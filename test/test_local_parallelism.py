@@ -635,7 +635,7 @@ def test_resolve_local_parallelism_args_auto_detects_gpus(monkeypatch):
     )
     monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP", "4")
     monkeypatch.setattr(
-        planning, "_detect_num_cuda_devices_no_torch", lambda: 4)
+        planning, "detect_num_cuda_devices_no_torch", lambda: 4)
     args = Namespace(
         max_workers_per_gpu="auto",
         num_jobs="auto",
@@ -681,7 +681,7 @@ def test_resolve_local_parallelism_args_detects_gpus_before_explicit_jobs(
     )
     monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP", "4")
     monkeypatch.setattr(
-        planning, "_detect_num_cuda_devices_no_torch", lambda: 8)
+        planning, "detect_num_cuda_devices_no_torch", lambda: 8)
     args = Namespace(
         max_workers_per_gpu="auto",
         num_jobs=16,
@@ -699,7 +699,7 @@ def test_worker_pool_from_args_preserves_serial_mode_with_auto_gpus(
     """Explicit ``--num-jobs 0`` must not become invalid after GPU detect."""
     monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
     monkeypatch.setattr(
-        planning, "_detect_num_cuda_devices_no_torch", lambda: 2)
+        planning, "detect_num_cuda_devices_no_torch", lambda: 2)
     configured = []
     monkeypatch.setattr(
         worker_pool_module, "configure_pytorch",
@@ -751,7 +751,7 @@ def test_resolve_local_parallelism_args_skips_auto_detect_with_explicit_gpus(
         monkeypatch):
     """An explicit --gpus value isn't overridden by auto-detect."""
     monkeypatch.setattr(
-        planning, "_detect_num_cuda_devices_no_torch",
+        planning, "detect_num_cuda_devices_no_torch",
         lambda: 8)  # would lie if called
     args = Namespace(
         max_workers_per_gpu="auto",
@@ -769,7 +769,7 @@ def test_resolve_local_parallelism_args_no_auto_detect_for_cpu_backend(
     """backend=cpu must not auto-detect GPUs (we don't want CUDA-pinned
     workers when the user explicitly asked for CPU inference)."""
     monkeypatch.setattr(
-        planning, "_detect_num_cuda_devices_no_torch",
+        planning, "detect_num_cuda_devices_no_torch",
         lambda: 8)
     args = Namespace(
         max_workers_per_gpu="auto",
@@ -789,7 +789,7 @@ def test_detect_num_cuda_devices_uses_empty_cuda_visible_devices(monkeypatch):
 
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
     monkeypatch.setattr(planning.subprocess, "check_output", boom)
-    assert planning._detect_num_cuda_devices_no_torch() == 0
+    assert planning.detect_num_cuda_devices_no_torch() == 0
 
 
 def test_free_vram_from_nvidia_smi_uses_cuda_visible_devices(monkeypatch):
@@ -803,7 +803,7 @@ def test_free_vram_from_nvidia_smi_uses_cuda_visible_devices(monkeypatch):
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "2,3")
     monkeypatch.setattr(
         planning.subprocess, "check_output", fake_check_output)
-    assert planning._free_vram_from_nvidia_smi_gb(2) == 1.0
+    assert planning.free_vram_from_nvidia_smi_gb(2) == 1.0
     assert calls == [[
         "nvidia-smi",
         "-i",
@@ -821,14 +821,14 @@ def test_detect_free_vram_per_gpu_preserves_heterogeneity(monkeypatch):
         planning.subprocess, "check_output",
         lambda args, **kw: b"8192\n71680\n")  # 8 GB, 70 GB
     assert planning.detect_free_vram_per_gpu_gb(2) == [8.0, 70.0]
-    assert planning._free_vram_from_nvidia_smi_gb(2) == 8.0
+    assert planning.free_vram_from_nvidia_smi_gb(2) == 8.0
 
 
 def test_free_vram_env_override_single_value_broadcasts(monkeypatch):
     monkeypatch.setenv(
         "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "12")
-    assert planning._free_vram_per_gpu_override_gb(4) == [12.0] * 4
-    assert planning._free_vram_override_gb(4) == 12.0
+    assert planning.free_vram_per_gpu_override_gb(4) == [12.0] * 4
+    assert planning.free_vram_override_gb(4) == 12.0
 
 
 def test_capacity_warnings_flags_below_safe_range():
@@ -899,7 +899,7 @@ def test_detect_num_cuda_devices_parses_nvidia_smi_l(monkeypatch):
     )
     monkeypatch.setattr(
         planning.subprocess, "check_output", lambda *a, **kw: sample)
-    assert planning._detect_num_cuda_devices_no_torch() == 2
+    assert planning.detect_num_cuda_devices_no_torch() == 2
 
 
 def test_detect_num_cuda_devices_returns_zero_when_smi_missing(monkeypatch):
@@ -907,7 +907,7 @@ def test_detect_num_cuda_devices_returns_zero_when_smi_missing(monkeypatch):
     def boom(*a, **kw):
         raise OSError("nvidia-smi: not found")
     monkeypatch.setattr(planning.subprocess, "check_output", boom)
-    assert planning._detect_num_cuda_devices_no_torch() == 0
+    assert planning.detect_num_cuda_devices_no_torch() == 0
 
 
 @pytest.mark.slow

@@ -12,8 +12,12 @@
 
 """Compatibility wrapper for :mod:`mhcflurry.parallelism`."""
 
-import sys
-
 from . import parallelism as _parallelism
+from .parallelism import *  # noqa: F401,F403
 
-sys.modules[__name__] = _parallelism
+
+def __getattr__(name):
+    return getattr(_parallelism, name)
+
+
+__all__ = _parallelism.__all__

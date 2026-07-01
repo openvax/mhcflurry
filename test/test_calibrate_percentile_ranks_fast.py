@@ -27,6 +27,7 @@ import pytest
 
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry import common
+from mhcflurry.affinity import calibration_sizing
 from mhcflurry.common import positional_frequency_matrix, random_peptides
 from mhcflurry.class1_neural_network import cartesian_output_log_ic50_sum
 from mhcflurry.motif_summary import (
@@ -435,8 +436,8 @@ def test_check_training_batch_fits_shrinks_loudly_on_oom(caplog):
 
     from mhcflurry.pytorch_sizing import (
         check_training_batch_fits,
-        _TRAINING_PEAK_MULTIPLIER,
-        _estimate_peak_bytes_per_row,
+        TRAINING_PEAK_MULTIPLIER,
+        estimate_peak_bytes_per_row,
     )
 
     class FakeCUDA:
@@ -446,11 +447,11 @@ def test_check_training_batch_fits_shrinks_loudly_on_oom(caplog):
         def __str__(self):
             return "cuda:0"
 
-    # Swap out _free_device_memory_bytes for the duration of this test.
+    # Swap out free_device_memory_bytes for the duration of this test.
     from mhcflurry import pytorch_sizing
-    saved = pytorch_sizing._free_device_memory_bytes
+    saved = pytorch_sizing.free_device_memory_bytes
     try:
-        pytorch_sizing._free_device_memory_bytes = lambda device: 8 * (1 << 30)
+        pytorch_sizing.free_device_memory_bytes = lambda device: 8 * (1 << 30)
 
         class TinyModel:
             # Pretend peak row = 1 KB; 8 GB / 2 workers / 2 (0.5 fraction)
@@ -465,7 +466,7 @@ def test_check_training_batch_fits_shrinks_loudly_on_oom(caplog):
             dense_layers = [_Layer]
 
         model = TinyModel()
-        peak = _estimate_peak_bytes_per_row(model) * _TRAINING_PEAK_MULTIPLIER
+        peak = estimate_peak_bytes_per_row(model) * TRAINING_PEAK_MULTIPLIER
         assert peak > 0
         device = FakeCUDA()
 
@@ -491,7 +492,7 @@ def test_check_training_batch_fits_shrinks_loudly_on_oom(caplog):
         assert "TRAINING BATCH WILL NOT FIT" in joined
         assert "CHANGES TRAINING DYNAMICS" in joined
     finally:
-        pytorch_sizing._free_device_memory_bytes = saved
+        pytorch_sizing.free_device_memory_bytes = saved
 
 
 @pytest.mark.parametrize(
@@ -516,11 +517,11 @@ def test_fit_end_to_end_shrinks_minibatch_when_vram_too_small(
     from mhcflurry.common import random_peptides
 
     # Override accelerator free-memory to be tiny so the shrink fires.
-    saved_free = pytorch_sizing._free_device_memory_bytes
+    saved_free = pytorch_sizing.free_device_memory_bytes
     old_backend = common._pytorch_backend
     try:
         common.configure_pytorch(backend=backend)
-        pytorch_sizing._free_device_memory_bytes = lambda device: (
+        pytorch_sizing.free_device_memory_bytes = lambda device: (
             128 * (1 << 20) if device.type == device_type else saved_free(device)
         )
 
@@ -571,7 +572,7 @@ def test_fit_end_to_end_shrinks_minibatch_when_vram_too_small(
             "config would no longer reflect the user's configured value"
         )
     finally:
-        pytorch_sizing._free_device_memory_bytes = saved_free
+        pytorch_sizing.free_device_memory_bytes = saved_free
         common.configure_pytorch(backend=old_backend)
 
 
@@ -627,19 +628,19 @@ def test_compute_prediction_batch_size_scales_with_memory_and_workers():
     workers-per-GPU partition."""
     from mhcflurry.pytorch_sizing import (
         compute_prediction_batch_size,
-        _AUTO_BATCH_CPU_FALLBACK,
-        _AUTO_BATCH_MAX_ROWS,
-        _AUTO_BATCH_MIN_ROWS,
+        AUTO_BATCH_CPU_FALLBACK,
+        AUTO_BATCH_MAX_ROWS,
+        AUTO_BATCH_MIN_ROWS,
     )
 
     cpu = torch.device("cpu")
     # CPU short-circuit: fixed fallback regardless of workers / memory.
     # Large batches on CPU thrash L3 and don't help the small networks
     # mhcflurry trains.
-    assert compute_prediction_batch_size(cpu) == _AUTO_BATCH_CPU_FALLBACK
+    assert compute_prediction_batch_size(cpu) == AUTO_BATCH_CPU_FALLBACK
     assert compute_prediction_batch_size(
         cpu, num_workers_per_gpu=16,
-    ) == _AUTO_BATCH_CPU_FALLBACK
+    ) == AUTO_BATCH_CPU_FALLBACK
 
     # Model=None (fallback estimate) still produces a within-bounds
     # batch on MPS/CUDA if either is available locally.
@@ -650,8 +651,8 @@ def test_compute_prediction_batch_size_scales_with_memory_and_workers():
         )
         single = compute_prediction_batch_size(dev)
         shared = compute_prediction_batch_size(dev, num_workers_per_gpu=8)
-        assert _AUTO_BATCH_MIN_ROWS <= single <= _AUTO_BATCH_MAX_ROWS
-        assert _AUTO_BATCH_MIN_ROWS <= shared <= _AUTO_BATCH_MAX_ROWS
+        assert AUTO_BATCH_MIN_ROWS <= single <= AUTO_BATCH_MAX_ROWS
+        assert AUTO_BATCH_MIN_ROWS <= shared <= AUTO_BATCH_MAX_ROWS
         # Sharing the GPU with 8 workers partitions the budget — each
         # worker's batch is no larger than the unshared case. Equality
         # is allowed because the min_rows floor clamps both cases
@@ -694,12 +695,12 @@ def test_calibrate_auto_size_uses_reserved_headroom_not_cache_safety(monkeypatch
     monkeypatch.delenv(
         "MHCFLURRY_CALIBRATE_AUTO_FIXED_SAFETY_MULTIPLIER", raising=False)
     monkeypatch.setattr(
-        pytorch_sizing, "_free_device_memory_bytes",
+        pytorch_sizing, "free_device_memory_bytes",
         lambda device: int(28.63 * (1 << 30)),
     )
 
     peptide_batch, allele_batch = (
-        Class1AffinityPredictor._auto_size_calibration_batches(
+        calibration_sizing.auto_size_calibration_batches(
             Merged(),
             FakeCUDA(),
             n_peptides=50_000,
@@ -745,13 +746,13 @@ def test_calibrate_auto_size_still_floors_when_cache_does_not_fit(
         networks = [SubNet() for _ in range(8)]
 
     monkeypatch.setattr(
-        pytorch_sizing, "_free_device_memory_bytes",
+        pytorch_sizing, "free_device_memory_bytes",
         lambda device: int(16 * (1 << 30)),
     )
 
     with caplog.at_level(logging.WARNING, logger="root"):
         peptide_batch, allele_batch = (
-            Class1AffinityPredictor._auto_size_calibration_batches(
+            calibration_sizing.auto_size_calibration_batches(
                 Merged(),
                 FakeCUDA(),
                 n_peptides=50_000,
@@ -791,12 +792,12 @@ def test_calibrate_auto_size_honors_lower_fraction_budget(monkeypatch):
     monkeypatch.setenv("MHCFLURRY_CALIBRATE_AUTO_RESERVE_FRACTION", "0.10")
     monkeypatch.setenv("MHCFLURRY_CALIBRATE_AUTO_RESERVE_GB", "1.0")
     monkeypatch.setattr(
-        pytorch_sizing, "_free_device_memory_bytes",
+        pytorch_sizing, "free_device_memory_bytes",
         lambda device: int(40 * (1 << 30)),
     )
 
     low_fraction_batch = (
-        Class1AffinityPredictor._auto_size_calibration_batches(
+        calibration_sizing.auto_size_calibration_batches(
             Model(),
             FakeCUDA(),
             n_peptides=50_000,
@@ -810,7 +811,7 @@ def test_calibrate_auto_size_honors_lower_fraction_budget(monkeypatch):
 
     monkeypatch.setenv("MHCFLURRY_CALIBRATE_AUTO_FREE_MEMORY_FRACTION", "0.85")
     default_fraction_batch = (
-        Class1AffinityPredictor._auto_size_calibration_batches(
+        calibration_sizing.auto_size_calibration_batches(
             Model(),
             FakeCUDA(),
             n_peptides=50_000,
@@ -850,12 +851,12 @@ def test_calibrate_auto_size_honors_lower_reserved_headroom(monkeypatch):
     monkeypatch.setenv("MHCFLURRY_CALIBRATE_AUTO_FREE_MEMORY_FRACTION", "0.95")
     monkeypatch.setenv("MHCFLURRY_CALIBRATE_AUTO_RESERVE_GB", "20.0")
     monkeypatch.setattr(
-        pytorch_sizing, "_free_device_memory_bytes",
+        pytorch_sizing, "free_device_memory_bytes",
         lambda device: int(40 * (1 << 30)),
     )
 
     high_reserve_batch = (
-        Class1AffinityPredictor._auto_size_calibration_batches(
+        calibration_sizing.auto_size_calibration_batches(
             Model(),
             FakeCUDA(),
             n_peptides=50_000,
@@ -869,7 +870,7 @@ def test_calibrate_auto_size_honors_lower_reserved_headroom(monkeypatch):
 
     monkeypatch.setenv("MHCFLURRY_CALIBRATE_AUTO_RESERVE_GB", "1.0")
     low_reserve_batch = (
-        Class1AffinityPredictor._auto_size_calibration_batches(
+        calibration_sizing.auto_size_calibration_batches(
             Model(),
             FakeCUDA(),
             n_peptides=50_000,
@@ -917,13 +918,13 @@ def test_calibrate_auto_size_reused_cache_uses_current_free_memory(
         networks = [SubNet() for _ in range(9)]
 
     monkeypatch.setattr(
-        pytorch_sizing, "_free_device_memory_bytes",
+        pytorch_sizing, "free_device_memory_bytes",
         lambda device: int(18.79 * (1 << 30)),
     )
 
     with caplog.at_level(logging.WARNING, logger="root"):
         peptide_batch, allele_batch = (
-            Class1AffinityPredictor._auto_size_calibration_batches(
+            calibration_sizing.auto_size_calibration_batches(
                 Merged(),
                 FakeCUDA(),
                 n_peptides=400_000,
@@ -950,36 +951,24 @@ def test_peptide_sequences_fingerprint_distinguishes_middle_changes():
     boundary peptides matched. Reusing a stale peptide-stage cache in
     that case silently produced wrong PercentRankTransforms.
     """
-    from mhcflurry.class1_affinity_predictor import (
-        _peptide_sequences_fingerprint,
-    )
-
-    a = _peptide_sequences_fingerprint(["AAAA", "BBBB", "CCCC"])
-    b = _peptide_sequences_fingerprint(["AAAA", "XXXX", "CCCC"])
+    a = calibration_sizing.peptide_sequences_fingerprint(["AAAA", "BBBB", "CCCC"])
+    b = calibration_sizing.peptide_sequences_fingerprint(["AAAA", "XXXX", "CCCC"])
     assert a != b
 
 
 def test_peptide_sequences_fingerprint_length_prefix_prevents_concat_collision():
     """Length prefixing prevents the trivial concatenation collision."""
-    from mhcflurry.class1_affinity_predictor import (
-        _peptide_sequences_fingerprint,
-    )
-
     assert (
-        _peptide_sequences_fingerprint(["AB", "C"])
-        != _peptide_sequences_fingerprint(["A", "BC"])
+        calibration_sizing.peptide_sequences_fingerprint(["AB", "C"])
+        != calibration_sizing.peptide_sequences_fingerprint(["A", "BC"])
     )
 
 
 def test_peptide_sequences_fingerprint_order_sensitive():
     """Reordering the same peptides must change the fingerprint."""
-    from mhcflurry.class1_affinity_predictor import (
-        _peptide_sequences_fingerprint,
-    )
-
     assert (
-        _peptide_sequences_fingerprint(["A", "B"])
-        != _peptide_sequences_fingerprint(["B", "A"])
+        calibration_sizing.peptide_sequences_fingerprint(["A", "B"])
+        != calibration_sizing.peptide_sequences_fingerprint(["B", "A"])
     )
 
 
@@ -987,10 +976,10 @@ def test_calibration_stage_cache_signature_omits_build_batch_size():
     """The peptide-stage cache is independent of the fill chunk size."""
     encoded = EncodableSequences.create(["AAAA", "CCCC"])
     networks = [object()]
-    first = Class1AffinityPredictor._calibration_stage_cache_signature(
+    first = calibration_sizing.calibration_stage_cache_signature(
         encoded, networks, torch.device("cpu"),
     )
-    second = Class1AffinityPredictor._calibration_stage_cache_signature(
+    second = calibration_sizing.calibration_stage_cache_signature(
         encoded, networks, torch.device("cpu"),
     )
 
@@ -999,18 +988,13 @@ def test_calibration_stage_cache_signature_omits_build_batch_size():
 
 
 def test_calibration_fast_cache_state_lifecycle():
-    """``_calibration_fast_cache`` is lazy and ``clear`` releases it."""
-    from mhcflurry.class1_affinity_predictor import (
-        Class1AffinityPredictor,
-        _CalibrationFastCache,
-    )
-
+    """The fast-calibration cache is lazy and ``clear`` releases it."""
     predictor = Class1AffinityPredictor()
     assert getattr(predictor, "_calibration_fast_cache_state", None) is None
 
-    cache = predictor._calibration_fast_cache()
-    assert isinstance(cache, _CalibrationFastCache)
-    assert predictor._calibration_fast_cache() is cache  # idempotent
+    cache = calibration_sizing.calibration_fast_cache(predictor)
+    assert isinstance(cache, calibration_sizing.CalibrationFastCache)
+    assert calibration_sizing.calibration_fast_cache(predictor) is cache
 
     cache.cached_stages = ["sentinel"]
     cache.stage_signature = ("sig",)
@@ -1064,7 +1048,7 @@ def test_calibrate_fast_cache_signature_cleared_if_rebuild_fails():
         class1_pan_allele_models=[FailingNetwork()],
         allele_to_sequence={"A": "AAAAAAAA"},
     )
-    cache = predictor._calibration_fast_cache()
+    cache = calibration_sizing.calibration_fast_cache(predictor)
     cache.stage_signature = ("old-signature",)
     cache.cached_stages = ["old-cache"]
 

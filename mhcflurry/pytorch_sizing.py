@@ -16,10 +16,10 @@ import logging
 import os
 
 DEFAULT_PREDICT_BATCH_SIZE = "auto"
-_AUTO_BATCH_MAX_ROWS = 1_000_000  # cap past which kernel-launch savings flatten
-_AUTO_BATCH_MIN_ROWS = 1024  # floor: avoid pathologically tiny batches
-_AUTO_BATCH_CPU_FALLBACK = 32_768  # CPU: large batches thrash L3; stay modest
-_AUTO_BATCH_FREE_FRACTION = 0.5  # half of free VRAM is the working-set budget
+AUTO_BATCH_MAX_ROWS = 1_000_000  # cap past which kernel-launch savings flatten
+AUTO_BATCH_MIN_ROWS = 1024  # floor: avoid pathologically tiny batches
+AUTO_BATCH_CPU_FALLBACK = 32_768  # CPU: large batches thrash L3; stay modest
+AUTO_BATCH_FREE_FRACTION = 0.5  # half of free VRAM is the working-set budget
 _MPS_PSUTIL_WARNED = False  # one-shot warning if psutil is missing on MPS
 if os.environ.get("MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"):
     DEFAULT_PREDICT_BATCH_SIZE = int(os.environ["MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"])
@@ -28,7 +28,7 @@ if os.environ.get("MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"):
     )
 
 
-def _estimate_peak_bytes_per_row(model):
+def estimate_peak_bytes_per_row(model):
     """Worst-case peak activation bytes per sample during a forward.
 
     Walks the model's configured layers and returns the maximum hidden-
@@ -76,7 +76,7 @@ def _estimate_peak_bytes_per_row(model):
     if sub_networks is not None and not hasattr(model, "peptide_encoding_shape"):
         try:
             return int(sum(
-                _estimate_peak_bytes_per_row(net) for net in sub_networks
+                estimate_peak_bytes_per_row(net) for net in sub_networks
             ))
         except (AttributeError, TypeError) as exc:
             logging.warning(
@@ -118,7 +118,7 @@ def _estimate_peak_bytes_per_row(model):
     return int(peak * 4 * 2 * 4)  # fp32 × 2 buffers × 4x safety
 
 
-def _free_device_memory_bytes(device):
+def free_device_memory_bytes(device):
     """Best-effort free-memory query. Returns a conservative value when
     the device doesn't expose a direct free-memory API.
 
@@ -194,10 +194,10 @@ def compute_prediction_batch_size(
         device,
         model=None,
         num_workers_per_gpu=1,
-        free_memory_fraction=_AUTO_BATCH_FREE_FRACTION,
-        max_rows=_AUTO_BATCH_MAX_ROWS,
-        min_rows=_AUTO_BATCH_MIN_ROWS,
-        cpu_fallback=_AUTO_BATCH_CPU_FALLBACK):
+        free_memory_fraction=AUTO_BATCH_FREE_FRACTION,
+        max_rows=AUTO_BATCH_MAX_ROWS,
+        min_rows=AUTO_BATCH_MIN_ROWS,
+        cpu_fallback=AUTO_BATCH_CPU_FALLBACK):
     """Auto-size a prediction batch for ``device`` and ``model``.
 
     Divides free VRAM by the per-row peak activation estimate for the
@@ -210,8 +210,8 @@ def compute_prediction_batch_size(
     """
     if device.type == "cpu":
         return cpu_fallback
-    peak_bytes = _estimate_peak_bytes_per_row(model)
-    free = _free_device_memory_bytes(device)
+    peak_bytes = estimate_peak_bytes_per_row(model)
+    free = free_device_memory_bytes(device)
     workers = max(int(num_workers_per_gpu), 1)
     budget = int(free * float(free_memory_fraction) / workers)
     budget = max(budget, peak_bytes * min_rows)
@@ -219,7 +219,7 @@ def compute_prediction_batch_size(
     return int(max(min_rows, min(rows, max_rows)))
 
 
-def _env_workers_per_gpu(default=1):
+def env_workers_per_gpu(default=1):
     """Read the ``MHCFLURRY_MAX_WORKERS_PER_GPU`` env var.
 
     The local parallelism pool sets this in each training worker so
@@ -257,7 +257,7 @@ def resolve_prediction_batch_size(
 # plus gradients and optimizer state. RMSProp/Adam each store 1-2x weights in
 # moving averages on top, so 4x the inference peak is a conservative floor that
 # leaves headroom for cuDNN workspace and Python-side torch overhead.
-_TRAINING_PEAK_MULTIPLIER = 4
+TRAINING_PEAK_MULTIPLIER = 4
 
 
 def check_training_batch_fits(
@@ -272,7 +272,7 @@ def check_training_batch_fits(
 
     Training peak memory = activations kept alive across the forward
     pass (for backward), plus gradients, plus optimizer state. That's
-    roughly ``4 × _estimate_peak_bytes_per_row`` (inference peak).
+    roughly ``4 × estimate_peak_bytes_per_row`` (inference peak).
 
     Returns ``(effective_batch_size, shrunk: bool)``. When the
     requested batch is too large for the available VRAM — partitioned
@@ -288,8 +288,8 @@ def check_training_batch_fits(
     import sys
     if device.type == "cpu" or requested_batch_size <= min_batch:
         return int(requested_batch_size), False
-    peak_bytes = _estimate_peak_bytes_per_row(model) * _TRAINING_PEAK_MULTIPLIER
-    free = _free_device_memory_bytes(device)
+    peak_bytes = estimate_peak_bytes_per_row(model) * TRAINING_PEAK_MULTIPLIER
+    free = free_device_memory_bytes(device)
     workers = max(int(num_workers_per_gpu), 1)
     budget = int(free * float(free_memory_fraction) / workers)
     max_rows = max(budget // peak_bytes, min_batch)

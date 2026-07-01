@@ -107,11 +107,11 @@ def write_tiny_affinity_data(filename):
 
 
 def run_command(command_module, args):
-    command_module.GLOBAL_DATA.clear()
+    command_module.WORKER_CONTEXT.clear()
     try:
         command_module.run(args)
     finally:
-        command_module.GLOBAL_DATA.clear()
+        command_module.WORKER_CONTEXT.clear()
 
 
 def test_train_calibrate_and_select_commands():

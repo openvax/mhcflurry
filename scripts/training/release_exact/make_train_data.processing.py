@@ -51,7 +51,7 @@ from mhcflurry.cluster_parallelism import (
 # stored here before creating the thread pool will be inherited to the child
 # processes upon fork() call, allowing local workers to read the same
 # copy-on-write pages instead of receiving a pickled copy.
-GLOBAL_DATA = {}
+WORKER_CONTEXT = {}
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -124,7 +124,7 @@ def do_process_samples(samples, constant_data=None):
     ]
 
     if constant_data is None:
-        constant_data = GLOBAL_DATA
+        constant_data = WORKER_CONTEXT
 
     args = constant_data['args']
     lengths = constant_data['lengths']
@@ -315,13 +315,13 @@ def run():
 
     print("Selecting decoys.")
 
-    GLOBAL_DATA['args'] = args
-    GLOBAL_DATA['lengths'] = [8, 9, 10, 11]
-    GLOBAL_DATA['all_peptides_by_length'] = all_peptides_by_length
-    GLOBAL_DATA['proteome_sequences'] = proteome_sequences
-    GLOBAL_DATA['flanking_length'] = flanking_length
-    GLOBAL_DATA['sample_table'] = sample_table
-    GLOBAL_DATA['hit_df'] = hit_df
+    WORKER_CONTEXT['args'] = args
+    WORKER_CONTEXT['lengths'] = [8, 9, 10, 11]
+    WORKER_CONTEXT['all_peptides_by_length'] = all_peptides_by_length
+    WORKER_CONTEXT['proteome_sequences'] = proteome_sequences
+    WORKER_CONTEXT['flanking_length'] = flanking_length
+    WORKER_CONTEXT['sample_table'] = sample_table
+    WORKER_CONTEXT['hit_df'] = hit_df
 
     worker_pool = None
     start = time.time()
@@ -341,7 +341,7 @@ def run():
             args,
             work_function=do_process_samples,
             work_items=tasks,
-            constant_data=GLOBAL_DATA,
+            constant_data=WORKER_CONTEXT,
             input_serialization_method="dill",
             result_serialization_method="pickle",
             clear_constant_data=False)
@@ -351,7 +351,7 @@ def run():
         assert worker_pool is not None
         attach_constant_data_to_work_items_if_needed(
             tasks,
-            GLOBAL_DATA,
+            WORKER_CONTEXT,
             worker_pool,
         )
         results = worker_pool.imap_unordered(

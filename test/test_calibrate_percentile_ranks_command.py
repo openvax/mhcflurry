@@ -175,7 +175,7 @@ def test_percent_rank_status_helpers_count_sequence_equivalent_calibration():
 
 def test_list_percent_rank_status_stdout_starts_with_csv_header(
         monkeypatch, tmp_path, capsys):
-    from mhcflurry import calibrate_percentile_ranks_command as mod
+    import mhcflurry.cli.calibrate_percentile_ranks_command as mod
 
     def fake_status(args):
         print("allele,normalized_allele")

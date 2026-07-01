@@ -55,9 +55,6 @@ DEFAULT_CENTRALITY_MEASURE = "mean"
 # Any value > 0 will result in attempting to optimize models after loading.
 OPTIMIZATION_LEVEL = int(environ.get("MHCFLURRY_OPTIMIZATION_LEVEL", 1))
 
-_peptide_sequences_fingerprint = calibration_sizing.peptide_sequences_fingerprint
-_CalibrationFastCache = calibration_sizing.CalibrationFastCache
-
 
 class Class1AffinityPredictor(object):
     """
@@ -1668,77 +1665,6 @@ class Class1AffinityPredictor(object):
             }
         return {}
 
-    @staticmethod
-    @staticmethod
-    def _auto_size_calibration_batches(
-            model, device, n_peptides, n_alleles,
-            num_workers_per_gpu=1,
-            free_memory_fraction=0.85,
-            num_cached_networks=1,
-            peptide_stage_dim=None,
-            num_sub_networks=None,
-            cuda_overhead_bytes=2 * (1 << 30),
-            safety_multiplier=1.3,
-            fixed_peptide_batch=None,
-            fixed_allele_batch=None):
-        return calibration_sizing.auto_size_calibration_batches(
-            model,
-            device,
-            n_peptides,
-            n_alleles,
-            num_workers_per_gpu=num_workers_per_gpu,
-            free_memory_fraction=free_memory_fraction,
-            num_cached_networks=num_cached_networks,
-            peptide_stage_dim=peptide_stage_dim,
-            num_sub_networks=num_sub_networks,
-            cuda_overhead_bytes=cuda_overhead_bytes,
-            safety_multiplier=safety_multiplier,
-            fixed_peptide_batch=fixed_peptide_batch,
-            fixed_allele_batch=fixed_allele_batch,
-        )
-
-    @staticmethod
-    def _estimate_calibration_peak_bytes_per_row(model):
-        return calibration_sizing.estimate_calibration_peak_bytes_per_row(model)
-
-    @staticmethod
-    def _choose_calibration_batch_shape(
-            total_rows,
-            n_peptides,
-            n_alleles,
-            min_peptide_batch,
-            max_allele_batch=256,
-            fixed_peptide_batch=None,
-            fixed_allele_batch=None):
-        return calibration_sizing.choose_calibration_batch_shape(
-            total_rows,
-            n_peptides=n_peptides,
-            n_alleles=n_alleles,
-            min_peptide_batch=min_peptide_batch,
-            max_allele_batch=max_allele_batch,
-            fixed_peptide_batch=fixed_peptide_batch,
-            fixed_allele_batch=fixed_allele_batch,
-        )
-
-    @staticmethod
-    def _calibration_stage_cache_signature(encoded_peptides, networks, device):
-        return calibration_sizing.calibration_stage_cache_signature(
-            encoded_peptides,
-            networks,
-            device,
-        )
-
-    @staticmethod
-    def _probe_peptide_stage_dim(net_obj, encoded_peptides, device):
-        return calibration_sizing.probe_peptide_stage_dim(
-            net_obj,
-            encoded_peptides,
-            device,
-        )
-
-    def _calibration_fast_cache(self):
-        return calibration_sizing.calibration_fast_cache(self)
-
     def clear_calibration_fast_cache(self):
         return calibration_sizing.clear_calibration_fast_cache(self)
 
@@ -1784,7 +1710,7 @@ class Class1AffinityPredictor(object):
         changes.
 
         Caching note: this method memoizes the peptide-stage activations on
-        the predictor instance across calls (see ``_calibration_fast_cache``).
+        the predictor instance across calls.
         That cache is keyed on network identity, not weight content, so do not
         mutate the predictor's network weights in place between calls on the
         same instance without first calling ``clear_calibration_fast_cache()``.
@@ -1891,7 +1817,7 @@ class Class1AffinityPredictor(object):
         # call inside the same worker process and re-builds
         # ``cached_stages`` from scratch even though the peptide universe
         # and the predictor are identical. Cache the built tensors on
-        # ``self._calibration_fast_cache`` and skip the rebuild whenever
+        # ``calibration_sizing.calibration_fast_cache`` and skip the rebuild whenever
         # the signature matches. ``forward_peptide_stage`` runs once per
         # peptide-batch per network, so for the production workload
         # (~400k peptides × many allele chunks/worker) each saved rebuild
@@ -1908,13 +1834,14 @@ class Class1AffinityPredictor(object):
         # Cache validity also assumes the predictor's network weights are not
         # mutated in place between calls on the same instance: the key tracks
         # network *identity*, not weight content (see
-        # ``_calibration_stage_cache_signature`` for why a content fingerprint
-        # is unreliable here), so a caller that re-fits a network in place must
+        # ``calibration_sizing.calibration_stage_cache_signature`` for why a
+        # content fingerprint is unreliable here), so a caller that re-fits a
+        # network in place must
         # call ``clear_calibration_fast_cache()`` to avoid reusing stale
         # stages. Adding/removing/replacing whole models is already safe (new
         # network objects -> new ids -> cache miss).
-        cache = self._calibration_fast_cache()
-        cache_signature = self._calibration_stage_cache_signature(
+        cache = calibration_sizing.calibration_fast_cache(self)
+        cache_signature = calibration_sizing.calibration_stage_cache_signature(
             encoded_peptides, networks, device,
         )
         cache_hit = (
@@ -1931,7 +1858,7 @@ class Class1AffinityPredictor(object):
             probe_net.to(device)
             # Probe the *actual* peptide_stage output dim so the cache
             # estimate doesn't fall back to the encoding-shape floor.
-            probed_stage_dim = self._probe_peptide_stage_dim(
+            probed_stage_dim = calibration_sizing.probe_peptide_stage_dim(
                 probe_net_obj, encoded_peptides, device,
             )
             sub_networks = getattr(probe_net, "networks", None)
@@ -1947,7 +1874,7 @@ class Class1AffinityPredictor(object):
             pinned_allele = (
                 None if allele_batch_size in (None, "auto")
                 else int(allele_batch_size))
-            auto_peptide, auto_allele = self._auto_size_calibration_batches(
+            auto_peptide, auto_allele = calibration_sizing.auto_size_calibration_batches(
                 probe_net, device, n_peptides, len(alleles),
                 num_workers_per_gpu=num_workers_per_gpu,
                 # If the peptide-stage cache is already resident in this

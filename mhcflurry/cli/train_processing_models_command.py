@@ -16,10 +16,8 @@ Train Class1 processing models.
 import argparse
 import os
 from os.path import join
-import signal
 import sys
 import time
-import traceback
 import random
 import pprint
 import hashlib
@@ -35,14 +33,15 @@ import tqdm  # progress bar
 from ..class1_processing_predictor import Class1ProcessingPredictor
 from ..class1_processing_neural_network import Class1ProcessingNeuralNetwork
 from ..pytorch_sizing import (
-    _TRAINING_PEAK_MULTIPLIER,
-    _estimate_peak_bytes_per_row,
+    TRAINING_PEAK_MULTIPLIER,
+    estimate_peak_bytes_per_row,
 )
 from ..common import (
     add_random_seed_arg,
     configure_random_seed,
     configure_logging,
     derive_seed,
+    install_sigusr1_stack_trace_handler,
     write_generate_sh,
 )
 from ..parallelism import (
@@ -67,7 +66,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # stored here before creating the thread pool will be inherited to the child
 # processes upon fork() call, allowing local workers to read the same
 # copy-on-write pages instead of receiving a pickled copy.
-GLOBAL_DATA = {}
+WORKER_CONTEXT = {}
 
 _PROCESSING_WORKER_RUNTIME_FLOOR_GB = 2.0
 _PROCESSING_WORKER_SAFETY_FACTOR = 1.3
@@ -192,9 +191,7 @@ def assign_folds(df, num_folds, held_out_samples, seed=None):
 
 
 def run(argv=sys.argv[1:]):
-    # On sigusr1 print stack trace
-    print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
-    signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
+    install_sigusr1_stack_trace_handler()
 
     args = parser.parse_args(argv)
 
@@ -278,7 +275,7 @@ def estimate_processing_worker_gb(args):
             )
             max_forward_bytes_per_row = max(
                 max_forward_bytes_per_row,
-                _estimate_peak_bytes_per_row(network),
+                estimate_peak_bytes_per_row(network),
             )
             max_minibatch_size = max(
                 max_minibatch_size,
@@ -292,7 +289,7 @@ def estimate_processing_worker_gb(args):
         training_batch_bytes = (
             max_minibatch_size
             * max_forward_bytes_per_row
-            * _TRAINING_PEAK_MULTIPLIER
+            * TRAINING_PEAK_MULTIPLIER
         )
         runtime_bytes = int(_PROCESSING_WORKER_RUNTIME_FLOOR_GB * (1 << 30))
         estimate_gb = (
@@ -426,10 +423,10 @@ def train_models(args):
     print("Loaded predictor with %d networks" % len(predictor.models))
 
     with open(join(args.out_models_dir, "training_init_info.pkl"), "rb") as fd:
-        GLOBAL_DATA.update(pickle.load(fd))
+        WORKER_CONTEXT.update(pickle.load(fd))
     print("Loaded training init info.")
 
-    all_work_items = GLOBAL_DATA["work_items"]
+    all_work_items = WORKER_CONTEXT["work_items"]
     complete_work_item_names = [
         network.fit_info[-1]["training_info"]["work_item_name"]
         for network in predictor.models
@@ -448,7 +445,7 @@ def train_models(args):
     # order is reproducible (per-fit results don't depend on order — each
     # fit reseeds from its own work-item seed — but this keeps the whole
     # run deterministic).
-    master_seed = GLOBAL_DATA.get("seed")
+    master_seed = WORKER_CONTEXT.get("seed")
     random.Random(master_seed).shuffle(work_items)
     for (work_item_num, item) in enumerate(work_items):
         item['work_item_num'] = work_item_num
@@ -479,14 +476,14 @@ def train_models(args):
             args,
             work_function=train_model,
             work_items=work_items,
-            constant_data=GLOBAL_DATA,
+            constant_data=WORKER_CONTEXT,
             result_serialization_method="pickle")
     else:
         run_single_worker_torch_compile_warmup(
             args,
             work_items,
             train_model,
-            constant_data=GLOBAL_DATA,
+            constant_data=WORKER_CONTEXT,
         )
 
         worker_pool = worker_pool_with_gpu_assignments_from_args(args)
@@ -505,7 +502,7 @@ def train_models(args):
             # tears the pool down via the finally rather than leaking
             # non-daemon workers.
             attach_constant_data_to_work_items_if_needed(
-                work_items, GLOBAL_DATA, worker_pool
+                work_items, WORKER_CONTEXT, worker_pool
             )
             results_generator = worker_pool.imap_unordered(
                 partial(call_wrapped_kwargs, train_model),
@@ -620,7 +617,7 @@ def train_model(
         predictor,
         save_to,
         compile_warmup_only=False,
-        constant_data=GLOBAL_DATA):
+        constant_data=WORKER_CONTEXT):
 
     from sklearn.metrics import roc_auc_score
     from mhcflurry.flanking_encoding import FlankingEncoding

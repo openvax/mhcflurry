@@ -15,11 +15,9 @@ Simple, relatively naive parallel map implementation for HPC clusters.
 
 Used for training MHCflurry models.
 """
-import traceback
 import sys
 import os
 import time
-import signal
 import argparse
 import pickle
 import subprocess
@@ -31,6 +29,7 @@ from .parallelism import (
     configure_cluster_worker_torch_compile_threads,
 )
 from .class1_affinity_predictor import Class1AffinityPredictor
+from .common import install_sigusr1_stack_trace_handler
 
 
 def add_cluster_parallelism_args(parser):
@@ -396,9 +395,7 @@ def worker_entry_point(argv=sys.argv[1:]):
     ----------
     argv : list of string
     """
-    # On sigusr1 print stack trace
-    print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
-    signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
+    install_sigusr1_stack_trace_handler()
 
     args = parser.parse_args(argv)
 

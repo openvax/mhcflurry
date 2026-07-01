@@ -21,10 +21,8 @@ selected models across all folds.
 import argparse
 import os
 import re
-import signal
 import sys
 import time
-import traceback
 import hashlib
 from pprint import pprint
 
@@ -39,6 +37,7 @@ from ..allele_encoding import AlleleEncoding
 from ..common import (
     configure_logging,
     filter_canonicalizable_alleles,
+    install_sigusr1_stack_trace_handler,
     write_generate_sh,
 )
 from ..parallelism import (
@@ -63,7 +62,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # stored here before creating the thread pool will be inherited to the child
 # processes upon fork() call, allowing local workers to read the same
 # copy-on-write pages instead of receiving a pickled copy.
-GLOBAL_DATA = {}
+WORKER_CONTEXT = {}
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -155,9 +154,7 @@ def mse(
 
 
 def run(argv=sys.argv[1:]):
-    # On sigusr1 print stack trace
-    print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
-    signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
+    install_sigusr1_stack_trace_handler()
 
     args = parser.parse_args(argv)
 
@@ -265,8 +262,8 @@ def run(argv=sys.argv[1:]):
             'max_models': args.max_models_per_fold,
         })
 
-    GLOBAL_DATA["data"] = df
-    GLOBAL_DATA["input_predictor"] = input_predictor
+    WORKER_CONTEXT["data"] = df
+    WORKER_CONTEXT["input_predictor"] = input_predictor
 
     if not os.path.exists(args.out_models_dir):
         print("Attempting to create directory: %s" % args.out_models_dir)
@@ -292,7 +289,7 @@ def run(argv=sys.argv[1:]):
             args,
             work_function=model_select,
             work_items=work_items,
-            constant_data=GLOBAL_DATA,
+            constant_data=WORKER_CONTEXT,
             result_serialization_method="pickle")
     else:
         worker_pool = worker_pool_with_gpu_assignments_from_args(args)
@@ -303,7 +300,7 @@ def run(argv=sys.argv[1:]):
         assert not serial_run
 
         attach_constant_data_to_work_items_if_needed(
-            work_items, GLOBAL_DATA, worker_pool
+            work_items, WORKER_CONTEXT, worker_pool
         )
         # Parallel run
         results = worker_pool.imap_unordered(
@@ -350,14 +347,14 @@ def run(argv=sys.argv[1:]):
         args.out_models_dir))
 
 
-def do_model_select_task(item, constant_data=GLOBAL_DATA):
+def do_model_select_task(item, constant_data=WORKER_CONTEXT):
     if 'constant_data' in item:
         constant_data = item.pop('constant_data')
     return model_select(constant_data=constant_data, **item)
 
 
 def model_select(
-        fold_num, models, min_models, max_models, constant_data=GLOBAL_DATA):
+        fold_num, models, min_models, max_models, constant_data=WORKER_CONTEXT):
     """
     Model select for a fold.
 

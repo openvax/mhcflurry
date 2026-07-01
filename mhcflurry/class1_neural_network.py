@@ -63,7 +63,7 @@ from .class1_training import (
     _timing_enabled,
     _timing_start,
     _timing_stop,
-    _torch_from_numpy,
+    torch_from_numpy,
     _update_min_validation_loss,
     _validation_interval_from_hyperparameters,
 )
@@ -78,9 +78,9 @@ from .pytorch_training import (
 
 
 DEFAULT_PREDICT_BATCH_SIZE = pytorch_sizing.DEFAULT_PREDICT_BATCH_SIZE
-_env_workers_per_gpu = pytorch_sizing._env_workers_per_gpu
 check_training_batch_fits = pytorch_sizing.check_training_batch_fits
 compute_prediction_batch_size = pytorch_sizing.compute_prediction_batch_size
+env_workers_per_gpu = pytorch_sizing.env_workers_per_gpu
 resolve_prediction_batch_size = pytorch_sizing.resolve_prediction_batch_size
 
 KERAS_BATCH_NORM_EPSILON = 1e-3
@@ -2517,16 +2517,16 @@ class Class1NeuralNetwork(object):
             _val_peptide_np.ndim == 2
             and numpy.issubdtype(_val_peptide_np.dtype, numpy.integer)
         ):
-            val_peptide_device = _torch_from_numpy(_val_peptide_np).to(device)
+            val_peptide_device = torch_from_numpy(_val_peptide_np).to(device)
         else:
-            val_peptide_device = _torch_from_numpy(
+            val_peptide_device = torch_from_numpy(
                 _val_peptide_np).to(device).float()
         val_allele_device = None
         if "allele" in validation_x_dict:
-            val_allele_device = _torch_from_numpy(
+            val_allele_device = torch_from_numpy(
                 validation_x_dict["allele"]
             ).to(device).float()
-        val_y_device = _torch_from_numpy(
+        val_y_device = torch_from_numpy(
             output.astype(numpy.float32)).to(device)
 
         # Streaming-pretrain batches stay as numpy arrays until the parent
@@ -3195,7 +3195,7 @@ class Class1NeuralNetwork(object):
             _requested_minibatch,
             device,
             network,
-            num_workers_per_gpu=_env_workers_per_gpu(1),
+            num_workers_per_gpu=env_workers_per_gpu(1),
         )
         if _shrunk:
             fit_info["minibatch_size_shrunk_from"] = _requested_minibatch
@@ -3341,21 +3341,21 @@ class Class1NeuralNetwork(object):
                 _val_peptide_np.ndim == 2
                 and numpy.issubdtype(_val_peptide_np.dtype, numpy.integer)
             ):
-                _val_peptide_device = _torch_from_numpy(_val_peptide_np).to(device)
+                _val_peptide_device = torch_from_numpy(_val_peptide_np).to(device)
             else:
-                _val_peptide_device = _torch_from_numpy(
+                _val_peptide_device = torch_from_numpy(
                     _val_peptide_np).float().to(device)
-            _val_y_device = _torch_from_numpy(
+            _val_y_device = torch_from_numpy(
                 y_encoded[val_indices].astype(numpy.float32)
             ).to(device)
             _val_allele_device = None
             if "allele" in x_dict_without_random_negatives:
-                _val_allele_device = _torch_from_numpy(
+                _val_allele_device = torch_from_numpy(
                     x_dict_without_random_negatives["allele"][val_training_indices]
                 ).float().to(device)
             _val_weights_device = None
             if sample_weights_with_negatives is not None:
-                _val_weights_device = _torch_from_numpy(
+                _val_weights_device = torch_from_numpy(
                     sample_weights_with_negatives[val_indices]
                 ).float().to(device)
             _val_device_tensors = (
@@ -3786,7 +3786,7 @@ class Class1NeuralNetwork(object):
             the same CUDA device, pass the worker count so the auto-
             sizer partitions the VRAM budget. Ignored for explicit int
             batch_size. When not passed, falls back to
-            ``_env_workers_per_gpu(1)`` (the ``MHCFLURRY_MAX_WORKERS_PER_GPU``
+            ``env_workers_per_gpu(1)`` (the ``MHCFLURRY_MAX_WORKERS_PER_GPU``
             env var the worker pool sets), mirroring ``fit()``.
 
         Returns
@@ -3794,7 +3794,7 @@ class Class1NeuralNetwork(object):
         numpy.array of nM affinity predictions
         """
         if num_workers_per_gpu is None:
-            num_workers_per_gpu = _env_workers_per_gpu(1)
+            num_workers_per_gpu = env_workers_per_gpu(1)
 
         assert self.prediction_cache is not None
         use_cache = allele_encoding is None and isinstance(peptides, EncodableSequences)

@@ -21,10 +21,8 @@ selected models across all folds. AUC is used as the metric.
 import argparse
 import os
 import re
-import signal
 import sys
 import time
-import traceback
 import hashlib
 from pprint import pprint
 
@@ -36,7 +34,11 @@ import tqdm  # progress bar
 
 from ..class1_processing_predictor import Class1ProcessingPredictor
 from ..flanking_encoding import FlankingEncoding
-from ..common import configure_logging, write_generate_sh
+from ..common import (
+    configure_logging,
+    install_sigusr1_stack_trace_handler,
+    write_generate_sh,
+)
 from ..parallelism import (
     resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
@@ -57,7 +59,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # stored here before creating the thread pool will be inherited to the child
 # processes upon fork() call, allowing local workers to read the same
 # copy-on-write pages instead of receiving a pickled copy.
-GLOBAL_DATA = {}
+WORKER_CONTEXT = {}
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -103,9 +105,7 @@ add_cluster_parallelism_args(parser)
 
 
 def run(argv=sys.argv[1:]):
-    # On sigusr1 print stack trace
-    print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
-    signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
+    install_sigusr1_stack_trace_handler()
 
     args = parser.parse_args(argv)
 
@@ -170,8 +170,8 @@ def run(argv=sys.argv[1:]):
             'max_models': args.max_models_per_fold,
         })
 
-    GLOBAL_DATA["data"] = df
-    GLOBAL_DATA["input_predictor"] = input_predictor
+    WORKER_CONTEXT["data"] = df
+    WORKER_CONTEXT["input_predictor"] = input_predictor
 
     if not os.path.exists(args.out_models_dir):
         print("Attempting to create directory: %s" % args.out_models_dir)
@@ -196,7 +196,7 @@ def run(argv=sys.argv[1:]):
             args,
             work_function=model_select,
             work_items=work_items,
-            constant_data=GLOBAL_DATA,
+            constant_data=WORKER_CONTEXT,
             result_serialization_method="pickle")
     else:
         worker_pool = worker_pool_with_gpu_assignments_from_args(args)
@@ -251,12 +251,12 @@ def run(argv=sys.argv[1:]):
         len(result_predictor.models), args.out_models_dir))
 
 
-def do_model_select_task(item, constant_data=GLOBAL_DATA):
+def do_model_select_task(item, constant_data=WORKER_CONTEXT):
     return model_select(constant_data=constant_data, **item)
 
 
 def model_select(
-        fold_num, models, min_models, max_models, constant_data=GLOBAL_DATA):
+        fold_num, models, min_models, max_models, constant_data=WORKER_CONTEXT):
     """
     Model select for a fold.
 

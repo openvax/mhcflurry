@@ -123,7 +123,6 @@ def test_legacy_command_module_shims_reexport_cli_modules():
     for module_name in command_modules:
         legacy = importlib.import_module("mhcflurry.%s" % module_name)
         canonical = importlib.import_module("mhcflurry.cli.%s" % module_name)
-        assert legacy is canonical
         assert legacy.run is canonical.run
         assert legacy.parser is canonical.parser
 

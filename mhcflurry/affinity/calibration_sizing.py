@@ -14,7 +14,6 @@
 
 import hashlib
 import logging
-from os import environ
 
 import numpy
 
@@ -109,38 +108,34 @@ def auto_size_calibration_batches(
     Returns the chosen ``(peptide_batch, allele_batch)``.
     """
     from ..pytorch_sizing import (
+        AUTO_BATCH_MAX_ROWS,
+        AUTO_BATCH_MIN_ROWS,
         compute_prediction_batch_size,
-        _free_device_memory_bytes,
-        _AUTO_BATCH_MAX_ROWS,
-        _AUTO_BATCH_MIN_ROWS,
+        free_device_memory_bytes,
     )
     import torch
-
-    def env_float(name, default):
-        try:
-            return float(environ.get(name, default))
-        except (TypeError, ValueError):
-            logging.warning(
-                "Ignoring invalid %s=%r; using %s",
-                name, environ.get(name), default,
-            )
-            return float(default)
+    from ..workload_planning import env_float
 
     if n_peptides == 0 or n_alleles == 0:
         return max(n_peptides, 1), max(n_alleles, 1)
     free_memory_fraction = env_float(
         "MHCFLURRY_CALIBRATE_AUTO_FREE_MEMORY_FRACTION",
         free_memory_fraction,
+        bounds=(0.0, 1.0),
     )
     reserve_fraction = env_float(
-        "MHCFLURRY_CALIBRATE_AUTO_RESERVE_FRACTION", 0.10)
+        "MHCFLURRY_CALIBRATE_AUTO_RESERVE_FRACTION", 0.10,
+        bounds=(0.0, 1.0))
     reserve_min_bytes = int(
-        env_float("MHCFLURRY_CALIBRATE_AUTO_RESERVE_GB", 2.0)
+        env_float(
+            "MHCFLURRY_CALIBRATE_AUTO_RESERVE_GB", 2.0,
+            bounds=(0.0, None))
         * (1 << 30)
     )
     fixed_safety_multiplier = env_float(
         "MHCFLURRY_CALIBRATE_AUTO_FIXED_SAFETY_MULTIPLIER",
         safety_multiplier,
+        bounds=(0.0, None),
     )
     if device.type != "cuda":
         total_rows = compute_prediction_batch_size(
@@ -151,7 +146,7 @@ def auto_size_calibration_batches(
         )
     else:
         workers = max(int(num_workers_per_gpu), 1)
-        free = _free_device_memory_bytes(device)
+        free = free_device_memory_bytes(device)
         total_memory = free
         try:
             props = torch.cuda.get_device_properties(device)
@@ -254,7 +249,7 @@ def auto_size_calibration_batches(
             guarded_fixed_overhead / 1e9,
             forward_budget / 1e9, peak_bytes, peak_bytes / 1024,
         )
-        if forward_budget < peak_bytes * _AUTO_BATCH_MIN_ROWS:
+        if forward_budget < peak_bytes * AUTO_BATCH_MIN_ROWS:
             logging.warning(
                 "calibrate auto-sizer: fixed overhead "
                 "(cache %.2f GB + scratch/state %.2f GB × safety %.2fx) "
@@ -271,16 +266,16 @@ def auto_size_calibration_batches(
                 reserve_bytes / 1e9,
                 workers,
             )
-            forward_budget = peak_bytes * _AUTO_BATCH_MIN_ROWS
+            forward_budget = peak_bytes * AUTO_BATCH_MIN_ROWS
         total_rows = max(
-            _AUTO_BATCH_MIN_ROWS,
-            min(forward_budget // peak_bytes, _AUTO_BATCH_MAX_ROWS),
+            AUTO_BATCH_MIN_ROWS,
+            min(forward_budget // peak_bytes, AUTO_BATCH_MAX_ROWS),
         )
     return choose_calibration_batch_shape(
         total_rows,
         n_peptides=n_peptides,
         n_alleles=n_alleles,
-        min_peptide_batch=max(_AUTO_BATCH_MIN_ROWS, 2_000),
+        min_peptide_batch=max(AUTO_BATCH_MIN_ROWS, 2_000),
         fixed_peptide_batch=fixed_peptide_batch,
         fixed_allele_batch=fixed_allele_batch,
     )
@@ -295,22 +290,22 @@ def estimate_calibration_peak_bytes_per_row(model):
     before combining them. Hidden-layer peak memory is therefore the max
     sub-network peak, not the sum of every sub-network peak.
     """
-    from ..pytorch_sizing import _estimate_peak_bytes_per_row
+    from ..pytorch_sizing import estimate_peak_bytes_per_row
 
     if model is None:
-        return _estimate_peak_bytes_per_row(model)
+        return estimate_peak_bytes_per_row(model)
 
     sub_networks = getattr(model, "networks", None)
     if sub_networks is None or hasattr(model, "peptide_encoding_shape"):
-        return _estimate_peak_bytes_per_row(model)
+        return estimate_peak_bytes_per_row(model)
 
     try:
         sub_peaks = [
-            _estimate_peak_bytes_per_row(net)
+            estimate_peak_bytes_per_row(net)
             for net in sub_networks
         ]
         if not sub_peaks:
-            return _estimate_peak_bytes_per_row(model)
+            return estimate_peak_bytes_per_row(model)
         output_channels = 0
         for net in sub_networks:
             output_layer = getattr(net, "output_layer", None)
@@ -325,7 +320,7 @@ def estimate_calibration_peak_bytes_per_row(model):
             "falling back to generic estimator: %s",
             exc,
         )
-        return _estimate_peak_bytes_per_row(model)
+        return estimate_peak_bytes_per_row(model)
 
 def choose_calibration_batch_shape(
         total_rows,
@@ -438,7 +433,7 @@ def probe_peptide_stage_dim(net_obj, encoded_peptides, device):
     to the heuristic.
     """
     import torch
-    from .encodable_sequences import EncodableSequences
+    from ..encodable_sequences import EncodableSequences
     try:
         seqs = list(encoded_peptides.sequences)
         if not seqs:
@@ -461,7 +456,7 @@ def probe_peptide_stage_dim(net_obj, encoded_peptides, device):
         with torch.no_grad():
             stage = model.forward_peptide_stage(probe_tensor)
         return int(stage.shape[-1])
-    except Exception as exc:
+    except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
         logging.warning(
             "calibrate auto-sizer: peptide_stage_dim probe failed "
             "(%s); falling back to encoding-shape heuristic", exc,
