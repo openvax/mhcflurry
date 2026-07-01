@@ -12,6 +12,7 @@
 
 """Calibration sizing and cache helpers for class I affinity predictors."""
 
+import collections
 import hashlib
 import logging
 
@@ -101,6 +102,207 @@ def resolve_peptide_feature_dim(model, peptide_feature_dim, peak_bytes):
     return int(peak_bytes // 32) if peak_bytes else 1024
 
 
+CalibrationSizingEnv = collections.namedtuple(
+    "CalibrationSizingEnv",
+    [
+        "free_memory_fraction",
+        "reserve_fraction",
+        "reserve_min_bytes",
+        "fixed_safety_multiplier",
+    ],
+)
+
+
+def read_calibration_sizing_env(free_memory_fraction, safety_multiplier):
+    """Resolve the ``MHCFLURRY_CALIBRATE_AUTO_*`` overrides for the sizer.
+
+    ``free_memory_fraction`` and ``safety_multiplier`` are the caller
+    defaults used when the matching env var is unset. Invalid or
+    out-of-range values raise ``ValueError`` (via ``env_float``) rather than
+    being silently ignored. Returns a ``CalibrationSizingEnv``.
+    """
+    from ..workload_planning import env_float
+
+    return CalibrationSizingEnv(
+        free_memory_fraction=env_float(
+            "MHCFLURRY_CALIBRATE_AUTO_FREE_MEMORY_FRACTION",
+            free_memory_fraction,
+            bounds=(0.0, 1.0),
+        ),
+        reserve_fraction=env_float(
+            "MHCFLURRY_CALIBRATE_AUTO_RESERVE_FRACTION", 0.10,
+            bounds=(0.0, 1.0)),
+        reserve_min_bytes=int(
+            env_float(
+                "MHCFLURRY_CALIBRATE_AUTO_RESERVE_GB", 2.0,
+                bounds=(0.0, None))
+            * (1 << 30)
+        ),
+        fixed_safety_multiplier=env_float(
+            "MHCFLURRY_CALIBRATE_AUTO_FIXED_SAFETY_MULTIPLIER",
+            safety_multiplier,
+            bounds=(0.0, None),
+        ),
+    )
+
+
+def cuda_device_memory_bytes(device):
+    """Return best-effort ``(free_bytes, total_bytes)`` for a CUDA device.
+
+    ``free`` comes from the shared ``free_device_memory_bytes`` probe.
+    ``total`` uses ``torch.cuda.get_device_properties`` when available and
+    otherwise falls back to ``free`` -- tests and nonstandard CUDA wrappers
+    may not expose device properties, and the explicit reserve still keeps
+    the budget bounded.
+    """
+    import torch
+
+    from ..pytorch_sizing import free_device_memory_bytes
+
+    free = free_device_memory_bytes(device)
+    total_memory = free
+    try:
+        props = torch.cuda.get_device_properties(device)
+        total_memory = int(props.total_memory)
+    except (
+            AssertionError, AttributeError, RuntimeError,
+            TypeError, ValueError):
+        pass
+    return free, total_memory
+
+
+def cuda_calibration_total_rows(
+        model, device, n_peptides,
+        num_workers_per_gpu,
+        env,
+        num_cached_networks,
+        peptide_feature_dim,
+        num_sub_networks,
+        cuda_overhead_bytes):
+    """Size the cartesian forward row budget on a CUDA device.
+
+    Carves a per-worker VRAM budget out of free memory, subtracts the fixed
+    overhead (the persistent peptide-feature cache plus safety-padded
+    CUDA/runtime scratch and small state), and converts the remaining
+    forward budget into a row count. ``env`` is a ``CalibrationSizingEnv``
+    from ``read_calibration_sizing_env``; see ``auto_size_calibration_batches``
+    for the full peak model. Returns the row budget for
+    ``choose_calibration_batch_shape``.
+    """
+    from ..pytorch_sizing import AUTO_BATCH_MAX_ROWS, AUTO_BATCH_MIN_ROWS
+
+    free_memory_fraction = env.free_memory_fraction
+    reserve_fraction = env.reserve_fraction
+    reserve_min_bytes = env.reserve_min_bytes
+    fixed_safety_multiplier = env.fixed_safety_multiplier
+
+    workers = max(int(num_workers_per_gpu), 1)
+    free, total_memory = cuda_device_memory_bytes(device)
+    peak_bytes = estimate_calibration_peak_bytes_per_row(model)
+    reserve_bytes = max(
+        reserve_min_bytes,
+        int(total_memory * reserve_fraction),
+    )
+    fraction_budget = int(
+        free * float(free_memory_fraction) / workers)
+    reserved_headroom_budget = int(
+        max(free - reserve_bytes, 0) / workers)
+    per_worker_budget = min(fraction_budget, reserved_headroom_budget)
+    sub_networks = getattr(model, "networks", None)
+    if num_sub_networks is None:
+        num_sub_networks = (
+            len(sub_networks) if sub_networks is not None else 1
+        )
+    peptide_feature_dim = resolve_peptide_feature_dim(
+        model,
+        peptide_feature_dim,
+        peak_bytes,
+    )
+    cache_bytes = (
+        int(num_cached_networks)
+        * int(n_peptides)
+        * int(peptide_feature_dim)
+        * 4
+    )
+    # Small-state pad: log-IC50 accumulator, ic50_unique view,
+    # motif-summary state, PercentRankTransform.fit_batch_torch
+    # buffers, allele_idx tensor, etc. Scales with a_size and
+    # n_peptides; a 1 GB constant covers the production ranges
+    # without further accounting. Cheap insurance vs OOM.
+    small_state_bytes = 1 * (1 << 30)
+    # The peptide-stage cache estimate is shape-derived and
+    # persistent, so multiplying it by a fragmentation safety factor
+    # unnecessarily strands several GB on A100-40GB. Keep explicit
+    # global headroom, and safety-pad only CUDA/runtime scratch and
+    # small state whose allocation behavior is less predictable.
+    scratch_state_bytes = int(cuda_overhead_bytes) + small_state_bytes
+    guarded_fixed_overhead = (
+        cache_bytes
+        + int(scratch_state_bytes * fixed_safety_multiplier)
+    )
+    forward_budget = per_worker_budget - guarded_fixed_overhead
+    log_fields = {
+        "free_gb": free / 1e9,
+        "workers": workers,
+        "total_gb": total_memory / 1e9,
+        "reserve_gb": reserve_bytes / 1e9,
+        "fraction_budget_gb": fraction_budget / 1e9,
+        "per_worker_budget_gb": per_worker_budget / 1e9,
+        "peptide_feature_dim": peptide_feature_dim,
+        "num_sub_networks": num_sub_networks,
+        "num_cached_networks": num_cached_networks,
+        "cache_gb": cache_bytes / 1e9,
+        "cuda_overhead_gb": cuda_overhead_bytes / 1e9,
+        "small_state_gb": small_state_bytes / 1e9,
+        "scratch_safety": fixed_safety_multiplier,
+        "guarded_fixed_gb": guarded_fixed_overhead / 1e9,
+        "forward_budget_gb": forward_budget / 1e9,
+        "peak_bytes_per_row": peak_bytes,
+        "peak_kb_per_row": peak_bytes / 1024,
+    }
+    logging.info(
+        "calibrate auto-sizer: free=%(free_gb).2f GB, "
+        "workers=%(workers)d, total=%(total_gb).2f GB, "
+        "reserve=%(reserve_gb).2f GB, "
+        "fraction_budget=%(fraction_budget_gb).2f GB, "
+        "per_worker_budget=%(per_worker_budget_gb).2f GB, "
+        "peptide_feature_dim=%(peptide_feature_dim)d "
+        "(sub_networks=%(num_sub_networks)d, "
+        "num_cached=%(num_cached_networks)d), "
+        "cache=%(cache_gb).2f GB, "
+        "cuda_overhead=%(cuda_overhead_gb).2f GB, "
+        "small_state=%(small_state_gb).2f GB, "
+        "scratch_safety=%(scratch_safety).2fx, "
+        "guarded_fixed=%(guarded_fixed_gb).2f GB "
+        "-> forward_budget=%(forward_budget_gb).2f GB, "
+        "peak_bytes_per_row=%(peak_bytes_per_row)d "
+        "(≈%(peak_kb_per_row).2f KB)",
+        log_fields,
+    )
+    if forward_budget < peak_bytes * AUTO_BATCH_MIN_ROWS:
+        logging.warning(
+            "calibrate auto-sizer: fixed overhead "
+            "(cache %.2f GB + scratch/state %.2f GB × safety %.2fx) "
+            "exceeds per-worker budget %.2f GB "
+            "(%.2f GB free, %.2f GB reserved, %d workers). "
+            "Falling back to minimum batch; reduce "
+            "--max-workers-per-gpu or lower the peptide universe "
+            "size.",
+            cache_bytes / 1e9,
+            scratch_state_bytes / 1e9,
+            fixed_safety_multiplier,
+            per_worker_budget / 1e9,
+            free / 1e9,
+            reserve_bytes / 1e9,
+            workers,
+        )
+        forward_budget = peak_bytes * AUTO_BATCH_MIN_ROWS
+    return max(
+        AUTO_BATCH_MIN_ROWS,
+        min(forward_budget // peak_bytes, AUTO_BATCH_MAX_ROWS),
+    )
+
+
 def auto_size_calibration_batches(
         model, device, n_peptides, n_alleles,
         num_workers_per_gpu=1,
@@ -148,160 +350,31 @@ def auto_size_calibration_batches(
     Returns the chosen ``(peptide_batch, allele_batch)``.
     """
     from ..pytorch_sizing import (
-        AUTO_BATCH_MAX_ROWS,
         AUTO_BATCH_MIN_ROWS,
         compute_prediction_batch_size,
-        free_device_memory_bytes,
     )
-    import torch
-    from ..workload_planning import env_float
 
     if n_peptides == 0 or n_alleles == 0:
         return max(n_peptides, 1), max(n_alleles, 1)
-    free_memory_fraction = env_float(
-        "MHCFLURRY_CALIBRATE_AUTO_FREE_MEMORY_FRACTION",
-        free_memory_fraction,
-        bounds=(0.0, 1.0),
-    )
-    reserve_fraction = env_float(
-        "MHCFLURRY_CALIBRATE_AUTO_RESERVE_FRACTION", 0.10,
-        bounds=(0.0, 1.0))
-    reserve_min_bytes = int(
-        env_float(
-            "MHCFLURRY_CALIBRATE_AUTO_RESERVE_GB", 2.0,
-            bounds=(0.0, None))
-        * (1 << 30)
-    )
-    fixed_safety_multiplier = env_float(
-        "MHCFLURRY_CALIBRATE_AUTO_FIXED_SAFETY_MULTIPLIER",
-        safety_multiplier,
-        bounds=(0.0, None),
-    )
+    env = read_calibration_sizing_env(free_memory_fraction, safety_multiplier)
     if device.type != "cuda":
         total_rows = compute_prediction_batch_size(
             device,
             model=model,
             num_workers_per_gpu=num_workers_per_gpu,
-            free_memory_fraction=free_memory_fraction,
+            free_memory_fraction=env.free_memory_fraction,
         )
     else:
-        workers = max(int(num_workers_per_gpu), 1)
-        free = free_device_memory_bytes(device)
-        total_memory = free
-        try:
-            props = torch.cuda.get_device_properties(device)
-            total_memory = int(props.total_memory)
-        except (
-                AssertionError, AttributeError, RuntimeError,
-                TypeError, ValueError):
-            # Tests and nonstandard CUDA wrappers may not expose device
-            # properties. Fall back to free memory; the explicit reserve
-            # still keeps the budget bounded.
-            pass
-        peak_bytes = estimate_calibration_peak_bytes_per_row(model)
-        reserve_bytes = max(
-            reserve_min_bytes,
-            int(total_memory * reserve_fraction),
-        )
-        fraction_budget = int(
-            free * float(free_memory_fraction) / workers)
-        reserved_headroom_budget = int(
-            max(free - reserve_bytes, 0) / workers)
-        per_worker_budget = min(fraction_budget, reserved_headroom_budget)
-        sub_networks = getattr(model, "networks", None)
-        if num_sub_networks is None:
-            num_sub_networks = (
-                len(sub_networks) if sub_networks is not None else 1
-            )
-        peptide_feature_dim = resolve_peptide_feature_dim(
+        total_rows = cuda_calibration_total_rows(
             model,
-            peptide_feature_dim,
-            peak_bytes,
-        )
-        cache_bytes = (
-            int(num_cached_networks)
-            * int(n_peptides)
-            * int(peptide_feature_dim)
-            * 4
-        )
-        # Small-state pad: log-IC50 accumulator, ic50_unique view,
-        # motif-summary state, PercentRankTransform.fit_batch_torch
-        # buffers, allele_idx tensor, etc. Scales with a_size and
-        # n_peptides; a 1 GB constant covers the production ranges
-        # without further accounting. Cheap insurance vs OOM.
-        small_state_bytes = 1 * (1 << 30)
-        # The peptide-stage cache estimate is shape-derived and
-        # persistent, so multiplying it by a fragmentation safety factor
-        # unnecessarily strands several GB on A100-40GB. Keep explicit
-        # global headroom, and safety-pad only CUDA/runtime scratch and
-        # small state whose allocation behavior is less predictable.
-        scratch_state_bytes = int(cuda_overhead_bytes) + small_state_bytes
-        guarded_fixed_overhead = (
-            cache_bytes
-            + int(scratch_state_bytes * fixed_safety_multiplier)
-        )
-        forward_budget = (
-            per_worker_budget - guarded_fixed_overhead
-        )
-        log_fields = {
-            "free_gb": free / 1e9,
-            "workers": workers,
-            "total_gb": total_memory / 1e9,
-            "reserve_gb": reserve_bytes / 1e9,
-            "fraction_budget_gb": fraction_budget / 1e9,
-            "per_worker_budget_gb": per_worker_budget / 1e9,
-            "peptide_feature_dim": peptide_feature_dim,
-            "num_sub_networks": num_sub_networks,
-            "num_cached_networks": num_cached_networks,
-            "cache_gb": cache_bytes / 1e9,
-            "cuda_overhead_gb": cuda_overhead_bytes / 1e9,
-            "small_state_gb": small_state_bytes / 1e9,
-            "scratch_safety": fixed_safety_multiplier,
-            "guarded_fixed_gb": guarded_fixed_overhead / 1e9,
-            "forward_budget_gb": forward_budget / 1e9,
-            "peak_bytes_per_row": peak_bytes,
-            "peak_kb_per_row": peak_bytes / 1024,
-        }
-        logging.info(
-            "calibrate auto-sizer: free=%(free_gb).2f GB, "
-            "workers=%(workers)d, total=%(total_gb).2f GB, "
-            "reserve=%(reserve_gb).2f GB, "
-            "fraction_budget=%(fraction_budget_gb).2f GB, "
-            "per_worker_budget=%(per_worker_budget_gb).2f GB, "
-            "peptide_feature_dim=%(peptide_feature_dim)d "
-            "(sub_networks=%(num_sub_networks)d, "
-            "num_cached=%(num_cached_networks)d), "
-            "cache=%(cache_gb).2f GB, "
-            "cuda_overhead=%(cuda_overhead_gb).2f GB, "
-            "small_state=%(small_state_gb).2f GB, "
-            "scratch_safety=%(scratch_safety).2fx, "
-            "guarded_fixed=%(guarded_fixed_gb).2f GB "
-            "-> forward_budget=%(forward_budget_gb).2f GB, "
-            "peak_bytes_per_row=%(peak_bytes_per_row)d "
-            "(≈%(peak_kb_per_row).2f KB)",
-            log_fields,
-        )
-        if forward_budget < peak_bytes * AUTO_BATCH_MIN_ROWS:
-            logging.warning(
-                "calibrate auto-sizer: fixed overhead "
-                "(cache %.2f GB + scratch/state %.2f GB × safety %.2fx) "
-                "exceeds per-worker budget %.2f GB "
-                "(%.2f GB free, %.2f GB reserved, %d workers). "
-                "Falling back to minimum batch; reduce "
-                "--max-workers-per-gpu or lower the peptide universe "
-                "size.",
-                cache_bytes / 1e9,
-                scratch_state_bytes / 1e9,
-                fixed_safety_multiplier,
-                per_worker_budget / 1e9,
-                free / 1e9,
-                reserve_bytes / 1e9,
-                workers,
-            )
-            forward_budget = peak_bytes * AUTO_BATCH_MIN_ROWS
-        total_rows = max(
-            AUTO_BATCH_MIN_ROWS,
-            min(forward_budget // peak_bytes, AUTO_BATCH_MAX_ROWS),
+            device,
+            n_peptides,
+            num_workers_per_gpu=num_workers_per_gpu,
+            env=env,
+            num_cached_networks=num_cached_networks,
+            peptide_feature_dim=peptide_feature_dim,
+            num_sub_networks=num_sub_networks,
+            cuda_overhead_bytes=cuda_overhead_bytes,
         )
     return choose_calibration_batch_shape(
         total_rows,
