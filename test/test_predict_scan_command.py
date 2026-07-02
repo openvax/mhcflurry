@@ -17,7 +17,7 @@ import pandas
 import pytest
 from numpy.testing import assert_array_less
 
-from mhcflurry import predict_scan_command
+import mhcflurry.cli.predict_scan_command as predict_scan_command
 
 from . import data_path
 

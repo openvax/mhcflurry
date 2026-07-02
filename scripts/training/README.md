@@ -16,6 +16,18 @@ one-off tuning runs do not belong here.
   predictor on top. Use this as a tail-on after a sweep.
 - **`pan_allele_release_full.sh`** — Composition wrapper that runs Stage
   1 then inlines Stages 2–3. The full release in one invocation.
+- **`runplz_release_full.py`** — Brev/runplz launcher for the same full
+  release pipeline. Use this when training remotely; keep machine-
+  specific patching or interrupted-run recovery in ignored `jobs/`.
+
+For Brev/runplz execution:
+
+```bash
+runplz --outputs-dir /path/to/output scripts/training/runplz_release_full.py
+```
+
+For the full release gate (training, comparison, plots, and deployment
+validation), prefer `scripts/release/retrain_evaluate_deploy.sh`.
 
 ## Hyperparameter generation (consumed by the release scripts)
 

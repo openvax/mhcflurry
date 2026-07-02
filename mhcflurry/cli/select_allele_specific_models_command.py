@@ -15,10 +15,8 @@ Model select class1 single allele models.
 """
 import argparse
 import os
-import signal
 import sys
 import time
-import traceback
 import random
 from functools import partial
 from pprint import pprint
@@ -38,6 +36,7 @@ from ..common import (
     configure_random_seed,
     derive_seed,
     filter_canonicalizable_alleles,
+    install_sigusr1_stack_trace_handler,
     normalize_allele_name,
     random_peptides,
     write_generate_sh,
@@ -58,7 +57,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # stored here before creating the thread pool will be inherited to the child
 # processes upon fork() call, allowing local workers to read the same
 # copy-on-write pages instead of receiving a pickled copy.
-GLOBAL_DATA = {}
+WORKER_CONTEXT = {}
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -208,9 +207,7 @@ add_random_seed_arg(parser)
 
 
 def run(argv=sys.argv[1:]):
-    # On sigusr1 print stack trace
-    print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
-    signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
+    install_sigusr1_stack_trace_handler()
 
     args = parser.parse_args(argv)
 
@@ -220,7 +217,7 @@ def run(argv=sys.argv[1:]):
 
     # Seed all randomness up front (the allele shuffle below runs in this
     # process). Per-allele scrambling in model_select runs in workers, so we
-    # also stash the master seed in GLOBAL_DATA and reseed per allele there.
+    # also stash the master seed in WORKER_CONTEXT and reseed per allele there.
     master_seed = configure_random_seed(
         args.random_seed, name="select-allele-specific")
 
@@ -356,7 +353,7 @@ def run(argv=sys.argv[1:]):
             args.unselected_accuracy_scorer,
             combined_min_contribution_percent=0.0)[0]
         print("Using unselected accuracy scorer: %s" % unselected_accuracy_scorer)
-    GLOBAL_DATA["unselected_accuracy_scorer"] = unselected_accuracy_scorer
+    WORKER_CONTEXT["unselected_accuracy_scorer"] = unselected_accuracy_scorer
 
     print("Selectors for alleles:")
     allele_to_selector = {}
@@ -374,12 +371,12 @@ def run(argv=sys.argv[1:]):
         allele_to_model_selection_kwargs[allele] = (
             selector_to_model_selection_kwargs[possible_selector])
 
-    GLOBAL_DATA["args"] = args
-    GLOBAL_DATA["input_predictor"] = input_predictor
-    GLOBAL_DATA["unselected_accuracy_scorer"] = unselected_accuracy_scorer
-    GLOBAL_DATA["allele_to_selector"] = allele_to_selector
-    GLOBAL_DATA["allele_to_model_selection_kwargs"] = allele_to_model_selection_kwargs
-    GLOBAL_DATA["seed"] = master_seed
+    WORKER_CONTEXT["args"] = args
+    WORKER_CONTEXT["input_predictor"] = input_predictor
+    WORKER_CONTEXT["unselected_accuracy_scorer"] = unselected_accuracy_scorer
+    WORKER_CONTEXT["allele_to_selector"] = allele_to_selector
+    WORKER_CONTEXT["allele_to_model_selection_kwargs"] = allele_to_model_selection_kwargs
+    WORKER_CONTEXT["seed"] = master_seed
 
     if not os.path.exists(args.out_models_dir):
         print("Attempting to create directory: %s" % args.out_models_dir)
@@ -412,7 +409,7 @@ def run(argv=sys.argv[1:]):
         # Parallel run
         random.shuffle(alleles)
         results = worker_pool.imap_unordered(
-            partial(model_select, constant_data=GLOBAL_DATA),
+            partial(model_select, constant_data=WORKER_CONTEXT),
             alleles,
             chunksize=1)
 
@@ -471,7 +468,7 @@ class ScrambledPredictor(object):
         return self._predictions[peptides].sample(frac=1.0).values
 
 
-def model_select(allele, constant_data=GLOBAL_DATA):
+def model_select(allele, constant_data=WORKER_CONTEXT):
     # Runs in a worker, which reseeds its RNGs from entropy on startup. Reseed
     # from the run's master seed mixed with the allele so the scrambling
     # ``.sample(frac=1.0)`` in the accuracy scorer is reproducible per allele.

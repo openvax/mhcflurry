@@ -16,10 +16,8 @@ Train Class1 pan-allele models.
 import argparse
 import os
 from os.path import join
-import signal
 import sys
 import time
-import traceback
 import random
 import pprint
 import hashlib
@@ -42,6 +40,7 @@ from ..common import (
     configure_random_seed,
     configure_logging,
     derive_seed,
+    install_sigusr1_stack_trace_handler,
     normalize_allele_name,
     write_generate_sh,
 )
@@ -76,7 +75,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # stored here before creating the thread pool will be inherited to the child
 # processes upon fork() call, allowing local workers to read the same
 # copy-on-write pages instead of receiving a pickled copy.
-GLOBAL_DATA = {}
+WORKER_CONTEXT = {}
 
 # Note on parallelization:
 # When running in parallel, avoid using the neural network backend in the main
@@ -459,9 +458,7 @@ def pretrain_network_input_iterator(
 
 
 def run(argv=sys.argv[1:]):
-    # On sigusr1 print stack trace
-    print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
-    signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
+    install_sigusr1_stack_trace_handler()
 
     args = parser.parse_args(argv)
 
@@ -537,7 +534,7 @@ def initialize_training(args):
     # wall times:
     #   start               — argparse + validation done; before any I/O
     #   data_loaded         — train_data CSV parsed + filtered + folded
-    #   setup_done          — pool + all GLOBAL_DATA
+    #   setup_done          — pool + all WORKER_CONTEXT
     #   training_done       — all work items finished
     # Extract deltas by grepping stdout for ``TIMING_MARKER``.
     print(f"TIMING_MARKER start {time.time():.3f}")
@@ -714,10 +711,10 @@ def train_models(args):
     print("Loaded predictor with %d networks" % len(predictor.neural_networks))
 
     with open(join(args.out_models_dir, "training_init_info.pkl"), "rb") as fd:
-        GLOBAL_DATA.update(pickle.load(fd))
+        WORKER_CONTEXT.update(pickle.load(fd))
     print("Loaded training init info.")
 
-    all_work_items = GLOBAL_DATA["work_items"]
+    all_work_items = WORKER_CONTEXT["work_items"]
 
     apply_resolved_training_hyperparameters_to_work_items(all_work_items, args)
 
@@ -739,7 +736,7 @@ def train_models(args):
     # order is reproducible (per-fit results don't depend on order — each
     # fit reseeds from its own work-item seed — but this keeps the whole
     # run deterministic).
-    master_seed = GLOBAL_DATA.get("seed")
+    master_seed = WORKER_CONTEXT.get("seed")
     random.Random(master_seed).shuffle(work_items)
     for (work_item_num, item) in enumerate(work_items):
         item['work_item_num'] = work_item_num
@@ -771,14 +768,14 @@ def train_models(args):
             args,
             work_function=train_model,
             work_items=work_items,
-            constant_data=GLOBAL_DATA,
+            constant_data=WORKER_CONTEXT,
             result_serialization_method="save_predictor")
     else:
         run_single_worker_torch_compile_warmup(
             args,
             work_items,
             train_model,
-            constant_data=GLOBAL_DATA,
+            constant_data=WORKER_CONTEXT,
         )
 
         worker_pool = worker_pool_with_gpu_assignments_from_args(args)
@@ -797,7 +794,7 @@ def train_models(args):
             # tears the pool down via the finally rather than leaking
             # non-daemon workers.
             attach_constant_data_to_work_items_if_needed(
-                work_items, GLOBAL_DATA, worker_pool
+                work_items, WORKER_CONTEXT, worker_pool
             )
             results_generator = worker_pool.imap_unordered(
                 partial(call_wrapped_kwargs, train_model),
@@ -833,7 +830,7 @@ def train_models(args):
     # We want the final predictor to support all alleles with sequences, not
     # just those we actually used for model training.
     predictor.allele_to_sequence = (
-        GLOBAL_DATA['full_allele_encoding'].allele_to_sequence)
+        WORKER_CONTEXT['full_allele_encoding'].allele_to_sequence)
     predictor.clear_cache()
     predictor.save(args.out_models_dir)
     write_generate_sh(args.out_models_dir)
@@ -932,7 +929,7 @@ def train_model(
         predictor,
         save_to,
         compile_warmup_only=False,
-        constant_data=GLOBAL_DATA):
+        constant_data=WORKER_CONTEXT):
 
     if compile_warmup_only:
         _run_compile_warmup(hyperparameters, fold_num, constant_data)

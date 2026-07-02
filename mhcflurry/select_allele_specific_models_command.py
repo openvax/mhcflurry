@@ -12,8 +12,14 @@
 
 """Compatibility wrapper for :mod:`mhcflurry.cli.select_allele_specific_models_command`."""
 
-import sys
-
 from .cli import select_allele_specific_models_command as _impl
 
-sys.modules[__name__] = _impl
+run = _impl.run
+parser = _impl.parser
+
+
+def __getattr__(name):
+    return getattr(_impl, name)
+
+
+__all__ = ["run", "parser"]

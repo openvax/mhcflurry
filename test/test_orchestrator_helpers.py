@@ -212,7 +212,7 @@ def test_attach_constant_data_skips_fork_pool():
 
     assert attached is False
     assert all("constant_data" not in item for item in work_items)
-    assert any("inherit GLOBAL_DATA" in line for line in logs)
+    assert any("inherit WORKER_CONTEXT" in line for line in logs)
 
 
 def test_attach_constant_data_attaches_for_non_fork_pool():

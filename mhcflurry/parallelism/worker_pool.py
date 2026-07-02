@@ -25,7 +25,7 @@ import numpy
 
 from ..common import configure_pytorch, normalize_pytorch_backend
 from ..workload_planning import WORKLOAD_GENERIC
-from .planning import _cuda_visible_devices_from_env, resolve_local_parallelism_args
+from .planning import cuda_visible_devices_from_env, resolve_local_parallelism_args
 from .worker_runtime import worker_init, worker_init_entry_point
 
 
@@ -263,12 +263,12 @@ def attach_constant_data_to_work_items_if_needed(
         log = print
     if worker_pool_uses_fork(worker_pool):
         log(
-            "Local Pool uses fork; workers inherit GLOBAL_DATA without "
+            "Local Pool uses fork; workers inherit WORKER_CONTEXT without "
             "per-task pickle payloads."
         )
         return False
     log(
-        "Local Pool does not use fork; attaching GLOBAL_DATA to each work "
+        "Local Pool does not use fork; attaching WORKER_CONTEXT to each work "
         "item for worker delivery."
     )
     for item in work_items:
@@ -398,7 +398,7 @@ def worker_init_kwargs_for_scheduler(
             for _ in range(num_jobs)
         ]
 
-    cuda_visible_devices = _cuda_visible_devices_from_env()
+    cuda_visible_devices = cuda_visible_devices_from_env()
     if cuda_visible_devices is None:
         gpu_device_nums = list(range(num_gpus))
     else:

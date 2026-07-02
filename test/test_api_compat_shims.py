@@ -31,7 +31,6 @@ def test_old_local_parallelism_import_matches_new_parallelism_package():
         worker_runtime,
     )
 
-    assert old_module is new_package
     assert old_module.worker_init is worker_runtime.worker_init
     assert old_module.add_local_parallelism_args is cli_args.add_local_parallelism_args
     assert old_module.resolve_local_parallelism_args is planning.resolve_local_parallelism_args
@@ -43,6 +42,7 @@ def test_old_local_parallelism_import_matches_new_parallelism_package():
         old_module.resolve_torchinductor_compile_threads_env
         is torch_compile.resolve_torchinductor_compile_threads_env
     )
+    assert old_module.__all__ == new_package.__all__
 
 
 def test_class1_neural_network_public_helpers_remain_importable():
@@ -63,17 +63,6 @@ def test_class1_neural_network_public_helpers_remain_importable():
         old_module.peptide_sequences_to_network_input
         is encoding.peptide_sequences_to_network_input
     )
-
-
-def test_class1_affinity_predictor_helper_imports_remain_compatible():
-    import mhcflurry.class1_affinity_predictor as old_module
-    from mhcflurry.affinity import calibration_sizing
-
-    assert (
-        old_module._peptide_sequences_fingerprint
-        is calibration_sizing.peptide_sequences_fingerprint
-    )
-    assert old_module._CalibrationFastCache is calibration_sizing.CalibrationFastCache
 
 
 def test_legacy_configure_tensorflow_entry_point():

@@ -15,10 +15,8 @@ Calibrate percentile ranks for models. Runs in-place.
 """
 import argparse
 import os
-import signal
 import sys
 import time
-import traceback
 import collections
 from functools import partial
 
@@ -37,6 +35,7 @@ from ..common import (
     configure_pytorch,
     configure_random_seed,
     filter_canonicalizable_alleles,
+    install_sigusr1_stack_trace_handler,
     random_peptides,
     write_generate_sh,
 )
@@ -68,7 +67,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # stored here before creating the thread pool will be inherited to the child
 # processes upon fork() call, allowing local workers to read the same
 # copy-on-write pages instead of receiving a pickled copy.
-GLOBAL_DATA = {}
+WORKER_CONTEXT = {}
 
 parser = argparse.ArgumentParser(usage=__doc__)
 parser.add_argument(
@@ -232,9 +231,7 @@ def run(argv=sys.argv[1:]):
     args = parser.parse_args(argv)
 
     if not args.list_percent_rank_status:
-        # On sigusr1 print stack trace
-        print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
-        signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
+        install_sigusr1_stack_trace_handler()
 
     args.models_dir = os.path.abspath(args.models_dir)
 
@@ -455,23 +452,23 @@ def run_class1_presentation_predictor(args, peptides):
     print("Sampled genotypes: ", list(genotypes))
     print("Num peptides: ", len(peptides))
 
-    GLOBAL_DATA["presentation_models_dir"] = args.models_dir
-    GLOBAL_DATA["presentation_peptides"] = peptides
+    WORKER_CONTEXT["presentation_models_dir"] = args.models_dir
+    WORKER_CONTEXT["presentation_peptides"] = peptides
     affinity_model_kwargs = {"batch_size": args.prediction_batch_size}
     if hasattr(args, "max_workers_per_gpu"):
         affinity_model_kwargs["num_workers_per_gpu"] = (
             num_workers_per_gpu_from_args(args)
         )
-    GLOBAL_DATA["presentation_predict_kwargs"] = {
+    WORKER_CONTEXT["presentation_predict_kwargs"] = {
         "affinity_model_kwargs": affinity_model_kwargs,
         "processing_batch_size": args.prediction_batch_size,
     }
-    GLOBAL_DATA.pop("_presentation_predictor", None)
-    GLOBAL_DATA.pop("_presentation_predictor_models_dir", None)
+    WORKER_CONTEXT.pop("_presentation_predictor", None)
+    WORKER_CONTEXT.pop("_presentation_predictor_models_dir", None)
 
     serial_run = not args.cluster_parallelism and args.num_jobs == 0
     if serial_run:
-        GLOBAL_DATA["_presentation_predictor"] = predictor
+        WORKER_CONTEXT["_presentation_predictor"] = predictor
 
     genotype_items = list(genotypes.items())
     work_items = []
@@ -496,7 +493,7 @@ def run_class1_presentation_predictor(args, peptides):
             args,
             work_function=do_class1_presentation_percent_rank_scores,
             work_items=work_items,
-            constant_data=GLOBAL_DATA,
+            constant_data=WORKER_CONTEXT,
             result_serialization_method="pickle",
             clear_constant_data=True)
     else:
@@ -518,7 +515,7 @@ def run_class1_presentation_predictor(args, peptides):
             # tears the pool down via the finally rather than leaking
             # non-daemon workers.
             attach_constant_data_to_work_items_if_needed(
-                work_items, GLOBAL_DATA, worker_pool
+                work_items, WORKER_CONTEXT, worker_pool
             )
             results = worker_pool.imap_unordered(
                 partial(call_wrapped_kwargs,
@@ -564,18 +561,18 @@ def run_class1_presentation_predictor(args, peptides):
 
 def _presentation_predictor_for_calibration(constant_data):
     cache_key = constant_data["presentation_models_dir"]
-    predictor = GLOBAL_DATA.get("_presentation_predictor")
+    predictor = WORKER_CONTEXT.get("_presentation_predictor")
     if (
             predictor is None
-            or GLOBAL_DATA.get("_presentation_predictor_models_dir") != cache_key):
+            or WORKER_CONTEXT.get("_presentation_predictor_models_dir") != cache_key):
         predictor = Class1PresentationPredictor.load(cache_key)
-        GLOBAL_DATA["_presentation_predictor"] = predictor
-        GLOBAL_DATA["_presentation_predictor_models_dir"] = cache_key
+        WORKER_CONTEXT["_presentation_predictor"] = predictor
+        WORKER_CONTEXT["_presentation_predictor_models_dir"] = cache_key
     return predictor
 
 
 def do_class1_presentation_percent_rank_scores(
-        genotypes, chunk_num=None, constant_data=GLOBAL_DATA):
+        genotypes, chunk_num=None, constant_data=WORKER_CONTEXT):
     del chunk_num
     predictor = _presentation_predictor_for_calibration(constant_data)
     predictions_df = predictor.predict(
@@ -650,10 +647,10 @@ def run_class1_affinity_predictor(args, peptides):
     assert encoded_peptides.encoding_cache  # must have cached the encoding
     print("Finished encoding peptides in %0.2f sec." % (time.time() - start))
 
-    # Store peptides in GLOBAL_DATA so forked local workers inherit the same
+    # Store peptides in WORKER_CONTEXT so forked local workers inherit the same
     # copy-on-write pages instead of receiving a pickled copy.
-    GLOBAL_DATA["calibration_peptides"] = encoded_peptides
-    GLOBAL_DATA["predictor"] = predictor
+    WORKER_CONTEXT["calibration_peptides"] = encoded_peptides
+    WORKER_CONTEXT["predictor"] = predictor
     model_kwargs = {
         'batch_size': args.prediction_batch_size,
     }
@@ -664,7 +661,7 @@ def run_class1_affinity_predictor(args, peptides):
     if hasattr(args, 'max_workers_per_gpu'):
         model_kwargs['num_workers_per_gpu'] = num_workers_per_gpu_from_args(args)
     num_workers_per_gpu = num_workers_per_gpu_from_args(args)
-    GLOBAL_DATA["args"] = {
+    WORKER_CONTEXT["args"] = {
         'motif_summary': args.motif_summary,
         'summary_top_peptide_fractions': args.summary_top_peptide_fraction,
         'verbose': args.verbosity > 0,
@@ -699,7 +696,7 @@ def run_class1_affinity_predictor(args, peptides):
             args,
             work_function=do_class1_affinity_calibrate_percentile_ranks,
             work_items=work_items,
-            constant_data=GLOBAL_DATA,
+            constant_data=WORKER_CONTEXT,
             result_serialization_method="pickle",
             clear_constant_data=True)
     else:
@@ -720,7 +717,7 @@ def run_class1_affinity_predictor(args, peptides):
             # tears the pool down via the finally rather than leaking
             # non-daemon workers.
             attach_constant_data_to_work_items_if_needed(
-                work_items, GLOBAL_DATA, worker_pool
+                work_items, WORKER_CONTEXT, worker_pool
             )
             results = worker_pool.imap_unordered(
                 partial(call_wrapped_kwargs, do_class1_affinity_calibrate_percentile_ranks),
@@ -763,7 +760,7 @@ def run_class1_affinity_predictor(args, peptides):
 
 
 def do_class1_affinity_calibrate_percentile_ranks(
-        alleles, constant_data=GLOBAL_DATA):
+        alleles, constant_data=WORKER_CONTEXT):
 
     if 'predictor' not in constant_data:
         raise ValueError("No predictor provided: " + str(constant_data))

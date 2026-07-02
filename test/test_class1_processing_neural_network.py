@@ -267,7 +267,7 @@ def test_fit_uses_eager_network_for_validation_by_default(monkeypatch):
 
 def test_processing_peak_estimate_scales_with_conv_shape():
     """Processing prediction autosizing should see Conv1d activation width."""
-    from mhcflurry.pytorch_sizing import _estimate_peak_bytes_per_row
+    from mhcflurry.pytorch_sizing import estimate_peak_bytes_per_row
 
     small = Class1ProcessingNeuralNetwork(
         peptide_max_length=15,
@@ -289,8 +289,8 @@ def test_processing_peak_estimate_scales_with_conv_shape():
         **large.network_hyperparameter_defaults.subselect(large.hyperparameters)
     )
 
-    small_estimate = _estimate_peak_bytes_per_row(small_network)
-    large_estimate = _estimate_peak_bytes_per_row(large_network)
+    small_estimate = estimate_peak_bytes_per_row(small_network)
+    large_estimate = estimate_peak_bytes_per_row(large_network)
 
     assert small_estimate == 15 * 21 * 4 * 2 * 4
     assert large_estimate == 25 * 512 * 4 * 2 * 4

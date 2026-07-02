@@ -23,7 +23,7 @@ from multiprocessing.util import Finalize
 import numpy
 
 from ..common import configure_pytorch
-from .planning import _resolved_int
+from .planning import resolved_int
 
 
 def worker_init_entry_point(
@@ -89,7 +89,7 @@ def worker_init(
     # multiple fit()/predict() calls are co-resident on one GPU.
     if max_workers_per_gpu is not None:
         os.environ["MHCFLURRY_MAX_WORKERS_PER_GPU"] = str(
-            _resolved_int(max_workers_per_gpu, "max_workers_per_gpu"))
+            resolved_int(max_workers_per_gpu, "max_workers_per_gpu"))
 
 
 # Solution suggested in https://bugs.python.org/issue13831

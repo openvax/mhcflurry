@@ -15,17 +15,16 @@ Train Class1 presentation models.
 """
 import argparse
 import os
-import signal
 import sys
 import time
-import traceback
 from functools import partial
 
 import numpy
 import pandas
 import tqdm  # progress bar
 
-from ..pytorch_sizing import _estimate_peak_bytes_per_row
+from ..affinity.calibration_sizing import estimate_calibration_peak_bytes_per_row
+from ..pytorch_sizing import estimate_peak_bytes_per_row
 from ..class1_processing_predictor import Class1ProcessingPredictor
 from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..class1_presentation_predictor import Class1PresentationPredictor
@@ -33,6 +32,7 @@ from ..common import (
     add_random_seed_arg,
     configure_logging,
     configure_random_seed,
+    install_sigusr1_stack_trace_handler,
     write_generate_sh,
 )
 from ..parallelism import (
@@ -49,7 +49,7 @@ from ..workload_planning import (
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
-GLOBAL_DATA = {}
+WORKER_CONTEXT = {}
 
 # Presentation feature workers keep affinity + processing predictors resident
 # and then run one model family at a time in auto-sized prediction batches.
@@ -117,9 +117,7 @@ add_local_parallelism_args(parser)
 add_random_seed_arg(parser)
 
 def run(argv=sys.argv[1:]):
-    # On sigusr1 print stack trace
-    print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
-    signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
+    install_sigusr1_stack_trace_handler()
 
     args = parser.parse_args(argv)
 
@@ -381,10 +379,8 @@ def presentation_network_peak_bytes_per_row(network):
     """Estimate forward peak memory for a presentation feature network."""
     sub_networks = getattr(network, "networks", None)
     if sub_networks is not None and not hasattr(network, "peptide_encoding_shape"):
-        return Class1AffinityPredictor._estimate_calibration_peak_bytes_per_row(
-            network
-        )
-    return _estimate_peak_bytes_per_row(network)
+        return estimate_calibration_peak_bytes_per_row(network)
+    return estimate_peak_bytes_per_row(network)
 
 
 def predict_features_parallel(args, predictor, df, experiment_to_alleles):
@@ -420,8 +416,8 @@ def predict_features_parallel(args, predictor, df, experiment_to_alleles):
         item["include_without_flanks"] = include_without_flanks
         item["include_with_flanks"] = include_with_flanks
 
-    GLOBAL_DATA.clear()
-    GLOBAL_DATA.update({
+    WORKER_CONTEXT.clear()
+    WORKER_CONTEXT.update({
         "predictor": predictor,
         "data": df,
         "experiment_to_alleles": experiment_to_alleles,
@@ -433,7 +429,7 @@ def predict_features_parallel(args, predictor, df, experiment_to_alleles):
         print("Worker pool", worker_pool)
         assert worker_pool is not None
         attach_constant_data_to_work_items_if_needed(
-            work_items, GLOBAL_DATA, worker_pool
+            work_items, WORKER_CONTEXT, worker_pool
         )
 
         affinity = numpy.empty(len(df), dtype="float64")
@@ -504,7 +500,7 @@ def predict_feature_chunk(
         sample_name,
         include_without_flanks,
         include_with_flanks,
-        constant_data=GLOBAL_DATA):
+        constant_data=WORKER_CONTEXT):
     predictor = constant_data["predictor"]
     df = constant_data["data"].iloc[start:end]
     experiment_to_alleles = constant_data["experiment_to_alleles"]

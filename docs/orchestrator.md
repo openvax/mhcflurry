@@ -25,8 +25,8 @@ orchestrator process               training worker process
 ─────────────────────              ───────────────────────
 
 parse args                         (forked / spawned)
-load training data                  inherit GLOBAL_DATA
-build GLOBAL_DATA           ─┐
+load training data                  inherit WORKER_CONTEXT
+build WORKER_CONTEXT        ─┐
                              │
 hoist env knobs              │
   TORCHINDUCTOR_COMPILE_THREADS
@@ -91,7 +91,7 @@ Two backends, one CLI surface:
   historical CPU-overflow behavior.
 - **Cluster** (`cluster_parallelism.py`): one job per work-item
   submitted via `bsub` / `sbatch` / `sh`. Workers serialize
-  GLOBAL_DATA to NFS and deserialize on the worker side.
+  WORKER_CONTEXT to NFS and deserialize on the worker side.
 
 Worker-side code (`train_model()`, etc.) is identical between
 backends. Only the orchestrator branches on `args.cluster_parallelism`.
@@ -269,7 +269,7 @@ before compiling losses to avoid the PyTorch 2.4 / Triton
 
 1. Add a `_initialize_<name>(args, all_work_items)` helper near the
    existing ones in `train_pan_allele_models_command.py`.
-2. Stash the result in `GLOBAL_DATA["<name>"]`.
+2. Stash the result in `WORKER_CONTEXT["<name>"]`.
 3. Document the lookup key. Workers retrieve via
    `constant_data["<name>"]` (forked workers inherit; spawned/cluster
    workers receive via pickle).

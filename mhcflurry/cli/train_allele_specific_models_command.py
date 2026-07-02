@@ -15,10 +15,8 @@ Train Class1 single allele models.
 """
 import argparse
 import os
-import signal
 import sys
 import time
-import traceback
 import random
 from functools import partial
 
@@ -36,6 +34,7 @@ from ..common import (
     configure_logging,
     configure_random_seed,
     derive_seed,
+    install_sigusr1_stack_trace_handler,
     write_generate_sh,
 )
 from ..parallelism import (
@@ -60,7 +59,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # stored here before creating the thread pool will be inherited to the child
 # processes upon fork() call, allowing local workers to read the same
 # copy-on-write pages instead of receiving a pickled copy.
-GLOBAL_DATA = {}
+WORKER_CONTEXT = {}
 
 # Note on parallelization:
 # When running in parallel, avoid using the neural network backend in the main
@@ -160,9 +159,7 @@ TRAIN_DATA_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
 
 
 def run(argv=sys.argv[1:]):
-    # On sigusr1 print stack trace
-    print("To show stack trace, run:\nkill -s USR1 %d" % os.getpid())
-    signal.signal(signal.SIGUSR1, lambda sig, frame: traceback.print_stack())
+    install_sigusr1_stack_trace_handler()
 
     args = parser.parse_args(argv)
 
@@ -248,12 +245,12 @@ def run(argv=sys.argv[1:]):
 
     print("Training data: %s" % (str(df.shape)))
 
-    GLOBAL_DATA["train_data"] = df
-    GLOBAL_DATA["args"] = args
+    WORKER_CONTEXT["train_data"] = df
+    WORKER_CONTEXT["args"] = args
     # Persist the resolved master seed so workers (which reseed from entropy
     # in worker_init) can derive a stable per-fit seed via derive_seed. The
     # main-process global seeding above doesn't reach worker fits.
-    GLOBAL_DATA["seed"] = master_seed
+    WORKER_CONTEXT["seed"] = master_seed
     resolve_local_parallelism_args(
         args,
         workload_name=WORKLOAD_AFFINITY_TRAINING,
@@ -293,7 +290,7 @@ def run(argv=sys.argv[1:]):
                 hyperparameters.get('train_data', {})))
 
         if hyperparameters['train_data']['pretrain_min_points'] and (
-                'allele_similarity_matrix' not in GLOBAL_DATA):
+                'allele_similarity_matrix' not in WORKER_CONTEXT):
             print("Generating allele similarity matrix.")
             if not args.allele_sequences:
                 parser.error(
@@ -316,7 +313,7 @@ def run(argv=sys.argv[1:]):
                     blosum_encoding.reshape((len(allele_sequences), -1))),
                 index=allele_sequences.index.values,
                 columns=allele_sequences.index.values)
-            GLOBAL_DATA['allele_similarity_matrix'] = allele_similarity_matrix
+            WORKER_CONTEXT['allele_similarity_matrix'] = allele_similarity_matrix
             print("Computed allele similarity matrix")
             print(allele_similarity_matrix)
 
@@ -361,7 +358,7 @@ def run(argv=sys.argv[1:]):
 
         assert worker_pool is not None
         attach_constant_data_to_work_items_if_needed(
-            work_items, GLOBAL_DATA, worker_pool
+            work_items, WORKER_CONTEXT, worker_pool
         )
         results_generator = worker_pool.imap_unordered(
             partial(call_wrapped_kwargs, train_model),
@@ -435,7 +432,7 @@ def run(argv=sys.argv[1:]):
 
 
 def alleles_by_similarity(allele):
-    allele_similarity = GLOBAL_DATA['allele_similarity_matrix']
+    allele_similarity = WORKER_CONTEXT['allele_similarity_matrix']
     if allele not in allele_similarity.columns:
         # Use random alleles
         print("No similar alleles for: %s" % allele)
@@ -460,7 +457,7 @@ def train_model(
         progress_print_interval,
         predictor,
         save_to,
-        constant_data=GLOBAL_DATA):
+        constant_data=WORKER_CONTEXT):
 
     if predictor is None:
         predictor = Class1AffinityPredictor()

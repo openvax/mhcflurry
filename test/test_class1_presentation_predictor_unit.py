@@ -17,7 +17,7 @@ import pandas
 import torch
 
 import mhcflurry.class1_presentation_predictor as presentation_module
-import mhcflurry.train_presentation_models_command as train_presentation
+import mhcflurry.cli.train_presentation_models_command as train_presentation
 from mhcflurry.class1_presentation_predictor import Class1PresentationPredictor
 
 
@@ -243,8 +243,8 @@ def test_presentation_feature_chunks_use_global_data():
         (3, 5, "s2"),
     ]
 
-    train_presentation.GLOBAL_DATA.clear()
-    train_presentation.GLOBAL_DATA.update({
+    train_presentation.WORKER_CONTEXT.clear()
+    train_presentation.WORKER_CONTEXT.update({
         "predictor": FakePresentationPredictor(),
         "data": df,
         "experiment_to_alleles": {
@@ -308,7 +308,7 @@ def test_estimate_presentation_feature_worker_gb_uses_model_shape(monkeypatch):
     monkeypatch.setenv("MHCFLURRY_PRESENTATION_WORKER_TRANSIENT_ROWS", "10")
     monkeypatch.setattr(
         train_presentation,
-        "_estimate_peak_bytes_per_row",
+        "estimate_peak_bytes_per_row",
         lambda network: 512 * 1024 * 1024
         if network is processing_network else 1024,
     )
@@ -325,13 +325,13 @@ def test_presentation_worker_estimator_uses_cartesian_merged_peak(monkeypatch):
     merged_network = FakeNetwork()
     merged_network.networks = [FakeNetwork(), FakeNetwork()]
     monkeypatch.setattr(
-        train_presentation.Class1AffinityPredictor,
-        "_estimate_calibration_peak_bytes_per_row",
-        staticmethod(lambda network: 123 if network is merged_network else 0),
+        train_presentation,
+        "estimate_calibration_peak_bytes_per_row",
+        lambda network: 123 if network is merged_network else 0,
     )
     monkeypatch.setattr(
         train_presentation,
-        "_estimate_peak_bytes_per_row",
+        "estimate_peak_bytes_per_row",
         lambda network: 999,
     )
 

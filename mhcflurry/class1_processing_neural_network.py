@@ -26,7 +26,7 @@ import torch.nn.functional as F
 
 from . import amino_acid
 from .hyperparameters import HyperparameterDefaults
-from .class1_training import _torch_from_numpy
+from .class1_training import torch_from_numpy
 from .pytorch_sizing import DEFAULT_PREDICT_BATCH_SIZE
 from .flanking_encoding import FlankingEncoding
 from .common import get_pytorch_device
@@ -815,14 +815,14 @@ class Class1ProcessingNeuralNetwork(object):
         # slicing by `batch_idx` on-device removes the per-step
         # numpy.from_numpy + astype + .to(device) trio that this loop
         # used to do every minibatch.
-        # Route through _torch_from_numpy (copies non-writeable arrays) for
+        # Route through torch_from_numpy (copies non-writeable arrays) for
         # parity with the affinity path; encode_indices returns fresh arrays
         # today, but this guards against a future read-only cache entry.
-        seq_dev = _torch_from_numpy(x_dict["sequence"]).to(device)
-        length_dev = _torch_from_numpy(x_dict["peptide_length"]).to(device)
-        targets_dev = _torch_from_numpy(targets.astype(numpy.float32)).to(device)
+        seq_dev = torch_from_numpy(x_dict["sequence"]).to(device)
+        length_dev = torch_from_numpy(x_dict["peptide_length"]).to(device)
+        targets_dev = torch_from_numpy(targets.astype(numpy.float32)).to(device)
         weights_dev = (
-            _torch_from_numpy(sample_weights.astype(numpy.float32)).to(device)
+            torch_from_numpy(sample_weights.astype(numpy.float32)).to(device)
             if sample_weights is not None
             else None
         )
@@ -1079,7 +1079,7 @@ class Class1ProcessingNeuralNetwork(object):
         numpy for the public API.
         """
         from .pytorch_sizing import (
-            _env_workers_per_gpu,
+            env_workers_per_gpu,
             resolve_prediction_batch_size,
         )
 
@@ -1100,7 +1100,7 @@ class Class1ProcessingNeuralNetwork(object):
             batch_size,
             device,
             model=network,
-            num_workers_per_gpu=_env_workers_per_gpu(1),
+            num_workers_per_gpu=env_workers_per_gpu(1),
         )
 
         n_samples = len(x_dict["sequence"])

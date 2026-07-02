@@ -31,7 +31,7 @@ from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_processing_predictor import Class1ProcessingPredictor
 from .pytorch_sizing import (
     DEFAULT_PREDICT_BATCH_SIZE,
-    _env_workers_per_gpu,
+    env_workers_per_gpu,
 )
 from .encodable_sequences import EncodableSequences
 from .regression_target import from_ic50
@@ -275,7 +275,7 @@ class Class1PresentationPredictor(object):
             model_kwargs = dict(model_kwargs)
         affinity_model_kwargs = {
             "batch_size": PREDICT_BATCH_SIZE,
-            "num_workers_per_gpu": _env_workers_per_gpu(1),
+            "num_workers_per_gpu": env_workers_per_gpu(1),
         }
         affinity_model_kwargs.update(model_kwargs)
         predict_cartesian = getattr(

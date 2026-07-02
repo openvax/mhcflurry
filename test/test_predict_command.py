@@ -20,7 +20,7 @@ import pandas
 
 import torch
 
-from mhcflurry import predict_command
+import mhcflurry.cli.predict_command as predict_command
 
 from mhcflurry.testing_utils import cleanup, startup
 
