@@ -239,7 +239,7 @@ def _public_path_for_role(role, release_pin):
         "affinity": ("models_class1_pan", "models.combined"),
         "processing": (
             "models_class1_processing", "models.selected.with_flanks"),
-        "presentation": ("models_class1_presentation", "models.combined"),
+        "presentation": ("models_class1_presentation", "models"),
         "training": (None, None),
     }
     download_name, sub = role_to_download.get(role, (None, None))
@@ -284,6 +284,7 @@ def _probe_run_dir(spec, role):
         return _first_match(candidates, _looks_like_affinity_dir)
     if role == "presentation":
         candidates = [
+            os.path.join(spec, "presentation", "models"),
             os.path.join(spec, "presentation", "models.combined"),
             os.path.join(spec, "presentation"),
             spec,

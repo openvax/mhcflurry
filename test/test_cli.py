@@ -351,9 +351,18 @@ def test_probe_run_dir_finds_affinity_via_allele_sequences(tmp_path):
 
 
 def test_probe_run_dir_finds_presentation_via_weights_csv(tmp_path):
-    target = tmp_path / "run" / "presentation" / "models.combined"
+    target = tmp_path / "run" / "presentation" / "models"
     target.mkdir(parents=True)
     # Class1PresentationPredictor.save() writes weights.csv at the top level.
+    (target / "weights.csv").write_text(",kind\npresentation_score,affinity\n")
+    resolved = compare_models._probe_run_dir(
+        str(tmp_path / "run"), "presentation")
+    assert resolved == str(target)
+
+
+def test_probe_run_dir_still_finds_legacy_presentation_models_combined(tmp_path):
+    target = tmp_path / "run" / "presentation" / "models.combined"
+    target.mkdir(parents=True)
     (target / "weights.csv").write_text(",kind\npresentation_score,affinity\n")
     resolved = compare_models._probe_run_dir(
         str(tmp_path / "run"), "presentation")

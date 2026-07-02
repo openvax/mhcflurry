@@ -11,6 +11,8 @@ belong.
 - **`scripts/training/`** — the production training pipeline. Stage scripts
   (`pan_allele_release_*.sh`, `presentation_from_affinity.sh`) and the
   sweep + plot tools that publish artifacts. See its own README.
+- **`scripts/release/`** — packaging and deployment helpers for trained
+  model artifacts, plus the end-to-end release workflow entry point.
 - **`scripts/dev/`** — developer ergonomic helpers (e.g. relocating
   large run-output dirs outside the rsync source tree). Not invoked by
   CI or release.
@@ -42,6 +44,18 @@ belong.
 - **`validate_presentation_with_flanks.py`** — fixed 10-peptide regression
   set including SLLQHLIGL (PRAME) with real flanks; rank correlation vs
   public release. Cheap acceptance test before publishing a new bundle.
+
+## Current audit
+
+The maintained scripts are generally well scoped: release training lives
+under `training/`, development helpers live under `dev/`, and the
+top-level validation tools are narrow checks. The main gap was that Brev
+training and model-asset deployment were living outside this maintained
+surface. `scripts/training/runplz_release_full.py` is now the reusable
+Brev/runplz training entry point, and
+`scripts/release/retrain_evaluate_deploy.sh` is the single maintained
+workflow for training, evaluating, plotting, and deployment validation.
+
 ## What used to live here (deleted)
 
 - TF→PyTorch parity scripts (`compare_tf_pytorch_random_outputs.py`,
