@@ -25,11 +25,13 @@ Runs whichever components are available on both sides:
   public (no manifest).
 * ``affinity`` — per-allele ROC-AUC / PR-AUC / PPV@N on the
   monoallelic hit/decoy benchmark.
+* ``processing`` — per-sample + per-length metrics on the multiallelic
+  hit/decoy benchmark for the requested processing flank variants.
 * ``presentation`` — per-sample + per-length micro/macro metrics on
   the multiallelic hit/decoy benchmark, with-flanks and without-flanks.
 
-Writes CSVs + JSON only. ``mhcflurry plot-model-comparison`` consumes
-the CSVs to render plots.
+Writes detailed CSV/JSON artifacts plus release-summary CSV/Markdown tables.
+``mhcflurry plot-model-comparison`` consumes the CSVs to render plots.
 """
 from __future__ import annotations
 
@@ -56,14 +58,16 @@ from ..parallelism import (
 from ..pseudosequences import LEGACY_ALLELE_SEQUENCES_FILENAME
 from ..workload_planning import (
     WORKLOAD_AFFINITY_INFERENCE,
+    WORKLOAD_PROCESSING_INFERENCE,
     WORKLOAD_PRESENTATION_INFERENCE,
 )
 
 
 _METRIC_NAMES = ("roc_auc", "pr_auc", "ppv_at_n")
+_PROCESSING_MODES = ("with_flanks", "no_flank", "short_flanks")
 _PRESENTATION_SCORE_KINDS = ("presentation_score", "presentation_percentile")
 _PRESENTATION_MODES = ("with_flanks", "without_flanks")
-_COMPONENT_NAMES = ("training_stats", "affinity", "presentation")
+_COMPONENT_NAMES = ("training_stats", "affinity", "processing", "presentation")
 
 _T0 = time.time()
 
@@ -129,7 +133,7 @@ def register_subparser(parser):
         "--include",
         default="auto",
         help=(
-            "Comma-separated subset of {training_stats, affinity, "
+            "Comma-separated subset of {training_stats, affinity, processing, "
             "presentation}; default 'auto' runs whichever components are "
             "available on both sides."
         ),
@@ -149,6 +153,14 @@ def register_subparser(parser):
         "--affinity-source", choices=["mixmhcpred", "netmhcpan4", "both"],
         default="mixmhcpred",
         help="Which monoallelic benchmark source to use for affinity eval.",
+    )
+    parser.add_argument(
+        "--processing-modes",
+        default=",".join(_PROCESSING_MODES),
+        help=(
+            "Comma-separated subset of {with_flanks, no_flank, short_flanks} "
+            "for the processing component."
+        ),
     )
     parser.add_argument(
         "--presentation-modes",
@@ -181,9 +193,12 @@ def run(args):
         headline["training_stats"] = _run_training_stats(side_a, side_b, args.out)
     if "affinity" in components:
         headline["affinity"] = _run_affinity(side_a, side_b, args)
+    if "processing" in components:
+        headline["processing"] = _run_processing(side_a, side_b, args)
     if "presentation" in components:
         headline["presentation"] = _run_presentation(side_a, side_b, args)
 
+    _write_release_summary_tables(headline, side_a, side_b, args.out, components)
     _write_summary_markdown(headline, side_a, side_b, args.out, components)
     return 0
 
@@ -238,7 +253,7 @@ def _public_path_for_role(role, release_pin):
     role_to_download = {
         "affinity": ("models_class1_pan", "models.combined"),
         "processing": (
-            "models_class1_processing", "models.selected.with_flanks"),
+            "models_class1_processing", ""),
         "presentation": ("models_class1_presentation", "models"),
         "training": (None, None),
     }
@@ -292,10 +307,10 @@ def _probe_run_dir(spec, role):
         return _first_match(candidates, _looks_like_presentation_dir)
     if role == "processing":
         candidates = [
-            os.path.join(spec, "processing", "models.selected.with_flanks"),
             os.path.join(spec, "processing"),
+            spec,
         ]
-        return _first_match(candidates, os.path.isdir)
+        return _first_match(candidates, _looks_like_processing_dir)
     if role == "training":
         candidates = [
             os.path.join(spec, "affinity", "models.unselected.combined"),
@@ -332,6 +347,18 @@ def _looks_like_presentation_dir(path):
     )
 
 
+def _looks_like_processing_dir(path):
+    if not os.path.isdir(path):
+        return False
+    basename = os.path.basename(os.path.normpath(path))
+    if basename.startswith("models.selected."):
+        return True
+    return any(
+        os.path.isdir(os.path.join(path, "models.selected.%s" % mode))
+        for mode in _PROCESSING_MODES
+    )
+
+
 def _side_to_json(side):
     return {
         "letter": side["letter"],
@@ -347,6 +374,8 @@ def _resolve_components(include_arg, side_a, side_b):
         available.append("training_stats")
     if side_a["paths"]["affinity"] and side_b["paths"]["affinity"]:
         available.append("affinity")
+    if side_a["paths"]["processing"] and side_b["paths"]["processing"]:
+        available.append("processing")
     if side_a["paths"]["presentation"] and side_b["paths"]["presentation"]:
         available.append("presentation")
 
@@ -827,6 +856,174 @@ def _affinity_summary(test, per_allele, per_length):
 
 
 # ---------------------------------------------------------------------------
+# Component: processing
+# ---------------------------------------------------------------------------
+
+
+def _processing_model_dir(processing_root, mode):
+    """Return the model directory for one processing flank ``mode``."""
+    if not processing_root:
+        return None
+    candidates = [
+        os.path.join(processing_root, "models.selected.%s" % mode),
+        processing_root,
+    ]
+    expected_basename = "models.selected.%s" % mode
+    for path in candidates:
+        if (
+                os.path.isdir(path) and
+                os.path.basename(os.path.normpath(path)) == expected_basename):
+            return path
+    return None
+
+
+def _predict_processing_chunk(predictor_dir, rows, mode, chunk_num):
+    """Worker entry: load processing predictor, score one chunk."""
+    from .. import Class1ProcessingPredictor
+    predictor = Class1ProcessingPredictor.load(predictor_dir)
+
+    df = pandas.DataFrame(rows)
+    kwargs = {
+        "peptides": df.peptide.values,
+        "batch_size": "auto",
+    }
+    if mode in ("with_flanks", "short_flanks"):
+        kwargs["n_flanks"] = df.n_flank.values
+        kwargs["c_flanks"] = df.c_flank.values
+    elif mode != "no_flank":
+        raise ValueError("Unexpected processing mode: %s" % mode)
+    return chunk_num, numpy.asarray(predictor.predict(**kwargs))
+
+
+def _parallel_processing_predict(args, predictor_dir, df, mode, label):
+    if len(df) == 0:
+        return numpy.asarray([], dtype=float)
+    worker_pool = worker_pool_with_gpu_assignments_from_args(
+        args,
+        workload_name=WORKLOAD_PROCESSING_INFERENCE,
+        workload_hints={"prediction_rows": len(df)},
+        start_method="spawn",
+    )
+    _stamp("predicting %s processing (%s, %d rows)" % (label, mode, len(df)))
+    if worker_pool is None:
+        _, predictions = _predict_processing_chunk(
+            predictor_dir, df.to_dict("list"), mode, chunk_num=0)
+        return predictions
+
+    work_items = []
+    for (chunk_num, start, end) in chunk_ranges_for_local_parallelism(
+            len(df), args.num_jobs):
+        work_items.append({
+            "chunk_num": chunk_num,
+            "predictor_dir": predictor_dir,
+            "rows": df.iloc[start:end].to_dict("list"),
+            "mode": mode,
+        })
+    try:
+        results = worker_pool.imap_unordered(
+            partial(call_wrapped_kwargs, _predict_processing_chunk),
+            work_items,
+            chunksize=1,
+        )
+        chunks = [result for result in results]
+        worker_pool.close()
+        worker_pool.join()
+        worker_pool = None
+    finally:
+        if worker_pool is not None:
+            worker_pool.terminate()
+            worker_pool.join()
+    return numpy.concatenate([
+        values for (_, values) in sorted(chunks, key=lambda t: t[0])
+    ])
+
+
+def _run_processing(side_a, side_b, args):
+    component_dir = os.path.join(args.out, "processing")
+    os.makedirs(component_dir, exist_ok=True)
+
+    data_dir = args.data_dir or _default_data_evaluation_dir()
+    requested_modes = [m.strip() for m in args.processing_modes.split(",") if m]
+    bad_modes = [m for m in requested_modes if m not in _PROCESSING_MODES]
+    if bad_modes:
+        raise SystemExit(
+            "Unknown processing modes: %s" % ", ".join(bad_modes))
+
+    benchmark = _load_presentation_benchmark(data_dir, args.limit_files)
+    summaries = {}
+    summary_rows = []
+    for mode in requested_modes:
+        a_model_dir = _processing_model_dir(side_a["paths"]["processing"], mode)
+        b_model_dir = _processing_model_dir(side_b["paths"]["processing"], mode)
+        if not a_model_dir or not b_model_dir:
+            _stamp(
+                "WARNING: skipping processing mode %s; missing model dir "
+                "for side %s%s%s" % (
+                    mode,
+                    "A" if not a_model_dir else "",
+                    " and " if not a_model_dir and not b_model_dir else "",
+                    "B" if not b_model_dir else "",
+                )
+            )
+            continue
+        _stamp("=== processing mode: %s ===" % mode)
+        scored = benchmark[[
+            "peptide", "sample_id", "hla", "hit", "peptide_len",
+            "n_flank", "c_flank",
+        ]].copy()
+        scored["a_processing_score"] = _parallel_processing_predict(
+            args, a_model_dir, benchmark, mode, label="A")
+        scored["b_processing_score"] = _parallel_processing_predict(
+            args, b_model_dir, benchmark, mode, label="B")
+
+        pred_path = os.path.join(
+            component_dir, "predictions_%s.csv.bz2" % mode)
+        scored.to_csv(pred_path, index=False)
+        _stamp("  wrote %s" % pred_path)
+
+        per_sample = _presentation_per_sample(scored, "processing_score")
+        per_sample.to_csv(
+            os.path.join(
+                component_dir,
+                "per_sample_%s_processing_score.csv" % mode,
+            ),
+            index=False,
+        )
+        per_length, per_length_per_sample = _presentation_per_length(
+            scored, "processing_score")
+        per_length.to_csv(
+            os.path.join(
+                component_dir,
+                "per_length_%s_processing_score.csv" % mode,
+            ),
+            index=False,
+        )
+        if not per_length_per_sample.empty:
+            per_length_per_sample.to_csv(
+                os.path.join(
+                    component_dir,
+                    "per_length_per_sample_%s_processing_score.csv" % mode,
+                ),
+                index=False,
+            )
+        summary = _presentation_mode_summary(
+            scored, per_sample, per_length, mode, "processing_score")
+        summaries[mode] = {"processing_score": summary}
+        summary_rows.append(_presentation_summary_row(summary))
+
+    with open(os.path.join(component_dir, "summary.json"), "w") as fd:
+        json.dump(summaries, fd, indent=2, sort_keys=True)
+    summary_table = pandas.DataFrame(summary_rows)
+    summary_table.to_csv(
+        os.path.join(component_dir, "summary_table.csv"), index=False)
+    _stamp("  wrote processing summary.json + summary_table.csv")
+    return {
+        "modes": [row["mode"] for row in summary_rows],
+        "summaries": summaries,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Component: presentation
 # ---------------------------------------------------------------------------
 
@@ -972,6 +1169,8 @@ def _score_values(df, prefix, score_kind):
         return df["%s_presentation_score" % prefix].values
     if score_kind == "presentation_percentile":
         return -df["%s_presentation_percentile" % prefix].values
+    if score_kind == "processing_score":
+        return df["%s_processing_score" % prefix].values
     raise ValueError("Unknown score kind: %s" % score_kind)
 
 
@@ -1176,6 +1375,134 @@ def _run_presentation(side_a, side_b, args):
 
 
 # ---------------------------------------------------------------------------
+# Release-gate summary tables
+# ---------------------------------------------------------------------------
+
+
+_METRIC_DISPLAY_NAMES = {
+    "roc_auc": "AUROC",
+    "pr_auc": "AUPRC",
+    "ppv_at_n": "PPV@N",
+}
+
+
+def _pct_change(a_value, b_value):
+    if b_value is None or numpy.isnan(b_value) or b_value == 0:
+        return numpy.nan
+    return 100.0 * (a_value - b_value) / b_value
+
+
+def _append_release_metric_row(rows, component, group_key, group_value,
+                               metric, average, a_value, b_value):
+    rows.append({
+        "component": component,
+        group_key: group_value,
+        "metric": _METRIC_DISPLAY_NAMES[metric],
+        "average": average,
+        "side_a": a_value,
+        "side_b": b_value,
+        "diff": a_value - b_value,
+        "pct_change": _pct_change(a_value, b_value),
+    })
+
+
+def _release_summary_rows(headline, components):
+    rows = []
+    if "affinity" in components and "affinity" in headline:
+        summary = headline["affinity"]
+        for metric in _METRIC_NAMES:
+            macro = summary["macro_mean_over_alleles"][metric]
+            _append_release_metric_row(
+                rows, "affinity", "eval", "affinity",
+                metric, "Macro", macro["a"], macro["b"])
+        for metric in _METRIC_NAMES:
+            micro_a = summary["micro_pooled"]["a"][metric]
+            micro_b = summary["micro_pooled"]["b"][metric]
+            _append_release_metric_row(
+                rows, "affinity", "eval", "affinity",
+                metric, "Micro", micro_a, micro_b)
+
+    for component, score_kind in (
+            ("processing", "processing_score"),
+            ("presentation", "presentation_score")):
+        if component not in components or component not in headline:
+            continue
+        for mode in headline[component]["modes"]:
+            summary = headline[component]["summaries"].get(mode, {}).get(score_kind)
+            if summary is None:
+                continue
+            for metric in _METRIC_NAMES:
+                macro = summary["macro_mean_over_samples"][metric]
+                _append_release_metric_row(
+                    rows, component, "flank_mode", mode,
+                    metric, "Macro", macro["a"], macro["b"])
+            for metric in _METRIC_NAMES:
+                micro_a = summary["micro_pooled"]["a"][metric]
+                micro_b = summary["micro_pooled"]["b"][metric]
+                _append_release_metric_row(
+                    rows, component, "flank_mode", mode,
+                    metric, "Micro", micro_a, micro_b)
+    return rows
+
+
+def _format_metric(value, signed=False, pct=False):
+    if value is None or numpy.isnan(value):
+        return "nan"
+    if pct:
+        return "%+.2f%%" % value
+    if signed:
+        return "%+.4f" % value
+    return "%.4f" % value
+
+
+def _label_heading(label):
+    return str(label).replace("_", " ").title()
+
+
+def _write_release_summary_tables(headline, side_a, side_b, out_dir, components):
+    rows = _release_summary_rows(headline, components)
+    if not rows:
+        return
+    csv_path = os.path.join(out_dir, "release_summary.csv")
+    pandas.DataFrame(rows).to_csv(csv_path, index=False)
+
+    side_a_heading = _label_heading(side_a["label"])
+    side_b_heading = _label_heading(side_b["label"])
+    lines = ["# release summary", ""]
+    for component, title, group_key, group_label in (
+            ("affinity", "Affinity", "eval", "Eval"),
+            ("presentation", "Presentation", "flank_mode", "Flank mode"),
+            ("processing", "Processing", "flank_mode", "Flank mode")):
+        component_rows = [row for row in rows if row["component"] == component]
+        if not component_rows:
+            continue
+        lines.extend([
+            "## %s" % title,
+            "",
+            "| %s | Metric | Average | %s | %s | Diff | %% change |"
+            % (group_label, side_a_heading, side_b_heading),
+            "|---|---|---:|---:|---:|---:|---:|",
+        ])
+        for row in component_rows:
+            lines.append(
+                "| %s | %s | %s | %s | %s | %s | %s |" % (
+                    row.get(group_key, ""),
+                    row["metric"],
+                    row["average"],
+                    _format_metric(row["side_a"]),
+                    _format_metric(row["side_b"]),
+                    _format_metric(row["diff"], signed=True),
+                    _format_metric(row["pct_change"], pct=True),
+                )
+            )
+        lines.append("")
+
+    with open(os.path.join(out_dir, "release_summary.md"), "w") as fd:
+        fd.write("\n".join(lines))
+    _stamp("wrote release_summary.csv + release_summary.md")
+
+
+# ---------------------------------------------------------------------------
 # Summary markdown
 # ---------------------------------------------------------------------------
 
@@ -1225,6 +1552,23 @@ def _write_summary_markdown(headline, side_a, side_b, out_dir, components):
             )
         )
         lines.append("- Details: `affinity/per_allele.csv`, `affinity/summary.json`")
+        lines.append("")
+
+    if "processing" in components:
+        s = headline["processing"]
+        lines.append("## processing")
+        for mode in s["modes"]:
+            msum = s["summaries"][mode]["processing_score"]
+            pooled_a = msum["micro_pooled"]["a"]["roc_auc"]
+            pooled_b = msum["micro_pooled"]["b"]["roc_auc"]
+            lines.append(
+                "- %s / processing_score: micro ROC-AUC A=%.4f, "
+                "B=%.4f, diff=%+.4f (%d samples reported)" % (
+                    mode, pooled_a, pooled_b, pooled_a - pooled_b,
+                    msum["n_samples_reported"],
+                )
+            )
+        lines.append("- Details: `processing/summary_table.csv`, `processing/summary.json`")
         lines.append("")
 
     if "presentation" in components:

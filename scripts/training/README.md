@@ -11,7 +11,7 @@ one-off tuning runs do not belong here.
   the heartbeat / write_snapshot / log_release_event instrumentation,
   `--continue-incomplete` resume, and the eval-against-public step.
 - **`presentation_from_affinity.sh`** — Stages 2–3. Takes an existing
-  affinity `models.combined/` and trains the no-flank + short-flanks
+  affinity `models.combined/` and trains the with-flanks, no-flank, and short-flanks
   processing predictors, then fits + calibrates the presentation
   predictor on top. Use this as a tail-on after a sweep.
 - **`pan_allele_release_full.sh`** — Composition wrapper that runs Stage
@@ -34,11 +34,13 @@ validation), prefer `scripts/release/retrain_evaluate_deploy.sh`.
 ## Hyperparameter generation (consumed by the release scripts)
 
 - **`release_exact/generate_hyperparameters.py`** — The 35-architecture
-  pan-allele recipe (lr=1e-3, mb=128, 1024×512 dense, with-skip-
-  connections). Pinned bit-for-bit with the 2.2.0 release.
+  pan-allele recipe. It defaults to minibatch 1024 and accepts
+  `--minibatch-size` so release scripts and sweeps can change the value
+  without patching the file.
 - **`release_exact/generate_hyperparameters.base.py`** /
   **`generate_hyperparameters.variants.py`** — Processing-network
-  hyperparameter base + no_flank / short_flanks variant emitters.
+  hyperparameter base + with_flanks / no_flank / short_flanks variant emitters.
+  The base generator accepts `--minibatch-size` and also defaults to 1024.
 - **`release_exact/make_train_data.processing.py`** /
   **`make_train_data.presentation.py`** — Per-stage train-data
   preparation (annotated mass-spec hits, decoy generation, format
@@ -58,10 +60,11 @@ validation), prefer `scripts/release/retrain_evaluate_deploy.sh`.
 - **`mhcflurry compare-models`** — Unified two-side comparator covering
   training stats (per-task wall-time / epoch / loss deltas), affinity
   (per-allele + per-length ROC/PR/PPV on `data_evaluation` monoallelic),
-  and presentation (per-sample + per-length on multiallelic with/without
-  flanks). Each side can be a training-run directory, `public` (current
-  install), or `public:<release_name>`. Default `--b public`. Replaces
-  the three legacy `scripts/training/compare_*.py` tools.
+  processing, and presentation (per-sample + per-length on multiallelic
+  flank modes). Each side can be a training-run directory, `public`
+  (current install), or `public:<release_name>`. Default `--b public`.
+  Writes detailed component artifacts plus `release_summary.csv` and
+  `release_summary.md`.
 - **`mhcflurry plot-model-comparison`** — Renders ROC/PR/scatter/delta
   plots from a `compare-models` output directory. Separate subcommand so
   the metric pipeline doesn't pay the matplotlib import cost.

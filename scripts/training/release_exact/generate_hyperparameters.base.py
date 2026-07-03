@@ -11,22 +11,41 @@
 # limitations under the License.
 
 """
-Generate grid of hyperparameters
+Generate grid of hyperparameters.
 """
 from __future__ import print_function
-from sys import stdout, stderr
+
+import argparse
 from copy import deepcopy
-from yaml import dump
+from sys import stdout, stderr
+
+from yaml import safe_dump
+
+
+DEFAULT_MINIBATCH_SIZE = 1024
+
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument(
+    "--minibatch-size",
+    type=int,
+    default=DEFAULT_MINIBATCH_SIZE,
+    help=(
+        "Training minibatch size to write into every architecture. "
+        "Default: %(default)s"
+    ),
+)
+args = parser.parse_args()
 
 base_hyperparameters = dict(
     convolutional_filters=64,
     convolutional_kernel_size=8,
-    convolutional_kernel_l1_l2=(0.00, 0.0),
+    convolutional_kernel_l1_l2=[0.00, 0.0],
     flanking_averages=True,
     n_flank_length=15,
     c_flank_length=15,
     post_convolutional_dense_layer_sizes=[],
-    minibatch_size=512,
+    minibatch_size=args.minibatch_size,
     dropout_rate=0.5,
     convolutional_activation="relu",
     patience=20,
@@ -50,7 +69,7 @@ def hyperparrameters_grid():
                                     new["convolutional_filters"] = convolutional_filters
                                     new["flanking_averages"] = flanking_averages
                                     new["convolutional_kernel_size"] = convolutional_kernel_size
-                                    new["convolutional_kernel_l1_l2"] = (l1, 0.0)
+                                    new["convolutional_kernel_l1_l2"] = [l1, 0.0]
                                     new["post_convolutional_dense_layer_sizes"] = s
                                     new["dropout_rate"] = d
                                     yield new
@@ -61,4 +80,4 @@ for new in hyperparrameters_grid():
         grid.append(new)
 
 print("Hyperparameters grid size: %d" % len(grid), file=stderr)
-dump(grid, stdout)
+safe_dump(grid, stdout)

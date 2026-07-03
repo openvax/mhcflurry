@@ -13,9 +13,9 @@
 """Plot the metric outputs from ``mhcflurry compare-models``.
 
 Reads the CSVs + JSON written by ``compare-models`` and renders ROC / PR
-/ scatter / per-allele delta plots under ``<input>/plots/``. Kept as a
-separate subcommand so the metric pipeline doesn't pay the matplotlib
-import cost.
+/ scatter / per-allele delta plots under ``<input>/plots/`` for affinity,
+processing, and presentation comparisons. Kept as a separate subcommand so
+the metric pipeline doesn't pay the matplotlib import cost.
 """
 from __future__ import annotations
 
@@ -53,8 +53,8 @@ def register_subparser(parser):
     parser.add_argument(
         "--components", default="auto",
         help=(
-            "Comma-separated subset of {affinity, presentation}; default "
-            "'auto' plots whichever components are present in --input."
+            "Comma-separated subset of {affinity, processing, presentation}; "
+            "default 'auto' plots whichever components are present in --input."
         ),
     )
     return parser
@@ -80,6 +80,8 @@ def run(args):
     for component in components:
         if component == "affinity":
             _plot_affinity(args.input, plot_dir, labels, args.max_scatter_points)
+        elif component == "processing":
+            _plot_processing(args.input, plot_dir, labels, args.max_scatter_points)
         elif component == "presentation":
             _plot_presentation(args.input, plot_dir, labels, args.max_scatter_points)
     return 0
@@ -99,6 +101,8 @@ def _detect_available_components(input_dir):
     components = []
     if os.path.isfile(os.path.join(input_dir, "affinity", "predictions.csv.bz2")):
         components.append("affinity")
+    if os.path.isdir(os.path.join(input_dir, "processing")):
+        components.append("processing")
     if os.path.isdir(os.path.join(input_dir, "presentation")):
         components.append("presentation")
     return components
@@ -156,14 +160,61 @@ def _save_per_allele_delta(plt, per_allele, sub_dir, label_a, label_b):
     plt.close(fig)
 
 
-# ---------------------------------------------------------------------------
-# presentation
-# ---------------------------------------------------------------------------
-
-
+_PROCESSING_MODES = ("with_flanks", "no_flank", "short_flanks")
 _PRESENTATION_MODES = ("with_flanks", "without_flanks")
 _PRESENTATION_SCORE_KINDS = ("presentation_score", "presentation_percentile")
 _METRIC_NAMES = ("roc_auc", "pr_auc", "ppv_at_n")
+
+
+# ---------------------------------------------------------------------------
+# processing
+# ---------------------------------------------------------------------------
+
+
+def _plot_processing(input_dir, plot_dir, labels, max_scatter_points):
+    import matplotlib.pyplot as plt
+    from sklearn.metrics import (
+        average_precision_score, precision_recall_curve,
+        roc_auc_score, roc_curve,
+    )
+
+    sub_dir = os.path.join(plot_dir, "processing")
+    os.makedirs(sub_dir, exist_ok=True)
+    label_a, label_b = labels["a"], labels["b"]
+
+    processing_dir = os.path.join(input_dir, "processing")
+    for mode in _PROCESSING_MODES:
+        pred_path = os.path.join(
+            processing_dir, "predictions_%s.csv.bz2" % mode)
+        if not os.path.isfile(pred_path):
+            continue
+        df = pandas.read_csv(pred_path)
+        a_score = _score_values(df, "a", "processing_score")
+        b_score = _score_values(df, "b", "processing_score")
+        y = df.hit.values
+        _save_roc(plt, roc_curve, roc_auc_score,
+                  y, a_score, b_score, label_a, label_b,
+                  os.path.join(sub_dir, "roc_%s.png" % mode),
+                  title="%s processing ROC" % mode)
+        _save_pr(plt, precision_recall_curve, average_precision_score,
+                 y, a_score, b_score, label_a, label_b,
+                 os.path.join(sub_dir, "pr_%s.png" % mode),
+                 title="%s processing PR" % mode)
+        _save_scatter(plt, b_score, a_score, label_b, label_a,
+                      os.path.join(sub_dir, "scatter_%s.png" % mode),
+                      title="%s processing: %s vs %s" % (
+                          mode, label_a, label_b),
+                      max_points=max_scatter_points)
+
+    summary_table_path = os.path.join(processing_dir, "summary_table.csv")
+    if os.path.isfile(summary_table_path):
+        summary = pandas.read_csv(summary_table_path)
+        _save_macro_bars(plt, summary, sub_dir, label_a, label_b)
+
+
+# ---------------------------------------------------------------------------
+# presentation
+# ---------------------------------------------------------------------------
 
 
 def _plot_presentation(input_dir, plot_dir, labels, max_scatter_points):
@@ -215,6 +266,8 @@ def _score_values(df, prefix, score_kind):
         return df["%s_presentation_score" % prefix].values
     if score_kind == "presentation_percentile":
         return -df["%s_presentation_percentile" % prefix].values
+    if score_kind == "processing_score":
+        return df["%s_processing_score" % prefix].values
     raise ValueError("Unknown score kind: %s" % score_kind)
 
 
@@ -224,7 +277,7 @@ def _save_macro_bars(plt, summary, sub_dir, label_a, label_b):
     x_labels = [
         "%s\n%s" % (
             row.mode,
-            row.score_kind.replace("presentation_", ""),
+            row.score_kind.replace("presentation_", "").replace("_score", ""),
         )
         for row in summary.itertuples()
     ]

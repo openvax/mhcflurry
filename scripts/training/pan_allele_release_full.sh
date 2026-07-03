@@ -28,6 +28,14 @@
 #   DATALOADER_NUM_WORKERS     'auto' (default) lets the orchestrator pick
 #   PROCESSING_HELD_OUT_SAMPLES  (default 50; subset script uses 10)
 #   PRESENTATION_DECOYS_PER_HIT (default 99 to match release; subset uses 2)
+#   TRAINING_MINIBATCH_SIZE    shared affinity/processing default (default 1024)
+#   AFFINITY_MINIBATCH_SIZE    affinity-specific override
+#   PROCESSING_MINIBATCH_SIZE  processing-specific override
+#   PROCESSING_VARIANTS        space-separated variants to train
+#                              (default "with_flanks no_flank short_flanks")
+#   PRESENTATION_PROCESSING_WITH_FLANKS_KIND
+#                              processing variant used as presentation's
+#                              with-flanks predictor (default with_flanks)
 set -euo pipefail
 set -x
 
@@ -59,6 +67,11 @@ DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-auto}"
 PROCESSING_HELD_OUT_SAMPLES="${PROCESSING_HELD_OUT_SAMPLES:-50}"
 PRESENTATION_DECOYS_PER_HIT="${PRESENTATION_DECOYS_PER_HIT:-99}"
 PRESENTATION_FEATURE_CHUNK_SIZE="${PRESENTATION_FEATURE_CHUNK_SIZE:-250000}"
+TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-1024}"
+AFFINITY_MINIBATCH_SIZE="${AFFINITY_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
+PROCESSING_MINIBATCH_SIZE="${PROCESSING_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
+PROCESSING_VARIANTS="${PROCESSING_VARIANTS:-with_flanks no_flank short_flanks}"
+PRESENTATION_PROCESSING_WITH_FLANKS_KIND="${PRESENTATION_PROCESSING_WITH_FLANKS_KIND:-with_flanks}"
 
 if [ "$GPUS" -eq 0 ]; then
     NUM_JOBS=1
@@ -197,6 +210,8 @@ MHCFLURRY_OUT="$BASE_OUT/affinity" \
     GPUS="$GPUS" \
     MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
     DATALOADER_NUM_WORKERS="$DATALOADER_NUM_WORKERS" \
+    TRAINING_MINIBATCH_SIZE="$TRAINING_MINIBATCH_SIZE" \
+    AFFINITY_MINIBATCH_SIZE="$AFFINITY_MINIBATCH_SIZE" \
     bash "$SCRIPT_DIR/pan_allele_release_affinity.sh"
 AFFINITY_PREDICTOR="$BASE_OUT/affinity/models.combined"
 echo "STAGE 1 duration: $(( $(date +%s) - STAGE1_START )) sec"
@@ -233,9 +248,11 @@ python make_train_data.processing.py \
     "${COMMON_PARALLELISM_ARGS[@]}"
 compress_csv_bzip2 "$(pwd)/train_data.csv"
 
-python generate_hyperparameters.base.py > hyperparameters.base.yaml
+python generate_hyperparameters.base.py \
+    --minibatch-size "$PROCESSING_MINIBATCH_SIZE" \
+    > hyperparameters.base.yaml
 
-for kind in no_flank short_flanks; do
+for kind in $PROCESSING_VARIANTS; do
     python generate_hyperparameters.variants.py hyperparameters.base.yaml "$kind" \
         > "hyperparameters.$kind.full.yaml"
     # Round-trip through safe_dump to strip python/tuple tags so
@@ -298,7 +315,7 @@ compress_csv_bzip2 "$(pwd)/train_data.csv"
 mhcflurry-class1-train-presentation-models \
     --data "$(pwd)/train_data.csv.bz2" \
     --affinity-predictor "$AFFINITY_PREDICTOR" \
-    --processing-predictor-with-flanks "$BASE_OUT/processing/models.selected.short_flanks" \
+    --processing-predictor-with-flanks "$BASE_OUT/processing/models.selected.$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" \
     --processing-predictor-without-flanks "$BASE_OUT/processing/models.selected.no_flank" \
     --out-models-dir "$(pwd)/models" \
     --feature-chunk-size "$PRESENTATION_FEATURE_CHUNK_SIZE" \
@@ -320,7 +337,7 @@ mhcflurry-calibrate-percentile-ranks \
 # so it's self-contained for distribution.
 cp "$AFFINITY_PREDICTOR/train_data.csv.bz2" \
     "$(pwd)/models/affinity_predictor_train_data.csv.bz2"
-cp "$BASE_OUT/processing/models.selected.short_flanks/train_data.csv.bz2" \
+cp "$BASE_OUT/processing/models.selected.$PRESENTATION_PROCESSING_WITH_FLANKS_KIND/train_data.csv.bz2" \
     "$(pwd)/models/processing_predictor_with_flanks_train_data.csv.bz2"
 cp "$BASE_OUT/processing/models.selected.no_flank/train_data.csv.bz2" \
     "$(pwd)/models/processing_predictor_no_flank_train_data.csv.bz2"
@@ -329,6 +346,6 @@ echo "STAGE 3 duration: $(( $(date +%s) - STAGE3_START )) sec"
 
 echo "=== DONE ==="
 echo "affinity:     $AFFINITY_PREDICTOR"
-echo "processing:   $BASE_OUT/processing/models.selected.{no_flank,short_flanks}"
+echo "processing:   $BASE_OUT/processing/models.selected.{${PROCESSING_VARIANTS// /,}}"
 echo "presentation: $BASE_OUT/presentation/models"
 ls -la "$BASE_OUT/presentation/models" | head -20

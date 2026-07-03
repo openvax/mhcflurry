@@ -242,6 +242,7 @@ def _make_args(**overrides):
         a=None, b=None, a_label=None, b_label=None, out=None,
         include="auto", data_dir=None, limit_files=None,
         affinity_source="mixmhcpred",
+        processing_modes="with_flanks,no_flank,short_flanks",
         presentation_modes="with_flanks,without_flanks",
     )
     for letter in ("a", "b"):
@@ -360,6 +361,14 @@ def test_probe_run_dir_finds_presentation_via_weights_csv(tmp_path):
     assert resolved == str(target)
 
 
+def test_probe_run_dir_finds_processing_root(tmp_path):
+    target = tmp_path / "run" / "processing" / "models.selected.with_flanks"
+    target.mkdir(parents=True)
+    resolved = compare_models._probe_run_dir(
+        str(tmp_path / "run"), "processing")
+    assert resolved == str(tmp_path / "run" / "processing")
+
+
 def test_probe_run_dir_still_finds_legacy_presentation_models_combined(tmp_path):
     target = tmp_path / "run" / "presentation" / "models.combined"
     target.mkdir(parents=True)
@@ -386,6 +395,15 @@ def test_resolve_components_auto_picks_available(tmp_path):
     }
     components = compare_models._resolve_components("auto", side_a, side_b)
     assert components == ["training_stats"]
+
+
+def test_resolve_components_auto_includes_processing():
+    side = {
+        "label": "a", "letter": "a", "spec": "a",
+        "paths": {"training": None, "affinity": None,
+                  "presentation": None, "processing": "/tmp/processing"},
+    }
+    assert compare_models._resolve_components("auto", side, side) == ["processing"]
 
 
 def test_resolve_components_explicit_drops_unavailable(capsys):
@@ -473,6 +491,72 @@ def test_affinity_metrics_handle_no_reportable_alleles():
     assert summary["n_alleles_reported"] == 0
     assert summary["allele_count"]["a_better_roc_auc"] == 0
     assert summary["allele_count"]["b_better_roc_auc"] == 0
+
+
+def test_processing_summary_uses_processing_score():
+    scored = pandas.DataFrame({
+        "peptide": ["AAAAAAAA", "BBBBBBBB", "CCCCCCCC", "DDDDDDDD"],
+        "sample_id": ["s1", "s1", "s2", "s2"],
+        "hla": ["HLA-A*02:01"] * 4,
+        "hit": [1, 0, 1, 0],
+        "peptide_len": [8, 8, 8, 8],
+        "a_processing_score": [0.9, 0.1, 0.8, 0.2],
+        "b_processing_score": [0.6, 0.4, 0.7, 0.3],
+    })
+    per_sample = compare_models._presentation_per_sample(
+        scored, "processing_score")
+    per_length, _ = compare_models._presentation_per_length(
+        scored, "processing_score")
+    summary = compare_models._presentation_mode_summary(
+        scored, per_sample, per_length, "no_flank", "processing_score")
+    row = compare_models._presentation_summary_row(summary)
+    assert row["mode"] == "no_flank"
+    assert row["a_macro_roc_auc"] == pytest.approx(1.0)
+    assert row["b_macro_roc_auc"] == pytest.approx(1.0)
+
+
+def test_release_summary_rows_include_affinity_processing_presentation():
+    metric_summary = {
+        "n_rows": 4,
+        "n_hits": 2,
+        "n_samples_reported": 2,
+        "micro_pooled": {
+            "a": {"roc_auc": 0.9, "pr_auc": 0.8, "ppv_at_n": 0.7},
+            "b": {"roc_auc": 0.8, "pr_auc": 0.7, "ppv_at_n": 0.6},
+        },
+        "macro_mean_over_samples": {
+            "roc_auc": {"a": 0.91, "b": 0.81},
+            "pr_auc": {"a": 0.82, "b": 0.72},
+            "ppv_at_n": {"a": 0.73, "b": 0.63},
+        },
+    }
+    headline = {
+        "affinity": {
+            "micro_pooled": {
+                "a": {"roc_auc": 0.98, "pr_auc": 0.68, "ppv_at_n": 0.66},
+                "b": {"roc_auc": 0.97, "pr_auc": 0.65, "ppv_at_n": 0.64},
+            },
+            "macro_mean_over_alleles": {
+                "roc_auc": {"a": 0.981, "b": 0.973},
+                "pr_auc": {"a": 0.683, "b": 0.657},
+                "ppv_at_n": {"a": 0.669, "b": 0.645},
+            },
+        },
+        "processing": {
+            "modes": ["no_flank"],
+            "summaries": {"no_flank": {"processing_score": metric_summary}},
+        },
+        "presentation": {
+            "modes": ["with_flanks"],
+            "summaries": {"with_flanks": {"presentation_score": metric_summary}},
+        },
+    }
+    rows = compare_models._release_summary_rows(
+        headline, ["affinity", "processing", "presentation"])
+    assert {row["component"] for row in rows} == {
+        "affinity", "processing", "presentation"}
+    assert any(row["metric"] == "AUROC" and row["average"] == "Macro"
+               for row in rows)
 
 
 # ---------------------------------------------------------------------------
@@ -608,6 +692,12 @@ def test_detect_available_components_finds_affinity(tmp_path):
     aff.mkdir()
     (aff / "predictions.csv.bz2").write_text("hit,a_score,b_score\n")
     assert "affinity" in plot_model_comparison._detect_available_components(
+        str(tmp_path))
+
+
+def test_detect_available_components_finds_processing(tmp_path):
+    (tmp_path / "processing").mkdir()
+    assert "processing" in plot_model_comparison._detect_available_components(
         str(tmp_path))
 
 

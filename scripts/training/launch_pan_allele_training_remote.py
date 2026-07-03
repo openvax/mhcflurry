@@ -89,6 +89,7 @@ app = App(
     min_disk=MIN_DISK,
     timeout=60 * 60 * 24 * 14,
     env={
+        "AFFINITY_MINIBATCH_SIZE": os.environ.get("AFFINITY_MINIBATCH_SIZE", "1024"),
         "DATALOADER_NUM_WORKERS": os.environ.get("DATALOADER_NUM_WORKERS", "auto"),
         "MAX_TASKS_PER_WORKER": os.environ.get("MAX_TASKS_PER_WORKER", "12"),
         "MAX_WORKERS_PER_GPU": os.environ.get("MAX_WORKERS_PER_GPU", "auto"),
@@ -102,9 +103,19 @@ app = App(
         ),
         "MATMUL_PRECISION": os.environ.get("MATMUL_PRECISION", "high"),
         "MATMUL_PRECISION_CLI": os.environ.get("MATMUL_PRECISION_CLI", "high"),
+        "PRESENTATION_PROCESSING_WITH_FLANKS_KIND": os.environ.get(
+            "PRESENTATION_PROCESSING_WITH_FLANKS_KIND", "with_flanks"
+        ),
+        "PROCESSING_MINIBATCH_SIZE": os.environ.get(
+            "PROCESSING_MINIBATCH_SIZE", "1024"
+        ),
+        "PROCESSING_VARIANTS": os.environ.get(
+            "PROCESSING_VARIANTS", "with_flanks no_flank short_flanks"
+        ),
         "TORCHINDUCTOR_COMPILE_THREADS": os.environ.get(
             "TORCHINDUCTOR_COMPILE_THREADS", "auto"
         ),
+        "TRAINING_MINIBATCH_SIZE": os.environ.get("TRAINING_MINIBATCH_SIZE", "1024"),
     },
 )
 def train_release_full():

@@ -15,6 +15,9 @@
 #   NUM_JOBS=N                 parallelism (default: $GPUS). Controls
 #                              how many networks train concurrently;
 #                              mhcflurry pairs jobs 1:1 with GPUs.
+#   TRAINING_MINIBATCH_SIZE    shared release-training minibatch default
+#                              (default 1024)
+#   AFFINITY_MINIBATCH_SIZE    affinity-specific override
 set -euo pipefail
 set -x
 
@@ -327,8 +330,12 @@ TRAINING_DATA="$(pwd)/train_data.csv.bz2"
 
 # ---- hyperparameters -------------------------------------------------
 CURRENT_PHASE="hyperparameters"
+TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-1024}"
+AFFINITY_MINIBATCH_SIZE="${AFFINITY_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
 cp "$RECIPE_DIR/generate_hyperparameters.py" .
-python generate_hyperparameters.py > hyperparameters.yaml
+python generate_hyperparameters.py \
+    --minibatch-size "$AFFINITY_MINIBATCH_SIZE" \
+    > hyperparameters.yaml
 # ``dataloader_num_workers`` is no longer injected here. The orchestrator
 # overrides each work item's hyperparameters via the
 # ``--dataloader-num-workers`` CLI flag at planning time (see

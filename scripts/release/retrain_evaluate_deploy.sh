@@ -22,6 +22,10 @@ Usage:
       --run-dir /path/to/release-run \
       --release 2.3.0 \
       [--backend local|brev-existing|ssh] \
+      [--minibatch-size 1024] \
+      [--affinity-minibatch-size 1024] \
+      [--processing-minibatch-size 1024] \
+      [--processing-variants "with_flanks no_flank short_flanks"] \
       [--skip-train] [--skip-eval] [--skip-plots] [--skip-deploy] \
       [--deploy-mode dry-run|draft|publish]
 
@@ -39,6 +43,8 @@ Evaluation:
   After training, the script runs:
       mhcflurry compare-models --a RUN_DIR --b public
       mhcflurry plot-model-comparison --input RUN_DIR/eval_comparison
+  compare-models writes release_summary.csv and release_summary.md with
+  affinity, processing, and presentation release-gate tables.
 
 Deployment:
   The final step calls deploy_trained_models.sh. The default deploy mode is
@@ -85,10 +91,16 @@ SKIP_PLOTS=0
 SKIP_DEPLOY=0
 DEPLOY_MODE=dry-run
 DATA_DIR=
-COMPARE_INCLUDE=affinity,presentation
+COMPARE_INCLUDE=affinity,processing,presentation
+PROCESSING_MODES=with_flanks,no_flank,short_flanks
 PRESENTATION_MODES=with_flanks,without_flanks
 RUN_LABEL=new
 DRY_RUN=0
+TRAINING_MINIBATCH_SIZE=1024
+AFFINITY_MINIBATCH_SIZE=
+PROCESSING_MINIBATCH_SIZE=
+PROCESSING_VARIANTS="with_flanks no_flank short_flanks"
+PRESENTATION_PROCESSING_WITH_FLANKS_KIND=with_flanks
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -167,6 +179,30 @@ while [ $# -gt 0 ]; do
             DRY_RUN=1
             shift
             ;;
+        --minibatch-size)
+            TRAINING_MINIBATCH_SIZE=$2
+            shift 2
+            ;;
+        --affinity-minibatch-size)
+            AFFINITY_MINIBATCH_SIZE=$2
+            shift 2
+            ;;
+        --processing-minibatch-size)
+            PROCESSING_MINIBATCH_SIZE=$2
+            shift 2
+            ;;
+        --processing-variants)
+            PROCESSING_VARIANTS=$2
+            shift 2
+            ;;
+        --presentation-processing-with-flanks-kind)
+            PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$2
+            shift 2
+            ;;
+        --processing-modes)
+            PROCESSING_MODES=$2
+            shift 2
+            ;;
         -h|--help)
             usage
             exit 0
@@ -181,6 +217,12 @@ done
 [ -n "$RELEASE" ] || die "--release is required"
 if [ -z "$GITHUB_RELEASE" ]; then
     GITHUB_RELEASE=$RELEASE
+fi
+if [ -z "$AFFINITY_MINIBATCH_SIZE" ]; then
+    AFFINITY_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE
+fi
+if [ -z "$PROCESSING_MINIBATCH_SIZE" ]; then
+    PROCESSING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE
 fi
 case "$BACKEND" in
     local|brev-existing|ssh) ;;
@@ -200,6 +242,8 @@ RUN_DIR=${RUN_DIR%/}
 note "Run directory: $RUN_DIR"
 note "Release:       $RELEASE"
 note "Backend:       $BACKEND"
+note "Batch sizes:   affinity=$AFFINITY_MINIBATCH_SIZE processing=$PROCESSING_MINIBATCH_SIZE"
+note "Processing:    variants=$PROCESSING_VARIANTS; eval_modes=$PROCESSING_MODES"
 
 if [ "$SKIP_TRAIN" != "1" ]; then
     case "$BACKEND" in
@@ -208,6 +252,11 @@ if [ "$SKIP_TRAIN" != "1" ]; then
             run_cmd env \
                 "MHCFLURRY_OUT=$RUN_DIR" \
                 "REPO=$REPO" \
+                "TRAINING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE" \
+                "AFFINITY_MINIBATCH_SIZE=$AFFINITY_MINIBATCH_SIZE" \
+                "PROCESSING_MINIBATCH_SIZE=$PROCESSING_MINIBATCH_SIZE" \
+                "PROCESSING_VARIANTS=$PROCESSING_VARIANTS" \
+                "PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" \
                 bash "$REPO/scripts/training/pan_allele_release_full.sh"
             ;;
         brev-existing)
@@ -216,6 +265,11 @@ if [ "$SKIP_TRAIN" != "1" ]; then
             run_cmd env \
                 "MHCFLURRY_OUT=$RUN_DIR" \
                 "REPO=$REPO" \
+                "TRAINING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE" \
+                "AFFINITY_MINIBATCH_SIZE=$AFFINITY_MINIBATCH_SIZE" \
+                "PROCESSING_MINIBATCH_SIZE=$PROCESSING_MINIBATCH_SIZE" \
+                "PROCESSING_VARIANTS=$PROCESSING_VARIANTS" \
+                "PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" \
                 runplz --outputs-dir "$RUN_DIR" \
                 "$REPO/scripts/training/launch_pan_allele_training_remote.py"
             ;;
@@ -228,6 +282,11 @@ if [ "$SKIP_TRAIN" != "1" ]; then
             REMOTE_COMMAND="cd '$REMOTE_REPO'"
             REMOTE_COMMAND="$REMOTE_COMMAND && MHCFLURRY_OUT='$REMOTE_RUN_DIR'"
             REMOTE_COMMAND="$REMOTE_COMMAND REPO='$REMOTE_REPO'"
+            REMOTE_COMMAND="$REMOTE_COMMAND TRAINING_MINIBATCH_SIZE='$TRAINING_MINIBATCH_SIZE'"
+            REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_MINIBATCH_SIZE='$AFFINITY_MINIBATCH_SIZE'"
+            REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_MINIBATCH_SIZE='$PROCESSING_MINIBATCH_SIZE'"
+            REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_VARIANTS='$PROCESSING_VARIANTS'"
+            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_PROCESSING_WITH_FLANKS_KIND='$PRESENTATION_PROCESSING_WITH_FLANKS_KIND'"
             REMOTE_COMMAND="$REMOTE_COMMAND bash"
             REMOTE_COMMAND="$REMOTE_COMMAND scripts/training/pan_allele_release_full.sh"
             run_cmd ssh "$REMOTE" \
@@ -249,7 +308,7 @@ if [ "$SKIP_EVAL" != "1" ]; then
     if [ -z "$DATA_DIR" ]; then
         require_command mhcflurry-downloads
         run_cmd mhcflurry-downloads fetch data_evaluation models_class1_pan \
-            models_class1_presentation
+            models_class1_processing models_class1_presentation
         if [ "$DRY_RUN" = "1" ]; then
             DATA_DIR='<mhcflurry-downloads path data_evaluation>'
         else
@@ -262,6 +321,7 @@ if [ "$SKIP_EVAL" != "1" ]; then
         --b public \
         --data-dir "$DATA_DIR" \
         --include "$COMPARE_INCLUDE" \
+        --processing-modes "$PROCESSING_MODES" \
         --presentation-modes "$PRESENTATION_MODES" \
         --out "$EVAL_OUT"
 else
