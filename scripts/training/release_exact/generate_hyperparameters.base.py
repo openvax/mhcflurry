@@ -25,17 +25,18 @@ from yaml import safe_dump
 DEFAULT_MINIBATCH_SIZE = 1024
 
 
-parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument(
-    "--minibatch-size",
-    type=int,
-    default=DEFAULT_MINIBATCH_SIZE,
-    help=(
-        "Training minibatch size to write into every architecture. "
-        "Default: %(default)s"
-    ),
-)
-args = parser.parse_args()
+def make_parser():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--minibatch-size",
+        type=int,
+        default=DEFAULT_MINIBATCH_SIZE,
+        help=(
+            "Training minibatch size to write into every architecture. "
+            "Default: %(default)s"
+        ),
+    )
+    return parser
 
 base_hyperparameters = dict(
     convolutional_filters=64,
@@ -45,16 +46,15 @@ base_hyperparameters = dict(
     n_flank_length=15,
     c_flank_length=15,
     post_convolutional_dense_layer_sizes=[],
-    minibatch_size=args.minibatch_size,
+    minibatch_size=DEFAULT_MINIBATCH_SIZE,
     dropout_rate=0.5,
     convolutional_activation="relu",
     patience=20,
     learning_rate=0.001)
 
-grid = []
-
-
-def hyperparrameters_grid():
+def hyperparameters_grid(minibatch_size=DEFAULT_MINIBATCH_SIZE):
+    base = deepcopy(base_hyperparameters)
+    base["minibatch_size"] = minibatch_size
     for learning_rate in [0.001]:
         for convolutional_activation in ["tanh", "relu"]:
             for convolutional_filters in [256, 512]:
@@ -63,7 +63,7 @@ def hyperparrameters_grid():
                         for l1 in [0.0, 1e-6]:
                             for s in [[8], [16]]:
                                 for d in [0.3, 0.5]:
-                                    new = deepcopy(base_hyperparameters)
+                                    new = deepcopy(base)
                                     new["learning_rate"] = learning_rate
                                     new["convolutional_activation"] = convolutional_activation
                                     new["convolutional_filters"] = convolutional_filters
@@ -75,9 +75,20 @@ def hyperparrameters_grid():
                                     yield new
 
 
-for new in hyperparrameters_grid():
-    if new not in grid:
-        grid.append(new)
+def build_grid(minibatch_size=DEFAULT_MINIBATCH_SIZE):
+    grid = []
+    for new in hyperparameters_grid(minibatch_size=minibatch_size):
+        if new not in grid:
+            grid.append(new)
+    return grid
 
-print("Hyperparameters grid size: %d" % len(grid), file=stderr)
-safe_dump(grid, stdout)
+
+def main(argv=None):
+    args = make_parser().parse_args(argv)
+    grid = build_grid(minibatch_size=args.minibatch_size)
+    print("Hyperparameters grid size: %d" % len(grid), file=stderr)
+    safe_dump(grid, stdout)
+
+
+if __name__ == "__main__":
+    main()

@@ -892,7 +892,13 @@ def _predict_processing_chunk(predictor_dir, rows, mode, chunk_num):
         kwargs["c_flanks"] = df.c_flank.values
     elif mode != "no_flank":
         raise ValueError("Unexpected processing mode: %s" % mode)
-    return chunk_num, numpy.asarray(predictor.predict(**kwargs))
+    predictions = numpy.asarray(predictor.predict(**kwargs))
+    if len(predictions) != len(df):
+        raise ValueError(
+            "Predictor returned %d rows for %d inputs" % (
+                len(predictions), len(df))
+        )
+    return chunk_num, predictions
 
 
 def _parallel_processing_predict(args, predictor_dir, df, mode, label):
@@ -1013,7 +1019,8 @@ def _run_processing(side_a, side_b, args):
 
     with open(os.path.join(component_dir, "summary.json"), "w") as fd:
         json.dump(summaries, fd, indent=2, sort_keys=True)
-    summary_table = pandas.DataFrame(summary_rows)
+    summary_table = pandas.DataFrame(
+        summary_rows, columns=_component_summary_table_columns())
     summary_table.to_csv(
         os.path.join(component_dir, "summary_table.csv"), index=False)
     _stamp("  wrote processing summary.json + summary_table.csv")
@@ -1294,6 +1301,20 @@ def _presentation_summary_row(summary):
     return row
 
 
+def _component_summary_table_columns():
+    columns = ["mode", "score_kind", "n_rows", "n_hits", "n_samples_reported"]
+    for metric in _METRIC_NAMES:
+        columns.extend([
+            "a_micro_%s" % metric,
+            "b_micro_%s" % metric,
+            "micro_%s_diff" % metric,
+            "a_macro_%s" % metric,
+            "b_macro_%s" % metric,
+            "macro_%s_diff" % metric,
+        ])
+    return columns
+
+
 def _run_presentation(side_a, side_b, args):
     component_dir = os.path.join(args.out, "presentation")
     os.makedirs(component_dir, exist_ok=True)
@@ -1364,7 +1385,8 @@ def _run_presentation(side_a, side_b, args):
 
     with open(os.path.join(component_dir, "summary.json"), "w") as fd:
         json.dump(summaries, fd, indent=2, sort_keys=True)
-    summary_table = pandas.DataFrame(summary_rows)
+    summary_table = pandas.DataFrame(
+        summary_rows, columns=_component_summary_table_columns())
     summary_table.to_csv(
         os.path.join(component_dir, "summary_table.csv"), index=False)
     _stamp("  wrote summary.json + summary_table.csv")

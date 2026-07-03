@@ -51,7 +51,7 @@ def test_compare_models_help_runs(capsys):
     captured = capsys.readouterr().out
     for flag in ["--a", "--b", "--include", "--out", "--data-dir",
                  "--num-jobs", "--gpus", "--max-workers-per-gpu",
-                 "--presentation-modes"]:
+                 "--processing-modes", "--presentation-modes"]:
         assert flag in captured, "missing flag in help: %s" % flag
 
 
@@ -83,6 +83,87 @@ def test_all_legacy_commands_registered():
         "pseudosequences",
     }
     assert expected.issubset(set(cli_main._SUBCOMMANDS))
+
+
+def _load_script_module(path, module_name):
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_affinity_hyperparameter_generator_is_importable():
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "scripts/training/release_exact/generate_hyperparameters.py",
+    )
+    module = _load_script_module(path, "affinity_hyperparameters_under_test")
+    grid = module.build_grid(minibatch_size=2048)
+    assert len(grid) == 35
+    assert {item["minibatch_size"] for item in grid} == {2048}
+
+
+def test_processing_hyperparameter_generator_is_importable():
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "scripts/training/release_exact/generate_hyperparameters.base.py",
+    )
+    module = _load_script_module(path, "processing_hyperparameters_under_test")
+    grid = module.build_grid(minibatch_size=2048)
+    assert len(grid) == 128
+    assert {item["minibatch_size"] for item in grid} == {2048}
+
+
+def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
+    """Family-specific minibatch env vars should only be set when provided."""
+    fake_runplz = types.ModuleType("runplz")
+    fake_config = types.ModuleType("runplz.config")
+
+    class FakeImage:
+        @classmethod
+        def from_registry(cls, *_args, **_kwargs):
+            return cls()
+
+        def apt_install(self, *_args, **_kwargs):
+            return self
+
+        def pip_install(self, *_args, **_kwargs):
+            return self
+
+        def pip_install_local_dir(self, *_args, **_kwargs):
+            return self
+
+    class FakeApp:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def function(self, *_args, **_kwargs):
+            return lambda fn: fn
+
+        def local_entrypoint(self, *_args, **_kwargs):
+            return lambda fn: fn
+
+    fake_runplz.App = FakeApp
+    fake_runplz.Image = FakeImage
+    fake_config.BrevConfig = lambda **kwargs: kwargs
+    monkeypatch.setitem(sys.modules, "runplz", fake_runplz)
+    monkeypatch.setitem(sys.modules, "runplz.config", fake_config)
+
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "scripts/training/launch_pan_allele_training_remote.py",
+    )
+    module = _load_script_module(path, "remote_launcher_under_test")
+    env = module.remote_training_env({"TRAINING_MINIBATCH_SIZE": "2048"})
+    assert env["TRAINING_MINIBATCH_SIZE"] == "2048"
+    assert "AFFINITY_MINIBATCH_SIZE" not in env
+    assert "PROCESSING_MINIBATCH_SIZE" not in env
+
+    env = module.remote_training_env({
+        "TRAINING_MINIBATCH_SIZE": "2048",
+        "AFFINITY_MINIBATCH_SIZE": "512",
+    })
+    assert env["AFFINITY_MINIBATCH_SIZE"] == "512"
 
 
 def test_main_help_does_not_import_predict_command():
@@ -699,6 +780,13 @@ def test_detect_available_components_finds_processing(tmp_path):
     (tmp_path / "processing").mkdir()
     assert "processing" in plot_model_comparison._detect_available_components(
         str(tmp_path))
+
+
+def test_read_optional_csv_tolerates_empty_summary(tmp_path):
+    path = tmp_path / "summary_table.csv"
+    path.write_text("\n")
+    summary = plot_model_comparison._read_optional_csv(str(path))
+    assert summary.empty
 
 
 def test_detect_available_components_finds_presentation(tmp_path):

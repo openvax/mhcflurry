@@ -108,6 +108,13 @@ def _detect_available_components(input_dir):
     return components
 
 
+def _read_optional_csv(path):
+    try:
+        return pandas.read_csv(path)
+    except pandas.errors.EmptyDataError:
+        return pandas.DataFrame()
+
+
 # ---------------------------------------------------------------------------
 # affinity
 # ---------------------------------------------------------------------------
@@ -208,7 +215,7 @@ def _plot_processing(input_dir, plot_dir, labels, max_scatter_points):
 
     summary_table_path = os.path.join(processing_dir, "summary_table.csv")
     if os.path.isfile(summary_table_path):
-        summary = pandas.read_csv(summary_table_path)
+        summary = _read_optional_csv(summary_table_path)
         _save_macro_bars(plt, summary, sub_dir, label_a, label_b)
 
 
@@ -256,7 +263,7 @@ def _plot_presentation(input_dir, plot_dir, labels, max_scatter_points):
 
     summary_table_path = os.path.join(presentation_dir, "summary_table.csv")
     if os.path.isfile(summary_table_path):
-        summary = pandas.read_csv(summary_table_path)
+        summary = _read_optional_csv(summary_table_path)
         _save_macro_bars(plt, summary, sub_dir, label_a, label_b)
 
 

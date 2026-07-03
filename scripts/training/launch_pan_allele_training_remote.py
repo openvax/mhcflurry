@@ -45,6 +45,38 @@ MIN_DISK = int(os.environ.get("RUNPLZ_MIN_DISK", "1000"))
 DEFAULT_OUT = os.environ.get("MHCFLURRY_OUT", "/root/mhcflurry-release-run")
 
 
+def remote_training_env(environ=os.environ):
+    env = {
+        "DATALOADER_NUM_WORKERS": environ.get("DATALOADER_NUM_WORKERS", "auto"),
+        "MAX_TASKS_PER_WORKER": environ.get("MAX_TASKS_PER_WORKER", "12"),
+        "MAX_WORKERS_PER_GPU": environ.get("MAX_WORKERS_PER_GPU", "auto"),
+        "MHCFLURRY_ENABLE_TIMING": environ.get("MHCFLURRY_ENABLE_TIMING", "1"),
+        "MHCFLURRY_TORCH_COMPILE": environ.get("MHCFLURRY_TORCH_COMPILE", "1"),
+        "MHCFLURRY_TORCH_COMPILE_LOSS": environ.get(
+            "MHCFLURRY_TORCH_COMPILE_LOSS", "1"
+        ),
+        "MHCFLURRY_MATMUL_PRECISION": environ.get(
+            "MHCFLURRY_MATMUL_PRECISION", "high"
+        ),
+        "MATMUL_PRECISION": environ.get("MATMUL_PRECISION", "high"),
+        "MATMUL_PRECISION_CLI": environ.get("MATMUL_PRECISION_CLI", "high"),
+        "PRESENTATION_PROCESSING_WITH_FLANKS_KIND": environ.get(
+            "PRESENTATION_PROCESSING_WITH_FLANKS_KIND", "with_flanks"
+        ),
+        "PROCESSING_VARIANTS": environ.get(
+            "PROCESSING_VARIANTS", "with_flanks no_flank short_flanks"
+        ),
+        "TORCHINDUCTOR_COMPILE_THREADS": environ.get(
+            "TORCHINDUCTOR_COMPILE_THREADS", "auto"
+        ),
+        "TRAINING_MINIBATCH_SIZE": environ.get("TRAINING_MINIBATCH_SIZE", "1024"),
+    }
+    for name in ("AFFINITY_MINIBATCH_SIZE", "PROCESSING_MINIBATCH_SIZE"):
+        if name in environ:
+            env[name] = environ[name]
+    return env
+
+
 image = (
     Image.from_registry(
         os.environ.get(
@@ -88,35 +120,7 @@ app = App(
     min_memory=MIN_MEMORY,
     min_disk=MIN_DISK,
     timeout=60 * 60 * 24 * 14,
-    env={
-        "AFFINITY_MINIBATCH_SIZE": os.environ.get("AFFINITY_MINIBATCH_SIZE", "1024"),
-        "DATALOADER_NUM_WORKERS": os.environ.get("DATALOADER_NUM_WORKERS", "auto"),
-        "MAX_TASKS_PER_WORKER": os.environ.get("MAX_TASKS_PER_WORKER", "12"),
-        "MAX_WORKERS_PER_GPU": os.environ.get("MAX_WORKERS_PER_GPU", "auto"),
-        "MHCFLURRY_ENABLE_TIMING": os.environ.get("MHCFLURRY_ENABLE_TIMING", "1"),
-        "MHCFLURRY_TORCH_COMPILE": os.environ.get("MHCFLURRY_TORCH_COMPILE", "1"),
-        "MHCFLURRY_TORCH_COMPILE_LOSS": os.environ.get(
-            "MHCFLURRY_TORCH_COMPILE_LOSS", "1"
-        ),
-        "MHCFLURRY_MATMUL_PRECISION": os.environ.get(
-            "MHCFLURRY_MATMUL_PRECISION", "high"
-        ),
-        "MATMUL_PRECISION": os.environ.get("MATMUL_PRECISION", "high"),
-        "MATMUL_PRECISION_CLI": os.environ.get("MATMUL_PRECISION_CLI", "high"),
-        "PRESENTATION_PROCESSING_WITH_FLANKS_KIND": os.environ.get(
-            "PRESENTATION_PROCESSING_WITH_FLANKS_KIND", "with_flanks"
-        ),
-        "PROCESSING_MINIBATCH_SIZE": os.environ.get(
-            "PROCESSING_MINIBATCH_SIZE", "1024"
-        ),
-        "PROCESSING_VARIANTS": os.environ.get(
-            "PROCESSING_VARIANTS", "with_flanks no_flank short_flanks"
-        ),
-        "TORCHINDUCTOR_COMPILE_THREADS": os.environ.get(
-            "TORCHINDUCTOR_COMPILE_THREADS", "auto"
-        ),
-        "TRAINING_MINIBATCH_SIZE": os.environ.get("TRAINING_MINIBATCH_SIZE", "1024"),
-    },
+    env=remote_training_env(),
 )
 def train_release_full():
     """Run the maintained full release training script."""

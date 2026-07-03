@@ -24,17 +24,18 @@ from yaml import safe_dump
 DEFAULT_MINIBATCH_SIZE = 1024
 
 
-parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument(
-    "--minibatch-size",
-    type=int,
-    default=DEFAULT_MINIBATCH_SIZE,
-    help=(
-        "Training minibatch size to write into every architecture. "
-        "Default: %(default)s"
-    ),
-)
-args = parser.parse_args()
+def make_parser():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--minibatch-size",
+        type=int,
+        default=DEFAULT_MINIBATCH_SIZE,
+        help=(
+            "Training minibatch size to write into every architecture. "
+            "Default: %(default)s"
+        ),
+    )
+    return parser
 
 base_hyperparameters = {
     'activation': 'tanh',
@@ -59,7 +60,7 @@ base_hyperparameters = {
     # Release training uses a shared default across model families. Keep this
     # script-level CLI knob so sweeps and remote workflows can override it
     # without patching the recipe.
-    'minibatch_size': args.minibatch_size,
+    'minibatch_size': DEFAULT_MINIBATCH_SIZE,
     'optimizer': 'rmsprop',
     'output_activation': 'sigmoid',
     "patience": 20,
@@ -77,10 +78,10 @@ base_hyperparameters = {
     # Run the validation pass every N epochs instead of every epoch.
     # Validation represents a per-epoch GPU-sync barrier that prevents
     # pipelining the next epoch's CPU prep with the current epoch's
-    # training tail. With minibatch=16384 the effective val batch is
-    # 4×minibatch=65536 (see ``effective_validation_batch_size``), so a
-    # 244K-row val set is ~4 batches per pass. Early-stop check still
-    # fires reliably because patience=20 is far larger than
+    # training tail. The effective validation batch size scales with the
+    # configured training minibatch, so callers that change --minibatch-size
+    # also change validation-pass chunking. Early-stop check still fires
+    # reliably because patience=20 is far larger than
     # ``validation_interval=5``. A final validation pass is forced
     # before any patience-triggered break (see fit() loop).
     "validation_interval": 5,
@@ -134,25 +135,36 @@ base_hyperparameters = {
     'data_dependent_initialization_method': "lsuv",
 }
 
-grid = []
-for layer_sizes in [[512, 256], [512, 512], [1024, 512], [1024, 1024]]:
-    l1_base = 0.0000001
-    for l1 in [l1_base, l1_base / 10, l1_base / 100, l1_base / 1000, 0.0]:
-        new = deepcopy(base_hyperparameters)
-        new["topology"] = 'feedforward'
-        new["layer_sizes"] = layer_sizes
-        new["dense_layer_l1_regularization"] = l1
-        if not grid or new not in grid:
-            grid.append(new)
+def build_grid(minibatch_size=DEFAULT_MINIBATCH_SIZE):
+    grid = []
+    base = deepcopy(base_hyperparameters)
+    base["minibatch_size"] = minibatch_size
+    for layer_sizes in [[512, 256], [512, 512], [1024, 512], [1024, 1024]]:
+        l1_base = 0.0000001
+        for l1 in [l1_base, l1_base / 10, l1_base / 100, l1_base / 1000, 0.0]:
+            new = deepcopy(base)
+            new["topology"] = 'feedforward'
+            new["layer_sizes"] = layer_sizes
+            new["dense_layer_l1_regularization"] = l1
+            if not grid or new not in grid:
+                grid.append(new)
 
-for layer_sizes in [[256, 512], [256, 256, 512], [256, 512, 512]]:
-    l1_base = 0.0000001
-    for l1 in [l1_base, l1_base / 10, l1_base / 100, l1_base / 1000, 0.0]:
-        new = deepcopy(base_hyperparameters)
-        new["topology"] = 'with-skip-connections'
-        new["layer_sizes"] = layer_sizes
-        new["dense_layer_l1_regularization"] = l1
-        if not grid or new not in grid:
-            grid.append(new)
+    for layer_sizes in [[256, 512], [256, 256, 512], [256, 512, 512]]:
+        l1_base = 0.0000001
+        for l1 in [l1_base, l1_base / 10, l1_base / 100, l1_base / 1000, 0.0]:
+            new = deepcopy(base)
+            new["topology"] = 'with-skip-connections'
+            new["layer_sizes"] = layer_sizes
+            new["dense_layer_l1_regularization"] = l1
+            if not grid or new not in grid:
+                grid.append(new)
+    return grid
 
-safe_dump(grid, stdout)
+
+def main(argv=None):
+    args = make_parser().parse_args(argv)
+    safe_dump(build_grid(minibatch_size=args.minibatch_size), stdout)
+
+
+if __name__ == "__main__":
+    main()
