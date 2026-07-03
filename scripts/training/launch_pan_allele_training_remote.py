@@ -12,10 +12,11 @@
 # limitations under the License.
 
 """
-Launch the full pan-allele release training pipeline on Brev through runplz.
+Launch pan-allele training on remote GPU machines.
 
-This is the maintained remote wrapper for pan_allele_release_full.sh. Local runs
-should call that shell script directly.
+This is the maintained remote wrapper for pan_allele_release_full.sh. It uses
+runplz as the transport, with Brev configuration when runplz is pointed at Brev
+instances. Local runs should call the shell script directly.
 """
 
 from __future__ import annotations

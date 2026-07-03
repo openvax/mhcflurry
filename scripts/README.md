@@ -51,8 +51,8 @@ The maintained scripts are generally well scoped: release training lives
 under `training/`, development helpers live under `dev/`, and the
 top-level validation tools are narrow checks. The main gap was that Brev
 training and model-asset deployment were living outside this maintained
-surface. `scripts/training/runplz_release_full.py` is now the reusable
-Brev/runplz training entry point, and
+surface. `scripts/training/launch_pan_allele_training_remote.py` is now the
+reusable remote/cloud pan-allele training entry point, and
 `scripts/release/retrain_evaluate_deploy.sh` is the single maintained
 workflow for training, evaluating, plotting, and deployment validation.
 
