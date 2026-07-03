@@ -49,6 +49,12 @@ import numpy
 import pandas
 from sklearn.metrics import average_precision_score, roc_auc_score
 
+from .model_comparison_constants import (
+    METRIC_NAMES,
+    PRESENTATION_MODES,
+    PRESENTATION_SCORE_KINDS,
+    PROCESSING_MODES,
+)
 from ..parallelism import (
     add_prediction_parallelism_args,
     call_wrapped_kwargs,
@@ -63,10 +69,6 @@ from ..workload_planning import (
 )
 
 
-_METRIC_NAMES = ("roc_auc", "pr_auc", "ppv_at_n")
-_PROCESSING_MODES = ("with_flanks", "no_flank", "short_flanks")
-_PRESENTATION_SCORE_KINDS = ("presentation_score", "presentation_percentile")
-_PRESENTATION_MODES = ("with_flanks", "without_flanks")
 _COMPONENT_NAMES = ("training_stats", "affinity", "processing", "presentation")
 
 _T0 = time.time()
@@ -156,7 +158,7 @@ def register_subparser(parser):
     )
     parser.add_argument(
         "--processing-modes",
-        default=",".join(_PROCESSING_MODES),
+        default=",".join(PROCESSING_MODES),
         help=(
             "Comma-separated subset of {with_flanks, no_flank, short_flanks} "
             "for the processing component."
@@ -164,7 +166,7 @@ def register_subparser(parser):
     )
     parser.add_argument(
         "--presentation-modes",
-        default=",".join(_PRESENTATION_MODES),
+        default=",".join(PRESENTATION_MODES),
         help=(
             "Comma-separated subset of {with_flanks, without_flanks} for "
             "the presentation component."
@@ -355,7 +357,7 @@ def _looks_like_processing_dir(path):
         return True
     return any(
         os.path.isdir(os.path.join(path, "models.selected.%s" % mode))
-        for mode in _PROCESSING_MODES
+        for mode in PROCESSING_MODES
     )
 
 
@@ -438,20 +440,20 @@ def _add_diffs(df, metric_names, a_prefix="a", b_prefix="b"):
     return df
 
 
-def _metric_table_columns(id_columns, metric_names=_METRIC_NAMES):
+def _metric_table_columns(id_columns, metric_names=METRIC_NAMES):
     columns = list(id_columns) + ["n", "n_pos"]
     for metric in metric_names:
         columns.extend(["a_%s" % metric, "b_%s" % metric, "%s_diff" % metric])
     return columns
 
 
-def _metric_table(rows, id_columns, metric_names=_METRIC_NAMES):
+def _metric_table(rows, id_columns, metric_names=METRIC_NAMES):
     df = pandas.DataFrame(rows, columns=_metric_table_columns(
         id_columns, metric_names))
     return _add_diffs(df, metric_names)
 
 
-def _per_length_columns(metric_names=_METRIC_NAMES):
+def _per_length_columns(metric_names=METRIC_NAMES):
     columns = ["length", "n", "n_pos", "n_alleles_reported"]
     for metric in metric_names:
         columns.extend([
@@ -465,7 +467,7 @@ def _per_length_columns(metric_names=_METRIC_NAMES):
     return columns
 
 
-def _presentation_per_length_columns(metric_names=_METRIC_NAMES):
+def _presentation_per_length_columns(metric_names=METRIC_NAMES):
     columns = ["length", "n", "n_pos", "n_samples_reported"]
     for metric in metric_names:
         columns.extend([
@@ -768,7 +770,7 @@ def _affinity_per_allele(test):
         m_a = _metrics(group.hit.values, group.a_score.values)
         m_b = _metrics(group.hit.values, group.b_score.values)
         row = {"allele": allele, "n": m_a["n"], "n_pos": m_a["n_pos"]}
-        for metric in _METRIC_NAMES:
+        for metric in METRIC_NAMES:
             row["a_%s" % metric] = m_a[metric]
             row["b_%s" % metric] = m_b[metric]
         rows.append(row)
@@ -794,8 +796,8 @@ def _affinity_per_length(test):
             per_allele_L.append({
                 "allele": allele, "length": L,
                 "n": ma_a["n"], "n_pos": ma_a["n_pos"],
-                **{"a_%s" % m: ma_a[m] for m in _METRIC_NAMES},
-                **{"b_%s" % m: ma_b[m] for m in _METRIC_NAMES},
+                **{"a_%s" % m: ma_a[m] for m in METRIC_NAMES},
+                **{"b_%s" % m: ma_b[m] for m in METRIC_NAMES},
             })
         per_allele_rows.extend(per_allele_L)
         row = {
@@ -803,7 +805,7 @@ def _affinity_per_length(test):
             "n": m_a_L["n"], "n_pos": m_a_L["n_pos"],
             "n_alleles_reported": len(per_allele_L),
         }
-        for metric in _METRIC_NAMES:
+        for metric in METRIC_NAMES:
             row["a_micro_%s" % metric] = m_a_L[metric]
             row["b_micro_%s" % metric] = m_b_L[metric]
             row["a_macro_%s" % metric] = (
@@ -842,14 +844,14 @@ def _affinity_summary(test, per_allele, per_length):
                 "a": float(per_allele["a_%s" % metric].mean()),
                 "b": float(per_allele["b_%s" % metric].mean()),
             }
-            for metric in _METRIC_NAMES
+            for metric in METRIC_NAMES
         },
         "allele_count": {
             "a_better_%s" % metric: int((per_allele["%s_diff" % metric] > 0).sum())
-            for metric in _METRIC_NAMES
+            for metric in METRIC_NAMES
         } | {
             "b_better_%s" % metric: int((per_allele["%s_diff" % metric] < 0).sum())
-            for metric in _METRIC_NAMES
+            for metric in METRIC_NAMES
         },
         "per_length": per_length.to_dict(orient="records"),
     }
@@ -950,7 +952,7 @@ def _run_processing(side_a, side_b, args):
 
     data_dir = args.data_dir or _default_data_evaluation_dir()
     requested_modes = [m.strip() for m in args.processing_modes.split(",") if m]
-    bad_modes = [m for m in requested_modes if m not in _PROCESSING_MODES]
+    bad_modes = [m for m in requested_modes if m not in PROCESSING_MODES]
     if bad_modes:
         raise SystemExit(
             "Unknown processing modes: %s" % ", ".join(bad_modes))
@@ -1198,7 +1200,7 @@ def _presentation_per_sample(scored, score_kind):
             "sample_id": sample_id, "hla": hla,
             "n": m_a["n"], "n_pos": m_a["n_pos"],
         }
-        for metric in _METRIC_NAMES:
+        for metric in METRIC_NAMES:
             row["a_%s" % metric] = m_a[metric]
             row["b_%s" % metric] = m_b[metric]
         rows.append(row)
@@ -1220,7 +1222,7 @@ def _presentation_per_length(scored, score_kind):
             "n": m_a["n"], "n_pos": m_a["n_pos"],
             "n_samples_reported": int(len(sub_sample)),
         }
-        for metric in _METRIC_NAMES:
+        for metric in METRIC_NAMES:
             row["a_micro_%s" % metric] = m_a[metric]
             row["b_micro_%s" % metric] = m_b[metric]
             row["micro_%s_diff" % metric] = m_a[metric] - m_b[metric]
@@ -1262,14 +1264,14 @@ def _presentation_mode_summary(scored, per_sample, per_length, mode, score_kind)
                 "a": float(numpy.nanmean(per_sample["a_%s" % metric])),
                 "b": float(numpy.nanmean(per_sample["b_%s" % metric])),
             }
-            for metric in _METRIC_NAMES
+            for metric in METRIC_NAMES
         },
         "sample_count": {
             "a_better_%s" % m: int((per_sample["%s_diff" % m] > 0).sum())
-            for m in _METRIC_NAMES
+            for m in METRIC_NAMES
         } | {
             "b_better_%s" % m: int((per_sample["%s_diff" % m] < 0).sum())
-            for m in _METRIC_NAMES
+            for m in METRIC_NAMES
         },
         "per_length": per_length.to_dict(orient="records"),
     }
@@ -1283,7 +1285,7 @@ def _presentation_summary_row(summary):
         "n_hits": summary["n_hits"],
         "n_samples_reported": summary["n_samples_reported"],
     }
-    for metric in _METRIC_NAMES:
+    for metric in METRIC_NAMES:
         row["a_micro_%s" % metric] = summary["micro_pooled"]["a"][metric]
         row["b_micro_%s" % metric] = summary["micro_pooled"]["b"][metric]
         row["micro_%s_diff" % metric] = (
@@ -1303,7 +1305,7 @@ def _presentation_summary_row(summary):
 
 def _component_summary_table_columns():
     columns = ["mode", "score_kind", "n_rows", "n_hits", "n_samples_reported"]
-    for metric in _METRIC_NAMES:
+    for metric in METRIC_NAMES:
         columns.extend([
             "a_micro_%s" % metric,
             "b_micro_%s" % metric,
@@ -1321,7 +1323,7 @@ def _run_presentation(side_a, side_b, args):
 
     data_dir = args.data_dir or _default_data_evaluation_dir()
     requested_modes = [m.strip() for m in args.presentation_modes.split(",") if m]
-    bad_modes = [m for m in requested_modes if m not in _PRESENTATION_MODES]
+    bad_modes = [m for m in requested_modes if m not in PRESENTATION_MODES]
     if bad_modes:
         raise SystemExit(
             "Unknown presentation modes: %s" % ", ".join(bad_modes))
@@ -1352,7 +1354,7 @@ def _run_presentation(side_a, side_b, args):
         _stamp("  wrote %s" % pred_path)
 
         summaries[mode] = {}
-        for score_kind in _PRESENTATION_SCORE_KINDS:
+        for score_kind in PRESENTATION_SCORE_KINDS:
             per_sample = _presentation_per_sample(scored, score_kind)
             per_sample.to_csv(
                 os.path.join(
@@ -1432,12 +1434,12 @@ def _release_summary_rows(headline, components):
     rows = []
     if "affinity" in components and "affinity" in headline:
         summary = headline["affinity"]
-        for metric in _METRIC_NAMES:
+        for metric in METRIC_NAMES:
             macro = summary["macro_mean_over_alleles"][metric]
             _append_release_metric_row(
                 rows, "affinity", "eval", "affinity",
                 metric, "Macro", macro["a"], macro["b"])
-        for metric in _METRIC_NAMES:
+        for metric in METRIC_NAMES:
             micro_a = summary["micro_pooled"]["a"][metric]
             micro_b = summary["micro_pooled"]["b"][metric]
             _append_release_metric_row(
@@ -1453,12 +1455,12 @@ def _release_summary_rows(headline, components):
             summary = headline[component]["summaries"].get(mode, {}).get(score_kind)
             if summary is None:
                 continue
-            for metric in _METRIC_NAMES:
+            for metric in METRIC_NAMES:
                 macro = summary["macro_mean_over_samples"][metric]
                 _append_release_metric_row(
                     rows, component, "flank_mode", mode,
                     metric, "Macro", macro["a"], macro["b"])
-            for metric in _METRIC_NAMES:
+            for metric in METRIC_NAMES:
                 micro_a = summary["micro_pooled"]["a"][metric]
                 micro_b = summary["micro_pooled"]["b"][metric]
                 _append_release_metric_row(
@@ -1559,7 +1561,7 @@ def _write_summary_markdown(headline, side_a, side_b, out_dir, components):
     if "affinity" in components:
         s = headline["affinity"]
         lines.append("## affinity")
-        for metric in _METRIC_NAMES:
+        for metric in METRIC_NAMES:
             macro = s["macro_mean_over_alleles"][metric]
             lines.append(
                 "- macro %s: A=%.4f, B=%.4f, diff=%+.4f" % (
@@ -1597,7 +1599,7 @@ def _write_summary_markdown(headline, side_a, side_b, out_dir, components):
         s = headline["presentation"]
         lines.append("## presentation")
         for mode in s["modes"]:
-            for score_kind in _PRESENTATION_SCORE_KINDS:
+            for score_kind in PRESENTATION_SCORE_KINDS:
                 msum = s["summaries"][mode][score_kind]
                 pooled_a = msum["micro_pooled"]["a"]["roc_auc"]
                 pooled_b = msum["micro_pooled"]["b"]["roc_auc"]

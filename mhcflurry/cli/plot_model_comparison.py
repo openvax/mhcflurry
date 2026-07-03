@@ -26,6 +26,13 @@ import os
 import numpy
 import pandas
 
+from .model_comparison_constants import (
+    METRIC_NAMES,
+    PRESENTATION_MODES,
+    PRESENTATION_SCORE_KINDS,
+    PROCESSING_MODES,
+)
+
 
 def make_parser():
     """Return a standalone parser for documentation tooling (autoprogram)."""
@@ -167,12 +174,6 @@ def _save_per_allele_delta(plt, per_allele, sub_dir, label_a, label_b):
     plt.close(fig)
 
 
-_PROCESSING_MODES = ("with_flanks", "no_flank", "short_flanks")
-_PRESENTATION_MODES = ("with_flanks", "without_flanks")
-_PRESENTATION_SCORE_KINDS = ("presentation_score", "presentation_percentile")
-_METRIC_NAMES = ("roc_auc", "pr_auc", "ppv_at_n")
-
-
 # ---------------------------------------------------------------------------
 # processing
 # ---------------------------------------------------------------------------
@@ -190,7 +191,7 @@ def _plot_processing(input_dir, plot_dir, labels, max_scatter_points):
     label_a, label_b = labels["a"], labels["b"]
 
     processing_dir = os.path.join(input_dir, "processing")
-    for mode in _PROCESSING_MODES:
+    for mode in PROCESSING_MODES:
         pred_path = os.path.join(
             processing_dir, "predictions_%s.csv.bz2" % mode)
         if not os.path.isfile(pred_path):
@@ -236,13 +237,13 @@ def _plot_presentation(input_dir, plot_dir, labels, max_scatter_points):
     label_a, label_b = labels["a"], labels["b"]
 
     presentation_dir = os.path.join(input_dir, "presentation")
-    for mode in _PRESENTATION_MODES:
+    for mode in PRESENTATION_MODES:
         pred_path = os.path.join(
             presentation_dir, "predictions_%s.csv.bz2" % mode)
         if not os.path.isfile(pred_path):
             continue
         df = pandas.read_csv(pred_path)
-        for score_kind in _PRESENTATION_SCORE_KINDS:
+        for score_kind in PRESENTATION_SCORE_KINDS:
             a_score = _score_values(df, "a", score_kind)
             b_score = _score_values(df, "b", score_kind)
             y = df.hit.values
@@ -290,7 +291,7 @@ def _save_macro_bars(plt, summary, sub_dir, label_a, label_b):
     ]
     x = numpy.arange(len(summary))
     width = 0.38
-    for metric in _METRIC_NAMES:
+    for metric in METRIC_NAMES:
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.bar(x - width / 2, summary["a_macro_%s" % metric], width, label=label_a)
         ax.bar(x + width / 2, summary["b_macro_%s" % metric], width, label=label_b)
