@@ -21,17 +21,19 @@ Usage:
   scripts/release/retrain_evaluate_deploy.sh \
       --run-dir /path/to/release-run \
       --release 2.3.0 \
-      [--backend local|runplz|ssh] \
+      [--backend local|brev-existing|ssh] \
       [--skip-train] [--skip-eval] [--skip-plots] [--skip-deploy] \
       [--deploy-mode dry-run|draft|publish]
 
 Backends:
-  local   Run scripts/training/pan_allele_release_full.sh in this checkout.
-  runplz  Launch scripts/training/runplz_release_full.py. This is the Brev
-          path when runplz is configured for Brev instances.
-  ssh     Run the local training script on a remote host, then rsync the remote
-          run directory back. Requires --remote, --remote-repo, and
-          --remote-run-dir.
+  local          Run scripts/training/pan_allele_release_full.sh here.
+  brev-existing  Run on existing Brev/runplz capacity. This does not provision
+                 a new machine; runplz/Brev handles the remote container,
+                 package sync, and credentials.
+  ssh            Run on a specific remote host, then rsync the run directory
+                 back. Requires --remote, --remote-repo, and --remote-run-dir.
+                 Authentication is whatever your local ssh/rsync configuration
+                 uses, typically SSH keys or an SSH config Host entry.
 
 Evaluation:
   After training, the script runs:
@@ -181,8 +183,8 @@ if [ -z "$GITHUB_RELEASE" ]; then
     GITHUB_RELEASE=$RELEASE
 fi
 case "$BACKEND" in
-    local|runplz|ssh) ;;
-    *) die "--backend must be one of: local, runplz, ssh" ;;
+    local|brev-existing|ssh) ;;
+    *) die "--backend must be one of: local, brev-existing, ssh" ;;
 esac
 case "$DEPLOY_MODE" in
     dry-run|draft|publish) ;;
@@ -208,14 +210,14 @@ if [ "$SKIP_TRAIN" != "1" ]; then
                 "REPO=$REPO" \
                 bash "$REPO/scripts/training/pan_allele_release_full.sh"
             ;;
-        runplz)
+        brev-existing)
             require_command runplz
             run_cmd mkdir -p "$RUN_DIR"
             run_cmd env \
                 "MHCFLURRY_OUT=$RUN_DIR" \
                 "REPO=$REPO" \
                 runplz --outputs-dir "$RUN_DIR" \
-                "$REPO/scripts/training/runplz_release_full.py"
+                "$REPO/scripts/training/launch_pan_allele_training_remote.py"
             ;;
         ssh)
             require_command ssh

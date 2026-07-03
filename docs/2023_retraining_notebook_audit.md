@@ -98,8 +98,8 @@ committed as the workflow.
    `short_flanks` is the canonical with-flank presentation input for 2.3.x.
 9. Make the release gate one command:
    `scripts/release/retrain_evaluate_deploy.sh` trains, evaluates, plots, and
-   runs deployment validation. It supports local, runplz/Brev, and SSH-backed
-   remote machines.
+   runs deployment validation. It supports local execution, existing
+   Brev/runplz capacity, and SSH-backed remote machines.
 
 ## Current Single-Command Entry Point
 
@@ -113,13 +113,13 @@ scripts/release/retrain_evaluate_deploy.sh \
     --deploy-mode dry-run
 ```
 
-Brev through runplz:
+Brev through existing runplz capacity:
 
 ```bash
 scripts/release/retrain_evaluate_deploy.sh \
     --run-dir /path/to/release-run \
     --release 2.3.0 \
-    --backend runplz \
+    --backend brev-existing \
     --deploy-mode dry-run
 ```
 

@@ -32,8 +32,16 @@ scripts/release/retrain_evaluate_deploy.sh \
     --deploy-mode dry-run
 ```
 
-Use `--backend runplz` for the maintained Brev/runplz path or `--backend ssh`
-with `--remote`, `--remote-repo`, and `--remote-run-dir` for a generic remote
-machine. The script runs training, `mhcflurry compare-models`,
+Supported backends are:
+
+- `local`: train in the current checkout on the current machine.
+- `brev-existing`: train on existing Brev/runplz capacity. This does not
+  provision a new machine; runplz/Brev handles remote execution, package sync,
+  and credentials.
+- `ssh`: train on a specific remote host, with `--remote`, `--remote-repo`, and
+  `--remote-run-dir`. Authentication comes from local `ssh` / `rsync`
+  configuration, typically SSH keys or an SSH config `Host`.
+
+The script runs training, `mhcflurry compare-models`,
 `mhcflurry plot-model-comparison`, and deployment validation in order; each
 stage has a `--skip-*` flag for resuming.
