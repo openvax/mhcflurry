@@ -14,9 +14,11 @@
 """
 Launch pan-allele training on remote GPU machines.
 
-This is the maintained remote wrapper for pan_allele_release_full.sh. It uses
-runplz as the transport, with Brev configuration when runplz is pointed at Brev
-instances. Local runs should call the shell script directly.
+This is the maintained runplz wrapper for pan_allele_release_full.sh. The
+release workflow chooses whether Brev should use an existing instance or
+intentionally provision one by setting RUNPLZ_BREV_* environment variables
+before invoking ``runplz brev``. Local runs should call the shell script
+directly.
 """
 
 from __future__ import annotations
@@ -35,14 +37,81 @@ except ImportError as e:
     ) from e
 
 
-APP_NAME = os.environ.get("RUNPLZ_APP_NAME", "mhcflurry-release-full")
+APP_NAME = os.environ.get("RUNPLZ_APP_NAME", "mhcflurry-pan-allele-training")
 GPU_TYPE = os.environ.get("RUNPLZ_GPU", "A100")
 NUM_GPUS = int(os.environ.get("RUNPLZ_NUM_GPUS", "4"))
 MIN_GPU_MEMORY = int(os.environ.get("RUNPLZ_MIN_GPU_MEMORY", "35"))
 MIN_CPU = int(os.environ.get("RUNPLZ_MIN_CPU", "32"))
 MIN_MEMORY = int(os.environ.get("RUNPLZ_MIN_MEMORY", "300"))
 MIN_DISK = int(os.environ.get("RUNPLZ_MIN_DISK", "1000"))
-DEFAULT_OUT = os.environ.get("MHCFLURRY_OUT", "/root/mhcflurry-release-run")
+DEFAULT_OUT = os.environ.get(
+    "MHCFLURRY_OUT", "/root/mhcflurry-pan-allele-training-run"
+)
+
+TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
+FALSE_ENV_VALUES = {"0", "false", "no", "off"}
+
+
+def env_bool(environ, name, default=False):
+    value = environ.get(name)
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    if normalized in TRUE_ENV_VALUES:
+        return True
+    if normalized in FALSE_ENV_VALUES:
+        return False
+    raise ValueError(
+        "%s must be one of %s or %s; got %r" % (
+            name,
+            sorted(TRUE_ENV_VALUES),
+            sorted(FALSE_ENV_VALUES),
+            value,
+        )
+    )
+
+
+def env_int_optional(environ, name):
+    value = environ.get(name)
+    if value is None or not value.strip():
+        return None
+    return int(value)
+
+
+def env_csv_tuple(environ, name, default):
+    value = environ.get(name)
+    if value is None:
+        return default
+    if not value.strip():
+        return ()
+    return tuple(item.strip() for item in value.split(",") if item.strip())
+
+
+def brev_config_from_env(environ=os.environ):
+    return BrevConfig(
+        auto_create_instances=env_bool(
+            environ, "RUNPLZ_BREV_AUTO_CREATE", default=False
+        ),
+        instance_type=(
+            environ.get("RUNPLZ_BREV_INSTANCE_TYPE")
+            or environ.get("BREV_INSTANCE_TYPE")
+            or None
+        ),
+        mode=environ.get("RUNPLZ_BREV_MODE", "container"),
+        on_finish=environ.get("RUNPLZ_BREV_ON_FINISH", "leave"),
+        max_runtime_seconds=env_int_optional(
+            environ, "RUNPLZ_BREV_MAX_RUNTIME_SECONDS"
+        ),
+        ssh_ready_wait_seconds=int(
+            environ.get("RUNPLZ_BREV_SSH_READY_WAIT_SECONDS", "2400")
+        ),
+        instance_type_fallback_count=int(
+            environ.get("RUNPLZ_BREV_INSTANCE_TYPE_FALLBACK_COUNT", "3")
+        ),
+        exclude_providers=env_csv_tuple(
+            environ, "RUNPLZ_BREV_EXCLUDE_PROVIDERS", ("oci",)
+        ),
+    )
 
 
 def remote_training_env(environ=os.environ):
@@ -102,12 +171,7 @@ image = (
 
 app = App(
     APP_NAME,
-    brev_config=BrevConfig(
-        auto_create_instances=False,
-        mode="container",
-        on_finish="leave",
-        ssh_ready_wait_seconds=2400,
-    ),
+    brev_config=brev_config_from_env(),
 )
 
 

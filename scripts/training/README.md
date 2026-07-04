@@ -17,15 +17,19 @@ one-off tuning runs do not belong here.
 - **`pan_allele_release_full.sh`** — Composition wrapper that runs Stage
   1 then inlines Stages 2–3. The full release in one invocation.
 - **`launch_pan_allele_training_remote.py`** — remote/cloud launcher for
-  the same pan-allele training pipeline. It currently uses runplz, with
-  Brev configuration when runplz is pointed at Brev instances. Use this
-  when training remotely; keep machine-specific patching or interrupted-
-  run recovery in ignored `jobs/`.
+  the same pan-allele training pipeline. It uses runplz as the transport,
+  with Brev provisioning behavior controlled by `RUNPLZ_BREV_*`
+  environment variables. Prefer the release workflow wrapper below unless
+  you are debugging the remote launcher itself.
 
 For Brev/runplz execution:
 
 ```bash
-runplz --outputs-dir /path/to/output scripts/training/launch_pan_allele_training_remote.py
+RUNPLZ_BREV_AUTO_CREATE=0 \
+runplz brev \
+    --outputs-dir /path/to/output \
+    --instance existing-brev-instance \
+    scripts/training/launch_pan_allele_training_remote.py
 ```
 
 For the full release gate (training, comparison, plots, and deployment

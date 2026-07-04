@@ -21,19 +21,23 @@ Usage:
   scripts/release/retrain_evaluate_deploy.sh \
       --run-dir /path/to/release-run \
       --release 2.3.0 \
-      [--backend local|brev-existing|ssh] \
+      [--backend local|brev-existing|brev-provision|ssh] \
       [--minibatch-size 1024] \
       [--affinity-minibatch-size 1024] \
       [--processing-minibatch-size 1024] \
       [--processing-variants "with_flanks no_flank short_flanks"] \
+      [--brev-instance NAME] [--brev-on-finish leave|stop|delete] \
+      [--brev-instance-type TYPE] \
       [--skip-train] [--skip-eval] [--skip-plots] [--skip-deploy] \
       [--deploy-mode dry-run|draft|publish]
 
 Backends:
   local          Run scripts/training/pan_allele_release_full.sh here.
-  brev-existing  Run on existing Brev/runplz capacity. This does not provision
-                 a new machine; runplz/Brev handles the remote container,
-                 package sync, and credentials.
+  brev-existing  Run on a named existing Brev instance. Requires
+                 --brev-instance. A missing instance is an error.
+  brev-provision Provision a named Brev instance if it does not exist, then run
+                 the same remote training job. If --brev-instance is omitted,
+                 this script generates a run-specific name.
   ssh            Run on a specific remote host, then rsync the run directory
                  back. Requires --remote, --remote-repo, and --remote-run-dir.
                  Authentication is whatever your local ssh/rsync configuration
@@ -77,6 +81,37 @@ run_cmd() {
     fi
 }
 
+run_brev_training() {
+    local auto_create=$1
+    require_command runplz
+    run_cmd mkdir -p "$RUN_DIR"
+    local runplz_env=(
+        "MHCFLURRY_OUT=$RUN_DIR"
+        "REPO=$REPO"
+        "TRAINING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE"
+        "AFFINITY_MINIBATCH_SIZE=$AFFINITY_MINIBATCH_SIZE"
+        "PROCESSING_MINIBATCH_SIZE=$PROCESSING_MINIBATCH_SIZE"
+        "PROCESSING_VARIANTS=$PROCESSING_VARIANTS"
+        "PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$PRESENTATION_PROCESSING_WITH_FLANKS_KIND"
+        "RUNPLZ_BREV_AUTO_CREATE=$auto_create"
+        "RUNPLZ_BREV_ON_FINISH=$BREV_ON_FINISH"
+        "RUNPLZ_BREV_INSTANCE_TYPE_FALLBACK_COUNT=$BREV_INSTANCE_TYPE_FALLBACK_COUNT"
+        "RUNPLZ_BREV_EXCLUDE_PROVIDERS=$BREV_EXCLUDE_PROVIDERS"
+    )
+    if [ -n "$BREV_INSTANCE_TYPE" ]; then
+        runplz_env+=("RUNPLZ_BREV_INSTANCE_TYPE=$BREV_INSTANCE_TYPE")
+    fi
+    if [ -n "$BREV_MAX_RUNTIME_SECONDS" ]; then
+        runplz_env+=("RUNPLZ_BREV_MAX_RUNTIME_SECONDS=$BREV_MAX_RUNTIME_SECONDS")
+    fi
+    run_cmd env \
+        "${runplz_env[@]}" \
+        runplz brev --outputs-dir "$RUN_DIR" \
+        --log-file "$RUN_DIR/runplz-driver.log" \
+        --instance "$BREV_INSTANCE" \
+        "$REPO/scripts/training/launch_pan_allele_training_remote.py"
+}
+
 RUN_DIR=
 RELEASE=
 GITHUB_RELEASE=
@@ -85,6 +120,12 @@ REMOTE=
 REMOTE_REPO=
 REMOTE_RUN_DIR=
 SYNC_REMOTE_OUTPUT=1
+BREV_INSTANCE="${RUNPLZ_BREV_INSTANCE:-${BREV_INSTANCE:-}}"
+BREV_ON_FINISH="${RUNPLZ_BREV_ON_FINISH:-${BREV_ON_FINISH:-}}"
+BREV_INSTANCE_TYPE="${RUNPLZ_BREV_INSTANCE_TYPE:-${BREV_INSTANCE_TYPE:-}}"
+BREV_MAX_RUNTIME_SECONDS="${RUNPLZ_BREV_MAX_RUNTIME_SECONDS:-${BREV_MAX_RUNTIME_SECONDS:-}}"
+BREV_INSTANCE_TYPE_FALLBACK_COUNT="${RUNPLZ_BREV_INSTANCE_TYPE_FALLBACK_COUNT:-3}"
+BREV_EXCLUDE_PROVIDERS="${RUNPLZ_BREV_EXCLUDE_PROVIDERS:-oci}"
 SKIP_TRAIN=0
 SKIP_EVAL=0
 SKIP_PLOTS=0
@@ -133,6 +174,30 @@ while [ $# -gt 0 ]; do
             ;;
         --remote-run-dir)
             REMOTE_RUN_DIR=$2
+            shift 2
+            ;;
+        --brev-instance)
+            BREV_INSTANCE=$2
+            shift 2
+            ;;
+        --brev-on-finish)
+            BREV_ON_FINISH=$2
+            shift 2
+            ;;
+        --brev-instance-type)
+            BREV_INSTANCE_TYPE=$2
+            shift 2
+            ;;
+        --brev-max-runtime-seconds)
+            BREV_MAX_RUNTIME_SECONDS=$2
+            shift 2
+            ;;
+        --brev-instance-type-fallback-count)
+            BREV_INSTANCE_TYPE_FALLBACK_COUNT=$2
+            shift 2
+            ;;
+        --brev-exclude-providers)
+            BREV_EXCLUDE_PROVIDERS=$2
             shift 2
             ;;
         --no-sync-remote-output)
@@ -225,12 +290,42 @@ if [ -z "$PROCESSING_MINIBATCH_SIZE" ]; then
     PROCESSING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE
 fi
 case "$BACKEND" in
-    local|brev-existing|ssh) ;;
-    *) die "--backend must be one of: local, brev-existing, ssh" ;;
+    local|brev-existing|brev-provision|ssh) ;;
+    *) die "--backend must be one of: local, brev-existing, brev-provision, ssh" ;;
 esac
 case "$DEPLOY_MODE" in
     dry-run|draft|publish) ;;
     *) die "--deploy-mode must be one of: dry-run, draft, publish" ;;
+esac
+if [ -z "$BREV_ON_FINISH" ]; then
+    case "$BACKEND" in
+        brev-provision)
+            BREV_ON_FINISH=stop
+            ;;
+        *)
+            BREV_ON_FINISH=leave
+            ;;
+    esac
+fi
+case "$BREV_ON_FINISH" in
+    leave|stop|delete) ;;
+    *) die "--brev-on-finish must be one of: leave, stop, delete" ;;
+esac
+if [ "$BACKEND" = "brev-provision" ] && [ -z "$BREV_INSTANCE" ]; then
+    RELEASE_SLUG=$(
+        printf '%s' "$RELEASE" | tr -cs 'A-Za-z0-9' '-' | sed 's/^-//; s/-$//'
+    )
+    BREV_INSTANCE="mhcflurry-${RELEASE_SLUG}-$(date +%Y%m%d-%H%M%S)"
+fi
+case "$BACKEND" in
+    brev-existing)
+        [ -n "$BREV_INSTANCE" ] || \
+            die "--brev-instance is required for --backend brev-existing"
+        ;;
+    brev-provision)
+        [ -n "$BREV_INSTANCE" ] || \
+            die "could not derive a Brev instance name for --backend brev-provision"
+        ;;
 esac
 
 case "$RUN_DIR" in
@@ -244,6 +339,12 @@ note "Release:       $RELEASE"
 note "Backend:       $BACKEND"
 note "Batch sizes:   affinity=$AFFINITY_MINIBATCH_SIZE processing=$PROCESSING_MINIBATCH_SIZE"
 note "Processing:    variants=$PROCESSING_VARIANTS; eval_modes=$PROCESSING_MODES"
+case "$BACKEND" in
+    brev-existing|brev-provision)
+        note "Brev instance: $BREV_INSTANCE"
+        note "Brev cleanup:  $BREV_ON_FINISH"
+        ;;
+esac
 
 if [ "$SKIP_TRAIN" != "1" ]; then
     case "$BACKEND" in
@@ -260,18 +361,10 @@ if [ "$SKIP_TRAIN" != "1" ]; then
                 bash "$REPO/scripts/training/pan_allele_release_full.sh"
             ;;
         brev-existing)
-            require_command runplz
-            run_cmd mkdir -p "$RUN_DIR"
-            run_cmd env \
-                "MHCFLURRY_OUT=$RUN_DIR" \
-                "REPO=$REPO" \
-                "TRAINING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE" \
-                "AFFINITY_MINIBATCH_SIZE=$AFFINITY_MINIBATCH_SIZE" \
-                "PROCESSING_MINIBATCH_SIZE=$PROCESSING_MINIBATCH_SIZE" \
-                "PROCESSING_VARIANTS=$PROCESSING_VARIANTS" \
-                "PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" \
-                runplz --outputs-dir "$RUN_DIR" \
-                "$REPO/scripts/training/launch_pan_allele_training_remote.py"
+            run_brev_training 0
+            ;;
+        brev-provision)
+            run_brev_training 1
             ;;
         ssh)
             require_command ssh

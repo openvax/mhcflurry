@@ -165,6 +165,21 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     })
     assert env["AFFINITY_MINIBATCH_SIZE"] == "512"
 
+    brev_config = module.brev_config_from_env({
+        "RUNPLZ_BREV_AUTO_CREATE": "1",
+        "RUNPLZ_BREV_INSTANCE_TYPE": "test.gpu",
+        "RUNPLZ_BREV_ON_FINISH": "stop",
+        "RUNPLZ_BREV_MAX_RUNTIME_SECONDS": "3600",
+        "RUNPLZ_BREV_INSTANCE_TYPE_FALLBACK_COUNT": "5",
+        "RUNPLZ_BREV_EXCLUDE_PROVIDERS": "oci,broken",
+    })
+    assert brev_config["auto_create_instances"] is True
+    assert brev_config["instance_type"] == "test.gpu"
+    assert brev_config["on_finish"] == "stop"
+    assert brev_config["max_runtime_seconds"] == 3600
+    assert brev_config["instance_type_fallback_count"] == 5
+    assert brev_config["exclude_providers"] == ("oci", "broken")
+
 
 def test_main_help_does_not_import_predict_command():
     """``mhcflurry --help`` must not pay the cost of importing every

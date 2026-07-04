@@ -36,9 +36,15 @@ scripts/release/retrain_evaluate_deploy.sh \
 Supported backends are:
 
 - `local`: train in the current checkout on the current machine.
-- `brev-existing`: train on existing Brev/runplz capacity. This does not
-  provision a new machine; runplz/Brev handles remote execution, package sync,
-  and credentials.
+- `brev-existing`: train on a named existing Brev instance. Pass
+  `--brev-instance NAME`; a missing instance is an error.
+- `brev-provision`: train on a named Brev instance, provisioning it if it does
+  not already exist. Pass `--brev-instance NAME` to choose the name, or omit it
+  to let the script generate one from the release and timestamp. The default
+  cleanup policy is `--brev-on-finish stop`; use `leave` for interactive
+  debugging or `delete` for disposable runs. `--brev-instance-type TYPE` pins a
+  Brev type, otherwise runplz selects from the function's GPU/CPU/RAM/disk
+  requirements.
 - `ssh`: train on a specific remote host, with `--remote`, `--remote-repo`, and
   `--remote-run-dir`. Authentication comes from local `ssh` / `rsync`
   configuration, typically SSH keys or an SSH config `Host`.
