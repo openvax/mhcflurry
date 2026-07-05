@@ -37,7 +37,9 @@ Backends:
                  --brev-instance. A missing instance is an error.
   brev-provision Provision a named Brev instance if it does not exist, then run
                  the same remote training job. If --brev-instance is omitted,
-                 this script generates a run-specific name.
+                 this script generates a run-specific name. Defaults to the
+                 4xA100 instance type used for the release pipeline; override
+                 with --brev-instance-type.
   ssh            Run on a specific remote host, then rsync the run directory
                  back. Requires --remote, --remote-repo, and --remote-run-dir.
                  Authentication is whatever your local ssh/rsync configuration
@@ -123,6 +125,7 @@ SYNC_REMOTE_OUTPUT=1
 BREV_INSTANCE="${RUNPLZ_BREV_INSTANCE:-${BREV_INSTANCE:-}}"
 BREV_ON_FINISH="${RUNPLZ_BREV_ON_FINISH:-${BREV_ON_FINISH:-}}"
 BREV_INSTANCE_TYPE="${RUNPLZ_BREV_INSTANCE_TYPE:-${BREV_INSTANCE_TYPE:-}}"
+DEFAULT_BREV_PROVISION_INSTANCE_TYPE="${DEFAULT_BREV_PROVISION_INSTANCE_TYPE:-a2-highgpu-4g:nvidia-tesla-a100:4}"
 BREV_MAX_RUNTIME_SECONDS="${RUNPLZ_BREV_MAX_RUNTIME_SECONDS:-${BREV_MAX_RUNTIME_SECONDS:-}}"
 BREV_INSTANCE_TYPE_FALLBACK_COUNT="${RUNPLZ_BREV_INSTANCE_TYPE_FALLBACK_COUNT:-3}"
 BREV_EXCLUDE_PROVIDERS="${RUNPLZ_BREV_EXCLUDE_PROVIDERS:-oci}"
@@ -317,6 +320,9 @@ if [ "$BACKEND" = "brev-provision" ] && [ -z "$BREV_INSTANCE" ]; then
     )
     BREV_INSTANCE="mhcflurry-${RELEASE_SLUG}-$(date +%Y%m%d-%H%M%S)"
 fi
+if [ "$BACKEND" = "brev-provision" ] && [ -z "$BREV_INSTANCE_TYPE" ]; then
+    BREV_INSTANCE_TYPE=$DEFAULT_BREV_PROVISION_INSTANCE_TYPE
+fi
 case "$BACKEND" in
     brev-existing)
         [ -n "$BREV_INSTANCE" ] || \
@@ -343,6 +349,7 @@ case "$BACKEND" in
     brev-existing|brev-provision)
         note "Brev instance: $BREV_INSTANCE"
         note "Brev cleanup:  $BREV_ON_FINISH"
+        note "Brev type:     ${BREV_INSTANCE_TYPE:-runplz auto-select}"
         ;;
 esac
 

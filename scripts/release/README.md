@@ -42,9 +42,9 @@ Supported backends are:
   not already exist. Pass `--brev-instance NAME` to choose the name, or omit it
   to let the script generate one from the release and timestamp. The default
   cleanup policy is `--brev-on-finish stop`; use `leave` for interactive
-  debugging or `delete` for disposable runs. `--brev-instance-type TYPE` pins a
-  Brev type, otherwise runplz selects from the function's GPU/CPU/RAM/disk
-  requirements.
+  debugging or `delete` for disposable runs. Provisioned full-training runs
+  default to the known 4xA100 type `a2-highgpu-4g:nvidia-tesla-a100:4`;
+  `--brev-instance-type TYPE` overrides it.
 - `ssh`: train on a specific remote host, with `--remote`, `--remote-repo`, and
   `--remote-run-dir`. Authentication comes from local `ssh` / `rsync`
   configuration, typically SSH keys or an SSH config `Host`.
