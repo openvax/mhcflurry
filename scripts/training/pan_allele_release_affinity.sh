@@ -46,6 +46,8 @@ export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_ABSOLUTE_PATH")"
 RECIPE_DIR="$SCRIPT_DIR/release_exact"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/set_cpu_threads.sh"
 
 mkdir -p "$MHCFLURRY_OUT"
 cd "$MHCFLURRY_OUT"
@@ -275,8 +277,6 @@ MAX_TASKS_PER_WORKER="${MAX_TASKS_PER_WORKER:-12}"
 # budget and the training hyperparameters stay in lockstep.
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-auto}"
 
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/set_cpu_threads.sh"
 DATALOADER_NUM_WORKERS_REQUESTED="$DATALOADER_NUM_WORKERS"
 DATALOADER_NUM_WORKERS="$(resolve_dataloader_num_workers "$NUM_JOBS")"
 printf >&2 \

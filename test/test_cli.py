@@ -156,14 +156,17 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     module = _load_script_module(path, "remote_launcher_under_test")
     env = module.remote_training_env({"TRAINING_MINIBATCH_SIZE": "2048"})
     assert env["TRAINING_MINIBATCH_SIZE"] == "2048"
+    assert env["MKL_THREADING_LAYER"] == "GNU"
     assert "AFFINITY_MINIBATCH_SIZE" not in env
     assert "PROCESSING_MINIBATCH_SIZE" not in env
 
     env = module.remote_training_env({
         "TRAINING_MINIBATCH_SIZE": "2048",
         "AFFINITY_MINIBATCH_SIZE": "512",
+        "MKL_THREADING_LAYER": "TBB",
     })
     assert env["AFFINITY_MINIBATCH_SIZE"] == "512"
+    assert env["MKL_THREADING_LAYER"] == "TBB"
 
     brev_config = module.brev_config_from_env({
         "RUNPLZ_BREV_AUTO_CREATE": "1",

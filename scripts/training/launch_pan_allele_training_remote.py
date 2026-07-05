@@ -119,6 +119,10 @@ def remote_training_env(environ=os.environ):
         "DATALOADER_NUM_WORKERS": environ.get("DATALOADER_NUM_WORKERS", "auto"),
         "MAX_TASKS_PER_WORKER": environ.get("MAX_TASKS_PER_WORKER", "12"),
         "MAX_WORKERS_PER_GPU": environ.get("MAX_WORKERS_PER_GPU", "auto"),
+        # PyTorch/Inductor workers load GNU OpenMP (libgomp). The PyTorch
+        # conda image also includes mkl-service, whose INTEL threading default
+        # aborts when libgomp is already loaded.
+        "MKL_THREADING_LAYER": environ.get("MKL_THREADING_LAYER", "GNU"),
         "MHCFLURRY_ENABLE_TIMING": environ.get("MHCFLURRY_ENABLE_TIMING", "1"),
         "MHCFLURRY_TORCH_COMPILE": environ.get("MHCFLURRY_TORCH_COMPILE", "1"),
         "MHCFLURRY_TORCH_COMPILE_LOSS": environ.get(

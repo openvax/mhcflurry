@@ -43,6 +43,8 @@ set -x
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RECIPE_DIR="$SCRIPT_DIR/release_exact"
 : "${REPO:=$(cd "$SCRIPT_DIR/../.." && pwd)}"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/set_cpu_threads.sh"
 
 export PYTHONUNBUFFERED=1
 # Same default as the affinity stage; the orchestrator's CLI flag
@@ -102,8 +104,6 @@ fi
 
 # Resolve DataLoader prefetch workers before building parallelism args so the
 # shell-side CPU thread budget matches the mhcflurry worker hyperparameters.
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/set_cpu_threads.sh"
 DATALOADER_NUM_WORKERS_REQUESTED="$DATALOADER_NUM_WORKERS"
 DATALOADER_NUM_WORKERS="$(resolve_dataloader_num_workers "$NUM_JOBS")"
 printf >&2 \
