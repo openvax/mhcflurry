@@ -144,7 +144,11 @@ def remote_training_env(environ=os.environ):
         ),
         "TRAINING_MINIBATCH_SIZE": environ.get("TRAINING_MINIBATCH_SIZE", "1024"),
     }
-    for name in ("AFFINITY_MINIBATCH_SIZE", "PROCESSING_MINIBATCH_SIZE"):
+    for name in (
+        "AFFINITY_MINIBATCH_SIZE",
+        "AFFINITY_MAX_WORKERS_PER_GPU",
+        "PROCESSING_MINIBATCH_SIZE",
+    ):
         if name in environ:
             env[name] = environ[name]
     return env

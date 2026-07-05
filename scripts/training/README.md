@@ -15,7 +15,10 @@ one-off tuning runs do not belong here.
   processing predictors, then fits + calibrates the presentation
   predictor on top. Use this as a tail-on after a sweep.
 - **`pan_allele_release_full.sh`** — Composition wrapper that runs Stage
-  1 then inlines Stages 2–3. The full release in one invocation.
+  1 then inlines Stages 2–3. The full release in one invocation. Its affinity
+  stage defaults to `AFFINITY_MAX_WORKERS_PER_GPU=3` so mb1024 training fits
+  on 80GB A100s; set `AFFINITY_MAX_WORKERS_PER_GPU=auto` or a number to
+  override.
 - **`launch_pan_allele_training_remote.py`** — remote/cloud launcher for
   the same pan-allele training pipeline. It uses runplz as the transport,
   with Brev provisioning behavior controlled by `RUNPLZ_BREV_*`
@@ -82,8 +85,11 @@ validation), prefer `scripts/release/retrain_evaluate_deploy.sh`.
 
 - **`set_cpu_threads.sh`** — Auto-computes the per-training-worker BLAS
   thread budget and uniformly sets `OMP_NUM_THREADS` /
-  `MKL_NUM_THREADS` / `OPENBLAS_NUM_THREADS`. Sourced by
-  the release-stage scripts before they fork training workers.
+  `MKL_NUM_THREADS` / `OPENBLAS_NUM_THREADS`. It also pins
+  `MKL_THREADING_LAYER=GNU` before Python starts so numpy/MKL and
+  PyTorch/Inductor workers share GNU OpenMP instead of aborting on mixed
+  runtimes. Sourced by the release-stage scripts before they fork training
+  workers.
 
 ## Profiling
 

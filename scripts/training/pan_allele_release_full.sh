@@ -24,7 +24,10 @@
 #   MHCFLURRY_OUT              required — root for all artifacts
 #   REPO                       path to the mhcflurry repo
 #                              (default: this checkout)
-#   MAX_WORKERS_PER_GPU        per-GPU worker cap (default 2 on 80GB cards)
+#   MAX_WORKERS_PER_GPU        default per-GPU worker cap for shared stages
+#   AFFINITY_MAX_WORKERS_PER_GPU
+#                              affinity per-GPU worker cap (default 3 for
+#                              mb1024 on 80GB A100s)
 #   DATALOADER_NUM_WORKERS     'auto' (default) lets the orchestrator pick
 #   PROCESSING_HELD_OUT_SAMPLES  (default 50; subset script uses 10)
 #   PRESENTATION_DECOYS_PER_HIT (default 99 to match release; subset uses 2)
@@ -60,10 +63,10 @@ if command -v nvidia-smi >/dev/null 2>&1; then
 else
     GPUS=0
 fi
-# Default to auto so the new (2.3.0) full release exercises the
-# orchestrator's hardware-aware resolver. On 8x80GB this lands at 4
-# workers/GPU = 32 fit workers (vs the affinity-only release_exact's
-# pinned 2/GPU = 16, which preserves bit-for-bit replication of 2.2.0).
+# Default to auto so the full release exercises the orchestrator's
+# hardware-aware resolver for shared non-affinity stages. Affinity uses its
+# own cap below: at minibatch 1024, four concurrent affinity workers on one
+# 80GB A100 can OOM during validation.
 MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-auto}"
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-auto}"
 PROCESSING_HELD_OUT_SAMPLES="${PROCESSING_HELD_OUT_SAMPLES:-50}"
@@ -71,6 +74,7 @@ PRESENTATION_DECOYS_PER_HIT="${PRESENTATION_DECOYS_PER_HIT:-99}"
 PRESENTATION_FEATURE_CHUNK_SIZE="${PRESENTATION_FEATURE_CHUNK_SIZE:-250000}"
 TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-1024}"
 AFFINITY_MINIBATCH_SIZE="${AFFINITY_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
+AFFINITY_MAX_WORKERS_PER_GPU="${AFFINITY_MAX_WORKERS_PER_GPU:-3}"
 PROCESSING_MINIBATCH_SIZE="${PROCESSING_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
 PROCESSING_VARIANTS="${PROCESSING_VARIANTS:-with_flanks no_flank short_flanks}"
 PRESENTATION_PROCESSING_WITH_FLANKS_KIND="${PRESENTATION_PROCESSING_WITH_FLANKS_KIND:-with_flanks}"
@@ -110,10 +114,10 @@ printf >&2 \
     "[pan_allele_release_full.sh] DATALOADER_NUM_WORKERS=%s resolved to %s\n" \
     "$DATALOADER_NUM_WORKERS_REQUESTED" "$DATALOADER_NUM_WORKERS"
 
-# Same parallelism args as stage 1; processing/presentation stages
-# below pick this up. --torch-compile auto reads MHCFLURRY_TORCH_COMPILE
-# env (set above), so the env path and the CLI path produce identical
-# orchestrator state.
+# Shared parallelism args for the later stages. The affinity stage uses its own
+# worker cap and job count below. --torch-compile auto reads
+# MHCFLURRY_TORCH_COMPILE env (set above), so the env path and the CLI path
+# produce identical orchestrator state.
 COMMON_PARALLELISM_ARGS=(
     --num-jobs "$NUM_JOBS"
     --max-tasks-per-worker 1000
@@ -205,14 +209,25 @@ compress_csv_bzip2() {
 # ============================================================
 echo "=== STAGE 1: AFFINITY ==="
 STAGE1_START=$(date +%s)
-MHCFLURRY_OUT="$BASE_OUT/affinity" \
-    NUM_JOBS="$NUM_JOBS" \
-    GPUS="$GPUS" \
-    MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
-    DATALOADER_NUM_WORKERS="$DATALOADER_NUM_WORKERS" \
-    TRAINING_MINIBATCH_SIZE="$TRAINING_MINIBATCH_SIZE" \
-    AFFINITY_MINIBATCH_SIZE="$AFFINITY_MINIBATCH_SIZE" \
-    bash "$SCRIPT_DIR/pan_allele_release_affinity.sh"
+AFFINITY_NUM_JOBS="${AFFINITY_NUM_JOBS:-}"
+if [ -z "$AFFINITY_NUM_JOBS" ] && [ "$GPUS" -eq 0 ]; then
+    AFFINITY_NUM_JOBS=1
+elif [ -z "$AFFINITY_NUM_JOBS" ] && \
+        [ "$AFFINITY_MAX_WORKERS_PER_GPU" != "auto" ]; then
+    AFFINITY_NUM_JOBS="$(( GPUS * AFFINITY_MAX_WORKERS_PER_GPU ))"
+fi
+AFFINITY_ENV=(
+    "MHCFLURRY_OUT=$BASE_OUT/affinity"
+    "GPUS=$GPUS"
+    "MAX_WORKERS_PER_GPU=$AFFINITY_MAX_WORKERS_PER_GPU"
+    "DATALOADER_NUM_WORKERS=$DATALOADER_NUM_WORKERS"
+    "TRAINING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE"
+    "AFFINITY_MINIBATCH_SIZE=$AFFINITY_MINIBATCH_SIZE"
+)
+if [ -n "$AFFINITY_NUM_JOBS" ]; then
+    AFFINITY_ENV+=("NUM_JOBS=$AFFINITY_NUM_JOBS")
+fi
+env "${AFFINITY_ENV[@]}" bash "$SCRIPT_DIR/pan_allele_release_affinity.sh"
 AFFINITY_PREDICTOR="$BASE_OUT/affinity/models.combined"
 echo "STAGE 1 duration: $(( $(date +%s) - STAGE1_START )) sec"
 echo "affinity predictor: $AFFINITY_PREDICTOR"

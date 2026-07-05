@@ -24,6 +24,7 @@ Usage:
       [--backend local|brev-existing|brev-provision|ssh] \
       [--minibatch-size 1024] \
       [--affinity-minibatch-size 1024] \
+      [--affinity-max-workers-per-gpu 3] \
       [--processing-minibatch-size 1024] \
       [--processing-variants "with_flanks no_flank short_flanks"] \
       [--brev-instance NAME] [--brev-on-finish leave|stop|delete] \
@@ -92,6 +93,7 @@ run_brev_training() {
         "REPO=$REPO"
         "TRAINING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE"
         "AFFINITY_MINIBATCH_SIZE=$AFFINITY_MINIBATCH_SIZE"
+        "AFFINITY_MAX_WORKERS_PER_GPU=$AFFINITY_MAX_WORKERS_PER_GPU"
         "PROCESSING_MINIBATCH_SIZE=$PROCESSING_MINIBATCH_SIZE"
         "PROCESSING_VARIANTS=$PROCESSING_VARIANTS"
         "PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$PRESENTATION_PROCESSING_WITH_FLANKS_KIND"
@@ -142,6 +144,7 @@ RUN_LABEL=new
 DRY_RUN=0
 TRAINING_MINIBATCH_SIZE=1024
 AFFINITY_MINIBATCH_SIZE=
+AFFINITY_MAX_WORKERS_PER_GPU="${AFFINITY_MAX_WORKERS_PER_GPU:-3}"
 PROCESSING_MINIBATCH_SIZE=
 PROCESSING_VARIANTS="with_flanks no_flank short_flanks"
 PRESENTATION_PROCESSING_WITH_FLANKS_KIND=with_flanks
@@ -255,6 +258,10 @@ while [ $# -gt 0 ]; do
             AFFINITY_MINIBATCH_SIZE=$2
             shift 2
             ;;
+        --affinity-max-workers-per-gpu)
+            AFFINITY_MAX_WORKERS_PER_GPU=$2
+            shift 2
+            ;;
         --processing-minibatch-size)
             PROCESSING_MINIBATCH_SIZE=$2
             shift 2
@@ -344,6 +351,7 @@ note "Run directory: $RUN_DIR"
 note "Release:       $RELEASE"
 note "Backend:       $BACKEND"
 note "Batch sizes:   affinity=$AFFINITY_MINIBATCH_SIZE processing=$PROCESSING_MINIBATCH_SIZE"
+note "Affinity MWPG: $AFFINITY_MAX_WORKERS_PER_GPU"
 note "Processing:    variants=$PROCESSING_VARIANTS; eval_modes=$PROCESSING_MODES"
 case "$BACKEND" in
     brev-existing|brev-provision)
@@ -362,6 +370,7 @@ if [ "$SKIP_TRAIN" != "1" ]; then
                 "REPO=$REPO" \
                 "TRAINING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE" \
                 "AFFINITY_MINIBATCH_SIZE=$AFFINITY_MINIBATCH_SIZE" \
+                "AFFINITY_MAX_WORKERS_PER_GPU=$AFFINITY_MAX_WORKERS_PER_GPU" \
                 "PROCESSING_MINIBATCH_SIZE=$PROCESSING_MINIBATCH_SIZE" \
                 "PROCESSING_VARIANTS=$PROCESSING_VARIANTS" \
                 "PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" \
@@ -384,6 +393,7 @@ if [ "$SKIP_TRAIN" != "1" ]; then
             REMOTE_COMMAND="$REMOTE_COMMAND REPO='$REMOTE_REPO'"
             REMOTE_COMMAND="$REMOTE_COMMAND TRAINING_MINIBATCH_SIZE='$TRAINING_MINIBATCH_SIZE'"
             REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_MINIBATCH_SIZE='$AFFINITY_MINIBATCH_SIZE'"
+            REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_MAX_WORKERS_PER_GPU='$AFFINITY_MAX_WORKERS_PER_GPU'"
             REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_MINIBATCH_SIZE='$PROCESSING_MINIBATCH_SIZE'"
             REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_VARIANTS='$PROCESSING_VARIANTS'"
             REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_PROCESSING_WITH_FLANKS_KIND='$PRESENTATION_PROCESSING_WITH_FLANKS_KIND'"

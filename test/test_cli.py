@@ -158,14 +158,17 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert env["TRAINING_MINIBATCH_SIZE"] == "2048"
     assert env["MKL_THREADING_LAYER"] == "GNU"
     assert "AFFINITY_MINIBATCH_SIZE" not in env
+    assert "AFFINITY_MAX_WORKERS_PER_GPU" not in env
     assert "PROCESSING_MINIBATCH_SIZE" not in env
 
     env = module.remote_training_env({
         "TRAINING_MINIBATCH_SIZE": "2048",
         "AFFINITY_MINIBATCH_SIZE": "512",
+        "AFFINITY_MAX_WORKERS_PER_GPU": "3",
         "MKL_THREADING_LAYER": "TBB",
     })
     assert env["AFFINITY_MINIBATCH_SIZE"] == "512"
+    assert env["AFFINITY_MAX_WORKERS_PER_GPU"] == "3"
     assert env["MKL_THREADING_LAYER"] == "TBB"
 
     brev_config = module.brev_config_from_env({

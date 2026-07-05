@@ -30,6 +30,7 @@ scripts/release/retrain_evaluate_deploy.sh \
     --release 2.3.0 \
     --backend local \
     --minibatch-size 1024 \
+    --affinity-max-workers-per-gpu 3 \
     --deploy-mode dry-run
 ```
 
@@ -55,9 +56,11 @@ stage has a `--skip-*` flag for resuming.
 
 Training batch-size knobs are first-class release options. `--minibatch-size`
 sets the shared default (currently 1024); `--affinity-minibatch-size` and
-`--processing-minibatch-size` override individual model families. Processing
-variants default to `with_flanks no_flank short_flanks`, and the presentation
-stage uses `with_flanks` as its with-flank processing predictor unless
+`--processing-minibatch-size` override individual model families. Affinity
+training defaults to `--affinity-max-workers-per-gpu 3`, which keeps mb1024
+fits under the validation-time VRAM budget on 80GB A100s. Processing variants
+default to `with_flanks no_flank short_flanks`, and the presentation stage uses
+`with_flanks` as its with-flank processing predictor unless
 `--presentation-processing-with-flanks-kind` says otherwise.
 
 Evaluation now includes affinity, processing, and presentation by default. In
