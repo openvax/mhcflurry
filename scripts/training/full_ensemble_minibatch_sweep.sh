@@ -43,10 +43,6 @@
 set -euo pipefail
 set -x
 
-pseudosequence_lookup() {
-  python -c 'from mhcflurry.pseudosequences import main; main()' "$@"
-}
-
 : "${MHCFLURRY_OUT:?MHCFLURRY_OUT must be set}"
 SWEEP_OUT="${SWEEP_OUT:-$MHCFLURRY_OUT/full_sweep}"
 MINIBATCH_SIZES="${MINIBATCH_SIZES:-256 512 1024 2048 4096 8192 16384}"
@@ -54,7 +50,7 @@ TRAIN_DATA="${TRAIN_DATA:-$MHCFLURRY_OUT/train_data.csv.bz2}"
 HYPERPARAMS_TPL="${HYPERPARAMS_TPL:-$MHCFLURRY_OUT/hyperparameters.yaml}"
 if [ -z "${ALLELE_SEQUENCES:-}" ]; then
   ALLELE_SEQUENCES_DIR="$(mhcflurry-downloads path allele_sequences)"
-  ALLELE_SEQUENCES="$(pseudosequence_lookup path \
+  ALLELE_SEQUENCES="$(mhcflurry pseudosequences path \
     --directory "$ALLELE_SEQUENCES_DIR" \
     --length 39 \
     --fallback-legacy)"

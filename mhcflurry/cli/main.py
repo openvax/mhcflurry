@@ -82,6 +82,12 @@ _SUBCOMMANDS = {
     "class1-train-presentation-models": (
         "mhcflurry.cli.train_presentation_models_command", "run",
         "Train the Class I presentation predictor (affinity + processing)."),
+    "class1-generate-training-hyperparameters": (
+        "mhcflurry.cli.generate_training_hyperparameters", "run_argv",
+        "Generate release-training hyperparameter grids."),
+    "class1-reassign-mass-spec-training-data": (
+        "mhcflurry.cli.reassign_mass_spec_training_data", "run_argv",
+        "Reassign mass-spec rows in Class I affinity training data."),
     "pseudosequences": (
         "mhcflurry.pseudosequences", "main",
         "Pseudosequence CSV registry helper (filename / path / list)."),
@@ -116,6 +122,8 @@ _HELP_GROUPS = (
         "compare-models", "plot-model-comparison",
     )),
     ("Helpers", (
+        "class1-generate-training-hyperparameters",
+        "class1-reassign-mass-spec-training-data",
         "pseudosequences",
     )),
 )

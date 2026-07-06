@@ -13,6 +13,14 @@
 """
 Class I MHC ligand prediction package
 """
+import os
+
+
+# Must run before importing modules that transitively import numpy/MKL. Some
+# conda images default MKL to INTEL threading, which aborts after PyTorch has
+# loaded GNU libgomp. Respect an explicit user choice, but make mhcflurry CLI
+# entry points safe when they are the first package imported.
+os.environ.setdefault("MKL_THREADING_LAYER", "GNU")
 
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_neural_network import Class1NeuralNetwork

@@ -13,8 +13,9 @@
 #   REPO, GPUS, MAX_WORKERS_PER_GPU, NUM_JOBS, DATALOADER_NUM_WORKERS,
 #   MATMUL_PRECISION, MHCFLURRY_TORCH_COMPILE,
 #   PROCESSING_HELD_OUT_SAMPLES, PRESENTATION_DECOYS_PER_HIT,
-#   TRAINING_MINIBATCH_SIZE, PROCESSING_MINIBATCH_SIZE,
-#   PROCESSING_VARIANTS, PRESENTATION_PROCESSING_WITH_FLANKS_KIND
+#   PRESENTATION_FEATURE_CHUNK_SIZE, TRAINING_MINIBATCH_SIZE,
+#   PROCESSING_MINIBATCH_SIZE, PROCESSING_VARIANTS,
+#   PRESENTATION_PROCESSING_WITH_FLANKS_KIND
 set -euo pipefail
 set -x
 
@@ -40,6 +41,7 @@ MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-auto}"
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-auto}"
 PROCESSING_HELD_OUT_SAMPLES="${PROCESSING_HELD_OUT_SAMPLES:-50}"
 PRESENTATION_DECOYS_PER_HIT="${PRESENTATION_DECOYS_PER_HIT:-99}"
+PRESENTATION_FEATURE_CHUNK_SIZE="${PRESENTATION_FEATURE_CHUNK_SIZE:-250000}"
 TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-1024}"
 PROCESSING_MINIBATCH_SIZE="${PROCESSING_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
 PROCESSING_VARIANTS="${PROCESSING_VARIANTS:-with_flanks no_flank short_flanks}"
@@ -81,6 +83,19 @@ COMMON_PARALLELISM_ARGS=(
 )
 [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ] && COMMON_PARALLELISM_ARGS+=(--enable-timing)
 
+PRESENTATION_NUM_JOBS="${PRESENTATION_NUM_JOBS:-auto}"
+PRESENTATION_MAX_WORKERS_PER_GPU="${PRESENTATION_MAX_WORKERS_PER_GPU:-1}"
+PRESENTATION_PARALLELISM_ARGS=(
+    --num-jobs "$PRESENTATION_NUM_JOBS"
+    --max-tasks-per-worker 1000
+    --gpus "$GPUS"
+    --max-workers-per-gpu "$PRESENTATION_MAX_WORKERS_PER_GPU"
+    --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
+    --torch-compile auto
+    --matmul-precision "${MATMUL_PRECISION:-none}"
+)
+[ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ] && PRESENTATION_PARALLELISM_ARGS+=(--enable-timing)
+
 PRESENTATION_CALIBRATION_NUM_JOBS="${PRESENTATION_CALIBRATION_NUM_JOBS:-auto}"
 PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU="${PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU:-auto}"
 PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE="${PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE:-auto}"
@@ -119,8 +134,6 @@ mhcflurry-downloads fetch data_mass_spec_annotated data_references
 
 cp "$REPO/downloads-generation/models_class1_processing/annotate_hits_with_expression.py" .
 cp "$RECIPE_DIR/make_train_data.processing.py" .
-cp "$RECIPE_DIR/generate_hyperparameters.base.py" .
-cp "$RECIPE_DIR/generate_hyperparameters.variants.py" .
 
 python annotate_hits_with_expression.py \
     --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
@@ -138,25 +151,14 @@ python make_train_data.processing.py \
     "${COMMON_PARALLELISM_ARGS[@]}"
 compress_csv_bzip2 "$(pwd)/train_data.csv"
 
-python generate_hyperparameters.base.py \
+mhcflurry class1-generate-training-hyperparameters processing-base \
     --minibatch-size "$PROCESSING_MINIBATCH_SIZE" \
     > hyperparameters.base.yaml
 
 for kind in $PROCESSING_VARIANTS; do
-    python generate_hyperparameters.variants.py hyperparameters.base.yaml "$kind" \
-        > "hyperparameters.$kind.full.yaml"
-    python - "$kind" <<'PY'
-import sys, yaml
-kind = sys.argv[1]
-hp = yaml.unsafe_load(open(f"hyperparameters.{kind}.full.yaml"))
-def detuple(x):
-    if isinstance(x, tuple): return list(x)
-    if isinstance(x, list):  return [detuple(e) for e in x]
-    if isinstance(x, dict):  return {k: detuple(v) for k, v in x.items()}
-    return x
-with open(f"hyperparameters.{kind}.yaml", "w") as f:
-    yaml.safe_dump([detuple(d) for d in hp], f)
-PY
+    mhcflurry class1-generate-training-hyperparameters processing-variant \
+        hyperparameters.base.yaml "$kind" \
+        > "hyperparameters.$kind.yaml"
 
     mhcflurry-class1-train-processing-models \
         --data "$(pwd)/train_data.csv.bz2" \
@@ -203,7 +205,9 @@ mhcflurry-class1-train-presentation-models \
     --affinity-predictor "$AFFINITY_PREDICTOR" \
     --processing-predictor-with-flanks "$BASE_OUT/processing/models.selected.$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" \
     --processing-predictor-without-flanks "$BASE_OUT/processing/models.selected.no_flank" \
-    --out-models-dir "$(pwd)/models"
+    --out-models-dir "$(pwd)/models" \
+    --feature-chunk-size "$PRESENTATION_FEATURE_CHUNK_SIZE" \
+    "${PRESENTATION_PARALLELISM_ARGS[@]}"
 
 mhcflurry-calibrate-percentile-ranks \
     --models-dir "$(pwd)/models" \

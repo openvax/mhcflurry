@@ -27,6 +27,7 @@ import types
 
 import pandas
 import pytest
+import yaml
 
 from mhcflurry.cli import compare_models, main as cli_main
 from mhcflurry.cli import plot_model_comparison
@@ -112,6 +113,53 @@ def test_processing_hyperparameter_generator_is_importable():
     grid = module.build_grid(minibatch_size=2048)
     assert len(grid) == 128
     assert {item["minibatch_size"] for item in grid} == {2048}
+
+
+def test_training_hyperparameter_cli_generates_processing_variant(tmp_path, capsys):
+    cli_main.main([
+        "class1-generate-training-hyperparameters",
+        "processing-base",
+        "--minibatch-size",
+        "2048",
+    ])
+    base_text = capsys.readouterr().out
+    base = yaml.safe_load(base_text)
+    assert len(base) == 128
+    assert {item["minibatch_size"] for item in base} == {2048}
+
+    base_path = tmp_path / "hyperparameters.base.yaml"
+    base_path.write_text(base_text)
+    cli_main.main([
+        "class1-generate-training-hyperparameters",
+        "processing-variant",
+        str(base_path),
+        "short_flanks",
+    ])
+    variant = yaml.safe_load(capsys.readouterr().out)
+    assert len(variant) == 128
+    assert {item["n_flank_length"] for item in variant} == {5}
+    assert {item["c_flank_length"] for item in variant} == {5}
+
+
+def test_reassign_mass_spec_training_data_cli(tmp_path):
+    input_path = tmp_path / "train.csv"
+    output_path = tmp_path / "out.csv"
+    pandas.DataFrame({
+        "measurement_kind": ["mass_spec", "binding"],
+        "measurement_inequality": ["=", "="],
+        "measurement_value": [123.0, 456.0],
+    }).to_csv(input_path, index=False)
+
+    cli_main.main([
+        "class1-reassign-mass-spec-training-data",
+        str(input_path),
+        "--set-measurement-value",
+        "100",
+        "--out-csv",
+        str(output_path),
+    ])
+    result = pandas.read_csv(output_path)
+    assert result.measurement_value.tolist() == [100.0, 456.0]
 
 
 def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):

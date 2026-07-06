@@ -116,6 +116,17 @@ def brev_config_from_env(environ=os.environ):
 
 def remote_training_env(environ=os.environ):
     env = {
+        "COMPARE_INCLUDE": environ.get(
+            "COMPARE_INCLUDE", "affinity,processing,presentation"
+        ),
+        "COMPARE_MAX_TASKS_PER_WORKER": environ.get(
+            "COMPARE_MAX_TASKS_PER_WORKER",
+            environ.get("MAX_TASKS_PER_WORKER", "12"),
+        ),
+        "COMPARE_MAX_WORKERS_PER_GPU": environ.get(
+            "COMPARE_MAX_WORKERS_PER_GPU", "auto"
+        ),
+        "COMPARE_NUM_JOBS": environ.get("COMPARE_NUM_JOBS", "auto"),
         "DATALOADER_NUM_WORKERS": environ.get("DATALOADER_NUM_WORKERS", "auto"),
         "MAX_TASKS_PER_WORKER": environ.get("MAX_TASKS_PER_WORKER", "12"),
         "MAX_WORKERS_PER_GPU": environ.get("MAX_WORKERS_PER_GPU", "auto"),
@@ -136,9 +147,18 @@ def remote_training_env(environ=os.environ):
         "PRESENTATION_PROCESSING_WITH_FLANKS_KIND": environ.get(
             "PRESENTATION_PROCESSING_WITH_FLANKS_KIND", "with_flanks"
         ),
+        "PRESENTATION_MODES": environ.get(
+            "PRESENTATION_MODES", "with_flanks,without_flanks"
+        ),
         "PROCESSING_VARIANTS": environ.get(
             "PROCESSING_VARIANTS", "with_flanks no_flank short_flanks"
         ),
+        "PROCESSING_MODES": environ.get(
+            "PROCESSING_MODES", "with_flanks,no_flank,short_flanks"
+        ),
+        "RUN_LABEL": environ.get("RUN_LABEL", "new"),
+        "RUN_RELEASE_EVAL": environ.get("RUN_RELEASE_EVAL", "0"),
+        "RUN_RELEASE_PLOTS": environ.get("RUN_RELEASE_PLOTS", "0"),
         "TORCHINDUCTOR_COMPILE_THREADS": environ.get(
             "TORCHINDUCTOR_COMPILE_THREADS", "auto"
         ),
@@ -173,6 +193,7 @@ image = (
         "libxslt1-dev",
         "procps",
     )
+    .pip_install("matplotlib")
     .pip_install("runplz>=3.11.0")
     .pip_install_local_dir(".", editable=True)
 )
@@ -206,6 +227,85 @@ def train_release_full():
     env.update({"MHCFLURRY_OUT": str(out), "REPO": str(repo)})
     subprocess.run(
         ["bash", "scripts/training/pan_allele_release_full.sh"],
+        check=True,
+        cwd=repo,
+        env=env,
+    )
+    if env_bool(env, "RUN_RELEASE_EVAL", default=False):
+        run_release_evaluation(repo, out, env)
+    if env_bool(env, "RUN_RELEASE_PLOTS", default=False):
+        run_release_plots(repo, out, env)
+
+
+def run_release_evaluation(repo, out, env):
+    """Fetch release eval data and run compare-models on the remote GPU box."""
+    eval_out = out / "eval_comparison"
+    eval_out.mkdir(parents=True, exist_ok=True)
+
+    subprocess.run(
+        [
+            "mhcflurry",
+            "downloads",
+            "fetch",
+            "data_evaluation",
+            "models_class1_pan",
+            "models_class1_processing",
+            "models_class1_presentation",
+        ],
+        check=True,
+        cwd=repo,
+        env=env,
+    )
+    data_dir = subprocess.check_output(
+        ["mhcflurry", "downloads", "path", "data_evaluation"],
+        cwd=repo,
+        env=env,
+        text=True,
+    ).strip()
+
+    compare_args = [
+        "mhcflurry",
+        "compare-models",
+        "--a", str(out),
+        "--a-label", env.get("RUN_LABEL", "new"),
+        "--b", "public",
+        "--data-dir", data_dir,
+        "--include", env.get("COMPARE_INCLUDE", "affinity,processing,presentation"),
+        "--processing-modes", env.get(
+            "PROCESSING_MODES", "with_flanks,no_flank,short_flanks"
+        ),
+        "--presentation-modes", env.get(
+            "PRESENTATION_MODES", "with_flanks,without_flanks"
+        ),
+        "--out", str(eval_out),
+        "--backend", env.get("COMPARE_BACKEND", "auto"),
+        "--num-jobs", env.get("COMPARE_NUM_JOBS", "auto"),
+        "--max-workers-per-gpu", env.get("COMPARE_MAX_WORKERS_PER_GPU", "auto"),
+        "--max-tasks-per-worker", env.get("COMPARE_MAX_TASKS_PER_WORKER", "12"),
+        "--worker-log-dir", str(eval_out / "worker_logs"),
+        "--torch-compile", env.get(
+            "COMPARE_TORCH_COMPILE",
+            env.get("MHCFLURRY_TORCH_COMPILE", "auto"),
+        ),
+        "--matmul-precision", env.get(
+            "COMPARE_MATMUL_PRECISION",
+            env.get("MHCFLURRY_MATMUL_PRECISION", "high"),
+        ),
+    ]
+    compare_gpus = env.get("COMPARE_GPUS", str(NUM_GPUS))
+    if compare_gpus.strip().lower() != "auto":
+        compare_args.extend(["--gpus", compare_gpus])
+    subprocess.run(compare_args, check=True, cwd=repo, env=env)
+
+
+def run_release_plots(repo, out, env):
+    """Render compare-models plots before the remote instance is cleaned up."""
+    subprocess.run(
+        [
+            "mhcflurry",
+            "plot-model-comparison",
+            "--input", str(out / "eval_comparison"),
+        ],
         check=True,
         cwd=repo,
         env=env,

@@ -63,10 +63,10 @@ if command -v nvidia-smi >/dev/null 2>&1; then
 else
     GPUS=0
 fi
-# Default to auto so the full release exercises the orchestrator's
-# hardware-aware resolver for shared non-affinity stages. Affinity uses its
-# own cap below: at minibatch 1024, four concurrent affinity workers on one
-# 80GB A100 can OOM during validation.
+# Default to auto so each training command exercises the orchestrator's
+# workload-aware resolver. Affinity training in particular has a
+# minibatch-sensitive validation footprint; leave worker packing to the
+# in-process training command, which sees the hyperparameters and row count.
 MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-auto}"
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-auto}"
 PROCESSING_HELD_OUT_SAMPLES="${PROCESSING_HELD_OUT_SAMPLES:-50}"
@@ -74,7 +74,7 @@ PRESENTATION_DECOYS_PER_HIT="${PRESENTATION_DECOYS_PER_HIT:-99}"
 PRESENTATION_FEATURE_CHUNK_SIZE="${PRESENTATION_FEATURE_CHUNK_SIZE:-250000}"
 TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-1024}"
 AFFINITY_MINIBATCH_SIZE="${AFFINITY_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
-AFFINITY_MAX_WORKERS_PER_GPU="${AFFINITY_MAX_WORKERS_PER_GPU:-3}"
+AFFINITY_MAX_WORKERS_PER_GPU="${AFFINITY_MAX_WORKERS_PER_GPU:-auto}"
 PROCESSING_MINIBATCH_SIZE="${PROCESSING_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
 PROCESSING_VARIANTS="${PROCESSING_VARIANTS:-with_flanks no_flank short_flanks}"
 PRESENTATION_PROCESSING_WITH_FLANKS_KIND="${PRESENTATION_PROCESSING_WITH_FLANKS_KIND:-with_flanks}"
@@ -220,7 +220,7 @@ AFFINITY_ENV=(
     "MHCFLURRY_OUT=$BASE_OUT/affinity"
     "GPUS=$GPUS"
     "MAX_WORKERS_PER_GPU=$AFFINITY_MAX_WORKERS_PER_GPU"
-    "DATALOADER_NUM_WORKERS=$DATALOADER_NUM_WORKERS"
+    "DATALOADER_NUM_WORKERS=${AFFINITY_DATALOADER_NUM_WORKERS:-$DATALOADER_NUM_WORKERS_REQUESTED}"
     "TRAINING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE"
     "AFFINITY_MINIBATCH_SIZE=$AFFINITY_MINIBATCH_SIZE"
 )
@@ -244,8 +244,6 @@ mhcflurry-downloads fetch data_mass_spec_annotated data_references
 
 cp "$REPO/downloads-generation/models_class1_processing/annotate_hits_with_expression.py" .
 cp "$RECIPE_DIR/make_train_data.processing.py" .
-cp "$RECIPE_DIR/generate_hyperparameters.base.py" .
-cp "$RECIPE_DIR/generate_hyperparameters.variants.py" .
 
 python annotate_hits_with_expression.py \
     --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
@@ -263,28 +261,17 @@ python make_train_data.processing.py \
     "${COMMON_PARALLELISM_ARGS[@]}"
 compress_csv_bzip2 "$(pwd)/train_data.csv"
 
-python generate_hyperparameters.base.py \
+mhcflurry class1-generate-training-hyperparameters processing-base \
     --minibatch-size "$PROCESSING_MINIBATCH_SIZE" \
     > hyperparameters.base.yaml
 
 for kind in $PROCESSING_VARIANTS; do
-    python generate_hyperparameters.variants.py hyperparameters.base.yaml "$kind" \
-        > "hyperparameters.$kind.full.yaml"
-    # Round-trip through safe_dump to strip python/tuple tags so
-    # downstream readers can use yaml.safe_load.
-    python - "$kind" <<'PY'
-import sys, yaml
-kind = sys.argv[1]
-hp = yaml.unsafe_load(open(f"hyperparameters.{kind}.full.yaml"))
-def detuple(x):
-    if isinstance(x, tuple): return list(x)
-    if isinstance(x, list):  return [detuple(e) for e in x]
-    if isinstance(x, dict):  return {k: detuple(v) for k, v in x.items()}
-    return x
-with open(f"hyperparameters.{kind}.yaml", "w") as f:
-    yaml.safe_dump([detuple(d) for d in hp], f)
-print(f"processing.{kind}: using {len(hp)} architectures")
-PY
+    mhcflurry class1-generate-training-hyperparameters processing-variant \
+        hyperparameters.base.yaml "$kind" \
+        > "hyperparameters.$kind.yaml"
+    ARCH_COUNT=$(python -c \
+        "import yaml; print(len(yaml.safe_load(open('hyperparameters.$kind.yaml'))))")
+    echo "processing.$kind: using $ARCH_COUNT architectures"
 
     mhcflurry-class1-train-processing-models \
         --data "$(pwd)/train_data.csv.bz2" \

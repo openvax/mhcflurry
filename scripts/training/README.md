@@ -16,13 +16,17 @@ one-off tuning runs do not belong here.
   predictor on top. Use this as a tail-on after a sweep.
 - **`pan_allele_release_full.sh`** — Composition wrapper that runs Stage
   1 then inlines Stages 2–3. The full release in one invocation. Its affinity
-  stage defaults to `AFFINITY_MAX_WORKERS_PER_GPU=3` so mb1024 training fits
-  on 80GB A100s; set `AFFINITY_MAX_WORKERS_PER_GPU=auto` or a number to
-  override.
+  stage leaves `AFFINITY_MAX_WORKERS_PER_GPU=auto` so the affinity training
+  command can choose worker packing from the hyperparameter grid, row count,
+  minibatch, and detected VRAM. Set `AFFINITY_MAX_WORKERS_PER_GPU` to a number
+  only when deliberately pinning a known-good count for a specific machine.
 - **`launch_pan_allele_training_remote.py`** — remote/cloud launcher for
   the same pan-allele training pipeline. It uses runplz as the transport,
   with Brev provisioning behavior controlled by `RUNPLZ_BREV_*`
-  environment variables. Prefer the release workflow wrapper below unless
+  environment variables. When invoked by the release workflow wrapper, it also
+  runs `mhcflurry compare-models` and `mhcflurry plot-model-comparison` on the
+  remote GPU machine before cleanup so release-scale inference does not fall
+  back to the local laptop. Prefer the release workflow wrapper below unless
   you are debugging the remote launcher itself.
 
 For Brev/runplz execution:
@@ -40,23 +44,25 @@ validation), prefer `scripts/release/retrain_evaluate_deploy.sh`.
 
 ## Hyperparameter generation (consumed by the release scripts)
 
-- **`release_exact/generate_hyperparameters.py`** — The 35-architecture
-  pan-allele recipe. It defaults to minibatch 1024 and accepts
-  `--minibatch-size` so release scripts and sweeps can change the value
-  without patching the file.
-- **`release_exact/generate_hyperparameters.base.py`** /
-  **`generate_hyperparameters.variants.py`** — Processing-network
-  hyperparameter base + with_flanks / no_flank / short_flanks variant emitters.
-  The base generator accepts `--minibatch-size` and also defaults to 1024.
+- **`mhcflurry class1-generate-training-hyperparameters`** — package-owned
+  generator for the 35-architecture pan-allele affinity recipe and the
+  processing-network base / with_flanks / no_flank / short_flanks variants.
+  It defaults to minibatch 1024 and accepts `--minibatch-size` for the base
+  grids so release scripts and sweeps can change the value without patching
+  files. The `release_exact/generate_hyperparameters*.py` files are thin
+  compatibility shims for older direct-script workflows.
 - **`release_exact/make_train_data.processing.py`** /
   **`make_train_data.presentation.py`** — Per-stage train-data
   preparation (annotated mass-spec hits, decoy generation, format
   filters). Run by the release scripts.
-- **`release_exact/reassign_mass_spec_training_data.py`** — One-time
-  remapping kept in tree because rerunning the release sometimes
-  surfaces stale assignments and we'd want it again.
-- **`release_exact/additional_alleles.txt`** — Curated allele list
-  augmenting the auto-derived set; baked into the release.
+- **`mhcflurry class1-reassign-mass-spec-training-data`** — one-time
+  mass-spec affinity-value remapping kept as a real CLI because rerunning
+  the release sometimes surfaces stale assignments and we'd want it again.
+  `release_exact/reassign_mass_spec_training_data.py` remains as a
+  compatibility shim.
+- **`release_exact/additional_alleles.txt`** — archived curated allele list
+  from the older release recipe. The maintained rc14 release scripts do not
+  currently read it.
 
 ## Sweep + analysis tooling
 
@@ -70,8 +76,10 @@ validation), prefer `scripts/release/retrain_evaluate_deploy.sh`.
   processing, and presentation (per-sample + per-length on multiallelic
   flank modes). Each side can be a training-run directory, `public`
   (current install), or `public:<release_name>`. Default `--b public`.
-  Writes detailed component artifacts plus `release_summary.csv` and
-  `release_summary.md`.
+  Prediction uses the same GPU-aware parallel worker planner as the inference
+  CLIs; metric aggregation remains in pandas / scikit-learn for exact release
+  summary compatibility. Writes detailed component artifacts plus
+  `release_summary.csv` and `release_summary.md`.
 - **`mhcflurry plot-model-comparison`** — Renders ROC/PR/scatter/delta
   plots from a `compare-models` output directory. Separate subcommand so
   the metric pipeline doesn't pay the matplotlib import cost.
