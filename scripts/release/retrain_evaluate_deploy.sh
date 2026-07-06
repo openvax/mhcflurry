@@ -29,6 +29,9 @@ Usage:
       [--processing-variants "with_flanks no_flank short_flanks"] \
       [--brev-instance NAME] [--brev-on-finish leave|stop|delete] \
       [--brev-stop-failure-action warn|delete] \
+      [--brev-cleanup-timeout-seconds 60] \
+      [--brev-create-timeout-seconds 2400] \
+      [--brev-container-image pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime] \
       [--brev-sync-mode release|full] \
       [--brev-instance-type TYPE] \
       [--skip-train] [--skip-eval] [--skip-plots] [--skip-deploy] \
@@ -68,6 +71,13 @@ Logs:
   runplz events, training/eval logs, GPU telemetry, and generated configs.
   Use --brev-sync-mode full only for full post-mortem copies of all candidate
   pools and intermediate CSVs.
+
+Postprocess-only Brev runs:
+  With --backend brev-provision --skip-train, the wrapper can provision a
+  temporary Brev machine, copy the final selected model artifacts from RUN_DIR,
+  run compare-models / plot-model-comparison remotely, sync summary tables and
+  figures back, and then apply --brev-on-finish. It does not upload the full
+  training run or row-level prediction CSVs.
 EOF
 }
 
@@ -86,6 +96,46 @@ warn() {
 
 require_command() {
     command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"
+}
+
+lowercase() {
+    printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+normalize_compare_torch_compile() {
+    local value="${1:-auto}"
+    case "$(lowercase "$value")" in
+        auto) printf 'auto\n' ;;
+        1|true|yes|on) printf '1\n' ;;
+        0|false|no|off) printf '0\n' ;;
+        *)
+            die "COMPARE_TORCH_COMPILE must be auto, true/false, or 1/0; got '$value'"
+            ;;
+    esac
+}
+
+normalize_compare_matmul_precision() {
+    local value="${1:-high}"
+    local normalized
+    normalized="$(lowercase "$value")"
+    case "$normalized" in
+        none|highest|high|medium) printf '%s\n' "$normalized" ;;
+        *)
+            die "COMPARE_MATMUL_PRECISION must be one of none, highest, high, medium; got '$value'"
+            ;;
+    esac
+}
+
+validate_compare_gpus() {
+    local value="${1:-auto}"
+    if [ "$(lowercase "$value")" = "auto" ]; then
+        return 0
+    fi
+    case "$value" in
+        ''|*[!0-9]*)
+            die "COMPARE_GPUS must be auto or a non-negative integer; got '$value'"
+            ;;
+    esac
 }
 
 format_command() {
@@ -128,6 +178,10 @@ run_cmd() {
 run_logged_step() {
     local step="$1"
     local log_file="$WORKFLOW_LOG_DIR/$step.log"
+    local errexit_was_set=0
+    case "$-" in
+        *e*) errexit_was_set=1 ;;
+    esac
     shift
 
     run_cmd mkdir -p "$WORKFLOW_LOG_DIR"
@@ -151,7 +205,11 @@ run_logged_step() {
         "$@" 2>&1 | tee -a "$log_file"
     )
     local status=$?
-    set -e
+    if [ "$errexit_was_set" = "1" ]; then
+        set -e
+    else
+        set +e
+    fi
 
     {
         printf '[%s] end step=%s status=%s\n' \
@@ -159,6 +217,44 @@ run_logged_step() {
     } | tee -a "$log_file" >&2
     record_workflow_event "$step" "$status" "log=$log_file"
     return "$status"
+}
+
+run_with_timeout() {
+    local timeout_seconds="$1"
+    shift
+    python - "$timeout_seconds" "$@" <<'PY'
+import subprocess
+import sys
+
+timeout_seconds = float(sys.argv[1])
+command = sys.argv[2:]
+try:
+    result = subprocess.run(command, timeout=timeout_seconds)
+except subprocess.TimeoutExpired:
+    print(
+        "Command timed out after %.0f seconds: %s" % (
+            timeout_seconds, " ".join(command),
+        ),
+        file=sys.stderr,
+    )
+    raise SystemExit(124)
+raise SystemExit(result.returncode)
+PY
+}
+
+run_logged_step_with_timeout() {
+    local step="$1"
+    local timeout_seconds="$2"
+    shift 2
+    run_logged_step "$step" run_with_timeout "$timeout_seconds" "$@"
+}
+
+write_git_repo_archive() {
+    local output="$1"
+    local tar_output="${output%.bz2}"
+    rm -f "$tar_output" "$output"
+    git -C "$REPO" archive --format=tar HEAD -o "$tar_output"
+    bzip2 -f "$tar_output"
 }
 
 run_dir_has_model_artifacts() {
@@ -195,17 +291,359 @@ brev_latest_remote_exit_code() {
 
 brev_instance_status() {
     require_command brev
-    BREV_INSTANCE_NAME="$BREV_INSTANCE" brev ls --json | python -c '
+    BREV_INSTANCE_NAME="$BREV_INSTANCE" \
+    BREV_CLEANUP_TIMEOUT_SECONDS="$BREV_CLEANUP_TIMEOUT_SECONDS" \
+        python - <<'PY'
 import json
 import os
+import subprocess
 import sys
 
 name = os.environ["BREV_INSTANCE_NAME"]
-for item in json.load(sys.stdin):
+timeout_seconds = float(os.environ["BREV_CLEANUP_TIMEOUT_SECONDS"])
+try:
+    result = subprocess.run(
+        ["brev", "ls", "--json"],
+        capture_output=True,
+        check=True,
+        text=True,
+        timeout=timeout_seconds,
+    )
+except subprocess.TimeoutExpired:
+    print(
+        "brev ls --json timed out after %.0f seconds" % timeout_seconds,
+        file=sys.stderr,
+    )
+    raise SystemExit(124)
+except subprocess.CalledProcessError as exc:
+    if exc.stderr:
+        print(exc.stderr, file=sys.stderr, end="")
+    raise SystemExit(exc.returncode)
+
+for item in json.loads(result.stdout or "[]"):
     if item.get("name") == name:
         print(item.get("status", ""))
         break
-'
+PY
+}
+
+brev_instance_field() {
+    require_command brev
+    local field="$1"
+    BREV_INSTANCE_NAME="$BREV_INSTANCE" \
+    BREV_INSTANCE_FIELD="$field" \
+    BREV_CLEANUP_TIMEOUT_SECONDS="$BREV_CLEANUP_TIMEOUT_SECONDS" \
+        python - <<'PY'
+import json
+import os
+import subprocess
+import sys
+
+name = os.environ["BREV_INSTANCE_NAME"]
+field = os.environ["BREV_INSTANCE_FIELD"]
+timeout_seconds = float(os.environ["BREV_CLEANUP_TIMEOUT_SECONDS"])
+try:
+    result = subprocess.run(
+        ["brev", "ls", "--json"],
+        capture_output=True,
+        check=True,
+        text=True,
+        timeout=timeout_seconds,
+    )
+except subprocess.TimeoutExpired:
+    print(
+        "brev ls --json timed out after %.0f seconds" % timeout_seconds,
+        file=sys.stderr,
+    )
+    raise SystemExit(124)
+except subprocess.CalledProcessError as exc:
+    if exc.stderr:
+        print(exc.stderr, file=sys.stderr, end="")
+    raise SystemExit(exc.returncode)
+
+for item in json.loads(result.stdout or "[]"):
+    if item.get("name") == name:
+        print(item.get(field, ""))
+        break
+PY
+}
+
+wait_for_brev_shell_ready() {
+    local attempt
+    local status
+    local shell_status
+    local health_status
+    for attempt in $(seq 1 "$BREV_SHELL_READY_ATTEMPTS"); do
+        status="$(brev_instance_status || true)"
+        shell_status="$(brev_instance_field shell_status || true)"
+        health_status="$(brev_instance_field health_status || true)"
+        note "Brev readiness check $attempt/$BREV_SHELL_READY_ATTEMPTS: status=${status:-unknown} shell=${shell_status:-unknown} health=${health_status:-unknown}"
+        if [ "$status" = "RUNNING" ] && [ "$shell_status" = "READY" ]; then
+            return 0
+        fi
+        if [ "$status" = "FAILURE" ]; then
+            return 1
+        fi
+        sleep "$BREV_SHELL_READY_DELAY_SECONDS"
+    done
+    return 1
+}
+
+build_brev_postprocess_archives() {
+    local staging="$1"
+    local repo_archive="$staging/repo.tar.bz2"
+    local models_archive="$staging/model_artifacts.tar.bz2"
+
+    run_cmd mkdir -p "$staging"
+    run_logged_step postprocess_package_repo \
+        write_git_repo_archive "$repo_archive"
+    run_logged_step postprocess_package_models \
+        tar -C "$RUN_DIR" -cjf "$models_archive" \
+        affinity/models.combined \
+        processing/models.selected.with_flanks \
+        processing/models.selected.no_flank \
+        processing/models.selected.short_flanks \
+        presentation/models
+}
+
+ensure_brev_postprocess_instance() {
+    local auto_create="$1"
+    require_command brev
+
+    local status
+    status="$(brev_instance_status || true)"
+    if [ -z "$status" ]; then
+        if [ "$auto_create" != "1" ]; then
+            die "Brev instance not found: $BREV_INSTANCE"
+        fi
+        run_logged_step_with_timeout \
+            brev_create_postprocess "$BREV_CREATE_TIMEOUT_SECONDS" \
+            brev create "$BREV_INSTANCE" \
+            --type "$BREV_INSTANCE_TYPE" \
+            --mode container \
+            --container-image "$BREV_CONTAINER_IMAGE" \
+            --timeout "$BREV_CREATE_TIMEOUT_SECONDS"
+        return 0
+    fi
+    if [ "$status" != "RUNNING" ]; then
+        run_logged_step_with_timeout \
+            brev_start_postprocess "$BREV_CREATE_TIMEOUT_SECONDS" \
+            brev start "$BREV_INSTANCE"
+    fi
+}
+
+run_brev_postprocess() {
+    local auto_create="$1"
+    set +e
+    (
+        set -e
+        run_brev_postprocess_impl "$auto_create"
+    )
+    local status=$?
+    set -e
+    if [ "$status" -ne 0 ]; then
+        warn "Brev postprocess failed with status $status."
+        apply_brev_cleanup || true
+        return "$status"
+    fi
+    if [ "$SKIP_EVAL" != "1" ]; then
+        BREV_REMOTE_EVAL_DONE=1
+    fi
+    if [ "$SKIP_PLOTS" != "1" ] && [ -d "$RUN_DIR/eval_comparison/plots" ]; then
+        BREV_REMOTE_PLOTS_DONE=1
+    fi
+}
+
+run_brev_postprocess_impl() {
+    local auto_create="$1"
+    if [ "$SKIP_EVAL" = "1" ]; then
+        return 0
+    fi
+    if [ "$DRY_RUN" = "1" ]; then
+        note "Would run Brev postprocess-only eval/plot on $BREV_INSTANCE."
+        BREV_REMOTE_EVAL_DONE=1
+        if [ "$SKIP_PLOTS" != "1" ]; then
+            BREV_REMOTE_PLOTS_DONE=1
+        fi
+        return 0
+    fi
+    run_dir_has_model_artifacts || \
+        die "Postprocess-only Brev run requires final model artifacts in $RUN_DIR"
+
+    require_command brev
+    require_command tar
+    run_cmd mkdir -p "$RUN_DIR"
+    local staging="$RUN_DIR/.brev-postprocess"
+    local remote_root=/root/mhcflurry-postprocess
+    local repo_archive="$staging/repo.tar.bz2"
+    local models_archive="$staging/model_artifacts.tar.bz2"
+    local remote_script="$staging/run_remote_postprocess.sh"
+    local remote_sync_script="$staging/build_postprocess_sync_archive.sh"
+    local remote_archive="$remote_root/postprocess_sync.tar.bz2"
+    local local_archive="$staging/postprocess_sync.tar.bz2"
+
+    BREV_EXPECT_REMOTE_EVAL=1
+    if [ "$SKIP_PLOTS" != "1" ]; then
+        BREV_EXPECT_REMOTE_PLOTS=1
+    fi
+
+    run_cmd rm -rf "$staging"
+    build_brev_postprocess_archives "$staging"
+    ensure_brev_postprocess_instance "$auto_create"
+
+    run_logged_step postprocess_wait_for_shell \
+        wait_for_brev_shell_ready
+    run_logged_step postprocess_prepare_remote_dir \
+        brev exec "$BREV_INSTANCE" "mkdir -p '$remote_root'"
+    run_logged_step postprocess_copy_repo \
+        brev copy "$repo_archive" "$BREV_INSTANCE:$remote_root/repo.tar.bz2"
+    run_logged_step postprocess_copy_models \
+        brev copy "$models_archive" "$BREV_INSTANCE:$remote_root/model_artifacts.tar.bz2"
+
+    {
+        cat <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+EOF
+        printf 'export RUN_LABEL=%q\n' "$RUN_LABEL"
+        printf 'export COMPARE_INCLUDE=%q\n' "$COMPARE_INCLUDE"
+        printf 'export PROCESSING_MODES=%q\n' "$PROCESSING_MODES"
+        printf 'export PRESENTATION_MODES=%q\n' "$PRESENTATION_MODES"
+        printf 'export COMPARE_BACKEND=%q\n' "$COMPARE_BACKEND"
+        printf 'export COMPARE_NUM_JOBS=%q\n' "$COMPARE_NUM_JOBS"
+        printf 'export COMPARE_MAX_WORKERS_PER_GPU=%q\n' "$COMPARE_MAX_WORKERS_PER_GPU"
+        printf 'export COMPARE_MAX_TASKS_PER_WORKER=%q\n' "$COMPARE_MAX_TASKS_PER_WORKER"
+        printf 'export COMPARE_TORCH_COMPILE=%q\n' "$COMPARE_TORCH_COMPILE"
+        printf 'export COMPARE_MATMUL_PRECISION=%q\n' "$COMPARE_MATMUL_PRECISION"
+        printf 'export COMPARE_GPUS=%q\n' "$COMPARE_GPUS"
+        cat <<'EOF'
+
+remote_root=/root/mhcflurry-postprocess
+repo_dir="$remote_root/repo"
+run_dir="$remote_root/run"
+
+export MKL_THREADING_LAYER="${MKL_THREADING_LAYER:-GNU}"
+export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
+export MHCFLURRY_MATMUL_PRECISION="${MHCFLURRY_MATMUL_PRECISION:-high}"
+export MHCFLURRY_ENABLE_TIMING="${MHCFLURRY_ENABLE_TIMING:-1}"
+
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    python-is-python3 python3-pip bzip2 wget rsync build-essential git \
+    libhdf5-dev libxml2-dev libxslt1-dev procps
+
+python -m pip install --upgrade pip
+python -m pip install matplotlib
+
+rm -rf "$repo_dir" "$run_dir"
+mkdir -p "$repo_dir" "$run_dir"
+tar -C "$repo_dir" -xjf "$remote_root/repo.tar.bz2"
+tar -C "$run_dir" -xjf "$remote_root/model_artifacts.tar.bz2"
+
+cd "$repo_dir"
+python -m pip install -e .
+
+mhcflurry downloads fetch \
+    data_evaluation models_class1_pan \
+    models_class1_processing models_class1_presentation
+data_dir="$(mhcflurry downloads path data_evaluation)"
+
+compare_args=(
+    mhcflurry compare-models
+    --a "$run_dir" \
+    --a-label "${RUN_LABEL:-new}" \
+    --b public \
+    --data-dir "$data_dir" \
+    --include "${COMPARE_INCLUDE:-affinity,processing,presentation}" \
+    --processing-modes "${PROCESSING_MODES:-with_flanks,no_flank,short_flanks}" \
+    --presentation-modes "${PRESENTATION_MODES:-with_flanks,without_flanks}" \
+    --out "$run_dir/eval_comparison" \
+    --backend "$COMPARE_BACKEND" \
+    --num-jobs "$COMPARE_NUM_JOBS" \
+    --max-workers-per-gpu "$COMPARE_MAX_WORKERS_PER_GPU" \
+    --max-tasks-per-worker "$COMPARE_MAX_TASKS_PER_WORKER" \
+    --worker-log-dir "$run_dir/eval_comparison/worker_logs" \
+    --torch-compile "$COMPARE_TORCH_COMPILE" \
+    --matmul-precision "$COMPARE_MATMUL_PRECISION"
+)
+case "$(printf '%s' "$COMPARE_GPUS" | tr '[:upper:]' '[:lower:]')" in
+    auto) ;;
+    *)
+    compare_args+=(--gpus "$COMPARE_GPUS")
+        ;;
+esac
+"${compare_args[@]}"
+
+if [ "${RUN_RELEASE_PLOTS:-1}" = "1" ]; then
+    mhcflurry plot-model-comparison --input "$run_dir/eval_comparison"
+    python scripts/training/plot_loss_curves.py \
+        --selected-dir "$run_dir/affinity/models.combined" \
+        --out "$run_dir/affinity/loss_plots"
+fi
+EOF
+    } > "$remote_script"
+    chmod +x "$remote_script"
+
+    run_logged_step postprocess_run_remote \
+        brev exec "$BREV_INSTANCE" "@$remote_script"
+
+    cat > "$remote_sync_script" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+remote_root=/root/mhcflurry-postprocess
+run_dir="$remote_root/run"
+archive="$remote_root/postprocess_sync.tar.bz2"
+manifest="$remote_root/postprocess_sync_paths.txt"
+rm -f "$archive" "$manifest"
+cd "$run_dir"
+
+add_path() {
+    if [ -e "$1" ]; then
+        printf '%s\n' "$1" >> "$manifest"
+    else
+        printf 'missing optional sync path: %s\n' "$1" >&2
+    fi
+}
+
+add_glob() {
+    local path
+    for path in "$@"; do
+        [ -e "$path" ] && printf '%s\n' "$path" >> "$manifest"
+    done
+}
+
+add_path eval_comparison/release_summary.csv
+add_path eval_comparison/release_summary.md
+add_path eval_comparison/summary.md
+add_path eval_comparison/side_a.json
+add_path eval_comparison/side_b.json
+add_path eval_comparison/plots
+add_path affinity/loss_plots
+add_glob eval_comparison/*/summary.json
+add_glob eval_comparison/*/summary_table.csv
+add_glob eval_comparison/*/per_*.csv
+
+sort -u "$manifest" -o "$manifest"
+tar -cjf "$archive" -T "$manifest"
+printf 'postprocess sync manifest:\n'
+cat "$manifest"
+du -sh "$archive"
+EOF
+    chmod +x "$remote_sync_script"
+
+    run_logged_step postprocess_prepare_sync \
+        brev exec "$BREV_INSTANCE" "@$remote_sync_script"
+    run_logged_step postprocess_copy_outputs \
+        brev copy "$BREV_INSTANCE:$remote_archive" "$staging/"
+    run_logged_step postprocess_extract_outputs \
+        tar -C "$RUN_DIR" -xjf "$local_archive"
+    run_cmd rm -rf "$staging"
+
+    BREV_REMOTE_EVAL_DONE=1
+    if [ "$SKIP_PLOTS" != "1" ] && [ -d "$RUN_DIR/eval_comparison/plots" ]; then
+        BREV_REMOTE_PLOTS_DONE=1
+    fi
+    apply_brev_cleanup
 }
 
 sync_brev_output() {
@@ -297,7 +735,15 @@ add_path .runplz/run.json
 add_path .runplz/run.sh
 add_path .runplz/run_driver.log
 
-add_path eval_comparison
+add_path eval_comparison/release_summary.csv
+add_path eval_comparison/release_summary.md
+add_path eval_comparison/summary.md
+add_path eval_comparison/side_a.json
+add_path eval_comparison/side_b.json
+add_path eval_comparison/plots
+add_glob eval_comparison/*/summary.json
+add_glob eval_comparison/*/summary_table.csv
+add_glob eval_comparison/*/per_*.csv
 
 add_path affinity/models.combined
 add_path affinity/eval_comparison
@@ -374,7 +820,9 @@ apply_brev_cleanup() {
             ;;
         stop)
             set +e
-            run_logged_step brev_stop brev stop "$BREV_INSTANCE"
+            run_logged_step_with_timeout \
+                brev_stop "$BREV_CLEANUP_TIMEOUT_SECONDS" \
+                brev stop "$BREV_INSTANCE"
             local stop_status=$?
             set -e
             if [ "$stop_status" -ne 0 ]; then
@@ -387,7 +835,9 @@ apply_brev_cleanup() {
                 warn "Brev instance is still RUNNING after stop: $BREV_INSTANCE"
                 if [ "$BREV_STOP_FAILURE_ACTION" = "delete" ]; then
                     warn "Deleting provisioned instance because stop did not take effect."
-                    run_logged_step brev_delete_after_failed_stop \
+                    run_logged_step_with_timeout \
+                        brev_delete_after_failed_stop \
+                        "$BREV_CLEANUP_TIMEOUT_SECONDS" \
                         brev delete "$BREV_INSTANCE"
                 else
                     warn "Leaving instance running; rerun 'brev stop $BREV_INSTANCE' or delete it manually."
@@ -397,7 +847,9 @@ apply_brev_cleanup() {
             fi
             ;;
         delete)
-            run_logged_step brev_delete brev delete "$BREV_INSTANCE"
+            run_logged_step_with_timeout \
+                brev_delete "$BREV_CLEANUP_TIMEOUT_SECONDS" \
+                brev delete "$BREV_INSTANCE"
             ;;
     esac
 }
@@ -492,10 +944,15 @@ BREV_INSTANCE="${RUNPLZ_BREV_INSTANCE:-${BREV_INSTANCE:-}}"
 BREV_ON_FINISH="${RUNPLZ_BREV_ON_FINISH:-${BREV_ON_FINISH:-}}"
 BREV_INSTANCE_TYPE="${RUNPLZ_BREV_INSTANCE_TYPE:-${BREV_INSTANCE_TYPE:-}}"
 DEFAULT_BREV_PROVISION_INSTANCE_TYPE="${DEFAULT_BREV_PROVISION_INSTANCE_TYPE:-a2-highgpu-4g:nvidia-tesla-a100:4}"
+BREV_CONTAINER_IMAGE="${BREV_CONTAINER_IMAGE:-pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime}"
 BREV_MAX_RUNTIME_SECONDS="${RUNPLZ_BREV_MAX_RUNTIME_SECONDS:-${BREV_MAX_RUNTIME_SECONDS:-}}"
 BREV_INSTANCE_TYPE_FALLBACK_COUNT="${RUNPLZ_BREV_INSTANCE_TYPE_FALLBACK_COUNT:-3}"
 BREV_EXCLUDE_PROVIDERS="${RUNPLZ_BREV_EXCLUDE_PROVIDERS:-oci}"
 BREV_STOP_FAILURE_ACTION="${BREV_STOP_FAILURE_ACTION:-}"
+BREV_CLEANUP_TIMEOUT_SECONDS="${BREV_CLEANUP_TIMEOUT_SECONDS:-60}"
+BREV_CREATE_TIMEOUT_SECONDS="${BREV_CREATE_TIMEOUT_SECONDS:-2400}"
+BREV_SHELL_READY_ATTEMPTS="${BREV_SHELL_READY_ATTEMPTS:-40}"
+BREV_SHELL_READY_DELAY_SECONDS="${BREV_SHELL_READY_DELAY_SECONDS:-15}"
 BREV_SYNC_MODE="${BREV_SYNC_MODE:-release}"
 SKIP_TRAIN=0
 SKIP_EVAL=0
@@ -506,6 +963,13 @@ DATA_DIR=
 COMPARE_INCLUDE=affinity,processing,presentation
 PROCESSING_MODES=with_flanks,no_flank,short_flanks
 PRESENTATION_MODES=with_flanks,without_flanks
+COMPARE_BACKEND="${COMPARE_BACKEND:-auto}"
+COMPARE_NUM_JOBS="${COMPARE_NUM_JOBS:-auto}"
+COMPARE_MAX_WORKERS_PER_GPU="${COMPARE_MAX_WORKERS_PER_GPU:-auto}"
+COMPARE_MAX_TASKS_PER_WORKER="${COMPARE_MAX_TASKS_PER_WORKER:-12}"
+COMPARE_TORCH_COMPILE="${COMPARE_TORCH_COMPILE:-${MHCFLURRY_TORCH_COMPILE:-auto}}"
+COMPARE_MATMUL_PRECISION="${COMPARE_MATMUL_PRECISION:-${MHCFLURRY_MATMUL_PRECISION:-high}}"
+COMPARE_GPUS="${COMPARE_GPUS:-4}"
 RUN_LABEL=new
 DRY_RUN=0
 TRAINING_MINIBATCH_SIZE=1024
@@ -568,6 +1032,18 @@ while [ $# -gt 0 ]; do
             ;;
         --brev-stop-failure-action)
             BREV_STOP_FAILURE_ACTION=$2
+            shift 2
+            ;;
+        --brev-cleanup-timeout-seconds)
+            BREV_CLEANUP_TIMEOUT_SECONDS=$2
+            shift 2
+            ;;
+        --brev-create-timeout-seconds)
+            BREV_CREATE_TIMEOUT_SECONDS=$2
+            shift 2
+            ;;
+        --brev-container-image)
+            BREV_CONTAINER_IMAGE=$2
             shift 2
             ;;
         --brev-sync-mode)
@@ -679,6 +1155,9 @@ fi
 if [ -z "$PROCESSING_MINIBATCH_SIZE" ]; then
     PROCESSING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE
 fi
+COMPARE_TORCH_COMPILE="$(normalize_compare_torch_compile "$COMPARE_TORCH_COMPILE")"
+COMPARE_MATMUL_PRECISION="$(normalize_compare_matmul_precision "$COMPARE_MATMUL_PRECISION")"
+validate_compare_gpus "$COMPARE_GPUS"
 case "$BACKEND" in
     local|brev-existing|brev-provision|ssh) ;;
     *) die "--backend must be one of: local, brev-existing, brev-provision, ssh" ;;
@@ -764,6 +1243,7 @@ case "$BACKEND" in
         note "Stop fallback:  $BREV_STOP_FAILURE_ACTION"
         note "Brev sync:     $BREV_SYNC_MODE"
         note "Brev type:     ${BREV_INSTANCE_TYPE:-runplz auto-select}"
+        note "Brev image:    $BREV_CONTAINER_IMAGE"
         ;;
 esac
 
@@ -817,6 +1297,14 @@ if [ "$SKIP_TRAIN" != "1" ]; then
     esac
 else
     note "Skipping training."
+    case "$BACKEND" in
+        brev-existing)
+            run_brev_postprocess 0
+            ;;
+        brev-provision)
+            run_brev_postprocess 1
+            ;;
+    esac
 fi
 
 if [ "$SKIP_EVAL" != "1" ]; then

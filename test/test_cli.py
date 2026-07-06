@@ -25,6 +25,7 @@ import os
 import sys
 import types
 
+import numpy
 import pandas
 import pytest
 import yaml
@@ -233,6 +234,23 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert brev_config["max_runtime_seconds"] == 3600
     assert brev_config["instance_type_fallback_count"] == 5
     assert brev_config["exclude_providers"] == ("oci", "broken")
+
+    assert module.compare_torch_compile_value({
+        "MHCFLURRY_TORCH_COMPILE": "yes",
+    }) == "1"
+    assert module.compare_torch_compile_value({
+        "COMPARE_TORCH_COMPILE": "off",
+    }) == "0"
+    assert module.compare_torch_compile_value({}) == "auto"
+    assert module.compare_matmul_precision_value({
+        "COMPARE_MATMUL_PRECISION": "HIGH",
+    }) == "high"
+    with pytest.raises(ValueError):
+        module.compare_torch_compile_value({"COMPARE_TORCH_COMPILE": "maybe"})
+    with pytest.raises(ValueError):
+        module.compare_matmul_precision_value({
+            "COMPARE_MATMUL_PRECISION": "fast",
+        })
 
 
 def test_main_help_does_not_import_predict_command():
@@ -874,3 +892,30 @@ def test_load_side_labels_reads_json(tmp_path):
     (tmp_path / "side_b.json").write_text(json.dumps({"label": "baseline"}))
     labels = plot_model_comparison._load_side_labels(str(tmp_path))
     assert labels == {"a": "candidate", "b": "baseline"}
+
+
+def test_roc_pr_plots_skip_single_class_slices(tmp_path):
+    matplotlib = pytest.importorskip("matplotlib")
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from sklearn.metrics import (
+        average_precision_score,
+        precision_recall_curve,
+        roc_auc_score,
+        roc_curve,
+    )
+
+    y = numpy.asarray([1, 1, 1])
+    a_score = numpy.asarray([0.1, 0.2, 0.3])
+    b_score = numpy.asarray([numpy.nan, numpy.nan, numpy.nan])
+
+    roc_path = tmp_path / "roc.png"
+    pr_path = tmp_path / "pr.png"
+    plot_model_comparison._save_roc(
+        plt, roc_curve, roc_auc_score,
+        y, a_score, b_score, "a", "b", str(roc_path), "ROC")
+    plot_model_comparison._save_pr(
+        plt, precision_recall_curve, average_precision_score,
+        y, a_score, b_score, "a", "b", str(pr_path), "PR")
+    assert roc_path.is_file()
+    assert pr_path.is_file()

@@ -71,6 +71,38 @@ def env_bool(environ, name, default=False):
     )
 
 
+def compare_torch_compile_value(environ):
+    value = environ.get(
+        "COMPARE_TORCH_COMPILE",
+        environ.get("MHCFLURRY_TORCH_COMPILE", "auto"),
+    )
+    normalized = value.strip().lower()
+    if normalized in TRUE_ENV_VALUES:
+        return "1"
+    if normalized in FALSE_ENV_VALUES:
+        return "0"
+    if normalized == "auto":
+        return "auto"
+    raise ValueError(
+        "COMPARE_TORCH_COMPILE must be auto, true/false, or 1/0; got %r" %
+        value
+    )
+
+
+def compare_matmul_precision_value(environ):
+    value = environ.get(
+        "COMPARE_MATMUL_PRECISION",
+        environ.get("MHCFLURRY_MATMUL_PRECISION", "high"),
+    )
+    normalized = value.strip().lower()
+    if normalized not in {"none", "highest", "high", "medium"}:
+        raise ValueError(
+            "COMPARE_MATMUL_PRECISION must be one of none, highest, high, "
+            "medium; got %r" % value
+        )
+    return normalized
+
+
 def env_int_optional(environ, name):
     value = environ.get(name)
     if value is None or not value.strip():
@@ -283,14 +315,8 @@ def run_release_evaluation(repo, out, env):
         "--max-workers-per-gpu", env.get("COMPARE_MAX_WORKERS_PER_GPU", "auto"),
         "--max-tasks-per-worker", env.get("COMPARE_MAX_TASKS_PER_WORKER", "12"),
         "--worker-log-dir", str(eval_out / "worker_logs"),
-        "--torch-compile", env.get(
-            "COMPARE_TORCH_COMPILE",
-            env.get("MHCFLURRY_TORCH_COMPILE", "auto"),
-        ),
-        "--matmul-precision", env.get(
-            "COMPARE_MATMUL_PRECISION",
-            env.get("MHCFLURRY_MATMUL_PRECISION", "high"),
-        ),
+        "--torch-compile", compare_torch_compile_value(env),
+        "--matmul-precision", compare_matmul_precision_value(env),
     ]
     compare_gpus = env.get("COMPARE_GPUS", str(NUM_GPUS))
     if compare_gpus.strip().lower() != "auto":

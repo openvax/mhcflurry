@@ -888,6 +888,7 @@ def _predict_processing_chunk(predictor_dir, rows, mode, chunk_num):
     kwargs = {
         "peptides": df.peptide.values,
         "batch_size": "auto",
+        "throw": False,
     }
     if mode in ("with_flanks", "short_flanks"):
         kwargs["n_flanks"] = df.n_flank.values

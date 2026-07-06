@@ -315,7 +315,7 @@ def _save_roc(plt, roc_curve_fn, roc_auc_fn,
     fig, ax = plt.subplots(figsize=(6, 5))
     for label, values in ((label_a, a_score), (label_b, b_score)):
         mask = ~numpy.isnan(values)
-        if not mask.any():
+        if not mask.any() or len(numpy.unique(y[mask])) < 2:
             continue
         fpr, tpr, _ = roc_curve_fn(y[mask], values[mask])
         auc = roc_auc_fn(y[mask], values[mask])
@@ -324,7 +324,8 @@ def _save_roc(plt, roc_curve_fn, roc_auc_fn,
     ax.set_xlabel("False positive rate")
     ax.set_ylabel("True positive rate")
     ax.set_title(title)
-    ax.legend()
+    if ax.get_legend_handles_labels()[0]:
+        ax.legend()
     fig.tight_layout()
     fig.savefig(out_path)
     plt.close(fig)
@@ -335,7 +336,7 @@ def _save_pr(plt, pr_curve_fn, ap_fn,
     fig, ax = plt.subplots(figsize=(6, 5))
     for label, values in ((label_a, a_score), (label_b, b_score)):
         mask = ~numpy.isnan(values)
-        if not mask.any():
+        if not mask.any() or len(numpy.unique(y[mask])) < 2:
             continue
         precision, recall, _ = pr_curve_fn(y[mask], values[mask])
         ap = ap_fn(y[mask], values[mask])
@@ -343,7 +344,8 @@ def _save_pr(plt, pr_curve_fn, ap_fn,
     ax.set_xlabel("Recall")
     ax.set_ylabel("Precision")
     ax.set_title(title)
-    ax.legend()
+    if ax.get_legend_handles_labels()[0]:
+        ax.legend()
     fig.tight_layout()
     fig.savefig(out_path)
     plt.close(fig)
