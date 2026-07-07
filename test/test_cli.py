@@ -1314,7 +1314,7 @@ def test_paper_figures_external_baseline_geometry_is_configurable(tmp_path):
             "description": predictor,
             "color": "(0.5, 0.4, 0.8)",
         }
-        for predictor in ("candidate", "baseline_a", "baseline_b")
+        for predictor in ("candidate", "baseline_a", "baseline_b", "baseline_c")
     ]).set_index("predictor")
     scores = pandas.DataFrame([
         {
@@ -1335,10 +1335,15 @@ def test_paper_figures_external_baseline_geometry_is_configurable(tmp_path):
     ])
     predictors = paper_figures.PredictorConfig(
         candidate="candidate",
-        external_baselines=(("baseline_a", "a"), ("baseline_b", "b")),
-        preferred_predictors=("candidate", "baseline_a", "baseline_b"),
+        external_baselines=(
+            ("baseline_a", "a"),
+            ("baseline_b", "b"),
+            ("baseline_c", "c"),
+        ),
+        preferred_predictors=(
+            "candidate", "baseline_a", "baseline_b", "baseline_c"),
         presentation_panel_predictors=("candidate",),
-        presentation_panel_baselines=("baseline_a", "baseline_b"),
+        presentation_panel_baselines=("baseline_a", "baseline_b", "baseline_c"),
     )
     saved_axes = {}
 

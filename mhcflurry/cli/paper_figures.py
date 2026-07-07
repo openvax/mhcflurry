@@ -37,6 +37,8 @@ CANDIDATE_PREDICTOR = "mhcflurry_production"
 EXTERNAL_BASELINES = (
     ("netmhcpan4.ba", "ba"),
     ("netmhcpan4.el", "el"),
+    ("netmhcpan4.2.ba", "netmhcpan42_ba"),
+    ("netmhcpan4.2.el", "netmhcpan42_el"),
     ("mixmhcpred", "mixmhcpred"),
 )
 
@@ -48,6 +50,8 @@ PRESENTATION_PANEL_PREDICTORS = (
 PRESENTATION_PANEL_BASELINES = (
     "netmhcpan4.ba",
     "netmhcpan4.el",
+    "netmhcpan4.2.ba",
+    "netmhcpan4.2.el",
     "mixmhcpred",
     "mhcflurry_production",
 )
@@ -55,6 +59,8 @@ PRESENTATION_PANEL_BASELINES = (
 PREFERRED_PREDICTORS = (
     "netmhcpan4.ba",
     "netmhcpan4.el",
+    "netmhcpan4.2.ba",
+    "netmhcpan4.2.el",
     "mixmhcpred",
     "mhcflurry_production",
     "presentation_without_flanks_presentation_score",
@@ -473,6 +479,24 @@ def _first_present(df, names):
     return None
 
 
+def _external_baselines_in_predictors(predictors, available_predictors):
+    available = set(available_predictors)
+    return tuple(
+        (predictor, suffix)
+        for predictor, suffix in predictors.external_baselines
+        if predictor in available
+    )
+
+
+def _external_baselines_with_percent_change(predictors, columns, metric):
+    columns = set(columns)
+    return tuple(
+        (predictor, suffix)
+        for predictor, suffix in predictors.external_baselines
+        if "percent_change_%s_%s" % (metric, suffix) in columns
+    )
+
+
 def _generate_multiallelic_figures(
         artifacts_dir, predictor_info, recent_sample_ids, sample_group,
         max_scatter_points, writer, predictors):
@@ -487,9 +511,6 @@ def _generate_multiallelic_figures(
     scores = _normalize_score_predictors(pandas.read_csv(path))
     required = {
         "sample_id", "length_label", "predictor", "auc", "ppv",
-        "percent_change_auc_ba", "percent_change_ppv_ba",
-        "percent_change_auc_el", "percent_change_ppv_el",
-        "percent_change_auc_mixmhcpred", "percent_change_ppv_mixmhcpred",
     }
     missing = sorted(required - set(scores.columns))
     if missing:
@@ -547,23 +568,26 @@ def _plot_external_scatter_triptych(
 
     candidate = predictors.candidate
     pivot = _pivot_all_lengths(scores, metric)
-    needed = [candidate] + [
-        predictor for predictor, _ in predictors.external_baselines
-    ]
-    missing = [predictor for predictor in needed if predictor not in pivot.columns]
-    if missing:
+    if candidate not in pivot.columns:
         writer.skip(
-            "multiallelic", name, missing,
-            "Required predictors absent from multiallelic scores.")
+            "multiallelic", name, [candidate],
+            "Candidate predictor absent from multiallelic scores.")
+        return
+    baselines = _external_baselines_in_predictors(
+        predictors, pivot.columns)
+    if not baselines:
+        writer.skip(
+            "multiallelic", name,
+            [predictor for predictor, _ in predictors.external_baselines],
+            "No external baseline predictors found in multiallelic scores.")
         return
 
-    n_cols = len(predictors.external_baselines)
+    n_cols = len(baselines)
     fig, axes = plt.subplots(
         1, n_cols, figsize=(max(2.4, 2.35 * n_cols), 2.2),
         squeeze=False)
     y_label = _short_label(predictor_info, candidate)
-    for ax, (baseline, _suffix) in zip(
-            axes[0], predictors.external_baselines):
+    for ax, (baseline, _suffix) in zip(axes[0], baselines):
         sub = pivot[[baseline, candidate]].replace(
             [numpy.inf, -numpy.inf], numpy.nan).dropna()
         _scatter_with_winner_colors(
@@ -593,13 +617,24 @@ def _plot_percent_change_by_length(
             "MHCflurry production scores absent.")
         return
 
-    n_cols = len(predictors.external_baselines)
+    baselines = _external_baselines_with_percent_change(
+        predictors, sub.columns, metric)
+    if not baselines:
+        writer.skip(
+            "multiallelic", name,
+            [
+                "percent_change_%s_%s" % (metric, suffix)
+                for _predictor, suffix in predictors.external_baselines
+            ],
+            "No percent-change columns found for external baselines.")
+        return
+
+    n_cols = len(baselines)
     fig, axes = plt.subplots(
         1, n_cols, figsize=(max(2.4, 2.35 * n_cols), 2.1),
         sharey=True, squeeze=False)
     color = _predictor_color(predictor_info, predictor)
-    for ax, (baseline, suffix) in zip(
-            axes[0], predictors.external_baselines):
+    for ax, (baseline, suffix) in zip(axes[0], baselines):
         column = "percent_change_%s_%s" % (metric, suffix)
         if column not in sub.columns:
             ax.set_visible(False)
@@ -643,12 +678,23 @@ def _plot_percent_change_bars(
             "No preferred predictors found in multiallelic scores.")
         return
 
-    n_cols = len(predictors.external_baselines)
+    baselines = _external_baselines_with_percent_change(
+        predictors, sub.columns, metric)
+    if not baselines:
+        writer.skip(
+            "multiallelic", name,
+            [
+                "percent_change_%s_%s" % (metric, suffix)
+                for _predictor, suffix in predictors.external_baselines
+            ],
+            "No percent-change columns found for external baselines.")
+        return
+
+    n_cols = len(baselines)
     fig, axes = plt.subplots(
         1, n_cols, figsize=(max(2.4, 2.35 * n_cols), 3.3),
         sharey=True, squeeze=False)
-    for ax, (baseline, suffix) in zip(
-            axes[0], predictors.external_baselines):
+    for ax, (baseline, suffix) in zip(axes[0], baselines):
         column = "percent_change_%s_%s" % (metric, suffix)
         if column not in sub.columns:
             ax.set_visible(False)
@@ -701,10 +747,10 @@ def _plot_mean_ppv_small(
         if len(values):
             rows.append((predictor, values.mean(), _predictor_color(
                 predictor_info, predictor)))
+    external_baselines = _external_baselines_in_predictors(
+        predictors, sub["predictor"])
     external_values = sub.loc[
-        sub["predictor"].isin([
-            p for p, _ in predictors.external_baselines
-        ]), "ppv"
+        sub["predictor"].isin([p for p, _ in external_baselines]), "ppv"
     ].replace([numpy.inf, -numpy.inf], numpy.nan).dropna()
     if len(external_values):
         rows.append(("external_tools", external_values.mean(), (0.45, 0.45, 0.45)))
@@ -741,28 +787,33 @@ def _plot_presentation_scatter_grid(
     pivot = _pivot_all_lengths(scores, "ppv")
     if recent_sample_ids is not None:
         pivot = pivot.loc[pivot.index.isin(recent_sample_ids)]
-    needed = (
-        list(predictors.presentation_panel_predictors) +
-        list(predictors.presentation_panel_baselines)
-    )
-    missing = [predictor for predictor in needed if predictor not in pivot.columns]
-    if missing:
+    candidate_predictors = [
+        predictor for predictor in predictors.presentation_panel_predictors
+        if predictor in pivot.columns
+    ]
+    baseline_predictors = [
+        predictor for predictor in predictors.presentation_panel_baselines
+        if predictor in pivot.columns
+    ]
+    if not candidate_predictors or not baseline_predictors:
         writer.skip(
-            "multiallelic", name, missing,
+            "multiallelic", name,
+            (
+                list(predictors.presentation_panel_predictors) +
+                list(predictors.presentation_panel_baselines)
+            ),
             "Required presentation-panel predictors absent.")
         return
 
-    n_rows = len(predictors.presentation_panel_predictors)
-    n_cols = len(predictors.presentation_panel_baselines)
+    n_rows = len(candidate_predictors)
+    n_cols = len(baseline_predictors)
     fig, axes = plt.subplots(
         n_rows, n_cols,
         figsize=(max(2.0, 1.8 * n_cols), max(2.0, 1.95 * n_rows)),
         squeeze=False,
     )
-    for row_index, candidate in enumerate(
-            predictors.presentation_panel_predictors):
-        for col_index, baseline in enumerate(
-                predictors.presentation_panel_baselines):
+    for row_index, candidate in enumerate(candidate_predictors):
+        for col_index, baseline in enumerate(baseline_predictors):
             ax = axes[row_index, col_index]
             sub = pivot[[baseline, candidate]].replace(
                 [numpy.inf, -numpy.inf], numpy.nan).dropna()
@@ -774,7 +825,7 @@ def _plot_presentation_scatter_grid(
                 ax.set_ylabel(_short_label(predictor_info, candidate))
             else:
                 ax.set_ylabel("")
-            if row_index == len(predictors.presentation_panel_predictors) - 1:
+            if row_index == len(candidate_predictors) - 1:
                 ax.set_xlabel("Baseline PPV")
             else:
                 ax.set_xlabel("")
@@ -953,18 +1004,17 @@ def _plot_monoallelic_scatter(
         columns="predictor",
         values=metric,
         aggfunc="mean")
-    needed = [candidate] + [
-        predictor for predictor, _ in predictors.external_baselines
-    ]
-    missing = [predictor for predictor in needed if predictor not in pivot.columns]
-    if missing:
+    baselines = _external_baselines_in_predictors(
+        predictors, pivot.columns)
+    if not baselines:
         writer.skip(
-            "monoallelic", name, missing,
-            "Required predictors absent from monoallelic scores.")
+            "monoallelic", name,
+            [predictor for predictor, _ in predictors.external_baselines],
+            "No external baseline predictors found in monoallelic scores.")
         return
     _plot_scatter_triptych_from_pivot(
         pivot, predictor_info, candidate, metric_label, max_points, name,
-        "monoallelic", writer, predictors)
+        "monoallelic", writer, predictors, baselines=baselines)
 
 
 def _generate_processing_notebook_figures(
@@ -1356,15 +1406,24 @@ def _copy_architecture_figures(artifacts_dir, writer):
 
 def _plot_scatter_triptych_from_pivot(
         pivot, predictor_info, candidate, metric_label, max_points, name, family,
-        writer, predictors):
+        writer, predictors, baselines=None):
     import matplotlib.pyplot as plt
 
-    n_cols = len(predictors.external_baselines)
+    if baselines is None:
+        baselines = _external_baselines_in_predictors(
+            predictors, pivot.columns)
+    if not baselines:
+        writer.skip(
+            family, name,
+            [predictor for predictor, _ in predictors.external_baselines],
+            "No external baseline predictors found.")
+        return
+
+    n_cols = len(baselines)
     fig, axes = plt.subplots(
         1, n_cols, figsize=(max(2.4, 2.35 * n_cols), 2.2),
         squeeze=False)
-    for ax, (baseline, _suffix) in zip(
-            axes[0], predictors.external_baselines):
+    for ax, (baseline, _suffix) in zip(axes[0], baselines):
         sub = pivot[[baseline, candidate]].replace(
             [numpy.inf, -numpy.inf], numpy.nan).dropna()
         _scatter_with_winner_colors(
@@ -1492,6 +1551,16 @@ def _short_label(predictor_info, predictor):
             value = row.get(column)
             if isinstance(value, str) and value and value != "-":
                 return value
+    fallback = {
+        "netmhcpan4.ba": "NetMHCpan 4.0 BA",
+        "netmhcpan4.el": "NetMHCpan 4.0 EL",
+        "netmhcpan4.2.ba": "NetMHCpan 4.2 BA",
+        "netmhcpan4.2.el": "NetMHCpan 4.2 EL",
+        "mixmhcpred": "MixMHCpred",
+        "mhcflurry_production": "MHCflurry BA",
+    }
+    if predictor in fallback:
+        return fallback[predictor]
     return predictor.replace("_", " ")
 
 
@@ -1508,6 +1577,8 @@ def _predictor_color(predictor_info, predictor):
     fallback = {
         "netmhcpan4.ba": (0.886, 0.290, 0.200),
         "netmhcpan4.el": (1.000, 0.710, 0.722),
+        "netmhcpan4.2.ba": (0.650, 0.120, 0.130),
+        "netmhcpan4.2.el": (0.980, 0.520, 0.540),
         "mixmhcpred": (0.204, 0.541, 0.741),
         "mhcflurry_production": (0.596, 0.557, 0.835),
     }

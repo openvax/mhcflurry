@@ -464,15 +464,15 @@ def _plot_processing(input_dir, plot_dir, labels, max_scatter_points):
         _save_roc(plt, roc_curve, roc_auc_score,
                   y, a_score, b_score, label_a, label_b,
                   os.path.join(sub_dir, "roc_%s.png" % mode),
-                  title="%s processing ROC" % mode)
+                  title="%s processing ROC" % _display_identifier(mode))
         _save_pr(plt, precision_recall_curve, average_precision_score,
                  y, a_score, b_score, label_a, label_b,
                  os.path.join(sub_dir, "pr_%s.png" % mode),
-                 title="%s processing PR" % mode)
+                 title="%s processing PR" % _display_identifier(mode))
         _save_scatter(plt, b_score, a_score, label_b, label_a,
                       os.path.join(sub_dir, "scatter_%s.png" % mode),
                       title="%s processing: %s vs %s" % (
-                          mode, label_a, label_b),
+                          _display_identifier(mode), label_a, label_b),
                       max_points=max_scatter_points)
 
     summary_table_path = os.path.join(processing_dir, "summary_table.csv")
@@ -480,7 +480,8 @@ def _plot_processing(input_dir, plot_dir, labels, max_scatter_points):
         summary = _read_optional_csv(summary_table_path)
         _safe_plot(
             "processing macro bars",
-            _save_macro_bars, plt, summary, sub_dir, label_a, label_b)
+            _save_macro_bars, plt, summary, sub_dir, label_a, label_b,
+            "Processing prediction")
     _save_component_paper_plots(
         plt,
         processing_dir,
@@ -526,15 +527,22 @@ def _plot_presentation(input_dir, plot_dir, labels, max_scatter_points):
             _save_roc(plt, roc_curve, roc_auc_score,
                       y, a_score, b_score, label_a, label_b,
                       os.path.join(sub_dir, "roc_%s.png" % stub),
-                      title="%s ROC (%s)" % (mode, score_kind))
+                      title="%s ROC (%s)" % (
+                          _display_identifier(mode),
+                          _display_score_kind(score_kind)))
             _save_pr(plt, precision_recall_curve, average_precision_score,
                      y, a_score, b_score, label_a, label_b,
                      os.path.join(sub_dir, "pr_%s.png" % stub),
-                     title="%s PR (%s)" % (mode, score_kind))
+                     title="%s PR (%s)" % (
+                         _display_identifier(mode),
+                         _display_score_kind(score_kind)))
             _save_scatter(plt, b_score, a_score, label_b, label_a,
                           os.path.join(sub_dir, "scatter_%s.png" % stub),
                           title="%s (%s): %s vs %s" % (
-                              mode, score_kind, label_a, label_b),
+                              _display_identifier(mode),
+                              _display_score_kind(score_kind),
+                              label_a,
+                              label_b),
                           max_points=max_scatter_points)
 
     summary_table_path = os.path.join(presentation_dir, "summary_table.csv")
@@ -542,11 +550,12 @@ def _plot_presentation(input_dir, plot_dir, labels, max_scatter_points):
         summary = _read_optional_csv(summary_table_path)
         _safe_plot(
             "presentation macro bars",
-            _save_macro_bars, plt, summary, sub_dir, label_a, label_b)
+            _save_macro_bars, plt, summary, sub_dir, label_a, label_b,
+            "Presentation prediction")
     for score_kind in PRESENTATION_SCORE_KINDS:
         suffix = "" if score_kind == "presentation_score" else "_%s" % score_kind
         title_suffix = "" if score_kind == "presentation_score" else (
-            " (%s)" % score_kind.replace("_", " "))
+            " (%s)" % _display_score_kind(score_kind))
         _save_component_paper_plots(
             plt,
             presentation_dir,
@@ -623,7 +632,7 @@ def _plot_release_summary(input_dir, paper_dir, labels):
         ax.grid(axis="y")
     axes[0][0].set_ylabel("Macro mean")
     axes[0][-1].legend(frameon=False)
-    fig.suptitle("Release-gate macro accuracy")
+    fig.suptitle("Model comparison: macro accuracy by component")
     fig.tight_layout()
     _save_figure(fig, os.path.join(paper_dir, "release_summary_macro.png"))
     plt.close(fig)
@@ -652,7 +661,7 @@ def _plot_release_summary(input_dir, paper_dir, labels):
         ax.set_xticklabels(rows.index, rotation=35, ha="right")
         ax.set_ylabel("%s - %s" % (labels["a"], labels["b"]))
         ax.grid(axis="y")
-    fig.suptitle("Release-gate macro deltas")
+    fig.suptitle("Model comparison: macro deltas by component")
     fig.tight_layout()
     _save_figure(fig, os.path.join(paper_dir, "release_summary_macro_delta.png"))
     plt.close(fig)
@@ -662,8 +671,10 @@ def _release_summary_group_label(row):
     component = row.get("component", "")
     mode = row.get("flank_mode", "")
     if isinstance(mode, str) and mode:
-        return "%s\n%s" % (component, mode)
-    return str(row.get("eval", component))
+        return "%s\n%s" % (
+            _display_identifier(component),
+            _display_identifier(mode))
+    return _display_identifier(row.get("eval", component))
 
 
 def _save_component_paper_plots(
@@ -756,8 +767,9 @@ def _save_metric_scatter_grid(
             ax.set_ylim(low, high)
             ax.grid(False)
             ax.set_title(METRIC_DISPLAY_NAMES[metric])
+            row_display = _display_identifier(row_label)
             if col_idx == 0:
-                ax.set_ylabel("%s\n%s" % (row_label, label_a))
+                ax.set_ylabel("%s\n%s" % (row_display, label_a))
             else:
                 ax.set_ylabel(label_a)
             ax.set_xlabel(label_b)
@@ -783,7 +795,7 @@ def _save_metric_delta_boxplots(
         figsize=(3.0 * len(METRIC_NAMES), 3.0),
         squeeze=False,
     )
-    labels = [label for (label, _) in frames]
+    labels = [_display_identifier(label) for (label, _) in frames]
     for ax, metric in zip(axes[0], METRIC_NAMES):
         a_col, b_col = _metric_columns(metric)
         data = []
@@ -851,7 +863,8 @@ def _save_per_length_grid(
             ax.set_ylim(_metric_ylim(metric, df[[a_col, b_col]].values))
             ax.grid(axis="y")
             if col_idx == 0:
-                ax.set_ylabel("%s\nMacro mean" % row_label)
+                ax.set_ylabel("%s\nMacro mean" % (
+                    _display_identifier(row_label)))
             else:
                 ax.set_ylabel("Macro mean")
             if row_idx == 0 and col_idx == n_cols - 1:
@@ -1022,7 +1035,7 @@ def _save_figure(fig, out_path):
         fig.savefig(path.with_suffix(".pdf"), bbox_inches="tight")
 
 
-def _save_macro_bars(plt, summary, sub_dir, label_a, label_b):
+def _save_macro_bars(plt, summary, sub_dir, label_a, label_b, title_prefix):
     if summary.empty:
         return
     required = {"mode", "score_kind"}
@@ -1033,8 +1046,8 @@ def _save_macro_bars(plt, summary, sub_dir, label_a, label_b):
         return
     x_labels = [
         "%s\n%s" % (
-            row.mode,
-            row.score_kind.replace("presentation_", "").replace("_score", ""),
+            _display_identifier(row.mode),
+            _display_score_kind(row.score_kind),
         )
         for row in summary.itertuples()
     ]
@@ -1063,8 +1076,8 @@ def _save_macro_bars(plt, summary, sub_dir, label_a, label_b):
         ax.set_xticks(x)
         ax.set_xticklabels(x_labels, rotation=30, ha="right")
         ax.set_ylabel(METRIC_DISPLAY_NAMES[metric])
-        ax.set_title("Macro mean over samples: %s" % (
-            METRIC_DISPLAY_NAMES[metric]))
+        ax.set_title("%s: macro %s over samples" % (
+            title_prefix, METRIC_DISPLAY_NAMES[metric]))
         ax.set_ylim(_metric_ylim(
             metric,
             summary[["a_macro_%s" % metric, "b_macro_%s" % metric]].values,
@@ -1185,6 +1198,19 @@ def _add_identity_line(ax, x, y):
     ax.set_xlim(low, high)
     ax.set_ylim(low, high)
     ax.set_aspect("equal", adjustable="box")
+
+
+def _display_identifier(value):
+    return str(value).replace("_", " ")
+
+
+def _display_score_kind(value):
+    display = {
+        "presentation_score": "presentation score",
+        "presentation_percentile": "presentation percentile",
+        "processing_score": "processing score",
+    }
+    return display.get(str(value), _display_identifier(value))
 
 
 # Module-level parser for sphinx autoprogram; behaves like the legacy
