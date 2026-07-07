@@ -30,6 +30,8 @@ Usage:
       [--compare-presentation-num-jobs 1] \
       [--compare-presentation-max-workers-per-gpu 1] \
       [--compare-presentation-torch-compile 0] \
+      [--compare-baseline public:2.0.0] \
+      [--compare-baseline-label "MHCflurry 2.0"] \
       [--brev-instance NAME] [--brev-on-finish leave|stop|delete] \
       [--brev-stop-failure-action warn|delete] \
       [--brev-cleanup-timeout-seconds 60] \
@@ -59,12 +61,15 @@ Backends:
 
 Evaluation:
   After training, the script runs:
-      mhcflurry compare-models --a RUN_DIR --b public
+      mhcflurry compare-models --a RUN_DIR --b COMPARE_BASELINE
       mhcflurry plot-model-comparison --input RUN_DIR/eval_comparison
   compare-models writes release_summary.csv and release_summary.md with
   affinity, processing, and presentation release-gate tables. Presentation
   inference is memory-heavier than affinity/processing, so the release wrapper
-  defaults it to one GPU worker unless overridden.
+  defaults it to one GPU worker unless overridden. The default baseline is the
+  closest older public release available in downloads.yml, public:2.0.0; pass
+  --compare-baseline public to compare against the currently configured public
+  release, or pass a model-run directory / public:<release_name>.
   If --paper-figures-artifacts-dir is set, the plotting step also runs:
       mhcflurry paper-figures --artifacts-dir DIR
   and writes notebook-style SVG/PDF/PNG panels under
@@ -110,6 +115,29 @@ require_command() {
 
 lowercase() {
     printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+display_release_version() {
+    printf '%s' "$1" | sed 's/rc[0-9][0-9]*$//'
+}
+
+public_release_from_spec() {
+    case "$1" in
+        public:*)
+            printf '%s\n' "${1#public:}"
+            ;;
+    esac
+}
+
+fetch_pinned_public_baseline_downloads() {
+    local release
+    release="$(public_release_from_spec "$COMPARE_BASELINE")"
+    if [ -z "$release" ]; then
+        return 0
+    fi
+    MHCFLURRY_DOWNLOADS_CURRENT_RELEASE="$release" \
+        mhcflurry-downloads fetch \
+        models_class1_pan models_class1_processing models_class1_presentation
 }
 
 normalize_compare_torch_compile() {
@@ -232,7 +260,7 @@ run_logged_step() {
 run_with_timeout() {
     local timeout_seconds="$1"
     shift
-    python - "$timeout_seconds" "$@" <<'PY'
+    python3 - "$timeout_seconds" "$@" <<'PY'
 import subprocess
 import sys
 
@@ -262,15 +290,20 @@ run_logged_step_with_timeout() {
 write_git_repo_archive() {
     local output="$1"
     local tar_output="${output%.bz2}"
-    rm -f "$tar_output" "$output"
-    git -C "$REPO" archive --format=tar HEAD -o "$tar_output"
-    bzip2 -f "$tar_output"
+    rm -f "$tar_output" "$output" || return $?
+    git -C "$REPO" archive --format=tar HEAD -o "$tar_output" || return $?
+    bzip2 -f "$tar_output" || return $?
+    [ -s "$output" ]
 }
 
 run_dir_has_model_artifacts() {
-    [ -d "$RUN_DIR/affinity/models.combined" ] && \
-        [ -d "$RUN_DIR/processing/models.selected.no_flank" ] && \
-        [ -d "$RUN_DIR/presentation/models" ]
+    [ -d "$RUN_DIR/affinity/models.combined" ] || return 1
+    [ -d "$RUN_DIR/presentation/models" ] || return 1
+    local kind
+    for kind in $PROCESSING_VARIANTS; do
+        [ -d "$RUN_DIR/processing/models.selected.$kind" ] || return 1
+    done
+    return 0
 }
 
 run_dir_has_synced_brev_outputs() {
@@ -290,7 +323,7 @@ brev_latest_remote_exit_code() {
     require_command brev
     local output
     output="$(
-        brev exec "$BREV_INSTANCE" \
+        run_with_timeout "$BREV_CLEANUP_TIMEOUT_SECONDS" brev exec "$BREV_INSTANCE" \
             "bash -lc \"grep 'remote_command_exit' ~/runplz-latest/out/.runplz/events.ndjson 2>/dev/null | tail -1\"" \
             2>/dev/null || true
     )"
@@ -303,7 +336,7 @@ brev_instance_status() {
     require_command brev
     BREV_INSTANCE_NAME="$BREV_INSTANCE" \
     BREV_CLEANUP_TIMEOUT_SECONDS="$BREV_CLEANUP_TIMEOUT_SECONDS" \
-        python - <<'PY'
+        python3 - <<'PY'
 import json
 import os
 import subprocess
@@ -343,7 +376,7 @@ brev_instance_field() {
     BREV_INSTANCE_NAME="$BREV_INSTANCE" \
     BREV_INSTANCE_FIELD="$field" \
     BREV_CLEANUP_TIMEOUT_SECONDS="$BREV_CLEANUP_TIMEOUT_SECONDS" \
-        python - <<'PY'
+        python3 - <<'PY'
 import json
 import os
 import subprocess
@@ -403,17 +436,20 @@ build_brev_postprocess_archives() {
     local staging="$1"
     local repo_archive="$staging/repo.tar.bz2"
     local models_archive="$staging/model_artifacts.tar.bz2"
+    local model_paths=(
+        affinity/models.combined
+        presentation/models
+    )
+    local kind
+    for kind in $PROCESSING_VARIANTS; do
+        model_paths+=("processing/models.selected.$kind")
+    done
 
     run_cmd mkdir -p "$staging"
     run_logged_step postprocess_package_repo \
         write_git_repo_archive "$repo_archive"
     run_logged_step postprocess_package_models \
-        tar -C "$RUN_DIR" -cjf "$models_archive" \
-        affinity/models.combined \
-        processing/models.selected.with_flanks \
-        processing/models.selected.no_flank \
-        processing/models.selected.short_flanks \
-        presentation/models
+        tar -C "$RUN_DIR" -cjf "$models_archive" "${model_paths[@]}"
 }
 
 ensure_brev_postprocess_instance() {
@@ -452,8 +488,7 @@ run_brev_postprocess() {
     local status=$?
     set -e
     if [ "$status" -ne 0 ]; then
-        warn "Brev postprocess failed with status $status."
-        apply_brev_cleanup || true
+        warn "Brev postprocess failed with status $status; leaving $BREV_INSTANCE available to preserve remote artifacts."
         return "$status"
     fi
     if [ "$SKIP_EVAL" != "1" ]; then
@@ -503,11 +538,14 @@ run_brev_postprocess_impl() {
 
     run_logged_step postprocess_wait_for_shell \
         wait_for_brev_shell_ready
-    run_logged_step postprocess_prepare_remote_dir \
+    run_logged_step_with_timeout \
+        postprocess_prepare_remote_dir "$BREV_CLEANUP_TIMEOUT_SECONDS" \
         brev exec "$BREV_INSTANCE" "mkdir -p '$remote_root'"
-    run_logged_step postprocess_copy_repo \
+    run_logged_step_with_timeout \
+        postprocess_copy_repo "$BREV_CREATE_TIMEOUT_SECONDS" \
         brev copy "$repo_archive" "$BREV_INSTANCE:$remote_root/repo.tar.bz2"
-    run_logged_step postprocess_copy_models \
+    run_logged_step_with_timeout \
+        postprocess_copy_models "$BREV_CREATE_TIMEOUT_SECONDS" \
         brev copy "$models_archive" "$BREV_INSTANCE:$remote_root/model_artifacts.tar.bz2"
 
     {
@@ -516,6 +554,8 @@ run_brev_postprocess_impl() {
 set -euo pipefail
 EOF
         printf 'export RUN_LABEL=%q\n' "$RUN_LABEL"
+        printf 'export COMPARE_BASELINE=%q\n' "$COMPARE_BASELINE"
+        printf 'export COMPARE_BASELINE_LABEL=%q\n' "$COMPARE_BASELINE_LABEL"
         printf 'export COMPARE_INCLUDE=%q\n' "$COMPARE_INCLUDE"
         printf 'export PROCESSING_MODES=%q\n' "$PROCESSING_MODES"
         printf 'export PRESENTATION_MODES=%q\n' "$PRESENTATION_MODES"
@@ -532,6 +572,11 @@ EOF
         printf 'export COMPARE_PRESENTATION_TORCH_COMPILE=%q\n' "$COMPARE_PRESENTATION_TORCH_COMPILE"
         printf 'export PAPER_FIGURES_ARTIFACTS_DIR=%q\n' "$PAPER_FIGURES_ARTIFACTS_DIR"
         printf 'export PAPER_FIGURES_FORMATS=%q\n' "$PAPER_FIGURES_FORMATS"
+        printf 'export PAPER_FIGURES_CANDIDATE_PREDICTOR=%q\n' "$PAPER_FIGURES_CANDIDATE_PREDICTOR"
+        printf 'export PAPER_FIGURES_EXTERNAL_BASELINES=%q\n' "$PAPER_FIGURES_EXTERNAL_BASELINES"
+        printf 'export PAPER_FIGURES_PREFERRED_PREDICTORS=%q\n' "$PAPER_FIGURES_PREFERRED_PREDICTORS"
+        printf 'export PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS=%q\n' "$PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS"
+        printf 'export PAPER_FIGURES_PRESENTATION_PANEL_BASELINES=%q\n' "$PAPER_FIGURES_PRESENTATION_PANEL_BASELINES"
         cat <<'EOF'
 
 remote_root=/root/mhcflurry-postprocess
@@ -549,7 +594,7 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libhdf5-dev libxml2-dev libxslt1-dev procps
 
 python -m pip install --upgrade pip
-python -m pip install matplotlib
+python -m pip install matplotlib pypdf
 
 rm -rf "$repo_dir" "$run_dir"
 mkdir -p "$repo_dir" "$run_dir"
@@ -562,13 +607,20 @@ python -m pip install -e .
 mhcflurry downloads fetch \
     data_evaluation models_class1_pan \
     models_class1_processing models_class1_presentation
+baseline_release="${COMPARE_BASELINE#public:}"
+if [ "$baseline_release" != "$COMPARE_BASELINE" ]; then
+    MHCFLURRY_DOWNLOADS_CURRENT_RELEASE="$baseline_release" \
+        mhcflurry downloads fetch \
+        models_class1_pan models_class1_processing models_class1_presentation
+fi
 data_dir="$(mhcflurry downloads path data_evaluation)"
 
 compare_args=(
     mhcflurry compare-models
     --a "$run_dir" \
     --a-label "${RUN_LABEL:-new}" \
-    --b public \
+    --b "${COMPARE_BASELINE:-public:2.0.0}" \
+    --b-label "${COMPARE_BASELINE_LABEL:-MHCflurry 2.0}" \
     --data-dir "$data_dir" \
     --include "${COMPARE_INCLUDE:-affinity,processing,presentation}" \
     --processing-modes "${PROCESSING_MODES:-with_flanks,no_flank,short_flanks}" \
@@ -598,6 +650,8 @@ if [ "${RUN_RELEASE_PLOTS:-1}" = "1" ]; then
     plot_args=(
         mhcflurry plot-model-comparison
         --input "$run_dir/eval_comparison"
+        --a-label "${RUN_LABEL:-new}"
+        --b-label "${COMPARE_BASELINE_LABEL:-MHCflurry 2.0}"
         --summary-pdf "$run_dir/eval_comparison/plots/model_comparison_figures.pdf"
     )
     if [ -n "${PAPER_FIGURES_ARTIFACTS_DIR:-}" ]; then
@@ -606,6 +660,21 @@ if [ "${RUN_RELEASE_PLOTS:-1}" = "1" ]; then
             --paper-figures-out "$run_dir/eval_comparison/plots/paper_2023"
             --paper-figures-formats "${PAPER_FIGURES_FORMATS:-svg,pdf,png}"
         )
+        if [ -n "${PAPER_FIGURES_CANDIDATE_PREDICTOR:-}" ]; then
+            plot_args+=(--paper-figures-candidate-predictor "$PAPER_FIGURES_CANDIDATE_PREDICTOR")
+        fi
+        if [ -n "${PAPER_FIGURES_EXTERNAL_BASELINES:-}" ]; then
+            plot_args+=(--paper-figures-external-baselines "$PAPER_FIGURES_EXTERNAL_BASELINES")
+        fi
+        if [ -n "${PAPER_FIGURES_PREFERRED_PREDICTORS:-}" ]; then
+            plot_args+=(--paper-figures-preferred-predictors "$PAPER_FIGURES_PREFERRED_PREDICTORS")
+        fi
+        if [ -n "${PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS:-}" ]; then
+            plot_args+=(--paper-figures-presentation-panel-predictors "$PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS")
+        fi
+        if [ -n "${PAPER_FIGURES_PRESENTATION_PANEL_BASELINES:-}" ]; then
+            plot_args+=(--paper-figures-presentation-panel-baselines "$PAPER_FIGURES_PRESENTATION_PANEL_BASELINES")
+        fi
     fi
     "${plot_args[@]}"
     python scripts/training/plot_loss_curves.py \
@@ -616,7 +685,8 @@ EOF
     } > "$remote_script"
     chmod +x "$remote_script"
 
-    run_logged_step postprocess_run_remote \
+    run_logged_step_with_timeout \
+        postprocess_run_remote "$BREV_POSTPROCESS_TIMEOUT_SECONDS" \
         brev exec "$BREV_INSTANCE" "@$remote_script"
 
     cat > "$remote_sync_script" <<'EOF'
@@ -663,9 +733,11 @@ du -sh "$archive"
 EOF
     chmod +x "$remote_sync_script"
 
-    run_logged_step postprocess_prepare_sync \
+    run_logged_step_with_timeout \
+        postprocess_prepare_sync "$BREV_CREATE_TIMEOUT_SECONDS" \
         brev exec "$BREV_INSTANCE" "@$remote_sync_script"
-    run_logged_step postprocess_copy_outputs \
+    run_logged_step_with_timeout \
+        postprocess_copy_outputs "$BREV_CREATE_TIMEOUT_SECONDS" \
         brev copy "$BREV_INSTANCE:$remote_archive" "$staging/"
     run_logged_step postprocess_extract_outputs \
         tar -C "$RUN_DIR" -xjf "$local_archive"
@@ -709,7 +781,8 @@ sync_brev_full_output() {
     local sync_parent="$1"
     local copied_out="$sync_parent/out"
     set +e
-    run_logged_step brev_sync_copy \
+    run_logged_step_with_timeout \
+        brev_sync_copy "$BREV_CREATE_TIMEOUT_SECONDS" \
         brev copy "$BREV_INSTANCE:/root/runplz-latest/out" "$sync_parent/"
     local copy_status=$?
     set -e
@@ -792,14 +865,10 @@ add_path affinity/select.log
 add_path affinity/train.log
 add_glob affinity/LOG-worker.*.txt
 
-add_path processing/models.selected.with_flanks
-add_path processing/models.selected.no_flank
-add_path processing/models.selected.short_flanks
+add_glob processing/models.selected.*
 add_path processing/hits_with_tpm.csv.bz2
 add_path processing/hyperparameters.base.yaml
-add_path processing/hyperparameters.with_flanks.yaml
-add_path processing/hyperparameters.no_flank.yaml
-add_path processing/hyperparameters.short_flanks.yaml
+add_glob processing/hyperparameters.*.yaml
 add_path processing/train_data.csv.bz2
 add_glob processing/LOG-worker.*.txt
 
@@ -815,7 +884,8 @@ EOF
     chmod +x "$sync_script"
 
     set +e
-    run_logged_step brev_sync_prepare_release_archive \
+    run_logged_step_with_timeout \
+        brev_sync_prepare_release_archive "$BREV_CREATE_TIMEOUT_SECONDS" \
         brev exec "$BREV_INSTANCE" "@$sync_script"
     local prepare_status=$?
     set -e
@@ -824,7 +894,8 @@ EOF
     fi
 
     set +e
-    run_logged_step brev_sync_copy_release_archive \
+    run_logged_step_with_timeout \
+        brev_sync_copy_release_archive "$BREV_CREATE_TIMEOUT_SECONDS" \
         brev copy "$BREV_INSTANCE:$remote_archive" "$sync_parent/"
     local copy_status=$?
     set -e
@@ -867,10 +938,16 @@ apply_brev_cleanup() {
                 warn "Brev instance is still RUNNING after stop: $BREV_INSTANCE"
                 if [ "$BREV_STOP_FAILURE_ACTION" = "delete" ]; then
                     warn "Deleting provisioned instance because stop did not take effect."
+                    set +e
                     run_logged_step_with_timeout \
                         brev_delete_after_failed_stop \
                         "$BREV_CLEANUP_TIMEOUT_SECONDS" \
                         brev delete "$BREV_INSTANCE"
+                    local delete_status=$?
+                    set -e
+                    if [ "$delete_status" -ne 0 ]; then
+                        warn "brev delete failed for $BREV_INSTANCE with status $delete_status"
+                    fi
                 else
                     warn "Leaving instance running; rerun 'brev stop $BREV_INSTANCE' or delete it manually."
                 fi
@@ -879,9 +956,15 @@ apply_brev_cleanup() {
             fi
             ;;
         delete)
+            set +e
             run_logged_step_with_timeout \
                 brev_delete "$BREV_CLEANUP_TIMEOUT_SECONDS" \
                 brev delete "$BREV_INSTANCE"
+            local delete_status=$?
+            set -e
+            if [ "$delete_status" -ne 0 ]; then
+                warn "brev delete failed for $BREV_INSTANCE with status $delete_status"
+            fi
             ;;
     esac
 }
@@ -913,10 +996,17 @@ run_brev_training() {
         "RUN_RELEASE_EVAL=$run_release_eval"
         "RUN_RELEASE_PLOTS=$run_release_plots"
         "COMPARE_INCLUDE=$COMPARE_INCLUDE"
+        "COMPARE_BASELINE=$COMPARE_BASELINE"
+        "COMPARE_BASELINE_LABEL=$COMPARE_BASELINE_LABEL"
         "PROCESSING_MODES=$PROCESSING_MODES"
         "PRESENTATION_MODES=$PRESENTATION_MODES"
         "PAPER_FIGURES_ARTIFACTS_DIR=$PAPER_FIGURES_ARTIFACTS_DIR"
         "PAPER_FIGURES_FORMATS=$PAPER_FIGURES_FORMATS"
+        "PAPER_FIGURES_CANDIDATE_PREDICTOR=$PAPER_FIGURES_CANDIDATE_PREDICTOR"
+        "PAPER_FIGURES_EXTERNAL_BASELINES=$PAPER_FIGURES_EXTERNAL_BASELINES"
+        "PAPER_FIGURES_PREFERRED_PREDICTORS=$PAPER_FIGURES_PREFERRED_PREDICTORS"
+        "PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS=$PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS"
+        "PAPER_FIGURES_PRESENTATION_PANEL_BASELINES=$PAPER_FIGURES_PRESENTATION_PANEL_BASELINES"
         "RUN_LABEL=$RUN_LABEL"
         "RUNPLZ_BREV_AUTO_CREATE=$auto_create"
         "RUNPLZ_BREV_ON_FINISH=$runplz_on_finish"
@@ -985,6 +1075,7 @@ BREV_EXCLUDE_PROVIDERS="${RUNPLZ_BREV_EXCLUDE_PROVIDERS:-oci}"
 BREV_STOP_FAILURE_ACTION="${BREV_STOP_FAILURE_ACTION:-}"
 BREV_CLEANUP_TIMEOUT_SECONDS="${BREV_CLEANUP_TIMEOUT_SECONDS:-60}"
 BREV_CREATE_TIMEOUT_SECONDS="${BREV_CREATE_TIMEOUT_SECONDS:-2400}"
+BREV_POSTPROCESS_TIMEOUT_SECONDS="${BREV_POSTPROCESS_TIMEOUT_SECONDS:-86400}"
 BREV_SHELL_READY_ATTEMPTS="${BREV_SHELL_READY_ATTEMPTS:-40}"
 BREV_SHELL_READY_DELAY_SECONDS="${BREV_SHELL_READY_DELAY_SECONDS:-15}"
 BREV_SYNC_MODE="${BREV_SYNC_MODE:-release}"
@@ -1008,9 +1099,16 @@ COMPARE_PRESENTATION_NUM_JOBS="${COMPARE_PRESENTATION_NUM_JOBS:-1}"
 COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU="${COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU:-1}"
 COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER="${COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER:-1}"
 COMPARE_PRESENTATION_TORCH_COMPILE="${COMPARE_PRESENTATION_TORCH_COMPILE:-0}"
+COMPARE_BASELINE="${COMPARE_BASELINE:-public:2.0.0}"
+COMPARE_BASELINE_LABEL="${COMPARE_BASELINE_LABEL:-}"
 PAPER_FIGURES_ARTIFACTS_DIR="${PAPER_FIGURES_ARTIFACTS_DIR:-}"
 PAPER_FIGURES_FORMATS="${PAPER_FIGURES_FORMATS:-svg,pdf,png}"
-RUN_LABEL=new
+PAPER_FIGURES_CANDIDATE_PREDICTOR="${PAPER_FIGURES_CANDIDATE_PREDICTOR:-}"
+PAPER_FIGURES_EXTERNAL_BASELINES="${PAPER_FIGURES_EXTERNAL_BASELINES:-}"
+PAPER_FIGURES_PREFERRED_PREDICTORS="${PAPER_FIGURES_PREFERRED_PREDICTORS:-}"
+PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS="${PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS:-}"
+PAPER_FIGURES_PRESENTATION_PANEL_BASELINES="${PAPER_FIGURES_PRESENTATION_PANEL_BASELINES:-}"
+RUN_LABEL="${RUN_LABEL:-}"
 DRY_RUN=0
 TRAINING_MINIBATCH_SIZE=1024
 AFFINITY_MINIBATCH_SIZE=
@@ -1154,8 +1252,36 @@ while [ $# -gt 0 ]; do
             COMPARE_PRESENTATION_TORCH_COMPILE=$2
             shift 2
             ;;
+        --compare-baseline)
+            COMPARE_BASELINE=$2
+            shift 2
+            ;;
+        --compare-baseline-label)
+            COMPARE_BASELINE_LABEL=$2
+            shift 2
+            ;;
         --paper-figures-artifacts-dir)
             PAPER_FIGURES_ARTIFACTS_DIR=$2
+            shift 2
+            ;;
+        --paper-figures-candidate-predictor)
+            PAPER_FIGURES_CANDIDATE_PREDICTOR=$2
+            shift 2
+            ;;
+        --paper-figures-external-baselines)
+            PAPER_FIGURES_EXTERNAL_BASELINES=$2
+            shift 2
+            ;;
+        --paper-figures-preferred-predictors)
+            PAPER_FIGURES_PREFERRED_PREDICTORS=$2
+            shift 2
+            ;;
+        --paper-figures-presentation-panel-predictors)
+            PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS=$2
+            shift 2
+            ;;
+        --paper-figures-presentation-panel-baselines)
+            PAPER_FIGURES_PRESENTATION_PANEL_BASELINES=$2
             shift 2
             ;;
         --run-label)
@@ -1208,6 +1334,19 @@ done
 [ -n "$RELEASE" ] || die "--release is required"
 if [ -z "$GITHUB_RELEASE" ]; then
     GITHUB_RELEASE=$RELEASE
+fi
+if [ -z "$RUN_LABEL" ]; then
+    RUN_LABEL="MHCflurry $(display_release_version "$RELEASE")"
+fi
+if [ -z "$COMPARE_BASELINE_LABEL" ]; then
+    baseline_release="$(public_release_from_spec "$COMPARE_BASELINE")"
+    if [ -n "$baseline_release" ]; then
+        COMPARE_BASELINE_LABEL="MHCflurry $(display_release_version "$baseline_release")"
+    elif [ "$COMPARE_BASELINE" = "public" ]; then
+        COMPARE_BASELINE_LABEL="MHCflurry public"
+    else
+        COMPARE_BASELINE_LABEL="$(basename "$COMPARE_BASELINE")"
+    fi
 fi
 if [ -z "$AFFINITY_MINIBATCH_SIZE" ]; then
     AFFINITY_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE
@@ -1295,6 +1434,7 @@ note "Run directory: $RUN_DIR"
 note "Release:       $RELEASE"
 note "Backend:       $BACKEND"
 note "Batch sizes:   affinity=$AFFINITY_MINIBATCH_SIZE processing=$PROCESSING_MINIBATCH_SIZE"
+note "Compare:       $RUN_LABEL vs $COMPARE_BASELINE_LABEL ($COMPARE_BASELINE)"
 note "Affinity MWPG: $AFFINITY_MAX_WORKERS_PER_GPU"
 note "Processing:    variants=$PROCESSING_VARIANTS; eval_modes=$PROCESSING_MODES"
 case "$BACKEND" in
@@ -1385,10 +1525,13 @@ if [ "$SKIP_EVAL" != "1" ]; then
                 DATA_DIR="$(mhcflurry-downloads path data_evaluation)"
             fi
         fi
+        run_logged_step fetch_compare_baseline_downloads \
+            fetch_pinned_public_baseline_downloads
         run_logged_step compare_models mhcflurry compare-models \
             --a "$RUN_DIR" \
             --a-label "$RUN_LABEL" \
-            --b public \
+            --b "$COMPARE_BASELINE" \
+            --b-label "$COMPARE_BASELINE_LABEL" \
             --data-dir "$DATA_DIR" \
             --include "$COMPARE_INCLUDE" \
             --processing-modes "$PROCESSING_MODES" \
@@ -1416,6 +1559,8 @@ if [ "$SKIP_PLOTS" != "1" ]; then
         plot_args=(
             mhcflurry plot-model-comparison
             --input "$RUN_DIR/eval_comparison"
+            --a-label "$RUN_LABEL"
+            --b-label "$COMPARE_BASELINE_LABEL"
             --summary-pdf "$RUN_DIR/eval_comparison/plots/model_comparison_figures.pdf"
         )
         if [ -n "$PAPER_FIGURES_ARTIFACTS_DIR" ]; then
@@ -1424,6 +1569,21 @@ if [ "$SKIP_PLOTS" != "1" ]; then
                 --paper-figures-out "$RUN_DIR/eval_comparison/plots/paper_2023"
                 --paper-figures-formats "$PAPER_FIGURES_FORMATS"
             )
+            if [ -n "$PAPER_FIGURES_CANDIDATE_PREDICTOR" ]; then
+                plot_args+=(--paper-figures-candidate-predictor "$PAPER_FIGURES_CANDIDATE_PREDICTOR")
+            fi
+            if [ -n "$PAPER_FIGURES_EXTERNAL_BASELINES" ]; then
+                plot_args+=(--paper-figures-external-baselines "$PAPER_FIGURES_EXTERNAL_BASELINES")
+            fi
+            if [ -n "$PAPER_FIGURES_PREFERRED_PREDICTORS" ]; then
+                plot_args+=(--paper-figures-preferred-predictors "$PAPER_FIGURES_PREFERRED_PREDICTORS")
+            fi
+            if [ -n "$PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS" ]; then
+                plot_args+=(--paper-figures-presentation-panel-predictors "$PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS")
+            fi
+            if [ -n "$PAPER_FIGURES_PRESENTATION_PANEL_BASELINES" ]; then
+                plot_args+=(--paper-figures-presentation-panel-baselines "$PAPER_FIGURES_PRESENTATION_PANEL_BASELINES")
+            fi
         fi
         run_logged_step plot_model_comparison \
             "${plot_args[@]}"

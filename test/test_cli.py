@@ -99,7 +99,10 @@ def test_plot_help_runs(capsys):
         cli_main.main(["plot-model-comparison", "--help"])
     captured = capsys.readouterr().out
     assert "--input" in captured
+    assert "--a-label" in captured
     assert "--paper-figures-artifacts-dir" in captured
+    assert "--paper-figures-candidate-predictor" in captured
+    assert "--include-paper-figures-in-summary-pdf" in captured
 
 
 def test_plot_model_comparison_dispatches_paper_figures(tmp_path, monkeypatch):
@@ -109,6 +112,8 @@ def test_plot_model_comparison_dispatches_paper_figures(tmp_path, monkeypatch):
         captured["artifacts_dir"] = args.artifacts_dir
         captured["out"] = args.out
         captured["formats"] = args.formats
+        captured["candidate_predictor"] = args.candidate_predictor
+        captured["external_baselines"] = args.external_baselines
         return 0
 
     monkeypatch.setattr(paper_figures, "run", fake_run)
@@ -117,12 +122,16 @@ def test_plot_model_comparison_dispatches_paper_figures(tmp_path, monkeypatch):
         "--paper-figures-artifacts-dir", str(tmp_path / "artifacts"),
         "--paper-figures-out", str(tmp_path / "paper"),
         "--paper-figures-formats", "svg,pdf",
+        "--paper-figures-candidate-predictor", "candidate",
+        "--paper-figures-external-baselines", "baseline:ba",
     ])
     assert plot_model_comparison.run(args) == 0
     assert captured == {
         "artifacts_dir": str(tmp_path / "artifacts"),
         "out": str(tmp_path / "paper"),
         "formats": "svg,pdf",
+        "candidate_predictor": "candidate",
+        "external_baselines": "baseline:ba",
     }
 
 
@@ -132,6 +141,8 @@ def test_paper_figures_help_runs(capsys):
     captured = capsys.readouterr().out
     assert "--artifacts-dir" in captured
     assert "--formats" in captured
+    assert "--candidate-predictor" in captured
+    assert "--external-baselines" in captured
 
 
 def test_unknown_subcommand_errors():
@@ -275,6 +286,8 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     module = _load_script_module(path, "remote_launcher_under_test")
     env = module.remote_training_env({"TRAINING_MINIBATCH_SIZE": "2048"})
     assert env["TRAINING_MINIBATCH_SIZE"] == "2048"
+    assert env["COMPARE_BASELINE"] == "public:2.0.0"
+    assert env["COMPARE_BASELINE_LABEL"] == "MHCflurry 2.0"
     assert env["MKL_THREADING_LAYER"] == "GNU"
     assert env["COMPARE_PRESENTATION_NUM_JOBS"] == "1"
     assert env["COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU"] == "1"
@@ -288,10 +301,14 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
         "TRAINING_MINIBATCH_SIZE": "2048",
         "AFFINITY_MINIBATCH_SIZE": "512",
         "AFFINITY_MAX_WORKERS_PER_GPU": "3",
+        "COMPARE_BASELINE": "public:2.2.0",
+        "COMPARE_BASELINE_LABEL": "MHCflurry 2.2",
         "MKL_THREADING_LAYER": "TBB",
     })
     assert env["AFFINITY_MINIBATCH_SIZE"] == "512"
     assert env["AFFINITY_MAX_WORKERS_PER_GPU"] == "3"
+    assert env["COMPARE_BASELINE"] == "public:2.2.0"
+    assert env["COMPARE_BASELINE_LABEL"] == "MHCflurry 2.2"
     assert env["MKL_THREADING_LAYER"] == "TBB"
 
     brev_config = module.brev_config_from_env({
@@ -1111,6 +1128,8 @@ def test_plot_model_comparison_writes_paper_plots_from_summaries(tmp_path):
 
     args = plot_model_comparison.make_parser().parse_args([
         "--input", str(tmp_path),
+        "--a-label", "MHCflurry 2.3.0",
+        "--b-label", "MHCflurry 2.2.0",
         "--summary-pdf", str(tmp_path / "plots" / "figures.pdf"),
     ])
     assert plot_model_comparison.run(args) == 0
@@ -1121,6 +1140,7 @@ def test_plot_model_comparison_writes_paper_plots_from_summaries(tmp_path):
         tmp_path / "plots" / "paper" / "affinity_per_length_macro.png",
         tmp_path / "plots" / "paper" / "processing_per_sample_scatter.png",
         tmp_path / "plots" / "paper" / "presentation_per_length_macro.png",
+        tmp_path / "plots" / "paper" / "presentation_per_length_macro.pdf",
         tmp_path / "plots" / "figures.pdf",
     ]:
         assert path.is_file()
@@ -1259,3 +1279,24 @@ def test_paper_figures_writes_available_2023_style_panels(tmp_path):
         == "fig.3_scores_plots_monoallelic.scatter.auc.monoallelic.ba"
     ).any()
     assert "skipped" in set(manifest["status"])
+
+
+def test_paper_figures_predictor_config_parser():
+    args = paper_figures.make_parser().parse_args([
+        "--artifacts-dir", "artifacts",
+        "--out", "out",
+        "--candidate-predictor", "candidate",
+        "--external-baselines", "baseline_a:ba,baseline_b",
+        "--preferred-predictors", "candidate,baseline_a",
+        "--presentation-panel-predictors", "candidate_ps",
+        "--presentation-panel-baselines", "baseline_a,baseline_b",
+    ])
+    config = paper_figures._parse_predictor_config(args)
+    assert config.candidate == "candidate"
+    assert config.external_baselines == (
+        ("baseline_a", "ba"),
+        ("baseline_b", "baseline_b"),
+    )
+    assert config.preferred_predictors == ("candidate", "baseline_a")
+    assert config.presentation_panel_predictors == ("candidate_ps",)
+    assert config.presentation_panel_baselines == ("baseline_a", "baseline_b")

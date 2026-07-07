@@ -75,22 +75,28 @@ validation), prefer `scripts/release/retrain_evaluate_deploy.sh`.
   (per-allele + per-length ROC/PR/PPV on `data_evaluation` monoallelic),
   processing, and presentation (per-sample + per-length on multiallelic
   flank modes). Each side can be a training-run directory, `public`
-  (current install), or `public:<release_name>`. Default `--b public`.
+  (current install), or `public:<release_name>`. The release wrapper defaults
+  to comparing new weights against `public:2.0.0`, while the bare command still
+  defaults `--b public`.
   Prediction uses the same GPU-aware parallel worker planner as the inference
   CLIs; metric aggregation remains in pandas / scikit-learn for exact release
   summary compatibility. Writes detailed component artifacts plus
   `release_summary.csv` and `release_summary.md`.
 - **`mhcflurry plot-model-comparison`** — Renders ROC/PR/scatter/delta
   diagnostics plus paper-style per-allele, per-sample, per-length, and
-  release-summary panels from a `compare-models` output directory. It can also
-  collect the generated PNGs into a single PDF via `--summary-pdf`. Separate
-  subcommand so the metric pipeline doesn't pay the matplotlib import cost.
+  release-summary panels from a `compare-models` output directory. It writes
+  per-plot PDFs next to PNGs and can collect the vector outputs into a single
+  PDF via `--summary-pdf`. Separate subcommand so the metric pipeline doesn't
+  pay the matplotlib import cost.
 - **`mhcflurry paper-figures`** — Ports the 2023 retraining-notebook figure
   suite into a reproducible CLI. It consumes notebook-style artifacts such as
   `accuracy_scores.multiallelic.csv`, `predictor_info.csv`, monoallelic/AP
   score tables, motif workbooks, and architecture artwork; writes SVG/PDF/PNG
   panels plus a vector multi-page PDF; and records unavailable figure families
   in `manifest.csv` / `missing_inputs.md` instead of silently fabricating them.
+  Its comparator predictors are configurable (`--candidate-predictor`,
+  `--external-baselines`, `--preferred-predictors`) with the 2023 predictor set
+  as the default.
 - **`plot_minibatch_sweep.py`** — Stylized plots from a `sweep_summary.csv`
   (gradient-color dots by mb, lin-lin + log-log only, adjustText
   de-overlap). Invoked by the sweep wrapper after completion.

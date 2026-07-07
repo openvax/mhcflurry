@@ -151,6 +151,10 @@ def remote_training_env(environ=os.environ):
         "COMPARE_INCLUDE": environ.get(
             "COMPARE_INCLUDE", "affinity,processing,presentation"
         ),
+        "COMPARE_BASELINE": environ.get("COMPARE_BASELINE", "public:2.0.0"),
+        "COMPARE_BASELINE_LABEL": environ.get(
+            "COMPARE_BASELINE_LABEL", "MHCflurry 2.0"
+        ),
         "COMPARE_MAX_TASKS_PER_WORKER": environ.get(
             "COMPARE_MAX_TASKS_PER_WORKER",
             environ.get("MAX_TASKS_PER_WORKER", "12"),
@@ -200,6 +204,21 @@ def remote_training_env(environ=os.environ):
         "PAPER_FIGURES_FORMATS": environ.get(
             "PAPER_FIGURES_FORMATS", "svg,pdf,png"
         ),
+        "PAPER_FIGURES_CANDIDATE_PREDICTOR": environ.get(
+            "PAPER_FIGURES_CANDIDATE_PREDICTOR", ""
+        ),
+        "PAPER_FIGURES_EXTERNAL_BASELINES": environ.get(
+            "PAPER_FIGURES_EXTERNAL_BASELINES", ""
+        ),
+        "PAPER_FIGURES_PREFERRED_PREDICTORS": environ.get(
+            "PAPER_FIGURES_PREFERRED_PREDICTORS", ""
+        ),
+        "PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS": environ.get(
+            "PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS", ""
+        ),
+        "PAPER_FIGURES_PRESENTATION_PANEL_BASELINES": environ.get(
+            "PAPER_FIGURES_PRESENTATION_PANEL_BASELINES", ""
+        ),
         "PROCESSING_VARIANTS": environ.get(
             "PROCESSING_VARIANTS", "with_flanks no_flank short_flanks"
         ),
@@ -243,7 +262,7 @@ image = (
         "libxslt1-dev",
         "procps",
     )
-    .pip_install("matplotlib")
+    .pip_install("matplotlib", "pypdf")
     .pip_install("runplz>=3.11.0")
     .pip_install_local_dir(".", editable=True)
 )
@@ -312,14 +331,34 @@ def run_release_evaluation(repo, out, env):
         env=env,
         text=True,
     ).strip()
+    baseline = env.get("COMPARE_BASELINE", "public:2.0.0")
+    if baseline.startswith("public:"):
+        baseline_env = env.copy()
+        baseline_env["MHCFLURRY_DOWNLOADS_CURRENT_RELEASE"] = (
+            baseline.split(":", 1)[1]
+        )
+        subprocess.run(
+            [
+                "mhcflurry",
+                "downloads",
+                "fetch",
+                "models_class1_pan",
+                "models_class1_processing",
+                "models_class1_presentation",
+            ],
+            check=True,
+            cwd=repo,
+            env=baseline_env,
+        )
 
     compare_args = [
         "mhcflurry",
-        "compare-models",
-        "--a", str(out),
-        "--a-label", env.get("RUN_LABEL", "new"),
-        "--b", "public",
-        "--data-dir", data_dir,
+            "compare-models",
+            "--a", str(out),
+            "--a-label", env.get("RUN_LABEL", "new"),
+            "--b", env.get("COMPARE_BASELINE", "public:2.0.0"),
+            "--b-label", env.get("COMPARE_BASELINE_LABEL", "MHCflurry 2.0"),
+            "--data-dir", data_dir,
         "--include", env.get("COMPARE_INCLUDE", "affinity,processing,presentation"),
         "--processing-modes", env.get(
             "PROCESSING_MODES", "with_flanks,no_flank,short_flanks"
@@ -360,6 +399,8 @@ def run_release_plots(repo, out, env):
         "mhcflurry",
         "plot-model-comparison",
         "--input", str(out / "eval_comparison"),
+        "--a-label", env.get("RUN_LABEL", "new"),
+        "--b-label", env.get("COMPARE_BASELINE_LABEL", "MHCflurry 2.0"),
         "--summary-pdf",
         str(out / "eval_comparison" / "plots" / "model_comparison_figures.pdf"),
     ]
@@ -372,6 +413,22 @@ def run_release_plots(repo, out, env):
             "--paper-figures-formats",
             env.get("PAPER_FIGURES_FORMATS", "svg,pdf,png"),
         ])
+        passthrough = (
+            ("PAPER_FIGURES_CANDIDATE_PREDICTOR",
+             "--paper-figures-candidate-predictor"),
+            ("PAPER_FIGURES_EXTERNAL_BASELINES",
+             "--paper-figures-external-baselines"),
+            ("PAPER_FIGURES_PREFERRED_PREDICTORS",
+             "--paper-figures-preferred-predictors"),
+            ("PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS",
+             "--paper-figures-presentation-panel-predictors"),
+            ("PAPER_FIGURES_PRESENTATION_PANEL_BASELINES",
+             "--paper-figures-presentation-panel-baselines"),
+        )
+        for env_name, flag in passthrough:
+            value = env.get(env_name, "").strip()
+            if value:
+                plot_args.extend([flag, value])
     subprocess.run(plot_args, check=True, cwd=repo, env=env)
 
 

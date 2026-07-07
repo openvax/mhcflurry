@@ -233,6 +233,24 @@ else
     MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU_REQUESTED"
     NUM_JOBS="${NUM_JOBS:-auto}"
 fi
+if [ "$GPUS" -gt 0 ] && [ "$NUM_JOBS" != "auto" ]; then
+    case "$NUM_JOBS" in
+        *[!0-9]*)
+            echo "NUM_JOBS must be auto or an integer; got '$NUM_JOBS'." >&2
+            exit 2
+            ;;
+    esac
+    if [ "$MAX_WORKERS_PER_GPU" = "auto" ]; then
+        echo "NUM_JOBS=$NUM_JOBS with MAX_WORKERS_PER_GPU=auto is unsafe for affinity training; using NUM_JOBS=auto so the training orchestrator can size workers from the minibatch-aware VRAM estimate." >&2
+        NUM_JOBS=auto
+    else
+        capacity="$(( GPUS * MAX_WORKERS_PER_GPU ))"
+        if [ "$NUM_JOBS" -gt "$capacity" ]; then
+            echo "Clamping NUM_JOBS=$NUM_JOBS to GPU capacity $capacity." >&2
+            NUM_JOBS="$capacity"
+        fi
+    fi
+fi
 echo "Num jobs: $NUM_JOBS (max-workers-per-gpu=$MAX_WORKERS_PER_GPU; requested=$MAX_WORKERS_PER_GPU_REQUESTED)"
 # Recycle after a bounded number of tasks so compile is still amortized
 # but leaks / descriptor creep / orphaned-runtime state cannot accumulate

@@ -75,8 +75,22 @@ def register_subparser(parser):
     parser.add_argument(
         "--summary-pdf",
         help=(
-            "Optional PDF path. When set, all generated PNG plots are also "
-            "collected into a single PDF."
+            "Optional PDF path. When set, generated plots are collected into "
+            "a single PDF, preserving vector plots where possible."
+        ),
+    )
+    parser.add_argument(
+        "--a-label",
+        help=(
+            "Override side A label from side_a.json. Useful for regenerating "
+            "plots from an existing comparison without recomputing metrics."
+        ),
+    )
+    parser.add_argument(
+        "--b-label",
+        help=(
+            "Override side B label from side_b.json. Useful for regenerating "
+            "plots from an existing comparison without recomputing metrics."
         ),
     )
     parser.add_argument(
@@ -99,6 +113,49 @@ def register_subparser(parser):
         default="svg,pdf,png",
         help="Comma-separated paper-figure formats. Default: %(default)s.",
     )
+    parser.add_argument(
+        "--include-paper-figures-in-summary-pdf",
+        action="store_true",
+        default=False,
+        help=(
+            "When --summary-pdf and --paper-figures-artifacts-dir are both "
+            "set, append paper_2023/paper_figures.pdf to the summary PDF. "
+            "Off by default because those notebook artifacts may contain "
+            "archival predictor outputs rather than the current comparison."
+        ),
+    )
+    parser.add_argument(
+        "--paper-figures-candidate-predictor",
+        help="Candidate predictor passed through to ``mhcflurry paper-figures``.",
+    )
+    parser.add_argument(
+        "--paper-figures-external-baselines",
+        help=(
+            "External baselines passed through to ``mhcflurry paper-figures`` "
+            "as PREDICTOR or PREDICTOR:PERCENT_CHANGE_SUFFIX."
+        ),
+    )
+    parser.add_argument(
+        "--paper-figures-preferred-predictors",
+        help=(
+            "Comma-separated preferred predictors passed through to "
+            "``mhcflurry paper-figures``."
+        ),
+    )
+    parser.add_argument(
+        "--paper-figures-presentation-panel-predictors",
+        help=(
+            "Comma-separated presentation-panel candidate predictors passed "
+            "through to ``mhcflurry paper-figures``."
+        ),
+    )
+    parser.add_argument(
+        "--paper-figures-presentation-panel-baselines",
+        help=(
+            "Comma-separated presentation-panel baseline predictors passed "
+            "through to ``mhcflurry paper-figures``."
+        ),
+    )
     return parser
 
 
@@ -107,6 +164,10 @@ def run(args):
     matplotlib.use("Agg")
 
     labels = _load_side_labels(args.input)
+    if args.a_label:
+        labels["a"] = args.a_label
+    if args.b_label:
+        labels["b"] = args.b_label
     plot_dir = os.path.join(args.input, "plots")
     os.makedirs(plot_dir, exist_ok=True)
     paper_dir = os.path.join(plot_dir, "paper")
@@ -123,14 +184,32 @@ def run(args):
 
     for component in components:
         if component == "affinity":
-            _plot_affinity(args.input, plot_dir, labels, args.max_scatter_points)
+            _safe_plot(
+                "affinity plots",
+                _plot_affinity,
+                args.input,
+                plot_dir,
+                labels,
+                args.max_scatter_points)
         elif component == "processing":
-            _plot_processing(args.input, plot_dir, labels, args.max_scatter_points)
+            _safe_plot(
+                "processing plots",
+                _plot_processing,
+                args.input,
+                plot_dir,
+                labels,
+                args.max_scatter_points)
         elif component == "presentation":
-            _plot_presentation(args.input, plot_dir, labels, args.max_scatter_points)
-    _plot_release_summary(args.input, paper_dir, labels)
-    if args.summary_pdf:
-        _write_summary_pdf(plot_dir, args.summary_pdf)
+            _safe_plot(
+                "presentation plots",
+                _plot_presentation,
+                args.input,
+                plot_dir,
+                labels,
+                args.max_scatter_points)
+    _safe_plot(
+        "release-summary plots", _plot_release_summary, args.input,
+        paper_dir, labels)
     if args.paper_figures_artifacts_dir:
         from . import paper_figures
 
@@ -140,10 +219,45 @@ def run(args):
             "--out", out_dir,
             "--formats", args.paper_figures_formats,
         ])
+        _append_optional_paper_figure_args(args, paper_args)
         status = paper_figures.run(paper_args)
         if status:
             return status
+    if args.summary_pdf:
+        _write_summary_pdf(
+            plot_dir,
+            args.summary_pdf,
+            include_paper_2023=args.include_paper_figures_in_summary_pdf,
+        )
     return 0
+
+
+def _append_optional_paper_figure_args(args, paper_args):
+    passthrough = {
+        "paper_figures_candidate_predictor": "candidate_predictor",
+        "paper_figures_external_baselines": "external_baselines",
+        "paper_figures_preferred_predictors": "preferred_predictors",
+        "paper_figures_presentation_panel_predictors": (
+            "presentation_panel_predictors"
+        ),
+        "paper_figures_presentation_panel_baselines": (
+            "presentation_panel_baselines"
+        ),
+    }
+    for source, target in passthrough.items():
+        value = getattr(args, source)
+        if value:
+            setattr(paper_args, target, value)
+
+
+def _safe_plot(label, func, *args, **kwargs):
+    try:
+        return func(*args, **kwargs)
+    except Exception as e:
+        print(
+            "WARNING: skipping %s: %s: %s" % (
+                label, type(e).__name__, e))
+        return None
 
 
 def _load_side_labels(input_dir):
@@ -202,7 +316,12 @@ def _plot_affinity(input_dir, plot_dir, labels, max_scatter_points):
     pred_path = os.path.join(input_dir, "affinity", "predictions.csv.bz2")
     label_a, label_b = labels["a"], labels["b"]
     if os.path.isfile(pred_path):
-        df = pandas.read_csv(pred_path)
+        df = _read_optional_csv(pred_path)
+        if not {"hit", "a_score", "b_score"}.issubset(df.columns):
+            df = pandas.DataFrame()
+    else:
+        df = pandas.DataFrame()
+    if not df.empty:
         y = df.hit.values
         a_score = df.a_score.values
         b_score = df.b_score.values
@@ -220,7 +339,7 @@ def _plot_affinity(input_dir, plot_dir, labels, max_scatter_points):
 
     per_allele_path = os.path.join(input_dir, "affinity", "per_allele.csv")
     if os.path.isfile(per_allele_path):
-        per_allele = pandas.read_csv(per_allele_path)
+        per_allele = _read_optional_csv(per_allele_path)
         _save_per_allele_delta(plt, per_allele, sub_dir, label_a, label_b)
         _save_metric_scatter_grid(
             plt,
@@ -244,7 +363,11 @@ def _plot_affinity(input_dir, plot_dir, labels, max_scatter_points):
 
 
 def _save_per_allele_delta(plt, per_allele, sub_dir, label_a, label_b):
+    if "roc_auc_diff" not in per_allele.columns:
+        return
     sorted_df = per_allele.sort_values("roc_auc_diff", ascending=False)
+    if sorted_df.empty:
+        return
     fig, ax = plt.subplots(figsize=(10, 4))
     ax.bar(numpy.arange(len(sorted_df)), sorted_df["roc_auc_diff"])
     ax.axhline(0, color="0.6", linewidth=1)
@@ -252,7 +375,7 @@ def _save_per_allele_delta(plt, per_allele, sub_dir, label_a, label_b):
     ax.set_ylabel("%s − %s ROC-AUC" % (label_a, label_b))
     ax.set_title("Per-allele ROC-AUC delta")
     fig.tight_layout()
-    fig.savefig(os.path.join(sub_dir, "per_allele_roc_delta.png"))
+    _save_figure(fig, os.path.join(sub_dir, "per_allele_roc_delta.png"))
     plt.close(fig)
 
 
@@ -301,7 +424,9 @@ def _plot_processing(input_dir, plot_dir, labels, max_scatter_points):
     summary_table_path = os.path.join(processing_dir, "summary_table.csv")
     if os.path.isfile(summary_table_path):
         summary = _read_optional_csv(summary_table_path)
-        _save_macro_bars(plt, summary, sub_dir, label_a, label_b)
+        _safe_plot(
+            "processing macro bars",
+            _save_macro_bars, plt, summary, sub_dir, label_a, label_b)
     _save_component_paper_plots(
         plt,
         processing_dir,
@@ -361,17 +486,25 @@ def _plot_presentation(input_dir, plot_dir, labels, max_scatter_points):
     summary_table_path = os.path.join(presentation_dir, "summary_table.csv")
     if os.path.isfile(summary_table_path):
         summary = _read_optional_csv(summary_table_path)
-        _save_macro_bars(plt, summary, sub_dir, label_a, label_b)
-    _save_component_paper_plots(
-        plt,
-        presentation_dir,
-        paper_dir,
-        "presentation",
-        PRESENTATION_MODES,
-        "presentation_score",
-        label_a,
-        label_b,
-    )
+        _safe_plot(
+            "presentation macro bars",
+            _save_macro_bars, plt, summary, sub_dir, label_a, label_b)
+    for score_kind in PRESENTATION_SCORE_KINDS:
+        suffix = "" if score_kind == "presentation_score" else "_%s" % score_kind
+        title_suffix = "" if score_kind == "presentation_score" else (
+            " (%s)" % score_kind.replace("_", " "))
+        _save_component_paper_plots(
+            plt,
+            presentation_dir,
+            paper_dir,
+            "presentation",
+            PRESENTATION_MODES,
+            score_kind,
+            label_a,
+            label_b,
+            name_suffix=suffix,
+            title_suffix=title_suffix,
+        )
 
 
 def _score_values(df, prefix, score_kind):
@@ -396,6 +529,10 @@ def _plot_release_summary(input_dir, paper_dir, labels):
     if summary.empty:
         return
 
+    required = {"average", "component", "metric", "side_a", "side_b", "diff"}
+    if not required.issubset(summary.columns):
+        return
+
     macro = summary.loc[summary.average == "Macro"].copy()
     if macro.empty:
         return
@@ -410,6 +547,12 @@ def _plot_release_summary(input_dir, paper_dir, labels):
     )
     for ax, metric in zip(axes[0], METRIC_NAMES):
         rows = macro.loc[macro.metric == METRIC_DISPLAY_NAMES[metric]]
+        rows = (
+            rows.groupby("plot_group", as_index=False)[
+                ["side_a", "side_b", "diff"]
+            ]
+            .mean()
+        )
         rows = rows.set_index("plot_group").reindex(ordered_groups)
         x = numpy.arange(len(rows))
         width = 0.36
@@ -424,7 +567,7 @@ def _plot_release_summary(input_dir, paper_dir, labels):
     axes[0][-1].legend(frameon=False)
     fig.suptitle("Release-gate macro accuracy")
     fig.tight_layout()
-    fig.savefig(os.path.join(paper_dir, "release_summary_macro.png"))
+    _save_figure(fig, os.path.join(paper_dir, "release_summary_macro.png"))
     plt.close(fig)
 
     fig, axes = plt.subplots(
@@ -434,6 +577,12 @@ def _plot_release_summary(input_dir, paper_dir, labels):
     )
     for ax, metric in zip(axes[0], METRIC_NAMES):
         rows = macro.loc[macro.metric == METRIC_DISPLAY_NAMES[metric]]
+        rows = (
+            rows.groupby("plot_group", as_index=False)[
+                ["side_a", "side_b", "diff"]
+            ]
+            .mean()
+        )
         rows = rows.set_index("plot_group").reindex(ordered_groups)
         values = rows["diff"].values
         colors = numpy.where(values >= 0, "#2b8cbe", "#d95f02")
@@ -446,7 +595,7 @@ def _plot_release_summary(input_dir, paper_dir, labels):
         ax.grid(axis="y", color="0.9", linewidth=0.8)
     fig.suptitle("Release-gate macro deltas")
     fig.tight_layout()
-    fig.savefig(os.path.join(paper_dir, "release_summary_macro_delta.png"))
+    _save_figure(fig, os.path.join(paper_dir, "release_summary_macro_delta.png"))
     plt.close(fig)
 
 
@@ -460,7 +609,7 @@ def _release_summary_group_label(row):
 
 def _save_component_paper_plots(
         plt, component_dir, paper_dir, component, modes, score_kind,
-        label_a, label_b):
+        label_a, label_b, name_suffix="", title_suffix=""):
     sample_frames = []
     length_frames = []
     for mode in modes:
@@ -482,16 +631,21 @@ def _save_component_paper_plots(
         _save_metric_scatter_grid(
             plt,
             sample_frames,
-            os.path.join(paper_dir, "%s_per_sample_scatter.png" % component),
+            os.path.join(
+                paper_dir,
+                "%s_per_sample_scatter%s.png" % (component, name_suffix)),
             label_a,
             label_b,
-            "%s per-sample accuracy" % component.title(),
+            "%s per-sample accuracy%s" % (component.title(), title_suffix),
         )
         _save_metric_delta_boxplots(
             plt,
             sample_frames,
-            os.path.join(paper_dir, "%s_per_sample_delta_boxplots.png" % component),
-            "%s per-sample deltas" % component.title(),
+            os.path.join(
+                paper_dir,
+                "%s_per_sample_delta_boxplots%s.png" % (
+                    component, name_suffix)),
+            "%s per-sample deltas%s" % (component.title(), title_suffix),
             label_a,
             label_b,
         )
@@ -500,10 +654,12 @@ def _save_component_paper_plots(
         _save_per_length_grid(
             plt,
             length_frames,
-            os.path.join(paper_dir, "%s_per_length_macro.png" % component),
+            os.path.join(
+                paper_dir,
+                "%s_per_length_macro%s.png" % (component, name_suffix)),
             label_a,
             label_b,
-            "%s by peptide length" % component.title(),
+            "%s by peptide length%s" % (component.title(), title_suffix),
         )
 
 
@@ -554,7 +710,7 @@ def _save_metric_scatter_grid(
             )
     fig.suptitle(title)
     fig.tight_layout()
-    fig.savefig(out_path)
+    _save_figure(fig, out_path)
     plt.close(fig)
 
 
@@ -586,7 +742,7 @@ def _save_metric_delta_boxplots(
         ax.grid(axis="y", color="0.9", linewidth=0.8)
     fig.suptitle(title)
     fig.tight_layout()
-    fig.savefig(out_path)
+    _save_figure(fig, out_path)
     plt.close(fig)
 
 
@@ -599,7 +755,13 @@ def _save_per_length_grid(
         figsize=(3.2 * n_cols, 2.6 * n_rows),
         squeeze=False,
     )
+    legend_handles = None
+    legend_labels = None
     for row_idx, (row_label, df) in enumerate(frames):
+        if "length" not in df.columns:
+            for ax in axes[row_idx]:
+                ax.axis("off")
+            continue
         x = numpy.arange(len(df))
         lengths = [str(v) for v in df["length"]]
         width = 0.36
@@ -622,10 +784,19 @@ def _save_per_length_grid(
             else:
                 ax.set_ylabel("Macro mean")
             if row_idx == 0 and col_idx == n_cols - 1:
-                ax.legend(frameon=False)
+                legend_handles, legend_labels = ax.get_legend_handles_labels()
+    if legend_handles:
+        fig.legend(
+            legend_handles,
+            legend_labels,
+            loc="lower center",
+            ncol=len(legend_labels),
+            frameon=False,
+            bbox_to_anchor=(0.5, 0.0),
+        )
     fig.suptitle(title)
-    fig.tight_layout()
-    fig.savefig(out_path)
+    fig.tight_layout(rect=(0.0, 0.06, 1.0, 0.96))
+    _save_figure(fig, out_path)
     plt.close(fig)
 
 
@@ -648,7 +819,53 @@ def _metric_ylim(metric, values):
     return low, high
 
 
-def _write_summary_pdf(plot_dir, out_path):
+def _write_summary_pdf(plot_dir, out_path, include_paper_2023=False):
+    plot_dir = Path(plot_dir)
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    pdfs = [
+        path for path in sorted(plot_dir.rglob("*.pdf"))
+        if path.resolve() != out_path.resolve()
+        and (
+            "paper_2023" not in path.parts
+            or (
+                include_paper_2023
+                and path.name == "paper_figures.pdf"
+            )
+        )
+    ]
+    if pdfs:
+        try:
+            pdf_reader, pdf_writer = _pdf_reader_writer()
+        except ImportError:
+            _write_summary_pdf_from_pngs(plot_dir, out_path)
+            return
+        paper = [path for path in pdfs if "paper" in path.parts]
+        rest = [path for path in pdfs if path not in paper]
+        writer = pdf_writer()
+        for path in paper + rest:
+            reader = pdf_reader(str(path))
+            for page in reader.pages:
+                writer.add_page(page)
+        with open(out_path, "wb") as fd:
+            writer.write(fd)
+        return
+    _write_summary_pdf_from_pngs(plot_dir, out_path)
+
+
+def _pdf_reader_writer():
+    try:
+        from pypdf import PdfReader, PdfWriter
+        return PdfReader, PdfWriter
+    except ImportError:
+        try:
+            from PyPDF2 import PdfReader, PdfWriter
+            return PdfReader, PdfWriter
+        except ImportError as e:
+            raise ImportError("pypdf or PyPDF2 is required") from e
+
+
+def _write_summary_pdf_from_pngs(plot_dir, out_path):
     import matplotlib.pyplot as plt
     from matplotlib.backends.backend_pdf import PdfPages
 
@@ -677,8 +894,22 @@ def _write_summary_pdf(plot_dir, out_path):
             plt.close(fig)
 
 
+def _save_figure(fig, out_path):
+    path = Path(out_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=300, bbox_inches="tight")
+    if path.suffix.lower() == ".png":
+        fig.savefig(path.with_suffix(".pdf"), bbox_inches="tight")
+
+
 def _save_macro_bars(plt, summary, sub_dir, label_a, label_b):
     if summary.empty:
+        return
+    required = {"mode", "score_kind"}
+    for metric in METRIC_NAMES:
+        required.add("a_macro_%s" % metric)
+        required.add("b_macro_%s" % metric)
+    if not required.issubset(summary.columns):
         return
     x_labels = [
         "%s\n%s" % (
@@ -699,7 +930,7 @@ def _save_macro_bars(plt, summary, sub_dir, label_a, label_b):
         ax.set_title("Macro mean over samples: %s" % metric)
         ax.legend()
         fig.tight_layout()
-        fig.savefig(os.path.join(sub_dir, "macro_%s.png" % metric))
+        _save_figure(fig, os.path.join(sub_dir, "macro_%s.png" % metric))
         plt.close(fig)
 
 
@@ -725,7 +956,7 @@ def _save_roc(plt, roc_curve_fn, roc_auc_fn,
     if ax.get_legend_handles_labels()[0]:
         ax.legend()
     fig.tight_layout()
-    fig.savefig(out_path)
+    _save_figure(fig, out_path)
     plt.close(fig)
 
 
@@ -745,7 +976,7 @@ def _save_pr(plt, pr_curve_fn, ap_fn,
     if ax.get_legend_handles_labels()[0]:
         ax.legend()
     fig.tight_layout()
-    fig.savefig(out_path)
+    _save_figure(fig, out_path)
     plt.close(fig)
 
 
@@ -762,7 +993,7 @@ def _save_scatter(plt, x_score, y_score, x_label, y_label,
     ax.set_ylabel(y_label)
     ax.set_title(title)
     fig.tight_layout()
-    fig.savefig(out_path)
+    _save_figure(fig, out_path)
     plt.close(fig)
 
 

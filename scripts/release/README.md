@@ -86,13 +86,19 @@ known-good worker count for a specific machine. Processing variants default to
 Evaluation now includes affinity, processing, and presentation by default. In
 addition to the detailed component CSV/JSON files and plots, `compare-models`
 writes `release_summary.csv` and `release_summary.md` with the release-gate
-tables used to compare newly trained weights against public weights.
+tables used to compare newly trained weights against a configurable baseline.
+The release wrapper defaults to `--compare-baseline public:2.0.0`, the closest
+older public model bundle available in `downloads.yml`, and labels the new side
+as `MHCflurry <release>` with any `rcN` suffix stripped. Use
+`--compare-baseline public` for the currently configured public release, or pass
+another training-run directory / `public:<release_name>` plus
+`--compare-baseline-label` to tune the figure labels.
 `plot-model-comparison` now writes both release-diagnostic plots and a
 paper-style `plots/paper/` suite: per-allele affinity scatter panels,
 per-sample processing/presentation scatter panels, per-length bars, delta
 boxplots, and release-summary overview panels. The release wrapper also asks it
-to write `plots/model_comparison_figures.pdf` so remote runs sync a portable
-figure packet without a separate local plotting step.
+to write vector-first `plots/model_comparison_figures.pdf` so remote runs sync a
+portable publication-review packet without a separate local plotting step.
 
 For reproducing the 2023 retraining-notebook figure suite, pass
 `--paper-figures-artifacts-dir /path/to/2023/artifacts` (or set
@@ -101,4 +107,7 @@ For reproducing the 2023 retraining-notebook figure suite, pass
 and writes SVG/PDF/PNG panels plus `paper_figures.pdf`, `manifest.csv`, and
 `missing_inputs.md` under `eval_comparison/plots/paper_2023/`. Figure
 families whose source tables are absent are reported there instead of being
-faked.
+faked. The notebook-style comparator suite is configurable through
+`mhcflurry paper-figures` flags such as `--candidate-predictor`,
+`--external-baselines`, and `--preferred-predictors`; the defaults preserve the
+2023 notebook predictor set.

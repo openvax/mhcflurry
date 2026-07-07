@@ -25,11 +25,14 @@ import argparse
 import ast
 import os
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy
 import pandas
 
+
+CANDIDATE_PREDICTOR = "mhcflurry_production"
 
 EXTERNAL_BASELINES = (
     ("netmhcpan4.ba", "ba"),
@@ -62,6 +65,15 @@ PREFERRED_PREDICTORS = (
 
 LENGTH_LABEL_ORDER = ("All", "8-mer", "9-mer", "10-mer", "11-mer")
 DEFAULT_FORMATS = ("svg", "pdf", "png")
+
+
+@dataclass(frozen=True)
+class PredictorConfig:
+    candidate: str
+    external_baselines: tuple
+    preferred_predictors: tuple
+    presentation_panel_predictors: tuple
+    presentation_panel_baselines: tuple
 
 
 def make_parser():
@@ -122,6 +134,49 @@ def register_subparser(parser):
         help="Sample group for recent-only multiallelic panels.",
     )
     parser.add_argument(
+        "--candidate-predictor",
+        default=CANDIDATE_PREDICTOR,
+        help=(
+            "Predictor to treat as the candidate MHCflurry model in "
+            "notebook-style comparison panels. Default: %(default)s."
+        ),
+    )
+    parser.add_argument(
+        "--external-baselines",
+        default=",".join(
+            "%s:%s" % (predictor, suffix)
+            for predictor, suffix in EXTERNAL_BASELINES),
+        help=(
+            "Comma-separated external predictor comparators. Each item is "
+            "PREDICTOR or PREDICTOR:PERCENT_CHANGE_SUFFIX. Default: "
+            "%(default)s."
+        ),
+    )
+    parser.add_argument(
+        "--preferred-predictors",
+        default=",".join(PREFERRED_PREDICTORS),
+        help=(
+            "Comma-separated predictors for summary bar panels. Default: "
+            "%(default)s."
+        ),
+    )
+    parser.add_argument(
+        "--presentation-panel-predictors",
+        default=",".join(PRESENTATION_PANEL_PREDICTORS),
+        help=(
+            "Comma-separated candidate predictors for presentation-vs-baseline "
+            "scatter grids. Default: %(default)s."
+        ),
+    )
+    parser.add_argument(
+        "--presentation-panel-baselines",
+        default=",".join(PRESENTATION_PANEL_BASELINES),
+        help=(
+            "Comma-separated baseline predictors for presentation-vs-baseline "
+            "scatter grids. Default: %(default)s."
+        ),
+    )
+    parser.add_argument(
         "--max-scatter-points",
         type=int,
         default=20_000,
@@ -145,6 +200,7 @@ def run(args):
     out_dir.mkdir(parents=True, exist_ok=True)
     formats = _parse_formats(args.formats)
     combined_pdf = _combined_pdf_path(args.combined_pdf, out_dir)
+    predictors = _parse_predictor_config(args)
 
     _apply_paper_style()
     writer = FigureWriter(out_dir, formats, combined_pdf)
@@ -152,23 +208,47 @@ def run(args):
         predictor_info = _read_predictor_info(
             artifacts_dir / "predictor_info.csv", writer)
         sample_ids = _read_sample_group_ids(args, artifacts_dir, writer)
-        _generate_multiallelic_figures(
+        _run_figure_family(
+            writer, "multiallelic", "all", _generate_multiallelic_figures,
             artifacts_dir, predictor_info, sample_ids, args.sample_group,
-            args.max_scatter_points, writer)
-        _generate_model_selection_figures(artifacts_dir, writer)
-        _generate_monoallelic_figures(
-            artifacts_dir, predictor_info, args.max_scatter_points, writer)
-        _generate_processing_notebook_figures(artifacts_dir, predictor_info, writer)
-        _generate_proteasome_figures(artifacts_dir, writer)
-        _copy_architecture_figures(artifacts_dir, writer)
+            args.max_scatter_points, writer, predictors)
+        _run_figure_family(
+            writer, "model-selection", "all",
+            _generate_model_selection_figures, artifacts_dir, writer)
+        _run_figure_family(
+            writer, "monoallelic", "all", _generate_monoallelic_figures,
+            artifacts_dir, predictor_info, args.max_scatter_points, writer,
+            predictors)
+        _run_figure_family(
+            writer, "antigen-processing", "all",
+            _generate_processing_notebook_figures,
+            artifacts_dir, predictor_info, writer, predictors)
+        _run_figure_family(
+            writer, "proteasome", "all",
+            _generate_proteasome_figures, artifacts_dir, writer)
+        _run_figure_family(
+            writer, "architecture", "all",
+            _copy_architecture_figures, artifacts_dir, writer)
     finally:
         writer.close()
+        _write_manifest(out_dir, writer.rows)
+        _write_missing_inputs(out_dir, writer.rows)
 
-    _write_manifest(out_dir, writer.rows)
-    _write_missing_inputs(out_dir, writer.rows)
-    if args.strict and any(row["status"] == "skipped" for row in writer.rows):
+    if args.strict and any(
+            row["status"] in ("skipped", "failed") for row in writer.rows):
         return 2
     return 0
+
+
+def _run_figure_family(writer, family, figure, func, *args):
+    try:
+        func(*args)
+    except Exception as e:
+        writer.fail(
+            family,
+            figure,
+            "%s: %s" % (type(e).__name__, e),
+        )
 
 
 class FigureWriter:
@@ -219,6 +299,16 @@ class FigureWriter:
             "missing": str(missing),
         })
 
+    def fail(self, family, figure, note):
+        self.rows.append({
+            "family": family,
+            "figure": figure,
+            "status": "failed",
+            "paths": "",
+            "note": note,
+            "missing": "",
+        })
+
     def close(self):
         if self.pdf_pages is not None:
             self.pdf_pages.close()
@@ -236,6 +326,39 @@ def _parse_formats(value):
             "Unsupported figure formats: %s. Allowed: %s" % (
                 ", ".join(sorted(unknown)), ", ".join(sorted(allowed))))
     return formats
+
+
+def _parse_predictor_config(args):
+    return PredictorConfig(
+        candidate=args.candidate_predictor,
+        external_baselines=_parse_external_baselines(args.external_baselines),
+        preferred_predictors=_parse_predictor_list(args.preferred_predictors),
+        presentation_panel_predictors=_parse_predictor_list(
+            args.presentation_panel_predictors),
+        presentation_panel_baselines=_parse_predictor_list(
+            args.presentation_panel_baselines),
+    )
+
+
+def _parse_predictor_list(value):
+    return tuple(part.strip() for part in value.split(",") if part.strip())
+
+
+def _parse_external_baselines(value):
+    result = []
+    for part in _parse_predictor_list(value):
+        if ":" in part:
+            predictor, suffix = part.split(":", 1)
+        else:
+            predictor = part
+            suffix = part.rsplit(".", 1)[-1]
+        predictor = predictor.strip()
+        suffix = suffix.strip()
+        if predictor:
+            result.append((predictor, suffix))
+    if not result:
+        raise ValueError("--external-baselines must contain at least one predictor")
+    return tuple(result)
 
 
 def _combined_pdf_path(value, out_dir):
@@ -334,7 +457,7 @@ def _first_present(df, names):
 
 def _generate_multiallelic_figures(
         artifacts_dir, predictor_info, recent_sample_ids, sample_group,
-        max_scatter_points, writer):
+        max_scatter_points, writer, predictors):
     path = artifacts_dir / "accuracy_scores.multiallelic.csv"
     if not path.is_file():
         writer.skip(
@@ -367,45 +490,48 @@ def _generate_multiallelic_figures(
     _plot_external_scatter_triptych(
         scores, predictor_info, "auc", "AUC",
         "fig.3_scores_plots_multiallelic.scatter.auc.ba",
-        max_scatter_points, writer)
+        max_scatter_points, writer, predictors)
     _plot_external_scatter_triptych(
         scores, predictor_info, "ppv", "PPV",
         "fig.3_scores_plots_multiallelic.scatter.ppv.ba",
-        max_scatter_points, writer)
+        max_scatter_points, writer, predictors)
     _plot_percent_change_by_length(
         scores, predictor_info, "auc", "AUC",
         "fig.3_scores_plots_multiallelic.bar_by_peptide_length.auc.ba",
-        writer)
+        writer, predictors)
     _plot_percent_change_bars(
         scores, predictor_info, "auc", "AUC",
         "fig.3_scores_plots_multiallelic.bar.auc.presentation",
-        writer)
+        writer, predictors)
     _plot_percent_change_bars(
         scores, predictor_info, "ppv", "PPV",
         "fig.3_scores_plots_multiallelic.bar.ppv.presentation",
-        writer)
+        writer, predictors)
     _plot_mean_ppv_small(
         scores, predictor_info, recent_sample_ids, recent_note,
         "fig.3_scores_plots_multiallelic.mean_ppv_small_plot",
-        writer)
+        writer, predictors)
     _plot_presentation_scatter_grid(
         scores, predictor_info, recent_sample_ids, recent_note,
         max_scatter_points,
         "fig.3_scores_plots_multiallelic.scatter.ppv.presentation",
-        writer)
+        writer, predictors)
     _plot_graphical_abstract_logistic_regression(
         predictor_info,
         "fig.3_scores_plots_multiallelic.graphical_abstract_logistic_regression",
-        writer)
+        writer, predictors)
 
 
 def _plot_external_scatter_triptych(
-        scores, predictor_info, metric, metric_label, name, max_points, writer):
+        scores, predictor_info, metric, metric_label, name, max_points, writer,
+        predictors):
     import matplotlib.pyplot as plt
 
-    candidate = "mhcflurry_production"
+    candidate = predictors.candidate
     pivot = _pivot_all_lengths(scores, metric)
-    needed = [candidate] + [predictor for predictor, _ in EXTERNAL_BASELINES]
+    needed = [candidate] + [
+        predictor for predictor, _ in predictors.external_baselines
+    ]
     missing = [predictor for predictor in needed if predictor not in pivot.columns]
     if missing:
         writer.skip(
@@ -415,7 +541,7 @@ def _plot_external_scatter_triptych(
 
     fig, axes = plt.subplots(1, 3, figsize=(7.1, 2.2))
     y_label = _short_label(predictor_info, candidate)
-    for ax, (baseline, _suffix) in zip(axes, EXTERNAL_BASELINES):
+    for ax, (baseline, _suffix) in zip(axes, predictors.external_baselines):
         sub = pivot[[baseline, candidate]].replace(
             [numpy.inf, -numpy.inf], numpy.nan).dropna()
         _scatter_with_winner_colors(
@@ -433,10 +559,11 @@ def _plot_external_scatter_triptych(
 
 
 def _plot_percent_change_by_length(
-        scores, predictor_info, metric, metric_label, name, writer):
+        scores, predictor_info, metric, metric_label, name, writer,
+        predictors):
     import matplotlib.pyplot as plt
 
-    predictor = "mhcflurry_production"
+    predictor = predictors.candidate
     sub = scores.loc[scores["predictor"] == predictor].copy()
     if sub.empty:
         writer.skip(
@@ -446,7 +573,7 @@ def _plot_percent_change_by_length(
 
     fig, axes = plt.subplots(1, 3, figsize=(7.1, 2.1), sharey=True)
     color = _predictor_color(predictor_info, predictor)
-    for ax, (baseline, suffix) in zip(axes, EXTERNAL_BASELINES):
+    for ax, (baseline, suffix) in zip(axes, predictors.external_baselines):
         column = "percent_change_%s_%s" % (metric, suffix)
         if column not in sub.columns:
             ax.set_visible(False)
@@ -475,33 +602,37 @@ def _plot_percent_change_by_length(
 
 
 def _plot_percent_change_bars(
-        scores, predictor_info, metric, metric_label, name, writer):
+        scores, predictor_info, metric, metric_label, name, writer,
+        predictors):
     import matplotlib.pyplot as plt
 
     sub = _all_length_rows(scores)
-    predictors = [
-        predictor for predictor in PREFERRED_PREDICTORS
+    selected_predictors = [
+        predictor for predictor in predictors.preferred_predictors
         if predictor in set(sub["predictor"])
     ]
-    if not predictors:
+    if not selected_predictors:
         writer.skip(
-            "multiallelic", name, list(PREFERRED_PREDICTORS),
+            "multiallelic", name, list(predictors.preferred_predictors),
             "No preferred predictors found in multiallelic scores.")
         return
 
     fig, axes = plt.subplots(1, 3, figsize=(7.1, 3.3), sharey=True)
-    for ax, (baseline, suffix) in zip(axes, EXTERNAL_BASELINES):
+    for ax, (baseline, suffix) in zip(axes, predictors.external_baselines):
         column = "percent_change_%s_%s" % (metric, suffix)
         if column not in sub.columns:
             ax.set_visible(False)
             continue
         means = (
-            sub.loc[sub["predictor"].isin(predictors), ["predictor", column]]
+            sub.loc[
+                sub["predictor"].isin(selected_predictors),
+                ["predictor", column],
+            ]
             .replace([numpy.inf, -numpy.inf], numpy.nan)
             .dropna()
             .groupby("predictor")[column]
             .mean()
-            .reindex(predictors)
+            .reindex(selected_predictors)
             .dropna()
         )
         labels = [_short_label(predictor_info, item) for item in means.index]
@@ -520,14 +651,15 @@ def _plot_percent_change_bars(
 
 
 def _plot_mean_ppv_small(
-        scores, predictor_info, recent_sample_ids, note, name, writer):
+        scores, predictor_info, recent_sample_ids, note, name, writer,
+        predictors):
     import matplotlib.pyplot as plt
 
     sub = _all_length_rows(scores)
     if recent_sample_ids is not None:
         sub = sub.loc[sub["sample_id"].isin(recent_sample_ids)]
     candidates = [
-        "mhcflurry_production",
+        predictors.candidate,
         "presentation_without_flanks_processing_score",
         "presentation_with_flanks_presentation_score",
         "presentation_without_flanks_presentation_score",
@@ -540,7 +672,9 @@ def _plot_mean_ppv_small(
             rows.append((predictor, values.mean(), _predictor_color(
                 predictor_info, predictor)))
     external_values = sub.loc[
-        sub["predictor"].isin([p for p, _ in EXTERNAL_BASELINES]), "ppv"
+        sub["predictor"].isin([
+            p for p, _ in predictors.external_baselines
+        ]), "ppv"
     ].replace([numpy.inf, -numpy.inf], numpy.nan).dropna()
     if len(external_values):
         rows.append(("external_tools", external_values.mean(), (0.45, 0.45, 0.45)))
@@ -570,13 +704,17 @@ def _plot_mean_ppv_small(
 
 
 def _plot_presentation_scatter_grid(
-        scores, predictor_info, recent_sample_ids, note, max_points, name, writer):
+        scores, predictor_info, recent_sample_ids, note, max_points, name,
+        writer, predictors):
     import matplotlib.pyplot as plt
 
     pivot = _pivot_all_lengths(scores, "ppv")
     if recent_sample_ids is not None:
         pivot = pivot.loc[pivot.index.isin(recent_sample_ids)]
-    needed = list(PRESENTATION_PANEL_PREDICTORS) + list(PRESENTATION_PANEL_BASELINES)
+    needed = (
+        list(predictors.presentation_panel_predictors) +
+        list(predictors.presentation_panel_baselines)
+    )
     missing = [predictor for predictor in needed if predictor not in pivot.columns]
     if missing:
         writer.skip(
@@ -584,9 +722,17 @@ def _plot_presentation_scatter_grid(
             "Required presentation-panel predictors absent.")
         return
 
-    fig, axes = plt.subplots(2, 4, figsize=(7.2, 3.9))
-    for row_index, candidate in enumerate(PRESENTATION_PANEL_PREDICTORS):
-        for col_index, baseline in enumerate(PRESENTATION_PANEL_BASELINES):
+    n_rows = len(predictors.presentation_panel_predictors)
+    n_cols = len(predictors.presentation_panel_baselines)
+    fig, axes = plt.subplots(
+        n_rows, n_cols,
+        figsize=(max(2.0, 1.8 * n_cols), max(2.0, 1.95 * n_rows)),
+        squeeze=False,
+    )
+    for row_index, candidate in enumerate(
+            predictors.presentation_panel_predictors):
+        for col_index, baseline in enumerate(
+                predictors.presentation_panel_baselines):
             ax = axes[row_index, col_index]
             sub = pivot[[baseline, candidate]].replace(
                 [numpy.inf, -numpy.inf], numpy.nan).dropna()
@@ -598,7 +744,7 @@ def _plot_presentation_scatter_grid(
                 ax.set_ylabel(_short_label(predictor_info, candidate))
             else:
                 ax.set_ylabel("")
-            if row_index == len(PRESENTATION_PANEL_PREDICTORS) - 1:
+            if row_index == len(predictors.presentation_panel_predictors) - 1:
                 ax.set_xlabel("Baseline PPV")
             else:
                 ax.set_xlabel("")
@@ -609,12 +755,12 @@ def _plot_presentation_scatter_grid(
 
 
 def _plot_graphical_abstract_logistic_regression(
-        predictor_info, name, writer):
+        predictor_info, name, writer, predictors):
     import matplotlib.pyplot as plt
 
     x = numpy.linspace(-5.0, 5.0, 200)
     y = 1.0 / (1.0 + numpy.exp(-x))
-    ba_color = _predictor_color(predictor_info, "mhcflurry_production")
+    ba_color = _predictor_color(predictor_info, predictors.candidate)
     ap_color = _predictor_color(
         predictor_info, "presentation_with_flanks_processing_score")
     ps_color = _predictor_color(
@@ -669,6 +815,11 @@ def _generate_model_selection_figures(artifacts_dir, writer):
 
     df = df.copy()
     df["locus"] = df[allele_col].map(_allele_locus)
+    optional_panels = []
+    if count_col:
+        optional_panels.append((count_col, "Training peptides", (0.55, 0.55, 0.55), True))
+    if binder_col:
+        optional_panels.append((binder_col, "% binders", (0.65, 0.39, 0.67), False))
     for locus, label in (
             ("HLA-A", "hla_a"),
             ("HLA-B", "hla_b"),
@@ -684,7 +835,7 @@ def _generate_model_selection_figures(artifacts_dir, writer):
                 "No rows for locus %s." % locus)
             continue
         fig, axes = plt.subplots(
-            1, 3 if count_col and binder_col else 1,
+            1, 1 + len(optional_panels),
             figsize=(7.1, max(1.7, 0.18 * len(sub) + 0.6)),
             squeeze=False)
         ax = axes[0, 0]
@@ -695,20 +846,15 @@ def _generate_model_selection_figures(artifacts_dir, writer):
         ax.set_xlabel("AUC")
         ax.set_title(locus)
         _despine(ax)
-        if count_col:
-            ax = axes[0, 1]
-            ax.barh(y, sub[count_col], color=(0.55, 0.55, 0.55))
+        for panel_index, (column, xlabel, color, log_scale) in enumerate(
+                optional_panels, start=1):
+            ax = axes[0, panel_index]
+            ax.barh(y, sub[column], color=color)
             ax.set_yticks(y)
             ax.set_yticklabels([])
-            ax.set_xscale("log")
-            ax.set_xlabel("Training peptides")
-            _despine(ax)
-        if binder_col:
-            ax = axes[0, 2]
-            ax.barh(y, sub[binder_col], color=(0.65, 0.39, 0.67))
-            ax.set_yticks(y)
-            ax.set_yticklabels([])
-            ax.set_xlabel("% binders")
+            if log_scale:
+                ax.set_xscale("log")
+            ax.set_xlabel(xlabel)
             _despine(ax)
         fig.tight_layout(w_pad=1.0)
         writer.save(
@@ -718,18 +864,19 @@ def _generate_model_selection_figures(artifacts_dir, writer):
 
 
 def _generate_monoallelic_figures(
-        artifacts_dir, predictor_info, max_scatter_points, writer):
+        artifacts_dir, predictor_info, max_scatter_points, writer,
+        predictors):
     path = artifacts_dir / "accuracy_scores.monoallelic.csv"
     if path.is_file():
         scores = _normalize_score_predictors(pandas.read_csv(path))
         _plot_monoallelic_scatter(
             scores, predictor_info, "auc", "AUC", max_scatter_points,
             "fig.3_scores_plots_monoallelic.scatter.auc.monoallelic.ba",
-            writer)
+            writer, predictors)
         _plot_monoallelic_scatter(
             scores, predictor_info, "ppv", "PPV", max_scatter_points,
             "fig.3_scores_plots_monoallelic.scatter.ppv.monoallelic.ba",
-            writer)
+            writer, predictors)
     else:
         writer.skip(
             "monoallelic",
@@ -749,6 +896,7 @@ def _generate_monoallelic_figures(
             scores, predictor_info, "auc", "AUC", max_scatter_points,
             "fig.3_scores_plots_monoallelic.scatter.auc.monoallelic.novel_alleles.ba",
             writer,
+            predictors,
             preferred_candidate="no_additional_ms_similar")
     else:
         writer.skip(
@@ -760,10 +908,10 @@ def _generate_monoallelic_figures(
 
 def _plot_monoallelic_scatter(
         scores, predictor_info, metric, metric_label, max_points, name, writer,
-        preferred_candidate="no_additional_ms"):
+        predictors, preferred_candidate="no_additional_ms"):
     candidate = (
         preferred_candidate if preferred_candidate in set(scores["predictor"])
-        else "mhcflurry_production"
+        else predictors.candidate
     )
     if candidate not in set(scores["predictor"]):
         writer.skip(
@@ -775,7 +923,9 @@ def _plot_monoallelic_scatter(
         columns="predictor",
         values=metric,
         aggfunc="mean")
-    needed = [candidate] + [predictor for predictor, _ in EXTERNAL_BASELINES]
+    needed = [candidate] + [
+        predictor for predictor, _ in predictors.external_baselines
+    ]
     missing = [predictor for predictor in needed if predictor not in pivot.columns]
     if missing:
         writer.skip(
@@ -784,17 +934,19 @@ def _plot_monoallelic_scatter(
         return
     _plot_scatter_triptych_from_pivot(
         pivot, predictor_info, candidate, metric_label, max_points, name,
-        "monoallelic", writer)
+        "monoallelic", writer, predictors)
 
 
-def _generate_processing_notebook_figures(artifacts_dir, predictor_info, writer):
+def _generate_processing_notebook_figures(
+        artifacts_dir, predictor_info, writer, predictors):
     no_c_path = artifacts_dir / "accuracy_scores.multiallelic.no_C.csv"
     motif_path = artifacts_dir / "antigen_processing.motifs.xlsx"
     correlation_path = artifacts_dir / "correlation.processing_vs_affinity.sampled.csv.bz2"
     training_path = artifacts_dir / "train_data.ap.production.csv"
 
     if no_c_path.is_file():
-        _plot_cysteine_removed_panels(artifacts_dir, no_c_path, predictor_info, writer)
+        _plot_cysteine_removed_panels(
+            artifacts_dir, no_c_path, predictor_info, writer, predictors)
     else:
         writer.skip(
             "antigen-processing",
@@ -841,7 +993,8 @@ def _generate_processing_notebook_figures(artifacts_dir, predictor_info, writer)
             "AP correlation and training-data tables absent.")
 
 
-def _plot_cysteine_removed_panels(artifacts_dir, no_c_path, predictor_info, writer):
+def _plot_cysteine_removed_panels(
+        artifacts_dir, no_c_path, predictor_info, writer, predictors):
     import matplotlib.pyplot as plt
 
     full_path = artifacts_dir / "accuracy_scores.multiallelic.csv"
@@ -901,10 +1054,10 @@ def _plot_cysteine_removed_panels(artifacts_dir, no_c_path, predictor_info, writ
         "fig.4_processing_predictor_plots.auc.ap.c_removed.bar",
         "antigen-processing")
 
-    _plot_ap_vs_others(no_c, predictor_info, writer)
+    _plot_ap_vs_others(no_c, predictor_info, writer, predictors)
 
 
-def _plot_ap_vs_others(scores, predictor_info, writer):
+def _plot_ap_vs_others(scores, predictor_info, writer, predictors):
     import matplotlib.pyplot as plt
 
     sub = _all_length_rows(scores)
@@ -912,10 +1065,8 @@ def _plot_ap_vs_others(scores, predictor_info, writer):
         predictor for predictor in (
             "presentation_without_flanks_processing_score",
             "presentation_with_flanks_processing_score",
-            "mhcflurry_production",
-            "netmhcpan4.ba",
-            "netmhcpan4.el",
-            "mixmhcpred",
+            predictors.candidate,
+            *[predictor for predictor, _ in predictors.external_baselines],
         )
         if predictor in set(sub["predictor"])
     ]
@@ -1023,27 +1174,48 @@ def _plot_ap_correlation_panels(correlation_path, training_path, writer):
 
     fig, ax = plt.subplots(figsize=(3.0, 2.5))
     numeric = corr.select_dtypes(include=[numpy.number])
-    if len(numeric.columns) >= 2:
+    if len(numeric.columns) < 2:
+        plt.close(fig)
+        writer.skip(
+            "antigen-processing",
+            "fig.4_processing_predictor_plots.extended.ap_correlation",
+            [correlation_path],
+            "Correlation heatmap requires at least two numeric columns.")
+    else:
         im = ax.imshow(numeric.corr(), cmap="coolwarm", vmin=-1, vmax=1)
         ax.set_xticks(numpy.arange(len(numeric.columns)))
         ax.set_yticks(numpy.arange(len(numeric.columns)))
         ax.set_xticklabels(numeric.columns, rotation=45, ha="right")
         ax.set_yticklabels(numeric.columns)
         fig.colorbar(im, ax=ax, shrink=0.8, label="Correlation")
-    _despine(ax)
-    fig.tight_layout()
-    writer.save(
-        fig,
-        "fig.4_processing_predictor_plots.extended.ap_correlation",
-        "antigen-processing")
+        _despine(ax)
+        fig.tight_layout()
+        writer.save(
+            fig,
+            "fig.4_processing_predictor_plots.extended.ap_correlation",
+            "antigen-processing")
 
     if "included" in training.columns and y_col in training.columns:
+        included = _coerce_bool_series(training["included"])
+        if included is None:
+            writer.skip(
+                "antigen-processing",
+                "fig.4_processing_predictor_plots.correlation.included_vs_excluded",
+                [training_path],
+                "Included flag contains values that are not parseable as booleans.")
+            return
         fig, ax = plt.subplots(figsize=(2.5, 2.3))
         groups = [
-            training.loc[training["included"].astype(bool), y_col].dropna(),
-            training.loc[~training["included"].astype(bool), y_col].dropna(),
+            training.loc[included, y_col].dropna(),
+            training.loc[~included, y_col].dropna(),
         ]
-        ax.boxplot(groups, labels=["Included", "Excluded"], showfliers=False)
+        try:
+            ax.boxplot(
+                groups, tick_labels=["Included", "Excluded"],
+                showfliers=False)
+        except TypeError:
+            ax.boxplot(
+                groups, labels=["Included", "Excluded"], showfliers=False)
         ax.set_ylabel("Processing score")
         _despine(ax)
         fig.tight_layout()
@@ -1057,6 +1229,27 @@ def _plot_ap_correlation_panels(correlation_path, training_path, writer):
             "fig.4_processing_predictor_plots.correlation.included_vs_excluded",
             [training_path],
             "Training table lacks included flag or processing score column.")
+
+
+def _coerce_bool_series(series):
+    if pandas.api.types.is_bool_dtype(series):
+        return series.fillna(False).astype(bool)
+    if pandas.api.types.is_numeric_dtype(series):
+        return series.fillna(0).astype(float) != 0
+
+    normalized = series.fillna("").astype(str).str.strip().str.lower()
+    true_values = {"1", "true", "t", "yes", "y", "included", "include"}
+    false_values = {
+        "", "0", "false", "f", "no", "n", "excluded", "exclude"
+    }
+    parsed = normalized.map(
+        lambda value: True if value in true_values else (
+            False if value in false_values else numpy.nan
+        )
+    )
+    if parsed.isnull().any():
+        return None
+    return parsed.astype(bool)
 
 
 def _generate_proteasome_figures(artifacts_dir, writer):
@@ -1132,11 +1325,11 @@ def _copy_architecture_figures(artifacts_dir, writer):
 
 def _plot_scatter_triptych_from_pivot(
         pivot, predictor_info, candidate, metric_label, max_points, name, family,
-        writer):
+        writer, predictors):
     import matplotlib.pyplot as plt
 
     fig, axes = plt.subplots(1, 3, figsize=(7.1, 2.2))
-    for ax, (baseline, _suffix) in zip(axes, EXTERNAL_BASELINES):
+    for ax, (baseline, _suffix) in zip(axes, predictors.external_baselines):
         sub = pivot[[baseline, candidate]].replace(
             [numpy.inf, -numpy.inf], numpy.nan).dropna()
         _scatter_with_winner_colors(
@@ -1333,10 +1526,12 @@ def _write_manifest(out_dir, rows):
 
 
 def _write_missing_inputs(out_dir, rows):
-    skipped = [row for row in rows if row["status"] == "skipped"]
+    skipped = [
+        row for row in rows if row["status"] in ("skipped", "failed")
+    ]
     path = Path(out_dir) / "missing_inputs.md"
     with open(path, "w") as fd:
-        fd.write("# Missing paper-figure inputs\n\n")
+        fd.write("# Missing or failed paper-figure inputs\n\n")
         if not skipped:
             fd.write("All requested figure families were generated.\n")
             return

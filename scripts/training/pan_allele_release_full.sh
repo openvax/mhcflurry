@@ -79,6 +79,22 @@ PROCESSING_MINIBATCH_SIZE="${PROCESSING_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE
 PROCESSING_VARIANTS="${PROCESSING_VARIANTS:-with_flanks no_flank short_flanks}"
 PRESENTATION_PROCESSING_WITH_FLANKS_KIND="${PRESENTATION_PROCESSING_WITH_FLANKS_KIND:-with_flanks}"
 
+processing_variant_enabled() {
+    case " $PROCESSING_VARIANTS " in
+        *" $1 "*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+processing_variant_enabled no_flank || {
+    echo "PROCESSING_VARIANTS must include no_flank for presentation training." >&2
+    exit 2
+}
+processing_variant_enabled "$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" || {
+    echo "PROCESSING_VARIANTS must include PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$PRESENTATION_PROCESSING_WITH_FLANKS_KIND." >&2
+    exit 2
+}
+
 if [ "$GPUS" -eq 0 ]; then
     NUM_JOBS=1
     MAX_WORKERS_PER_GPU=1
@@ -103,7 +119,22 @@ PY
     NUM_JOBS="$(( GPUS * MAX_WORKERS_PER_GPU ))"
     echo "Resolved MAX_WORKERS_PER_GPU=auto to $MAX_WORKERS_PER_GPU; NUM_JOBS=$NUM_JOBS"
 else
-    NUM_JOBS="${NUM_JOBS:-$(( GPUS * MAX_WORKERS_PER_GPU ))}"
+    case "${NUM_JOBS:-auto}" in
+        auto)
+            NUM_JOBS="$(( GPUS * MAX_WORKERS_PER_GPU ))"
+            ;;
+        *[!0-9]*)
+            echo "NUM_JOBS must be auto or an integer; got '$NUM_JOBS'." >&2
+            exit 2
+            ;;
+        *)
+            capacity="$(( GPUS * MAX_WORKERS_PER_GPU ))"
+            if [ "$NUM_JOBS" -gt "$capacity" ]; then
+                echo "Clamping NUM_JOBS=$NUM_JOBS to GPU capacity $capacity." >&2
+                NUM_JOBS="$capacity"
+            fi
+            ;;
+    esac
 fi
 
 # Resolve DataLoader prefetch workers before building parallelism args so the
