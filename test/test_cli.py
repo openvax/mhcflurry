@@ -53,8 +53,43 @@ def test_compare_models_help_runs(capsys):
     captured = capsys.readouterr().out
     for flag in ["--a", "--b", "--include", "--out", "--data-dir",
                  "--num-jobs", "--gpus", "--max-workers-per-gpu",
-                 "--processing-modes", "--presentation-modes"]:
+                 "--processing-modes", "--presentation-modes",
+                 "--presentation-num-jobs",
+                 "--presentation-max-workers-per-gpu",
+                 "--presentation-torch-compile"]:
         assert flag in captured, "missing flag in help: %s" % flag
+
+
+def test_compare_models_presentation_parallelism_overrides():
+    parser = compare_models.make_parser()
+    args = parser.parse_args([
+        "--a", "public",
+        "--out", "unused",
+        "--num-jobs", "4",
+        "--max-workers-per-gpu", "4",
+        "--presentation-num-jobs", "1",
+        "--presentation-max-workers-per-gpu", "1",
+        "--presentation-max-tasks-per-worker", "1",
+        "--presentation-torch-compile", "0",
+    ])
+    args._local_parallelism_args_resolved = True
+    args.workload_plan = object()
+
+    base_args = compare_models._parallelism_args_for_component(args, "affinity")
+    presentation_args = compare_models._parallelism_args_for_component(
+        args, "presentation")
+
+    assert base_args is args
+    assert presentation_args is not args
+    assert presentation_args.num_jobs == 1
+    assert presentation_args.max_workers_per_gpu == 1
+    assert presentation_args.max_tasks_per_worker == 1
+    assert presentation_args.torch_compile == "0"
+    assert not presentation_args._local_parallelism_args_resolved
+    assert not hasattr(presentation_args, "workload_plan")
+    assert args.num_jobs == 4
+    assert args.max_workers_per_gpu == 4
+    assert args._local_parallelism_args_resolved
 
 
 def test_plot_help_runs(capsys):
@@ -206,6 +241,10 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     env = module.remote_training_env({"TRAINING_MINIBATCH_SIZE": "2048"})
     assert env["TRAINING_MINIBATCH_SIZE"] == "2048"
     assert env["MKL_THREADING_LAYER"] == "GNU"
+    assert env["COMPARE_PRESENTATION_NUM_JOBS"] == "1"
+    assert env["COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU"] == "1"
+    assert env["COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER"] == "1"
+    assert env["COMPARE_PRESENTATION_TORCH_COMPILE"] == "0"
     assert "AFFINITY_MINIBATCH_SIZE" not in env
     assert "AFFINITY_MAX_WORKERS_PER_GPU" not in env
     assert "PROCESSING_MINIBATCH_SIZE" not in env

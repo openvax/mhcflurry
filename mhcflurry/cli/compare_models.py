@@ -78,6 +78,64 @@ def _stamp(msg):
     print("[+%7.1fs] %s" % (time.time() - _T0, msg), flush=True)
 
 
+def _num_jobs_override_arg(value):
+    if str(value).strip().lower() == "auto":
+        return "auto"
+    try:
+        parsed = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            "expected 'auto' or an integer >= 0, got %r" % value
+        )
+    if parsed < 0:
+        raise argparse.ArgumentTypeError(
+            "expected 'auto' or an integer >= 0, got %r" % value
+        )
+    return parsed
+
+
+def _max_workers_per_gpu_override_arg(value):
+    if str(value).strip().lower() == "auto":
+        return "auto"
+    try:
+        parsed = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            "expected 'auto' or an integer >= 1, got %r" % value
+        )
+    if parsed < 1:
+        raise argparse.ArgumentTypeError(
+            "expected 'auto' or an integer >= 1, got %r" % value
+        )
+    return parsed
+
+
+def _parallelism_args_for_component(args, component):
+    if component != "presentation":
+        return args
+
+    overrides = {
+        "num_jobs": args.presentation_num_jobs,
+        "max_workers_per_gpu": args.presentation_max_workers_per_gpu,
+        "max_tasks_per_worker": args.presentation_max_tasks_per_worker,
+        "torch_compile": args.presentation_torch_compile,
+    }
+    overrides = {
+        name: value for (name, value) in overrides.items()
+        if value is not None
+    }
+    if not overrides:
+        return args
+
+    component_args = argparse.Namespace(**vars(args))
+    for name, value in overrides.items():
+        setattr(component_args, name, value)
+    component_args._local_parallelism_args_resolved = False
+    if hasattr(component_args, "workload_plan"):
+        del component_args.workload_plan
+    return component_args
+
+
 # ---------------------------------------------------------------------------
 # argparse + dispatch
 # ---------------------------------------------------------------------------
@@ -173,6 +231,34 @@ def register_subparser(parser):
         ),
     )
     add_prediction_parallelism_args(parser)
+    parser.add_argument(
+        "--presentation-num-jobs",
+        type=_num_jobs_override_arg,
+        default=None,
+        help=(
+            "Override --num-jobs for presentation inference. This is useful "
+            "because presentation prediction has a larger per-worker GPU "
+            "footprint than affinity or processing."
+        ),
+    )
+    parser.add_argument(
+        "--presentation-max-workers-per-gpu",
+        type=_max_workers_per_gpu_override_arg,
+        default=None,
+        help="Override --max-workers-per-gpu for presentation inference.",
+    )
+    parser.add_argument(
+        "--presentation-max-tasks-per-worker",
+        type=int,
+        default=None,
+        help="Override --max-tasks-per-worker for presentation inference.",
+    )
+    parser.add_argument(
+        "--presentation-torch-compile",
+        choices=("auto", "0", "1"),
+        default=None,
+        help="Override --torch-compile for presentation inference.",
+    )
     return parser
 
 
@@ -1332,15 +1418,16 @@ def _run_presentation(side_a, side_b, args):
     benchmark = _load_presentation_benchmark(data_dir, args.limit_files)
     summaries = {}
     summary_rows = []
+    presentation_args = _parallelism_args_for_component(args, "presentation")
     for mode in requested_modes:
         _stamp("=== presentation mode: %s ===" % mode)
         scored = benchmark.copy()
         a_pred = _parallel_presentation_predict(
-            args, side_a["paths"]["presentation"],
+            presentation_args, side_a["paths"]["presentation"],
             benchmark, mode, label="A",
         )
         b_pred = _parallel_presentation_predict(
-            args, side_b["paths"]["presentation"],
+            presentation_args, side_b["paths"]["presentation"],
             benchmark, mode, label="B",
         )
         for prefix, pred in (("a", a_pred), ("b", b_pred)):

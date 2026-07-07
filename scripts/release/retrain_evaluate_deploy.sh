@@ -27,6 +27,9 @@ Usage:
       [--affinity-max-workers-per-gpu auto] \
       [--processing-minibatch-size 1024] \
       [--processing-variants "with_flanks no_flank short_flanks"] \
+      [--compare-presentation-num-jobs 1] \
+      [--compare-presentation-max-workers-per-gpu 1] \
+      [--compare-presentation-torch-compile 0] \
       [--brev-instance NAME] [--brev-on-finish leave|stop|delete] \
       [--brev-stop-failure-action warn|delete] \
       [--brev-cleanup-timeout-seconds 60] \
@@ -58,7 +61,9 @@ Evaluation:
       mhcflurry compare-models --a RUN_DIR --b public
       mhcflurry plot-model-comparison --input RUN_DIR/eval_comparison
   compare-models writes release_summary.csv and release_summary.md with
-  affinity, processing, and presentation release-gate tables.
+  affinity, processing, and presentation release-gate tables. Presentation
+  inference is memory-heavier than affinity/processing, so the release wrapper
+  defaults it to one GPU worker unless overridden.
 
 Deployment:
   The final step calls deploy_trained_models.sh. The default deploy mode is
@@ -516,6 +521,10 @@ EOF
         printf 'export COMPARE_TORCH_COMPILE=%q\n' "$COMPARE_TORCH_COMPILE"
         printf 'export COMPARE_MATMUL_PRECISION=%q\n' "$COMPARE_MATMUL_PRECISION"
         printf 'export COMPARE_GPUS=%q\n' "$COMPARE_GPUS"
+        printf 'export COMPARE_PRESENTATION_NUM_JOBS=%q\n' "$COMPARE_PRESENTATION_NUM_JOBS"
+        printf 'export COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU=%q\n' "$COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU"
+        printf 'export COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER=%q\n' "$COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER"
+        printf 'export COMPARE_PRESENTATION_TORCH_COMPILE=%q\n' "$COMPARE_PRESENTATION_TORCH_COMPILE"
         cat <<'EOF'
 
 remote_root=/root/mhcflurry-postprocess
@@ -562,6 +571,10 @@ compare_args=(
     --num-jobs "$COMPARE_NUM_JOBS" \
     --max-workers-per-gpu "$COMPARE_MAX_WORKERS_PER_GPU" \
     --max-tasks-per-worker "$COMPARE_MAX_TASKS_PER_WORKER" \
+    --presentation-num-jobs "$COMPARE_PRESENTATION_NUM_JOBS" \
+    --presentation-max-workers-per-gpu "$COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU" \
+    --presentation-max-tasks-per-worker "$COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER" \
+    --presentation-torch-compile "$COMPARE_PRESENTATION_TORCH_COMPILE" \
     --worker-log-dir "$run_dir/eval_comparison/worker_logs" \
     --torch-compile "$COMPARE_TORCH_COMPILE" \
     --matmul-precision "$COMPARE_MATMUL_PRECISION"
@@ -970,6 +983,10 @@ COMPARE_MAX_TASKS_PER_WORKER="${COMPARE_MAX_TASKS_PER_WORKER:-12}"
 COMPARE_TORCH_COMPILE="${COMPARE_TORCH_COMPILE:-${MHCFLURRY_TORCH_COMPILE:-auto}}"
 COMPARE_MATMUL_PRECISION="${COMPARE_MATMUL_PRECISION:-${MHCFLURRY_MATMUL_PRECISION:-high}}"
 COMPARE_GPUS="${COMPARE_GPUS:-4}"
+COMPARE_PRESENTATION_NUM_JOBS="${COMPARE_PRESENTATION_NUM_JOBS:-1}"
+COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU="${COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU:-1}"
+COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER="${COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER:-1}"
+COMPARE_PRESENTATION_TORCH_COMPILE="${COMPARE_PRESENTATION_TORCH_COMPILE:-0}"
 RUN_LABEL=new
 DRY_RUN=0
 TRAINING_MINIBATCH_SIZE=1024
@@ -1098,6 +1115,22 @@ while [ $# -gt 0 ]; do
             PRESENTATION_MODES=$2
             shift 2
             ;;
+        --compare-presentation-num-jobs)
+            COMPARE_PRESENTATION_NUM_JOBS=$2
+            shift 2
+            ;;
+        --compare-presentation-max-workers-per-gpu)
+            COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU=$2
+            shift 2
+            ;;
+        --compare-presentation-max-tasks-per-worker)
+            COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER=$2
+            shift 2
+            ;;
+        --compare-presentation-torch-compile)
+            COMPARE_PRESENTATION_TORCH_COMPILE=$2
+            shift 2
+            ;;
         --run-label)
             RUN_LABEL=$2
             shift 2
@@ -1156,6 +1189,7 @@ if [ -z "$PROCESSING_MINIBATCH_SIZE" ]; then
     PROCESSING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE
 fi
 COMPARE_TORCH_COMPILE="$(normalize_compare_torch_compile "$COMPARE_TORCH_COMPILE")"
+COMPARE_PRESENTATION_TORCH_COMPILE="$(normalize_compare_torch_compile "$COMPARE_PRESENTATION_TORCH_COMPILE")"
 COMPARE_MATMUL_PRECISION="$(normalize_compare_matmul_precision "$COMPARE_MATMUL_PRECISION")"
 validate_compare_gpus "$COMPARE_GPUS"
 case "$BACKEND" in
@@ -1332,6 +1366,16 @@ if [ "$SKIP_EVAL" != "1" ]; then
             --include "$COMPARE_INCLUDE" \
             --processing-modes "$PROCESSING_MODES" \
             --presentation-modes "$PRESENTATION_MODES" \
+            --backend "$COMPARE_BACKEND" \
+            --num-jobs "$COMPARE_NUM_JOBS" \
+            --max-workers-per-gpu "$COMPARE_MAX_WORKERS_PER_GPU" \
+            --max-tasks-per-worker "$COMPARE_MAX_TASKS_PER_WORKER" \
+            --presentation-num-jobs "$COMPARE_PRESENTATION_NUM_JOBS" \
+            --presentation-max-workers-per-gpu "$COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU" \
+            --presentation-max-tasks-per-worker "$COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER" \
+            --presentation-torch-compile "$COMPARE_PRESENTATION_TORCH_COMPILE" \
+            --torch-compile "$COMPARE_TORCH_COMPILE" \
+            --matmul-precision "$COMPARE_MATMUL_PRECISION" \
             --out "$EVAL_OUT"
     fi
 else

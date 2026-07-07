@@ -159,6 +159,18 @@ def remote_training_env(environ=os.environ):
             "COMPARE_MAX_WORKERS_PER_GPU", "auto"
         ),
         "COMPARE_NUM_JOBS": environ.get("COMPARE_NUM_JOBS", "auto"),
+        "COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER": environ.get(
+            "COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER", "1"
+        ),
+        "COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU": environ.get(
+            "COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU", "1"
+        ),
+        "COMPARE_PRESENTATION_NUM_JOBS": environ.get(
+            "COMPARE_PRESENTATION_NUM_JOBS", "1"
+        ),
+        "COMPARE_PRESENTATION_TORCH_COMPILE": environ.get(
+            "COMPARE_PRESENTATION_TORCH_COMPILE", "0"
+        ),
         "DATALOADER_NUM_WORKERS": environ.get("DATALOADER_NUM_WORKERS", "auto"),
         "MAX_TASKS_PER_WORKER": environ.get("MAX_TASKS_PER_WORKER", "12"),
         "MAX_WORKERS_PER_GPU": environ.get("MAX_WORKERS_PER_GPU", "auto"),
@@ -314,6 +326,18 @@ def run_release_evaluation(repo, out, env):
         "--num-jobs", env.get("COMPARE_NUM_JOBS", "auto"),
         "--max-workers-per-gpu", env.get("COMPARE_MAX_WORKERS_PER_GPU", "auto"),
         "--max-tasks-per-worker", env.get("COMPARE_MAX_TASKS_PER_WORKER", "12"),
+        "--presentation-num-jobs", env.get("COMPARE_PRESENTATION_NUM_JOBS", "1"),
+        "--presentation-max-workers-per-gpu", env.get(
+            "COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU", "1"
+        ),
+        "--presentation-max-tasks-per-worker", env.get(
+            "COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER", "1"
+        ),
+        "--presentation-torch-compile", compare_torch_compile_value({
+            "COMPARE_TORCH_COMPILE": env.get(
+                "COMPARE_PRESENTATION_TORCH_COMPILE", "0"
+            )
+        }),
         "--worker-log-dir", str(eval_out / "worker_logs"),
         "--torch-compile", compare_torch_compile_value(env),
         "--matmul-precision", compare_matmul_precision_value(env),
