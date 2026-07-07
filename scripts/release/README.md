@@ -87,3 +87,9 @@ Evaluation now includes affinity, processing, and presentation by default. In
 addition to the detailed component CSV/JSON files and plots, `compare-models`
 writes `release_summary.csv` and `release_summary.md` with the release-gate
 tables used to compare newly trained weights against public weights.
+`plot-model-comparison` now writes both release-diagnostic plots and a
+paper-style `plots/paper/` suite: per-allele affinity scatter panels,
+per-sample processing/presentation scatter panels, per-length bars, delta
+boxplots, and release-summary overview panels. The release wrapper also asks it
+to write `plots/model_comparison_figures.pdf` so remote runs sync a portable
+figure packet without a separate local plotting step.

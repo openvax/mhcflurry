@@ -81,8 +81,10 @@ validation), prefer `scripts/release/retrain_evaluate_deploy.sh`.
   summary compatibility. Writes detailed component artifacts plus
   `release_summary.csv` and `release_summary.md`.
 - **`mhcflurry plot-model-comparison`** — Renders ROC/PR/scatter/delta
-  plots from a `compare-models` output directory. Separate subcommand so
-  the metric pipeline doesn't pay the matplotlib import cost.
+  diagnostics plus paper-style per-allele, per-sample, per-length, and
+  release-summary panels from a `compare-models` output directory. It can also
+  collect the generated PNGs into a single PDF via `--summary-pdf`. Separate
+  subcommand so the metric pipeline doesn't pay the matplotlib import cost.
 - **`plot_minibatch_sweep.py`** — Stylized plots from a `sweep_summary.csv`
   (gradient-color dots by mb, lin-lin + log-log only, adjustText
   de-overlap). Invoked by the sweep wrapper after completion.

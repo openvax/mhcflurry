@@ -588,7 +588,9 @@ esac
 "${compare_args[@]}"
 
 if [ "${RUN_RELEASE_PLOTS:-1}" = "1" ]; then
-    mhcflurry plot-model-comparison --input "$run_dir/eval_comparison"
+    mhcflurry plot-model-comparison \
+        --input "$run_dir/eval_comparison" \
+        --summary-pdf "$run_dir/eval_comparison/plots/model_comparison_figures.pdf"
     python scripts/training/plot_loss_curves.py \
         --selected-dir "$run_dir/affinity/models.combined" \
         --out "$run_dir/affinity/loss_plots"
@@ -1387,7 +1389,9 @@ if [ "$SKIP_PLOTS" != "1" ]; then
         note "Using plots produced on the Brev instance."
     else
         run_logged_step plot_model_comparison \
-            mhcflurry plot-model-comparison --input "$RUN_DIR/eval_comparison"
+            mhcflurry plot-model-comparison \
+                --input "$RUN_DIR/eval_comparison" \
+                --summary-pdf "$RUN_DIR/eval_comparison/plots/model_comparison_figures.pdf"
     fi
 else
     note "Skipping plots."

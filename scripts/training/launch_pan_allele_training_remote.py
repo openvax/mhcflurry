@@ -355,6 +355,8 @@ def run_release_plots(repo, out, env):
             "mhcflurry",
             "plot-model-comparison",
             "--input", str(out / "eval_comparison"),
+            "--summary-pdf",
+            str(out / "eval_comparison" / "plots" / "model_comparison_figures.pdf"),
         ],
         check=True,
         cwd=repo,

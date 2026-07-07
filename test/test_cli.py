@@ -958,3 +958,134 @@ def test_roc_pr_plots_skip_single_class_slices(tmp_path):
         y, a_score, b_score, "a", "b", str(pr_path), "PR")
     assert roc_path.is_file()
     assert pr_path.is_file()
+
+
+def test_plot_model_comparison_writes_paper_plots_from_summaries(tmp_path):
+    pytest.importorskip("matplotlib")
+
+    (tmp_path / "affinity").mkdir()
+    (tmp_path / "processing").mkdir()
+    (tmp_path / "presentation").mkdir()
+    (tmp_path / "side_a.json").write_text(json.dumps({"label": "new"}))
+    (tmp_path / "side_b.json").write_text(json.dumps({"label": "public"}))
+
+    pandas.DataFrame([
+        {
+            "component": "affinity",
+            "eval": "affinity",
+            "metric": metric,
+            "average": "Macro",
+            "side_a": 0.8,
+            "side_b": 0.7,
+            "diff": 0.1,
+            "pct_change": 10.0,
+            "flank_mode": "",
+        }
+        for metric in ("AUROC", "AUPRC", "PPV@N")
+    ]).to_csv(tmp_path / "release_summary.csv", index=False)
+
+    pandas.DataFrame([
+        {
+            "allele": "HLA-A*02:01",
+            "n": 10,
+            "n_pos": 2,
+            "a_roc_auc": 0.90,
+            "b_roc_auc": 0.85,
+            "roc_auc_diff": 0.05,
+            "a_pr_auc": 0.50,
+            "b_pr_auc": 0.45,
+            "pr_auc_diff": 0.05,
+            "a_ppv_at_n": 0.40,
+            "b_ppv_at_n": 0.30,
+            "ppv_at_n_diff": 0.10,
+        },
+        {
+            "allele": "HLA-B*07:02",
+            "n": 10,
+            "n_pos": 2,
+            "a_roc_auc": 0.80,
+            "b_roc_auc": 0.75,
+            "roc_auc_diff": 0.05,
+            "a_pr_auc": 0.40,
+            "b_pr_auc": 0.35,
+            "pr_auc_diff": 0.05,
+            "a_ppv_at_n": 0.30,
+            "b_ppv_at_n": 0.20,
+            "ppv_at_n_diff": 0.10,
+        },
+    ]).to_csv(tmp_path / "affinity" / "per_allele.csv", index=False)
+
+    pandas.DataFrame([
+        {
+            "length": 8,
+            "a_macro_roc_auc": 0.90,
+            "b_macro_roc_auc": 0.80,
+            "a_macro_pr_auc": 0.50,
+            "b_macro_pr_auc": 0.40,
+            "a_macro_ppv_at_n": 0.30,
+            "b_macro_ppv_at_n": 0.20,
+        },
+        {
+            "length": 9,
+            "a_macro_roc_auc": 0.91,
+            "b_macro_roc_auc": 0.81,
+            "a_macro_pr_auc": 0.51,
+            "b_macro_pr_auc": 0.41,
+            "a_macro_ppv_at_n": 0.31,
+            "b_macro_ppv_at_n": 0.21,
+        },
+    ]).to_csv(tmp_path / "affinity" / "per_length.csv", index=False)
+
+    component_rows = [
+        {
+            "sample_id": sample_id,
+            "a_roc_auc": 0.90 + offset,
+            "b_roc_auc": 0.85,
+            "a_pr_auc": 0.50 + offset,
+            "b_pr_auc": 0.45,
+            "a_ppv_at_n": 0.40 + offset,
+            "b_ppv_at_n": 0.35,
+        }
+        for sample_id, offset in (("s1", 0.00), ("s2", 0.01))
+    ]
+    length_rows = [
+        {
+            "length": length,
+            "a_macro_roc_auc": 0.90,
+            "b_macro_roc_auc": 0.85,
+            "a_macro_pr_auc": 0.50,
+            "b_macro_pr_auc": 0.45,
+            "a_macro_ppv_at_n": 0.40,
+            "b_macro_ppv_at_n": 0.35,
+        }
+        for length in (8, 9)
+    ]
+    for component, mode, score_kind in (
+            ("processing", "no_flank", "processing_score"),
+            ("presentation", "with_flanks", "presentation_score")):
+        pandas.DataFrame(component_rows).to_csv(
+            tmp_path / component / (
+                "per_sample_%s_%s.csv" % (mode, score_kind)),
+            index=False,
+        )
+        pandas.DataFrame(length_rows).to_csv(
+            tmp_path / component / (
+                "per_length_%s_%s.csv" % (mode, score_kind)),
+            index=False,
+        )
+
+    args = plot_model_comparison.make_parser().parse_args([
+        "--input", str(tmp_path),
+        "--summary-pdf", str(tmp_path / "plots" / "figures.pdf"),
+    ])
+    assert plot_model_comparison.run(args) == 0
+
+    for path in [
+        tmp_path / "plots" / "paper" / "release_summary_macro.png",
+        tmp_path / "plots" / "paper" / "affinity_per_allele_scatter.png",
+        tmp_path / "plots" / "paper" / "affinity_per_length_macro.png",
+        tmp_path / "plots" / "paper" / "processing_per_sample_scatter.png",
+        tmp_path / "plots" / "paper" / "presentation_per_length_macro.png",
+        tmp_path / "plots" / "figures.pdf",
+    ]:
+        assert path.is_file()
