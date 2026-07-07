@@ -38,7 +38,9 @@ Usage:
       [--brev-create-timeout-seconds 2400] \
       [--brev-container-image pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime] \
       [--brev-sync-mode release|full] \
-      [--paper-figures-artifacts-dir DIR] \
+      [--paper-figures-scores-dir DIR] \
+      [--paper-figures-multiallelic-predictions FILE] \
+      [--paper-figures-monoallelic-predictions FILE] \
       [--brev-instance-type TYPE] \
       [--skip-train] [--skip-eval] [--skip-plots] [--skip-deploy] \
       [--deploy-mode dry-run|draft|publish]
@@ -70,10 +72,11 @@ Evaluation:
   closest older public release available in downloads.yml, public:2.0.0; pass
   --compare-baseline public to compare against the currently configured public
   release, or pass a model-run directory / public:<release_name>.
-  If --paper-figures-artifacts-dir is set, the plotting step also runs:
-      mhcflurry paper-figures --artifacts-dir DIR
-  and writes notebook-style SVG/PDF/PNG panels under
-  RUN_DIR/eval_comparison/plots/paper_2023/.
+  If --paper-figures-scores-dir or a saved prediction table is set, the
+  plotting step also runs:
+      mhcflurry paper-figures --scores-dir DIR
+  and writes publication-style SVG/PDF/PNG panels under
+  RUN_DIR/eval_comparison/plots/paper_figures/.
 
 Deployment:
   The final step calls deploy_trained_models.sh. The default deploy mode is
@@ -570,7 +573,10 @@ EOF
         printf 'export COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU=%q\n' "$COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU"
         printf 'export COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER=%q\n' "$COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER"
         printf 'export COMPARE_PRESENTATION_TORCH_COMPILE=%q\n' "$COMPARE_PRESENTATION_TORCH_COMPILE"
+        printf 'export PAPER_FIGURES_SCORES_DIR=%q\n' "$PAPER_FIGURES_SCORES_DIR"
         printf 'export PAPER_FIGURES_ARTIFACTS_DIR=%q\n' "$PAPER_FIGURES_ARTIFACTS_DIR"
+        printf 'export PAPER_FIGURES_MULTIALLELIC_PREDICTIONS=%q\n' "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS"
+        printf 'export PAPER_FIGURES_MONOALLELIC_PREDICTIONS=%q\n' "$PAPER_FIGURES_MONOALLELIC_PREDICTIONS"
         printf 'export PAPER_FIGURES_FORMATS=%q\n' "$PAPER_FIGURES_FORMATS"
         printf 'export PAPER_FIGURES_CANDIDATE_PREDICTOR=%q\n' "$PAPER_FIGURES_CANDIDATE_PREDICTOR"
         printf 'export PAPER_FIGURES_EXTERNAL_BASELINES=%q\n' "$PAPER_FIGURES_EXTERNAL_BASELINES"
@@ -654,12 +660,22 @@ if [ "${RUN_RELEASE_PLOTS:-1}" = "1" ]; then
         --b-label "${COMPARE_BASELINE_LABEL:-MHCflurry 2.0}"
         --summary-pdf "$run_dir/eval_comparison/plots/model_comparison_figures.pdf"
     )
-    if [ -n "${PAPER_FIGURES_ARTIFACTS_DIR:-}" ]; then
+    if [ -n "${PAPER_FIGURES_SCORES_DIR:-}" ] || \
+            [ -n "${PAPER_FIGURES_MULTIALLELIC_PREDICTIONS:-}" ] || \
+            [ -n "${PAPER_FIGURES_MONOALLELIC_PREDICTIONS:-}" ]; then
         plot_args+=(
-            --paper-figures-artifacts-dir "$PAPER_FIGURES_ARTIFACTS_DIR"
-            --paper-figures-out "$run_dir/eval_comparison/plots/paper_2023"
+            --paper-figures-out "$run_dir/eval_comparison/plots/paper_figures"
             --paper-figures-formats "${PAPER_FIGURES_FORMATS:-svg,pdf,png}"
         )
+        if [ -n "${PAPER_FIGURES_SCORES_DIR:-}" ]; then
+            plot_args+=(--paper-figures-scores-dir "$PAPER_FIGURES_SCORES_DIR")
+        fi
+        if [ -n "${PAPER_FIGURES_MULTIALLELIC_PREDICTIONS:-}" ]; then
+            plot_args+=(--paper-figures-multiallelic-predictions "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS")
+        fi
+        if [ -n "${PAPER_FIGURES_MONOALLELIC_PREDICTIONS:-}" ]; then
+            plot_args+=(--paper-figures-monoallelic-predictions "$PAPER_FIGURES_MONOALLELIC_PREDICTIONS")
+        fi
         if [ -n "${PAPER_FIGURES_CANDIDATE_PREDICTOR:-}" ]; then
             plot_args+=(--paper-figures-candidate-predictor "$PAPER_FIGURES_CANDIDATE_PREDICTOR")
         fi
@@ -1000,7 +1016,10 @@ run_brev_training() {
         "COMPARE_BASELINE_LABEL=$COMPARE_BASELINE_LABEL"
         "PROCESSING_MODES=$PROCESSING_MODES"
         "PRESENTATION_MODES=$PRESENTATION_MODES"
+        "PAPER_FIGURES_SCORES_DIR=$PAPER_FIGURES_SCORES_DIR"
         "PAPER_FIGURES_ARTIFACTS_DIR=$PAPER_FIGURES_ARTIFACTS_DIR"
+        "PAPER_FIGURES_MULTIALLELIC_PREDICTIONS=$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS"
+        "PAPER_FIGURES_MONOALLELIC_PREDICTIONS=$PAPER_FIGURES_MONOALLELIC_PREDICTIONS"
         "PAPER_FIGURES_FORMATS=$PAPER_FIGURES_FORMATS"
         "PAPER_FIGURES_CANDIDATE_PREDICTOR=$PAPER_FIGURES_CANDIDATE_PREDICTOR"
         "PAPER_FIGURES_EXTERNAL_BASELINES=$PAPER_FIGURES_EXTERNAL_BASELINES"
@@ -1102,6 +1121,9 @@ COMPARE_PRESENTATION_TORCH_COMPILE="${COMPARE_PRESENTATION_TORCH_COMPILE:-0}"
 COMPARE_BASELINE="${COMPARE_BASELINE:-public:2.0.0}"
 COMPARE_BASELINE_LABEL="${COMPARE_BASELINE_LABEL:-}"
 PAPER_FIGURES_ARTIFACTS_DIR="${PAPER_FIGURES_ARTIFACTS_DIR:-}"
+PAPER_FIGURES_SCORES_DIR="${PAPER_FIGURES_SCORES_DIR:-$PAPER_FIGURES_ARTIFACTS_DIR}"
+PAPER_FIGURES_MULTIALLELIC_PREDICTIONS="${PAPER_FIGURES_MULTIALLELIC_PREDICTIONS:-}"
+PAPER_FIGURES_MONOALLELIC_PREDICTIONS="${PAPER_FIGURES_MONOALLELIC_PREDICTIONS:-}"
 PAPER_FIGURES_FORMATS="${PAPER_FIGURES_FORMATS:-svg,pdf,png}"
 PAPER_FIGURES_CANDIDATE_PREDICTOR="${PAPER_FIGURES_CANDIDATE_PREDICTOR:-}"
 PAPER_FIGURES_EXTERNAL_BASELINES="${PAPER_FIGURES_EXTERNAL_BASELINES:-}"
@@ -1260,8 +1282,21 @@ while [ $# -gt 0 ]; do
             COMPARE_BASELINE_LABEL=$2
             shift 2
             ;;
+        --paper-figures-scores-dir)
+            PAPER_FIGURES_SCORES_DIR=$2
+            shift 2
+            ;;
         --paper-figures-artifacts-dir)
             PAPER_FIGURES_ARTIFACTS_DIR=$2
+            PAPER_FIGURES_SCORES_DIR=$2
+            shift 2
+            ;;
+        --paper-figures-multiallelic-predictions)
+            PAPER_FIGURES_MULTIALLELIC_PREDICTIONS=$2
+            shift 2
+            ;;
+        --paper-figures-monoallelic-predictions)
+            PAPER_FIGURES_MONOALLELIC_PREDICTIONS=$2
             shift 2
             ;;
         --paper-figures-candidate-predictor)
@@ -1563,12 +1598,22 @@ if [ "$SKIP_PLOTS" != "1" ]; then
             --b-label "$COMPARE_BASELINE_LABEL"
             --summary-pdf "$RUN_DIR/eval_comparison/plots/model_comparison_figures.pdf"
         )
-        if [ -n "$PAPER_FIGURES_ARTIFACTS_DIR" ]; then
+        if [ -n "$PAPER_FIGURES_SCORES_DIR" ] || \
+                [ -n "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS" ] || \
+                [ -n "$PAPER_FIGURES_MONOALLELIC_PREDICTIONS" ]; then
             plot_args+=(
-                --paper-figures-artifacts-dir "$PAPER_FIGURES_ARTIFACTS_DIR"
-                --paper-figures-out "$RUN_DIR/eval_comparison/plots/paper_2023"
+                --paper-figures-out "$RUN_DIR/eval_comparison/plots/paper_figures"
                 --paper-figures-formats "$PAPER_FIGURES_FORMATS"
             )
+            if [ -n "$PAPER_FIGURES_SCORES_DIR" ]; then
+                plot_args+=(--paper-figures-scores-dir "$PAPER_FIGURES_SCORES_DIR")
+            fi
+            if [ -n "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS" ]; then
+                plot_args+=(--paper-figures-multiallelic-predictions "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS")
+            fi
+            if [ -n "$PAPER_FIGURES_MONOALLELIC_PREDICTIONS" ]; then
+                plot_args+=(--paper-figures-monoallelic-predictions "$PAPER_FIGURES_MONOALLELIC_PREDICTIONS")
+            fi
             if [ -n "$PAPER_FIGURES_CANDIDATE_PREDICTOR" ]; then
                 plot_args+=(--paper-figures-candidate-predictor "$PAPER_FIGURES_CANDIDATE_PREDICTOR")
             fi

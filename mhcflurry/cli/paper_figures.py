@@ -10,26 +10,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Generate paper-style figures from retraining/evaluation artifacts.
+"""Generate paper-style figures from retraining/evaluation outputs.
 
 This command ports the figure families from the 2023 retraining notebooks
-into a reproducible CLI. It is intentionally artifact-driven: each panel is
-generated only when the input table that supported the notebook version is
-present. Missing inputs are written to ``missing_inputs.md`` and
-``manifest.csv`` so a training run can distinguish "not generated because the
-data is absent" from "plotting silently drifted."
+into a reproducible CLI. It reads saved evaluation tables: raw saved
+prediction tables such as ``benchmark.multiallelic.csv.bz2``, derived score
+tables such as ``accuracy_scores.multiallelic.csv``, and the current
+``compare-models`` output directory when supplied. Missing inputs are written
+to ``missing_inputs.md`` and ``manifest.csv`` so a training run can distinguish
+"not generated because the data is absent" from "plotting silently drifted."
 """
 from __future__ import annotations
 
 import argparse
-import ast
+import json
 import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 import numpy
 import pandas
+
+from .figure_style import (
+    SIDE_A_COLOR,
+    SIDE_B_COLOR,
+    apply_paper_style as _apply_paper_style,
+    despine as _despine,
+    predictor_color as _predictor_color,
+    short_label as _short_label,
+)
 
 
 CANDIDATE_PREDICTOR = "mhcflurry_production"
@@ -37,8 +48,6 @@ CANDIDATE_PREDICTOR = "mhcflurry_production"
 EXTERNAL_BASELINES = (
     ("netmhcpan4.ba", "ba"),
     ("netmhcpan4.el", "el"),
-    ("netmhcpan4.2.ba", "netmhcpan42_ba"),
-    ("netmhcpan4.2.el", "netmhcpan42_el"),
     ("mixmhcpred", "mixmhcpred"),
 )
 
@@ -50,8 +59,6 @@ PRESENTATION_PANEL_PREDICTORS = (
 PRESENTATION_PANEL_BASELINES = (
     "netmhcpan4.ba",
     "netmhcpan4.el",
-    "netmhcpan4.2.ba",
-    "netmhcpan4.2.el",
     "mixmhcpred",
     "mhcflurry_production",
 )
@@ -59,8 +66,6 @@ PRESENTATION_PANEL_BASELINES = (
 PREFERRED_PREDICTORS = (
     "netmhcpan4.ba",
     "netmhcpan4.el",
-    "netmhcpan4.2.ba",
-    "netmhcpan4.2.el",
     "mixmhcpred",
     "mhcflurry_production",
     "presentation_without_flanks_presentation_score",
@@ -71,6 +76,21 @@ PREFERRED_PREDICTORS = (
 
 LENGTH_LABEL_ORDER = ("All", "8-mer", "9-mer", "10-mer", "11-mer")
 DEFAULT_FORMATS = ("svg", "pdf", "png")
+PREDICTION_METADATA_COLUMNS = {
+    "protein_accession",
+    "peptide",
+    "sample_id",
+    "sample",
+    "sample_group",
+    "n_flank",
+    "c_flank",
+    "hit",
+    "hla",
+    "allele",
+    "length",
+    "peptide_len",
+    "source_file",
+}
 
 
 @dataclass(frozen=True)
@@ -80,6 +100,15 @@ class PredictorConfig:
     preferred_predictors: tuple
     presentation_panel_predictors: tuple
     presentation_panel_baselines: tuple
+
+
+@dataclass(frozen=True)
+class FigureInputs:
+    scores_dir: Path
+    comparison_dir: Optional[Path]
+    run_dir: Optional[Path]
+    multiallelic_predictions: Optional[Path]
+    monoallelic_predictions: Optional[Path]
 
 
 def make_parser():
@@ -98,11 +127,45 @@ def register_subparser(parser):
     parser.description = __doc__
     parser.formatter_class = argparse.RawDescriptionHelpFormatter
     parser.add_argument(
-        "--artifacts-dir",
-        required=True,
+        "--scores-dir",
         help=(
-            "Directory containing 2023-style retraining artifacts such as "
-            "accuracy_scores.multiallelic.csv and predictor_info.csv."
+            "Directory containing saved figure inputs such as "
+            "accuracy_scores.multiallelic.csv, benchmark.multiallelic.csv.bz2, "
+            "and predictor_info.csv. These may come from a current training "
+            "run or imported benchmark outputs."
+        ),
+    )
+    parser.add_argument(
+        "--artifacts-dir",
+        help=(
+            "Compatibility alias for --scores-dir. Prefer --scores-dir in "
+            "new scripts."
+        ),
+    )
+    parser.add_argument(
+        "--comparison-dir",
+        help=(
+            "Optional directory produced by ``mhcflurry compare-models``. "
+            "When provided, paper-figures generates current-run panels from "
+            "fresh MHCflurry side-A vs side-B evaluation outputs instead of "
+            "requiring pre-derived score tables."
+        ),
+    )
+    parser.add_argument(
+        "--multiallelic-predictions",
+        help=(
+            "Optional saved multiallelic test-set prediction table. If "
+            "accuracy_scores.multiallelic.csv is absent, paper-figures derives "
+            "per-sample AUC/PPV tables from this file. Default: "
+            "<scores-dir>/benchmark.multiallelic.csv.bz2 when present."
+        ),
+    )
+    parser.add_argument(
+        "--monoallelic-predictions",
+        help=(
+            "Optional saved monoallelic test-set prediction table used to "
+            "derive monoallelic AUC/PPV plots when "
+            "accuracy_scores.monoallelic.csv is absent."
         ),
     )
     parser.add_argument(
@@ -201,7 +264,6 @@ def run(args):
     import matplotlib
     matplotlib.use("Agg")
 
-    artifacts_dir = Path(args.artifacts_dir)
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     formats = _parse_formats(args.formats)
@@ -209,6 +271,9 @@ def run(args):
     writer = FigureWriter(out_dir, formats, combined_pdf)
 
     try:
+        inputs = _resolve_figure_inputs(args, writer)
+        if inputs is None:
+            return 2
         try:
             predictors = _parse_predictor_config(args)
         except ValueError as e:
@@ -217,29 +282,30 @@ def run(args):
 
         _apply_paper_style()
         predictor_info = _read_predictor_info(
-            artifacts_dir / "predictor_info.csv", writer)
-        sample_ids = _read_sample_group_ids(args, artifacts_dir, writer)
+            inputs.scores_dir / "predictor_info.csv", writer)
+        sample_ids = _read_sample_group_ids(args, inputs.scores_dir, writer)
         _run_figure_family(
             writer, "multiallelic", "all", _generate_multiallelic_figures,
-            artifacts_dir, predictor_info, sample_ids, args.sample_group,
+            inputs, predictor_info, sample_ids, args.sample_group,
             args.max_scatter_points, writer, predictors)
         _run_figure_family(
             writer, "model-selection", "all",
-            _generate_model_selection_figures, artifacts_dir, writer)
+            _generate_model_selection_figures,
+            inputs, writer)
         _run_figure_family(
             writer, "monoallelic", "all", _generate_monoallelic_figures,
-            artifacts_dir, predictor_info, args.max_scatter_points, writer,
-            predictors)
+            inputs, predictor_info,
+            args.max_scatter_points, writer, predictors)
         _run_figure_family(
             writer, "antigen-processing", "all",
             _generate_processing_notebook_figures,
-            artifacts_dir, predictor_info, writer, predictors)
+            inputs, predictor_info, writer, predictors)
         _run_figure_family(
             writer, "proteasome", "all",
-            _generate_proteasome_figures, artifacts_dir, writer)
+            _generate_proteasome_figures, inputs, writer)
         _run_figure_family(
             writer, "architecture", "all",
-            _copy_architecture_figures, artifacts_dir, writer)
+            _copy_architecture_figures, inputs, writer)
     finally:
         writer.close()
         _write_manifest(out_dir, writer.rows)
@@ -393,36 +459,114 @@ def _combined_pdf_path(value, out_dir):
     return str(Path(out_dir) / "paper_figures.pdf")
 
 
-def _apply_paper_style():
-    import matplotlib.pyplot as plt
+def _resolve_figure_inputs(args, writer):
+    scores_value = args.scores_dir or args.artifacts_dir
+    comparison_dir = _resolve_comparison_dir(
+        args.comparison_dir,
+        Path(scores_value) if scores_value else None,
+    )
+    multiallelic_predictions = (
+        Path(args.multiallelic_predictions)
+        if args.multiallelic_predictions
+        else None
+    )
+    monoallelic_predictions = (
+        Path(args.monoallelic_predictions)
+        if args.monoallelic_predictions
+        else None
+    )
 
-    try:
-        import seaborn
-        seaborn.set_context("paper")
-        seaborn.set_style("white")
-    except ImportError:
-        pass
-    try:
-        plt.style.use("seaborn-v0_8-white")
-    except OSError:
+    if scores_value:
+        scores_dir = Path(scores_value)
+    elif multiallelic_predictions:
+        scores_dir = multiallelic_predictions.parent
+    elif monoallelic_predictions:
+        scores_dir = monoallelic_predictions.parent
+    elif comparison_dir is not None:
+        scores_dir = comparison_dir
+    else:
+        writer.fail(
+            "configuration",
+            "inputs",
+            (
+                "Specify --scores-dir, --artifacts-dir, --comparison-dir, "
+                "--multiallelic-predictions, or --monoallelic-predictions."
+            ),
+        )
+        return None
+
+    if multiallelic_predictions is None:
+        default_path = scores_dir / "benchmark.multiallelic.csv.bz2"
+        if default_path.is_file():
+            multiallelic_predictions = default_path
+    if monoallelic_predictions is None:
+        for name in (
+                "benchmark.monoallelic.csv.bz2",
+                "benchmark.monoallelic.train_excluded.csv.bz2"):
+            default_path = scores_dir / name
+            if default_path.is_file():
+                monoallelic_predictions = default_path
+                break
+
+    return FigureInputs(
+        scores_dir=scores_dir,
+        comparison_dir=comparison_dir,
+        run_dir=_resolve_run_dir(comparison_dir),
+        multiallelic_predictions=multiallelic_predictions,
+        monoallelic_predictions=monoallelic_predictions,
+    )
+
+
+def _resolve_comparison_dir(value, scores_dir):
+    if value:
+        return Path(value)
+    if scores_dir is not None and (scores_dir / "release_summary.csv").is_file():
+        return scores_dir
+    return None
+
+
+def _resolve_run_dir(comparison_dir):
+    if comparison_dir is None:
+        return None
+    comparison_dir = Path(comparison_dir)
+    if comparison_dir.name == "eval_comparison":
+        return comparison_dir.parent
+    return None
+
+
+def _current_affinity_per_allele(comparison_dir):
+    if comparison_dir is None:
+        return None
+    path = Path(comparison_dir) / "affinity" / "per_allele.csv"
+    if not path.is_file():
+        return None
+    df = pandas.read_csv(path)
+    required = {
+        "allele", "n", "n_pos", "a_roc_auc", "b_roc_auc",
+        "a_ppv_at_n", "b_ppv_at_n",
+    }
+    if not required.issubset(df.columns):
+        return None
+    return df
+
+
+def _comparison_labels(comparison_dir):
+    result = {"a": "Side A", "b": "Side B"}
+    if comparison_dir is None:
+        return result
+    for side in ("a", "b"):
+        path = Path(comparison_dir) / ("side_%s.json" % side)
+        if not path.is_file():
+            continue
         try:
-            plt.style.use("seaborn-white")
-        except OSError:
+            with open(path) as fd:
+                loaded = json.load(fd)
+            label = loaded.get("label")
+            if label:
+                result[side] = str(label)
+        except (OSError, ValueError, TypeError):
             pass
-    plt.rcParams.update({
-        "font.family": "sans-serif",
-        "font.size": 9,
-        "axes.labelsize": 9,
-        "axes.titlesize": 9,
-        "legend.fontsize": 8,
-        "xtick.labelsize": 8,
-        "ytick.labelsize": 8,
-        "figure.dpi": 150,
-        "savefig.dpi": 300,
-        "axes.spines.top": False,
-        "axes.spines.right": False,
-        "text.usetex": False,
-    })
+    return result
 
 
 def _read_predictor_info(path, writer):
@@ -448,6 +592,20 @@ def _read_sample_group_ids(args, artifacts_dir, writer):
     path = Path(args.sample_table) if args.sample_table else (
         artifacts_dir / "sample_table.csv")
     if not path.is_file():
+        benchmark_path = artifacts_dir / "benchmark.multiallelic.csv.bz2"
+        if benchmark_path.is_file():
+            try:
+                df = pandas.read_csv(
+                    benchmark_path,
+                    usecols=["sample_id", "sample_group"])
+                result = set(df.loc[
+                    df["sample_group"] == args.sample_group,
+                    "sample_id",
+                ])
+                if result:
+                    return result
+            except (OSError, ValueError):
+                pass
         writer.skip(
             "sample-groups", args.sample_group,
             [path],
@@ -469,6 +627,210 @@ def _read_sample_group_ids(args, artifacts_dir, writer):
             [path],
             "No rows found for sample group %s." % args.sample_group)
         return None
+    return result
+
+
+def _read_multiallelic_scores(inputs, writer, figure, predictors):
+    path = inputs.scores_dir / "accuracy_scores.multiallelic.csv"
+    if path.is_file():
+        return _normalize_score_predictors(pandas.read_csv(path))
+    if inputs.multiallelic_predictions is not None:
+        return _scores_from_saved_predictions(
+            inputs.multiallelic_predictions,
+            index_column="sample_id",
+            family="multiallelic",
+            figure=figure,
+            writer=writer,
+            external_baselines=predictors.external_baselines,
+        )
+    writer.skip(
+        "multiallelic",
+        figure,
+        [path, inputs.scores_dir / "benchmark.multiallelic.csv.bz2"],
+        "Multiallelic score table or saved prediction table is required.",
+    )
+    return None
+
+
+def _read_monoallelic_scores(inputs, writer, figure, predictors):
+    path = inputs.scores_dir / "accuracy_scores.monoallelic.csv"
+    if path.is_file():
+        return _normalize_score_predictors(pandas.read_csv(path))
+    if inputs.monoallelic_predictions is not None:
+        return _scores_from_saved_predictions(
+            inputs.monoallelic_predictions,
+            index_column=None,
+            family="monoallelic",
+            figure=figure,
+            writer=writer,
+            external_baselines=predictors.external_baselines,
+        )
+    return None
+
+
+def _scores_from_saved_predictions(
+        path, index_column, family, figure, writer, row_filter=None,
+        external_baselines=EXTERNAL_BASELINES):
+    path = Path(path)
+    if not path.is_file():
+        writer.skip(
+            family, figure, [path],
+            "Saved prediction table is absent.")
+        return None
+    df = pandas.read_csv(path)
+    if row_filter is not None:
+        df = row_filter(df)
+    if "hit" not in df.columns:
+        writer.skip(
+            family, figure, [path],
+            "Saved prediction table must contain a hit column.")
+        return None
+    index_column = index_column or _prediction_index_column(df)
+    if index_column is None:
+        writer.skip(
+            family, figure, [path],
+            "Saved prediction table needs sample_id, allele, or hla column.")
+        return None
+    if "length" not in df.columns:
+        if "peptide_len" in df.columns:
+            df["length"] = df["peptide_len"]
+        elif "peptide" in df.columns:
+            df["length"] = df["peptide"].astype(str).str.len()
+        else:
+            df["length"] = numpy.nan
+
+    predictor_columns = _prediction_score_columns(df)
+    if not predictor_columns:
+        writer.skip(
+            family, figure, [path],
+            "Saved prediction table has no numeric predictor score columns.")
+        return None
+
+    rows = []
+    for group_value, group in df.groupby(index_column):
+        rows.extend(_scores_for_prediction_group(
+            group, index_column, group_value, None, "All", predictor_columns))
+        for length, length_group in group.groupby("length"):
+            if pandas.isnull(length):
+                continue
+            length = int(length)
+            rows.extend(_scores_for_prediction_group(
+                length_group,
+                index_column,
+                group_value,
+                length,
+                "%d-mer" % length,
+                predictor_columns,
+            ))
+    scores = pandas.DataFrame(rows)
+    if scores.empty:
+        writer.skip(
+            family, figure, [path],
+            "Saved prediction table produced no evaluable score rows.")
+        return None
+    scores = _add_percent_change_columns(scores, external_baselines)
+    return _normalize_score_predictors(scores)
+
+
+def _prediction_index_column(df):
+    for column in ("sample_id", "allele", "hla"):
+        if column in df.columns:
+            return column
+    return None
+
+
+def _prediction_score_columns(df):
+    excluded = set(PREDICTION_METADATA_COLUMNS)
+    excluded.update(
+        column for column in df.columns
+        if column.endswith("_best_allele") or column.endswith(" allele")
+    )
+    result = []
+    for column in df.columns:
+        if column in excluded:
+            continue
+        values = pandas.to_numeric(df[column], errors="coerce")
+        if values.notnull().any():
+            df[column] = values
+            result.append(column)
+    return result
+
+
+def _scores_for_prediction_group(
+        group, index_column, group_value, length, length_label,
+        predictor_columns):
+    from sklearn.metrics import roc_auc_score
+
+    y_true = pandas.to_numeric(group["hit"], errors="coerce").fillna(0).values
+    rows = []
+    for predictor in predictor_columns:
+        score = pandas.to_numeric(group[predictor], errors="coerce").values
+        score = _orient_prediction_score(predictor, score)
+        mask = numpy.isfinite(score)
+        y = y_true[mask]
+        s = score[mask]
+        if len(y) == 0 or y.sum() == 0 or y.sum() == len(y):
+            auc = numpy.nan
+            ppv = numpy.nan
+        else:
+            auc = float(roc_auc_score(y, s))
+            ppv = _ppv_at_n(y, s, int(y.sum()))
+        rows.append({
+            index_column: group_value,
+            "sample_id": group_value,
+            "length": length,
+            "length_label": length_label,
+            "predictor": predictor,
+            "ppv": ppv,
+            "auc": auc,
+        })
+    return rows
+
+
+def _orient_prediction_score(predictor, score):
+    predictor = str(predictor).lower()
+    if (
+            predictor.endswith(".ba") or
+            "affinity" in predictor or
+            "presentation_percentile" in predictor):
+        return -numpy.asarray(score, dtype=float)
+    return numpy.asarray(score, dtype=float)
+
+
+def _ppv_at_n(y_true, y_score, n):
+    if n <= 0:
+        return numpy.nan
+    order = numpy.argsort(-numpy.asarray(y_score), kind="stable")
+    top = order[:n]
+    return float(numpy.asarray(y_true)[top].sum()) / float(n)
+
+
+def _add_percent_change_columns(scores, external_baselines=EXTERNAL_BASELINES):
+    result = scores.copy()
+    for metric in ("auc", "ppv"):
+        pivot = result.pivot_table(
+            index=["sample_id", "length_label"],
+            columns="predictor",
+            values=metric,
+            aggfunc="mean",
+        )
+        for baseline, suffix in external_baselines:
+            if baseline not in pivot.columns:
+                continue
+            baseline_values = pivot[baseline].replace(0, numpy.nan)
+            percent = pivot.subtract(baseline_values, axis=0).divide(
+                baseline_values, axis=0) * 100.0
+            column = "percent_change_%s_%s" % (metric, suffix)
+            stacked = percent.reset_index().melt(
+                id_vars=["sample_id", "length_label"],
+                var_name="predictor",
+                value_name=column,
+            )
+            result = result.merge(
+                stacked,
+                on=["sample_id", "length_label", "predictor"],
+                how="left",
+            )
     return result
 
 
@@ -498,17 +860,11 @@ def _external_baselines_with_percent_change(predictors, columns, metric):
 
 
 def _generate_multiallelic_figures(
-        artifacts_dir, predictor_info, recent_sample_ids, sample_group,
+        inputs, predictor_info, recent_sample_ids, sample_group,
         max_scatter_points, writer, predictors):
-    path = artifacts_dir / "accuracy_scores.multiallelic.csv"
-    if not path.is_file():
-        writer.skip(
-            "multiallelic", "all",
-            [path],
-            "Multiallelic benchmark scores are required.")
+    scores = _read_multiallelic_scores(inputs, writer, "all", predictors)
+    if scores is None:
         return
-
-    scores = _normalize_score_predictors(pandas.read_csv(path))
     required = {
         "sample_id", "length_label", "predictor", "auc", "ppv",
     }
@@ -516,7 +872,7 @@ def _generate_multiallelic_figures(
     if missing:
         writer.skip(
             "multiallelic", "all",
-            [path],
+            [inputs.scores_dir / "accuracy_scores.multiallelic.csv"],
             "Missing required columns: %s" % ", ".join(missing))
         return
 
@@ -863,32 +1219,66 @@ def _plot_graphical_abstract_logistic_regression(
     writer.save(fig, name, "multiallelic")
 
 
-def _generate_model_selection_figures(artifacts_dir, writer):
+def _generate_model_selection_figures(inputs, writer):
     path = _first_existing(
-        artifacts_dir,
+        inputs.scores_dir,
         ("model_selection_accuracy.csv", "model_selection_accuracy.xlsx"))
-    if path is None:
-        writer.skip(
-            "model-selection",
-            "fig.1_model_selection_predictor_accuracy.scores.by_locus",
-            [
-                artifacts_dir / "model_selection_accuracy.csv",
-                artifacts_dir / "model_selection_accuracy.xlsx",
-            ],
-            "Model-selection allele-level accuracy table absent.")
-        return
-    df = pandas.read_excel(path) if path.suffix == ".xlsx" else pandas.read_csv(path)
-    allele_col = _first_present(df, ("allele", "hla", "mhc_allele"))
-    score_col = _first_present(df, ("auc", "AUC", "score", "accuracy"))
-    count_col = _first_present(
-        df, ("num_peptides", "peptides", "train_peptides", "train_count"))
-    binder_col = _first_present(
-        df, ("percent_binders", "binder_percent", "binders_percent"))
+    baseline_col = None
+    score_label = "AUC"
+    baseline_label = None
+    source_path = path
+    if path is not None:
+        df = (
+            pandas.read_excel(path) if path.suffix == ".xlsx"
+            else pandas.read_csv(path)
+        )
+        allele_col = _first_present(df, ("allele", "hla", "mhc_allele"))
+        score_col = _first_present(df, ("auc", "AUC", "score", "accuracy"))
+        count_col = _first_present(
+            df, ("num_peptides", "peptides", "train_peptides", "train_count"))
+        binder_col = _first_present(
+            df, ("percent_binders", "binder_percent", "binders_percent"))
+    else:
+        per_allele = _current_affinity_per_allele(inputs.comparison_dir)
+        if per_allele is None:
+            writer.skip(
+                "model-selection",
+                "fig.1_model_selection_predictor_accuracy.scores.by_locus",
+                [
+                    inputs.scores_dir / "model_selection_accuracy.csv",
+                    inputs.scores_dir / "model_selection_accuracy.xlsx",
+                    (
+                        Path(inputs.comparison_dir) / "affinity" /
+                        "per_allele.csv"
+                        if inputs.comparison_dir else
+                        "compare-models affinity/per_allele.csv"
+                    ),
+                ],
+                "No model-selection table or current affinity comparison table.")
+            return
+        labels = _comparison_labels(inputs.comparison_dir)
+        df = per_allele.copy()
+        df["percent_binders"] = (
+            pandas.to_numeric(df["n_pos"], errors="coerce") /
+            pandas.to_numeric(df["n"], errors="coerce").replace(0, numpy.nan) *
+            100.0
+        )
+        allele_col = "allele"
+        score_col = "a_roc_auc"
+        baseline_col = "b_roc_auc"
+        score_label = "%s AUROC" % labels["a"]
+        baseline_label = "%s AUROC" % labels["b"]
+        count_col = "n"
+        binder_col = "percent_binders"
+        source_path = (
+            Path(inputs.comparison_dir) / "affinity" / "per_allele.csv"
+            if inputs.comparison_dir else None
+        )
     if allele_col is None or score_col is None:
         writer.skip(
             "model-selection",
             "fig.1_model_selection_predictor_accuracy.scores.by_locus",
-            [path],
+            [source_path],
             "Table must contain allele and AUC/score columns.")
         return
 
@@ -921,10 +1311,29 @@ def _generate_model_selection_figures(artifacts_dir, writer):
             squeeze=False)
         ax = axes[0, 0]
         y = numpy.arange(len(sub))
-        ax.barh(y, sub[score_col], color=(0.34, 0.46, 0.75))
+        if baseline_col and baseline_col in sub.columns:
+            height = 0.36
+            ax.barh(
+                y - height / 2,
+                sub[score_col],
+                height=height,
+                color=_predictor_color(
+                    pandas.DataFrame(), "mhcflurry_production"),
+                label=score_label,
+            )
+            ax.barh(
+                y + height / 2,
+                sub[baseline_col],
+                height=height,
+                color=(0.55, 0.55, 0.55),
+                label=baseline_label,
+            )
+            ax.legend(frameon=False, loc="lower right")
+        else:
+            ax.barh(y, sub[score_col], color=(0.34, 0.46, 0.75))
         ax.set_yticks(y)
         ax.set_yticklabels(sub[allele_col])
-        ax.set_xlabel("AUC")
+        ax.set_xlabel(score_label if not baseline_col else "AUROC")
         ax.set_title(locus)
         _despine(ax)
         for panel_index, (column, xlabel, color, log_scale) in enumerate(
@@ -945,11 +1354,14 @@ def _generate_model_selection_figures(artifacts_dir, writer):
 
 
 def _generate_monoallelic_figures(
-        artifacts_dir, predictor_info, max_scatter_points, writer,
-        predictors):
-    path = artifacts_dir / "accuracy_scores.monoallelic.csv"
-    if path.is_file():
-        scores = _normalize_score_predictors(pandas.read_csv(path))
+        inputs, predictor_info, max_scatter_points, writer, predictors):
+    scores = _read_monoallelic_scores(
+        inputs,
+        writer,
+        "fig.3_scores_plots_monoallelic.scatter.auc.monoallelic.ba",
+        predictors,
+    )
+    if scores is not None:
         _plot_monoallelic_scatter(
             scores, predictor_info, "auc", "AUC", max_scatter_points,
             "fig.3_scores_plots_monoallelic.scatter.auc.monoallelic.ba",
@@ -959,18 +1371,22 @@ def _generate_monoallelic_figures(
             "fig.3_scores_plots_monoallelic.scatter.ppv.monoallelic.ba",
             writer, predictors)
     else:
-        writer.skip(
-            "monoallelic",
+        _plot_current_affinity_scatter(
+            inputs.comparison_dir,
+            "roc_auc",
+            "AUROC",
             "fig.3_scores_plots_monoallelic.scatter.auc.monoallelic.ba",
-            [path],
-            "Monoallelic accuracy scores absent.")
-        writer.skip(
-            "monoallelic",
+            writer,
+        )
+        _plot_current_affinity_scatter(
+            inputs.comparison_dir,
+            "ppv_at_n",
+            "PPV@N",
             "fig.3_scores_plots_monoallelic.scatter.ppv.monoallelic.ba",
-            [path],
-            "Monoallelic accuracy scores absent.")
+            writer,
+        )
 
-    novel_path = artifacts_dir / "accuracy_scores.monoallelic.novel_alleles.csv"
+    novel_path = inputs.scores_dir / "accuracy_scores.monoallelic.novel_alleles.csv"
     if novel_path.is_file():
         scores = _normalize_score_predictors(pandas.read_csv(novel_path))
         _plot_monoallelic_scatter(
@@ -985,6 +1401,55 @@ def _generate_monoallelic_figures(
             "fig.3_scores_plots_monoallelic.scatter.auc.monoallelic.novel_alleles.ba",
             [novel_path],
             "Novel-allele monoallelic accuracy scores absent.")
+
+
+def _plot_current_affinity_scatter(
+        comparison_dir, metric, metric_label, name, writer):
+    import matplotlib.pyplot as plt
+
+    per_allele = _current_affinity_per_allele(comparison_dir)
+    if per_allele is None:
+        writer.skip(
+            "monoallelic",
+            name,
+            ["accuracy_scores.monoallelic.csv", "affinity/per_allele.csv"],
+            "No monoallelic score table or current affinity comparison table.")
+        return
+    labels = _comparison_labels(comparison_dir)
+    x_col = "b_%s" % metric
+    y_col = "a_%s" % metric
+    if x_col not in per_allele.columns or y_col not in per_allele.columns:
+        writer.skip(
+            "monoallelic", name, [comparison_dir],
+            "Current affinity comparison lacks %s columns." % metric)
+        return
+    sub = per_allele[[x_col, y_col]].replace(
+        [numpy.inf, -numpy.inf], numpy.nan).dropna()
+    if sub.empty:
+        writer.skip(
+            "monoallelic", name, [comparison_dir],
+            "Current affinity comparison has no finite %s values." % metric)
+        return
+    fig, ax = plt.subplots(figsize=(2.7, 2.5))
+    ax.scatter(
+        sub[x_col], sub[y_col],
+        c=[
+            SIDE_A_COLOR if y >= x else SIDE_B_COLOR
+            for x, y in zip(sub[x_col], sub[y_col])
+        ],
+        s=16,
+        alpha=0.8,
+        edgecolor="white",
+        linewidth=0.2,
+    )
+    _add_diagonal(ax, sub[x_col], sub[y_col])
+    ax.set_xlabel("%s %s" % (labels["b"], metric_label))
+    ax.set_ylabel("%s %s" % (labels["a"], metric_label))
+    ax.set_title("Allele-level %s" % metric_label)
+    _set_unit_limits(ax)
+    _despine(ax)
+    fig.tight_layout()
+    writer.save(fig, name, "monoallelic")
 
 
 def _plot_monoallelic_scatter(
@@ -1018,15 +1483,30 @@ def _plot_monoallelic_scatter(
 
 
 def _generate_processing_notebook_figures(
-        artifacts_dir, predictor_info, writer, predictors):
-    no_c_path = artifacts_dir / "accuracy_scores.multiallelic.no_C.csv"
-    motif_path = artifacts_dir / "antigen_processing.motifs.xlsx"
-    correlation_path = artifacts_dir / "correlation.processing_vs_affinity.sampled.csv.bz2"
-    training_path = artifacts_dir / "train_data.ap.production.csv"
+        inputs, predictor_info, writer, predictors):
+    no_c_path = inputs.scores_dir / "accuracy_scores.multiallelic.no_C.csv"
+    motif_path = inputs.scores_dir / "antigen_processing.motifs.xlsx"
+    correlation_path = (
+        inputs.scores_dir / "correlation.processing_vs_affinity.sampled.csv.bz2"
+    )
+    training_path = inputs.scores_dir / "train_data.ap.production.csv"
 
-    if no_c_path.is_file():
+    no_c_scores = _read_cysteine_removed_scores(
+        inputs, no_c_path, writer, predictors)
+    if no_c_scores is not None:
         _plot_cysteine_removed_panels(
-            artifacts_dir, no_c_path, predictor_info, writer, predictors)
+            inputs, no_c_scores, predictor_info, writer, predictors)
+    elif _plot_current_ap_vs_summary(inputs, writer):
+        writer.skip(
+            "antigen-processing",
+            "fig.4_processing_predictor_plots.auc.ap.c_removed.scatter",
+            [no_c_path],
+            "Cysteine-removed score table absent; generated current AP summary only.")
+        writer.skip(
+            "antigen-processing",
+            "fig.4_processing_predictor_plots.auc.ap.c_removed.bar",
+            [no_c_path],
+            "Cysteine-removed score table absent; generated current AP summary only.")
     else:
         writer.skip(
             "antigen-processing",
@@ -1046,6 +1526,8 @@ def _generate_processing_notebook_figures(
 
     if motif_path.is_file():
         _plot_ap_motif_logo(motif_path, writer)
+    elif _plot_ap_motif_from_training(inputs, writer):
+        pass
     else:
         writer.skip(
             "antigen-processing",
@@ -1055,6 +1537,8 @@ def _generate_processing_notebook_figures(
 
     if correlation_path.is_file() and training_path.is_file():
         _plot_ap_correlation_panels(correlation_path, training_path, writer)
+    elif _plot_ap_correlation_from_saved_predictions(inputs, writer):
+        pass
     else:
         writer.skip(
             "antigen-processing",
@@ -1073,20 +1557,44 @@ def _generate_processing_notebook_figures(
             "AP correlation and training-data tables absent.")
 
 
+def _read_cysteine_removed_scores(inputs, no_c_path, writer, predictors):
+    if no_c_path.is_file():
+        return _normalize_score_predictors(pandas.read_csv(no_c_path))
+    if inputs.multiallelic_predictions is None:
+        return None
+    return _scores_from_saved_predictions(
+        inputs.multiallelic_predictions,
+        index_column="sample_id",
+        family="antigen-processing",
+        figure="fig.4_processing_predictor_plots.auc.ap.c_removed.scatter",
+        writer=writer,
+        external_baselines=predictors.external_baselines,
+        row_filter=lambda df: df.loc[
+            ~df.get("peptide", pandas.Series("", index=df.index))
+            .astype(str)
+            .str.contains("C", na=False)
+        ].copy(),
+    )
+
+
 def _plot_cysteine_removed_panels(
-        artifacts_dir, no_c_path, predictor_info, writer, predictors):
+        inputs, no_c, predictor_info, writer, predictors):
     import matplotlib.pyplot as plt
 
-    full_path = artifacts_dir / "accuracy_scores.multiallelic.csv"
-    if not full_path.is_file():
+    full = _read_multiallelic_scores(
+        inputs,
+        writer,
+        "fig.4_processing_predictor_plots.auc.ap.c_removed.scatter",
+        predictors,
+    )
+    if full is None:
         writer.skip(
             "antigen-processing",
             "fig.4_processing_predictor_plots.auc.ap.c_removed.scatter",
-            [full_path],
+            [inputs.scores_dir / "accuracy_scores.multiallelic.csv"],
             "Full multiallelic benchmark scores absent.")
         return
-    full = _normalize_score_predictors(pandas.read_csv(full_path))
-    no_c = _normalize_score_predictors(pandas.read_csv(no_c_path))
+    no_c = _normalize_score_predictors(no_c)
     predictor = "presentation_without_flanks_processing_score"
     full_pivot = _pivot_all_lengths(full, "auc")
     no_c_pivot = _pivot_all_lengths(no_c, "auc")
@@ -1183,6 +1691,73 @@ def _plot_ap_vs_others(scores, predictor_info, writer, predictors):
         "antigen-processing")
 
 
+def _plot_current_ap_vs_summary(inputs, writer):
+    if inputs.comparison_dir is None:
+        return False
+    processing_path = (
+        Path(inputs.comparison_dir) / "processing" / "summary_table.csv"
+    )
+    presentation_path = (
+        Path(inputs.comparison_dir) / "presentation" / "summary_table.csv"
+    )
+    if not processing_path.is_file() and not presentation_path.is_file():
+        return False
+    frames = []
+    if processing_path.is_file():
+        processing = pandas.read_csv(processing_path)
+        for _, row in processing.iterrows():
+            frames.append({
+                "label": "AP %s" % str(row.get("mode", "")).replace("_", " "),
+                "AUROC": row.get("a_macro_roc_auc"),
+                "AUPRC": row.get("a_macro_pr_auc"),
+                "PPV@N": row.get("a_macro_ppv_at_n"),
+            })
+    if presentation_path.is_file():
+        presentation = pandas.read_csv(presentation_path)
+        if "score_kind" in presentation.columns:
+            presentation = presentation.loc[
+                presentation["score_kind"] == "presentation_score"
+            ]
+        for _, row in presentation.iterrows():
+            frames.append({
+                "label": "PS %s" % str(row.get("mode", "")).replace("_", " "),
+                "AUROC": row.get("a_macro_roc_auc"),
+                "AUPRC": row.get("a_macro_pr_auc"),
+                "PPV@N": row.get("a_macro_ppv_at_n"),
+            })
+    df = pandas.DataFrame(frames)
+    if df.empty:
+        return False
+    import matplotlib.pyplot as plt
+
+    metrics = ["AUROC", "AUPRC", "PPV@N"]
+    fig, axes = plt.subplots(1, len(metrics), figsize=(7.0, 2.6), squeeze=False)
+    x = numpy.arange(len(df))
+    colors = [
+        (0.353, 0.612, 0.518) if label.startswith("AP") else (0.596, 0.557, 0.835)
+        for label in df["label"]
+    ]
+    for ax, metric in zip(axes[0], metrics):
+        values = pandas.to_numeric(df[metric], errors="coerce")
+        ax.bar(x, values, color=colors, edgecolor="white", linewidth=0.6)
+        ax.set_title(metric)
+        ax.set_xticks(x)
+        ax.set_xticklabels(df["label"], rotation=35, ha="right")
+        finite = values[numpy.isfinite(values)]
+        upper = max(1.0, float(finite.max()) * 1.05) if len(finite) else 1.0
+        ax.set_ylim(0, upper)
+        _despine(ax)
+    axes[0, 0].set_ylabel("Macro mean")
+    fig.tight_layout(w_pad=1.0)
+    writer.save(
+        fig,
+        "fig.4_processing_predictor_plots.bar.ap_vs_others",
+        "antigen-processing",
+        note="Generated from current compare-models processing/presentation summaries.",
+    )
+    return True
+
+
 def _plot_ap_motif_logo(path, writer):
     import matplotlib.pyplot as plt
 
@@ -1217,6 +1792,85 @@ def _plot_ap_motif_logo(path, writer):
     writer.save(
         fig, "fig.4_processing_predictor_plots.logo.ap",
         "antigen-processing")
+
+
+def _plot_ap_motif_from_training(inputs, writer):
+    path = _processing_training_data_path(inputs)
+    if path is None:
+        return False
+    import matplotlib.pyplot as plt
+
+    try:
+        df = pandas.read_csv(
+            path,
+            usecols=lambda column: column in ("n_flank", "c_flank", "hit"),
+            nrows=200_000,
+        )
+    except (OSError, ValueError):
+        return False
+    if "hit" in df.columns:
+        df = df.loc[pandas.to_numeric(df["hit"], errors="coerce") == 1]
+    if df.empty or "n_flank" not in df.columns or "c_flank" not in df.columns:
+        return False
+
+    amino_acids = list("ACDEFGHIKLMNPQRSTVWY")
+    positions = ["N-%d" % i for i in range(5, 0, -1)] + [
+        "C+%d" % i for i in range(1, 6)
+    ]
+    counts = pandas.DataFrame(0.0, index=positions, columns=amino_acids)
+    for flank_col, offset in (("n_flank", 0), ("c_flank", 5)):
+        strings = df[flank_col].fillna("").astype(str)
+        for row in strings:
+            row = row[-5:] if flank_col == "n_flank" else row[:5]
+            row = row.rjust(5, "X") if flank_col == "n_flank" else row.ljust(5, "X")
+            for i, aa in enumerate(row):
+                if aa in counts.columns:
+                    counts.iloc[offset + i, counts.columns.get_loc(aa)] += 1.0
+    frequencies = counts.divide(counts.sum(axis=1).replace(0, numpy.nan), axis=0)
+    fig, ax = plt.subplots(figsize=(6.8, 2.4))
+    im = ax.imshow(
+        frequencies.fillna(0).values,
+        aspect="auto",
+        cmap="viridis",
+        vmin=0,
+        vmax=float(numpy.nanmax(frequencies.values)) if numpy.isfinite(
+            frequencies.values).any() else 1.0,
+    )
+    ax.set_xticks(numpy.arange(len(amino_acids)))
+    ax.set_xticklabels(amino_acids)
+    ax.set_yticks(numpy.arange(len(positions)))
+    ax.set_yticklabels(positions)
+    ax.set_xlabel("Amino acid")
+    ax.set_ylabel("Flank position")
+    fig.colorbar(im, ax=ax, shrink=0.8, label="Frequency")
+    _despine(ax)
+    fig.tight_layout()
+    writer.save(
+        fig,
+        "fig.4_processing_predictor_plots.logo.ap",
+        "antigen-processing",
+        note="Generated from current processing training flanks.",
+    )
+    return True
+
+
+def _processing_training_data_path(inputs):
+    candidates = [
+        inputs.scores_dir / "train_data.ap.production.csv",
+        inputs.scores_dir / "train_data.csv.bz2",
+    ]
+    if inputs.run_dir is not None:
+        candidates.extend([
+            Path(inputs.run_dir) / "processing" / "train_data.csv.bz2",
+            Path(inputs.run_dir) / "processing" / "models.selected.with_flanks" /
+            "train_data.csv.bz2",
+            Path(inputs.run_dir) / "processing" / "models.selected.no_flank" /
+            "train_data.csv.bz2",
+        ])
+    for path in candidates:
+        if path.is_file():
+            return path
+    return None
 
 
 def _plot_ap_correlation_panels(correlation_path, training_path, writer):
@@ -1312,6 +1966,130 @@ def _plot_ap_correlation_panels(correlation_path, training_path, writer):
             "Training table lacks included flag or processing score column.")
 
 
+def _plot_ap_correlation_from_saved_predictions(inputs, writer):
+    path = inputs.multiallelic_predictions
+    if path is None or not Path(path).is_file():
+        return False
+    import matplotlib.pyplot as plt
+
+    try:
+        df = pandas.read_csv(path, nrows=250_000)
+    except (OSError, ValueError):
+        return False
+    affinity_col = _first_present(
+        df,
+        (
+            "presentation_with_flanks_affinity",
+            "presentation_without_flanks_affinity",
+            "mhcflurry_production_affinity",
+        ),
+    )
+    processing_col = _first_present(
+        df,
+        (
+            "presentation_with_flanks_processing_score",
+            "presentation_without_flanks_processing_score",
+        ),
+    )
+    if affinity_col is None or processing_col is None:
+        return False
+    df = df.copy()
+    df[affinity_col] = -numpy.log10(
+        numpy.clip(pandas.to_numeric(df[affinity_col], errors="coerce"), 1e-3, 1e8)
+    )
+    df[processing_col] = pandas.to_numeric(
+        df[processing_col], errors="coerce")
+    finite = df[[affinity_col, processing_col]].replace(
+        [numpy.inf, -numpy.inf], numpy.nan).dropna()
+    if finite.empty:
+        return False
+
+    fig, ax = plt.subplots(figsize=(3.0, 2.5))
+    if "protein_accession" in df.columns:
+        top = df["protein_accession"].value_counts().head(6).index
+        for protein in top:
+            sub = df.loc[df["protein_accession"] == protein]
+            ax.scatter(
+                sub[affinity_col], sub[processing_col],
+                s=7, alpha=0.55, label=str(protein))
+        ax.legend(frameon=False, loc="best", handlelength=1.0, fontsize=6)
+    else:
+        ax.scatter(finite[affinity_col], finite[processing_col], s=7, alpha=0.55)
+    ax.set_xlabel("Affinity evidence")
+    ax.set_ylabel("Processing score")
+    _despine(ax)
+    fig.tight_layout()
+    writer.save(
+        fig,
+        "fig.4_processing_predictor_plots.correlation.ap_by_gene",
+        "antigen-processing",
+        note="Generated from saved multiallelic predictions.",
+    )
+
+    numeric_cols = [
+        column for column in df.columns
+        if (
+            "affinity" in column or
+            "processing_score" in column or
+            "presentation_score" in column
+        )
+    ]
+    numeric = df[numeric_cols].apply(pandas.to_numeric, errors="coerce")
+    if len(numeric.columns) >= 2:
+        fig, ax = plt.subplots(figsize=(4.5, 3.8))
+        corr = numeric.corr()
+        im = ax.imshow(corr, cmap="coolwarm", vmin=-1, vmax=1)
+        ax.set_xticks(numpy.arange(len(corr.columns)))
+        ax.set_yticks(numpy.arange(len(corr.columns)))
+        ax.set_xticklabels(
+            [_short_score_label(column) for column in corr.columns],
+            rotation=45,
+            ha="right",
+        )
+        ax.set_yticklabels([_short_score_label(column) for column in corr.columns])
+        fig.colorbar(im, ax=ax, shrink=0.8, label="Correlation")
+        _despine(ax)
+        fig.tight_layout()
+        writer.save(
+            fig,
+            "fig.4_processing_predictor_plots.extended.ap_correlation",
+            "antigen-processing",
+            note="Generated from saved multiallelic predictions.",
+        )
+
+    if "hit" in df.columns:
+        hit = pandas.to_numeric(df["hit"], errors="coerce").fillna(0) > 0
+        fig, ax = plt.subplots(figsize=(2.7, 2.3))
+        groups = [
+            df.loc[hit, processing_col].dropna(),
+            df.loc[~hit, processing_col].dropna(),
+        ]
+        try:
+            ax.boxplot(groups, tick_labels=["Hit", "Decoy"], showfliers=False)
+        except TypeError:
+            ax.boxplot(groups, labels=["Hit", "Decoy"], showfliers=False)
+        ax.set_ylabel("Processing score")
+        _despine(ax)
+        fig.tight_layout()
+        writer.save(
+            fig,
+            "fig.4_processing_predictor_plots.correlation.included_vs_excluded",
+            "antigen-processing",
+            note="Generated from saved multiallelic predictions.",
+        )
+    return True
+
+
+def _short_score_label(column):
+    return (
+        str(column)
+        .replace("presentation_with_flanks_", "with flanks ")
+        .replace("presentation_without_flanks_", "without flanks ")
+        .replace("mhcflurry_production_", "MHCflurry ")
+        .replace("_", " ")
+    )
+
+
 def _coerce_bool_series(series):
     if pandas.api.types.is_bool_dtype(series):
         return series.fillna(False).astype(bool)
@@ -1333,23 +2111,36 @@ def _coerce_bool_series(series):
     return parsed.astype(bool)
 
 
-def _generate_proteasome_figures(artifacts_dir, writer):
+def _generate_proteasome_figures(inputs, writer):
     path = _first_existing(
-        artifacts_dir,
+        inputs.scores_dir,
         ("Additional File 8.csv", "proteasome_mass_spec.csv"))
+    if path is None and inputs.run_dir is not None:
+        run_path = Path(inputs.run_dir) / "processing" / "hits_with_tpm.csv.bz2"
+        if run_path.is_file():
+            path = run_path
     if path is None:
         writer.skip(
             "proteasome",
             "fig.1_proteasome_mass_spec.proteosome.ms",
             [
-                artifacts_dir / "Additional File 8.csv",
-                artifacts_dir / "proteasome_mass_spec.csv",
+                inputs.scores_dir / "Additional File 8.csv",
+                inputs.scores_dir / "proteasome_mass_spec.csv",
+                (
+                    Path(inputs.run_dir) / "processing" / "hits_with_tpm.csv.bz2"
+                    if inputs.run_dir is not None else
+                    "run/processing/hits_with_tpm.csv.bz2"
+                ),
             ],
             "Proteasome mass-spec source table absent.")
         return
     df = pandas.read_csv(path)
-    category_col = _first_present(df, ("sample", "category", "condition", "gene"))
+    category_col = _first_present(
+        df, ("sample_type", "format", "sample", "category", "condition", "gene"))
     value_col = _first_present(df, ("count", "spectra", "intensity", "value"))
+    if value_col is None and "hit_id" in df.columns:
+        df["count"] = 1
+        value_col = "count"
     if category_col is None or value_col is None:
         writer.skip(
             "proteasome",
@@ -1372,7 +2163,7 @@ def _generate_proteasome_figures(artifacts_dir, writer):
     writer.save(fig, "fig.1_proteasome_mass_spec.proteosome.ms", "proteasome")
 
 
-def _copy_architecture_figures(artifacts_dir, writer):
+def _copy_architecture_figures(inputs, writer):
     patterns = (
         "*architecture*.svg", "*architecture*.pdf", "*architecture*.png",
         "*model_information*.svg", "*model_information*.pdf",
@@ -1382,7 +2173,7 @@ def _copy_architecture_figures(artifacts_dir, writer):
     copied = []
     asset_dir = writer.out_dir / "assets"
     for pattern in patterns:
-        for path in artifacts_dir.glob(pattern):
+        for path in inputs.scores_dir.glob(pattern):
             asset_dir.mkdir(parents=True, exist_ok=True)
             target = asset_dir / path.name
             shutil.copy2(path, target)
@@ -1396,12 +2187,88 @@ def _copy_architecture_figures(artifacts_dir, writer):
             "note": "Copied existing architecture/model-info artwork.",
             "missing": "",
         })
+    elif _plot_current_model_information(inputs, writer):
+        return
     else:
         writer.skip(
             "architecture",
             "architecture_diagrams",
-            [artifacts_dir / "*architecture*", artifacts_dir / "*model_info*"],
+            [
+                inputs.scores_dir / "*architecture*",
+                inputs.scores_dir / "*model_info*",
+                (
+                    Path(inputs.run_dir) / "**" / "manifest.csv"
+                    if inputs.run_dir is not None else
+                    "run/**/manifest.csv"
+                ),
+            ],
             "Architecture/model-information source artwork absent.")
+
+
+def _plot_current_model_information(inputs, writer):
+    if inputs.run_dir is None:
+        return False
+    manifests = sorted(Path(inputs.run_dir).glob("**/manifest.csv"))
+    rows = []
+    for path in manifests:
+        try:
+            df = pandas.read_csv(path, usecols=["model_name"])
+        except (OSError, ValueError):
+            continue
+        if df.empty:
+            continue
+        label = _manifest_component_label(path, inputs.run_dir)
+        rows.append((label, int(df["model_name"].nunique())))
+    if not rows:
+        return False
+    import matplotlib.pyplot as plt
+
+    summary = (
+        pandas.DataFrame(rows, columns=["component", "models"])
+        .groupby("component", as_index=False)["models"]
+        .sum()
+        .sort_values("models", ascending=True)
+    )
+    fig, ax = plt.subplots(figsize=(4.8, max(2.2, 0.32 * len(summary))))
+    y = numpy.arange(len(summary))
+    ax.barh(
+        y,
+        summary["models"],
+        color=(0.596, 0.557, 0.835),
+        edgecolor="white",
+        linewidth=0.6,
+    )
+    ax.set_yticks(y)
+    ax.set_yticklabels(summary["component"])
+    ax.set_xlabel("Selected / available models")
+    ax.set_title("Current model ensemble")
+    _despine(ax)
+    fig.tight_layout()
+    writer.save(
+        fig,
+        "fig.1_predictor_model_information.model_counts",
+        "architecture",
+        note="Generated from current run manifests.",
+    )
+    return True
+
+
+def _manifest_component_label(path, run_dir):
+    try:
+        rel = path.relative_to(run_dir)
+    except ValueError:
+        rel = path
+    parts = rel.parts
+    if "affinity" in parts:
+        return "Affinity"
+    if "presentation" in parts:
+        return "Presentation"
+    if "processing" in parts:
+        parent = path.parent.name
+        if parent.startswith("models.selected."):
+            return "Processing %s" % parent.replace("models.selected.", "").replace("_", " ")
+        return "Processing"
+    return path.parent.name.replace("_", " ")
 
 
 def _plot_scatter_triptych_from_pivot(
@@ -1536,71 +2403,6 @@ def _add_diagonal(ax, x, y):
     low = max(0.0, low - pad)
     high = min(1.0, high + pad)
     ax.plot([low, high], [low, high], color="0.35", linewidth=0.8, zorder=0)
-
-
-def _despine(ax):
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.grid(False)
-
-
-def _short_label(predictor_info, predictor):
-    if predictor in predictor_info.index:
-        row = predictor_info.loc[predictor]
-        for column in ("short", "description"):
-            value = row.get(column)
-            if isinstance(value, str) and value and value != "-":
-                return value
-    fallback = {
-        "netmhcpan4.ba": "NetMHCpan 4.0 BA",
-        "netmhcpan4.el": "NetMHCpan 4.0 EL",
-        "netmhcpan4.2.ba": "NetMHCpan 4.2 BA",
-        "netmhcpan4.2.el": "NetMHCpan 4.2 EL",
-        "mixmhcpred": "MixMHCpred",
-        "mhcflurry_production": "MHCflurry BA",
-    }
-    if predictor in fallback:
-        return fallback[predictor]
-    return predictor.replace("_", " ")
-
-
-def _predictor_color(predictor_info, predictor):
-    if predictor in predictor_info.index:
-        value = predictor_info.loc[predictor].get("color")
-        if isinstance(value, str) and value and value.lower() != "nan":
-            try:
-                parsed = ast.literal_eval(value)
-                if isinstance(parsed, (list, tuple)) and len(parsed) in (3, 4):
-                    return tuple(float(item) for item in parsed)
-            except (SyntaxError, ValueError, TypeError):
-                pass
-    fallback = {
-        "netmhcpan4.ba": (0.886, 0.290, 0.200),
-        "netmhcpan4.el": (1.000, 0.710, 0.722),
-        "netmhcpan4.2.ba": (0.650, 0.120, 0.130),
-        "netmhcpan4.2.el": (0.980, 0.520, 0.540),
-        "mixmhcpred": (0.204, 0.541, 0.741),
-        "mhcflurry_production": (0.596, 0.557, 0.835),
-    }
-    if predictor in fallback:
-        return fallback[predictor]
-    palette = (
-        (0.345, 0.467, 0.741),
-        (0.459, 0.439, 0.702),
-        (0.639, 0.400, 0.667),
-        (0.871, 0.443, 0.498),
-        (0.922, 0.612, 0.357),
-        (0.580, 0.690, 0.392),
-        (0.353, 0.612, 0.518),
-        (0.306, 0.573, 0.702),
-        (0.545, 0.545, 0.545),
-        (0.737, 0.506, 0.741),
-    )
-    index = sum(
-        (position + 1) * ord(char)
-        for position, char in enumerate(predictor)
-    ) % len(palette)
-    return palette[index]
 
 
 def _allele_locus(value):

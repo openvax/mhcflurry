@@ -88,15 +88,16 @@ validation), prefer `scripts/release/retrain_evaluate_deploy.sh`.
   per-plot PDFs next to PNGs and can collect the vector outputs into a single
   PDF via `--summary-pdf`. Separate subcommand so the metric pipeline doesn't
   pay the matplotlib import cost.
-- **`mhcflurry paper-figures`** — Ports the 2023 retraining-notebook figure
-  suite into a reproducible CLI. It consumes notebook-style artifacts such as
-  `accuracy_scores.multiallelic.csv`, `predictor_info.csv`, monoallelic/AP
-  score tables, motif workbooks, and architecture artwork; writes SVG/PDF/PNG
-  panels plus a vector multi-page PDF; and records unavailable figure families
-  in `manifest.csv` / `missing_inputs.md` instead of silently fabricating them.
-  Its comparator predictors are configurable (`--candidate-predictor`,
-  `--external-baselines`, `--preferred-predictors`) with the 2023 predictor set
-  as the default.
+- **`mhcflurry paper-figures`** — Generates the broader paper-style figure
+  suite from saved evaluation outputs. It accepts derived score tables such as
+  `accuracy_scores.multiallelic.csv`, saved test-set prediction tables such as
+  `benchmark.multiallelic.csv.bz2`, current `compare-models` output, and
+  optional metadata/artwork tables. It writes SVG/PDF/PNG panels plus a vector
+  multi-page PDF, and records unavailable figure families in `manifest.csv` /
+  `missing_inputs.md` instead of silently fabricating them. Comparator
+  predictors are configurable (`--candidate-predictor`,
+  `--external-baselines`, `--preferred-predictors`); defaults use NetMHCpan 4.0
+  BA/EL and MixMHCpred when saved columns are present.
 - **`plot_minibatch_sweep.py`** — Stylized plots from a `sweep_summary.csv`
   (gradient-color dots by mb, lin-lin + log-log only, adjustText
   de-overlap). Invoked by the sweep wrapper after completion.

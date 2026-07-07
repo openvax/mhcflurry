@@ -100,14 +100,22 @@ boxplots, and release-summary overview panels. The release wrapper also asks it
 to write vector-first `plots/model_comparison_figures.pdf` so remote runs sync a
 portable publication-review packet without a separate local plotting step.
 
-For reproducing the 2023 retraining-notebook figure suite, pass
-`--paper-figures-artifacts-dir /path/to/2023/artifacts` (or set
-`PAPER_FIGURES_ARTIFACTS_DIR`). The wrapper passes that through to
-`mhcflurry plot-model-comparison`, which invokes `mhcflurry paper-figures`
-and writes SVG/PDF/PNG panels plus `paper_figures.pdf`, `manifest.csv`, and
-`missing_inputs.md` under `eval_comparison/plots/paper_2023/`. Figure
-families whose source tables are absent are reported there instead of being
-faked. The notebook-style comparator suite is configurable through
-`mhcflurry paper-figures` flags such as `--candidate-predictor`,
-`--external-baselines`, and `--preferred-predictors`; the defaults preserve the
-2023 notebook predictor set.
+For the broader paper-style figure suite, pass
+`--paper-figures-scores-dir /path/to/saved/evaluation/outputs` (or set
+`PAPER_FIGURES_SCORES_DIR`). That directory may contain derived score tables
+such as `accuracy_scores.multiallelic.csv`, saved test-set prediction tables
+such as `benchmark.multiallelic.csv.bz2`, or optional metadata/artwork tables.
+You can also pass explicit saved prediction tables with
+`--paper-figures-multiallelic-predictions` and
+`--paper-figures-monoallelic-predictions`. The legacy
+`--paper-figures-artifacts-dir` / `PAPER_FIGURES_ARTIFACTS_DIR` spelling is
+still accepted as an alias for older 2023 bundle paths. The wrapper passes
+those inputs through to `mhcflurry plot-model-comparison`, which invokes
+`mhcflurry paper-figures` and writes SVG/PDF/PNG panels plus
+`paper_figures.pdf`, `manifest.csv`, and `missing_inputs.md` under
+`eval_comparison/plots/paper_figures/`. Figure families whose source tables are
+absent are reported there instead of being faked. The comparator suite is
+configurable through `mhcflurry paper-figures` flags such as
+`--candidate-predictor`, `--external-baselines`, and `--preferred-predictors`;
+the defaults use NetMHCpan 4.0 BA/EL and MixMHCpred when those saved
+prediction columns are available.

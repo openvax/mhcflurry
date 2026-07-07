@@ -100,7 +100,9 @@ def test_plot_help_runs(capsys):
     captured = capsys.readouterr().out
     assert "--input" in captured
     assert "--a-label" in captured
+    assert "--paper-figures-scores-dir" in captured
     assert "--paper-figures-artifacts-dir" in captured
+    assert "--paper-figures-multiallelic-predictions" in captured
     assert "--paper-figures-candidate-predictor" in captured
     assert "--include-paper-figures-in-summary-pdf" in captured
 
@@ -109,29 +111,35 @@ def test_plot_model_comparison_dispatches_paper_figures(tmp_path, monkeypatch):
     captured = {}
 
     def fake_run(args):
-        captured["artifacts_dir"] = args.artifacts_dir
+        captured["scores_dir"] = args.scores_dir
+        captured["comparison_dir"] = args.comparison_dir
         captured["out"] = args.out
         captured["formats"] = args.formats
         captured["candidate_predictor"] = args.candidate_predictor
         captured["external_baselines"] = args.external_baselines
+        captured["multiallelic_predictions"] = args.multiallelic_predictions
         return 0
 
     monkeypatch.setattr(paper_figures, "run", fake_run)
     args = plot_model_comparison.make_parser().parse_args([
         "--input", str(tmp_path / "comparison"),
-        "--paper-figures-artifacts-dir", str(tmp_path / "artifacts"),
+        "--paper-figures-scores-dir", str(tmp_path / "scores"),
         "--paper-figures-out", str(tmp_path / "paper"),
         "--paper-figures-formats", "svg,pdf",
         "--paper-figures-candidate-predictor", "candidate",
         "--paper-figures-external-baselines", "baseline:ba",
+        "--paper-figures-multiallelic-predictions",
+        str(tmp_path / "predictions.csv"),
     ])
     assert plot_model_comparison.run(args) == 0
     assert captured == {
-        "artifacts_dir": str(tmp_path / "artifacts"),
+        "scores_dir": str(tmp_path / "scores"),
+        "comparison_dir": str(tmp_path / "comparison"),
         "out": str(tmp_path / "paper"),
         "formats": "svg,pdf",
         "candidate_predictor": "candidate",
         "external_baselines": "baseline:ba",
+        "multiallelic_predictions": str(tmp_path / "predictions.csv"),
     }
 
 
@@ -139,7 +147,10 @@ def test_paper_figures_help_runs(capsys):
     with pytest.raises(SystemExit):
         cli_main.main(["paper-figures", "--help"])
     captured = capsys.readouterr().out
+    assert "--scores-dir" in captured
     assert "--artifacts-dir" in captured
+    assert "--comparison-dir" in captured
+    assert "--multiallelic-predictions" in captured
     assert "--formats" in captured
     assert "--candidate-predictor" in captured
     assert "--external-baselines" in captured
@@ -1271,7 +1282,7 @@ def test_paper_figures_writes_available_2023_style_panels(tmp_path):
         artifacts / "accuracy_scores.multiallelic.csv", index=False)
 
     args = paper_figures.make_parser().parse_args([
-        "--artifacts-dir", str(artifacts),
+        "--scores-dir", str(artifacts),
         "--out", str(tmp_path / "paper"),
         "--formats", "svg,pdf,png",
     ])
@@ -1299,6 +1310,109 @@ def test_paper_figures_writes_available_2023_style_panels(tmp_path):
         == "fig.3_scores_plots_monoallelic.scatter.auc.monoallelic.ba"
     ).any()
     assert "skipped" in set(manifest["status"])
+
+
+def test_paper_figures_derives_scores_from_saved_predictions(tmp_path):
+    pytest.importorskip("matplotlib")
+
+    scores_dir = tmp_path / "scores"
+    scores_dir.mkdir()
+    rows = []
+    peptides = {
+        8: ("AAAAAAAK", "AAAAAAAL", "AAAAAAAM", "AAAAAAAN"),
+        9: ("AAAAAAAAK", "AAAAAAAAL", "AAAAAAAAM", "AAAAAAAAN"),
+    }
+    for sample_id, sample_offset in (("s1", 0), ("s2", 5)):
+        for length, peptide_values in peptides.items():
+            for row_index, peptide in enumerate(peptide_values):
+                hit = 1 if row_index < 2 else 0
+                good = 0.90 - sample_offset * 0.01 - row_index * 0.02
+                bad = 0.20 + row_index * 0.02
+                rows.append({
+                    "sample_id": sample_id,
+                    "sample_group": "MULTIALLELIC-RECENT",
+                    "peptide": peptide,
+                    "length": length,
+                    "hit": hit,
+                    "netmhcpan4.ba": 20.0 if hit else 2000.0,
+                    "netmhcpan4.el": good if hit else bad,
+                    "mixmhcpred": good - 0.05 if hit else bad + 0.05,
+                    "mhcflurry_production": good + 0.02 if hit else bad,
+                    "presentation_without_flanks_presentation_score": (
+                        good if hit else bad),
+                    "presentation_with_flanks_presentation_score": (
+                        good + 0.01 if hit else bad),
+                    "presentation_without_flanks_processing_score": (
+                        good - 0.03 if hit else bad),
+                    "presentation_with_flanks_processing_score": (
+                        good - 0.02 if hit else bad),
+                })
+    predictions = scores_dir / "benchmark.multiallelic.csv"
+    pandas.DataFrame(rows).to_csv(predictions, index=False)
+
+    args = paper_figures.make_parser().parse_args([
+        "--scores-dir", str(scores_dir),
+        "--multiallelic-predictions", str(predictions),
+        "--out", str(tmp_path / "paper"),
+        "--formats", "png",
+        "--combined-pdf", "none",
+    ])
+    assert paper_figures.run(args) == 0
+    manifest = pandas.read_csv(tmp_path / "paper" / "manifest.csv")
+    assert (
+        manifest["figure"]
+        == "fig.3_scores_plots_multiallelic.scatter.auc.ba"
+    ).any()
+    assert (
+        tmp_path / "paper" / "png" /
+        "fig.3_scores_plots_multiallelic.scatter.auc.ba.png"
+    ).is_file()
+
+
+def test_paper_figures_uses_current_comparison_when_scores_absent(tmp_path):
+    pytest.importorskip("matplotlib")
+
+    comparison = tmp_path / "comparison"
+    (comparison / "affinity").mkdir(parents=True)
+    (comparison / "side_a.json").write_text(json.dumps({"label": "current"}))
+    (comparison / "side_b.json").write_text(json.dumps({"label": "public"}))
+    pandas.DataFrame([
+        {
+            "allele": "HLA-A*02:01",
+            "n": 40,
+            "n_pos": 10,
+            "a_roc_auc": 0.95,
+            "b_roc_auc": 0.90,
+            "a_ppv_at_n": 0.80,
+            "b_ppv_at_n": 0.70,
+        },
+        {
+            "allele": "HLA-B*07:02",
+            "n": 40,
+            "n_pos": 10,
+            "a_roc_auc": 0.91,
+            "b_roc_auc": 0.88,
+            "a_ppv_at_n": 0.76,
+            "b_ppv_at_n": 0.72,
+        },
+    ]).to_csv(comparison / "affinity" / "per_allele.csv", index=False)
+
+    args = paper_figures.make_parser().parse_args([
+        "--comparison-dir", str(comparison),
+        "--out", str(tmp_path / "paper"),
+        "--formats", "png",
+        "--combined-pdf", "none",
+    ])
+    assert paper_figures.run(args) == 0
+    manifest = pandas.read_csv(tmp_path / "paper" / "manifest.csv")
+    assert (
+        manifest["figure"]
+        == "fig.1_model_selection_predictor_accuracy.scores.hla_a"
+    ).any()
+    assert (
+        manifest["figure"]
+        == "fig.3_scores_plots_monoallelic.scatter.auc.monoallelic.ba"
+    ).any()
 
 
 def test_paper_figures_external_baseline_geometry_is_configurable(tmp_path):

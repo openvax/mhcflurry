@@ -27,6 +27,14 @@ from pathlib import Path
 import numpy
 import pandas
 
+from .figure_style import (
+    DIAGONAL_COLOR,
+    NEGATIVE_DELTA_COLOR,
+    POSITIVE_DELTA_COLOR,
+    SIDE_A_COLOR,
+    SIDE_B_COLOR,
+    apply_paper_style as _apply_paper_style,
+)
 from .model_comparison_constants import (
     METRIC_NAMES,
     PRESENTATION_MODES,
@@ -40,14 +48,6 @@ METRIC_DISPLAY_NAMES = {
     "pr_auc": "AUPRC",
     "ppv_at_n": "PPV@N",
 }
-
-SIDE_A_COLOR = (0.596, 0.557, 0.835)
-SIDE_B_COLOR = (0.545, 0.545, 0.545)
-POSITIVE_DELTA_COLOR = (0.353, 0.612, 0.518)
-NEGATIVE_DELTA_COLOR = (0.886, 0.290, 0.200)
-GRID_COLOR = "0.88"
-DIAGONAL_COLOR = "0.55"
-
 
 def make_parser():
     """Return a standalone parser for documentation tooling (autoprogram)."""
@@ -101,18 +101,25 @@ def register_subparser(parser):
         ),
     )
     parser.add_argument(
+        "--paper-figures-scores-dir",
+        help=(
+            "Optional saved figure-input directory passed to "
+            "``mhcflurry paper-figures --scores-dir``. This may contain "
+            "saved prediction tables, derived score tables, and predictor "
+            "metadata."
+        ),
+    )
+    parser.add_argument(
         "--paper-figures-artifacts-dir",
         help=(
-            "Optional 2023-style retraining artifact directory. When set, "
-            "also runs ``mhcflurry paper-figures`` and writes notebook-style "
-            "SVG/PDF/PNG figures."
+            "Compatibility alias for --paper-figures-scores-dir."
         ),
     )
     parser.add_argument(
         "--paper-figures-out",
         help=(
-            "Output directory for --paper-figures-artifacts-dir. Default: "
-            "<input>/plots/paper_2023."
+            "Output directory for paper-style figures. Default: "
+            "<input>/plots/paper_figures."
         ),
     )
     parser.add_argument(
@@ -125,10 +132,8 @@ def register_subparser(parser):
         action="store_true",
         default=False,
         help=(
-            "When --summary-pdf and --paper-figures-artifacts-dir are both "
-            "set, append paper_2023/paper_figures.pdf to the summary PDF. "
-            "Off by default because those notebook artifacts may contain "
-            "archival predictor outputs rather than the current comparison."
+            "When --summary-pdf and paper-style figures are enabled, append "
+            "paper_figures/paper_figures.pdf to the summary PDF."
         ),
     )
     parser.add_argument(
@@ -140,6 +145,20 @@ def register_subparser(parser):
         help=(
             "External baselines passed through to ``mhcflurry paper-figures`` "
             "as PREDICTOR or PREDICTOR:PERCENT_CHANGE_SUFFIX."
+        ),
+    )
+    parser.add_argument(
+        "--paper-figures-multiallelic-predictions",
+        help=(
+            "Saved multiallelic test-set prediction table passed through to "
+            "``mhcflurry paper-figures``."
+        ),
+    )
+    parser.add_argument(
+        "--paper-figures-monoallelic-predictions",
+        help=(
+            "Saved monoallelic test-set prediction table passed through to "
+            "``mhcflurry paper-figures``."
         ),
     )
     parser.add_argument(
@@ -218,15 +237,27 @@ def run(args):
     _safe_plot(
         "release-summary plots", _plot_release_summary, args.input,
         paper_dir, labels)
-    if args.paper_figures_artifacts_dir:
+    paper_scores_dir = (
+        args.paper_figures_scores_dir or args.paper_figures_artifacts_dir
+    )
+    paper_inputs_requested = any([
+        paper_scores_dir,
+        args.paper_figures_multiallelic_predictions,
+        args.paper_figures_monoallelic_predictions,
+    ])
+    if paper_inputs_requested:
         from . import paper_figures
 
-        out_dir = args.paper_figures_out or os.path.join(plot_dir, "paper_2023")
-        paper_args = paper_figures.make_parser().parse_args([
-            "--artifacts-dir", args.paper_figures_artifacts_dir,
+        out_dir = args.paper_figures_out or os.path.join(
+            plot_dir, "paper_figures")
+        paper_argv = [
+            "--comparison-dir", args.input,
             "--out", out_dir,
             "--formats", args.paper_figures_formats,
-        ])
+        ]
+        if paper_scores_dir:
+            paper_argv.extend(["--scores-dir", paper_scores_dir])
+        paper_args = paper_figures.make_parser().parse_args(paper_argv)
         _append_optional_paper_figure_args(args, paper_args)
         status = paper_figures.run(paper_args)
         if status:
@@ -237,52 +268,17 @@ def run(args):
             _write_summary_pdf,
             plot_dir,
             args.summary_pdf,
-            include_paper_2023=args.include_paper_figures_in_summary_pdf,
+            include_paper_figures=args.include_paper_figures_in_summary_pdf,
         )
     return 0
-
-
-def _apply_paper_style():
-    import matplotlib.pyplot as plt
-
-    try:
-        import seaborn
-        seaborn.set_context("paper")
-        seaborn.set_style("white")
-    except ImportError:
-        pass
-    try:
-        plt.style.use("seaborn-v0_8-white")
-    except OSError:
-        try:
-            plt.style.use("seaborn-white")
-        except OSError:
-            pass
-    plt.rcParams.update({
-        "font.family": "sans-serif",
-        "font.size": 9,
-        "axes.labelsize": 9,
-        "axes.titlesize": 10,
-        "legend.fontsize": 8,
-        "xtick.labelsize": 8,
-        "ytick.labelsize": 8,
-        "figure.dpi": 150,
-        "savefig.dpi": 300,
-        "axes.spines.top": False,
-        "axes.spines.right": False,
-        "axes.edgecolor": "0.15",
-        "axes.linewidth": 0.8,
-        "grid.color": GRID_COLOR,
-        "grid.linewidth": 0.6,
-        "legend.frameon": False,
-        "text.usetex": False,
-    })
 
 
 def _append_optional_paper_figure_args(args, paper_args):
     passthrough = {
         "paper_figures_candidate_predictor": "candidate_predictor",
         "paper_figures_external_baselines": "external_baselines",
+        "paper_figures_multiallelic_predictions": "multiallelic_predictions",
+        "paper_figures_monoallelic_predictions": "monoallelic_predictions",
         "paper_figures_preferred_predictors": "preferred_predictors",
         "paper_figures_presentation_panel_predictors": (
             "presentation_panel_predictors"
@@ -935,14 +931,14 @@ def _metric_ylim(metric, values):
     return low, high
 
 
-def _write_summary_pdf(plot_dir, out_path, include_paper_2023=False):
+def _write_summary_pdf(plot_dir, out_path, include_paper_figures=False):
     plot_dir = Path(plot_dir)
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pdfs = [
         path for path in sorted(plot_dir.rglob("*.pdf"))
         if _include_pdf_in_summary(
-            path, plot_dir, out_path, include_paper_2023)
+            path, plot_dir, out_path, include_paper_figures)
     ]
     if pdfs:
         try:
@@ -974,17 +970,21 @@ def _write_summary_pdf(plot_dir, out_path, include_paper_2023=False):
     _write_summary_pdf_from_pngs(plot_dir, out_path)
 
 
-def _include_pdf_in_summary(path, plot_dir, out_path, include_paper_2023):
+def _include_pdf_in_summary(path, plot_dir, out_path, include_paper_figures):
     if path.resolve() == out_path.resolve():
         return False
     relative_parts = path.relative_to(plot_dir).parts
     if len(relative_parts) == 1:
         return False
-    if "paper_2023" not in relative_parts:
+    paper_figure_dirs = {"paper_figures", "paper_2023"}
+    if not paper_figure_dirs.intersection(relative_parts):
         return True
     return (
-        include_paper_2023
-        and relative_parts == ("paper_2023", "paper_figures.pdf")
+        include_paper_figures
+        and relative_parts in {
+            ("paper_figures", "paper_figures.pdf"),
+            ("paper_2023", "paper_figures.pdf"),
+        }
     )
 
 

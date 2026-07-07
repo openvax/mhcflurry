@@ -198,8 +198,18 @@ def remote_training_env(environ=os.environ):
         "PRESENTATION_MODES": environ.get(
             "PRESENTATION_MODES", "with_flanks,without_flanks"
         ),
+        "PAPER_FIGURES_SCORES_DIR": environ.get(
+            "PAPER_FIGURES_SCORES_DIR",
+            environ.get("PAPER_FIGURES_ARTIFACTS_DIR", ""),
+        ),
         "PAPER_FIGURES_ARTIFACTS_DIR": environ.get(
             "PAPER_FIGURES_ARTIFACTS_DIR", ""
+        ),
+        "PAPER_FIGURES_MULTIALLELIC_PREDICTIONS": environ.get(
+            "PAPER_FIGURES_MULTIALLELIC_PREDICTIONS", ""
+        ),
+        "PAPER_FIGURES_MONOALLELIC_PREDICTIONS": environ.get(
+            "PAPER_FIGURES_MONOALLELIC_PREDICTIONS", ""
         ),
         "PAPER_FIGURES_FORMATS": environ.get(
             "PAPER_FIGURES_FORMATS", "svg,pdf,png"
@@ -404,15 +414,30 @@ def run_release_plots(repo, out, env):
         "--summary-pdf",
         str(out / "eval_comparison" / "plots" / "model_comparison_figures.pdf"),
     ]
-    artifacts_dir = env.get("PAPER_FIGURES_ARTIFACTS_DIR", "").strip()
-    if artifacts_dir:
+    scores_dir = env.get("PAPER_FIGURES_SCORES_DIR", "").strip()
+    multiallelic_predictions = env.get(
+        "PAPER_FIGURES_MULTIALLELIC_PREDICTIONS", "").strip()
+    monoallelic_predictions = env.get(
+        "PAPER_FIGURES_MONOALLELIC_PREDICTIONS", "").strip()
+    if scores_dir or multiallelic_predictions or monoallelic_predictions:
         plot_args.extend([
-            "--paper-figures-artifacts-dir", artifacts_dir,
             "--paper-figures-out",
-            str(out / "eval_comparison" / "plots" / "paper_2023"),
+            str(out / "eval_comparison" / "plots" / "paper_figures"),
             "--paper-figures-formats",
             env.get("PAPER_FIGURES_FORMATS", "svg,pdf,png"),
         ])
+        if scores_dir:
+            plot_args.extend(["--paper-figures-scores-dir", scores_dir])
+        if multiallelic_predictions:
+            plot_args.extend([
+                "--paper-figures-multiallelic-predictions",
+                multiallelic_predictions,
+            ])
+        if monoallelic_predictions:
+            plot_args.extend([
+                "--paper-figures-monoallelic-predictions",
+                monoallelic_predictions,
+            ])
         passthrough = (
             ("PAPER_FIGURES_CANDIDATE_PREDICTOR",
              "--paper-figures-candidate-predictor"),
