@@ -85,6 +85,12 @@ validation), prefer `scripts/release/retrain_evaluate_deploy.sh`.
   release-summary panels from a `compare-models` output directory. It can also
   collect the generated PNGs into a single PDF via `--summary-pdf`. Separate
   subcommand so the metric pipeline doesn't pay the matplotlib import cost.
+- **`mhcflurry paper-figures`** — Ports the 2023 retraining-notebook figure
+  suite into a reproducible CLI. It consumes notebook-style artifacts such as
+  `accuracy_scores.multiallelic.csv`, `predictor_info.csv`, monoallelic/AP
+  score tables, motif workbooks, and architecture artwork; writes SVG/PDF/PNG
+  panels plus a vector multi-page PDF; and records unavailable figure families
+  in `manifest.csv` / `missing_inputs.md` instead of silently fabricating them.
 - **`plot_minibatch_sweep.py`** — Stylized plots from a `sweep_summary.csv`
   (gradient-color dots by mb, lin-lin + log-log only, adjustText
   de-overlap). Invoked by the sweep wrapper after completion.

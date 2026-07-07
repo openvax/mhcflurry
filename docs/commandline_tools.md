@@ -11,8 +11,9 @@ Every historical `mhcflurry-*` console script is also reachable as
 same underlying entry point; the legacy `mhcflurry-*` scripts remain
 installed as compat shims and are not changing.
 
-The two commands new in 2.3.0 — `mhcflurry compare-models` and
-`mhcflurry plot-model-comparison` — only have the parent-command form.
+The commands new in 2.3.0 — `mhcflurry compare-models`,
+`mhcflurry plot-model-comparison`, and `mhcflurry paper-figures` — only
+have the parent-command form.
 
 ## Prediction and data
 
@@ -93,6 +94,11 @@ The two commands new in 2.3.0 — `mhcflurry compare-models` and
 
 .. autoprogram:: mhcflurry.cli.plot_model_comparison:parser
     :prog: mhcflurry plot-model-comparison
+
+.. _ref-mhcflurry-paper-figures:
+
+.. autoprogram:: mhcflurry.cli.paper_figures:parser
+    :prog: mhcflurry paper-figures
 ```
 
 ## Pseudosequence registry helper

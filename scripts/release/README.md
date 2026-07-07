@@ -93,3 +93,12 @@ per-sample processing/presentation scatter panels, per-length bars, delta
 boxplots, and release-summary overview panels. The release wrapper also asks it
 to write `plots/model_comparison_figures.pdf` so remote runs sync a portable
 figure packet without a separate local plotting step.
+
+For reproducing the 2023 retraining-notebook figure suite, pass
+`--paper-figures-artifacts-dir /path/to/2023/artifacts` (or set
+`PAPER_FIGURES_ARTIFACTS_DIR`). The wrapper passes that through to
+`mhcflurry plot-model-comparison`, which invokes `mhcflurry paper-figures`
+and writes SVG/PDF/PNG panels plus `paper_figures.pdf`, `manifest.csv`, and
+`missing_inputs.md` under `eval_comparison/plots/paper_2023/`. Figure
+families whose source tables are absent are reported there instead of being
+faked.

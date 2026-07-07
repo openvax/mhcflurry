@@ -79,6 +79,26 @@ def register_subparser(parser):
             "collected into a single PDF."
         ),
     )
+    parser.add_argument(
+        "--paper-figures-artifacts-dir",
+        help=(
+            "Optional 2023-style retraining artifact directory. When set, "
+            "also runs ``mhcflurry paper-figures`` and writes notebook-style "
+            "SVG/PDF/PNG figures."
+        ),
+    )
+    parser.add_argument(
+        "--paper-figures-out",
+        help=(
+            "Output directory for --paper-figures-artifacts-dir. Default: "
+            "<input>/plots/paper_2023."
+        ),
+    )
+    parser.add_argument(
+        "--paper-figures-formats",
+        default="svg,pdf,png",
+        help="Comma-separated paper-figure formats. Default: %(default)s.",
+    )
     return parser
 
 
@@ -111,6 +131,18 @@ def run(args):
     _plot_release_summary(args.input, paper_dir, labels)
     if args.summary_pdf:
         _write_summary_pdf(plot_dir, args.summary_pdf)
+    if args.paper_figures_artifacts_dir:
+        from . import paper_figures
+
+        out_dir = args.paper_figures_out or os.path.join(plot_dir, "paper_2023")
+        paper_args = paper_figures.make_parser().parse_args([
+            "--artifacts-dir", args.paper_figures_artifacts_dir,
+            "--out", out_dir,
+            "--formats", args.paper_figures_formats,
+        ])
+        status = paper_figures.run(paper_args)
+        if status:
+            return status
     return 0
 
 

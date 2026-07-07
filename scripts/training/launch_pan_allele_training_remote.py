@@ -194,6 +194,12 @@ def remote_training_env(environ=os.environ):
         "PRESENTATION_MODES": environ.get(
             "PRESENTATION_MODES", "with_flanks,without_flanks"
         ),
+        "PAPER_FIGURES_ARTIFACTS_DIR": environ.get(
+            "PAPER_FIGURES_ARTIFACTS_DIR", ""
+        ),
+        "PAPER_FIGURES_FORMATS": environ.get(
+            "PAPER_FIGURES_FORMATS", "svg,pdf,png"
+        ),
         "PROCESSING_VARIANTS": environ.get(
             "PROCESSING_VARIANTS", "with_flanks no_flank short_flanks"
         ),
@@ -350,18 +356,23 @@ def run_release_evaluation(repo, out, env):
 
 def run_release_plots(repo, out, env):
     """Render compare-models plots before the remote instance is cleaned up."""
-    subprocess.run(
-        [
-            "mhcflurry",
-            "plot-model-comparison",
-            "--input", str(out / "eval_comparison"),
-            "--summary-pdf",
-            str(out / "eval_comparison" / "plots" / "model_comparison_figures.pdf"),
-        ],
-        check=True,
-        cwd=repo,
-        env=env,
-    )
+    plot_args = [
+        "mhcflurry",
+        "plot-model-comparison",
+        "--input", str(out / "eval_comparison"),
+        "--summary-pdf",
+        str(out / "eval_comparison" / "plots" / "model_comparison_figures.pdf"),
+    ]
+    artifacts_dir = env.get("PAPER_FIGURES_ARTIFACTS_DIR", "").strip()
+    if artifacts_dir:
+        plot_args.extend([
+            "--paper-figures-artifacts-dir", artifacts_dir,
+            "--paper-figures-out",
+            str(out / "eval_comparison" / "plots" / "paper_2023"),
+            "--paper-figures-formats",
+            env.get("PAPER_FIGURES_FORMATS", "svg,pdf,png"),
+        ])
+    subprocess.run(plot_args, check=True, cwd=repo, env=env)
 
 
 @app.local_entrypoint()

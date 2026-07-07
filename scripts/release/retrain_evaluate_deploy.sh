@@ -36,6 +36,7 @@ Usage:
       [--brev-create-timeout-seconds 2400] \
       [--brev-container-image pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime] \
       [--brev-sync-mode release|full] \
+      [--paper-figures-artifacts-dir DIR] \
       [--brev-instance-type TYPE] \
       [--skip-train] [--skip-eval] [--skip-plots] [--skip-deploy] \
       [--deploy-mode dry-run|draft|publish]
@@ -64,6 +65,10 @@ Evaluation:
   affinity, processing, and presentation release-gate tables. Presentation
   inference is memory-heavier than affinity/processing, so the release wrapper
   defaults it to one GPU worker unless overridden.
+  If --paper-figures-artifacts-dir is set, the plotting step also runs:
+      mhcflurry paper-figures --artifacts-dir DIR
+  and writes notebook-style SVG/PDF/PNG panels under
+  RUN_DIR/eval_comparison/plots/paper_2023/.
 
 Deployment:
   The final step calls deploy_trained_models.sh. The default deploy mode is
@@ -525,6 +530,8 @@ EOF
         printf 'export COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU=%q\n' "$COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU"
         printf 'export COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER=%q\n' "$COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER"
         printf 'export COMPARE_PRESENTATION_TORCH_COMPILE=%q\n' "$COMPARE_PRESENTATION_TORCH_COMPILE"
+        printf 'export PAPER_FIGURES_ARTIFACTS_DIR=%q\n' "$PAPER_FIGURES_ARTIFACTS_DIR"
+        printf 'export PAPER_FIGURES_FORMATS=%q\n' "$PAPER_FIGURES_FORMATS"
         cat <<'EOF'
 
 remote_root=/root/mhcflurry-postprocess
@@ -588,9 +595,19 @@ esac
 "${compare_args[@]}"
 
 if [ "${RUN_RELEASE_PLOTS:-1}" = "1" ]; then
-    mhcflurry plot-model-comparison \
-        --input "$run_dir/eval_comparison" \
+    plot_args=(
+        mhcflurry plot-model-comparison
+        --input "$run_dir/eval_comparison"
         --summary-pdf "$run_dir/eval_comparison/plots/model_comparison_figures.pdf"
+    )
+    if [ -n "${PAPER_FIGURES_ARTIFACTS_DIR:-}" ]; then
+        plot_args+=(
+            --paper-figures-artifacts-dir "$PAPER_FIGURES_ARTIFACTS_DIR"
+            --paper-figures-out "$run_dir/eval_comparison/plots/paper_2023"
+            --paper-figures-formats "${PAPER_FIGURES_FORMATS:-svg,pdf,png}"
+        )
+    fi
+    "${plot_args[@]}"
     python scripts/training/plot_loss_curves.py \
         --selected-dir "$run_dir/affinity/models.combined" \
         --out "$run_dir/affinity/loss_plots"
@@ -898,6 +915,8 @@ run_brev_training() {
         "COMPARE_INCLUDE=$COMPARE_INCLUDE"
         "PROCESSING_MODES=$PROCESSING_MODES"
         "PRESENTATION_MODES=$PRESENTATION_MODES"
+        "PAPER_FIGURES_ARTIFACTS_DIR=$PAPER_FIGURES_ARTIFACTS_DIR"
+        "PAPER_FIGURES_FORMATS=$PAPER_FIGURES_FORMATS"
         "RUN_LABEL=$RUN_LABEL"
         "RUNPLZ_BREV_AUTO_CREATE=$auto_create"
         "RUNPLZ_BREV_ON_FINISH=$runplz_on_finish"
@@ -989,6 +1008,8 @@ COMPARE_PRESENTATION_NUM_JOBS="${COMPARE_PRESENTATION_NUM_JOBS:-1}"
 COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU="${COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU:-1}"
 COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER="${COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER:-1}"
 COMPARE_PRESENTATION_TORCH_COMPILE="${COMPARE_PRESENTATION_TORCH_COMPILE:-0}"
+PAPER_FIGURES_ARTIFACTS_DIR="${PAPER_FIGURES_ARTIFACTS_DIR:-}"
+PAPER_FIGURES_FORMATS="${PAPER_FIGURES_FORMATS:-svg,pdf,png}"
 RUN_LABEL=new
 DRY_RUN=0
 TRAINING_MINIBATCH_SIZE=1024
@@ -1131,6 +1152,10 @@ while [ $# -gt 0 ]; do
             ;;
         --compare-presentation-torch-compile)
             COMPARE_PRESENTATION_TORCH_COMPILE=$2
+            shift 2
+            ;;
+        --paper-figures-artifacts-dir)
+            PAPER_FIGURES_ARTIFACTS_DIR=$2
             shift 2
             ;;
         --run-label)
@@ -1388,10 +1413,20 @@ if [ "$SKIP_PLOTS" != "1" ]; then
     if [ "$BREV_REMOTE_PLOTS_DONE" = "1" ]; then
         note "Using plots produced on the Brev instance."
     else
+        plot_args=(
+            mhcflurry plot-model-comparison
+            --input "$RUN_DIR/eval_comparison"
+            --summary-pdf "$RUN_DIR/eval_comparison/plots/model_comparison_figures.pdf"
+        )
+        if [ -n "$PAPER_FIGURES_ARTIFACTS_DIR" ]; then
+            plot_args+=(
+                --paper-figures-artifacts-dir "$PAPER_FIGURES_ARTIFACTS_DIR"
+                --paper-figures-out "$RUN_DIR/eval_comparison/plots/paper_2023"
+                --paper-figures-formats "$PAPER_FIGURES_FORMATS"
+            )
+        fi
         run_logged_step plot_model_comparison \
-            mhcflurry plot-model-comparison \
-                --input "$RUN_DIR/eval_comparison" \
-                --summary-pdf "$RUN_DIR/eval_comparison/plots/model_comparison_figures.pdf"
+            "${plot_args[@]}"
     fi
 else
     note "Skipping plots."

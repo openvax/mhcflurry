@@ -31,6 +31,7 @@ import pytest
 import yaml
 
 from mhcflurry.cli import compare_models, main as cli_main
+from mhcflurry.cli import paper_figures
 from mhcflurry.cli import plot_model_comparison
 
 
@@ -39,6 +40,7 @@ def test_top_level_parser_lists_subcommands():
     help_text = parser.format_help()
     assert "compare-models" in help_text
     assert "plot-model-comparison" in help_text
+    assert "paper-figures" in help_text
 
 
 def test_compare_models_help_runs(capsys):
@@ -97,6 +99,39 @@ def test_plot_help_runs(capsys):
         cli_main.main(["plot-model-comparison", "--help"])
     captured = capsys.readouterr().out
     assert "--input" in captured
+    assert "--paper-figures-artifacts-dir" in captured
+
+
+def test_plot_model_comparison_dispatches_paper_figures(tmp_path, monkeypatch):
+    captured = {}
+
+    def fake_run(args):
+        captured["artifacts_dir"] = args.artifacts_dir
+        captured["out"] = args.out
+        captured["formats"] = args.formats
+        return 0
+
+    monkeypatch.setattr(paper_figures, "run", fake_run)
+    args = plot_model_comparison.make_parser().parse_args([
+        "--input", str(tmp_path / "comparison"),
+        "--paper-figures-artifacts-dir", str(tmp_path / "artifacts"),
+        "--paper-figures-out", str(tmp_path / "paper"),
+        "--paper-figures-formats", "svg,pdf",
+    ])
+    assert plot_model_comparison.run(args) == 0
+    assert captured == {
+        "artifacts_dir": str(tmp_path / "artifacts"),
+        "out": str(tmp_path / "paper"),
+        "formats": "svg,pdf",
+    }
+
+
+def test_paper_figures_help_runs(capsys):
+    with pytest.raises(SystemExit):
+        cli_main.main(["paper-figures", "--help"])
+    captured = capsys.readouterr().out
+    assert "--artifacts-dir" in captured
+    assert "--formats" in captured
 
 
 def test_unknown_subcommand_errors():
@@ -1089,3 +1124,138 @@ def test_plot_model_comparison_writes_paper_plots_from_summaries(tmp_path):
         tmp_path / "plots" / "figures.pdf",
     ]:
         assert path.is_file()
+
+
+def test_paper_figures_writes_available_2023_style_panels(tmp_path):
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    pandas.DataFrame([
+        {
+            "predictor": "netmhcpan4.ba",
+            "description": "NetMHCpan BA",
+            "primary": True,
+            "color": "(0.8, 0.2, 0.1)",
+            "short": "NetMHCpan BA",
+            "detail": "-",
+        },
+        {
+            "predictor": "netmhcpan4.el",
+            "description": "NetMHCpan EL",
+            "primary": True,
+            "color": "(1.0, 0.6, 0.6)",
+            "short": "NetMHCpan EL",
+            "detail": "-",
+        },
+        {
+            "predictor": "mixmhcpred",
+            "description": "MixMHCpred",
+            "primary": True,
+            "color": "(0.2, 0.5, 0.8)",
+            "short": "MixMHCpred",
+            "detail": "-",
+        },
+        {
+            "predictor": "mhcflurry_production",
+            "description": "MHCflurry BA",
+            "primary": True,
+            "color": "(0.5, 0.4, 0.8)",
+            "short": "MHCflurry BA",
+            "detail": "-",
+        },
+        {
+            "predictor": "presentation_without_flanks_presentation_score",
+            "description": "MHCflurry PS -flanks",
+            "primary": True,
+            "color": "(0.9, 0.6, 0.2)",
+            "short": "PS -flanks",
+            "detail": "-",
+        },
+        {
+            "predictor": "presentation_with_flanks_presentation_score",
+            "description": "MHCflurry PS +flanks",
+            "primary": True,
+            "color": "(0.3, 0.7, 0.2)",
+            "short": "PS +flanks",
+            "detail": "-",
+        },
+        {
+            "predictor": "presentation_without_flanks_processing_score",
+            "description": "MHCflurry AP -flanks",
+            "primary": False,
+            "color": "(0.1, 0.4, 0.2)",
+            "short": "AP -flanks",
+            "detail": "-",
+        },
+        {
+            "predictor": "presentation_with_flanks_processing_score",
+            "description": "MHCflurry AP +flanks",
+            "primary": False,
+            "color": "(0.8, 0.5, 0.7)",
+            "short": "AP +flanks",
+            "detail": "-",
+        },
+    ]).to_csv(artifacts / "predictor_info.csv", index=False)
+
+    predictors = [
+        "netmhcpan4.ba",
+        "netmhcpan4.el",
+        "mixmhcpred",
+        "mhcflurry_production_affinity",
+        "presentation_without_flanks_presentation_score",
+        "presentation_with_flanks_presentation_score",
+        "presentation_without_flanks_processing_score",
+        "presentation_with_flanks_processing_score",
+    ]
+    rows = []
+    for sample_index, sample_id in enumerate(["sample1", "sample2", "sample3"]):
+        for length_label, length in [("All", numpy.nan), ("8-mer", 8), ("9-mer", 9)]:
+            for predictor_index, predictor in enumerate(predictors):
+                base = 0.55 + sample_index * 0.02 + predictor_index * 0.01
+                if length_label != "All":
+                    base -= 0.03
+                rows.append({
+                    "sample_id": sample_id,
+                    "length": length,
+                    "length_label": length_label,
+                    "predictor": predictor,
+                    "ppv": min(0.95, base),
+                    "auc": min(0.99, base + 0.15),
+                    "percent_change_auc_ba": predictor_index + 1.0,
+                    "percent_change_ppv_ba": predictor_index + 2.0,
+                    "percent_change_auc_el": predictor_index + 3.0,
+                    "percent_change_ppv_el": predictor_index + 4.0,
+                    "percent_change_auc_mixmhcpred": predictor_index + 5.0,
+                    "percent_change_ppv_mixmhcpred": predictor_index + 6.0,
+                })
+    pandas.DataFrame(rows).to_csv(
+        artifacts / "accuracy_scores.multiallelic.csv", index=False)
+
+    args = paper_figures.make_parser().parse_args([
+        "--artifacts-dir", str(artifacts),
+        "--out", str(tmp_path / "paper"),
+        "--formats", "svg,pdf,png",
+    ])
+    assert paper_figures.run(args) == 0
+
+    for path in [
+        tmp_path / "paper" / "svg" /
+        "fig.3_scores_plots_multiallelic.scatter.auc.ba.svg",
+        tmp_path / "paper" / "pdf" /
+        "fig.3_scores_plots_multiallelic.scatter.ppv.presentation.pdf",
+        tmp_path / "paper" / "png" /
+        "fig.3_scores_plots_multiallelic.bar.auc.presentation.png",
+        tmp_path / "paper" / "paper_figures.pdf",
+        tmp_path / "paper" / "manifest.csv",
+        tmp_path / "paper" / "missing_inputs.md",
+    ]:
+        assert path.is_file()
+    manifest = pandas.read_csv(tmp_path / "paper" / "manifest.csv")
+    assert (
+        manifest["figure"]
+        == "fig.3_scores_plots_multiallelic.scatter.auc.ba"
+    ).any()
+    assert (
+        manifest["figure"]
+        == "fig.3_scores_plots_monoallelic.scatter.auc.monoallelic.ba"
+    ).any()
+    assert "skipped" in set(manifest["status"])

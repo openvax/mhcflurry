@@ -19,7 +19,8 @@ need. This keeps the torch-import cost off the top-level help path.
 
 Two flavors of subcommand:
 
-* **New under the parent**: ``compare-models``, ``plot-model-comparison``.
+* **New under the parent**: ``compare-models``, ``plot-model-comparison``,
+  ``paper-figures``.
   Each module exposes ``run_argv(argv)`` which does its own argparse.
 * **Historical mhcflurry-* commands**: ``predict``, ``predict-scan``,
   ``downloads``, ``calibrate-percentile-ranks``, the ``class1-train-*`` /
@@ -49,6 +50,9 @@ _SUBCOMMANDS = {
     "plot-model-comparison": (
         "mhcflurry.cli.plot_model_comparison", "run_argv",
         "Render plots from a compare-models output directory."),
+    "paper-figures": (
+        "mhcflurry.cli.paper_figures", "run_argv",
+        "Render paper-style figures from retraining artifacts."),
     "predict": (
         "mhcflurry.cli.predict_command", "run",
         "Predict MHC binding affinities for peptide/allele pairs."),
@@ -119,7 +123,7 @@ _HELP_GROUPS = (
         "class1-select-processing-models",
     )),
     ("Model comparison (new in 2.3.0)", (
-        "compare-models", "plot-model-comparison",
+        "compare-models", "plot-model-comparison", "paper-figures",
     )),
     ("Helpers", (
         "class1-generate-training-hyperparameters",
