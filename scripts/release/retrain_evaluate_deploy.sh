@@ -118,7 +118,7 @@ lowercase() {
 }
 
 display_release_version() {
-    printf '%s' "$1" | sed 's/rc[0-9][0-9]*$//'
+    printf '%s' "$1" | sed 's/[.-]\{0,1\}rc[0-9][0-9]*$//'
 }
 
 public_release_from_spec() {
@@ -539,7 +539,7 @@ run_brev_postprocess_impl() {
     run_logged_step postprocess_wait_for_shell \
         wait_for_brev_shell_ready
     run_logged_step_with_timeout \
-        postprocess_prepare_remote_dir "$BREV_CLEANUP_TIMEOUT_SECONDS" \
+        postprocess_prepare_remote_dir "$BREV_CREATE_TIMEOUT_SECONDS" \
         brev exec "$BREV_INSTANCE" "mkdir -p '$remote_root'"
     run_logged_step_with_timeout \
         postprocess_copy_repo "$BREV_CREATE_TIMEOUT_SECONDS" \

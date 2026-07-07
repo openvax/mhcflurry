@@ -41,6 +41,13 @@ METRIC_DISPLAY_NAMES = {
     "ppv_at_n": "PPV@N",
 }
 
+SIDE_A_COLOR = (0.596, 0.557, 0.835)
+SIDE_B_COLOR = (0.545, 0.545, 0.545)
+POSITIVE_DELTA_COLOR = (0.353, 0.612, 0.518)
+NEGATIVE_DELTA_COLOR = (0.886, 0.290, 0.200)
+GRID_COLOR = "0.88"
+DIAGONAL_COLOR = "0.55"
+
 
 def make_parser():
     """Return a standalone parser for documentation tooling (autoprogram)."""
@@ -163,6 +170,7 @@ def run(args):
     import matplotlib
     matplotlib.use("Agg")
 
+    _apply_paper_style()
     labels = _load_side_labels(args.input)
     if args.a_label:
         labels["a"] = args.a_label
@@ -224,12 +232,51 @@ def run(args):
         if status:
             return status
     if args.summary_pdf:
-        _write_summary_pdf(
+        _safe_plot(
+            "summary PDF",
+            _write_summary_pdf,
             plot_dir,
             args.summary_pdf,
             include_paper_2023=args.include_paper_figures_in_summary_pdf,
         )
     return 0
+
+
+def _apply_paper_style():
+    import matplotlib.pyplot as plt
+
+    try:
+        import seaborn
+        seaborn.set_context("paper")
+        seaborn.set_style("white")
+    except ImportError:
+        pass
+    try:
+        plt.style.use("seaborn-v0_8-white")
+    except OSError:
+        try:
+            plt.style.use("seaborn-white")
+        except OSError:
+            pass
+    plt.rcParams.update({
+        "font.family": "sans-serif",
+        "font.size": 9,
+        "axes.labelsize": 9,
+        "axes.titlesize": 10,
+        "legend.fontsize": 8,
+        "xtick.labelsize": 8,
+        "ytick.labelsize": 8,
+        "figure.dpi": 150,
+        "savefig.dpi": 300,
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+        "axes.edgecolor": "0.15",
+        "axes.linewidth": 0.8,
+        "grid.color": GRID_COLOR,
+        "grid.linewidth": 0.6,
+        "legend.frameon": False,
+        "text.usetex": False,
+    })
 
 
 def _append_optional_paper_figure_args(args, paper_args):
@@ -368,11 +415,18 @@ def _save_per_allele_delta(plt, per_allele, sub_dir, label_a, label_b):
     sorted_df = per_allele.sort_values("roc_auc_diff", ascending=False)
     if sorted_df.empty:
         return
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.bar(numpy.arange(len(sorted_df)), sorted_df["roc_auc_diff"])
-    ax.axhline(0, color="0.6", linewidth=1)
+    fig, ax = plt.subplots(figsize=(7.1, 2.5))
+    values = sorted_df["roc_auc_diff"].to_numpy(dtype=float)
+    ax.bar(
+        numpy.arange(len(sorted_df)),
+        values,
+        color=_delta_colors(values),
+        edgecolor="white",
+        linewidth=0.3,
+    )
+    ax.axhline(0, color=DIAGONAL_COLOR, linewidth=0.8)
     ax.set_xlabel("allele (sorted by ROC-AUC delta)")
-    ax.set_ylabel("%s − %s ROC-AUC" % (label_a, label_b))
+    ax.set_ylabel("%s - %s ROC-AUC" % (label_a, label_b))
     ax.set_title("Per-allele ROC-AUC delta")
     fig.tight_layout()
     _save_figure(fig, os.path.join(sub_dir, "per_allele_roc_delta.png"))
@@ -556,13 +610,17 @@ def _plot_release_summary(input_dir, paper_dir, labels):
         rows = rows.set_index("plot_group").reindex(ordered_groups)
         x = numpy.arange(len(rows))
         width = 0.36
-        ax.bar(x - width / 2, rows.side_a, width, label=labels["a"])
-        ax.bar(x + width / 2, rows.side_b, width, label=labels["b"])
+        ax.bar(
+            x - width / 2, rows.side_a, width, label=labels["a"],
+            color=SIDE_A_COLOR, edgecolor="white", linewidth=0.5)
+        ax.bar(
+            x + width / 2, rows.side_b, width, label=labels["b"],
+            color=SIDE_B_COLOR, edgecolor="white", linewidth=0.5)
         ax.set_title(METRIC_DISPLAY_NAMES[metric])
         ax.set_xticks(x)
         ax.set_xticklabels(rows.index, rotation=35, ha="right")
         ax.set_ylim(_metric_ylim(metric, rows[["side_a", "side_b"]].values))
-        ax.grid(axis="y", color="0.9", linewidth=0.8)
+        ax.grid(axis="y")
     axes[0][0].set_ylabel("Macro mean")
     axes[0][-1].legend(frameon=False)
     fig.suptitle("Release-gate macro accuracy")
@@ -585,14 +643,15 @@ def _plot_release_summary(input_dir, paper_dir, labels):
         )
         rows = rows.set_index("plot_group").reindex(ordered_groups)
         values = rows["diff"].values
-        colors = numpy.where(values >= 0, "#2b8cbe", "#d95f02")
-        ax.bar(numpy.arange(len(rows)), values, color=colors)
-        ax.axhline(0, color="0.4", linewidth=0.8)
+        ax.bar(
+            numpy.arange(len(rows)), values, color=_delta_colors(values),
+            edgecolor="white", linewidth=0.5)
+        ax.axhline(0, color=DIAGONAL_COLOR, linewidth=0.8)
         ax.set_title(METRIC_DISPLAY_NAMES[metric])
         ax.set_xticks(numpy.arange(len(rows)))
         ax.set_xticklabels(rows.index, rotation=35, ha="right")
         ax.set_ylabel("%s - %s" % (labels["a"], labels["b"]))
-        ax.grid(axis="y", color="0.9", linewidth=0.8)
+        ax.grid(axis="y")
     fig.suptitle("Release-gate macro deltas")
     fig.tight_layout()
     _save_figure(fig, os.path.join(paper_dir, "release_summary_macro_delta.png"))
@@ -687,12 +746,15 @@ def _save_metric_scatter_grid(
                 continue
             x = x[mask]
             y = y[mask]
-            ax.scatter(x, y, s=12, alpha=0.55, linewidths=0)
+            colors = _winner_colors(x, y)
+            ax.scatter(
+                x, y, s=13, alpha=0.72, linewidths=0.15,
+                edgecolors="white", c=colors)
             low, high = _metric_ylim(metric, numpy.concatenate([x, y]))
-            ax.plot([low, high], [low, high], color="0.65", linewidth=0.8)
+            ax.plot([low, high], [low, high], color=DIAGONAL_COLOR, linewidth=0.8)
             ax.set_xlim(low, high)
             ax.set_ylim(low, high)
-            ax.grid(color="0.9", linewidth=0.8)
+            ax.grid(False)
             ax.set_title(METRIC_DISPLAY_NAMES[metric])
             if col_idx == 0:
                 ax.set_ylabel("%s\n%s" % (row_label, label_a))
@@ -732,14 +794,19 @@ def _save_metric_delta_boxplots(
             values = (df[a_col] - df[b_col]).dropna().values
             data.append(values)
         try:
-            ax.boxplot(data, tick_labels=labels, showfliers=False)
+            artists = ax.boxplot(
+                data, tick_labels=labels, showfliers=False,
+                patch_artist=True)
         except TypeError:
-            ax.boxplot(data, labels=labels, showfliers=False)
-        ax.axhline(0, color="0.4", linewidth=0.8)
+            artists = ax.boxplot(
+                data, labels=labels, showfliers=False,
+                patch_artist=True)
+        _style_boxplot(artists)
+        ax.axhline(0, color=DIAGONAL_COLOR, linewidth=0.8)
         ax.set_title(METRIC_DISPLAY_NAMES[metric])
         ax.set_ylabel("%s - %s" % (label_a, label_b))
         ax.tick_params(axis="x", labelrotation=25)
-        ax.grid(axis="y", color="0.9", linewidth=0.8)
+        ax.grid(axis="y")
     fig.suptitle(title)
     fig.tight_layout()
     _save_figure(fig, out_path)
@@ -771,14 +838,18 @@ def _save_per_length_grid(
             if a_col not in df.columns or b_col not in df.columns:
                 ax.axis("off")
                 continue
-            ax.bar(x - width / 2, df[a_col], width, label=label_a)
-            ax.bar(x + width / 2, df[b_col], width, label=label_b)
+            ax.bar(
+                x - width / 2, df[a_col], width, label=label_a,
+                color=SIDE_A_COLOR, edgecolor="white", linewidth=0.5)
+            ax.bar(
+                x + width / 2, df[b_col], width, label=label_b,
+                color=SIDE_B_COLOR, edgecolor="white", linewidth=0.5)
             ax.set_title(METRIC_DISPLAY_NAMES[metric])
             ax.set_xticks(x)
             ax.set_xticklabels(lengths)
             ax.set_xlabel("Peptide length")
             ax.set_ylim(_metric_ylim(metric, df[[a_col, b_col]].values))
-            ax.grid(axis="y", color="0.9", linewidth=0.8)
+            ax.grid(axis="y")
             if col_idx == 0:
                 ax.set_ylabel("%s\nMacro mean" % row_label)
             else:
@@ -806,6 +877,36 @@ def _metric_columns(metric, average=None):
     return "a_%s_%s" % (average, metric), "b_%s_%s" % (average, metric)
 
 
+def _winner_colors(x_values, y_values):
+    return [
+        SIDE_A_COLOR if y_value >= x_value else SIDE_B_COLOR
+        for x_value, y_value in zip(x_values, y_values)
+    ]
+
+
+def _delta_colors(values):
+    values = numpy.asarray(values, dtype=float)
+    return [
+        POSITIVE_DELTA_COLOR if value >= 0 else NEGATIVE_DELTA_COLOR
+        for value in values
+    ]
+
+
+def _style_boxplot(artists):
+    for patch in artists.get("boxes", []):
+        patch.set_facecolor(SIDE_A_COLOR)
+        patch.set_alpha(0.35)
+        patch.set_edgecolor("0.30")
+        patch.set_linewidth(0.8)
+    for median in artists.get("medians", []):
+        median.set_color("0.15")
+        median.set_linewidth(1.1)
+    for key in ("whiskers", "caps"):
+        for artist in artists.get(key, []):
+            artist.set_color("0.35")
+            artist.set_linewidth(0.8)
+
+
 def _metric_ylim(metric, values):
     values = numpy.asarray(values, dtype=float)
     values = values[~numpy.isnan(values)]
@@ -825,32 +926,51 @@ def _write_summary_pdf(plot_dir, out_path, include_paper_2023=False):
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pdfs = [
         path for path in sorted(plot_dir.rglob("*.pdf"))
-        if path.resolve() != out_path.resolve()
-        and (
-            "paper_2023" not in path.parts
-            or (
-                include_paper_2023
-                and path.name == "paper_figures.pdf"
-            )
-        )
+        if _include_pdf_in_summary(
+            path, plot_dir, out_path, include_paper_2023)
     ]
     if pdfs:
         try:
-            pdf_reader, pdf_writer = _pdf_reader_writer()
-        except ImportError:
+            try:
+                pdf_reader, pdf_writer = _pdf_reader_writer()
+            except ImportError:
+                _write_summary_pdf_from_pngs(plot_dir, out_path)
+                return
+            paper = [path for path in pdfs if "paper" in path.parts]
+            rest = [path for path in pdfs if path not in paper]
+            writer = pdf_writer()
+            for path in paper + rest:
+                reader = pdf_reader(str(path))
+                for page in reader.pages:
+                    writer.add_page(page)
+            with open(out_path, "wb") as fd:
+                writer.write(fd)
+            return
+        except Exception as e:
+            print(
+                "WARNING: PDF merge failed; rebuilding summary from PNGs: "
+                "%s: %s" % (type(e).__name__, e))
+            try:
+                out_path.unlink()
+            except FileNotFoundError:
+                pass
             _write_summary_pdf_from_pngs(plot_dir, out_path)
             return
-        paper = [path for path in pdfs if "paper" in path.parts]
-        rest = [path for path in pdfs if path not in paper]
-        writer = pdf_writer()
-        for path in paper + rest:
-            reader = pdf_reader(str(path))
-            for page in reader.pages:
-                writer.add_page(page)
-        with open(out_path, "wb") as fd:
-            writer.write(fd)
-        return
     _write_summary_pdf_from_pngs(plot_dir, out_path)
+
+
+def _include_pdf_in_summary(path, plot_dir, out_path, include_paper_2023):
+    if path.resolve() == out_path.resolve():
+        return False
+    relative_parts = path.relative_to(plot_dir).parts
+    if len(relative_parts) == 1:
+        return False
+    if "paper_2023" not in relative_parts:
+        return True
+    return (
+        include_paper_2023
+        and relative_parts == ("paper_2023", "paper_figures.pdf")
+    )
 
 
 def _pdf_reader_writer():
@@ -874,7 +994,7 @@ def _write_summary_pdf_from_pngs(plot_dir, out_path):
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pngs = [
         path for path in sorted(plot_dir.rglob("*.png"))
-        if path.resolve() != out_path.resolve()
+        if len(path.relative_to(plot_dir).parts) > 1
     ]
     if not pngs:
         return
@@ -921,14 +1041,36 @@ def _save_macro_bars(plt, summary, sub_dir, label_a, label_b):
     x = numpy.arange(len(summary))
     width = 0.38
     for metric in METRIC_NAMES:
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.bar(x - width / 2, summary["a_macro_%s" % metric], width, label=label_a)
-        ax.bar(x + width / 2, summary["b_macro_%s" % metric], width, label=label_b)
+        fig, ax = plt.subplots(figsize=(7.1, 3.0))
+        ax.bar(
+            x - width / 2,
+            summary["a_macro_%s" % metric],
+            width,
+            label=label_a,
+            color=SIDE_A_COLOR,
+            edgecolor="white",
+            linewidth=0.5,
+        )
+        ax.bar(
+            x + width / 2,
+            summary["b_macro_%s" % metric],
+            width,
+            label=label_b,
+            color=SIDE_B_COLOR,
+            edgecolor="white",
+            linewidth=0.5,
+        )
         ax.set_xticks(x)
         ax.set_xticklabels(x_labels, rotation=30, ha="right")
-        ax.set_ylabel(metric)
-        ax.set_title("Macro mean over samples: %s" % metric)
-        ax.legend()
+        ax.set_ylabel(METRIC_DISPLAY_NAMES[metric])
+        ax.set_title("Macro mean over samples: %s" % (
+            METRIC_DISPLAY_NAMES[metric]))
+        ax.set_ylim(_metric_ylim(
+            metric,
+            summary[["a_macro_%s" % metric, "b_macro_%s" % metric]].values,
+        ))
+        ax.grid(axis="y")
+        ax.legend(frameon=False, loc="upper left", bbox_to_anchor=(1.0, 1.0))
         fig.tight_layout()
         _save_figure(fig, os.path.join(sub_dir, "macro_%s.png" % metric))
         plt.close(fig)
@@ -941,20 +1083,25 @@ def _save_macro_bars(plt, summary, sub_dir, label_a, label_b):
 
 def _save_roc(plt, roc_curve_fn, roc_auc_fn,
               y, a_score, b_score, label_a, label_b, out_path, title):
-    fig, ax = plt.subplots(figsize=(6, 5))
-    for label, values in ((label_a, a_score), (label_b, b_score)):
+    fig, ax = plt.subplots(figsize=(3.2, 3.0))
+    for label, values, color in (
+            (label_a, a_score, SIDE_A_COLOR),
+            (label_b, b_score, SIDE_B_COLOR)):
         mask = ~numpy.isnan(values)
         if not mask.any() or len(numpy.unique(y[mask])) < 2:
             continue
         fpr, tpr, _ = roc_curve_fn(y[mask], values[mask])
         auc = roc_auc_fn(y[mask], values[mask])
-        ax.plot(fpr, tpr, label="%s AUC=%.3f" % (label, auc))
-    ax.plot([0, 1], [0, 1], color="0.6", linewidth=1)
+        ax.plot(
+            fpr, tpr, label="%s AUC=%.3f" % (label, auc),
+            color=color, linewidth=1.6)
+    ax.plot([0, 1], [0, 1], color=DIAGONAL_COLOR, linewidth=0.8)
     ax.set_xlabel("False positive rate")
     ax.set_ylabel("True positive rate")
     ax.set_title(title)
     if ax.get_legend_handles_labels()[0]:
-        ax.legend()
+        ax.legend(frameon=False)
+    ax.grid(False)
     fig.tight_layout()
     _save_figure(fig, out_path)
     plt.close(fig)
@@ -962,19 +1109,24 @@ def _save_roc(plt, roc_curve_fn, roc_auc_fn,
 
 def _save_pr(plt, pr_curve_fn, ap_fn,
              y, a_score, b_score, label_a, label_b, out_path, title):
-    fig, ax = plt.subplots(figsize=(6, 5))
-    for label, values in ((label_a, a_score), (label_b, b_score)):
+    fig, ax = plt.subplots(figsize=(3.2, 3.0))
+    for label, values, color in (
+            (label_a, a_score, SIDE_A_COLOR),
+            (label_b, b_score, SIDE_B_COLOR)):
         mask = ~numpy.isnan(values)
         if not mask.any() or len(numpy.unique(y[mask])) < 2:
             continue
         precision, recall, _ = pr_curve_fn(y[mask], values[mask])
         ap = ap_fn(y[mask], values[mask])
-        ax.plot(recall, precision, label="%s AP=%.3f" % (label, ap))
+        ax.plot(
+            recall, precision, label="%s AP=%.3f" % (label, ap),
+            color=color, linewidth=1.6)
     ax.set_xlabel("Recall")
     ax.set_ylabel("Precision")
     ax.set_title(title)
     if ax.get_legend_handles_labels()[0]:
-        ax.legend()
+        ax.legend(frameon=False)
+    ax.grid(False)
     fig.tight_layout()
     _save_figure(fig, out_path)
     plt.close(fig)
@@ -984,17 +1136,55 @@ def _save_scatter(plt, x_score, y_score, x_label, y_label,
                   out_path, title, max_points):
     mask = ~(numpy.isnan(x_score) | numpy.isnan(y_score))
     idx = numpy.flatnonzero(mask)
+    if len(idx) == 0:
+        return
     if len(idx) > max_points:
         rng = numpy.random.default_rng(17)
         idx = rng.choice(idx, size=max_points, replace=False)
-    fig, ax = plt.subplots(figsize=(6, 6))
-    ax.scatter(x_score[idx], y_score[idx], s=4, alpha=0.25)
+    x = x_score[idx]
+    y = y_score[idx]
+    fig, ax = plt.subplots(figsize=(3.2, 3.0))
+    ax.scatter(
+        x,
+        y,
+        s=7,
+        alpha=0.42,
+        c=_winner_colors(x, y),
+        edgecolors="none",
+        rasterized=False,
+    )
+    _add_identity_line(ax, x, y)
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
     ax.set_title(title)
+    ax.grid(False)
     fig.tight_layout()
     _save_figure(fig, out_path)
     plt.close(fig)
+
+
+def _add_identity_line(ax, x, y):
+    finite = numpy.concatenate([
+        numpy.asarray(x, dtype=float),
+        numpy.asarray(y, dtype=float),
+    ])
+    finite = finite[numpy.isfinite(finite)]
+    if finite.size == 0:
+        return
+    low = float(finite.min())
+    high = float(finite.max())
+    if high <= low:
+        pad = max(abs(high) * 0.05, 0.01)
+        low -= pad
+        high += pad
+    else:
+        pad = (high - low) * 0.05
+        low -= pad
+        high += pad
+    ax.plot([low, high], [low, high], color=DIAGONAL_COLOR, linewidth=0.8)
+    ax.set_xlim(low, high)
+    ax.set_ylim(low, high)
+    ax.set_aspect("equal", adjustable="box")
 
 
 # Module-level parser for sphinx autoprogram; behaves like the legacy

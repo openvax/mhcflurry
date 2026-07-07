@@ -128,6 +128,10 @@ else
             exit 2
             ;;
         *)
+            if [ "$NUM_JOBS" -lt 1 ]; then
+                echo "NUM_JOBS must be at least 1; got '$NUM_JOBS'." >&2
+                exit 2
+            fi
             capacity="$(( GPUS * MAX_WORKERS_PER_GPU ))"
             if [ "$NUM_JOBS" -gt "$capacity" ]; then
                 echo "Clamping NUM_JOBS=$NUM_JOBS to GPU capacity $capacity." >&2

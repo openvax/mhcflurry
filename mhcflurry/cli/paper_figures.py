@@ -200,11 +200,16 @@ def run(args):
     out_dir.mkdir(parents=True, exist_ok=True)
     formats = _parse_formats(args.formats)
     combined_pdf = _combined_pdf_path(args.combined_pdf, out_dir)
-    predictors = _parse_predictor_config(args)
-
-    _apply_paper_style()
     writer = FigureWriter(out_dir, formats, combined_pdf)
+
     try:
+        try:
+            predictors = _parse_predictor_config(args)
+        except ValueError as e:
+            writer.fail("configuration", "predictor_config", str(e))
+            return 2
+
+        _apply_paper_style()
         predictor_info = _read_predictor_info(
             artifacts_dir / "predictor_info.csv", writer)
         sample_ids = _read_sample_group_ids(args, artifacts_dir, writer)
@@ -329,14 +334,27 @@ def _parse_formats(value):
 
 
 def _parse_predictor_config(args):
+    candidate = args.candidate_predictor.strip()
+    if not candidate:
+        raise ValueError("--candidate-predictor must be non-empty")
+    presentation_panel_predictors = _parse_predictor_list(
+        args.presentation_panel_predictors)
+    if not presentation_panel_predictors:
+        raise ValueError(
+            "--presentation-panel-predictors must contain at least one "
+            "predictor")
+    presentation_panel_baselines = _parse_predictor_list(
+        args.presentation_panel_baselines)
+    if not presentation_panel_baselines:
+        raise ValueError(
+            "--presentation-panel-baselines must contain at least one "
+            "predictor")
     return PredictorConfig(
-        candidate=args.candidate_predictor,
+        candidate=candidate,
         external_baselines=_parse_external_baselines(args.external_baselines),
         preferred_predictors=_parse_predictor_list(args.preferred_predictors),
-        presentation_panel_predictors=_parse_predictor_list(
-            args.presentation_panel_predictors),
-        presentation_panel_baselines=_parse_predictor_list(
-            args.presentation_panel_baselines),
+        presentation_panel_predictors=presentation_panel_predictors,
+        presentation_panel_baselines=presentation_panel_baselines,
     )
 
 
@@ -539,9 +557,13 @@ def _plot_external_scatter_triptych(
             "Required predictors absent from multiallelic scores.")
         return
 
-    fig, axes = plt.subplots(1, 3, figsize=(7.1, 2.2))
+    n_cols = len(predictors.external_baselines)
+    fig, axes = plt.subplots(
+        1, n_cols, figsize=(max(2.4, 2.35 * n_cols), 2.2),
+        squeeze=False)
     y_label = _short_label(predictor_info, candidate)
-    for ax, (baseline, _suffix) in zip(axes, predictors.external_baselines):
+    for ax, (baseline, _suffix) in zip(
+            axes[0], predictors.external_baselines):
         sub = pivot[[baseline, candidate]].replace(
             [numpy.inf, -numpy.inf], numpy.nan).dropna()
         _scatter_with_winner_colors(
@@ -571,9 +593,13 @@ def _plot_percent_change_by_length(
             "MHCflurry production scores absent.")
         return
 
-    fig, axes = plt.subplots(1, 3, figsize=(7.1, 2.1), sharey=True)
+    n_cols = len(predictors.external_baselines)
+    fig, axes = plt.subplots(
+        1, n_cols, figsize=(max(2.4, 2.35 * n_cols), 2.1),
+        sharey=True, squeeze=False)
     color = _predictor_color(predictor_info, predictor)
-    for ax, (baseline, suffix) in zip(axes, predictors.external_baselines):
+    for ax, (baseline, suffix) in zip(
+            axes[0], predictors.external_baselines):
         column = "percent_change_%s_%s" % (metric, suffix)
         if column not in sub.columns:
             ax.set_visible(False)
@@ -617,8 +643,12 @@ def _plot_percent_change_bars(
             "No preferred predictors found in multiallelic scores.")
         return
 
-    fig, axes = plt.subplots(1, 3, figsize=(7.1, 3.3), sharey=True)
-    for ax, (baseline, suffix) in zip(axes, predictors.external_baselines):
+    n_cols = len(predictors.external_baselines)
+    fig, axes = plt.subplots(
+        1, n_cols, figsize=(max(2.4, 2.35 * n_cols), 3.3),
+        sharey=True, squeeze=False)
+    for ax, (baseline, suffix) in zip(
+            axes[0], predictors.external_baselines):
         column = "percent_change_%s_%s" % (metric, suffix)
         if column not in sub.columns:
             ax.set_visible(False)
@@ -1061,16 +1091,17 @@ def _plot_ap_vs_others(scores, predictor_info, writer, predictors):
     import matplotlib.pyplot as plt
 
     sub = _all_length_rows(scores)
-    predictors = [
-        predictor for predictor in (
-            "presentation_without_flanks_processing_score",
-            "presentation_with_flanks_processing_score",
-            predictors.candidate,
-            *[predictor for predictor, _ in predictors.external_baselines],
-        )
+    comparison_predictors = dict.fromkeys((
+        "presentation_without_flanks_processing_score",
+        "presentation_with_flanks_processing_score",
+        predictors.candidate,
+        *[predictor for predictor, _ in predictors.external_baselines],
+    ))
+    selected_predictors = [
+        predictor for predictor in comparison_predictors
         if predictor in set(sub["predictor"])
     ]
-    if not predictors:
+    if not selected_predictors:
         writer.skip(
             "antigen-processing",
             "fig.4_processing_predictor_plots.bar.ap_vs_others",
@@ -1078,10 +1109,10 @@ def _plot_ap_vs_others(scores, predictor_info, writer, predictors):
             "No AP comparison predictors found.")
         return
     means = (
-        sub.loc[sub["predictor"].isin(predictors)]
+        sub.loc[sub["predictor"].isin(selected_predictors)]
         .groupby("predictor")["auc"]
         .mean()
-        .reindex(predictors)
+        .reindex(selected_predictors)
         .dropna()
     )
     fig, ax = plt.subplots(figsize=(3.4, 2.4))
@@ -1328,8 +1359,12 @@ def _plot_scatter_triptych_from_pivot(
         writer, predictors):
     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(1, 3, figsize=(7.1, 2.2))
-    for ax, (baseline, _suffix) in zip(axes, predictors.external_baselines):
+    n_cols = len(predictors.external_baselines)
+    fig, axes = plt.subplots(
+        1, n_cols, figsize=(max(2.4, 2.35 * n_cols), 2.2),
+        squeeze=False)
+    for ax, (baseline, _suffix) in zip(
+            axes[0], predictors.external_baselines):
         sub = pivot[[baseline, candidate]].replace(
             [numpy.inf, -numpy.inf], numpy.nan).dropna()
         _scatter_with_winner_colors(

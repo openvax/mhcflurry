@@ -240,6 +240,10 @@ if [ "$GPUS" -gt 0 ] && [ "$NUM_JOBS" != "auto" ]; then
             exit 2
             ;;
     esac
+    if [ "$NUM_JOBS" -lt 1 ]; then
+        echo "NUM_JOBS must be at least 1; got '$NUM_JOBS'." >&2
+        exit 2
+    fi
     if [ "$MAX_WORKERS_PER_GPU" = "auto" ]; then
         echo "NUM_JOBS=$NUM_JOBS with MAX_WORKERS_PER_GPU=auto is unsafe for affinity training; using NUM_JOBS=auto so the training orchestrator can size workers from the minibatch-aware VRAM estimate." >&2
         NUM_JOBS=auto

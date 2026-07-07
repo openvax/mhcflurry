@@ -1146,6 +1146,26 @@ def test_plot_model_comparison_writes_paper_plots_from_summaries(tmp_path):
         assert path.is_file()
 
 
+def test_summary_pdf_falls_back_from_corrupt_pdf(tmp_path):
+    matplotlib = pytest.importorskip("matplotlib")
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    plot_dir = tmp_path / "plots"
+    paper_dir = plot_dir / "paper"
+    paper_dir.mkdir(parents=True)
+    (paper_dir / "bad.pdf").write_bytes(b"not a pdf")
+
+    fig, ax = plt.subplots()
+    ax.plot([0, 1], [0, 1])
+    fig.savefig(paper_dir / "fallback.png")
+    plt.close(fig)
+
+    out = plot_dir / "summary.pdf"
+    plot_model_comparison._write_summary_pdf(plot_dir, out)
+    assert out.is_file()
+
+
 def test_paper_figures_writes_available_2023_style_panels(tmp_path):
     artifacts = tmp_path / "artifacts"
     artifacts.mkdir()
@@ -1279,6 +1299,99 @@ def test_paper_figures_writes_available_2023_style_panels(tmp_path):
         == "fig.3_scores_plots_monoallelic.scatter.auc.monoallelic.ba"
     ).any()
     assert "skipped" in set(manifest["status"])
+
+
+def test_paper_figures_external_baseline_geometry_is_configurable(tmp_path):
+    matplotlib = pytest.importorskip("matplotlib")
+    matplotlib.use("Agg")
+
+    import matplotlib.pyplot as plt
+
+    predictor_info = pandas.DataFrame([
+        {
+            "predictor": predictor,
+            "short": predictor.replace("_", " "),
+            "description": predictor,
+            "color": "(0.5, 0.4, 0.8)",
+        }
+        for predictor in ("candidate", "baseline_a", "baseline_b")
+    ]).set_index("predictor")
+    scores = pandas.DataFrame([
+        {
+            "sample_id": sample_id,
+            "length_label": "All",
+            "predictor": predictor,
+            "auc": value,
+            "ppv": value - 0.1,
+            "percent_change_auc_a": 1.0,
+            "percent_change_auc_b": 2.0,
+        }
+        for sample_id, offset in (("s1", 0.0), ("s2", 0.02))
+        for predictor, value in (
+            ("candidate", 0.75 + offset),
+            ("baseline_a", 0.70 + offset),
+            ("baseline_b", 0.72 + offset),
+        )
+    ])
+    predictors = paper_figures.PredictorConfig(
+        candidate="candidate",
+        external_baselines=(("baseline_a", "a"), ("baseline_b", "b")),
+        preferred_predictors=("candidate", "baseline_a", "baseline_b"),
+        presentation_panel_predictors=("candidate",),
+        presentation_panel_baselines=("baseline_a", "baseline_b"),
+    )
+    saved_axes = {}
+
+    class CaptureWriter:
+        def save(self, fig, name, _family, note=""):
+            saved_axes[name] = len(fig.axes)
+            plt.close(fig)
+
+        def skip(self, _family, name, _missing, _note):
+            saved_axes[name] = "skipped"
+
+    writer = CaptureWriter()
+    paper_figures._apply_paper_style()
+    paper_figures._plot_external_scatter_triptych(
+        scores, predictor_info, "auc", "AUC", "external", 100, writer,
+        predictors)
+    paper_figures._plot_percent_change_by_length(
+        scores, predictor_info, "auc", "AUC", "by_length", writer,
+        predictors)
+    paper_figures._plot_percent_change_bars(
+        scores, predictor_info, "auc", "AUC", "bars", writer, predictors)
+    paper_figures._plot_scatter_triptych_from_pivot(
+        paper_figures._pivot_all_lengths(scores, "auc"),
+        predictor_info,
+        "candidate",
+        "AUC",
+        100,
+        "pivot",
+        "test",
+        writer,
+        predictors,
+    )
+    assert saved_axes == {
+        "external": 2,
+        "by_length": 2,
+        "bars": 2,
+        "pivot": 2,
+    }
+
+
+def test_paper_figures_bad_predictor_config_writes_manifest(tmp_path):
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    args = paper_figures.make_parser().parse_args([
+        "--artifacts-dir", str(artifacts),
+        "--out", str(tmp_path / "paper"),
+        "--external-baselines", "",
+    ])
+    assert paper_figures.run(args) == 2
+    manifest = pandas.read_csv(tmp_path / "paper" / "manifest.csv")
+    assert manifest.iloc[0]["family"] == "configuration"
+    assert manifest.iloc[0]["figure"] == "predictor_config"
+    assert manifest.iloc[0]["status"] == "failed"
 
 
 def test_paper_figures_predictor_config_parser():
