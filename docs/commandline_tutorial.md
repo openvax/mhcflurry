@@ -255,11 +255,22 @@ To include paper-style figures from saved benchmark prediction tables or
 derived score tables:
 
 ```shell
+$ mhcflurry eval paper-figures score-predictions \
+    --kind multiallelic \
+    --input results/new_run/eval_inputs/benchmark.multiallelic.csv.bz2 \
+    --out results/new_run/eval_inputs/accuracy_scores.multiallelic.csv
+
 $ mhcflurry eval paper-figures render \
     --comparison-dir results/new_run/eval_comparison/ \
     --scores-dir results/new_run/eval_inputs/ \
     --out results/new_run/eval_comparison/plots/paper_figures/
 ```
+
+Saved prediction tables should contain a `hit` column, a grouping column such as
+`sample_id` or `allele`, optional peptide metadata, and one numeric score column
+per predictor. External tools such as NetMHCpan or MixMHCpred are run outside
+MHCflurry and enter the pipeline as additional numeric columns in those saved
+tables.
 
 For the common local path, the same steps can be composed:
 

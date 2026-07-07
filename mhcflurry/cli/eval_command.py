@@ -22,6 +22,8 @@ available:
   ``mhcflurry plot-model-comparison``.
 * ``mhcflurry eval paper-figures render`` delegates to
   ``mhcflurry paper-figures``.
+* ``mhcflurry eval paper-figures score-predictions`` derives reusable AUC/PPV
+  score tables from saved benchmark prediction tables.
 * ``mhcflurry eval paper-figures run`` runs compare-models, paper-figures, and
   plot-model-comparison as one local evaluation/figure pipeline.
 
@@ -74,6 +76,11 @@ def make_parser(prog="mhcflurry eval"):
         help="Compare models, render paper figures, and write plot PDFs.",
         add_help=False,
     )
+    paper_sub.add_parser(
+        "score-predictions",
+        help="Derive reusable score tables from saved predictions.",
+        add_help=False,
+    )
     return parser
 
 
@@ -115,6 +122,8 @@ def format_help(prog="mhcflurry eval"):
         "  compare-models          Compare two model ensembles.",
         "  plot-comparison         Render diagnostic plots from compare output.",
         "  paper-figures render    Render paper figures from saved inputs.",
+        "  paper-figures score-predictions",
+        "                          Derive score tables from saved predictions.",
         "  paper-figures run       Compare, render paper figures, and write PDFs.",
         "",
         "Compatibility:",
@@ -142,6 +151,10 @@ def _run_paper_figures(argv, prog):
         from . import paper_figures
         return _run_existing_command(
             paper_figures, argv[1:], "%s render" % prog)
+    if subcommand == "score-predictions":
+        return _run_score_predictions(
+            _make_score_predictions_parser(
+                "%s score-predictions" % prog).parse_args(argv[1:]))
     if subcommand == "run":
         return _run_paper_figures_pipeline(
             _make_paper_figures_run_parser("%s run" % prog).parse_args(
@@ -160,6 +173,7 @@ def _make_paper_figures_parser(prog):
     paper_parser = argparse.ArgumentParser(prog=prog)
     sub = paper_parser.add_subparsers(dest="paper_figures_subcommand", required=True)
     sub.add_parser("render", add_help=False)
+    sub.add_parser("score-predictions", add_help=False)
     sub.add_parser("run", add_help=False)
     return paper_parser
 
@@ -172,11 +186,82 @@ def _format_paper_figures_help(prog):
         "",
         "Subcommands:",
         "  render  Render figures from saved comparison/scores/prediction inputs.",
+        "  score-predictions",
+        "          Derive reusable score tables from saved predictions.",
         "  run     Run compare-models, render paper figures, and write PDFs.",
         "",
-        "Use '%s render --help' or '%s run --help' for arguments."
-        % (prog, prog),
+        "Use '%s render --help', '%s score-predictions --help', or "
+        "'%s run --help' for arguments." % (prog, prog, prog),
     ])
+
+
+def _make_score_predictions_parser(prog):
+    parser = argparse.ArgumentParser(
+        prog=prog,
+        description=(
+            "Derive reusable notebook-style AUC/PPV score tables from a saved "
+            "benchmark prediction table. The output can be passed back to "
+            "paper-figures through --scores-dir."
+        ),
+    )
+    parser.add_argument(
+        "--kind",
+        required=True,
+        choices=("multiallelic", "monoallelic"),
+        help="Benchmark kind. Sets the default grouping column.",
+    )
+    parser.add_argument(
+        "--input",
+        required=True,
+        help="Saved benchmark prediction table (CSV or CSV.BZ2).",
+    )
+    parser.add_argument(
+        "--out",
+        required=True,
+        help=(
+            "Output CSV path, typically accuracy_scores.multiallelic.csv or "
+            "accuracy_scores.monoallelic.csv."
+        ),
+    )
+    parser.add_argument(
+        "--index-column",
+        help=(
+            "Optional grouping column override. Defaults to sample_id for "
+            "multiallelic and auto-detect for monoallelic."
+        ),
+    )
+    parser.add_argument(
+        "--external-baselines",
+        default=None,
+        help=(
+            "Comma-separated external predictor comparators used for percent "
+            "change columns. Default matches paper-figures render."
+        ),
+    )
+    return parser
+
+
+def _run_score_predictions(args):
+    from . import paper_figures
+
+    if args.external_baselines:
+        external_baselines = paper_figures._parse_external_baselines(
+            args.external_baselines)
+    else:
+        external_baselines = paper_figures.EXTERNAL_BASELINES
+    index_column = args.index_column
+    if index_column is None and args.kind == "multiallelic":
+        index_column = "sample_id"
+    scores = paper_figures.score_saved_prediction_table(
+        args.input,
+        index_column=index_column,
+        external_baselines=external_baselines,
+    )
+    out = os.path.abspath(args.out)
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    scores.to_csv(out, index=False)
+    print("Wrote: %s" % out)
+    return 0
 
 
 def _make_paper_figures_run_parser(prog):

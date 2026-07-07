@@ -742,6 +742,37 @@ def _scores_from_saved_predictions(
     return _normalize_score_predictors(scores)
 
 
+class _ScoreTableErrorCollector:
+    def __init__(self):
+        self.message = None
+
+    def skip(self, family, figure, missing, note):
+        self.message = note
+
+
+def score_saved_prediction_table(
+        path, index_column=None, external_baselines=EXTERNAL_BASELINES):
+    """Return notebook-style AUC/PPV rows from a saved prediction table.
+
+    The input table must contain ``hit`` and one grouping column
+    (``sample_id``, ``allele``, or ``hla`` unless ``index_column`` is passed).
+    Every other numeric column is treated as a predictor score, with affinity
+    and percentile columns automatically oriented so larger means better.
+    """
+    writer = _ScoreTableErrorCollector()
+    scores = _scores_from_saved_predictions(
+        path,
+        index_column=index_column,
+        family="score-predictions",
+        figure="score-predictions",
+        writer=writer,
+        external_baselines=external_baselines,
+    )
+    if scores is None:
+        raise ValueError(writer.message or "No evaluable score rows.")
+    return scores
+
+
 def _prediction_index_column(df):
     for column in ("sample_id", "allele", "hla"):
         if column in df.columns:

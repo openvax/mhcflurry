@@ -48,6 +48,7 @@ def test_top_level_parser_lists_subcommands():
 def test_eval_help_runs(capsys):
     cli_main.main(["eval", "--help"])
     captured = capsys.readouterr().out
+    assert "paper-figures score-predictions" in captured
     assert "paper-figures run" in captured
     assert "Compatibility:" in captured
 
@@ -74,6 +75,60 @@ def test_eval_paper_figures_render_help_runs(capsys):
     captured = capsys.readouterr().out
     assert "usage: mhcflurry eval paper-figures render" in captured
     assert "--scores-dir" in captured
+
+
+def test_eval_paper_figures_score_predictions_writes_cache(tmp_path):
+    pytest.importorskip("sklearn")
+    predictions = tmp_path / "benchmark.multiallelic.csv"
+    pandas.DataFrame([
+        {
+            "sample_id": "sample1",
+            "peptide": "AAAAAAAAK",
+            "hit": 1,
+            "netmhcpan4.ba": 20.0,
+            "mhcflurry_production": 0.90,
+        },
+        {
+            "sample_id": "sample1",
+            "peptide": "AAAAAAAAL",
+            "hit": 1,
+            "netmhcpan4.ba": 30.0,
+            "mhcflurry_production": 0.80,
+        },
+        {
+            "sample_id": "sample1",
+            "peptide": "AAAAAAAAM",
+            "hit": 0,
+            "netmhcpan4.ba": 900.0,
+            "mhcflurry_production": 0.20,
+        },
+        {
+            "sample_id": "sample1",
+            "peptide": "AAAAAAAAN",
+            "hit": 0,
+            "netmhcpan4.ba": 1000.0,
+            "mhcflurry_production": 0.10,
+        },
+    ]).to_csv(predictions, index=False)
+    out = tmp_path / "accuracy_scores.multiallelic.csv"
+
+    status = eval_command.run_argv([
+        "paper-figures",
+        "score-predictions",
+        "--kind", "multiallelic",
+        "--input", str(predictions),
+        "--out", str(out),
+        "--external-baselines", "netmhcpan4.ba:ba",
+    ])
+
+    assert status == 0
+    scores = pandas.read_csv(out)
+    assert set(scores["predictor"]) == {
+        "netmhcpan4.ba",
+        "mhcflurry_production",
+    }
+    assert set(scores["length_label"]) == {"All", "9-mer"}
+    assert "percent_change_auc_ba" in scores.columns
 
 
 def test_eval_paper_figures_run_dispatches_pipeline(tmp_path, monkeypatch):
@@ -173,11 +228,21 @@ def test_compare_models_presentation_parallelism_overrides():
     args._local_parallelism_args_resolved = True
     args.workload_plan = object()
 
-    base_args = compare_models._parallelism_args_for_component(args, "affinity")
+    affinity_args = compare_models._parallelism_args_for_component(
+        args, "affinity")
+    processing_args = compare_models._parallelism_args_for_component(
+        args, "processing")
     presentation_args = compare_models._parallelism_args_for_component(
         args, "presentation")
 
-    assert base_args is args
+    assert affinity_args is not args
+    assert affinity_args.num_jobs == 4
+    assert not affinity_args._local_parallelism_args_resolved
+    assert not hasattr(affinity_args, "workload_plan")
+    assert processing_args is not args
+    assert processing_args.num_jobs == 4
+    assert not processing_args._local_parallelism_args_resolved
+    assert not hasattr(processing_args, "workload_plan")
     assert presentation_args is not args
     assert presentation_args.num_jobs == 1
     assert presentation_args.max_workers_per_gpu == 1
@@ -1271,6 +1336,24 @@ def test_summary_pdf_falls_back_from_corrupt_pdf(tmp_path):
     out = plot_dir / "summary.pdf"
     plot_model_comparison._write_summary_pdf(plot_dir, out)
     assert out.is_file()
+
+
+def test_summary_pdf_png_fallback_excludes_paper_figures_by_default(tmp_path):
+    plot_dir = tmp_path / "plots"
+    paper_png = plot_dir / "paper_figures" / "panel.png"
+    diagnostic_png = plot_dir / "affinity" / "panel.png"
+    paper_png.parent.mkdir(parents=True)
+    diagnostic_png.parent.mkdir(parents=True)
+    paper_png.write_bytes(b"unused")
+    diagnostic_png.write_bytes(b"unused")
+    out = plot_dir / "summary.pdf"
+
+    assert not plot_model_comparison._include_png_in_summary(
+        paper_png, plot_dir, out, include_paper_figures=False)
+    assert plot_model_comparison._include_png_in_summary(
+        paper_png, plot_dir, out, include_paper_figures=True)
+    assert plot_model_comparison._include_png_in_summary(
+        diagnostic_png, plot_dir, out, include_paper_figures=False)
 
 
 def test_paper_figures_writes_available_2023_style_panels(tmp_path):

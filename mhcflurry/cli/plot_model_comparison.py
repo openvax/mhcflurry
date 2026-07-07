@@ -945,7 +945,8 @@ def _write_summary_pdf(plot_dir, out_path, include_paper_figures=False):
             try:
                 pdf_reader, pdf_writer = _pdf_reader_writer()
             except ImportError:
-                _write_summary_pdf_from_pngs(plot_dir, out_path)
+                _write_summary_pdf_from_pngs(
+                    plot_dir, out_path, include_paper_figures)
                 return
             paper = [path for path in pdfs if "paper" in path.parts]
             rest = [path for path in pdfs if path not in paper]
@@ -965,9 +966,10 @@ def _write_summary_pdf(plot_dir, out_path, include_paper_figures=False):
                 out_path.unlink()
             except FileNotFoundError:
                 pass
-            _write_summary_pdf_from_pngs(plot_dir, out_path)
+            _write_summary_pdf_from_pngs(
+                plot_dir, out_path, include_paper_figures)
             return
-    _write_summary_pdf_from_pngs(plot_dir, out_path)
+    _write_summary_pdf_from_pngs(plot_dir, out_path, include_paper_figures)
 
 
 def _include_pdf_in_summary(path, plot_dir, out_path, include_paper_figures):
@@ -1000,7 +1002,20 @@ def _pdf_reader_writer():
             raise ImportError("pypdf or PyPDF2 is required") from e
 
 
-def _write_summary_pdf_from_pngs(plot_dir, out_path):
+def _include_png_in_summary(path, plot_dir, out_path, include_paper_figures):
+    if path.resolve() == out_path.resolve():
+        return False
+    relative_parts = path.relative_to(plot_dir).parts
+    if len(relative_parts) == 1:
+        return False
+    paper_figure_dirs = {"paper_figures", "paper_2023"}
+    if paper_figure_dirs.intersection(relative_parts):
+        return include_paper_figures
+    return True
+
+
+def _write_summary_pdf_from_pngs(
+        plot_dir, out_path, include_paper_figures=False):
     import matplotlib.pyplot as plt
     from matplotlib.backends.backend_pdf import PdfPages
 
@@ -1009,7 +1024,8 @@ def _write_summary_pdf_from_pngs(plot_dir, out_path):
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pngs = [
         path for path in sorted(plot_dir.rglob("*.png"))
-        if len(path.relative_to(plot_dir).parts) > 1
+        if _include_png_in_summary(
+            path, plot_dir, out_path, include_paper_figures)
     ]
     if not pngs:
         return

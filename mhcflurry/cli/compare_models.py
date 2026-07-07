@@ -111,8 +111,13 @@ def _max_workers_per_gpu_override_arg(value):
 
 
 def _parallelism_args_for_component(args, component):
+    component_args = argparse.Namespace(**vars(args))
+    component_args._local_parallelism_args_resolved = False
+    if hasattr(component_args, "workload_plan"):
+        del component_args.workload_plan
+
     if component != "presentation":
-        return args
+        return component_args
 
     overrides = {
         "num_jobs": args.presentation_num_jobs,
@@ -124,15 +129,8 @@ def _parallelism_args_for_component(args, component):
         name: value for (name, value) in overrides.items()
         if value is not None
     }
-    if not overrides:
-        return args
-
-    component_args = argparse.Namespace(**vars(args))
     for name, value in overrides.items():
         setattr(component_args, name, value)
-    component_args._local_parallelism_args_resolved = False
-    if hasattr(component_args, "workload_plan"):
-        del component_args.workload_plan
     return component_args
 
 
@@ -780,6 +778,7 @@ def _load_affinity_benchmark(data_dir, source, limit_files):
 def _run_affinity(side_a, side_b, args):
     component_dir = os.path.join(args.out, "affinity")
     os.makedirs(component_dir, exist_ok=True)
+    affinity_args = _parallelism_args_for_component(args, "affinity")
 
     data_dir = args.data_dir or _default_data_evaluation_dir()
     test = _load_affinity_benchmark(
@@ -812,12 +811,12 @@ def _run_affinity(side_a, side_b, args):
 
     _stamp("predicting side A affinity...")
     test["a_pred"] = _parallel_affinity_predict(
-        args, side_a["paths"]["affinity"],
+        affinity_args, side_a["paths"]["affinity"],
         test.peptide.values, test.hla.values,
     )
     _stamp("predicting side B affinity...")
     test["b_pred"] = _parallel_affinity_predict(
-        args, side_b["paths"]["affinity"],
+        affinity_args, side_b["paths"]["affinity"],
         test.peptide.values, test.hla.values,
     )
     test = test.dropna(subset=["a_pred", "b_pred"])
@@ -1036,6 +1035,7 @@ def _parallel_processing_predict(args, predictor_dir, df, mode, label):
 def _run_processing(side_a, side_b, args):
     component_dir = os.path.join(args.out, "processing")
     os.makedirs(component_dir, exist_ok=True)
+    processing_args = _parallelism_args_for_component(args, "processing")
 
     data_dir = args.data_dir or _default_data_evaluation_dir()
     requested_modes = [m.strip() for m in args.processing_modes.split(",") if m]
@@ -1067,9 +1067,9 @@ def _run_processing(side_a, side_b, args):
             "n_flank", "c_flank",
         ]].copy()
         scored["a_processing_score"] = _parallel_processing_predict(
-            args, a_model_dir, benchmark, mode, label="A")
+            processing_args, a_model_dir, benchmark, mode, label="A")
         scored["b_processing_score"] = _parallel_processing_predict(
-            args, b_model_dir, benchmark, mode, label="B")
+            processing_args, b_model_dir, benchmark, mode, label="B")
 
         pred_path = os.path.join(
             component_dir, "predictions_%s.csv.bz2" % mode)

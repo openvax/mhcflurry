@@ -123,6 +123,8 @@ prediction columns are available.
 For a local model-to-figures pass outside the release wrapper, use
 `mhcflurry eval paper-figures run --a RUN_DIR --b public --out RUN_DIR/eval`.
 That command composes compare-models, paper-figures, and the diagnostic plot
-PDF. It does not yet run external predictors itself; external NetMHCpan /
-MixMHCpred outputs should be saved and passed as canonical prediction tables
-until the planned `eval paper-figures register-external-predictions` step lands.
+PDF. Use `mhcflurry eval paper-figures score-predictions` to precompute
+`accuracy_scores.*.csv` caches from canonical saved prediction tables. The
+workflow does not run external predictors itself; external NetMHCpan /
+MixMHCpred outputs should be generated separately and passed as numeric columns
+in those canonical prediction tables.

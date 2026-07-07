@@ -99,6 +99,10 @@ validation), prefer `scripts/release/retrain_evaluate_deploy.sh`.
   predictors are configurable (`--candidate-predictor`,
   `--external-baselines`, `--preferred-predictors`); defaults use NetMHCpan 4.0
   BA/EL and MixMHCpred when saved columns are present.
+- **`mhcflurry eval paper-figures score-predictions`** — Converts a canonical
+  saved benchmark prediction table into a reusable `accuracy_scores.*.csv`
+  cache. This is the maintained replacement for the notebook-era AUC / PPV
+  table derivation step and is useful when re-rendering figures repeatedly.
 - **`mhcflurry eval paper-figures run`** — Local one-command composition of
   `compare-models`, `paper-figures render`, and `plot-comparison`. This is for
   already-trained models; remote training and cleanup still belong to the

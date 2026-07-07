@@ -116,11 +116,13 @@ mhcflurry eval paper-figures render --comparison-dir results/eval --out results/
 mhcflurry eval paper-figures run --a results/new_run --b public --out results/eval
 ```
 
-The planned evaluation namespace also gives the missing 2023-notebook pieces a
-clear home. Benchmark prediction, external predictor import, score derivation,
-metadata preparation, and paper rendering should become separate
-`mhcflurry eval paper-figures ...` steps, with `paper-figures run` composing
-them for release workflows and reusing cached prediction tables when present.
+The evaluation namespace is also the home for the 2023-notebook-style figure
+inputs. Use `mhcflurry eval paper-figures score-predictions` to turn saved
+benchmark prediction tables into reusable `accuracy_scores.*.csv` caches, then
+use `mhcflurry eval paper-figures render` for the publication-style panels.
+`paper-figures run` composes the local MHCflurry comparison and rendering steps;
+external predictor binaries such as NetMHCpan and MixMHCpred still need to
+produce saved prediction columns before they enter this pipeline.
 
 ## Pseudosequence registry helper
 
