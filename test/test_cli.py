@@ -1415,6 +1415,113 @@ def test_paper_figures_uses_current_comparison_when_scores_absent(tmp_path):
     ).any()
 
 
+def test_paper_figures_monoallelic_scatter_uses_all_length_rows(monkeypatch):
+    captured = {}
+
+    def fake_scatter(pivot, *_args, **_kwargs):
+        captured["pivot"] = pivot
+
+    monkeypatch.setattr(
+        paper_figures, "_plot_scatter_triptych_from_pivot", fake_scatter)
+
+    scores = pandas.DataFrame([
+        {
+            "allele": "HLA-A*02:01",
+            "length": numpy.nan,
+            "length_label": "All",
+            "predictor": "candidate",
+            "auc": 0.90,
+        },
+        {
+            "allele": "HLA-A*02:01",
+            "length": numpy.nan,
+            "length_label": "All",
+            "predictor": "baseline",
+            "auc": 0.80,
+        },
+        {
+            "allele": "HLA-A*02:01",
+            "length": 8,
+            "length_label": "8-mer",
+            "predictor": "candidate",
+            "auc": 0.10,
+        },
+        {
+            "allele": "HLA-A*02:01",
+            "length": 8,
+            "length_label": "8-mer",
+            "predictor": "baseline",
+            "auc": 0.20,
+        },
+    ])
+    predictors = paper_figures.PredictorConfig(
+        candidate="candidate",
+        external_baselines=(("baseline", "baseline"),),
+        preferred_predictors=("candidate", "baseline"),
+        presentation_panel_predictors=("candidate",),
+        presentation_panel_baselines=("baseline",),
+    )
+
+    class Writer:
+        def skip(self, *args):
+            raise AssertionError("unexpected skip: %r" % (args,))
+
+    paper_figures._plot_monoallelic_scatter(
+        scores,
+        pandas.DataFrame(),
+        "auc",
+        "AUC",
+        100,
+        "mono",
+        Writer(),
+        predictors,
+        preferred_candidate="candidate",
+    )
+    pivot = captured["pivot"]
+    assert pivot.loc["HLA-A*02:01", "candidate"] == 0.90
+    assert pivot.loc["HLA-A*02:01", "baseline"] == 0.80
+    assert len(pivot) == 1
+
+
+def test_paper_figures_prediction_scoring_drops_invalid_hit_rows():
+    group = pandas.DataFrame({
+        "sample_id": ["s1", "s1", "s1", "s1"],
+        "peptide": ["AAAA", "BBBB", "CCCC", "DDDD"],
+        "hit": [1, 0, numpy.nan, "bad"],
+        "candidate": [0.9, 0.1, 1.0, 1.0],
+    })
+    rows = paper_figures._scores_for_prediction_group(
+        group,
+        index_column="sample_id",
+        group_value="s1",
+        length=None,
+        length_label="All",
+        predictor_columns=["candidate"],
+    )
+    assert rows[0]["auc"] == 1.0
+    assert rows[0]["ppv"] == 1.0
+
+
+def test_paper_figures_ppv_uses_tie_breaker():
+    # File-order-stable sorting would pick the two hit rows first. The explicit
+    # tie breaker randomizes equal-score ordering deterministically.
+    ppv = paper_figures._ppv_at_n(
+        numpy.array([1, 1, 0, 0]),
+        numpy.array([0.5, 0.5, 0.5, 0.5]),
+        2,
+        tie_breaker=numpy.array([0.8, 0.9, 0.1, 0.2]),
+    )
+    assert ppv == 0.0
+
+
+def test_paper_figures_resolves_run_dir_for_named_comparison_dir(tmp_path):
+    run_dir = tmp_path / "run"
+    comparison_dir = run_dir / "comparison"
+    comparison_dir.mkdir(parents=True)
+    (run_dir / "processing").mkdir()
+    assert paper_figures._resolve_run_dir(comparison_dir) == run_dir
+
+
 def test_paper_figures_external_baseline_geometry_is_configurable(tmp_path):
     matplotlib = pytest.importorskip("matplotlib")
     matplotlib.use("Agg")

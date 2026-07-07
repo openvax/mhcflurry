@@ -520,7 +520,11 @@ def _resolve_figure_inputs(args, writer):
 def _resolve_comparison_dir(value, scores_dir):
     if value:
         return Path(value)
-    if scores_dir is not None and (scores_dir / "release_summary.csv").is_file():
+    if (
+            scores_dir is not None and
+            (scores_dir / "release_summary.csv").is_file() and
+            (scores_dir / "side_a.json").is_file() and
+            (scores_dir / "side_b.json").is_file()):
         return scores_dir
     return None
 
@@ -531,6 +535,11 @@ def _resolve_run_dir(comparison_dir):
     comparison_dir = Path(comparison_dir)
     if comparison_dir.name == "eval_comparison":
         return comparison_dir.parent
+    parent = comparison_dir.parent
+    if any(
+            (parent / name).exists()
+            for name in ("affinity", "processing", "presentation")):
+        return parent
     return None
 
 
@@ -761,7 +770,11 @@ def _scores_for_prediction_group(
         predictor_columns):
     from sklearn.metrics import roc_auc_score
 
-    y_true = pandas.to_numeric(group["hit"], errors="coerce").fillna(0).values
+    labels = pandas.to_numeric(group["hit"], errors="coerce")
+    valid_labels = labels.isin([0, 1])
+    group = group.loc[valid_labels].copy()
+    y_true = labels.loc[valid_labels].astype(int).values
+    tie_breaker = _prediction_tie_breaker(group)
     rows = []
     for predictor in predictor_columns:
         score = pandas.to_numeric(group[predictor], errors="coerce").values
@@ -769,12 +782,13 @@ def _scores_for_prediction_group(
         mask = numpy.isfinite(score)
         y = y_true[mask]
         s = score[mask]
+        ties = tie_breaker[mask]
         if len(y) == 0 or y.sum() == 0 or y.sum() == len(y):
             auc = numpy.nan
             ppv = numpy.nan
         else:
             auc = float(roc_auc_score(y, s))
-            ppv = _ppv_at_n(y, s, int(y.sum()))
+            ppv = _ppv_at_n(y, s, int(y.sum()), tie_breaker=ties)
         rows.append({
             index_column: group_value,
             "sample_id": group_value,
@@ -787,6 +801,20 @@ def _scores_for_prediction_group(
     return rows
 
 
+def _prediction_tie_breaker(group):
+    identity_columns = [
+        column for column in (
+            "sample_id", "allele", "hla", "peptide", "n_flank", "c_flank",
+            "length", "peptide_len")
+        if column in group.columns
+    ]
+    if identity_columns:
+        values = pandas.util.hash_pandas_object(
+            group[identity_columns].astype(str), index=False).values
+        return values.astype("float64") / float(numpy.iinfo("uint64").max)
+    return numpy.random.default_rng(0).random(len(group))
+
+
 def _orient_prediction_score(predictor, score):
     predictor = str(predictor).lower()
     if (
@@ -797,10 +825,14 @@ def _orient_prediction_score(predictor, score):
     return numpy.asarray(score, dtype=float)
 
 
-def _ppv_at_n(y_true, y_score, n):
+def _ppv_at_n(y_true, y_score, n, tie_breaker=None):
     if n <= 0:
         return numpy.nan
-    order = numpy.argsort(-numpy.asarray(y_score), kind="stable")
+    y_score = numpy.asarray(y_score, dtype=float)
+    if tie_breaker is None:
+        tie_breaker = numpy.zeros(len(y_score))
+    tie_breaker = numpy.asarray(tie_breaker, dtype=float)
+    order = numpy.lexsort((tie_breaker, -y_score))
     top = order[:n]
     return float(numpy.asarray(y_true)[top].sum()) / float(n)
 
@@ -1455,6 +1487,12 @@ def _plot_current_affinity_scatter(
 def _plot_monoallelic_scatter(
         scores, predictor_info, metric, metric_label, max_points, name, writer,
         predictors, preferred_candidate="no_additional_ms"):
+    scores = _all_length_rows(scores)
+    if scores.empty:
+        writer.skip(
+            "monoallelic", name, ["All-length monoallelic scores"],
+            "Monoallelic scores have no All-length rows.")
+        return
     candidate = (
         preferred_candidate if preferred_candidate in set(scores["predictor"])
         else predictors.candidate
@@ -1994,9 +2032,12 @@ def _plot_ap_correlation_from_saved_predictions(inputs, writer):
     if affinity_col is None or processing_col is None:
         return False
     df = df.copy()
-    df[affinity_col] = -numpy.log10(
-        numpy.clip(pandas.to_numeric(df[affinity_col], errors="coerce"), 1e-3, 1e8)
-    )
+    affinity_columns = [
+        column for column in df.columns
+        if "affinity" in str(column).lower()
+    ]
+    for column in affinity_columns:
+        df[column] = _affinity_to_evidence_score(df[column])
     df[processing_col] = pandas.to_numeric(
         df[processing_col], errors="coerce")
     finite = df[[affinity_col, processing_col]].replace(
@@ -2029,9 +2070,9 @@ def _plot_ap_correlation_from_saved_predictions(inputs, writer):
     numeric_cols = [
         column for column in df.columns
         if (
-            "affinity" in column or
-            "processing_score" in column or
-            "presentation_score" in column
+            "affinity" in str(column).lower() or
+            "processing_score" in str(column).lower() or
+            "presentation_score" in str(column).lower()
         )
     ]
     numeric = df[numeric_cols].apply(pandas.to_numeric, errors="coerce")
@@ -2078,6 +2119,12 @@ def _plot_ap_correlation_from_saved_predictions(inputs, writer):
             note="Generated from saved multiallelic predictions.",
         )
     return True
+
+
+def _affinity_to_evidence_score(values):
+    return -numpy.log10(
+        numpy.clip(pandas.to_numeric(values, errors="coerce"), 1e-3, 1e8)
+    )
 
 
 def _short_score_label(column):
@@ -2341,7 +2388,12 @@ def _monoallelic_index_columns(scores):
             ("allele",),
             ("sample_id",),
     ):
-        if all(column in scores.columns for column in candidates):
+        if all(
+                column in scores.columns and (
+                    column not in ("peptide_length", "length") or
+                    scores[column].notnull().any()
+                )
+                for column in candidates):
             return list(candidates)
     return scores.index
 

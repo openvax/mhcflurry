@@ -1288,7 +1288,9 @@ while [ $# -gt 0 ]; do
             ;;
         --paper-figures-artifacts-dir)
             PAPER_FIGURES_ARTIFACTS_DIR=$2
-            PAPER_FIGURES_SCORES_DIR=$2
+            if [ -z "$PAPER_FIGURES_SCORES_DIR" ]; then
+                PAPER_FIGURES_SCORES_DIR=$2
+            fi
             shift 2
             ;;
         --paper-figures-multiallelic-predictions)
