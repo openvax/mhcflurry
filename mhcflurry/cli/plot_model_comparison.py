@@ -481,7 +481,7 @@ def _plot_processing(input_dir, plot_dir, labels, max_scatter_points):
         _safe_plot(
             "processing macro bars",
             _save_macro_bars, plt, summary, sub_dir, label_a, label_b,
-            "Processing prediction")
+            "Processing")
     _save_component_paper_plots(
         plt,
         processing_dir,
@@ -491,6 +491,7 @@ def _plot_processing(input_dir, plot_dir, labels, max_scatter_points):
         "processing_score",
         label_a,
         label_b,
+        title_prefix="Processing score",
     )
 
 
@@ -551,11 +552,9 @@ def _plot_presentation(input_dir, plot_dir, labels, max_scatter_points):
         _safe_plot(
             "presentation macro bars",
             _save_macro_bars, plt, summary, sub_dir, label_a, label_b,
-            "Presentation prediction")
+            "Presentation")
     for score_kind in PRESENTATION_SCORE_KINDS:
         suffix = "" if score_kind == "presentation_score" else "_%s" % score_kind
-        title_suffix = "" if score_kind == "presentation_score" else (
-            " (%s)" % _display_score_kind(score_kind))
         _save_component_paper_plots(
             plt,
             presentation_dir,
@@ -566,7 +565,7 @@ def _plot_presentation(input_dir, plot_dir, labels, max_scatter_points):
             label_a,
             label_b,
             name_suffix=suffix,
-            title_suffix=title_suffix,
+            title_prefix=_score_kind_title(score_kind),
         )
 
 
@@ -679,7 +678,10 @@ def _release_summary_group_label(row):
 
 def _save_component_paper_plots(
         plt, component_dir, paper_dir, component, modes, score_kind,
-        label_a, label_b, name_suffix="", title_suffix=""):
+        label_a, label_b, name_suffix="", title_prefix=None):
+    if title_prefix is None:
+        title_prefix = component.title()
+
     sample_frames = []
     length_frames = []
     for mode in modes:
@@ -706,7 +708,7 @@ def _save_component_paper_plots(
                 "%s_per_sample_scatter%s.png" % (component, name_suffix)),
             label_a,
             label_b,
-            "%s per-sample accuracy%s" % (component.title(), title_suffix),
+            "%s per-sample accuracy" % title_prefix,
         )
         _save_metric_delta_boxplots(
             plt,
@@ -715,7 +717,7 @@ def _save_component_paper_plots(
                 paper_dir,
                 "%s_per_sample_delta_boxplots%s.png" % (
                     component, name_suffix)),
-            "%s per-sample deltas%s" % (component.title(), title_suffix),
+            "%s per-sample deltas" % title_prefix,
             label_a,
             label_b,
         )
@@ -729,7 +731,7 @@ def _save_component_paper_plots(
                 "%s_per_length_macro%s.png" % (component, name_suffix)),
             label_a,
             label_b,
-            "%s by peptide length%s" % (component.title(), title_suffix),
+            "%s by peptide length" % title_prefix,
         )
 
 
@@ -1211,6 +1213,15 @@ def _display_score_kind(value):
         "processing_score": "processing score",
     }
     return display.get(str(value), _display_identifier(value))
+
+
+def _score_kind_title(value):
+    display = {
+        "presentation_score": "Presentation score",
+        "presentation_percentile": "Presentation percentile rank",
+        "processing_score": "Processing score",
+    }
+    return display.get(str(value), _display_score_kind(value).title())
 
 
 # Module-level parser for sphinx autoprogram; behaves like the legacy
