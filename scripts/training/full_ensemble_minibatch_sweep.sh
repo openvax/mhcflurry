@@ -241,7 +241,7 @@ PY
     else
     eval_start=$(date +%s)
     mkdir -p "$SIZE_OUT/eval_comparison"
-    mhcflurry compare-models \
+    mhcflurry eval compare-models \
         --a "$SIZE_OUT/models.combined" \
         --a-label "mb_$MB" \
         --b public \

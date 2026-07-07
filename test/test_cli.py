@@ -31,6 +31,7 @@ import pytest
 import yaml
 
 from mhcflurry.cli import compare_models, main as cli_main
+from mhcflurry.cli import eval_command
 from mhcflurry.cli import paper_figures
 from mhcflurry.cli import plot_model_comparison
 
@@ -38,9 +39,104 @@ from mhcflurry.cli import plot_model_comparison
 def test_top_level_parser_lists_subcommands():
     parser = cli_main.build_parser()
     help_text = parser.format_help()
+    assert "eval" in help_text
     assert "compare-models" in help_text
     assert "plot-model-comparison" in help_text
     assert "paper-figures" in help_text
+
+
+def test_eval_help_runs(capsys):
+    cli_main.main(["eval", "--help"])
+    captured = capsys.readouterr().out
+    assert "paper-figures run" in captured
+    assert "Compatibility:" in captured
+
+
+def test_eval_compare_models_help_runs(capsys):
+    with pytest.raises(SystemExit):
+        cli_main.main(["eval", "compare-models", "--help"])
+    captured = capsys.readouterr().out
+    assert "usage: mhcflurry eval compare-models" in captured
+    assert "--data-dir" in captured
+
+
+def test_eval_plot_comparison_help_runs(capsys):
+    with pytest.raises(SystemExit):
+        cli_main.main(["eval", "plot-comparison", "--help"])
+    captured = capsys.readouterr().out
+    assert "usage: mhcflurry eval plot-comparison" in captured
+    assert "--paper-figures-scores-dir" in captured
+
+
+def test_eval_paper_figures_render_help_runs(capsys):
+    with pytest.raises(SystemExit):
+        cli_main.main(["eval", "paper-figures", "render", "--help"])
+    captured = capsys.readouterr().out
+    assert "usage: mhcflurry eval paper-figures render" in captured
+    assert "--scores-dir" in captured
+
+
+def test_eval_paper_figures_run_dispatches_pipeline(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_compare(args):
+        calls.append(("compare", args.a, args.b, args.out, args.include))
+        return 0
+
+    def fake_paper(args):
+        calls.append((
+            "paper",
+            args.comparison_dir,
+            args.out,
+            args.formats,
+            args.scores_dir,
+            args.external_baselines,
+        ))
+        return 0
+
+    def fake_plot(args):
+        calls.append((
+            "plot",
+            args.input,
+            args.summary_pdf,
+            args.include_paper_figures_in_summary_pdf,
+        ))
+        return 0
+
+    monkeypatch.setattr(compare_models, "run", fake_compare)
+    monkeypatch.setattr(paper_figures, "run", fake_paper)
+    monkeypatch.setattr(plot_model_comparison, "run", fake_plot)
+
+    out = tmp_path / "eval"
+    status = eval_command.run_argv([
+        "paper-figures",
+        "run",
+        "--a", "new-run",
+        "--b", "public:2.0.0",
+        "--out", str(out),
+        "--include", "affinity",
+        "--scores-dir", str(tmp_path / "scores"),
+        "--external-baselines", "netmhcpan4.ba:ba",
+        "--formats", "svg,pdf",
+    ])
+    assert status == 0
+    assert calls == [
+        ("compare", "new-run", "public:2.0.0", str(out), "affinity"),
+        (
+            "paper",
+            str(out),
+            str(out / "plots" / "paper_figures"),
+            "svg,pdf",
+            str(tmp_path / "scores"),
+            "netmhcpan4.ba:ba",
+        ),
+        (
+            "plot",
+            str(out),
+            str(out / "plots" / "model_comparison_figures.pdf"),
+            True,
+        ),
+    ]
 
 
 def test_compare_models_help_runs(capsys):
@@ -436,12 +532,12 @@ def test_bare_invocation_shows_grouped_help(capsys):
     assert "MHCflurry " in out  # version banner
     for group in (
             "Prediction:", "Calibration:", "Class I training:",
-            "Class I selection:", "Model comparison",
+            "Class I selection:", "Evaluation and figures",
     ):
         assert group in out, "missing group header: %s" % group
     # The example block should also surface.
     assert "Examples:" in out
-    assert "mhcflurry compare-models" in out
+    assert "mhcflurry eval compare-models" in out
 
 
 def test_subsubcommand_help_shows_full_prog(capsys):

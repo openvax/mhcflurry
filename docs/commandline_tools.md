@@ -11,9 +11,10 @@ Every historical `mhcflurry-*` console script is also reachable as
 same underlying entry point; the legacy `mhcflurry-*` scripts remain
 installed as compat shims and are not changing.
 
-The commands new in 2.3.0 — `mhcflurry compare-models`,
-`mhcflurry plot-model-comparison`, and `mhcflurry paper-figures` — only
-have the parent-command form.
+The evaluation commands new in 2.3.0 are grouped under
+`mhcflurry eval`. The older top-level forms (`mhcflurry compare-models`,
+`mhcflurry plot-model-comparison`, and `mhcflurry paper-figures`) remain
+available as compatibility shortcuts.
 
 ## Prediction and data
 
@@ -82,9 +83,14 @@ have the parent-command form.
     :prog: mhcflurry class1-train-presentation-models
 ```
 
-## Model comparison (new in 2.3.0)
+## Evaluation and figures (new in 2.3.0)
 
 ```{eval-rst}
+.. _ref-mhcflurry-eval:
+
+.. autoprogram:: mhcflurry.cli.eval_command:parser
+    :prog: mhcflurry eval
+
 .. _ref-mhcflurry-compare-models:
 
 .. autoprogram:: mhcflurry.cli.compare_models:parser
@@ -100,6 +106,21 @@ have the parent-command form.
 .. autoprogram:: mhcflurry.cli.paper_figures:parser
     :prog: mhcflurry paper-figures
 ```
+
+Prefer the namespaced form in new automation:
+
+```shell
+mhcflurry eval compare-models --a results/new_run --b public --out results/eval
+mhcflurry eval plot-comparison --input results/eval
+mhcflurry eval paper-figures render --comparison-dir results/eval --out results/eval/plots/paper_figures
+mhcflurry eval paper-figures run --a results/new_run --b public --out results/eval
+```
+
+The planned evaluation namespace also gives the missing 2023-notebook pieces a
+clear home. Benchmark prediction, external predictor import, score derivation,
+metadata preparation, and paper rendering should become separate
+`mhcflurry eval paper-figures ...` steps, with `paper-figures run` composing
+them for release workflows and reusing cached prediction tables when present.
 
 ## Pseudosequence registry helper
 

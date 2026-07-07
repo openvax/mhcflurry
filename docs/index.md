@@ -10,4 +10,6 @@ commandline_tools
 api
 testing
 development
+2023_retraining_notebook_audit
+orchestrator
 ```

@@ -182,6 +182,44 @@ def normalize_allele_name(
     return result.restrict_allele_fields(2).to_string()
 
 
+def allele_locus_name(
+        raw_name,
+        raise_on_error=False,
+        default_value="other",
+        use_allele_aliases=True):
+    """Return a class-I MHC locus label using mhcgnomes parsing.
+
+    Human loci are returned as ``HLA-A``, ``HLA-B``, etc. Mouse H-2 loci are
+    collapsed to ``H2`` for the plotting/genotype-sampling code that only needs
+    a species-level bucket. Invalid or unsupported inputs return
+    ``default_value`` unless ``raise_on_error`` is true.
+    """
+    result = parse(
+        str(raw_name),
+        only_class1=True,
+        required_result_types=[Allele, AlleleWithoutGene, Gene],
+        preferred_result_types=[Allele],
+        use_allele_aliases=use_allele_aliases,
+        infer_class2_pairing=False,
+        collapse_singleton_haplotypes=True,
+        collapse_singleton_serotypes=True,
+        raise_on_error=False,
+    )
+    if result is None:
+        if raise_on_error:
+            raise ValueError("Invalid MHC allele name: %s" % raw_name)
+        return default_value
+
+    species = getattr(result, "species", None)
+    prefix = getattr(species, "mhc_prefix", None)
+    gene_name = getattr(result, "gene_name", None)
+    if prefix == "HLA" and gene_name:
+        return "HLA-%s" % gene_name
+    if prefix == "H2":
+        return "H2"
+    return default_value
+
+
 def filter_canonicalizable_alleles(alleles, log_label="alleles"):
     """Drop alleles that ``normalize_allele_name`` refuses to canonicalize.
 

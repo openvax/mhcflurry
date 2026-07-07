@@ -19,8 +19,8 @@ need. This keeps the torch-import cost off the top-level help path.
 
 Two flavors of subcommand:
 
-* **New under the parent**: ``compare-models``, ``plot-model-comparison``,
-  ``paper-figures``.
+* **New under the parent**: ``eval``, ``compare-models``,
+  ``plot-model-comparison``, ``paper-figures``.
   Each module exposes ``run_argv(argv)`` which does its own argparse.
 * **Historical mhcflurry-* commands**: ``predict``, ``predict-scan``,
   ``downloads``, ``calibrate-percentile-ranks``, the ``class1-train-*`` /
@@ -44,6 +44,9 @@ from ..version import __version__
 # entry function must accept a single ``argv`` argument; it owns its own
 # arg parsing.
 _SUBCOMMANDS = {
+    "eval": (
+        "mhcflurry.cli.eval_command", "run_argv",
+        "Evaluation, model comparison, and paper-figure workflows."),
     "compare-models": (
         "mhcflurry.cli.compare_models", "run_argv",
         "Compare two model ensembles on data_evaluation."),
@@ -122,8 +125,8 @@ _HELP_GROUPS = (
         "class1-select-pan-allele-models",
         "class1-select-processing-models",
     )),
-    ("Model comparison (new in 2.3.0)", (
-        "compare-models", "plot-model-comparison", "paper-figures",
+    ("Evaluation and figures (new in 2.3.0)", (
+        "eval", "compare-models", "plot-model-comparison", "paper-figures",
     )),
     ("Helpers", (
         "class1-generate-training-hyperparameters",
@@ -210,7 +213,8 @@ def format_help():
     lines.extend([
         "Examples:",
         "  mhcflurry predict --alleles HLA-A0201 --peptides SIINFEKL --out out.csv",
-        "  mhcflurry compare-models --a results/new_run/ --b public --out cmp/",
+        "  mhcflurry eval compare-models --a results/new_run/ --b public --out cmp/",
+        "  mhcflurry eval paper-figures run --a results/new_run/ --out eval/",
         "  mhcflurry <subcommand> --help",
         "",
         "Options:",

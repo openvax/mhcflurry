@@ -224,6 +224,59 @@ resources.
 ```
 
 
+## Evaluating trained models
+
+After fitting a model, evaluate it before using it as a default predictor. The
+usual workflow is:
+
+1. Compare a trained run directory against a baseline.
+2. Render diagnostic plots from the comparison output.
+3. Optionally render the broader paper-style figure suite from cached benchmark
+   predictions or saved external-predictor outputs.
+
+For a local comparison against the installed public models:
+
+```shell
+$ mhcflurry eval compare-models \
+    --a results/new_run/ \
+    --b public \
+    --out results/new_run/eval_comparison/
+
+$ mhcflurry eval plot-comparison \
+    --input results/new_run/eval_comparison/ \
+    --summary-pdf results/new_run/eval_comparison/plots/model_comparison_figures.pdf
+```
+
+`eval compare-models` writes detailed component CSV/JSON files plus
+`release_summary.csv` and `release_summary.md`. `eval plot-comparison` reads
+that directory and writes ROC/PR/scatter/delta plots.
+
+To include paper-style figures from saved benchmark prediction tables or
+derived score tables:
+
+```shell
+$ mhcflurry eval paper-figures render \
+    --comparison-dir results/new_run/eval_comparison/ \
+    --scores-dir results/new_run/eval_inputs/ \
+    --out results/new_run/eval_comparison/plots/paper_figures/
+```
+
+For the common local path, the same steps can be composed:
+
+```shell
+$ mhcflurry eval paper-figures run \
+    --a results/new_run/ \
+    --b public \
+    --out results/new_run/eval_comparison/
+```
+
+That command is intentionally an evaluation command, not a training or remote
+provisioning command. For full release retraining on a remote GPU machine,
+including synchronization, cleanup, evaluation, plots, and packaging checks, see
+`scripts/release/retrain_evaluate_deploy.sh` and
+`scripts/release/README.md`.
+
+
 ## Environment variables
 
 MHCflurry behavior can be modified using these environment variables:
@@ -319,24 +372,27 @@ Every command on this page is now reachable two ways:
   (`mhcflurry-predict`, `mhcflurry-downloads`, etc.). Still installed
   as a compat shim; both forms run the same underlying entry point.
 
-Two tools are new in 2.3.0 and only have the unified form:
+Evaluation tools are new in 2.3.0 and live under the `eval` namespace:
 
-* {ref}`mhcflurry compare-models <ref-mhcflurry-compare-models>` — compares
+* {ref}`mhcflurry eval <ref-mhcflurry-eval>` — groups model comparison,
+  diagnostic plotting, and paper-style figure workflows.
+* {ref}`mhcflurry compare-models <ref-mhcflurry-compare-models>` — compatibility
+  shortcut for `mhcflurry eval compare-models`; compares
   two ensembles (run-vs-run or run-vs-public) across affinity,
   presentation, and training-stats components.
 * {ref}`mhcflurry plot-model-comparison <ref-mhcflurry-plot-model-comparison>`
-  — renders ROC/PR/scatter/delta plots from a `compare-models`
-  output directory.
+  — compatibility shortcut for `mhcflurry eval plot-comparison`; renders
+  ROC/PR/scatter/delta plots from a `compare-models` output directory.
 
 Example:
 
 ```shell
-$ mhcflurry compare-models \
+$ mhcflurry eval compare-models \
         --a results/new_run/ \
         --b public \
         --out results/comparison/
 
-$ mhcflurry plot-model-comparison --input results/comparison/
+$ mhcflurry eval plot-comparison --input results/comparison/
 ```
 
 `--b` defaults to `public`, which resolves to the currently-installed

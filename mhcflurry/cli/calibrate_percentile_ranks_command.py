@@ -30,6 +30,7 @@ from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..class1_presentation_predictor import Class1PresentationPredictor
 from ..common import (
     add_random_seed_arg,
+    allele_locus_name,
     amino_acid_distribution,
     configure_logging,
     configure_pytorch,
@@ -433,8 +434,10 @@ def run_class1_presentation_predictor(args, peptides):
     if args.alleles_per_genotype == 6:
         gene_to_alleles = collections.defaultdict(list)
         for a in alleles:
-            for gene in ["A", "B", "C"]:
-                if a.startswith("HLA-%s" % gene):
+            locus = allele_locus_name(a)
+            for gene, expected_locus in [
+                    ("A", "HLA-A"), ("B", "HLA-B"), ("C", "HLA-C")]:
+                if locus == expected_locus:
                     gene_to_alleles[gene].append(a)
 
         for _ in range(args.num_genotypes):

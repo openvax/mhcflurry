@@ -34,6 +34,9 @@ prediction jobs:
 - `mhcflurry-predict`, `mhcflurry-predict-scan`, and `mhcflurry-calibrate-percentile-ranks` use all visible GPUs by default.
 - `mhcflurry-class1-train-pan-allele-models` auto-tunes job and worker counts from the hardware, so the same command runs on a laptop, a single GPU, or an 8×A100 host.
 - `torch.compile` and matmul precision (including TF32) are available as flags on the training commands.
+- `mhcflurry eval` compares trained models, renders diagnostic plots, and
+  generates paper-style figure suites from current or cached benchmark
+  predictions.
 
 ## Try it now
 

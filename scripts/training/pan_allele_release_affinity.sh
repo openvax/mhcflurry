@@ -478,7 +478,7 @@ else
     EVAL_OUT="$MHCFLURRY_OUT/eval_comparison"
     mkdir -p "$EVAL_OUT"
     run_logged_step "eval_compare_new_vs_public" "$EVAL_LOG" \
-        mhcflurry compare-models \
+        mhcflurry eval compare-models \
             --a "$MHCFLURRY_OUT/models.combined" \
             --a-label new \
             --b public \

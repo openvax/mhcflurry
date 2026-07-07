@@ -63,8 +63,8 @@ Backends:
 
 Evaluation:
   After training, the script runs:
-      mhcflurry compare-models --a RUN_DIR --b COMPARE_BASELINE
-      mhcflurry plot-model-comparison --input RUN_DIR/eval_comparison
+      mhcflurry eval compare-models --a RUN_DIR --b COMPARE_BASELINE
+      mhcflurry eval plot-comparison --input RUN_DIR/eval_comparison
   compare-models writes release_summary.csv and release_summary.md with
   affinity, processing, and presentation release-gate tables. Presentation
   inference is memory-heavier than affinity/processing, so the release wrapper
@@ -74,7 +74,7 @@ Evaluation:
   release, or pass a model-run directory / public:<release_name>.
   If --paper-figures-scores-dir or a saved prediction table is set, the
   plotting step also runs:
-      mhcflurry paper-figures --scores-dir DIR
+      mhcflurry eval paper-figures render --scores-dir DIR
   and writes publication-style SVG/PDF/PNG panels under
   RUN_DIR/eval_comparison/plots/paper_figures/.
 
@@ -622,7 +622,7 @@ fi
 data_dir="$(mhcflurry downloads path data_evaluation)"
 
 compare_args=(
-    mhcflurry compare-models
+    mhcflurry eval compare-models
     --a "$run_dir" \
     --a-label "${RUN_LABEL:-new}" \
     --b "${COMPARE_BASELINE:-public:2.0.0}" \
@@ -654,7 +654,7 @@ esac
 
 if [ "${RUN_RELEASE_PLOTS:-1}" = "1" ]; then
     plot_args=(
-        mhcflurry plot-model-comparison
+        mhcflurry eval plot-comparison
         --input "$run_dir/eval_comparison"
         --a-label "${RUN_LABEL:-new}"
         --b-label "${COMPARE_BASELINE_LABEL:-MHCflurry 2.0}"
@@ -1564,7 +1564,7 @@ if [ "$SKIP_EVAL" != "1" ]; then
         fi
         run_logged_step fetch_compare_baseline_downloads \
             fetch_pinned_public_baseline_downloads
-        run_logged_step compare_models mhcflurry compare-models \
+        run_logged_step compare_models mhcflurry eval compare-models \
             --a "$RUN_DIR" \
             --a-label "$RUN_LABEL" \
             --b "$COMPARE_BASELINE" \
@@ -1594,7 +1594,7 @@ if [ "$SKIP_PLOTS" != "1" ]; then
         note "Using plots produced on the Brev instance."
     else
         plot_args=(
-            mhcflurry plot-model-comparison
+            mhcflurry eval plot-comparison
             --input "$RUN_DIR/eval_comparison"
             --a-label "$RUN_LABEL"
             --b-label "$COMPARE_BASELINE_LABEL"

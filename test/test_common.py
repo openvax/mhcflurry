@@ -15,6 +15,7 @@
 import logging
 
 from mhcflurry.common import (
+    allele_locus_name,
     filter_canonicalizable_alleles,
     AlleleKeyResolver,
     canonicalize_allele_series,
@@ -41,6 +42,14 @@ def test_filter_canonicalizable_alleles_returns_names_verbatim():
     # target (which would silently drop it on the default calibrate path).
     assert filter_canonicalizable_alleles(["HLA-B*44:01", "JUNK"]) == \
         ["HLA-B*44:01"]
+
+
+def test_allele_locus_name_uses_mhcgnomes():
+    assert allele_locus_name("HLA-A0201") == "HLA-A"
+    assert allele_locus_name("HLA-B*07:02") == "HLA-B"
+    assert allele_locus_name("HLA-C*03:04") == "HLA-C"
+    assert allele_locus_name("H-2-Kb") == "H2"
+    assert allele_locus_name("NONSENSE") == "other"
 
 
 def test_allele_key_resolver_priority():

@@ -363,12 +363,13 @@ def run_release_evaluation(repo, out, env):
 
     compare_args = [
         "mhcflurry",
-            "compare-models",
-            "--a", str(out),
-            "--a-label", env.get("RUN_LABEL", "new"),
-            "--b", env.get("COMPARE_BASELINE", "public:2.0.0"),
-            "--b-label", env.get("COMPARE_BASELINE_LABEL", "MHCflurry 2.0"),
-            "--data-dir", data_dir,
+        "eval",
+        "compare-models",
+        "--a", str(out),
+        "--a-label", env.get("RUN_LABEL", "new"),
+        "--b", env.get("COMPARE_BASELINE", "public:2.0.0"),
+        "--b-label", env.get("COMPARE_BASELINE_LABEL", "MHCflurry 2.0"),
+        "--data-dir", data_dir,
         "--include", env.get("COMPARE_INCLUDE", "affinity,processing,presentation"),
         "--processing-modes", env.get(
             "PROCESSING_MODES", "with_flanks,no_flank,short_flanks"
@@ -407,7 +408,8 @@ def run_release_plots(repo, out, env):
     """Render compare-models plots before the remote instance is cleaned up."""
     plot_args = [
         "mhcflurry",
-        "plot-model-comparison",
+        "eval",
+        "plot-comparison",
         "--input", str(out / "eval_comparison"),
         "--a-label", env.get("RUN_LABEL", "new"),
         "--b-label", env.get("COMPARE_BASELINE_LABEL", "MHCflurry 2.0"),

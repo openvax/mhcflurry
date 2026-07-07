@@ -24,8 +24,9 @@ one-off tuning runs do not belong here.
   the same pan-allele training pipeline. It uses runplz as the transport,
   with Brev provisioning behavior controlled by `RUNPLZ_BREV_*`
   environment variables. When invoked by the release workflow wrapper, it also
-  runs `mhcflurry compare-models` and `mhcflurry plot-model-comparison` on the
-  remote GPU machine before cleanup so release-scale inference does not fall
+  runs `mhcflurry eval compare-models` and
+  `mhcflurry eval plot-comparison` on the remote GPU machine before cleanup so
+  release-scale inference does not fall
   back to the local laptop. Prefer the release workflow wrapper below unless
   you are debugging the remote launcher itself.
 
@@ -70,7 +71,7 @@ validation), prefer `scripts/release/retrain_evaluate_deploy.sh`.
   Phase-idempotent (`.train.done` / `.select.done` / `.calibrate.done` /
   `.eval.done` sentinels) and supports `MHCFLURRY_SCALE_LR`,
   `MHCFLURRY_SKIP_CALIBRATE` for the variants we routinely run.
-- **`mhcflurry compare-models`** — Unified two-side comparator covering
+- **`mhcflurry eval compare-models`** — Unified two-side comparator covering
   training stats (per-task wall-time / epoch / loss deltas), affinity
   (per-allele + per-length ROC/PR/PPV on `data_evaluation` monoallelic),
   processing, and presentation (per-sample + per-length on multiallelic
@@ -82,13 +83,13 @@ validation), prefer `scripts/release/retrain_evaluate_deploy.sh`.
   CLIs; metric aggregation remains in pandas / scikit-learn for exact release
   summary compatibility. Writes detailed component artifacts plus
   `release_summary.csv` and `release_summary.md`.
-- **`mhcflurry plot-model-comparison`** — Renders ROC/PR/scatter/delta
+- **`mhcflurry eval plot-comparison`** — Renders ROC/PR/scatter/delta
   diagnostics plus paper-style per-allele, per-sample, per-length, and
   release-summary panels from a `compare-models` output directory. It writes
   per-plot PDFs next to PNGs and can collect the vector outputs into a single
   PDF via `--summary-pdf`. Separate subcommand so the metric pipeline doesn't
   pay the matplotlib import cost.
-- **`mhcflurry paper-figures`** — Generates the broader paper-style figure
+- **`mhcflurry eval paper-figures render`** — Generates the broader paper-style figure
   suite from saved evaluation outputs. It accepts derived score tables such as
   `accuracy_scores.multiallelic.csv`, saved test-set prediction tables such as
   `benchmark.multiallelic.csv.bz2`, current `compare-models` output, and
@@ -98,6 +99,10 @@ validation), prefer `scripts/release/retrain_evaluate_deploy.sh`.
   predictors are configurable (`--candidate-predictor`,
   `--external-baselines`, `--preferred-predictors`); defaults use NetMHCpan 4.0
   BA/EL and MixMHCpred when saved columns are present.
+- **`mhcflurry eval paper-figures run`** — Local one-command composition of
+  `compare-models`, `paper-figures render`, and `plot-comparison`. This is for
+  already-trained models; remote training and cleanup still belong to the
+  release wrapper.
 - **`plot_minibatch_sweep.py`** — Stylized plots from a `sweep_summary.csv`
   (gradient-color dots by mb, lin-lin + log-log only, adjustText
   de-overlap). Invoked by the sweep wrapper after completion.
@@ -129,7 +134,7 @@ with a `downloads-generation/<download_name>/GENERATE.sh` once their
 outputs are release artifacts that should be reproducible and
 downloadable.
 
-- **`mhcflurry compare-models`** (affinity + presentation components) —
+- **`mhcflurry eval compare-models`** (affinity + presentation components) —
   if the summary tables, plots, or row-level new-vs-public predictions
   are used as release evidence, make a generated analysis download that
   pins the new model paths, public download versions, data-evaluation

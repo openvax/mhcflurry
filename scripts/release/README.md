@@ -61,8 +61,8 @@ Supported backends are:
   `--remote-run-dir`. Authentication comes from local `ssh` / `rsync`
   configuration, typically SSH keys or an SSH config `Host`.
 
-The script runs training, `mhcflurry compare-models`,
-`mhcflurry plot-model-comparison`, and deployment validation in order; each
+The script runs training, `mhcflurry eval compare-models`,
+`mhcflurry eval plot-comparison`, and deployment validation in order; each
 stage has a `--skip-*` flag for resuming. For Brev backends, the expensive
 comparison and plot steps run on the remote GPU machine before artifact sync and
 cleanup, then the local wrapper uses the synced `eval_comparison/` outputs
@@ -93,7 +93,7 @@ as `MHCflurry <release>` with any `rcN` suffix stripped. Use
 `--compare-baseline public` for the currently configured public release, or pass
 another training-run directory / `public:<release_name>` plus
 `--compare-baseline-label` to tune the figure labels.
-`plot-model-comparison` now writes both release-diagnostic plots and a
+`eval plot-comparison` now writes both release-diagnostic plots and a
 paper-style `plots/paper/` suite: per-allele affinity scatter panels,
 per-sample processing/presentation scatter panels, per-length bars, delta
 boxplots, and release-summary overview panels. The release wrapper also asks it
@@ -110,12 +110,19 @@ You can also pass explicit saved prediction tables with
 `--paper-figures-monoallelic-predictions`. The legacy
 `--paper-figures-artifacts-dir` / `PAPER_FIGURES_ARTIFACTS_DIR` spelling is
 still accepted as an alias for older 2023 bundle paths. The wrapper passes
-those inputs through to `mhcflurry plot-model-comparison`, which invokes
-`mhcflurry paper-figures` and writes SVG/PDF/PNG panels plus
+those inputs through to `mhcflurry eval plot-comparison`, which invokes
+`mhcflurry eval paper-figures render` and writes SVG/PDF/PNG panels plus
 `paper_figures.pdf`, `manifest.csv`, and `missing_inputs.md` under
 `eval_comparison/plots/paper_figures/`. Figure families whose source tables are
 absent are reported there instead of being faked. The comparator suite is
-configurable through `mhcflurry paper-figures` flags such as
+configurable through `mhcflurry eval paper-figures render` flags such as
 `--candidate-predictor`, `--external-baselines`, and `--preferred-predictors`;
 the defaults use NetMHCpan 4.0 BA/EL and MixMHCpred when those saved
 prediction columns are available.
+
+For a local model-to-figures pass outside the release wrapper, use
+`mhcflurry eval paper-figures run --a RUN_DIR --b public --out RUN_DIR/eval`.
+That command composes compare-models, paper-figures, and the diagnostic plot
+PDF. It does not yet run external predictors itself; external NetMHCpan /
+MixMHCpred outputs should be saved and passed as canonical prediction tables
+until the planned `eval paper-figures register-external-predictions` step lands.

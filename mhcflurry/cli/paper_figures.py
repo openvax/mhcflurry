@@ -41,6 +41,7 @@ from .figure_style import (
     predictor_color as _predictor_color,
     short_label as _short_label,
 )
+from ..common import allele_locus_name
 
 
 CANDIDATE_PREDICTOR = "mhcflurry_production"
@@ -2458,18 +2459,8 @@ def _add_diagonal(ax, x, y):
 
 
 def _allele_locus(value):
-    from mhcgnomes import parse
-
-    result = parse(str(value), only_class1=True, raise_on_error=False)
-    if result is not None:
-        species = getattr(result, "species", None)
-        prefix = getattr(species, "mhc_prefix", None)
-        gene_name = getattr(result, "gene_name", None)
-        if prefix == "HLA" and gene_name in ("A", "B", "C"):
-            return "HLA-%s" % gene_name
-        if prefix == "H2":
-            return "H2"
-    return "other"
+    locus = allele_locus_name(value)
+    return locus if locus in ("HLA-A", "HLA-B", "HLA-C", "H2") else "other"
 
 
 def _first_existing(directory, names):

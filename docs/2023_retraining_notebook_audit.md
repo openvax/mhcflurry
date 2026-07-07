@@ -38,10 +38,15 @@ committed as the workflow.
   `tensorflow`, `mhcnames` in places). Ports should use the current PyTorch code,
   `mhcgnomes` / existing allele normalization helpers, and maintained CLI
   commands.
-- Current `mhcflurry compare-models` covers affinity and presentation regression
-  metrics, and `mhcflurry plot-model-comparison` renders generic plots. It does
-  not yet recreate the paper-style benchmark tables, sample-group comparisons,
-  model-selection workbook, motif workbook, or supplemental figures.
+- Current `mhcflurry eval compare-models` covers affinity, processing, and
+  presentation regression metrics, and `mhcflurry eval plot-comparison` renders
+  diagnostic plots. `mhcflurry eval paper-figures render` can render paper-style
+  panels from current compare output and saved score/prediction inputs. It does
+  not yet generate every upstream input itself: external-predictor runs,
+  canonical benchmark prediction tables, exact novel-allele splits, AP
+  motif/logo workbooks, curated proteasome mass-spec figure sources, and
+  architecture diagrams should land as granular `mhcflurry eval paper-figures`
+  generation/import subcommands.
 - The current full training script trains processing `no_flank` and
   `short_flanks` variants, then uses `short_flanks` as the with-flank processing
   component for presentation. Older download-generation trained a separate
