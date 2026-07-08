@@ -175,7 +175,10 @@ def remote_training_env(environ=os.environ):
         "COMPARE_PRESENTATION_TORCH_COMPILE": environ.get(
             "COMPARE_PRESENTATION_TORCH_COMPILE", "0"
         ),
-        "DATA_DIR": environ.get("DATA_DIR", ""),
+        # This must be a path visible inside the remote runplz job. Do not
+        # inherit DATA_DIR from the local shell; in the release wrapper that is
+        # a control-machine path and is handled by explicit staging instead.
+        "DATA_DIR": environ.get("RUNPLZ_EVAL_DATA_DIR", ""),
         "DATALOADER_NUM_WORKERS": environ.get("DATALOADER_NUM_WORKERS", "auto"),
         "MAX_TASKS_PER_WORKER": environ.get("MAX_TASKS_PER_WORKER", "12"),
         "MAX_WORKERS_PER_GPU": environ.get("MAX_WORKERS_PER_GPU", "auto"),

@@ -64,6 +64,21 @@ def test_generate_scripts_keep_packaged_proteome_peptide_artifacts():
     assert "proteome_peptides.$subset.csv.bz2" in predictions_generate
 
 
+def test_processing_train_data_uses_mhcgnomes_locus_filter():
+    module = load_script(
+        REPO_ROOT / "scripts/training/release_exact"
+        / "make_train_data.processing.py"
+    )
+
+    assert module.is_human_class1_abc_allele("HLA-A0201")
+    assert module.is_human_class1_abc_allele("HLA-A2")
+    assert module.is_human_class1_abc_allele("A2")
+    assert module.is_human_class1_abc_allele("HLA-B15")
+    assert module.is_human_class1_abc_allele("HLA-C*03:04")
+    assert not module.is_human_class1_abc_allele("H-2-Kb")
+    assert not module.is_human_class1_abc_allele("NONSENSE")
+
+
 def test_annotate_tpm_matches_rowwise_expression_sum():
     module = load_script(
         REPO_ROOT / "downloads-generation/models_class1_processing"

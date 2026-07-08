@@ -24,7 +24,7 @@ import tqdm
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
-from mhcflurry.common import configure_logging
+from mhcflurry.common import configure_logging, allele_locus_name
 from mhcflurry.parallelism import (
     add_local_parallelism_args,
     attach_constant_data_to_work_items_if_needed,
@@ -52,6 +52,11 @@ from mhcflurry.cluster_parallelism import (
 # processes upon fork() call, allowing local workers to read the same
 # copy-on-write pages instead of receiving a pickled copy.
 WORKER_CONTEXT = {}
+
+
+def is_human_class1_abc_allele(raw_name):
+    """Return true for HLA-A/B/C class-I alleles using mhcgnomes parsing."""
+    return allele_locus_name(raw_name) in ("HLA-A", "HLA-B", "HLA-C")
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -248,7 +253,9 @@ def run():
     print("Subselected to %d monoallelic samples" % hit_df.sample_id.nunique())
     hit_df["allele"] = hit_df.hla
 
-    hit_df = hit_df.loc[hit_df.allele.str.match("^HLA-[ABC]")]
+    hit_df = hit_df.loc[
+        hit_df.allele.map(is_human_class1_abc_allele)
+    ].copy()
     print("Subselected to %d HLA-A/B/C samples" % hit_df.sample_id.nunique())
 
     if args.exclude_contig:
