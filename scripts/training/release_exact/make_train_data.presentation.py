@@ -22,6 +22,7 @@ import pandas
 import tqdm
 
 import mhcflurry
+from mhcflurry.common import normalize_allele_name
 from mhcflurry.proteome_decoys import (
     infer_flanking_length,
     load_reference_sequences,
@@ -84,6 +85,26 @@ parser.add_argument(
     help="File to write")
 
 
+def canonicalize_training_allele(raw_name):
+    """Canonicalize an allele token when mhcgnomes can parse it."""
+    raw_name = str(raw_name).strip()
+    return normalize_allele_name(
+        raw_name,
+        raise_on_error=False,
+        default_value=raw_name,
+    )
+
+
+def split_hla_genotype(value):
+    """Split a whitespace-delimited genotype and canonicalize allele tokens."""
+    if pandas.isnull(value):
+        return tuple()
+    return tuple(
+        canonicalize_training_allele(allele)
+        for allele in str(value).split()
+    )
+
+
 def run():
     args = parser.parse_args(sys.argv[1:])
     hit_df = pandas.read_csv(args.hits)
@@ -98,7 +119,7 @@ def run():
         (hit_df.peptide.str.match("^[%s]+$" % "".join(
             mhcflurry.amino_acid.COMMON_AMINO_ACIDS)))
     ]
-    hit_df['alleles'] = hit_df.hla.str.split().map(tuple)
+    hit_df['alleles'] = hit_df.hla.map(split_hla_genotype)
     print("Loaded hits from %d samples" % hit_df.sample_id.nunique())
     if args.only_format:
         hit_df = hit_df.loc[hit_df.format == args.only_format].copy()
@@ -133,6 +154,7 @@ def run():
             continue
         print("Excluding hits from", train_dataset)
         train_df = pandas.read_csv(train_dataset)
+        train_df["allele"] = train_df.allele.map(canonicalize_training_allele)
         for (allele, peptides) in train_df.groupby("allele").peptide.unique().iteritems():
             allele_to_excluded_peptides[allele].update(peptides)
         train_counts = train_df.groupby(

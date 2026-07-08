@@ -23,6 +23,7 @@ import pandas as pd
 import pytest
 
 from mhcflurry import Class1AffinityPredictor, Class1PresentationPredictor
+from mhcflurry.common import allele_locus_name, normalize_allele_name
 from mhcflurry.downloads import get_path
 from mhcflurry.testing_utils import startup, cleanup
 
@@ -37,11 +38,15 @@ def _normalize_allele(allele):
     if allele is None or (isinstance(allele, float) and np.isnan(allele)):
         return allele
     allele = str(allele).strip()
-    if allele.startswith("HLA-") or "-" in allele:
-        return allele
-    if "*" in allele:
-        return f"HLA-{allele}"
-    return allele
+    return normalize_allele_name(
+        allele,
+        raise_on_error=False,
+        default_value=allele,
+    )
+
+
+def _is_human_hla_ab(allele):
+    return allele_locus_name(allele) in ("HLA-A", "HLA-B")
 
 
 @pytest.fixture(scope="module")
@@ -108,8 +113,7 @@ def test_selected_peptides_netmhcpan_affinity_close(selected_peptides_prediction
     mhc_alleles = [_normalize_allele(a) for a in df["mhcflurry_best_allele"].tolist()]
 
     mask = [
-        (net.startswith("HLA-A") or net.startswith("HLA-B"))
-        and (mhc.startswith("HLA-A") or mhc.startswith("HLA-B"))
+        _is_human_hla_ab(net) and _is_human_hla_ab(mhc)
         for net, mhc in zip(net_alleles, mhc_alleles)
     ]
 

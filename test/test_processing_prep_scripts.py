@@ -79,6 +79,23 @@ def test_processing_train_data_uses_mhcgnomes_locus_filter():
     assert not module.is_human_class1_abc_allele("NONSENSE")
 
 
+def test_presentation_train_data_canonicalizes_genotype_tokens():
+    module = load_script(
+        REPO_ROOT / "scripts/training/release_exact"
+        / "make_train_data.presentation.py"
+    )
+
+    assert module.split_hla_genotype("A*02:01 HLA-B0702 H-2-Kb") == (
+        "HLA-A*02:01",
+        "HLA-B*07:02",
+        "H2-K*b",
+    )
+    # Serotypes are still useful locus labels but not predictor keys; preserve
+    # them rather than guessing a two-field allele.
+    assert module.split_hla_genotype("HLA-A2") == ("HLA-A2",)
+    assert module.split_hla_genotype(float("nan")) == ()
+
+
 def test_annotate_tpm_matches_rowwise_expression_sum():
     module = load_script(
         REPO_ROOT / "downloads-generation/models_class1_processing"
