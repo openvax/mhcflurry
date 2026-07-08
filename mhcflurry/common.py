@@ -23,7 +23,7 @@ import warnings
 
 import numpy
 import pandas
-from mhcgnomes import parse, Allele, AlleleWithoutGene, Gene
+from mhcgnomes import parse, Allele, AlleleWithoutGene, Gene, Serotype
 
 
 from . import amino_acid
@@ -197,7 +197,7 @@ def allele_locus_name(
     result = parse(
         str(raw_name),
         only_class1=True,
-        required_result_types=[Allele, AlleleWithoutGene, Gene],
+        required_result_types=[Allele, AlleleWithoutGene, Gene, Serotype],
         preferred_result_types=[Allele],
         use_allele_aliases=use_allele_aliases,
         infer_class2_pairing=False,

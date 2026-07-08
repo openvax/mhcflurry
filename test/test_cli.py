@@ -154,6 +154,7 @@ def test_eval_paper_figures_run_dispatches_pipeline(tmp_path, monkeypatch):
             "plot",
             args.input,
             args.summary_pdf,
+            args.paper_figures_out,
             args.include_paper_figures_in_summary_pdf,
         ))
         return 0
@@ -189,6 +190,7 @@ def test_eval_paper_figures_run_dispatches_pipeline(tmp_path, monkeypatch):
             "plot",
             str(out),
             str(out / "plots" / "model_comparison_figures.pdf"),
+            str(out / "plots" / "paper_figures"),
             True,
         ),
     ]
@@ -1354,6 +1356,62 @@ def test_summary_pdf_png_fallback_excludes_paper_figures_by_default(tmp_path):
         paper_png, plot_dir, out, include_paper_figures=True)
     assert plot_model_comparison._include_png_in_summary(
         diagnostic_png, plot_dir, out, include_paper_figures=False)
+
+
+def test_summary_pdf_uses_actual_paper_figures_dir(tmp_path):
+    plot_dir = tmp_path / "plots"
+    custom_dir = plot_dir / "custom_paper"
+    combined = custom_dir / "paper_figures.pdf"
+    individual = custom_dir / "pdf" / "panel.pdf"
+    diagnostic = plot_dir / "paper" / "diagnostic.pdf"
+    for path in [combined, individual, diagnostic]:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"unused")
+    out = plot_dir / "summary.pdf"
+
+    paths = plot_model_comparison._summary_pdf_paths(
+        plot_dir,
+        out,
+        include_paper_figures=True,
+        paper_figures_dir=custom_dir,
+    )
+
+    assert paths == [combined, diagnostic]
+    assert not plot_model_comparison._include_pdf_in_summary(
+        individual,
+        plot_dir,
+        out,
+        include_paper_figures=True,
+        paper_figures_dir=custom_dir,
+    )
+    assert not plot_model_comparison._include_pdf_in_summary(
+        combined,
+        plot_dir,
+        out,
+        include_paper_figures=False,
+        paper_figures_dir=custom_dir,
+    )
+
+
+def test_summary_pdf_can_include_external_paper_figures_dir(tmp_path):
+    plot_dir = tmp_path / "plots"
+    external_dir = tmp_path / "external_paper"
+    combined = external_dir / "paper_figures.pdf"
+    diagnostic = plot_dir / "paper" / "diagnostic.pdf"
+    combined.parent.mkdir(parents=True)
+    diagnostic.parent.mkdir(parents=True)
+    combined.write_bytes(b"unused")
+    diagnostic.write_bytes(b"unused")
+    out = plot_dir / "summary.pdf"
+
+    paths = plot_model_comparison._summary_pdf_paths(
+        plot_dir,
+        out,
+        include_paper_figures=True,
+        paper_figures_dir=external_dir,
+    )
+
+    assert paths == [combined, diagnostic]
 
 
 def test_paper_figures_writes_available_2023_style_panels(tmp_path):

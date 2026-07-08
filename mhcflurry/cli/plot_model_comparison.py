@@ -263,12 +263,15 @@ def run(args):
         if status:
             return status
     if args.summary_pdf:
+        paper_figures_dir = args.paper_figures_out or os.path.join(
+            plot_dir, "paper_figures")
         _safe_plot(
             "summary PDF",
             _write_summary_pdf,
             plot_dir,
             args.summary_pdf,
             include_paper_figures=args.include_paper_figures_in_summary_pdf,
+            paper_figures_dir=paper_figures_dir,
         )
     return 0
 
@@ -931,27 +934,25 @@ def _metric_ylim(metric, values):
     return low, high
 
 
-def _write_summary_pdf(plot_dir, out_path, include_paper_figures=False):
+def _write_summary_pdf(
+        plot_dir, out_path, include_paper_figures=False,
+        paper_figures_dir=None):
     plot_dir = Path(plot_dir)
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    pdfs = [
-        path for path in sorted(plot_dir.rglob("*.pdf"))
-        if _include_pdf_in_summary(
-            path, plot_dir, out_path, include_paper_figures)
-    ]
+    pdfs = _summary_pdf_paths(
+        plot_dir, out_path, include_paper_figures, paper_figures_dir)
     if pdfs:
         try:
             try:
                 pdf_reader, pdf_writer = _pdf_reader_writer()
             except ImportError:
                 _write_summary_pdf_from_pngs(
-                    plot_dir, out_path, include_paper_figures)
+                    plot_dir, out_path, include_paper_figures,
+                    paper_figures_dir)
                 return
-            paper = [path for path in pdfs if "paper" in path.parts]
-            rest = [path for path in pdfs if path not in paper]
             writer = pdf_writer()
-            for path in paper + rest:
+            for path in pdfs:
                 reader = pdf_reader(str(path))
                 for page in reader.pages:
                     writer.add_page(page)
@@ -967,27 +968,75 @@ def _write_summary_pdf(plot_dir, out_path, include_paper_figures=False):
             except FileNotFoundError:
                 pass
             _write_summary_pdf_from_pngs(
-                plot_dir, out_path, include_paper_figures)
+                plot_dir, out_path, include_paper_figures, paper_figures_dir)
             return
-    _write_summary_pdf_from_pngs(plot_dir, out_path, include_paper_figures)
+    _write_summary_pdf_from_pngs(
+        plot_dir, out_path, include_paper_figures, paper_figures_dir)
 
 
-def _include_pdf_in_summary(path, plot_dir, out_path, include_paper_figures):
+def _summary_pdf_paths(
+        plot_dir, out_path, include_paper_figures=False,
+        paper_figures_dir=None):
+    result = []
+    for path in sorted(Path(plot_dir).rglob("*.pdf")):
+        if _include_pdf_in_summary(
+                path, plot_dir, out_path, include_paper_figures,
+                paper_figures_dir):
+            _append_unique_path(result, path)
+    if include_paper_figures:
+        for paper_dir in _paper_figure_dirs(plot_dir, paper_figures_dir):
+            paper_pdf = Path(paper_dir) / "paper_figures.pdf"
+            if paper_pdf.is_file():
+                _append_unique_path(result, paper_pdf, prepend=True)
+    return result
+
+
+def _append_unique_path(paths, path, prepend=False):
+    path = Path(path)
+    resolved = path.resolve()
+    if any(existing.resolve() == resolved for existing in paths):
+        return
+    if prepend:
+        paths.insert(0, path)
+    else:
+        paths.append(path)
+
+
+def _paper_figure_dirs(plot_dir, paper_figures_dir=None):
+    if paper_figures_dir:
+        return (Path(paper_figures_dir),)
+    plot_dir = Path(plot_dir)
+    return (plot_dir / "paper_figures", plot_dir / "paper_2023")
+
+
+def _path_is_relative_to(path, directory):
+    try:
+        Path(path).resolve().relative_to(Path(directory).resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def _include_pdf_in_summary(
+        path, plot_dir, out_path, include_paper_figures,
+        paper_figures_dir=None):
+    path = Path(path)
+    plot_dir = Path(plot_dir)
+    out_path = Path(out_path)
     if path.resolve() == out_path.resolve():
         return False
-    relative_parts = path.relative_to(plot_dir).parts
-    if len(relative_parts) == 1:
+    for paper_dir in _paper_figure_dirs(plot_dir, paper_figures_dir):
+        if _path_is_relative_to(path, paper_dir):
+            return (
+                include_paper_figures
+                and path.name == "paper_figures.pdf"
+                and path.parent.resolve() == Path(paper_dir).resolve()
+            )
+    try:
+        relative_parts = path.relative_to(plot_dir).parts
+    except ValueError:
         return False
-    paper_figure_dirs = {"paper_figures", "paper_2023"}
-    if not paper_figure_dirs.intersection(relative_parts):
-        return True
-    return (
-        include_paper_figures
-        and relative_parts in {
-            ("paper_figures", "paper_figures.pdf"),
-            ("paper_2023", "paper_figures.pdf"),
-        }
-    )
+    return len(relative_parts) > 1
 
 
 def _pdf_reader_writer():
@@ -1002,31 +1051,46 @@ def _pdf_reader_writer():
             raise ImportError("pypdf or PyPDF2 is required") from e
 
 
-def _include_png_in_summary(path, plot_dir, out_path, include_paper_figures):
+def _include_png_in_summary(
+        path, plot_dir, out_path, include_paper_figures,
+        paper_figures_dir=None):
+    path = Path(path)
+    plot_dir = Path(plot_dir)
+    out_path = Path(out_path)
     if path.resolve() == out_path.resolve():
         return False
-    relative_parts = path.relative_to(plot_dir).parts
-    if len(relative_parts) == 1:
+    for paper_dir in _paper_figure_dirs(plot_dir, paper_figures_dir):
+        if _path_is_relative_to(path, paper_dir):
+            return include_paper_figures
+    try:
+        relative_parts = path.relative_to(plot_dir).parts
+    except ValueError:
         return False
-    paper_figure_dirs = {"paper_figures", "paper_2023"}
-    if paper_figure_dirs.intersection(relative_parts):
-        return include_paper_figures
-    return True
+    return len(relative_parts) > 1
 
 
 def _write_summary_pdf_from_pngs(
-        plot_dir, out_path, include_paper_figures=False):
+        plot_dir, out_path, include_paper_figures=False,
+        paper_figures_dir=None):
     import matplotlib.pyplot as plt
     from matplotlib.backends.backend_pdf import PdfPages
 
     plot_dir = Path(plot_dir)
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    pngs = [
-        path for path in sorted(plot_dir.rglob("*.png"))
+    pngs = []
+    if include_paper_figures:
+        for paper_dir in _paper_figure_dirs(plot_dir, paper_figures_dir):
+            for path in sorted(Path(paper_dir).rglob("*.png")):
+                if _include_png_in_summary(
+                        path, plot_dir, out_path, include_paper_figures,
+                        paper_figures_dir):
+                    _append_unique_path(pngs, path)
+    for path in sorted(plot_dir.rglob("*.png")):
         if _include_png_in_summary(
-            path, plot_dir, out_path, include_paper_figures)
-    ]
+                path, plot_dir, out_path, include_paper_figures,
+                paper_figures_dir):
+            _append_unique_path(pngs, path)
     if not pngs:
         return
 

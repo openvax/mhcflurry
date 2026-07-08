@@ -413,6 +413,7 @@ def _run_paper_figures_pipeline(args):
     plot_argv = [
         "--input", args.out,
         "--summary-pdf", summary_pdf,
+        "--paper-figures-out", paper_out,
         "--include-paper-figures-in-summary-pdf",
     ]
     return plot_model_comparison.run(

@@ -48,6 +48,9 @@ def test_allele_locus_name_uses_mhcgnomes():
     assert allele_locus_name("HLA-A0201") == "HLA-A"
     assert allele_locus_name("HLA-B*07:02") == "HLA-B"
     assert allele_locus_name("HLA-C*03:04") == "HLA-C"
+    assert allele_locus_name("HLA-A2") == "HLA-A"
+    assert allele_locus_name("HLA-B15") == "HLA-B"
+    assert allele_locus_name("A2") == "HLA-A"
     assert allele_locus_name("H-2-Kb") == "H2"
     assert allele_locus_name("NONSENSE") == "other"
 
