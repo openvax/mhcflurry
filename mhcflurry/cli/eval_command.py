@@ -255,6 +255,7 @@ def _run_score_predictions(args):
     scores = paper_figures.score_saved_prediction_table(
         args.input,
         index_column=index_column,
+        kind=args.kind,
         external_baselines=external_baselines,
     )
     out = os.path.abspath(args.out)

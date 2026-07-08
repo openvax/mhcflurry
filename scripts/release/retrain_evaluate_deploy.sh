@@ -179,6 +179,13 @@ validate_compare_gpus() {
     esac
 }
 
+paper_figure_inputs_requested() {
+    [ -n "$PAPER_FIGURES_SCORES_DIR" ] || \
+        [ -n "$PAPER_FIGURES_ARTIFACTS_DIR" ] || \
+        [ -n "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS" ] || \
+        [ -n "$PAPER_FIGURES_MONOALLELIC_PREDICTIONS" ]
+}
+
 format_command() {
     local arg
     for arg in "$@"; do
@@ -438,6 +445,7 @@ wait_for_brev_shell_ready() {
 build_brev_postprocess_archives() {
     local staging="$1"
     local remote_paper_inputs_root="$2"
+    local remote_data_dir="$3"
     local repo_archive="$staging/repo.tar.bz2"
     local models_archive="$staging/model_artifacts.tar.bz2"
     local model_paths=(
@@ -455,6 +463,7 @@ build_brev_postprocess_archives() {
     run_logged_step postprocess_package_models \
         tar -C "$RUN_DIR" -cjf "$models_archive" "${model_paths[@]}"
     build_brev_paper_input_archive "$staging" "$remote_paper_inputs_root"
+    build_brev_data_dir_archive "$staging" "$remote_data_dir"
 }
 
 canonical_existing_path() {
@@ -576,6 +585,31 @@ build_brev_paper_input_archive() {
         tar -C "$paper_input_dir" -cjf "$paper_archive" .
 }
 
+build_brev_data_dir_archive() {
+    local staging="$1"
+    local remote_data_dir="$2"
+    local data_input_dir="$staging/data_dir"
+    local data_archive="$staging/data_dir.tar.bz2"
+
+    BREV_REMOTE_DATA_DIR=
+    rm -rf "$data_input_dir" "$data_archive"
+    if [ -z "$DATA_DIR" ]; then
+        return 0
+    fi
+    [ -d "$DATA_DIR" ] || die "Evaluation data directory not found: $DATA_DIR"
+    mkdir -p "$data_input_dir"
+    (
+        cd "$DATA_DIR"
+        tar -cf - .
+    ) | (
+        cd "$data_input_dir"
+        tar -xf -
+    )
+    BREV_REMOTE_DATA_DIR="$remote_data_dir"
+    run_logged_step postprocess_package_data_dir \
+        tar -C "$data_input_dir" -cjf "$data_archive" .
+}
+
 ensure_brev_postprocess_instance() {
     local auto_create="$1"
     require_command brev
@@ -647,11 +681,13 @@ run_brev_postprocess_impl() {
     local repo_archive="$staging/repo.tar.bz2"
     local models_archive="$staging/model_artifacts.tar.bz2"
     local paper_archive="$staging/paper_inputs.tar.bz2"
+    local data_archive="$staging/data_dir.tar.bz2"
     local remote_script="$staging/run_remote_postprocess.sh"
     local remote_sync_script="$staging/build_postprocess_sync_archive.sh"
     local remote_archive="$remote_root/postprocess_sync.tar.bz2"
     local local_archive="$staging/postprocess_sync.tar.bz2"
     local remote_paper_inputs_root="$remote_root/paper_inputs"
+    local remote_data_dir="$remote_root/data_dir"
 
     BREV_EXPECT_REMOTE_EVAL=1
     BREV_EXPECT_REMOTE_PLOTS=0
@@ -660,7 +696,8 @@ run_brev_postprocess_impl() {
     fi
 
     run_cmd rm -rf "$staging"
-    build_brev_postprocess_archives "$staging" "$remote_paper_inputs_root"
+    build_brev_postprocess_archives \
+        "$staging" "$remote_paper_inputs_root" "$remote_data_dir"
     ensure_brev_postprocess_instance "$auto_create"
 
     run_logged_step postprocess_wait_for_shell \
@@ -678,6 +715,11 @@ run_brev_postprocess_impl() {
         run_logged_step_with_timeout \
             postprocess_copy_paper_inputs "$BREV_CREATE_TIMEOUT_SECONDS" \
             brev copy "$paper_archive" "$BREV_INSTANCE:$remote_root/paper_inputs.tar.bz2"
+    fi
+    if [ -f "$data_archive" ]; then
+        run_logged_step_with_timeout \
+            postprocess_copy_data_dir "$BREV_CREATE_TIMEOUT_SECONDS" \
+            brev copy "$data_archive" "$BREV_INSTANCE:$remote_root/data_dir.tar.bz2"
     fi
 
     {
@@ -699,6 +741,7 @@ EOF
         printf 'export COMPARE_TORCH_COMPILE=%q\n' "$COMPARE_TORCH_COMPILE"
         printf 'export COMPARE_MATMUL_PRECISION=%q\n' "$COMPARE_MATMUL_PRECISION"
         printf 'export COMPARE_GPUS=%q\n' "$COMPARE_GPUS"
+        printf 'export DATA_DIR=%q\n' "$BREV_REMOTE_DATA_DIR"
         printf 'export COMPARE_PRESENTATION_NUM_JOBS=%q\n' "$COMPARE_PRESENTATION_NUM_JOBS"
         printf 'export COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU=%q\n' "$COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU"
         printf 'export COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER=%q\n' "$COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER"
@@ -741,20 +784,31 @@ if [ -f "$remote_root/paper_inputs.tar.bz2" ]; then
     mkdir -p "$remote_root/paper_inputs"
     tar -C "$remote_root/paper_inputs" -xjf "$remote_root/paper_inputs.tar.bz2"
 fi
+if [ -f "$remote_root/data_dir.tar.bz2" ]; then
+    rm -rf "$remote_root/data_dir"
+    mkdir -p "$remote_root/data_dir"
+    tar -C "$remote_root/data_dir" -xjf "$remote_root/data_dir.tar.bz2"
+fi
 
 cd "$repo_dir"
 python -m pip install -e .
 
-mhcflurry downloads fetch \
-    data_evaluation models_class1_pan \
-    models_class1_processing models_class1_presentation
+if [ -n "${DATA_DIR:-}" ]; then
+    data_dir="$DATA_DIR"
+    mhcflurry downloads fetch \
+        models_class1_pan models_class1_processing models_class1_presentation
+else
+    mhcflurry downloads fetch \
+        data_evaluation models_class1_pan \
+        models_class1_processing models_class1_presentation
+    data_dir="$(mhcflurry downloads path data_evaluation)"
+fi
 baseline_release="${COMPARE_BASELINE#public:}"
 if [ "$baseline_release" != "$COMPARE_BASELINE" ]; then
     MHCFLURRY_DOWNLOADS_CURRENT_RELEASE="$baseline_release" \
         mhcflurry downloads fetch \
         models_class1_pan models_class1_processing models_class1_presentation
 fi
-data_dir="$(mhcflurry downloads path data_evaluation)"
 
 compare_args=(
     mhcflurry eval compare-models
@@ -1128,13 +1182,31 @@ run_brev_training() {
     local run_release_eval=0
     local run_release_plots=0
     if [ "$SKIP_EVAL" != "1" ]; then
-        run_release_eval=1
+        if [ -n "$DATA_DIR" ]; then
+            note "Custom DATA_DIR is local to this wrapper; evaluation will run after Brev sync."
+        else
+            run_release_eval=1
+        fi
     fi
     if [ "$SKIP_PLOTS" != "1" ]; then
-        run_release_plots=1
+        if paper_figure_inputs_requested; then
+            note "Paper-figure inputs are local to this wrapper; plotting will run after Brev sync."
+        elif [ "$run_release_eval" = "1" ]; then
+            run_release_plots=1
+        fi
     fi
     BREV_EXPECT_REMOTE_EVAL=$run_release_eval
     BREV_EXPECT_REMOTE_PLOTS=$run_release_plots
+    local remote_paper_scores_dir=
+    local remote_paper_artifacts_dir=
+    local remote_paper_multiallelic_predictions=
+    local remote_paper_monoallelic_predictions=
+    if [ "$run_release_plots" = "1" ]; then
+        remote_paper_scores_dir=$PAPER_FIGURES_SCORES_DIR
+        remote_paper_artifacts_dir=$PAPER_FIGURES_ARTIFACTS_DIR
+        remote_paper_multiallelic_predictions=$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS
+        remote_paper_monoallelic_predictions=$PAPER_FIGURES_MONOALLELIC_PREDICTIONS
+    fi
     local runplz_env=(
         "MHCFLURRY_OUT=$RUN_DIR"
         "REPO=$REPO"
@@ -1156,16 +1228,17 @@ run_brev_training() {
         "COMPARE_TORCH_COMPILE=$COMPARE_TORCH_COMPILE"
         "COMPARE_MATMUL_PRECISION=$COMPARE_MATMUL_PRECISION"
         "COMPARE_GPUS=$COMPARE_GPUS"
+        "DATA_DIR="
         "COMPARE_PRESENTATION_NUM_JOBS=$COMPARE_PRESENTATION_NUM_JOBS"
         "COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU=$COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU"
         "COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER=$COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER"
         "COMPARE_PRESENTATION_TORCH_COMPILE=$COMPARE_PRESENTATION_TORCH_COMPILE"
         "PROCESSING_MODES=$PROCESSING_MODES"
         "PRESENTATION_MODES=$PRESENTATION_MODES"
-        "PAPER_FIGURES_SCORES_DIR=$PAPER_FIGURES_SCORES_DIR"
-        "PAPER_FIGURES_ARTIFACTS_DIR=$PAPER_FIGURES_ARTIFACTS_DIR"
-        "PAPER_FIGURES_MULTIALLELIC_PREDICTIONS=$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS"
-        "PAPER_FIGURES_MONOALLELIC_PREDICTIONS=$PAPER_FIGURES_MONOALLELIC_PREDICTIONS"
+        "PAPER_FIGURES_SCORES_DIR=$remote_paper_scores_dir"
+        "PAPER_FIGURES_ARTIFACTS_DIR=$remote_paper_artifacts_dir"
+        "PAPER_FIGURES_MULTIALLELIC_PREDICTIONS=$remote_paper_multiallelic_predictions"
+        "PAPER_FIGURES_MONOALLELIC_PREDICTIONS=$remote_paper_monoallelic_predictions"
         "PAPER_FIGURES_FORMATS=$PAPER_FIGURES_FORMATS"
         "PAPER_FIGURES_CANDIDATE_PREDICTOR=$PAPER_FIGURES_CANDIDATE_PREDICTOR"
         "PAPER_FIGURES_EXTERNAL_BASELINES=$PAPER_FIGURES_EXTERNAL_BASELINES"

@@ -648,6 +648,7 @@ def _read_multiallelic_scores(inputs, writer, figure, predictors):
         return _scores_from_saved_predictions(
             inputs.multiallelic_predictions,
             index_column="sample_id",
+            kind="multiallelic",
             family="multiallelic",
             figure=figure,
             writer=writer,
@@ -670,6 +671,7 @@ def _read_monoallelic_scores(inputs, writer, figure, predictors):
         return _scores_from_saved_predictions(
             inputs.monoallelic_predictions,
             index_column=None,
+            kind="monoallelic",
             family="monoallelic",
             figure=figure,
             writer=writer,
@@ -679,7 +681,7 @@ def _read_monoallelic_scores(inputs, writer, figure, predictors):
 
 
 def _scores_from_saved_predictions(
-        path, index_column, family, figure, writer, row_filter=None,
+        path, index_column, family, figure, writer, row_filter=None, kind=None,
         external_baselines=EXTERNAL_BASELINES):
     path = Path(path)
     if not path.is_file():
@@ -695,7 +697,7 @@ def _scores_from_saved_predictions(
             family, figure, [path],
             "Saved prediction table must contain a hit column.")
         return None
-    index_column = index_column or _prediction_index_column(df)
+    index_column = index_column or _prediction_index_column(df, kind=kind)
     if index_column is None:
         writer.skip(
             family, figure, [path],
@@ -751,13 +753,16 @@ class _ScoreTableErrorCollector:
 
 
 def score_saved_prediction_table(
-        path, index_column=None, external_baselines=EXTERNAL_BASELINES):
+        path, index_column=None, kind=None,
+        external_baselines=EXTERNAL_BASELINES):
     """Return notebook-style AUC/PPV rows from a saved prediction table.
 
     The input table must contain ``hit`` and one grouping column
     (``sample_id``, ``allele``, or ``hla`` unless ``index_column`` is passed).
     Every other numeric column is treated as a predictor score, with affinity
     and percentile columns automatically oriented so larger means better.
+    When ``kind="monoallelic"``, allele identifiers are preferred over
+    ``sample_id`` for automatic grouping.
     """
     writer = _ScoreTableErrorCollector()
     scores = _scores_from_saved_predictions(
@@ -766,6 +771,7 @@ def score_saved_prediction_table(
         family="score-predictions",
         figure="score-predictions",
         writer=writer,
+        kind=kind,
         external_baselines=external_baselines,
     )
     if scores is None:
@@ -773,8 +779,12 @@ def score_saved_prediction_table(
     return scores
 
 
-def _prediction_index_column(df):
-    for column in ("sample_id", "allele", "hla"):
+def _prediction_index_column(df, kind=None):
+    if kind == "monoallelic":
+        columns = ("allele", "hla", "sample_id")
+    else:
+        columns = ("sample_id", "allele", "hla")
+    for column in columns:
         if column in df.columns:
             return column
     return None
@@ -1635,6 +1645,7 @@ def _read_cysteine_removed_scores(inputs, no_c_path, writer, predictors):
     return _scores_from_saved_predictions(
         inputs.multiallelic_predictions,
         index_column="sample_id",
+        kind="multiallelic",
         family="antigen-processing",
         figure="fig.4_processing_predictor_plots.auc.ap.c_removed.scatter",
         writer=writer,

@@ -1363,8 +1363,9 @@ def test_summary_pdf_uses_actual_paper_figures_dir(tmp_path):
     custom_dir = plot_dir / "custom_paper"
     combined = custom_dir / "paper_figures.pdf"
     individual = custom_dir / "pdf" / "panel.pdf"
-    diagnostic = plot_dir / "paper" / "diagnostic.pdf"
-    for path in [combined, individual, diagnostic]:
+    legacy_individual = plot_dir / "paper_2023" / "pdf" / "panel.pdf"
+    diagnostic = plot_dir / "aaa" / "diagnostic.pdf"
+    for path in [combined, individual, legacy_individual, diagnostic]:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"unused")
     out = plot_dir / "summary.pdf"
@@ -1379,6 +1380,13 @@ def test_summary_pdf_uses_actual_paper_figures_dir(tmp_path):
     assert paths == [combined, diagnostic]
     assert not plot_model_comparison._include_pdf_in_summary(
         individual,
+        plot_dir,
+        out,
+        include_paper_figures=True,
+        paper_figures_dir=custom_dir,
+    )
+    assert not plot_model_comparison._include_pdf_in_summary(
+        legacy_individual,
         plot_dir,
         out,
         include_paper_figures=True,
@@ -1737,6 +1745,51 @@ def test_paper_figures_prediction_scoring_drops_invalid_hit_rows():
     )
     assert rows[0]["auc"] == 1.0
     assert rows[0]["ppv"] == 1.0
+
+
+def test_paper_figures_monoallelic_scoring_prefers_allele(tmp_path):
+    predictions = tmp_path / "predictions.csv"
+    pandas.DataFrame([
+        {
+            "sample_id": "shared",
+            "allele": "HLA-A*02:01",
+            "peptide": "AAAAAAAAA",
+            "hit": 1,
+            "candidate": 0.9,
+        },
+        {
+            "sample_id": "shared",
+            "allele": "HLA-A*02:01",
+            "peptide": "AAAAAAAAB",
+            "hit": 0,
+            "candidate": 0.1,
+        },
+        {
+            "sample_id": "shared",
+            "allele": "HLA-B*07:02",
+            "peptide": "BBBBBBBBB",
+            "hit": 1,
+            "candidate": 0.8,
+        },
+        {
+            "sample_id": "shared",
+            "allele": "HLA-B*07:02",
+            "peptide": "BBBBBBBBA",
+            "hit": 0,
+            "candidate": 0.2,
+        },
+    ]).to_csv(predictions, index=False)
+
+    scores = paper_figures.score_saved_prediction_table(
+        predictions, kind="monoallelic")
+    all_scores = scores.loc[
+        (scores["length_label"] == "All") &
+        (scores["predictor"] == "candidate")
+    ]
+
+    assert set(all_scores["allele"]) == {"HLA-A*02:01", "HLA-B*07:02"}
+    assert set(all_scores["auc"]) == {1.0}
+    assert len(all_scores) == 2
 
 
 def test_paper_figures_ppv_uses_tie_breaker():

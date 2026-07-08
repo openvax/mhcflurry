@@ -175,6 +175,7 @@ def remote_training_env(environ=os.environ):
         "COMPARE_PRESENTATION_TORCH_COMPILE": environ.get(
             "COMPARE_PRESENTATION_TORCH_COMPILE", "0"
         ),
+        "DATA_DIR": environ.get("DATA_DIR", ""),
         "DATALOADER_NUM_WORKERS": environ.get("DATALOADER_NUM_WORKERS", "auto"),
         "MAX_TASKS_PER_WORKER": environ.get("MAX_TASKS_PER_WORKER", "12"),
         "MAX_WORKERS_PER_GPU": environ.get("MAX_WORKERS_PER_GPU", "auto"),
@@ -321,26 +322,37 @@ def run_release_evaluation(repo, out, env):
     eval_out = out / "eval_comparison"
     eval_out.mkdir(parents=True, exist_ok=True)
 
-    subprocess.run(
-        [
-            "mhcflurry",
-            "downloads",
-            "fetch",
+    data_dir = env.get("DATA_DIR", "").strip()
+    if data_dir:
+        if not Path(data_dir).is_dir():
+            raise SystemExit(
+                "DATA_DIR does not exist on the remote machine: %s" % data_dir
+            )
+        download_names = [
+            "models_class1_pan",
+            "models_class1_processing",
+            "models_class1_presentation",
+        ]
+    else:
+        download_names = [
             "data_evaluation",
             "models_class1_pan",
             "models_class1_processing",
             "models_class1_presentation",
-        ],
+        ]
+    subprocess.run(
+        ["mhcflurry", "downloads", "fetch"] + download_names,
         check=True,
         cwd=repo,
         env=env,
     )
-    data_dir = subprocess.check_output(
-        ["mhcflurry", "downloads", "path", "data_evaluation"],
-        cwd=repo,
-        env=env,
-        text=True,
-    ).strip()
+    if not data_dir:
+        data_dir = subprocess.check_output(
+            ["mhcflurry", "downloads", "path", "data_evaluation"],
+            cwd=repo,
+            env=env,
+            text=True,
+        ).strip()
     baseline = env.get("COMPARE_BASELINE", "public:2.0.0")
     if baseline.startswith("public:"):
         baseline_env = env.copy()

@@ -978,17 +978,22 @@ def _summary_pdf_paths(
         plot_dir, out_path, include_paper_figures=False,
         paper_figures_dir=None):
     result = []
+    paper_pdfs = []
     for path in sorted(Path(plot_dir).rglob("*.pdf")):
         if _include_pdf_in_summary(
                 path, plot_dir, out_path, include_paper_figures,
                 paper_figures_dir):
-            _append_unique_path(result, path)
+            if _is_combined_paper_figures_pdf(
+                    path, plot_dir, paper_figures_dir):
+                _append_unique_path(paper_pdfs, path)
+            else:
+                _append_unique_path(result, path)
     if include_paper_figures:
         for paper_dir in _paper_figure_dirs(plot_dir, paper_figures_dir):
             paper_pdf = Path(paper_dir) / "paper_figures.pdf"
             if paper_pdf.is_file():
-                _append_unique_path(result, paper_pdf, prepend=True)
-    return result
+                _append_unique_path(paper_pdfs, paper_pdf)
+    return paper_pdfs + result
 
 
 def _append_unique_path(paths, path, prepend=False):
@@ -1003,10 +1008,27 @@ def _append_unique_path(paths, path, prepend=False):
 
 
 def _paper_figure_dirs(plot_dir, paper_figures_dir=None):
+    result = []
     if paper_figures_dir:
-        return (Path(paper_figures_dir),)
+        result.append(Path(paper_figures_dir))
     plot_dir = Path(plot_dir)
-    return (plot_dir / "paper_figures", plot_dir / "paper_2023")
+    result.extend([plot_dir / "paper_figures", plot_dir / "paper_2023"])
+    unique = []
+    for path in result:
+        resolved = path.resolve()
+        if not any(existing.resolve() == resolved for existing in unique):
+            unique.append(path)
+    return tuple(unique)
+
+
+def _is_combined_paper_figures_pdf(path, plot_dir, paper_figures_dir=None):
+    path = Path(path)
+    if path.name != "paper_figures.pdf":
+        return False
+    return any(
+        path.parent.resolve() == Path(paper_dir).resolve()
+        for paper_dir in _paper_figure_dirs(plot_dir, paper_figures_dir)
+    )
 
 
 def _path_is_relative_to(path, directory):
