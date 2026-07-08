@@ -134,6 +134,31 @@ def test_load_accepts_legacy_class1_pseudosequences_file(tmp_path):
     }
 
 
+def test_load_skips_incomplete_non_class1_pseudosequences_with_mhcgnomes(
+        tmp_path):
+    (tmp_path / "manifest.csv").write_text("model_name,allele,config_json\n")
+    (tmp_path / LEGACY_ALLELE_SEQUENCES_FILENAME).write_text(
+        "allele,sequence\n"
+        "HLA-A*02:01,COMPLETE\n"
+        "HLA-DQA1*01:01,XXCLASSII\n"
+        "TAP1,XXTAP\n"
+        "Caja-B5*01:01ps,XXPSEUDOGENE\n"
+        "NONSENSE,XXUNKNOWN\n"
+    )
+
+    predictor = Class1AffinityPredictor.load(
+        str(tmp_path),
+        optimization_level=0,
+    )
+
+    assert predictor.allele_to_sequence == {
+        "HLA-A*02:01": "COMPLETE",
+        # Unknown names are preserved for backwards compatibility; known
+        # non-class-I / unsupported MHC rows are the ones dropped.
+        "NONSENSE": "XXUNKNOWN",
+    }
+
+
 @pytest.mark.parametrize("filename,sequence", [
     (
         PSEUDOSEQUENCE_FILENAMES_BY_LENGTH[34],

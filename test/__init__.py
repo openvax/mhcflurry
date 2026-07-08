@@ -15,6 +15,7 @@ Utility functions for tests.
 """
 
 import os
+import sys
 import time
 
 
@@ -65,7 +66,13 @@ def _torch_device_available(torch, device_type):
         if not torch.backends.mps.is_built():
             return False, "torch.backends.mps.is_built() returned false"
         if not torch.backends.mps.is_available():
-            return False, "torch.backends.mps.is_available() returned false"
+            reason = "torch.backends.mps.is_available() returned false"
+            if os.path.basename(sys.argv[0]) == "pytest":
+                reason += (
+                    "; on this macOS/PyTorch setup the pytest console script "
+                    "can hide MPS while `python -m pytest` can exercise it"
+                )
+            return False, reason
 
     try:
         torch.empty(1, device=device_type)

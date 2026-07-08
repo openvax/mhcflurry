@@ -24,6 +24,7 @@ from socket import gethostname
 
 import numpy
 import pandas
+from mhcgnomes import parse
 
 from ..class1_neural_network import Class1NeuralNetwork
 from ..common import load_weights, normalize_allele_name, save_weights
@@ -35,6 +36,42 @@ from ..pseudosequences import (
     pseudosequence_filename_for_mapping,
 )
 from ..version import __version__
+
+
+def _parse_mhc_name(raw_name, only_class1):
+    """Parse an MHC name with mhcgnomes, returning None on failure."""
+    return parse(
+        str(raw_name),
+        only_class1=only_class1,
+        infer_class2_pairing=False,
+        collapse_singleton_haplotypes=True,
+        collapse_singleton_serotypes=True,
+        raise_on_error=False,
+    )
+
+
+def _is_incomplete_non_predictor_pseudosequence(name, sequence):
+    """Return true for incomplete pseudosequences we should drop on load."""
+    if "X" not in sequence:
+        return False
+
+    parsed_any_class = _parse_mhc_name(name, only_class1=False)
+    if parsed_any_class is None:
+        return False
+
+    parsed_class1 = _parse_mhc_name(name, only_class1=True)
+    if parsed_class1 is None:
+        # Known non-class-I MHC names such as class II and TAP entries do not
+        # belong in a class-I predictor.
+        return True
+
+    gene_name = getattr(parsed_class1, "gene_name", None)
+    return (
+        gene_name in {"HFE", "MICA", "MICB"}
+        or parsed_class1.annotation_pseudogene
+        or parsed_class1.annotation_null
+        or parsed_class1.annotation_questionable
+    )
 
 
 def save_predictor(predictor, models_dir, model_names_to_write=None, write_metadata=True):
@@ -268,10 +305,7 @@ def load_predictor(
                 # Detect class II, TAP, and pseudogene entries —
                 # these don't belong in a class I predictor and
                 # always have incomplete pseudosequences.
-                gene = name.split("*")[0].split("-")[-1] if "-" in name else ""
-                if ("X" in value and
-                        any(tag in gene
-                            for tag in ("DAA", "DAB", "TAP", "PS"))):
+                if _is_incomplete_non_predictor_pseudosequence(name, value):
                     skipped_non_class1.append(name)
                     continue
                 normalized = name
