@@ -437,6 +437,7 @@ wait_for_brev_shell_ready() {
 
 build_brev_postprocess_archives() {
     local staging="$1"
+    local remote_paper_inputs_root="$2"
     local repo_archive="$staging/repo.tar.bz2"
     local models_archive="$staging/model_artifacts.tar.bz2"
     local model_paths=(
@@ -453,6 +454,126 @@ build_brev_postprocess_archives() {
         write_git_repo_archive "$repo_archive"
     run_logged_step postprocess_package_models \
         tar -C "$RUN_DIR" -cjf "$models_archive" "${model_paths[@]}"
+    build_brev_paper_input_archive "$staging" "$remote_paper_inputs_root"
+}
+
+canonical_existing_path() {
+    local path="$1"
+    if [ -d "$path" ]; then
+        (cd "$path" && pwd -P)
+    else
+        local dir
+        local base
+        dir="$(dirname "$path")"
+        base="$(basename "$path")"
+        printf '%s/%s\n' "$(cd "$dir" && pwd -P)" "$base"
+    fi
+}
+
+same_existing_path() {
+    local left="$1"
+    local right="$2"
+    if [ -z "$left" ] || [ -z "$right" ]; then
+        return 1
+    fi
+    if [ ! -e "$left" ] || [ ! -e "$right" ]; then
+        return 1
+    fi
+    [ "$(canonical_existing_path "$left")" = "$(canonical_existing_path "$right")" ]
+}
+
+stage_brev_paper_input() {
+    local source="$1"
+    local target_relative="$2"
+    local input_dir="$3"
+    local remote_root="$4"
+    [ -e "$source" ] || die "Paper-figure input not found: $source"
+    local target="$input_dir/$target_relative"
+    rm -rf "$target"
+    mkdir -p "$(dirname "$target")"
+    if [ -d "$source" ]; then
+        mkdir -p "$target"
+        (
+            cd "$source"
+            tar -cf - .
+        ) | (
+            cd "$target"
+            tar -xf -
+        )
+    else
+        cp "$source" "$target"
+    fi
+    printf '%s/%s\n' "$remote_root" "$target_relative"
+}
+
+build_brev_paper_input_archive() {
+    local staging="$1"
+    local remote_root="$2"
+    local paper_input_dir="$staging/paper_inputs"
+    local paper_archive="$staging/paper_inputs.tar.bz2"
+    local multiallelic_basename
+    local monoallelic_basename
+
+    BREV_REMOTE_PAPER_FIGURES_SCORES_DIR=
+    BREV_REMOTE_PAPER_FIGURES_ARTIFACTS_DIR=
+    BREV_REMOTE_PAPER_FIGURES_MULTIALLELIC_PREDICTIONS=
+    BREV_REMOTE_PAPER_FIGURES_MONOALLELIC_PREDICTIONS=
+
+    rm -rf "$paper_input_dir" "$paper_archive"
+    if [ -z "$PAPER_FIGURES_SCORES_DIR" ] && \
+            [ -z "$PAPER_FIGURES_ARTIFACTS_DIR" ] && \
+            [ -z "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS" ] && \
+            [ -z "$PAPER_FIGURES_MONOALLELIC_PREDICTIONS" ]; then
+        return 0
+    fi
+
+    mkdir -p "$paper_input_dir"
+    if [ -n "$PAPER_FIGURES_SCORES_DIR" ]; then
+        BREV_REMOTE_PAPER_FIGURES_SCORES_DIR="$(
+            stage_brev_paper_input \
+                "$PAPER_FIGURES_SCORES_DIR" \
+                scores_dir \
+                "$paper_input_dir" \
+                "$remote_root"
+        )"
+    fi
+    if [ -n "$PAPER_FIGURES_ARTIFACTS_DIR" ]; then
+        if same_existing_path \
+                "$PAPER_FIGURES_ARTIFACTS_DIR" "$PAPER_FIGURES_SCORES_DIR"; then
+            BREV_REMOTE_PAPER_FIGURES_ARTIFACTS_DIR="$BREV_REMOTE_PAPER_FIGURES_SCORES_DIR"
+        else
+            BREV_REMOTE_PAPER_FIGURES_ARTIFACTS_DIR="$(
+                stage_brev_paper_input \
+                    "$PAPER_FIGURES_ARTIFACTS_DIR" \
+                    artifacts_dir \
+                    "$paper_input_dir" \
+                    "$remote_root"
+            )"
+        fi
+    fi
+    if [ -n "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS" ]; then
+        multiallelic_basename="$(basename "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS")"
+        BREV_REMOTE_PAPER_FIGURES_MULTIALLELIC_PREDICTIONS="$(
+            stage_brev_paper_input \
+                "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS" \
+                "multiallelic_predictions/$multiallelic_basename" \
+                "$paper_input_dir" \
+                "$remote_root"
+        )"
+    fi
+    if [ -n "$PAPER_FIGURES_MONOALLELIC_PREDICTIONS" ]; then
+        monoallelic_basename="$(basename "$PAPER_FIGURES_MONOALLELIC_PREDICTIONS")"
+        BREV_REMOTE_PAPER_FIGURES_MONOALLELIC_PREDICTIONS="$(
+            stage_brev_paper_input \
+                "$PAPER_FIGURES_MONOALLELIC_PREDICTIONS" \
+                "monoallelic_predictions/$monoallelic_basename" \
+                "$paper_input_dir" \
+                "$remote_root"
+        )"
+    fi
+
+    run_logged_step postprocess_package_paper_inputs \
+        tar -C "$paper_input_dir" -cjf "$paper_archive" .
 }
 
 ensure_brev_postprocess_instance() {
@@ -525,10 +646,12 @@ run_brev_postprocess_impl() {
     local remote_root=/root/mhcflurry-postprocess
     local repo_archive="$staging/repo.tar.bz2"
     local models_archive="$staging/model_artifacts.tar.bz2"
+    local paper_archive="$staging/paper_inputs.tar.bz2"
     local remote_script="$staging/run_remote_postprocess.sh"
     local remote_sync_script="$staging/build_postprocess_sync_archive.sh"
     local remote_archive="$remote_root/postprocess_sync.tar.bz2"
     local local_archive="$staging/postprocess_sync.tar.bz2"
+    local remote_paper_inputs_root="$remote_root/paper_inputs"
 
     BREV_EXPECT_REMOTE_EVAL=1
     BREV_EXPECT_REMOTE_PLOTS=0
@@ -537,20 +660,25 @@ run_brev_postprocess_impl() {
     fi
 
     run_cmd rm -rf "$staging"
-    build_brev_postprocess_archives "$staging"
+    build_brev_postprocess_archives "$staging" "$remote_paper_inputs_root"
     ensure_brev_postprocess_instance "$auto_create"
 
     run_logged_step postprocess_wait_for_shell \
         wait_for_brev_shell_ready
     run_logged_step_with_timeout \
         postprocess_prepare_remote_dir "$BREV_CREATE_TIMEOUT_SECONDS" \
-        brev exec "$BREV_INSTANCE" "mkdir -p '$remote_root'"
+        brev exec "$BREV_INSTANCE" "rm -rf '$remote_root' && mkdir -p '$remote_root'"
     run_logged_step_with_timeout \
         postprocess_copy_repo "$BREV_CREATE_TIMEOUT_SECONDS" \
         brev copy "$repo_archive" "$BREV_INSTANCE:$remote_root/repo.tar.bz2"
     run_logged_step_with_timeout \
         postprocess_copy_models "$BREV_CREATE_TIMEOUT_SECONDS" \
         brev copy "$models_archive" "$BREV_INSTANCE:$remote_root/model_artifacts.tar.bz2"
+    if [ -f "$paper_archive" ]; then
+        run_logged_step_with_timeout \
+            postprocess_copy_paper_inputs "$BREV_CREATE_TIMEOUT_SECONDS" \
+            brev copy "$paper_archive" "$BREV_INSTANCE:$remote_root/paper_inputs.tar.bz2"
+    fi
 
     {
         cat <<'EOF'
@@ -575,10 +703,10 @@ EOF
         printf 'export COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU=%q\n' "$COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU"
         printf 'export COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER=%q\n' "$COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER"
         printf 'export COMPARE_PRESENTATION_TORCH_COMPILE=%q\n' "$COMPARE_PRESENTATION_TORCH_COMPILE"
-        printf 'export PAPER_FIGURES_SCORES_DIR=%q\n' "$PAPER_FIGURES_SCORES_DIR"
-        printf 'export PAPER_FIGURES_ARTIFACTS_DIR=%q\n' "$PAPER_FIGURES_ARTIFACTS_DIR"
-        printf 'export PAPER_FIGURES_MULTIALLELIC_PREDICTIONS=%q\n' "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS"
-        printf 'export PAPER_FIGURES_MONOALLELIC_PREDICTIONS=%q\n' "$PAPER_FIGURES_MONOALLELIC_PREDICTIONS"
+        printf 'export PAPER_FIGURES_SCORES_DIR=%q\n' "$BREV_REMOTE_PAPER_FIGURES_SCORES_DIR"
+        printf 'export PAPER_FIGURES_ARTIFACTS_DIR=%q\n' "$BREV_REMOTE_PAPER_FIGURES_ARTIFACTS_DIR"
+        printf 'export PAPER_FIGURES_MULTIALLELIC_PREDICTIONS=%q\n' "$BREV_REMOTE_PAPER_FIGURES_MULTIALLELIC_PREDICTIONS"
+        printf 'export PAPER_FIGURES_MONOALLELIC_PREDICTIONS=%q\n' "$BREV_REMOTE_PAPER_FIGURES_MONOALLELIC_PREDICTIONS"
         printf 'export PAPER_FIGURES_FORMATS=%q\n' "$PAPER_FIGURES_FORMATS"
         printf 'export PAPER_FIGURES_CANDIDATE_PREDICTOR=%q\n' "$PAPER_FIGURES_CANDIDATE_PREDICTOR"
         printf 'export PAPER_FIGURES_EXTERNAL_BASELINES=%q\n' "$PAPER_FIGURES_EXTERNAL_BASELINES"
@@ -608,6 +736,11 @@ rm -rf "$repo_dir" "$run_dir"
 mkdir -p "$repo_dir" "$run_dir"
 tar -C "$repo_dir" -xjf "$remote_root/repo.tar.bz2"
 tar -C "$run_dir" -xjf "$remote_root/model_artifacts.tar.bz2"
+if [ -f "$remote_root/paper_inputs.tar.bz2" ]; then
+    rm -rf "$remote_root/paper_inputs"
+    mkdir -p "$remote_root/paper_inputs"
+    tar -C "$remote_root/paper_inputs" -xjf "$remote_root/paper_inputs.tar.bz2"
+fi
 
 cd "$repo_dir"
 python -m pip install -e .
@@ -1577,26 +1710,33 @@ if [ "$SKIP_EVAL" != "1" ]; then
         fi
         run_logged_step fetch_compare_baseline_downloads \
             fetch_pinned_public_baseline_downloads
-        run_logged_step compare_models mhcflurry eval compare-models \
-            --a "$RUN_DIR" \
-            --a-label "$RUN_LABEL" \
-            --b "$COMPARE_BASELINE" \
-            --b-label "$COMPARE_BASELINE_LABEL" \
-            --data-dir "$DATA_DIR" \
-            --include "$COMPARE_INCLUDE" \
-            --processing-modes "$PROCESSING_MODES" \
-            --presentation-modes "$PRESENTATION_MODES" \
-            --backend "$COMPARE_BACKEND" \
-            --num-jobs "$COMPARE_NUM_JOBS" \
-            --max-workers-per-gpu "$COMPARE_MAX_WORKERS_PER_GPU" \
-            --max-tasks-per-worker "$COMPARE_MAX_TASKS_PER_WORKER" \
-            --presentation-num-jobs "$COMPARE_PRESENTATION_NUM_JOBS" \
-            --presentation-max-workers-per-gpu "$COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU" \
-            --presentation-max-tasks-per-worker "$COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER" \
-            --presentation-torch-compile "$COMPARE_PRESENTATION_TORCH_COMPILE" \
-            --torch-compile "$COMPARE_TORCH_COMPILE" \
-            --matmul-precision "$COMPARE_MATMUL_PRECISION" \
+        compare_args=(
+            mhcflurry eval compare-models
+            --a "$RUN_DIR"
+            --a-label "$RUN_LABEL"
+            --b "$COMPARE_BASELINE"
+            --b-label "$COMPARE_BASELINE_LABEL"
+            --data-dir "$DATA_DIR"
+            --include "$COMPARE_INCLUDE"
+            --processing-modes "$PROCESSING_MODES"
+            --presentation-modes "$PRESENTATION_MODES"
+            --backend "$COMPARE_BACKEND"
+            --num-jobs "$COMPARE_NUM_JOBS"
+            --max-workers-per-gpu "$COMPARE_MAX_WORKERS_PER_GPU"
+            --max-tasks-per-worker "$COMPARE_MAX_TASKS_PER_WORKER"
+            --presentation-num-jobs "$COMPARE_PRESENTATION_NUM_JOBS"
+            --presentation-max-workers-per-gpu "$COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU"
+            --presentation-max-tasks-per-worker "$COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER"
+            --presentation-torch-compile "$COMPARE_PRESENTATION_TORCH_COMPILE"
+            --torch-compile "$COMPARE_TORCH_COMPILE"
+            --matmul-precision "$COMPARE_MATMUL_PRECISION"
             --out "$EVAL_OUT"
+        )
+        case "$(lowercase "$COMPARE_GPUS")" in
+            auto) ;;
+            *) compare_args+=(--gpus "$COMPARE_GPUS") ;;
+        esac
+        run_logged_step compare_models "${compare_args[@]}"
     fi
 else
     note "Skipping evaluation."
