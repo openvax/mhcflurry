@@ -15,6 +15,7 @@
 import collections
 import json
 import logging
+import re
 import time
 from functools import partial
 from getpass import getuser
@@ -57,7 +58,11 @@ def _is_incomplete_non_predictor_pseudosequence(name, sequence):
 
     parsed_any_class = _parse_mhc_name(name, only_class1=False)
     if parsed_any_class is None:
-        return False
+        # Legacy allele_sequences.csv artifacts contain a few incomplete
+        # non-predictor rows in old spellings mhcgnomes does not parse, e.g.
+        # Caja-PS*02:01 and SLA-TAP*1*01:01. Preserve the historical skip for
+        # these rows but keep unknown incomplete names available.
+        return bool(re.search(r"(?:^|[-*])(PS|TAP)(?:[-*]|[0-9])", str(name)))
 
     parsed_class1 = _parse_mhc_name(name, only_class1=True)
     if parsed_class1 is None:

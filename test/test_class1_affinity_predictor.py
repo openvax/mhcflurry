@@ -142,6 +142,8 @@ def test_load_skips_incomplete_non_class1_pseudosequences_with_mhcgnomes(
         "HLA-A*02:01,COMPLETE\n"
         "HLA-DQA1*01:01,XXCLASSII\n"
         "TAP1,XXTAP\n"
+        "SLA-TAP*1*01:01,XXLEGACYTAP\n"
+        "Caja-PS*02:01,XXLEGACYPS\n"
         "Caja-B5*01:01ps,XXPSEUDOGENE\n"
         "NONSENSE,XXUNKNOWN\n"
     )
