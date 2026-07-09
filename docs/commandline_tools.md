@@ -139,6 +139,31 @@ Subcommands:
 ```
 
 ```{eval-rst}
+.. _ref-mhcflurry-eval-artifacts:
+```
+
+### Evaluation and Plotting Artifacts
+
+The plotting commands are layered so expensive prediction and metric work can
+be cached and reused:
+
+| Layer | Command | Reads | Writes | Purpose |
+|---|---|---|---|---|
+| Metrics | `mhcflurry eval compare-models` | A candidate run and a baseline run or public release | `eval_comparison/` CSV/JSON metrics, `release_summary.csv`, `release_summary.md` | Produce reusable evaluation data without importing matplotlib. |
+| Diagnostics | `mhcflurry eval plot-comparison` | `eval_comparison/` | `eval_comparison/plots/`, optional `model_comparison_figures.pdf` | Render release-review ROC/PR/scatter/delta plots. |
+| Score cache | `mhcflurry eval paper-figures score-predictions` | Saved benchmark prediction table | `accuracy_scores.multiallelic.csv` or `accuracy_scores.monoallelic.csv` | Cache per-sample/per-allele AUC and PPV tables for repeated figure runs. |
+| Paper figures | `mhcflurry eval paper-figures render` | `eval_comparison/`, score cache, saved prediction tables, optional metadata/artwork | SVG/PDF/PNG panels, `paper_figures.pdf`, `manifest.csv`, `missing_inputs.md` | Render publication-style panels and report unavailable optional inputs. |
+| Local composition | `mhcflurry eval paper-figures run` | Candidate/baseline model directories | A fresh comparison plus diagnostic and paper figures | One-command local eval-to-figures path for already-trained models. |
+
+Saved prediction tables use a small canonical schema: `hit`, a grouping column
+(`sample_id` for multiallelic or `allele` / `hla` for monoallelic), optional
+peptide metadata, and one numeric score column per predictor. External tools
+such as NetMHCpan or MixMHCpred should be run separately and registered as
+additional numeric columns. Score direction is explicit: built-in predictor
+names have defaults, while custom predictor columns require
+`predictor_info.csv` rows with `predictor` and `higher_is_better`.
+
+```{eval-rst}
 .. _ref-mhcflurry-compare-models:
 
 .. autoprogram:: mhcflurry.cli.compare_models:parser
@@ -164,19 +189,9 @@ mhcflurry eval paper-figures render --comparison-dir results/eval --out results/
 mhcflurry eval paper-figures run --a results/new_run --b public --out results/eval
 ```
 
-The evaluation namespace is also the home for the 2023-notebook-style figure
-inputs. Use `mhcflurry eval paper-figures score-predictions` to turn saved
-benchmark prediction tables into reusable `accuracy_scores.*.csv` caches, then
-use `mhcflurry eval paper-figures render` for the publication-style panels.
-`paper-figures run` composes the local MHCflurry comparison and rendering steps;
-external predictor binaries such as NetMHCpan and MixMHCpred still need to
-produce saved prediction columns before they enter this pipeline.
-
-Saved prediction scoring needs an explicit score direction. Built-in predictor
-names have defaults; custom predictor columns should be accompanied by a
-`predictor_info.csv` file with `predictor` and `higher_is_better` columns, or
-passed directly with `mhcflurry eval paper-figures score-predictions
---predictor-info`.
+The `paper-figures` subcommands use the artifact contract above. External
+predictor binaries such as NetMHCpan and MixMHCpred still need to produce saved
+prediction columns before they enter this pipeline.
 
 For release-style training plus remote evaluation/plotting, use the training
 namespace:

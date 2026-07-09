@@ -107,7 +107,9 @@ implementation. Deployment is opt-in through `--deploy-mode`.
   table derivation step and is useful when re-rendering figures repeatedly.
   Built-in predictor names have known score direction; custom score columns
   should be described with `predictor_info.csv` using `predictor` and
-  `higher_is_better` columns.
+  `higher_is_better` columns. See the
+  [evaluation artifact map](../../docs/commandline_tools.md#evaluation-and-plotting-artifacts)
+  for the full contract.
 - **`mhcflurry eval paper-figures run`** — Local one-command composition of
   `compare-models`, `paper-figures render`, and `plot-comparison`. This is for
   already-trained models; remote training and cleanup still belong to the

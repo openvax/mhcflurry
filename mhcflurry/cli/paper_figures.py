@@ -152,13 +152,29 @@ def run_argv(argv):
 def register_subparser(parser):
     parser.description = __doc__
     parser.formatter_class = argparse.RawDescriptionHelpFormatter
+    parser.epilog = """
+Figure input contract:
+  * comparison-dir: output from ``mhcflurry eval compare-models``.
+  * scores-dir: reusable paper-figure inputs. Common files are
+    accuracy_scores.multiallelic.csv, accuracy_scores.monoallelic.csv,
+    benchmark.multiallelic.csv(.bz2), benchmark.monoallelic.csv(.bz2),
+    sample_table.csv, and predictor_info.csv.
+  * saved prediction tables: include hit, sample_id or allele/hla, optional
+    peptide metadata, and one numeric score column per predictor.
+  * score direction is explicit. Built-in predictor names have defaults; custom
+    score columns require predictor_info.csv rows with predictor and
+    higher_is_better.
+
+Missing optional figure inputs are recorded in manifest.csv and
+missing_inputs.md instead of being silently fabricated.
+"""
     parser.add_argument(
         "--scores-dir",
         help=(
             "Directory containing saved figure inputs such as "
             "accuracy_scores.multiallelic.csv, benchmark.multiallelic.csv.bz2, "
-            "and predictor_info.csv. These may come from a current training "
-            "run or imported benchmark outputs."
+            "and predictor_info.csv. Custom predictor rows in predictor_info.csv "
+            "should include higher_is_better."
         ),
     )
     parser.add_argument(
@@ -281,7 +297,10 @@ def register_subparser(parser):
         "--strict",
         action="store_true",
         default=False,
-        help="Return a non-zero exit code if any requested figure family skips.",
+        help=(
+            "Return a non-zero exit code if any requested non-metadata figure "
+            "family skips or fails."
+        ),
     )
     return parser
 

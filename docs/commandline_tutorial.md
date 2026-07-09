@@ -234,6 +234,9 @@ usual workflow is:
 3. Optionally render the broader paper-style figure suite from cached benchmark
    predictions or saved external-predictor outputs.
 
+The command reference has a compact table of the
+{ref}`evaluation and plotting artifact layers <ref-mhcflurry-eval-artifacts>`.
+
 For a local comparison against the installed public models:
 
 ```shell

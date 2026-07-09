@@ -64,6 +64,17 @@ def run_argv(argv):
 def register_subparser(parser):
     parser.description = __doc__
     parser.formatter_class = argparse.RawDescriptionHelpFormatter
+    parser.epilog = """
+Plotting layers:
+  * This command always reads an existing compare-models directory and writes
+    diagnostic plots under <input>/plots.
+  * --summary-pdf collects those diagnostic plot PDFs into one review packet.
+  * The --paper-figures-* flags optionally call ``mhcflurry eval paper-figures
+    render`` with saved score/prediction inputs for the broader paper-style
+    figure suite.
+  * Custom saved-prediction score columns need predictor_info.csv metadata with
+    predictor and higher_is_better.
+"""
     parser.add_argument(
         "--input", required=True,
         help="Output directory produced by ``mhcflurry compare-models``.",
@@ -106,7 +117,7 @@ def register_subparser(parser):
             "Optional saved figure-input directory passed to "
             "``mhcflurry paper-figures --scores-dir``. This may contain "
             "saved prediction tables, derived score tables, and predictor "
-            "metadata."
+            "metadata such as predictor_info.csv."
         ),
     )
     parser.add_argument(
