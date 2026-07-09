@@ -105,6 +105,9 @@ implementation. Deployment is opt-in through `--deploy-mode`.
   saved benchmark prediction table into a reusable `accuracy_scores.*.csv`
   cache. This is the maintained replacement for the notebook-era AUC / PPV
   table derivation step and is useful when re-rendering figures repeatedly.
+  Built-in predictor names have known score direction; custom score columns
+  should be described with `predictor_info.csv` using `predictor` and
+  `higher_is_better` columns.
 - **`mhcflurry eval paper-figures run`** — Local one-command composition of
   `compare-models`, `paper-figures render`, and `plot-comparison`. This is for
   already-trained models; remote training and cleanup still belong to the

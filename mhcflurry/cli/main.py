@@ -19,9 +19,8 @@ need. This keeps the torch-import cost off the top-level help path.
 
 Two flavors of subcommand:
 
-* **New under the parent**: ``eval``, ``compare-models``,
-  ``train``, ``eval``, ``compare-models``, ``plot-model-comparison``,
-  ``paper-figures``.
+* **New under the parent**: ``train``, ``eval``, ``compare-models``,
+  ``plot-model-comparison``, ``paper-figures``.
   Each module exposes ``run_argv(argv)`` which does its own argparse.
 * **Historical mhcflurry-* commands**: ``predict``, ``predict-scan``,
   ``downloads``, ``calibrate-percentile-ranks``, the ``class1-train-*`` /

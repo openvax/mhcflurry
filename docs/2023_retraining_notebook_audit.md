@@ -61,6 +61,8 @@ committed as the workflow.
 - Predictor metadata / aesthetics: `paper-figures render` accepts
   `predictor_info.csv` and otherwise uses the maintained `figure_style.py`
   labels and palette for MHCflurry, NetMHCpan 4.0 / 4.2, and MixMHCpred.
+  Saved-prediction scoring also uses `predictor_info.csv` for custom score
+  orientation through a `higher_is_better` column.
 - Wide benchmark tables: saved monoallelic and multiallelic prediction tables
   can be passed directly with `--monoallelic-predictions` and
   `--multiallelic-predictions`. The command does not yet run NetMHCpan /

@@ -191,8 +191,8 @@ def allele_locus_name(
 
     Human loci are returned as ``HLA-A``, ``HLA-B``, etc. Mouse H-2 loci are
     collapsed to ``H2`` for the plotting/genotype-sampling code that only needs
-    a species-level bucket. Invalid or unsupported inputs return
-    ``default_value`` unless ``raise_on_error`` is true.
+    a species-level bucket. Unparseable inputs raise when ``raise_on_error`` is
+    true. Valid but unhandled loci still return ``default_value``.
     """
     result = parse(
         str(raw_name),

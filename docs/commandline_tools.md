@@ -54,10 +54,29 @@ archives without duplicating orchestration logic in Python.
 
 ```{eval-rst}
 .. _ref-mhcflurry-train:
+```
 
-.. autoprogram:: mhcflurry.cli.train_command:parser
-    :prog: mhcflurry train
+### `mhcflurry train`
 
+`mhcflurry train` groups release-training workflows. It is a namespace command;
+run `mhcflurry train --help` or the concrete subcommand help for the complete
+argument list.
+
+```console
+$ mhcflurry train --help
+usage: mhcflurry train <subcommand> [args]
+
+Subcommands:
+  pan-allele-release  Run the retrain/evaluate/plot/release workflow.
+```
+
+The release workflow delegates to the maintained release script:
+
+```console
+$ mhcflurry train pan-allele-release --help
+```
+
+```{eval-rst}
 .. _ref-mhcflurry-class1-train-allele-specific-models:
 
 .. autoprogram:: mhcflurry.cli.train_allele_specific_models_command:parser
@@ -98,10 +117,28 @@ archives without duplicating orchestration logic in Python.
 
 ```{eval-rst}
 .. _ref-mhcflurry-eval:
+```
 
-.. autoprogram:: mhcflurry.cli.eval_command:parser
-    :prog: mhcflurry eval
+### `mhcflurry eval`
 
+`mhcflurry eval` groups model comparison, diagnostic plotting, reusable score
+generation, and paper-style figure rendering. It is a namespace command; run
+the concrete subcommand help for the complete argument list.
+
+```console
+$ mhcflurry eval --help
+usage: mhcflurry eval <subcommand> [args]
+
+Subcommands:
+  compare-models                 Compare two model ensembles.
+  plot-comparison                Render diagnostic plots from compare output.
+  paper-figures render           Render paper figures from saved inputs.
+  paper-figures score-predictions
+                                 Derive score tables from saved predictions.
+  paper-figures run              Compare, render paper figures, and write PDFs.
+```
+
+```{eval-rst}
 .. _ref-mhcflurry-compare-models:
 
 .. autoprogram:: mhcflurry.cli.compare_models:parser
@@ -134,6 +171,12 @@ use `mhcflurry eval paper-figures render` for the publication-style panels.
 `paper-figures run` composes the local MHCflurry comparison and rendering steps;
 external predictor binaries such as NetMHCpan and MixMHCpred still need to
 produce saved prediction columns before they enter this pipeline.
+
+Saved prediction scoring needs an explicit score direction. Built-in predictor
+names have defaults; custom predictor columns should be accompanied by a
+`predictor_info.csv` file with `predictor` and `higher_is_better` columns, or
+passed directly with `mhcflurry eval paper-figures score-predictions
+--predictor-info`.
 
 For release-style training plus remote evaluation/plotting, use the training
 namespace:

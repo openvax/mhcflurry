@@ -238,6 +238,13 @@ def _make_score_predictions_parser(prog):
             "change columns. Default matches paper-figures render."
         ),
     )
+    parser.add_argument(
+        "--predictor-info",
+        help=(
+            "Optional predictor_info.csv with predictor and higher_is_better "
+            "columns for custom score columns."
+        ),
+    )
     return parser
 
 
@@ -252,10 +259,17 @@ def _run_score_predictions(args):
     index_column = args.index_column
     if index_column is None and args.kind == "multiallelic":
         index_column = "sample_id"
+    predictor_info = None
+    if args.predictor_info:
+        import pandas
+        predictor_info = pandas.read_csv(args.predictor_info)
+        if "predictor" in predictor_info.columns:
+            predictor_info = predictor_info.set_index("predictor", drop=False)
     scores = paper_figures.score_saved_prediction_table(
         args.input,
         index_column=index_column,
         kind=args.kind,
+        predictor_info=predictor_info,
         external_baselines=external_baselines,
     )
     out = os.path.abspath(args.out)

@@ -46,6 +46,31 @@ from ..common import allele_locus_name
 
 CANDIDATE_PREDICTOR = "mhcflurry_production"
 
+DEFAULT_PREDICTOR_HIGHER_IS_BETTER = {
+    "mhcflurry_production": False,
+    "mhcflurry_production_affinity": False,
+    "mhcflurry_production_percentile": False,
+    "netmhcpan4.ba": False,
+    "netmhcpan4.ba_affinity": False,
+    "netmhcpan4.el": False,
+    "netmhcpan4.el_rank": False,
+    "netmhcpan4.el_percentile": False,
+    "netmhcpan4.2.ba": False,
+    "netmhcpan4.2.ba_affinity": False,
+    "netmhcpan4.2.el": False,
+    "netmhcpan4.2.el_rank": False,
+    "netmhcpan4.2.el_percentile": False,
+    "mixmhcpred": True,
+    "presentation_with_flanks_presentation_score": True,
+    "presentation_without_flanks_presentation_score": True,
+    "presentation_with_flanks_processing_score": True,
+    "presentation_without_flanks_processing_score": True,
+    "presentation_with_flanks_affinity": False,
+    "presentation_without_flanks_affinity": False,
+    "presentation_with_flanks_presentation_percentile": False,
+    "presentation_without_flanks_presentation_percentile": False,
+}
+
 EXTERNAL_BASELINES = (
     ("netmhcpan4.ba", "ba"),
     ("netmhcpan4.el", "el"),
@@ -284,7 +309,7 @@ def run(args):
         _apply_paper_style()
         predictor_info = _read_predictor_info(
             inputs.scores_dir / "predictor_info.csv", writer)
-        sample_ids = _read_sample_group_ids(args, inputs.scores_dir, writer)
+        sample_ids = _read_sample_group_ids(args, inputs, writer)
         _run_figure_family(
             writer, "multiallelic", "all", _generate_multiallelic_figures,
             inputs, predictor_info, sample_ids, args.sample_group,
@@ -312,10 +337,17 @@ def run(args):
         _write_manifest(out_dir, writer.rows)
         _write_missing_inputs(out_dir, writer.rows)
 
-    if args.strict and any(
-            row["status"] in ("skipped", "failed") for row in writer.rows):
+    if args.strict and any(_strict_failure_row(row) for row in writer.rows):
         return 2
     return 0
+
+
+def _strict_failure_row(row):
+    if row["status"] == "failed":
+        return True
+    if row["status"] != "skipped":
+        return False
+    return row["family"] != "metadata"
 
 
 def _run_figure_family(writer, family, figure, func, *args):
@@ -598,12 +630,54 @@ def _read_predictor_info(path, writer):
     return df.set_index("predictor", drop=False)
 
 
-def _read_sample_group_ids(args, artifacts_dir, writer):
+def _coerce_optional_bool(value):
+    if isinstance(value, bool):
+        return value
+    if pandas.isnull(value):
+        return None
+    text = str(value).strip().lower()
+    if text in ("1", "true", "yes", "y", "on"):
+        return True
+    if text in ("0", "false", "no", "n", "off"):
+        return False
+    return None
+
+
+def _predictor_orientations(predictor_info):
+    result = dict(DEFAULT_PREDICTOR_HIGHER_IS_BETTER)
+    if (
+            predictor_info is not None and
+            not predictor_info.empty and
+            "higher_is_better" in predictor_info.columns):
+        for predictor, row in predictor_info.iterrows():
+            value = _coerce_optional_bool(row.get("higher_is_better"))
+            if value is None:
+                continue
+            result[str(predictor)] = value
+            normalized = _normalize_predictor_name(predictor)
+            result[normalized] = value
+    return result
+
+
+def _read_sample_group_ids(args, inputs, writer):
+    artifacts_dir = inputs.scores_dir
     path = Path(args.sample_table) if args.sample_table else (
         artifacts_dir / "sample_table.csv")
     if not path.is_file():
-        benchmark_path = artifacts_dir / "benchmark.multiallelic.csv.bz2"
-        if benchmark_path.is_file():
+        benchmark_paths = []
+        if inputs.multiallelic_predictions is not None:
+            benchmark_paths.append(Path(inputs.multiallelic_predictions))
+        benchmark_paths.extend([
+            artifacts_dir / "benchmark.multiallelic.csv.bz2",
+            artifacts_dir / "benchmark.multiallelic.csv",
+        ])
+        seen = set()
+        for benchmark_path in benchmark_paths:
+            if benchmark_path in seen:
+                continue
+            seen.add(benchmark_path)
+            if not benchmark_path.is_file():
+                continue
             try:
                 df = pandas.read_csv(
                     benchmark_path,
@@ -618,7 +692,7 @@ def _read_sample_group_ids(args, artifacts_dir, writer):
                 pass
         writer.skip(
             "sample-groups", args.sample_group,
-            [path],
+            [path] + benchmark_paths,
             "Sample-group table absent; recent-only panels use all samples.")
         return None
     df = pandas.read_csv(path)
@@ -640,7 +714,7 @@ def _read_sample_group_ids(args, artifacts_dir, writer):
     return result
 
 
-def _read_multiallelic_scores(inputs, writer, figure, predictors):
+def _read_multiallelic_scores(inputs, writer, figure, predictors, predictor_info):
     path = inputs.scores_dir / "accuracy_scores.multiallelic.csv"
     if path.is_file():
         return _normalize_score_predictors(pandas.read_csv(path))
@@ -652,6 +726,7 @@ def _read_multiallelic_scores(inputs, writer, figure, predictors):
             family="multiallelic",
             figure=figure,
             writer=writer,
+            predictor_orientations=_predictor_orientations(predictor_info),
             external_baselines=predictors.external_baselines,
         )
     writer.skip(
@@ -663,7 +738,7 @@ def _read_multiallelic_scores(inputs, writer, figure, predictors):
     return None
 
 
-def _read_monoallelic_scores(inputs, writer, figure, predictors):
+def _read_monoallelic_scores(inputs, writer, figure, predictors, predictor_info):
     path = inputs.scores_dir / "accuracy_scores.monoallelic.csv"
     if path.is_file():
         return _normalize_score_predictors(pandas.read_csv(path))
@@ -675,6 +750,7 @@ def _read_monoallelic_scores(inputs, writer, figure, predictors):
             family="monoallelic",
             figure=figure,
             writer=writer,
+            predictor_orientations=_predictor_orientations(predictor_info),
             external_baselines=predictors.external_baselines,
         )
     return None
@@ -682,6 +758,7 @@ def _read_monoallelic_scores(inputs, writer, figure, predictors):
 
 def _scores_from_saved_predictions(
         path, index_column, family, figure, writer, row_filter=None, kind=None,
+        predictor_orientations=None,
         external_baselines=EXTERNAL_BASELINES):
     path = Path(path)
     if not path.is_file():
@@ -717,11 +794,33 @@ def _scores_from_saved_predictions(
             family, figure, [path],
             "Saved prediction table has no numeric predictor score columns.")
         return None
+    predictor_orientations = (
+        predictor_orientations
+        if predictor_orientations is not None
+        else _predictor_orientations(None)
+    )
+    unknown_orientation = [
+        predictor for predictor in predictor_columns
+        if (
+            predictor not in predictor_orientations and
+            _normalize_predictor_name(predictor) not in predictor_orientations
+        )
+    ]
+    if unknown_orientation:
+        writer.skip(
+            family, figure, unknown_orientation,
+            (
+                "Saved prediction table has predictor columns without score "
+                "orientation. Add higher_is_better true/false rows to "
+                "predictor_info.csv."
+            ))
+        return None
 
     rows = []
     for group_value, group in df.groupby(index_column):
         rows.extend(_scores_for_prediction_group(
-            group, index_column, group_value, None, "All", predictor_columns))
+            group, index_column, group_value, None, "All", predictor_columns,
+            predictor_orientations=predictor_orientations))
         for length, length_group in group.groupby("length"):
             if pandas.isnull(length):
                 continue
@@ -733,6 +832,7 @@ def _scores_from_saved_predictions(
                 length,
                 "%d-mer" % length,
                 predictor_columns,
+                predictor_orientations=predictor_orientations,
             ))
     scores = pandas.DataFrame(rows)
     if scores.empty:
@@ -740,8 +840,8 @@ def _scores_from_saved_predictions(
             family, figure, [path],
             "Saved prediction table produced no evaluable score rows.")
         return None
-    scores = _add_percent_change_columns(scores, external_baselines)
-    return _normalize_score_predictors(scores)
+    scores = _normalize_score_predictors(scores)
+    return _add_percent_change_columns(scores, external_baselines)
 
 
 class _ScoreTableErrorCollector:
@@ -753,14 +853,16 @@ class _ScoreTableErrorCollector:
 
 
 def score_saved_prediction_table(
-        path, index_column=None, kind=None,
+        path, index_column=None, kind=None, predictor_info=None,
         external_baselines=EXTERNAL_BASELINES):
     """Return notebook-style AUC/PPV rows from a saved prediction table.
 
     The input table must contain ``hit`` and one grouping column
     (``sample_id``, ``allele``, or ``hla`` unless ``index_column`` is passed).
-    Every other numeric column is treated as a predictor score, with affinity
-    and percentile columns automatically oriented so larger means better.
+    Every other numeric column is treated as a predictor score. Score
+    direction comes from the built-in predictor registry, or from a
+    ``predictor_info`` DataFrame with ``predictor`` and ``higher_is_better``
+    columns for custom predictors.
     When ``kind="monoallelic"``, allele identifiers are preferred over
     ``sample_id`` for automatic grouping.
     """
@@ -772,6 +874,7 @@ def score_saved_prediction_table(
         figure="score-predictions",
         writer=writer,
         kind=kind,
+        predictor_orientations=_predictor_orientations(predictor_info),
         external_baselines=external_baselines,
     )
     if scores is None:
@@ -809,7 +912,7 @@ def _prediction_score_columns(df):
 
 def _scores_for_prediction_group(
         group, index_column, group_value, length, length_label,
-        predictor_columns):
+        predictor_columns, predictor_orientations=None):
     from sklearn.metrics import roc_auc_score
 
     labels = pandas.to_numeric(group["hit"], errors="coerce")
@@ -820,7 +923,8 @@ def _scores_for_prediction_group(
     rows = []
     for predictor in predictor_columns:
         score = pandas.to_numeric(group[predictor], errors="coerce").values
-        score = _orient_prediction_score(predictor, score)
+        score = _orient_prediction_score(
+            predictor, score, predictor_orientations)
         mask = numpy.isfinite(score)
         y = y_true[mask]
         s = score[mask]
@@ -857,15 +961,19 @@ def _prediction_tie_breaker(group):
     return numpy.random.default_rng(0).random(len(group))
 
 
-def _orient_prediction_score(predictor, score):
-    predictor = str(predictor).lower()
-    if (
-            predictor.endswith(".ba") or
-            "affinity" in predictor or
-            "percentile" in predictor or
-            "rank" in predictor):
-        return -numpy.asarray(score, dtype=float)
-    return numpy.asarray(score, dtype=float)
+def _orient_prediction_score(predictor, score, predictor_orientations=None):
+    score = numpy.asarray(score, dtype=float)
+    if predictor_orientations is None:
+        predictor_orientations = _predictor_orientations(None)
+    candidates = [str(predictor), _normalize_predictor_name(predictor)]
+    for candidate in candidates:
+        if candidate in predictor_orientations:
+            if predictor_orientations[candidate]:
+                return score
+            return -score
+    raise ValueError(
+        "No score orientation configured for predictor %s. Add it to "
+        "predictor_info.csv with higher_is_better true/false." % predictor)
 
 
 def _ppv_at_n(y_true, y_score, n, tie_breaker=None):
@@ -937,7 +1045,8 @@ def _external_baselines_with_percent_change(predictors, columns, metric):
 def _generate_multiallelic_figures(
         inputs, predictor_info, recent_sample_ids, sample_group,
         max_scatter_points, writer, predictors):
-    scores = _read_multiallelic_scores(inputs, writer, "all", predictors)
+    scores = _read_multiallelic_scores(
+        inputs, writer, "all", predictors, predictor_info)
     if scores is None:
         return
     required = {
@@ -1440,6 +1549,7 @@ def _generate_monoallelic_figures(
         writer,
         "fig.3_scores_plots_monoallelic.scatter.auc.monoallelic.ba",
         predictors,
+        predictor_info,
     )
     if scores is not None:
         _plot_monoallelic_scatter(
@@ -1578,7 +1688,7 @@ def _generate_processing_notebook_figures(
     training_path = inputs.scores_dir / "train_data.ap.production.csv"
 
     no_c_scores = _read_cysteine_removed_scores(
-        inputs, no_c_path, writer, predictors)
+        inputs, no_c_path, writer, predictors, predictor_info)
     if no_c_scores is not None:
         _plot_cysteine_removed_panels(
             inputs, no_c_scores, predictor_info, writer, predictors)
@@ -1643,7 +1753,8 @@ def _generate_processing_notebook_figures(
             "AP correlation and training-data tables absent.")
 
 
-def _read_cysteine_removed_scores(inputs, no_c_path, writer, predictors):
+def _read_cysteine_removed_scores(
+        inputs, no_c_path, writer, predictors, predictor_info):
     if no_c_path.is_file():
         return _normalize_score_predictors(pandas.read_csv(no_c_path))
     if inputs.multiallelic_predictions is None:
@@ -1655,6 +1766,7 @@ def _read_cysteine_removed_scores(inputs, no_c_path, writer, predictors):
         family="antigen-processing",
         figure="fig.4_processing_predictor_plots.auc.ap.c_removed.scatter",
         writer=writer,
+        predictor_orientations=_predictor_orientations(predictor_info),
         external_baselines=predictors.external_baselines,
         row_filter=lambda df: df.loc[
             ~df.get("peptide", pandas.Series("", index=df.index))
@@ -1673,6 +1785,7 @@ def _plot_cysteine_removed_panels(
         writer,
         "fig.4_processing_predictor_plots.auc.ap.c_removed.scatter",
         predictors,
+        predictor_info,
     )
     if full is None:
         writer.skip(
@@ -2163,7 +2276,7 @@ def _plot_ap_correlation_from_saved_predictions(inputs, writer):
         fig.tight_layout()
         writer.save(
             fig,
-            "fig.4_processing_predictor_plots.correlation.included_vs_excluded",
+            "fig.4_processing_predictor_plots.processing_score.hit_vs_decoy",
             "antigen-processing",
             note="Generated from saved multiallelic predictions.",
         )
@@ -2417,9 +2530,16 @@ def _normalize_score_predictors(scores):
     if "predictor" not in scores.columns:
         return scores
     scores = scores.copy()
-    scores["predictor"] = scores["predictor"].str.replace(
-        r"_affinity$", "", regex=True)
+    scores["predictor"] = scores["predictor"].map(_normalize_predictor_name)
     return scores
+
+
+def _normalize_predictor_name(predictor):
+    predictor = str(predictor)
+    suffix = "_affinity"
+    if predictor.endswith(suffix):
+        return predictor[:-len(suffix)]
+    return predictor
 
 
 def _all_length_rows(scores):

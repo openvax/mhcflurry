@@ -272,6 +272,21 @@ per predictor. External tools such as NetMHCpan or MixMHCpred are run outside
 MHCflurry and enter the pipeline as additional numeric columns in those saved
 tables.
 
+Score direction is explicit. Built-in predictor names such as
+`mhcflurry_production`, `netmhcpan4.ba`, `netmhcpan4.el`, and `mixmhcpred` have
+known orientation. For custom numeric predictor columns, provide
+`predictor_info.csv` with `predictor` and `higher_is_better` columns in the
+same directory passed as `--scores-dir`, or pass it directly to
+`score-predictions`:
+
+```shell
+$ mhcflurry eval paper-figures score-predictions \
+    --kind multiallelic \
+    --input results/new_run/eval_inputs/benchmark.multiallelic.csv.bz2 \
+    --predictor-info results/new_run/eval_inputs/predictor_info.csv \
+    --out results/new_run/eval_inputs/accuracy_scores.multiallelic.csv
+```
+
 For the common local path, the same steps can be composed:
 
 ```shell

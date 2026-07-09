@@ -340,11 +340,11 @@ brev_latest_remote_exit_code() {
     expected="$(printf '%q' "$WORKFLOW_RUN_ID")"
     output="$(
         run_with_timeout "$BREV_CLEANUP_TIMEOUT_SECONDS" brev exec "$BREV_INSTANCE" \
-            "MHCFLURRY_RELEASE_WORKFLOW_ID=$expected bash -lc 'marker=\$(cat ~/runplz-latest/out/.runplz/mhcflurry_release_workflow_id 2>/dev/null || true); [ \"\$marker\" = \"\$MHCFLURRY_RELEASE_WORKFLOW_ID\" ] || exit 0; grep remote_command_exit ~/runplz-latest/out/.runplz/events.ndjson 2>/dev/null | tail -1'" \
+            "MHCFLURRY_RELEASE_WORKFLOW_ID=$expected bash -lc 'marker=\$(cat ~/runplz-latest/out/.runplz/mhcflurry_release_workflow_id 2>/dev/null || true); [ \"\$marker\" = \"\$MHCFLURRY_RELEASE_WORKFLOW_ID\" ] || exit 0; cat ~/runplz-latest/out/.runplz/mhcflurry_release_workflow_exit_code 2>/dev/null || true'" \
             2>/dev/null || true
     )"
     printf '%s\n' "$output" | sed -n \
-        's/.*"exit_code"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' \
+        's/[^0-9]*\([0-9][0-9]*\).*/\1/p' \
         | tail -1
 }
 
@@ -1281,7 +1281,10 @@ run_brev_training() {
             warn "runplz exited with $runplz_status, but remote command exit_code=0; continuing after explicit sync."
         else
             warn "runplz exited with $runplz_status; remote exit_code=${remote_exit:-unknown}."
-            sync_brev_output || true
+            sync_brev_output || {
+                warn "Brev output sync failed; leaving $BREV_INSTANCE available to preserve artifacts."
+                return "$runplz_status"
+            }
             apply_brev_cleanup
             return "$runplz_status"
         fi

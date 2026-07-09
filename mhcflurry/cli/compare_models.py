@@ -69,6 +69,8 @@ from ..workload_planning import (
 )
 
 
+METRIC_SCORE_KINDS = PRESENTATION_SCORE_KINDS + ("processing_score",)
+
 _COMPONENT_NAMES = ("training_stats", "affinity", "processing", "presentation")
 
 _T0 = time.time()
@@ -1076,7 +1078,8 @@ def _run_processing(side_a, side_b, args):
         scored.to_csv(pred_path, index=False)
         _stamp("  wrote %s" % pred_path)
 
-        per_sample = _presentation_per_sample(scored, "processing_score")
+        shared_scored = _shared_score_rows(scored, "processing_score")
+        per_sample = _presentation_per_sample(shared_scored, "processing_score")
         per_sample.to_csv(
             os.path.join(
                 component_dir,
@@ -1085,7 +1088,7 @@ def _run_processing(side_a, side_b, args):
             index=False,
         )
         per_length, per_length_per_sample = _presentation_per_length(
-            scored, "processing_score")
+            shared_scored, "processing_score")
         per_length.to_csv(
             os.path.join(
                 component_dir,
@@ -1102,7 +1105,7 @@ def _run_processing(side_a, side_b, args):
                 index=False,
             )
         summary = _presentation_mode_summary(
-            scored, per_sample, per_length, mode, "processing_score")
+            shared_scored, per_sample, per_length, mode, "processing_score")
         summaries[mode] = {"processing_score": summary}
         summary_rows.append(_presentation_summary_row(summary))
 
@@ -1257,9 +1260,8 @@ def _load_presentation_benchmark(data_dir, limit_files):
 def _score_values(df, prefix, score_kind):
     """Higher = better for the score we feed sklearn.
 
-    Affinity is already ``-log10(nM)``; ``presentation_score`` is already
-    higher-better; ``presentation_percentile`` is lower-better so we
-    negate.
+    ``presentation_score`` and ``processing_score`` are already higher-better;
+    ``presentation_percentile`` is lower-better so we negate it.
     """
     if score_kind == "presentation_score":
         return df["%s_presentation_score" % prefix].values
@@ -1271,12 +1273,7 @@ def _score_values(df, prefix, score_kind):
 
 
 def _score_pair_columns(score_kind):
-    if score_kind not in {
-            "presentation_score",
-            "presentation_percentile",
-            "processing_score",
-            "affinity",
-    }:
+    if score_kind not in METRIC_SCORE_KINDS:
         raise ValueError("Unknown score kind: %s" % score_kind)
     return ("a_%s" % score_kind, "b_%s" % score_kind)
 
@@ -1289,7 +1286,7 @@ def _shared_score_rows(scored, score_kind):
     unsupported peptides, so filter on both side-specific score columns before
     computing support counts or metric differences.
     """
-    return scored.dropna(subset=list(_score_pair_columns(score_kind))).copy()
+    return scored.dropna(subset=list(_score_pair_columns(score_kind)))
 
 
 def _presentation_per_sample(scored, score_kind):
@@ -1300,7 +1297,6 @@ def _presentation_per_sample(scored, score_kind):
     # NaN that the downstream nanmean skips. This asymmetry is intentional (the
     # two macros were never defined to share a threshold), but it does mean the
     # presentation macro can be pulled around by small, noisy samples.
-    scored = _shared_score_rows(scored, score_kind)
     rows = []
     for (sample_id, hla), group in scored.groupby(
             ["sample_id", "hla"], dropna=False):
@@ -1319,7 +1315,6 @@ def _presentation_per_sample(scored, score_kind):
 
 
 def _presentation_per_length(scored, score_kind):
-    scored = _shared_score_rows(scored, score_kind)
     rows = []
     per_length_per_sample = []
     for length, group in scored.groupby("peptide_len"):
@@ -1361,7 +1356,6 @@ def _presentation_per_length(scored, score_kind):
 
 
 def _presentation_mode_summary(scored, per_sample, per_length, mode, score_kind):
-    scored = _shared_score_rows(scored, score_kind)
     m_a = _metrics(scored.hit.values, _score_values(scored, "a", score_kind))
     m_b = _metrics(scored.hit.values, _score_values(scored, "b", score_kind))
     return {
@@ -1468,7 +1462,8 @@ def _run_presentation(side_a, side_b, args):
 
         summaries[mode] = {}
         for score_kind in PRESENTATION_SCORE_KINDS:
-            per_sample = _presentation_per_sample(scored, score_kind)
+            shared_scored = _shared_score_rows(scored, score_kind)
+            per_sample = _presentation_per_sample(shared_scored, score_kind)
             per_sample.to_csv(
                 os.path.join(
                     component_dir,
@@ -1477,7 +1472,7 @@ def _run_presentation(side_a, side_b, args):
                 index=False,
             )
             per_length, per_length_per_sample = _presentation_per_length(
-                scored, score_kind)
+                shared_scored, score_kind)
             per_length.to_csv(
                 os.path.join(
                     component_dir,
@@ -1494,7 +1489,7 @@ def _run_presentation(side_a, side_b, args):
                     index=False,
                 )
             summary = _presentation_mode_summary(
-                scored, per_sample, per_length, mode, score_kind)
+                shared_scored, per_sample, per_length, mode, score_kind)
             summaries[mode][score_kind] = summary
             summary_rows.append(_presentation_summary_row(summary))
 

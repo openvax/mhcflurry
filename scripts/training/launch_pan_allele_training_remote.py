@@ -322,20 +322,38 @@ def train_release_full():
     env = os.environ.copy()
     env.update({"MHCFLURRY_OUT": str(out), "REPO": str(repo)})
     workflow_id = env.get("MHCFLURRY_RELEASE_WORKFLOW_ID", "").strip()
+    exit_path = None
     if workflow_id:
         marker_dir = out / ".runplz"
         marker_dir.mkdir(parents=True, exist_ok=True)
         (marker_dir / "mhcflurry_release_workflow_id").write_text(workflow_id)
-    subprocess.run(
-        ["bash", "scripts/training/pan_allele_release_full.sh"],
-        check=True,
-        cwd=repo,
-        env=env,
-    )
-    if env_bool(env, "RUN_RELEASE_EVAL", default=False):
-        run_release_evaluation(repo, out, env)
-    if env_bool(env, "RUN_RELEASE_PLOTS", default=False):
-        run_release_plots(repo, out, env)
+        exit_path = marker_dir / "mhcflurry_release_workflow_exit_code"
+        try:
+            exit_path.unlink()
+        except FileNotFoundError:
+            pass
+    try:
+        subprocess.run(
+            ["bash", "scripts/training/pan_allele_release_full.sh"],
+            check=True,
+            cwd=repo,
+            env=env,
+        )
+        if env_bool(env, "RUN_RELEASE_EVAL", default=False):
+            run_release_evaluation(repo, out, env)
+        if env_bool(env, "RUN_RELEASE_PLOTS", default=False):
+            run_release_plots(repo, out, env)
+    except subprocess.CalledProcessError as e:
+        if exit_path is not None:
+            exit_path.write_text(str(e.returncode))
+        raise
+    except Exception:
+        if exit_path is not None:
+            exit_path.write_text("1")
+        raise
+    else:
+        if exit_path is not None:
+            exit_path.write_text("0")
 
 
 def run_release_evaluation(repo, out, env):

@@ -18,8 +18,8 @@ import os
 
 # Must run before importing modules that transitively import numpy/MKL. Some
 # conda images default MKL to INTEL threading, which aborts after PyTorch has
-# loaded GNU libgomp. Respect an explicit user choice, but make mhcflurry CLI
-# entry points safe when they are the first package imported.
+# loaded GNU libgomp. Respect an explicit user choice, but make mhcflurry safe
+# when it is the first package imported by a CLI command or spawned worker.
 os.environ.setdefault("MKL_THREADING_LAYER", "GNU")
 
 from .class1_affinity_predictor import Class1AffinityPredictor

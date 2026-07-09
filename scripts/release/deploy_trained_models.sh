@@ -37,7 +37,8 @@ Modes:
 Expected run layout:
   <run-dir>/affinity/models.combined
   <run-dir>/processing/models.selected.no_flank
-  <run-dir>/processing/models.selected.short_flanks
+  <run-dir>/processing/models.selected.with_flanks
+  <run-dir>/processing/models.selected.short_flanks  (optional)
   <run-dir>/presentation/models
 
 The script writes SHA256SUMS and a downloads.yml snippet beside the assets.
@@ -209,11 +210,15 @@ require_one_file "affinity percent ranks" \
 
 require_dir "$PROCESSING_NO_FLANK"
 require_file "$PROCESSING_NO_FLANK/manifest.csv"
-require_dir "$PROCESSING_SHORT_FLANKS"
-require_file "$PROCESSING_SHORT_FLANKS/manifest.csv"
-if [ ! -d "$PROCESSING_WITH_FLANKS" ]; then
-    warn "Processing models.selected.with_flanks is absent."
-    warn "The archive will contain no_flank and short_flanks only."
+require_dir "$PROCESSING_WITH_FLANKS"
+require_file "$PROCESSING_WITH_FLANKS/manifest.csv"
+PROCESSING_ARCHIVE_DIRS=(models.selected.no_flank models.selected.with_flanks)
+if [ -d "$PROCESSING_SHORT_FLANKS" ]; then
+    require_file "$PROCESSING_SHORT_FLANKS/manifest.csv"
+    PROCESSING_ARCHIVE_DIRS+=(models.selected.short_flanks)
+else
+    warn "Processing models.selected.short_flanks is absent."
+    warn "The archive will contain no_flank and with_flanks only."
 fi
 
 require_dir "$PRESENTATION_MODELS"
@@ -238,14 +243,8 @@ if [ "$MODE" = "dry-run" ]; then
     note "Dry run only. Commands that would run:"
     quote_cmd mkdir -p "$ASSETS_DIR"
     quote_cmd tar -C "$AFFINITY_DIR" -cjf "$ASSETS_DIR/$PAN_ASSET" models.combined
-    if [ -d "$PROCESSING_WITH_FLANKS" ]; then
-        quote_cmd tar -C "$PROCESSING_DIR" -cjf "$ASSETS_DIR/$PROCESSING_ASSET" \
-            models.selected.no_flank models.selected.short_flanks \
-            models.selected.with_flanks
-    else
-        quote_cmd tar -C "$PROCESSING_DIR" -cjf "$ASSETS_DIR/$PROCESSING_ASSET" \
-            models.selected.no_flank models.selected.short_flanks
-    fi
+    quote_cmd tar -C "$PROCESSING_DIR" -cjf "$ASSETS_DIR/$PROCESSING_ASSET" \
+        "${PROCESSING_ARCHIVE_DIRS[@]}"
     quote_cmd tar -C "$PRESENTATION_DIR" -cjf "$ASSETS_DIR/$PRESENTATION_ASSET" models
     quote_cmd gh release upload "$GITHUB_RELEASE" \
         "$ASSETS_DIR/$PAN_ASSET" \
@@ -258,14 +257,8 @@ fi
 
 mkdir -p "$ASSETS_DIR"
 tar -C "$AFFINITY_DIR" -cjf "$ASSETS_DIR/$PAN_ASSET" models.combined
-if [ -d "$PROCESSING_WITH_FLANKS" ]; then
-    tar -C "$PROCESSING_DIR" -cjf "$ASSETS_DIR/$PROCESSING_ASSET" \
-        models.selected.no_flank models.selected.short_flanks \
-        models.selected.with_flanks
-else
-    tar -C "$PROCESSING_DIR" -cjf "$ASSETS_DIR/$PROCESSING_ASSET" \
-        models.selected.no_flank models.selected.short_flanks
-fi
+tar -C "$PROCESSING_DIR" -cjf "$ASSETS_DIR/$PROCESSING_ASSET" \
+    "${PROCESSING_ARCHIVE_DIRS[@]}"
 tar -C "$PRESENTATION_DIR" -cjf "$ASSETS_DIR/$PRESENTATION_ASSET" models
 
 (

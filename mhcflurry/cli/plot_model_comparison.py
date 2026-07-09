@@ -307,7 +307,7 @@ def _safe_plot(label, func, *args, **kwargs):
 
 
 def _load_side_labels(input_dir):
-    labels = {"a": "a", "b": "b"}
+    labels = {"a": "Side A", "b": "Side B"}
     for letter in ("a", "b"):
         path = os.path.join(input_dir, "side_%s.json" % letter)
         if os.path.isfile(path):

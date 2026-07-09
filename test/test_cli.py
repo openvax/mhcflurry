@@ -147,28 +147,28 @@ def test_eval_paper_figures_score_predictions_writes_cache(tmp_path):
             "peptide": "AAAAAAAAK",
             "hit": 1,
             "netmhcpan4.ba": 20.0,
-            "mhcflurry_production": 0.90,
+            "mhcflurry_production": 20.0,
         },
         {
             "sample_id": "sample1",
             "peptide": "AAAAAAAAL",
             "hit": 1,
             "netmhcpan4.ba": 30.0,
-            "mhcflurry_production": 0.80,
+            "mhcflurry_production": 30.0,
         },
         {
             "sample_id": "sample1",
             "peptide": "AAAAAAAAM",
             "hit": 0,
             "netmhcpan4.ba": 900.0,
-            "mhcflurry_production": 0.20,
+            "mhcflurry_production": 900.0,
         },
         {
             "sample_id": "sample1",
             "peptide": "AAAAAAAAN",
             "hit": 0,
             "netmhcpan4.ba": 1000.0,
-            "mhcflurry_production": 0.10,
+            "mhcflurry_production": 1000.0,
         },
     ]).to_csv(predictions, index=False)
     out = tmp_path / "accuracy_scores.multiallelic.csv"
@@ -970,6 +970,13 @@ def test_metrics_ignores_nans_in_scores():
     assert m["n"] == 2
 
 
+def test_compare_models_pct_change_is_numeric():
+    assert compare_models._pct_change(0.75, 0.50) == 50.0
+    assert numpy.isclose(compare_models._pct_change(0.25, 0.20), 25.0)
+    assert pandas.isna(compare_models._pct_change(0.25, 0.0))
+    assert pandas.isna(compare_models._pct_change(0.25, numpy.nan))
+
+
 def test_processing_metrics_use_shared_non_nan_rows():
     scored = pandas.DataFrame({
         "sample_id": ["s1"] * 6,
@@ -980,12 +987,13 @@ def test_processing_metrics_use_shared_non_nan_rows():
         "b_processing_score": [0.8, 0.2, 0.7, 0.3, numpy.nan, numpy.nan],
     })
 
+    shared_scored = compare_models._shared_score_rows(scored, "processing_score")
     per_sample = compare_models._presentation_per_sample(
-        scored, "processing_score")
+        shared_scored, "processing_score")
     per_length, _per_length_per_sample = compare_models._presentation_per_length(
-        scored, "processing_score")
+        shared_scored, "processing_score")
     summary = compare_models._presentation_mode_summary(
-        scored, per_sample, per_length, "with_flanks", "processing_score")
+        shared_scored, per_sample, per_length, "with_flanks", "processing_score")
 
     assert per_sample.iloc[0]["n"] == 4
     assert per_sample.iloc[0]["n_pos"] == 2
@@ -1248,7 +1256,7 @@ def test_detect_available_components_finds_presentation(tmp_path):
 
 def test_load_side_labels_falls_back_when_missing(tmp_path):
     labels = plot_model_comparison._load_side_labels(str(tmp_path))
-    assert labels == {"a": "a", "b": "b"}
+    assert labels == {"a": "Side A", "b": "Side B"}
 
 
 def test_load_side_labels_reads_json(tmp_path):
@@ -1521,17 +1529,59 @@ def test_summary_pdf_can_include_external_paper_figures_dir(tmp_path):
     assert paths == [combined, diagnostic]
 
 
-def test_paper_figures_orients_percentile_and_rank_scores():
+def test_paper_figures_orients_configured_scores():
     score = numpy.array([0.1, 2.0, 50.0])
 
     for predictor in [
-            "netmhcpan_el_percentile",
-            "some_model_rank",
-            "presentation_percentile"]:
+            "mhcflurry_production",
+            "mhcflurry_production_affinity",
+            "netmhcpan4.ba_affinity",
+            "netmhcpan4.el_rank"]:
         assert numpy.allclose(
             paper_figures._orient_prediction_score(predictor, score),
-            -score,
-        )
+            -score)
+    assert numpy.allclose(
+        paper_figures._orient_prediction_score("mixmhcpred", score),
+        score)
+    assert numpy.allclose(
+        paper_figures._orient_prediction_score(
+            "custom_rank", score, {"custom_rank": True}),
+        score)
+    with pytest.raises(ValueError, match="No score orientation configured"):
+        paper_figures._orient_prediction_score("custom_rank", score)
+
+
+def test_paper_figures_score_predictions_uses_explicit_orientation(tmp_path):
+    predictions = tmp_path / "predictions.csv"
+    pandas.DataFrame([
+        {
+            "sample_id": "sample1",
+            "peptide": "AAAAAAAAK",
+            "hit": 1,
+            "mhcflurry_production": 20.0,
+            "netmhcpan4.ba_affinity": 40.0,
+        },
+        {
+            "sample_id": "sample1",
+            "peptide": "AAAAAAAAL",
+            "hit": 0,
+            "mhcflurry_production": 2000.0,
+            "netmhcpan4.ba_affinity": 4000.0,
+        },
+    ]).to_csv(predictions, index=False)
+
+    scores = paper_figures.score_saved_prediction_table(
+        predictions,
+        kind="multiallelic",
+        external_baselines=(("netmhcpan4.ba", "ba"),),
+    )
+    all_scores = scores.loc[scores["length_label"] == "All"]
+
+    assert all_scores.set_index("predictor").loc[
+        "mhcflurry_production", "auc"] == 1.0
+    assert all_scores.set_index("predictor").loc[
+        "netmhcpan4.ba", "auc"] == 1.0
+    assert "percent_change_auc_ba" in scores.columns
 
 
 def test_paper_figures_percent_change_columns_are_numeric():
@@ -1825,9 +1875,9 @@ def test_paper_figures_derives_scores_from_saved_predictions(tmp_path):
                     "length": length,
                     "hit": hit,
                     "netmhcpan4.ba": 20.0 if hit else 2000.0,
-                    "netmhcpan4.el": good if hit else bad,
+                    "netmhcpan4.el": 0.10 if hit else 10.0,
                     "mixmhcpred": good - 0.05 if hit else bad + 0.05,
-                    "mhcflurry_production": good + 0.02 if hit else bad,
+                    "mhcflurry_production": 30.0 if hit else 3000.0,
                     "presentation_without_flanks_presentation_score": (
                         good if hit else bad),
                     "presentation_with_flanks_presentation_score": (
@@ -1857,6 +1907,63 @@ def test_paper_figures_derives_scores_from_saved_predictions(tmp_path):
         tmp_path / "paper" / "png" /
         "fig.3_scores_plots_multiallelic.scatter.auc.ba.png"
     ).is_file()
+
+
+def test_paper_figures_sample_groups_use_explicit_predictions(tmp_path):
+    class CaptureWriter:
+        def __init__(self):
+            self.rows = []
+
+        def fail(self, family, figure, note):
+            self.rows.append({
+                "family": family,
+                "figure": figure,
+                "status": "failed",
+                "note": note,
+            })
+
+        def skip(self, family, figure, missing, note):
+            self.rows.append({
+                "family": family,
+                "figure": figure,
+                "status": "skipped",
+                "missing": missing,
+                "note": note,
+            })
+
+    scores_dir = tmp_path / "scores"
+    predictions_dir = tmp_path / "predictions"
+    scores_dir.mkdir()
+    predictions_dir.mkdir()
+    predictions = predictions_dir / "benchmark.multiallelic.csv"
+    pandas.DataFrame([
+        {
+            "sample_id": "recent",
+            "sample_group": "MULTIALLELIC-RECENT",
+            "peptide": "SIINFEKL",
+            "hit": 1,
+            "mhcflurry_production": 0.9,
+        },
+        {
+            "sample_id": "old",
+            "sample_group": "MULTIALLELIC-OLD",
+            "peptide": "SLYNTVATL",
+            "hit": 0,
+            "mhcflurry_production": 0.1,
+        },
+    ]).to_csv(predictions, index=False)
+    writer = CaptureWriter()
+    args = paper_figures.make_parser().parse_args([
+        "--scores-dir", str(scores_dir),
+        "--multiallelic-predictions", str(predictions),
+        "--out", str(tmp_path / "paper"),
+    ])
+
+    inputs = paper_figures._resolve_figure_inputs(args, writer)
+    sample_ids = paper_figures._read_sample_group_ids(args, inputs, writer)
+
+    assert sample_ids == {"recent"}
+    assert writer.rows == []
 
 
 def test_paper_figures_uses_current_comparison_when_scores_absent(tmp_path):
@@ -1987,6 +2094,7 @@ def test_paper_figures_prediction_scoring_drops_invalid_hit_rows():
         length=None,
         length_label="All",
         predictor_columns=["candidate"],
+        predictor_orientations={"candidate": True},
     )
     assert rows[0]["auc"] == 1.0
     assert rows[0]["ppv"] == 1.0
@@ -2025,8 +2133,12 @@ def test_paper_figures_monoallelic_scoring_prefers_allele(tmp_path):
         },
     ]).to_csv(predictions, index=False)
 
+    predictor_info = pandas.DataFrame([{
+        "predictor": "candidate",
+        "higher_is_better": True,
+    }]).set_index("predictor", drop=False)
     scores = paper_figures.score_saved_prediction_table(
-        predictions, kind="monoallelic")
+        predictions, kind="monoallelic", predictor_info=predictor_info)
     all_scores = scores.loc[
         (scores["length_label"] == "All") &
         (scores["predictor"] == "candidate")

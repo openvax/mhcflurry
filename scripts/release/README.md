@@ -128,7 +128,10 @@ PDF. Use `mhcflurry eval paper-figures score-predictions` to precompute
 `accuracy_scores.*.csv` caches from canonical saved prediction tables. The
 workflow does not run external predictors itself; external NetMHCpan /
 MixMHCpred outputs should be generated separately and passed as numeric columns
-in those canonical prediction tables.
+in those canonical prediction tables. Score direction is explicit: built-in
+predictor names have defaults, and custom score columns should be described in
+`predictor_info.csv` with `predictor` and `higher_is_better` columns (or passed
+to `score-predictions --predictor-info`).
 
 The same release workflow is also available from the unified CLI:
 

@@ -269,8 +269,9 @@ echo "STAGE 1 duration: $(( $(date +%s) - STAGE1_START )) sec"
 echo "affinity predictor: $AFFINITY_PREDICTOR"
 
 # ============================================================
-# STAGE 2 — PROCESSING (no_flank + short_flanks variants)
-# Both variants are inputs to the presentation predictor.
+# STAGE 2 — PROCESSING
+# Trains the configured processing variants. Presentation consumes no_flank and
+# the configured with-flanks source (with_flanks by default).
 # ============================================================
 echo "=== STAGE 2: PROCESSING ==="
 STAGE2_START=$(date +%s)
