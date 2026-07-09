@@ -135,6 +135,29 @@ to `score-predictions --predictor-info`). See the
 [evaluation artifact map](../../docs/commandline_tools.md#evaluation-and-plotting-artifacts)
 for the full contract.
 
+For Brev-backed training, local paper inputs stay on the control machine by
+default. Remote MHCflurry evaluation runs on the GPU instance, syncs back, and
+then the wrapper renders paper figures locally if `--paper-figures-scores-dir`
+or explicit saved prediction tables were supplied. This is the intended path
+when NetMHCpan/MixMHCpred are installed locally but not on the Brev image. To
+prepare those local inputs during the remote training window, pass
+`--paper-figures-prepare-command "..."`; the command runs in the background on
+the control machine and must write to the directory/file paths also supplied via
+`--paper-figures-scores-dir`, `--paper-figures-multiallelic-predictions`, or
+`--paper-figures-monoallelic-predictions`.
+
+Example:
+
+```bash
+mhcflurry train pan-allele-release \
+    --run-dir runs/2.3.0 \
+    --release 2.3.0 \
+    --backend brev-provision \
+    --paper-figures-scores-dir "$PWD/runs/2.3.0/external_predictions" \
+    --paper-figures-prepare-command \
+        "path/to/run_external_predictors.sh --out '$PWD/runs/2.3.0/external_predictions'"
+```
+
 The same release workflow is also available from the unified CLI:
 
 ```bash

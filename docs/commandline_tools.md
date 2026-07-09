@@ -163,6 +163,12 @@ additional numeric columns. Score direction is explicit: built-in predictor
 names have defaults, while custom predictor columns require
 `predictor_info.csv` rows with `predictor` and `higher_is_better`.
 
+For remote release training, `mhcflurry train pan-allele-release` can run a
+local `--paper-figures-prepare-command` on the control machine while the Brev
+training job is active. Use that hook for locally installed external predictors;
+the command should write to the same `--paper-figures-scores-dir` or saved
+prediction paths passed to the release workflow.
+
 ```{eval-rst}
 .. _ref-mhcflurry-compare-models:
 

@@ -42,6 +42,7 @@ Usage:
       [--paper-figures-scores-dir DIR] \
       [--paper-figures-multiallelic-predictions FILE] \
       [--paper-figures-monoallelic-predictions FILE] \
+      [--paper-figures-prepare-command COMMAND] \
       [--brev-instance-type TYPE] \
       [--skip-train] [--skip-eval] [--skip-plots] \
       [--deploy-mode none|dry-run|draft|publish]
@@ -78,6 +79,15 @@ Evaluation:
       mhcflurry eval paper-figures render --scores-dir DIR
   and writes publication-style SVG/PDF/PNG panels under
   RUN_DIR/eval_comparison/plots/paper_figures/.
+  External predictors such as NetMHCpan and MixMHCpred are not run by
+  MHCflurry. To keep a one-line remote-training launch, pass
+  --paper-figures-prepare-command COMMAND. The command runs locally on the
+  control machine while remote training is active and should write canonical
+  saved prediction tables or score caches to the path supplied through
+  --paper-figures-scores-dir / --paper-figures-*-predictions. When local paper
+  inputs are requested during a full Brev run, MHCflurry eval still runs on the
+  Brev GPU machine, then the paper-figure render runs locally after sync so
+  locally licensed external tools do not need to be installed on Brev.
 
 Deployment:
   Deployment is opt-in. By default --deploy-mode is none and the final
@@ -299,6 +309,92 @@ run_logged_step_with_timeout() {
     local timeout_seconds="$2"
     shift 2
     run_logged_step "$step" run_with_timeout "$timeout_seconds" "$@"
+}
+
+start_paper_figures_prepare() {
+    if [ -z "${PAPER_FIGURES_PREPARE_COMMAND:-}" ]; then
+        return 0
+    fi
+    if [ "${PAPER_FIGURES_PREPARE_DONE:-0}" = "1" ] || \
+            [ -n "${PAPER_FIGURES_PREPARE_PID:-}" ]; then
+        return 0
+    fi
+
+    local step=paper_figures_prepare
+    local log_file="$WORKFLOW_LOG_DIR/$step.log"
+    run_cmd mkdir -p "$WORKFLOW_LOG_DIR"
+    record_workflow_event "$step" start \
+        "background=1 log=$log_file command=$PAPER_FIGURES_PREPARE_COMMAND"
+
+    if [ "$DRY_RUN" = "1" ]; then
+        run_cmd bash -lc "$PAPER_FIGURES_PREPARE_COMMAND"
+        record_workflow_event "$step" 0 "dry-run log=$log_file"
+        PAPER_FIGURES_PREPARE_DONE=1
+        return 0
+    fi
+
+    {
+        printf '[%s] start step=%s background=1 command=%s\n' \
+            "$(workflow_timestamp)" "$step" "$PAPER_FIGURES_PREPARE_COMMAND"
+    } | tee -a "$log_file" >&2
+
+    (
+        set -o pipefail
+        bash -lc "$PAPER_FIGURES_PREPARE_COMMAND" 2>&1 | tee -a "$log_file"
+        exit "${PIPESTATUS[0]}"
+    ) &
+    PAPER_FIGURES_PREPARE_PID=$!
+    note "Started local paper-figure input preparation as PID $PAPER_FIGURES_PREPARE_PID."
+}
+
+wait_paper_figures_prepare() {
+    if [ -z "${PAPER_FIGURES_PREPARE_COMMAND:-}" ]; then
+        return 0
+    fi
+    if [ "${PAPER_FIGURES_PREPARE_DONE:-0}" = "1" ]; then
+        return 0
+    fi
+    if [ -z "${PAPER_FIGURES_PREPARE_PID:-}" ]; then
+        return 0
+    fi
+
+    local step=paper_figures_prepare
+    local log_file="$WORKFLOW_LOG_DIR/$step.log"
+    local errexit_was_set=0
+    local status
+    case "$-" in
+        *e*) errexit_was_set=1 ;;
+    esac
+
+    note "Waiting for local paper-figure input preparation (PID $PAPER_FIGURES_PREPARE_PID)."
+    set +e
+    wait "$PAPER_FIGURES_PREPARE_PID"
+    status=$?
+    if [ "$errexit_was_set" = "1" ]; then
+        set -e
+    else
+        set +e
+    fi
+    PAPER_FIGURES_PREPARE_DONE=1
+    PAPER_FIGURES_PREPARE_PID=
+
+    {
+        printf '[%s] end step=%s status=%s\n' \
+            "$(workflow_timestamp)" "$step" "$status"
+    } | tee -a "$log_file" >&2
+    record_workflow_event "$step" "$status" "log=$log_file"
+    return "$status"
+}
+
+cleanup_background_jobs() {
+    if [ -n "${PAPER_FIGURES_PREPARE_PID:-}" ] && \
+            [ "${PAPER_FIGURES_PREPARE_DONE:-0}" != "1" ]; then
+        if kill -0 "$PAPER_FIGURES_PREPARE_PID" 2>/dev/null; then
+            warn "Stopping unfinished paper-figure input preparation (PID $PAPER_FIGURES_PREPARE_PID)."
+            kill "$PAPER_FIGURES_PREPARE_PID" 2>/dev/null || true
+            wait "$PAPER_FIGURES_PREPARE_PID" 2>/dev/null || true
+        fi
+    fi
 }
 
 write_git_repo_archive() {
@@ -1353,6 +1449,9 @@ PAPER_FIGURES_ARTIFACTS_DIR="${PAPER_FIGURES_ARTIFACTS_DIR:-}"
 PAPER_FIGURES_SCORES_DIR="${PAPER_FIGURES_SCORES_DIR:-$PAPER_FIGURES_ARTIFACTS_DIR}"
 PAPER_FIGURES_MULTIALLELIC_PREDICTIONS="${PAPER_FIGURES_MULTIALLELIC_PREDICTIONS:-}"
 PAPER_FIGURES_MONOALLELIC_PREDICTIONS="${PAPER_FIGURES_MONOALLELIC_PREDICTIONS:-}"
+PAPER_FIGURES_PREPARE_COMMAND="${PAPER_FIGURES_PREPARE_COMMAND:-}"
+PAPER_FIGURES_PREPARE_PID=
+PAPER_FIGURES_PREPARE_DONE=0
 PAPER_FIGURES_FORMATS="${PAPER_FIGURES_FORMATS:-svg,pdf,png}"
 PAPER_FIGURES_CANDIDATE_PREDICTOR="${PAPER_FIGURES_CANDIDATE_PREDICTOR:-}"
 PAPER_FIGURES_EXTERNAL_BASELINES="${PAPER_FIGURES_EXTERNAL_BASELINES:-}"
@@ -1535,6 +1634,10 @@ while [ $# -gt 0 ]; do
             PAPER_FIGURES_MONOALLELIC_PREDICTIONS=$2
             shift 2
             ;;
+        --paper-figures-prepare-command)
+            PAPER_FIGURES_PREPARE_COMMAND=$2
+            shift 2
+            ;;
         --paper-figures-candidate-predictor)
             PAPER_FIGURES_CANDIDATE_PREDICTOR=$2
             shift 2
@@ -1643,6 +1746,14 @@ if [ "$SKIP_DEPLOY" = "1" ]; then
     fi
     warn "--skip-deploy is deprecated and no longer needed; deployment is opt-in."
 fi
+if [ -n "$PAPER_FIGURES_PREPARE_COMMAND" ]; then
+    if [ "$SKIP_PLOTS" = "1" ]; then
+        die "--paper-figures-prepare-command cannot be combined with --skip-plots"
+    fi
+    if ! paper_figure_inputs_requested; then
+        die "--paper-figures-prepare-command requires --paper-figures-scores-dir or --paper-figures-*-predictions so its outputs are used"
+    fi
+fi
 if [ -z "$BREV_ON_FINISH" ]; then
     case "$BACKEND" in
         brev-provision)
@@ -1714,6 +1825,9 @@ note "Batch sizes:   affinity=$AFFINITY_MINIBATCH_SIZE processing=$PROCESSING_MI
 note "Compare:       $RUN_LABEL vs $COMPARE_BASELINE_LABEL ($COMPARE_BASELINE)"
 note "Affinity MWPG: $AFFINITY_MAX_WORKERS_PER_GPU"
 note "Processing:    variants=$PROCESSING_VARIANTS; eval_modes=$PROCESSING_MODES"
+if [ -n "$PAPER_FIGURES_PREPARE_COMMAND" ]; then
+    note "Paper inputs:  local prepare command configured"
+fi
 case "$BACKEND" in
     brev-existing|brev-provision)
         note "Brev instance: $BREV_INSTANCE"
@@ -1724,6 +1838,9 @@ case "$BACKEND" in
         note "Brev image:    $BREV_CONTAINER_IMAGE"
         ;;
 esac
+
+trap cleanup_background_jobs EXIT
+start_paper_figures_prepare
 
 if [ "$SKIP_TRAIN" != "1" ]; then
     case "$BACKEND" in
@@ -1777,9 +1894,11 @@ else
     note "Skipping training."
     case "$BACKEND" in
         brev-existing)
+            wait_paper_figures_prepare
             run_brev_postprocess 0
             ;;
         brev-provision)
+            wait_paper_figures_prepare
             run_brev_postprocess 1
             ;;
     esac
@@ -1837,6 +1956,7 @@ else
 fi
 
 if [ "$SKIP_PLOTS" != "1" ]; then
+    wait_paper_figures_prepare
     if [ "$BREV_REMOTE_PLOTS_DONE" = "1" ]; then
         note "Using plots produced on the Brev instance."
     else

@@ -110,6 +110,12 @@ implementation. Deployment is opt-in through `--deploy-mode`.
   `higher_is_better` columns. See the
   [evaluation artifact map](../../docs/commandline_tools.md#evaluation-and-plotting-artifacts)
   for the full contract.
+- **`--paper-figures-prepare-command` on `mhcflurry train pan-allele-release`**
+  — Runs a local control-machine command while remote training is active. Use
+  it to generate NetMHCpan/MixMHCpred prediction columns or score caches when
+  those tools are installed locally but not on the Brev image. The command
+  should write to the paths also supplied via `--paper-figures-scores-dir` or
+  `--paper-figures-*-predictions`.
 - **`mhcflurry eval paper-figures run`** — Local one-command composition of
   `compare-models`, `paper-figures render`, and `plot-comparison`. This is for
   already-trained models; remote training and cleanup still belong to the
