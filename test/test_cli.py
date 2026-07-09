@@ -132,6 +132,8 @@ def test_release_workflow_prepare_command_is_dry_run_visible(tmp_path):
 
 
 def test_release_workflow_brev_prepare_uses_remote_postprocess(tmp_path):
+    env = dict(os.environ)
+    env["PATH"] = "/usr/bin:/bin"
     result = subprocess.run(
         [
             "bash",
@@ -146,6 +148,7 @@ def test_release_workflow_brev_prepare_uses_remote_postprocess(tmp_path):
         ],
         capture_output=True,
         text=True,
+        env=env,
         check=True,
     )
 

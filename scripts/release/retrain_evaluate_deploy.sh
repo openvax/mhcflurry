@@ -1308,7 +1308,9 @@ apply_brev_cleanup() {
 
 run_brev_training() {
     local auto_create=$1
-    require_command runplz
+    if [ "$DRY_RUN" != "1" ]; then
+        require_command runplz
+    fi
     run_cmd mkdir -p "$RUN_DIR"
     local runplz_on_finish=leave
     local run_release_eval=0
