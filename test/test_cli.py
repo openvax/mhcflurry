@@ -135,6 +135,7 @@ def test_eval_help_runs(capsys):
     cli_main.main(["eval", "--help"])
     captured = capsys.readouterr().out
     assert "paper-figures score-predictions" in captured
+    assert "paper-figures mhctools-predictions" in captured
     assert "paper-figures run" in captured
     assert "Compatibility:" in captured
 
@@ -215,6 +216,54 @@ def test_eval_paper_figures_score_predictions_writes_cache(tmp_path):
     }
     assert set(scores["length_label"]) == {"All", "9-mer"}
     assert "percent_change_auc_ba" in scores.columns
+
+
+def test_eval_paper_figures_mhctools_predictions_adds_columns(tmp_path):
+    benchmark = tmp_path / "benchmark.csv"
+    pandas.DataFrame([
+        {
+            "sample_id": "s1",
+            "peptide": "PEPTIDEA",
+            "hit": 1,
+            "hla": "HLA-A*02:01 HLA-B*07:02",
+        },
+        {
+            "sample_id": "s1",
+            "peptide": "PEPTIDEB",
+            "hit": 0,
+            "hla": "HLA-A*02:01 HLA-B*07:02",
+        },
+    ]).to_csv(benchmark, index=False)
+    fake_mhctools = tmp_path / "fake_mhctools.py"
+    fake_mhctools.write_text("""#!/usr/bin/env python3
+import sys
+import pandas
+
+out = sys.argv[sys.argv.index("--output-csv") + 1]
+pandas.DataFrame([
+    {"peptide": "PEPTIDEA", "allele": "HLA-A*02:01", "affinity": 50.0, "score": 0.9, "percentile_rank": 0.1},
+    {"peptide": "PEPTIDEA", "allele": "HLA-B*07:02", "affinity": 500.0, "score": 0.1, "percentile_rank": 5.0},
+    {"peptide": "PEPTIDEB", "allele": "HLA-A*02:01", "affinity": 1000.0, "score": 0.2, "percentile_rank": 10.0},
+    {"peptide": "PEPTIDEB", "allele": "HLA-B*07:02", "affinity": 30.0, "score": 0.8, "percentile_rank": 0.2},
+]).to_csv(out, index=False)
+""")
+    fake_mhctools.chmod(0o755)
+    out = tmp_path / "benchmark.with_external.csv"
+
+    status = eval_command.run_argv([
+        "paper-figures",
+        "mhctools-predictions",
+        "--input", str(benchmark),
+        "--out", str(out),
+        "--mhctools-command", str(fake_mhctools),
+        "--predictor", "fake:netmhcpan4.2.ba:affinity",
+    ])
+
+    assert status == 0
+    result = pandas.read_csv(out)
+    assert result["netmhcpan4.2.ba"].tolist() == [50.0, 30.0]
+    assert result["netmhcpan4.2.ba_best_allele"].tolist() == [
+        "HLA-A*02:01", "HLA-B*07:02"]
 
 
 def test_eval_paper_figures_run_dispatches_pipeline(tmp_path, monkeypatch):

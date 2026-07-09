@@ -24,6 +24,9 @@ available:
   ``mhcflurry paper-figures``.
 * ``mhcflurry eval paper-figures score-predictions`` derives reusable AUC/PPV
   score tables from saved benchmark prediction tables.
+* ``mhcflurry eval paper-figures mhctools-predictions`` optionally shells out
+  to the ``mhctools`` command to add external-predictor columns to a canonical
+  saved benchmark prediction table.
 * ``mhcflurry eval paper-figures run`` runs compare-models, paper-figures, and
   plot-model-comparison as one local evaluation/figure pipeline.
 
@@ -34,7 +37,15 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
+import shlex
+import subprocess
 import sys
+import tempfile
+
+import pandas
+
+from ..common import normalize_allele_name
 
 
 def make_parser(prog="mhcflurry eval"):
@@ -81,6 +92,11 @@ def make_parser(prog="mhcflurry eval"):
         help="Derive reusable score tables from saved predictions.",
         add_help=False,
     )
+    paper_sub.add_parser(
+        "mhctools-predictions",
+        help="Add optional mhctools external-predictor columns.",
+        add_help=False,
+    )
     return parser
 
 
@@ -124,6 +140,8 @@ def format_help(prog="mhcflurry eval"):
         "  paper-figures render    Render paper figures from saved inputs.",
         "  paper-figures score-predictions",
         "                          Derive score tables from saved predictions.",
+        "  paper-figures mhctools-predictions",
+        "                          Add optional mhctools predictor columns.",
         "  paper-figures run       Compare, render paper figures, and write PDFs.",
         "",
         "Compatibility:",
@@ -155,6 +173,10 @@ def _run_paper_figures(argv, prog):
         return _run_score_predictions(
             _make_score_predictions_parser(
                 "%s score-predictions" % prog).parse_args(argv[1:]))
+    if subcommand == "mhctools-predictions":
+        return _run_mhctools_predictions(
+            _make_mhctools_predictions_parser(
+                "%s mhctools-predictions" % prog).parse_args(argv[1:]))
     if subcommand == "run":
         return _run_paper_figures_pipeline(
             _make_paper_figures_run_parser("%s run" % prog).parse_args(
@@ -174,6 +196,7 @@ def _make_paper_figures_parser(prog):
     sub = paper_parser.add_subparsers(dest="paper_figures_subcommand", required=True)
     sub.add_parser("render", add_help=False)
     sub.add_parser("score-predictions", add_help=False)
+    sub.add_parser("mhctools-predictions", add_help=False)
     sub.add_parser("run", add_help=False)
     return paper_parser
 
@@ -188,10 +211,13 @@ def _format_paper_figures_help(prog):
         "  render  Render figures from saved comparison/scores/prediction inputs.",
         "  score-predictions",
         "          Derive reusable score tables from saved predictions.",
+        "  mhctools-predictions",
+        "          Add external predictor columns by shelling out to mhctools.",
         "  run     Run compare-models, render paper figures, and write PDFs.",
         "",
-        "Use '%s render --help', '%s score-predictions --help', or "
-        "'%s run --help' for arguments." % (prog, prog, prog),
+        "Use '%s render --help', '%s score-predictions --help', "
+        "'%s mhctools-predictions --help', or '%s run --help' for arguments." % (
+            prog, prog, prog, prog),
     ])
 
 
@@ -275,6 +301,191 @@ def _run_score_predictions(args):
     out = os.path.abspath(args.out)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     scores.to_csv(out, index=False)
+    print("Wrote: %s" % out)
+    return 0
+
+
+def _make_mhctools_predictions_parser(prog):
+    parser = argparse.ArgumentParser(
+        prog=prog,
+        description=(
+            "Add external predictor columns to a canonical benchmark "
+            "prediction table by shelling out to the optional mhctools command. "
+            "This keeps mhctools outside MHCflurry's package dependencies while "
+            "still providing a maintained one-command adapter for release "
+            "figure inputs."
+        ),
+    )
+    parser.add_argument(
+        "--input",
+        required=True,
+        help="Canonical benchmark prediction table (CSV or CSV.BZ2).",
+    )
+    parser.add_argument(
+        "--out",
+        required=True,
+        help="Output benchmark prediction table with added predictor columns.",
+    )
+    parser.add_argument(
+        "--predictor",
+        action="append",
+        required=True,
+        metavar="MHC_TOOLS_NAME:OUTPUT_COLUMN:FIELD",
+        help=(
+            "Predictor spec. FIELD is one of score, affinity, or "
+            "percentile_rank. Example: "
+            "netmhcpan42-ba:netmhcpan4.2.ba:affinity. May be repeated."
+        ),
+    )
+    parser.add_argument(
+        "--mhctools-command",
+        default="mhctools",
+        help=(
+            "mhctools executable or command prefix. Defaults to %(default)s. "
+            "This command is executed as a subprocess and is not imported."
+        ),
+    )
+    parser.add_argument(
+        "--peptide-column",
+        default="peptide",
+        help="Input peptide column. Default: %(default)s.",
+    )
+    parser.add_argument(
+        "--alleles-column",
+        help=(
+            "Input allele/genotype column. Defaults to hla if present, else "
+            "allele."
+        ),
+    )
+    parser.add_argument(
+        "--keep-raw-dir",
+        help="Optional directory for raw per-genotype mhctools CSV outputs.",
+    )
+    return parser
+
+
+def _parse_mhctools_predictor_spec(spec):
+    parts = spec.split(":")
+    if len(parts) != 3:
+        raise ValueError(
+            "--predictor must be MHC_TOOLS_NAME:OUTPUT_COLUMN:FIELD, got %r" %
+            spec)
+    predictor_name, output_column, field = [part.strip() for part in parts]
+    if not predictor_name or not output_column:
+        raise ValueError("Empty predictor name or output column in %r" % spec)
+    if field not in ("score", "affinity", "percentile_rank"):
+        raise ValueError(
+            "FIELD must be score, affinity, or percentile_rank in %r" % spec)
+    return predictor_name, output_column, field
+
+
+def _split_benchmark_alleles(value):
+    alleles = [
+        item for item in re.split(r"[,\s]+", str(value).strip())
+        if item
+    ]
+    normalized = []
+    for allele in alleles:
+        normalized.append(
+            normalize_allele_name(allele, raise_on_error=False) or allele)
+    return normalized
+
+
+def _best_mhctools_rows(raw_df, value_field):
+    required = {"peptide", "allele", value_field}
+    missing = required.difference(raw_df.columns)
+    if missing:
+        raise ValueError(
+            "mhctools output missing required columns for %s: %s" % (
+                value_field, ", ".join(sorted(missing))))
+    df = raw_df[["peptide", "allele", value_field]].copy()
+    df[value_field] = pandas.to_numeric(df[value_field], errors="coerce")
+    df = df.dropna(subset=[value_field])
+    ascending = value_field in ("affinity", "percentile_rank")
+    df = df.sort_values(
+        ["peptide", value_field],
+        ascending=[True, ascending],
+        kind="mergesort")
+    return df.drop_duplicates("peptide", keep="first")
+
+
+def _run_mhctools_for_group(
+        mhctools_command, predictor_name, alleles, peptides, out_csv):
+    with tempfile.NamedTemporaryFile("w", suffix=".peptides", delete=False) as fd:
+        peptide_file = fd.name
+        for peptide in peptides:
+            fd.write("%s\n" % peptide)
+    try:
+        command = shlex.split(mhctools_command) + [
+            "--mhc-predictor", predictor_name,
+            "--mhc-alleles", ",".join(alleles),
+            "--input-peptides-file", peptide_file,
+            "--output-csv", out_csv,
+        ]
+        subprocess.run(command, check=True)
+    finally:
+        try:
+            os.unlink(peptide_file)
+        except FileNotFoundError:
+            pass
+
+
+def _run_mhctools_predictions(args):
+    predictor_specs = [
+        _parse_mhctools_predictor_spec(spec)
+        for spec in args.predictor
+    ]
+    benchmark = pandas.read_csv(args.input)
+    allele_column = args.alleles_column
+    if allele_column is None:
+        allele_column = "hla" if "hla" in benchmark.columns else "allele"
+    for column in [args.peptide_column, allele_column]:
+        if column not in benchmark.columns:
+            raise ValueError("Input table lacks required column: %s" % column)
+
+    raw_dir = args.keep_raw_dir
+    if raw_dir:
+        os.makedirs(raw_dir, exist_ok=True)
+    output = benchmark.copy()
+
+    grouped = list(output.groupby(allele_column, sort=False))
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        for predictor_name, output_column, value_field in predictor_specs:
+            best_values = pandas.Series(index=output.index, dtype=float)
+            best_alleles = pandas.Series(index=output.index, dtype=object)
+            for group_num, (allele_value, group) in enumerate(grouped):
+                alleles = _split_benchmark_alleles(allele_value)
+                if not alleles:
+                    continue
+                peptides = sorted(group[args.peptide_column].dropna().unique())
+                if not peptides:
+                    continue
+                raw_csv = os.path.join(
+                    raw_dir or tmp_dir,
+                    "%s.%04d.csv" % (output_column, group_num))
+                print(
+                    "Running mhctools predictor %s for %d peptides and %d alleles" %
+                    (predictor_name, len(peptides), len(alleles)))
+                _run_mhctools_for_group(
+                    args.mhctools_command,
+                    predictor_name,
+                    alleles,
+                    peptides,
+                    raw_csv)
+                raw = pandas.read_csv(raw_csv)
+                best = _best_mhctools_rows(raw, value_field).set_index(
+                    "peptide")
+                peptide_series = group[args.peptide_column]
+                best_values.loc[group.index] = peptide_series.map(
+                    best[value_field])
+                best_alleles.loc[group.index] = peptide_series.map(
+                    best["allele"])
+            output[output_column] = best_values
+            output["%s_best_allele" % output_column] = best_alleles
+
+    out = os.path.abspath(args.out)
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    output.to_csv(out, index=False)
     print("Wrote: %s" % out)
     return 0
 

@@ -144,18 +144,29 @@ prepare those local inputs during the remote training window, pass
 `--paper-figures-prepare-command "..."`; the command runs in the background on
 the control machine and must write to the directory/file paths also supplied via
 `--paper-figures-scores-dir`, `--paper-figures-multiallelic-predictions`, or
-`--paper-figures-monoallelic-predictions`.
+`--paper-figures-monoallelic-predictions`. If you use `mhctools` for external
+predictors, call it through
+`mhcflurry eval paper-figures mhctools-predictions`: `mhctools` depends on
+MHCflurry, so MHCflurry does not import it or list it as a dependency.
 
 Example:
 
 ```bash
+PAPER_BENCHMARK="$PWD/notebooks/2023-retraining/artifacts/benchmark.multiallelic.csv.bz2"
+
 mhcflurry train pan-allele-release \
     --run-dir runs/2.3.0 \
     --release 2.3.0 \
     --backend brev-provision \
     --paper-figures-scores-dir "$PWD/runs/2.3.0/external_predictions" \
+    --paper-figures-external-baselines "netmhcpan4.2.ba,netmhcpan4.2.el,mixmhcpred" \
     --paper-figures-prepare-command \
-        "path/to/run_external_predictors.sh --out '$PWD/runs/2.3.0/external_predictions'"
+        "mhcflurry eval paper-figures mhctools-predictions \
+            --input '$PAPER_BENCHMARK' \
+            --out '$PWD/runs/2.3.0/external_predictions/benchmark.multiallelic.csv.bz2' \
+            --predictor netmhcpan42-ba:netmhcpan4.2.ba:affinity \
+            --predictor netmhcpan42-el:netmhcpan4.2.el:score \
+            --predictor mixmhcpred:mixmhcpred:score"
 ```
 
 The same release workflow is also available from the unified CLI:

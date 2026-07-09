@@ -116,6 +116,11 @@ implementation. Deployment is opt-in through `--deploy-mode`.
   those tools are installed locally but not on the Brev image. The command
   should write to the paths also supplied via `--paper-figures-scores-dir` or
   `--paper-figures-*-predictions`.
+- **`mhcflurry eval paper-figures mhctools-predictions`** — Optional adapter
+  for the previous hook. It shells out to the local `mhctools` executable and
+  joins the long mhctools output back into the canonical wide benchmark table.
+  This avoids a package dependency cycle: `mhctools` depends on MHCflurry, so
+  MHCflurry does not import or require it.
 - **`mhcflurry eval paper-figures run`** — Local one-command composition of
   `compare-models`, `paper-figures render`, and `plot-comparison`. This is for
   already-trained models; remote training and cleanup still belong to the

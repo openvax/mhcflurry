@@ -87,7 +87,9 @@ Evaluation:
   --paper-figures-scores-dir / --paper-figures-*-predictions. When local paper
   inputs are requested during a full Brev run, MHCflurry eval still runs on the
   Brev GPU machine, then the paper-figure render runs locally after sync so
-  locally licensed external tools do not need to be installed on Brev.
+  locally licensed external tools do not need to be installed on Brev. For
+  NetMHCpan/MixMHCpred via mhctools, use the optional subprocess adapter:
+      mhcflurry eval paper-figures mhctools-predictions
 
 Deployment:
   Deployment is opt-in. By default --deploy-mode is none and the final
