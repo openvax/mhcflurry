@@ -159,6 +159,27 @@ def test_release_workflow_brev_prepare_uses_remote_postprocess(tmp_path):
 
 
 def test_release_workflow_brev_provider_aliases(tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run-default"),
+            "--release", "2.3.0",
+            "--backend", "brev-provision",
+            "--brev-instance", "mhcflurry-dry-run-default",
+            "--skip-train",
+            "--skip-eval",
+            "--skip-plots",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    default_output = result.stdout + result.stderr
+    assert "Brev provider: gcp" in default_output
+    assert "Brev type:     a2-highgpu-4g:nvidia-tesla-a100:4" in default_output
+
     cases = [
         ("auto", "Brev type:     runplz auto-select"),
         ("gcp", "Brev type:     a2-highgpu-4g:nvidia-tesla-a100:4"),

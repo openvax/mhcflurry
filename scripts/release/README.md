@@ -54,10 +54,10 @@ Supported backends are:
   plots, and generated configs. Use
   `--brev-sync-mode full` only when you deliberately need every unselected
   candidate model and intermediate CSV for a deep post-mortem.
-  Provisioned full-training runs default to runplz auto-selection over current
-  Brev inventory, constrained by the launcher resource requests. Use
-  `--brev-provider gcp` to pin the old 4xA100 GCP shape, `--brev-provider denvr`
-  or `--brev-provider denvr-80gb` for the common Denvr 8xA100 shapes, or
+  Provisioned full-training runs default to the known-good 4xA100 GCP shape
+  (`a2-highgpu-4g:nvidia-tesla-a100:4`). Use `--brev-provider auto` to let
+  runplz select from current Brev inventory, `--brev-provider denvr` or
+  `--brev-provider denvr-80gb` for the common Denvr 8xA100 shapes, or
   `--brev-instance-type TYPE` for any exact Brev type. For auto-selection,
   `--brev-exclude-providers PREFIXES` can remove provider/type prefixes such as
   `oci` from the candidate list.
