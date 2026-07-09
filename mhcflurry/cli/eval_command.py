@@ -24,8 +24,8 @@ available:
   ``mhcflurry paper-figures``.
 * ``mhcflurry eval paper-figures score-predictions`` derives reusable AUC/PPV
   score tables from saved benchmark prediction tables.
-* ``mhcflurry eval paper-figures mhctools-predictions`` optionally shells out
-  to the ``mhctools`` command to add external-predictor columns to a canonical
+* ``mhcflurry eval paper-figures external-predictors`` optionally shells out to
+  external-predictor runners such as ``mhctools`` to add columns to a canonical
   saved benchmark prediction table.
 * ``mhcflurry eval paper-figures run`` runs compare-models, paper-figures, and
   plot-model-comparison as one local evaluation/figure pipeline.
@@ -93,8 +93,8 @@ def make_parser(prog="mhcflurry eval"):
         add_help=False,
     )
     paper_sub.add_parser(
-        "mhctools-predictions",
-        help="Add optional mhctools external-predictor columns.",
+        "external-predictors",
+        help="Add optional external-predictor columns.",
         add_help=False,
     )
     return parser
@@ -140,8 +140,8 @@ def format_help(prog="mhcflurry eval"):
         "  paper-figures render    Render paper figures from saved inputs.",
         "  paper-figures score-predictions",
         "                          Derive score tables from saved predictions.",
-        "  paper-figures mhctools-predictions",
-        "                          Add optional mhctools predictor columns.",
+        "  paper-figures external-predictors",
+        "                          Add optional external predictor columns.",
         "  paper-figures run       Compare, render paper figures, and write PDFs.",
         "",
         "Compatibility:",
@@ -173,10 +173,10 @@ def _run_paper_figures(argv, prog):
         return _run_score_predictions(
             _make_score_predictions_parser(
                 "%s score-predictions" % prog).parse_args(argv[1:]))
-    if subcommand == "mhctools-predictions":
-        return _run_mhctools_predictions(
-            _make_mhctools_predictions_parser(
-                "%s mhctools-predictions" % prog).parse_args(argv[1:]))
+    if subcommand == "external-predictors":
+        return _run_external_predictors(
+            _make_external_predictors_parser(
+                "%s external-predictors" % prog).parse_args(argv[1:]))
     if subcommand == "run":
         return _run_paper_figures_pipeline(
             _make_paper_figures_run_parser("%s run" % prog).parse_args(
@@ -196,7 +196,7 @@ def _make_paper_figures_parser(prog):
     sub = paper_parser.add_subparsers(dest="paper_figures_subcommand", required=True)
     sub.add_parser("render", add_help=False)
     sub.add_parser("score-predictions", add_help=False)
-    sub.add_parser("mhctools-predictions", add_help=False)
+    sub.add_parser("external-predictors", add_help=False)
     sub.add_parser("run", add_help=False)
     return paper_parser
 
@@ -211,12 +211,12 @@ def _format_paper_figures_help(prog):
         "  render  Render figures from saved comparison/scores/prediction inputs.",
         "  score-predictions",
         "          Derive reusable score tables from saved predictions.",
-        "  mhctools-predictions",
-        "          Add external predictor columns by shelling out to mhctools.",
+        "  external-predictors",
+        "          Add external predictor columns through an optional runner.",
         "  run     Run compare-models, render paper figures, and write PDFs.",
         "",
         "Use '%s render --help', '%s score-predictions --help', "
-        "'%s mhctools-predictions --help', or '%s run --help' for arguments." % (
+        "'%s external-predictors --help', or '%s run --help' for arguments." % (
             prog, prog, prog, prog),
     ])
 
@@ -305,15 +305,16 @@ def _run_score_predictions(args):
     return 0
 
 
-def _make_mhctools_predictions_parser(prog):
+def _make_external_predictors_parser(prog):
     parser = argparse.ArgumentParser(
         prog=prog,
         description=(
             "Add external predictor columns to a canonical benchmark "
-            "prediction table by shelling out to the optional mhctools command. "
-            "This keeps mhctools outside MHCflurry's package dependencies while "
-            "still providing a maintained one-command adapter for release "
-            "figure inputs."
+            "prediction table by shelling out to optional local predictor "
+            "runners. The initial runner is mhctools, which keeps NetMHCpan/"
+            "MixMHCpred execution outside MHCflurry's package dependencies "
+            "while still providing a maintained one-command adapter for "
+            "release figure inputs."
         ),
     )
     parser.add_argument(
@@ -330,11 +331,20 @@ def _make_mhctools_predictions_parser(prog):
         "--predictor",
         action="append",
         required=True,
-        metavar="MHC_TOOLS_NAME:OUTPUT_COLUMN:FIELD",
+        metavar="RUNNER_PREDICTOR:OUTPUT_COLUMN:FIELD",
         help=(
-            "Predictor spec. FIELD is one of score, affinity, or "
+            "External predictor spec. FIELD is one of score, affinity, or "
             "percentile_rank. Example: "
             "netmhcpan42-ba:netmhcpan4.2.ba:affinity. May be repeated."
+        ),
+    )
+    parser.add_argument(
+        "--runner",
+        choices=("mhctools",),
+        default="mhctools",
+        help=(
+            "External predictor runner. Only %(default)s is currently "
+            "implemented."
         ),
     )
     parser.add_argument(
@@ -364,11 +374,11 @@ def _make_mhctools_predictions_parser(prog):
     return parser
 
 
-def _parse_mhctools_predictor_spec(spec):
+def _parse_external_predictor_spec(spec):
     parts = spec.split(":")
     if len(parts) != 3:
         raise ValueError(
-            "--predictor must be MHC_TOOLS_NAME:OUTPUT_COLUMN:FIELD, got %r" %
+            "--predictor must be RUNNER_PREDICTOR:OUTPUT_COLUMN:FIELD, got %r" %
             spec)
     predictor_name, output_column, field = [part.strip() for part in parts]
     if not predictor_name or not output_column:
@@ -391,7 +401,7 @@ def _split_benchmark_alleles(value):
     return normalized
 
 
-def _best_mhctools_rows(raw_df, value_field):
+def _best_external_predictor_rows(raw_df, value_field):
     required = {"peptide", "allele", value_field}
     missing = required.difference(raw_df.columns)
     if missing:
@@ -430,9 +440,11 @@ def _run_mhctools_for_group(
             pass
 
 
-def _run_mhctools_predictions(args):
+def _run_external_predictors(args):
+    if args.runner != "mhctools":
+        raise ValueError("Unsupported external predictor runner: %s" % args.runner)
     predictor_specs = [
-        _parse_mhctools_predictor_spec(spec)
+        _parse_external_predictor_spec(spec)
         for spec in args.predictor
     ]
     benchmark = pandas.read_csv(args.input)
@@ -464,8 +476,8 @@ def _run_mhctools_predictions(args):
                     raw_dir or tmp_dir,
                     "%s.%04d.csv" % (output_column, group_num))
                 print(
-                    "Running mhctools predictor %s for %d peptides and %d alleles" %
-                    (predictor_name, len(peptides), len(alleles)))
+                    "Running %s external predictor %s for %d peptides and %d alleles" %
+                    (args.runner, predictor_name, len(peptides), len(alleles)))
                 _run_mhctools_for_group(
                     args.mhctools_command,
                     predictor_name,
@@ -473,7 +485,7 @@ def _run_mhctools_predictions(args):
                     peptides,
                     raw_csv)
                 raw = pandas.read_csv(raw_csv)
-                best = _best_mhctools_rows(raw, value_field).set_index(
+                best = _best_external_predictor_rows(raw, value_field).set_index(
                     "peptide")
                 peptide_series = group[args.peptide_column]
                 best_values.loc[group.index] = peptide_series.map(

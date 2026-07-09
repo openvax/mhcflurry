@@ -135,7 +135,7 @@ def test_eval_help_runs(capsys):
     cli_main.main(["eval", "--help"])
     captured = capsys.readouterr().out
     assert "paper-figures score-predictions" in captured
-    assert "paper-figures mhctools-predictions" in captured
+    assert "paper-figures external-predictors" in captured
     assert "paper-figures run" in captured
     assert "Compatibility:" in captured
 
@@ -218,7 +218,7 @@ def test_eval_paper_figures_score_predictions_writes_cache(tmp_path):
     assert "percent_change_auc_ba" in scores.columns
 
 
-def test_eval_paper_figures_mhctools_predictions_adds_columns(tmp_path):
+def test_eval_paper_figures_external_predictors_adds_columns(tmp_path):
     benchmark = tmp_path / "benchmark.csv"
     pandas.DataFrame([
         {
@@ -252,7 +252,7 @@ pandas.DataFrame([
 
     status = eval_command.run_argv([
         "paper-figures",
-        "mhctools-predictions",
+        "external-predictors",
         "--input", str(benchmark),
         "--out", str(out),
         "--mhctools-command", str(fake_mhctools),

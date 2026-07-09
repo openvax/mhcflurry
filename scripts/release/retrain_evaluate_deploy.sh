@@ -89,7 +89,7 @@ Evaluation:
   Brev GPU machine, then the paper-figure render runs locally after sync so
   locally licensed external tools do not need to be installed on Brev. For
   NetMHCpan/MixMHCpred via mhctools, use the optional subprocess adapter:
-      mhcflurry eval paper-figures mhctools-predictions
+      mhcflurry eval paper-figures external-predictors
 
 Deployment:
   Deployment is opt-in. By default --deploy-mode is none and the final

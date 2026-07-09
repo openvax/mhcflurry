@@ -146,7 +146,7 @@ the control machine and must write to the directory/file paths also supplied via
 `--paper-figures-scores-dir`, `--paper-figures-multiallelic-predictions`, or
 `--paper-figures-monoallelic-predictions`. If you use `mhctools` for external
 predictors, call it through
-`mhcflurry eval paper-figures mhctools-predictions`: `mhctools` depends on
+`mhcflurry eval paper-figures external-predictors`: `mhctools` depends on
 MHCflurry, so MHCflurry does not import it or list it as a dependency.
 
 Example:
@@ -161,7 +161,7 @@ mhcflurry train pan-allele-release \
     --paper-figures-scores-dir "$PWD/runs/2.3.0/external_predictions" \
     --paper-figures-external-baselines "netmhcpan4.2.ba,netmhcpan4.2.el,mixmhcpred" \
     --paper-figures-prepare-command \
-        "mhcflurry eval paper-figures mhctools-predictions \
+        "mhcflurry eval paper-figures external-predictors \
             --input '$PAPER_BENCHMARK' \
             --out '$PWD/runs/2.3.0/external_predictions/benchmark.multiallelic.csv.bz2' \
             --predictor netmhcpan42-ba:netmhcpan4.2.ba:affinity \

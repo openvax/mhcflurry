@@ -151,7 +151,7 @@ be cached and reused:
 |---|---|---|---|---|
 | Metrics | `mhcflurry eval compare-models` | A candidate run and a baseline run or public release | `eval_comparison/` CSV/JSON metrics, `release_summary.csv`, `release_summary.md` | Produce reusable evaluation data without importing matplotlib. |
 | Diagnostics | `mhcflurry eval plot-comparison` | `eval_comparison/` | `eval_comparison/plots/`, optional `model_comparison_figures.pdf` | Render release-review ROC/PR/scatter/delta plots. |
-| External predictor columns | `mhcflurry eval paper-figures mhctools-predictions` | Canonical benchmark table plus an optional local `mhctools` install | Benchmark table with added NetMHCpan/MixMHCpred-style columns | Run licensed external predictors locally without adding `mhctools` as an MHCflurry dependency. |
+| External predictor columns | `mhcflurry eval paper-figures external-predictors` | Canonical benchmark table plus an optional local external-predictor runner such as `mhctools` | Benchmark table with added NetMHCpan/MixMHCpred-style columns | Run licensed external predictors locally without adding them as MHCflurry dependencies. |
 | Score cache | `mhcflurry eval paper-figures score-predictions` | Saved benchmark prediction table | `accuracy_scores.multiallelic.csv` or `accuracy_scores.monoallelic.csv` | Cache per-sample/per-allele AUC and PPV tables for repeated figure runs. |
 | Paper figures | `mhcflurry eval paper-figures render` | `eval_comparison/`, score cache, saved prediction tables, optional metadata/artwork | SVG/PDF/PNG panels, `paper_figures.pdf`, `manifest.csv`, `missing_inputs.md` | Render publication-style panels and report unavailable optional inputs. |
 | Local composition | `mhcflurry eval paper-figures run` | Candidate/baseline model directories | A fresh comparison plus diagnostic and paper figures | One-command local eval-to-figures path for already-trained models. |
@@ -170,9 +170,10 @@ training job is active. Use that hook for locally installed external predictors;
 the command should write to the same `--paper-figures-scores-dir` or saved
 prediction paths passed to the release workflow.
 
-The maintained `mhctools-predictions` adapter invokes the optional `mhctools`
-executable as a subprocess. `mhctools` depends on MHCflurry, so it is not an
-MHCflurry package dependency and is never imported by the core library.
+The maintained `external-predictors` adapter invokes optional runner
+executables such as `mhctools` as subprocesses. `mhctools` depends on
+MHCflurry, so it is not an MHCflurry package dependency and is never imported by
+the core library.
 
 ```{eval-rst}
 .. _ref-mhcflurry-compare-models:
