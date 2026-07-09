@@ -40,8 +40,10 @@ runplz brev \
     scripts/training/launch_pan_allele_training_remote.py
 ```
 
-For the full release gate (training, comparison, plots, and deployment
-validation), prefer `scripts/release/retrain_evaluate_deploy.sh`.
+For the full release training/evaluation/plot workflow, prefer
+`mhcflurry train pan-allele-release`. It delegates to
+`scripts/release/retrain_evaluate_deploy.sh`, which remains the maintained
+implementation. Deployment is opt-in through `--deploy-mode`.
 
 ## Hyperparameter generation (consumed by the release scripts)
 
@@ -106,7 +108,7 @@ validation), prefer `scripts/release/retrain_evaluate_deploy.sh`.
 - **`mhcflurry eval paper-figures run`** — Local one-command composition of
   `compare-models`, `paper-figures render`, and `plot-comparison`. This is for
   already-trained models; remote training and cleanup still belong to the
-  release wrapper.
+  release wrapper exposed as `mhcflurry train pan-allele-release`.
 - **`plot_minibatch_sweep.py`** — Stylized plots from a `sweep_summary.csv`
   (gradient-color dots by mb, lin-lin + log-log only, adjustText
   de-overlap). Invoked by the sweep wrapper after completion.

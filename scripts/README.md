@@ -54,7 +54,10 @@ training and model-asset deployment were living outside this maintained
 surface. `scripts/training/launch_pan_allele_training_remote.py` is now the
 reusable remote/cloud pan-allele training entry point, and
 `scripts/release/retrain_evaluate_deploy.sh` is the single maintained
-workflow for training, evaluating, plotting, and deployment validation.
+workflow for training, evaluating, plotting, and optional deployment.
+The user-facing entry point for the same workflow is
+`mhcflurry train pan-allele-release`; it delegates to the release script so
+the shell orchestration remains the single implementation.
 
 ## What used to live here (deleted)
 

@@ -283,9 +283,17 @@ $ mhcflurry eval paper-figures run \
 
 That command is intentionally an evaluation command, not a training or remote
 provisioning command. For full release retraining on a remote GPU machine,
-including synchronization, cleanup, evaluation, plots, and packaging checks, see
-`scripts/release/retrain_evaluate_deploy.sh` and
-`scripts/release/README.md`.
+including synchronization, cleanup, evaluation, and plots, use:
+
+```shell
+$ mhcflurry train pan-allele-release \
+    --run-dir results/release-run/ \
+    --release 2.3.0 \
+    --backend brev-provision
+```
+
+Deployment is opt-in for that workflow. Add `--deploy-mode dry-run`, `draft`,
+or `publish` only when you want to package or upload model artifacts.
 
 
 ## Environment variables

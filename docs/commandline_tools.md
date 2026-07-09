@@ -16,6 +16,12 @@ The evaluation commands new in 2.3.0 are grouped under
 `mhcflurry plot-model-comparison`, and `mhcflurry paper-figures`) remain
 available as compatibility shortcuts.
 
+Release-training orchestration is grouped under `mhcflurry train`. The
+`pan-allele-release` workflow is a source-checkout command that delegates to
+the maintained release script, so it can provision remote machines, run
+evaluation/plots remotely, sync artifacts back, and optionally deploy model
+archives without duplicating orchestration logic in Python.
+
 ## Prediction and data
 
 ```{eval-rst}
@@ -47,6 +53,11 @@ available as compatibility shortcuts.
 ## Class I training and selection
 
 ```{eval-rst}
+.. _ref-mhcflurry-train:
+
+.. autoprogram:: mhcflurry.cli.train_command:parser
+    :prog: mhcflurry train
+
 .. _ref-mhcflurry-class1-train-allele-specific-models:
 
 .. autoprogram:: mhcflurry.cli.train_allele_specific_models_command:parser
@@ -123,6 +134,19 @@ use `mhcflurry eval paper-figures render` for the publication-style panels.
 `paper-figures run` composes the local MHCflurry comparison and rendering steps;
 external predictor binaries such as NetMHCpan and MixMHCpred still need to
 produce saved prediction columns before they enter this pipeline.
+
+For release-style training plus remote evaluation/plotting, use the training
+namespace:
+
+```shell
+mhcflurry train pan-allele-release \
+    --run-dir results/release-run \
+    --release 2.3.0 \
+    --backend brev-provision
+```
+
+Deployment is not part of the default path. Add `--deploy-mode dry-run`,
+`draft`, or `publish` only when you want to package/upload model artifacts.
 
 ## Pseudosequence registry helper
 

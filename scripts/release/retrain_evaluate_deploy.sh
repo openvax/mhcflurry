@@ -42,8 +42,8 @@ Usage:
       [--paper-figures-multiallelic-predictions FILE] \
       [--paper-figures-monoallelic-predictions FILE] \
       [--brev-instance-type TYPE] \
-      [--skip-train] [--skip-eval] [--skip-plots] [--skip-deploy] \
-      [--deploy-mode dry-run|draft|publish]
+      [--skip-train] [--skip-eval] [--skip-plots] \
+      [--deploy-mode none|dry-run|draft|publish]
 
 Backends:
   local          Run scripts/training/pan_allele_release_full.sh here.
@@ -79,8 +79,11 @@ Evaluation:
   RUN_DIR/eval_comparison/plots/paper_figures/.
 
 Deployment:
-  The final step calls deploy_trained_models.sh. The default deploy mode is
-  dry-run, so the script validates and prints release assets without uploading.
+  Deployment is opt-in. By default --deploy-mode is none and the final
+  deploy_trained_models.sh step is skipped. Pass --deploy-mode dry-run to
+  validate and print release assets without uploading, or pass draft / publish
+  for upload modes. The legacy --skip-deploy flag is accepted as a no-op for
+  old automation; new workflows should omit it.
 
 Logs:
   The wrapper writes per-step logs and a status table under:
@@ -1321,7 +1324,7 @@ SKIP_TRAIN=0
 SKIP_EVAL=0
 SKIP_PLOTS=0
 SKIP_DEPLOY=0
-DEPLOY_MODE=dry-run
+DEPLOY_MODE=none
 DATA_DIR=
 COMPARE_INCLUDE=affinity,processing,presentation
 PROCESSING_MODES=with_flanks,no_flank,short_flanks
@@ -1619,9 +1622,15 @@ case "$BACKEND" in
     *) die "--backend must be one of: local, brev-existing, brev-provision, ssh" ;;
 esac
 case "$DEPLOY_MODE" in
-    dry-run|draft|publish) ;;
-    *) die "--deploy-mode must be one of: dry-run, draft, publish" ;;
+    none|dry-run|draft|publish) ;;
+    *) die "--deploy-mode must be one of: none, dry-run, draft, publish" ;;
 esac
+if [ "$SKIP_DEPLOY" = "1" ]; then
+    if [ "$DEPLOY_MODE" != "none" ]; then
+        die "--skip-deploy cannot be combined with --deploy-mode $DEPLOY_MODE; deployment is opt-in, so omit --skip-deploy or use --deploy-mode none"
+    fi
+    warn "--skip-deploy is deprecated and no longer needed; deployment is opt-in."
+fi
 if [ -z "$BREV_ON_FINISH" ]; then
     case "$BACKEND" in
         brev-provision)
@@ -1865,7 +1874,7 @@ else
     note "Skipping plots."
 fi
 
-if [ "$SKIP_DEPLOY" != "1" ]; then
+if [ "$DEPLOY_MODE" != "none" ]; then
     run_logged_step deploy_trained_models \
         "$SCRIPT_DIR/deploy_trained_models.sh" \
         --run-dir "$RUN_DIR" \
@@ -1873,5 +1882,5 @@ if [ "$SKIP_DEPLOY" != "1" ]; then
         --github-release "$GITHUB_RELEASE" \
         --mode "$DEPLOY_MODE"
 else
-    note "Skipping deploy step."
+    note "Skipping deploy step. Pass --deploy-mode dry-run, draft, or publish to opt in."
 fi

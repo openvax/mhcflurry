@@ -22,6 +22,7 @@ import argparse
 import importlib
 import json
 import os
+import subprocess
 import sys
 import types
 
@@ -34,15 +35,75 @@ from mhcflurry.cli import compare_models, main as cli_main
 from mhcflurry.cli import eval_command
 from mhcflurry.cli import paper_figures
 from mhcflurry.cli import plot_model_comparison
+from mhcflurry.cli import train_command
 
 
 def test_top_level_parser_lists_subcommands():
     parser = cli_main.build_parser()
     help_text = parser.format_help()
+    assert "train" in help_text
     assert "eval" in help_text
     assert "compare-models" in help_text
     assert "plot-model-comparison" in help_text
     assert "paper-figures" in help_text
+
+
+def test_train_help_runs(capsys):
+    assert cli_main.main(["train", "--help"]) == 0
+    captured = capsys.readouterr().out
+    assert "pan-allele-release" in captured
+    assert "Deployment is opt-in" in captured
+
+
+def test_train_pan_allele_release_delegates(monkeypatch, tmp_path):
+    script = tmp_path / "retrain_evaluate_deploy.sh"
+    script.write_text("#!/usr/bin/env bash\n")
+    calls = []
+
+    def fake_call(argv):
+        calls.append(argv)
+        return 17
+
+    monkeypatch.setattr(train_command, "_workflow_script_path", lambda: script)
+    monkeypatch.setattr(train_command.subprocess, "call", fake_call)
+
+    status = cli_main.main([
+        "train",
+        "pan-allele-release",
+        "--run-dir", "runs/2.3.0",
+        "--release", "2.3.0",
+    ])
+
+    assert status == 17
+    assert calls == [[
+        "bash",
+        str(script),
+        "--run-dir", "runs/2.3.0",
+        "--release", "2.3.0",
+    ]]
+
+
+def test_release_workflow_deploy_is_opt_in_by_default(tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "local",
+            "--skip-train",
+            "--skip-eval",
+            "--skip-plots",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert "Skipping deploy step" in output
+    assert "deploy_trained_models" not in output
 
 
 def test_eval_help_runs(capsys):

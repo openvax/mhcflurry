@@ -109,42 +109,40 @@ committed as the workflow.
 5. Resolve the processing variant naming: either train a real
    `models.selected.with_flanks` variant again or document and test that
    `short_flanks` is the canonical with-flank presentation input for 2.3.x.
-6. Make the release gate one command:
-   `scripts/release/retrain_evaluate_deploy.sh` trains, evaluates, plots, and
-   runs deployment validation. It supports local execution, existing
-   Brev/runplz capacity, and SSH-backed remote machines.
+6. Make release retraining one command:
+   `mhcflurry train pan-allele-release` trains, evaluates, plots, and syncs
+   remote artifacts. It delegates to `scripts/release/retrain_evaluate_deploy.sh`,
+   which supports local execution, Brev/runplz capacity, and SSH-backed remote
+   machines. Deployment is opt-in through `--deploy-mode`.
 
 ## Current Single-Command Entry Point
 
 Local:
 
 ```bash
-scripts/release/retrain_evaluate_deploy.sh \
+mhcflurry train pan-allele-release \
     --run-dir /path/to/release-run \
     --release 2.3.0 \
-    --backend local \
-    --deploy-mode dry-run
+    --backend local
 ```
 
 Brev through existing runplz capacity:
 
 ```bash
-scripts/release/retrain_evaluate_deploy.sh \
+mhcflurry train pan-allele-release \
     --run-dir /path/to/release-run \
     --release 2.3.0 \
-    --backend brev-existing \
-    --deploy-mode dry-run
+    --backend brev-existing
 ```
 
 Generic SSH machine:
 
 ```bash
-scripts/release/retrain_evaluate_deploy.sh \
+mhcflurry train pan-allele-release \
     --run-dir /path/to/local-copy \
     --release 2.3.0 \
     --backend ssh \
     --remote user@host \
     --remote-repo /path/to/mhcflurry \
-    --remote-run-dir /path/to/remote-release-run \
-    --deploy-mode dry-run
+    --remote-run-dir /path/to/remote-release-run
 ```

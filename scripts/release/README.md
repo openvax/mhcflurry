@@ -30,8 +30,7 @@ scripts/release/retrain_evaluate_deploy.sh \
     --release 2.3.0 \
     --backend local \
     --minibatch-size 1024 \
-    --affinity-max-workers-per-gpu auto \
-    --deploy-mode dry-run
+    --affinity-max-workers-per-gpu auto
 ```
 
 Supported backends are:
@@ -61,9 +60,11 @@ Supported backends are:
   `--remote-run-dir`. Authentication comes from local `ssh` / `rsync`
   configuration, typically SSH keys or an SSH config `Host`.
 
-The script runs training, `mhcflurry eval compare-models`,
-`mhcflurry eval plot-comparison`, and deployment validation in order; each
-stage has a `--skip-*` flag for resuming. For Brev backends, the expensive
+The script runs training, `mhcflurry eval compare-models`, and
+`mhcflurry eval plot-comparison` in order; each training/evaluation/plot stage
+has a `--skip-*` flag for resuming. Deployment is opt-in: pass
+`--deploy-mode dry-run`, `draft`, or `publish` only when you want the
+model-artifact release step to run. For Brev backends, the expensive
 comparison and plot steps run on the remote GPU machine before artifact sync and
 cleanup, then the local wrapper uses the synced `eval_comparison/` outputs
 instead of repeating release-scale inference on the laptop. Per-step
@@ -128,3 +129,12 @@ PDF. Use `mhcflurry eval paper-figures score-predictions` to precompute
 workflow does not run external predictors itself; external NetMHCpan /
 MixMHCpred outputs should be generated separately and passed as numeric columns
 in those canonical prediction tables.
+
+The same release workflow is also available from the unified CLI:
+
+```bash
+mhcflurry train pan-allele-release \
+    --run-dir /path/to/release-run \
+    --release 2.3.0 \
+    --backend brev-provision
+```
