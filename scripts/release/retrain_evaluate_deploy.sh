@@ -85,9 +85,9 @@ Evaluation:
   control machine while remote training is active and should write canonical
   saved prediction tables or score caches to the path supplied through
   --paper-figures-scores-dir / --paper-figures-*-predictions. When local paper
-  inputs are requested during a full Brev run, MHCflurry eval still runs on the
-  Brev GPU machine, then the paper-figure render runs locally after sync so
-  locally licensed external tools do not need to be installed on Brev. For
+  inputs are requested during a full Brev run, the wrapper waits for those
+  inputs after training sync, stages them to the Brev machine, renders
+  paper-ready figures remotely, syncs the PDFs/plots back, then cleans up. For
   NetMHCpan/MixMHCpred via mhctools, use the optional subprocess adapter:
       mhcflurry eval paper-figures external-predictors
 
@@ -756,8 +756,10 @@ run_brev_postprocess() {
     if [ "$SKIP_EVAL" != "1" ]; then
         BREV_REMOTE_EVAL_DONE=1
     fi
-    if [ "$SKIP_PLOTS" != "1" ] && [ -d "$RUN_DIR/eval_comparison/plots" ]; then
-        BREV_REMOTE_PLOTS_DONE=1
+    if [ "$SKIP_PLOTS" != "1" ]; then
+        if [ "$DRY_RUN" = "1" ] || [ -d "$RUN_DIR/eval_comparison/plots" ]; then
+            BREV_REMOTE_PLOTS_DONE=1
+        fi
     fi
 }
 
@@ -1285,6 +1287,7 @@ run_brev_training() {
     local runplz_on_finish=leave
     local run_release_eval=0
     local run_release_plots=0
+    local run_remote_paper_postprocess=0
     if [ "$SKIP_EVAL" != "1" ]; then
         if [ -n "$DATA_DIR" ]; then
             note "Custom DATA_DIR is local to this wrapper; evaluation will run after Brev sync."
@@ -1294,7 +1297,8 @@ run_brev_training() {
     fi
     if [ "$SKIP_PLOTS" != "1" ]; then
         if paper_figure_inputs_requested; then
-            note "Paper-figure inputs are local to this wrapper; plotting will run after Brev sync."
+            note "Paper-figure inputs are local to this wrapper; plotting will run in a Brev postprocess after sync."
+            run_remote_paper_postprocess=1
         elif [ "$run_release_eval" = "1" ]; then
             run_release_plots=1
         fi
@@ -1372,6 +1376,21 @@ run_brev_training() {
     local runplz_status=$?
     set -e
 
+    if [ "$DRY_RUN" = "1" ]; then
+        if [ "$run_remote_paper_postprocess" = "1" ]; then
+            wait_paper_figures_prepare
+            run_brev_postprocess 0
+        else
+            if [ "$run_release_eval" = "1" ]; then
+                BREV_REMOTE_EVAL_DONE=1
+            fi
+            if [ "$run_release_plots" = "1" ]; then
+                BREV_REMOTE_PLOTS_DONE=1
+            fi
+        fi
+        return 0
+    fi
+
     local remote_exit
     remote_exit="$(brev_latest_remote_exit_code || true)"
     if [ "$runplz_status" -ne 0 ]; then
@@ -1398,6 +1417,19 @@ run_brev_training() {
     if [ "$run_release_plots" = "1" ] && \
             [ -d "$RUN_DIR/eval_comparison/plots" ]; then
         BREV_REMOTE_PLOTS_DONE=1
+    fi
+    if [ "$run_remote_paper_postprocess" = "1" ]; then
+        set +e
+        wait_paper_figures_prepare
+        local prepare_status=$?
+        set -e
+        if [ "$prepare_status" -ne 0 ]; then
+            warn "Paper-figure input preparation failed; applying Brev cleanup without remote paper plotting."
+            apply_brev_cleanup
+            return "$prepare_status"
+        fi
+        run_brev_postprocess 0
+        return
     fi
     apply_brev_cleanup
 }

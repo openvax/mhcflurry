@@ -131,6 +131,30 @@ def test_release_workflow_prepare_command_is_dry_run_visible(tmp_path):
     assert "mhcflurry eval plot-comparison" in output
 
 
+def test_release_workflow_brev_prepare_uses_remote_postprocess(tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "brev-provision",
+            "--brev-instance", "mhcflurry-dry-run-test",
+            "--paper-figures-scores-dir", str(tmp_path / "paper-inputs"),
+            "--paper-figures-prepare-command", "echo prepare-external-preds",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert "plotting will run in a Brev postprocess after sync" in output
+    assert "Would run Brev postprocess-only eval/plot" in output
+    assert "Using plots produced on the Brev instance" in output
+
+
 def test_eval_help_runs(capsys):
     cli_main.main(["eval", "--help"])
     captured = capsys.readouterr().out
