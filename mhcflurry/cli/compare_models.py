@@ -1270,6 +1270,28 @@ def _score_values(df, prefix, score_kind):
     raise ValueError("Unknown score kind: %s" % score_kind)
 
 
+def _score_pair_columns(score_kind):
+    if score_kind not in {
+            "presentation_score",
+            "presentation_percentile",
+            "processing_score",
+            "affinity",
+    }:
+        raise ValueError("Unknown score kind: %s" % score_kind)
+    return ("a_%s" % score_kind, "b_%s" % score_kind)
+
+
+def _shared_score_rows(scored, score_kind):
+    """Return rows where both sides have a score for ``score_kind``.
+
+    A/B release metrics are only meaningful when both sides are scored on the
+    same examples. Predictors run with ``throw=False`` can emit NaNs for
+    unsupported peptides, so filter on both side-specific score columns before
+    computing support counts or metric differences.
+    """
+    return scored.dropna(subset=list(_score_pair_columns(score_kind))).copy()
+
+
 def _presentation_per_sample(scored, score_kind):
     # NOTE: unlike _affinity_per_allele (which skips groups with <30 rows or
     # zero hits before entering the macro), this per-sample macro applies no
@@ -1278,6 +1300,7 @@ def _presentation_per_sample(scored, score_kind):
     # NaN that the downstream nanmean skips. This asymmetry is intentional (the
     # two macros were never defined to share a threshold), but it does mean the
     # presentation macro can be pulled around by small, noisy samples.
+    scored = _shared_score_rows(scored, score_kind)
     rows = []
     for (sample_id, hla), group in scored.groupby(
             ["sample_id", "hla"], dropna=False):
@@ -1296,6 +1319,7 @@ def _presentation_per_sample(scored, score_kind):
 
 
 def _presentation_per_length(scored, score_kind):
+    scored = _shared_score_rows(scored, score_kind)
     rows = []
     per_length_per_sample = []
     for length, group in scored.groupby("peptide_len"):
@@ -1337,6 +1361,7 @@ def _presentation_per_length(scored, score_kind):
 
 
 def _presentation_mode_summary(scored, per_sample, per_length, mode, score_kind):
+    scored = _shared_score_rows(scored, score_kind)
     m_a = _metrics(scored.hit.values, _score_values(scored, "a", score_kind))
     m_b = _metrics(scored.hit.values, _score_values(scored, "b", score_kind))
     return {

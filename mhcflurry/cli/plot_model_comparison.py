@@ -1126,7 +1126,11 @@ def _write_summary_pdf_from_pngs(
             ax = fig.add_axes([0.04, 0.06, 0.92, 0.84])
             ax.imshow(image)
             ax.axis("off")
-            fig.suptitle(str(path.relative_to(plot_dir)), fontsize=10)
+            try:
+                title = str(path.relative_to(plot_dir))
+            except ValueError:
+                title = str(path)
+            fig.suptitle(title, fontsize=10)
             pdf.savefig(fig)
             plt.close(fig)
 

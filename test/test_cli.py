@@ -523,6 +523,11 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert env["TRAINING_MINIBATCH_SIZE"] == "2048"
     assert env["COMPARE_BASELINE"] == "public:2.0.0"
     assert env["COMPARE_BASELINE_LABEL"] == "MHCflurry 2.0"
+    assert env["COMPARE_BACKEND"] == "auto"
+    assert env["COMPARE_GPUS"] == "auto"
+    assert env["COMPARE_TORCH_COMPILE"] == "auto"
+    assert env["COMPARE_MATMUL_PRECISION"] == "high"
+    assert env["MHCFLURRY_RELEASE_WORKFLOW_ID"] == ""
     assert env["MKL_THREADING_LAYER"] == "GNU"
     assert env["COMPARE_PRESENTATION_NUM_JOBS"] == "1"
     assert env["COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU"] == "1"
@@ -538,12 +543,22 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
         "AFFINITY_MAX_WORKERS_PER_GPU": "3",
         "COMPARE_BASELINE": "public:2.2.0",
         "COMPARE_BASELINE_LABEL": "MHCflurry 2.2",
+        "COMPARE_BACKEND": "cpu",
+        "COMPARE_GPUS": "1",
+        "COMPARE_TORCH_COMPILE": "off",
+        "COMPARE_MATMUL_PRECISION": "medium",
+        "MHCFLURRY_RELEASE_WORKFLOW_ID": "run-123",
         "MKL_THREADING_LAYER": "TBB",
     })
     assert env["AFFINITY_MINIBATCH_SIZE"] == "512"
     assert env["AFFINITY_MAX_WORKERS_PER_GPU"] == "3"
     assert env["COMPARE_BASELINE"] == "public:2.2.0"
     assert env["COMPARE_BASELINE_LABEL"] == "MHCflurry 2.2"
+    assert env["COMPARE_BACKEND"] == "cpu"
+    assert env["COMPARE_GPUS"] == "1"
+    assert env["COMPARE_TORCH_COMPILE"] == "off"
+    assert env["COMPARE_MATMUL_PRECISION"] == "medium"
+    assert env["MHCFLURRY_RELEASE_WORKFLOW_ID"] == "run-123"
     assert env["MKL_THREADING_LAYER"] == "TBB"
 
     brev_config = module.brev_config_from_env({
@@ -953,6 +968,29 @@ def test_metrics_ignores_nans_in_scores():
     s = [0.9, np.nan, 0.1, np.nan]
     m = compare_models._metrics(y, s)
     assert m["n"] == 2
+
+
+def test_processing_metrics_use_shared_non_nan_rows():
+    scored = pandas.DataFrame({
+        "sample_id": ["s1"] * 6,
+        "hla": ["HLA-A*02:01"] * 6,
+        "peptide_len": [8, 8, 9, 9, 10, 10],
+        "hit": [1, 0, 1, 0, 1, 0],
+        "a_processing_score": [0.9, 0.1, 0.8, 0.2, 0.7, 0.3],
+        "b_processing_score": [0.8, 0.2, 0.7, 0.3, numpy.nan, numpy.nan],
+    })
+
+    per_sample = compare_models._presentation_per_sample(
+        scored, "processing_score")
+    per_length, _per_length_per_sample = compare_models._presentation_per_length(
+        scored, "processing_score")
+    summary = compare_models._presentation_mode_summary(
+        scored, per_sample, per_length, "with_flanks", "processing_score")
+
+    assert per_sample.iloc[0]["n"] == 4
+    assert per_sample.iloc[0]["n_pos"] == 2
+    assert summary["n_rows"] == 4
+    assert summary["n_hits"] == 2
 
 
 def test_affinity_metrics_handle_no_reportable_alleles():
@@ -1483,6 +1521,151 @@ def test_summary_pdf_can_include_external_paper_figures_dir(tmp_path):
     assert paths == [combined, diagnostic]
 
 
+def test_paper_figures_orients_percentile_and_rank_scores():
+    score = numpy.array([0.1, 2.0, 50.0])
+
+    for predictor in [
+            "netmhcpan_el_percentile",
+            "some_model_rank",
+            "presentation_percentile"]:
+        assert numpy.allclose(
+            paper_figures._orient_prediction_score(predictor, score),
+            -score,
+        )
+
+
+def test_paper_figures_percent_change_columns_are_numeric():
+    scores = pandas.DataFrame([
+        {
+            "sample_id": "s1",
+            "length_label": "All",
+            "predictor": "candidate",
+            "auc": 0.75,
+            "ppv": 0.25,
+        },
+        {
+            "sample_id": "s1",
+            "length_label": "All",
+            "predictor": "baseline",
+            "auc": 0.50,
+            "ppv": 0.20,
+        },
+    ])
+
+    result = paper_figures._add_percent_change_columns(
+        scores, external_baselines=(("baseline", "base"),))
+    candidate = result.loc[result["predictor"] == "candidate"].iloc[0]
+
+    assert candidate["percent_change_auc_base"] == 50.0
+    assert numpy.isclose(candidate["percent_change_ppv_base"], 25.0)
+
+
+def test_paper_figures_mean_ppv_small_uses_with_flanks_and_weighted_external():
+    matplotlib = pytest.importorskip("matplotlib")
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    class CaptureWriter:
+        def __init__(self):
+            self.fig = None
+            self.skipped = False
+
+        def save(self, fig, _name, _family, note=""):
+            self.fig = fig
+
+        def skip(self, *_args, **_kwargs):
+            self.skipped = True
+
+    predictor_info = pandas.DataFrame([
+        {"predictor": "mhcflurry_production", "short": "BA", "color": "(0.1, 0.2, 0.3)"},
+        {
+            "predictor": "presentation_with_flanks_processing_score",
+            "short": "AP +flanks",
+            "color": "(0.2, 0.3, 0.4)",
+        },
+        {
+            "predictor": "presentation_with_flanks_presentation_score",
+            "short": "PS +flanks",
+            "color": "(0.3, 0.4, 0.5)",
+        },
+        {
+            "predictor": "presentation_without_flanks_processing_score",
+            "short": "AP -flanks",
+            "color": "(0.8, 0.1, 0.1)",
+        },
+        {"predictor": "netmhcpan4.ba", "short": "BA ext", "color": "(0.4, 0.4, 0.4)"},
+        {"predictor": "netmhcpan4.el", "short": "EL ext", "color": "(0.5, 0.5, 0.5)"},
+    ]).set_index("predictor")
+    scores = pandas.DataFrame([
+        {"sample_id": "s1", "length": numpy.nan, "length_label": "All", "predictor": "mhcflurry_production", "ppv": 0.60},
+        {"sample_id": "s1", "length": numpy.nan, "length_label": "All", "predictor": "presentation_with_flanks_processing_score", "ppv": 0.50},
+        {"sample_id": "s1", "length": numpy.nan, "length_label": "All", "predictor": "presentation_with_flanks_presentation_score", "ppv": 0.80},
+        {"sample_id": "s1", "length": numpy.nan, "length_label": "All", "predictor": "presentation_without_flanks_processing_score", "ppv": 0.99},
+        {"sample_id": "s1", "length": numpy.nan, "length_label": "All", "predictor": "netmhcpan4.ba", "ppv": 0.10},
+        {"sample_id": "s2", "length": numpy.nan, "length_label": "All", "predictor": "netmhcpan4.ba", "ppv": 0.30},
+        {"sample_id": "s1", "length": numpy.nan, "length_label": "All", "predictor": "netmhcpan4.el", "ppv": 0.90},
+    ])
+    writer = CaptureWriter()
+    predictors = paper_figures.PredictorConfig(
+        candidate="mhcflurry_production",
+        external_baselines=(
+            ("netmhcpan4.ba", "ba"),
+            ("netmhcpan4.el", "el"),
+        ),
+        preferred_predictors=(),
+        presentation_panel_predictors=(),
+        presentation_panel_baselines=(),
+    )
+
+    paper_figures._plot_mean_ppv_small(
+        scores,
+        predictor_info,
+        recent_sample_ids=None,
+        note="",
+        name="test",
+        writer=writer,
+        predictors=predictors,
+    )
+
+    assert not writer.skipped
+    ax = writer.fig.axes[0]
+    labels = [tick.get_text() for tick in ax.get_xticklabels()]
+    heights = [patch.get_height() for patch in ax.patches]
+    plt.close(writer.fig)
+
+    assert labels == ["BA", "AP +flanks", "PS +flanks", "External tools"]
+    assert numpy.allclose(heights, [0.60, 0.50, 0.80, 0.55])
+
+
+def test_summary_pdf_png_fallback_handles_external_paper_dir(tmp_path):
+    matplotlib = pytest.importorskip("matplotlib")
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    plot_dir = tmp_path / "plots"
+    external_dir = tmp_path / "external_paper"
+    diagnostic_dir = plot_dir / "paper"
+    for path in [external_dir, diagnostic_dir]:
+        path.mkdir(parents=True)
+    for path in [
+            external_dir / "external_panel.png",
+            diagnostic_dir / "diagnostic_panel.png"]:
+        fig, ax = plt.subplots()
+        ax.plot([0, 1], [0, 1])
+        fig.savefig(path)
+        plt.close(fig)
+
+    out = plot_dir / "summary.pdf"
+    plot_model_comparison._write_summary_pdf_from_pngs(
+        plot_dir,
+        out,
+        include_paper_figures=True,
+        paper_figures_dir=external_dir,
+    )
+
+    assert out.is_file()
+
+
 def test_paper_figures_writes_available_2023_style_panels(tmp_path):
     artifacts = tmp_path / "artifacts"
     artifacts.mkdir()
@@ -1616,6 +1799,7 @@ def test_paper_figures_writes_available_2023_style_panels(tmp_path):
         == "fig.3_scores_plots_monoallelic.scatter.auc.monoallelic.ba"
     ).any()
     assert "skipped" in set(manifest["status"])
+    assert "failed" not in set(manifest["status"])
 
 
 def test_paper_figures_derives_scores_from_saved_predictions(tmp_path):

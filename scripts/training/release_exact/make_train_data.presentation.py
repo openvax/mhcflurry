@@ -155,7 +155,7 @@ def run():
         print("Excluding hits from", train_dataset)
         train_df = pandas.read_csv(train_dataset)
         train_df["allele"] = train_df.allele.map(canonicalize_training_allele)
-        for (allele, peptides) in train_df.groupby("allele").peptide.unique().iteritems():
+        for (allele, peptides) in train_df.groupby("allele").peptide.unique().items():
             allele_to_excluded_peptides[allele].update(peptides)
         train_counts = train_df.groupby(
             ["allele", "peptide"]).measurement_value.count().to_dict()

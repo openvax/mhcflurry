@@ -155,6 +155,12 @@ def remote_training_env(environ=os.environ):
         "COMPARE_BASELINE_LABEL": environ.get(
             "COMPARE_BASELINE_LABEL", "MHCflurry 2.0"
         ),
+        "COMPARE_BACKEND": environ.get("COMPARE_BACKEND", "auto"),
+        "COMPARE_GPUS": environ.get("COMPARE_GPUS", "auto"),
+        "COMPARE_MATMUL_PRECISION": environ.get(
+            "COMPARE_MATMUL_PRECISION",
+            environ.get("MHCFLURRY_MATMUL_PRECISION", "high"),
+        ),
         "COMPARE_MAX_TASKS_PER_WORKER": environ.get(
             "COMPARE_MAX_TASKS_PER_WORKER",
             environ.get("MAX_TASKS_PER_WORKER", "12"),
@@ -175,6 +181,10 @@ def remote_training_env(environ=os.environ):
         "COMPARE_PRESENTATION_TORCH_COMPILE": environ.get(
             "COMPARE_PRESENTATION_TORCH_COMPILE", "0"
         ),
+        "COMPARE_TORCH_COMPILE": environ.get(
+            "COMPARE_TORCH_COMPILE",
+            environ.get("MHCFLURRY_TORCH_COMPILE", "auto"),
+        ),
         # This must be a path visible inside the remote runplz job. Do not
         # inherit DATA_DIR from the local shell; in the release wrapper that is
         # a control-machine path and is handled by explicit staging instead.
@@ -193,6 +203,9 @@ def remote_training_env(environ=os.environ):
         ),
         "MHCFLURRY_MATMUL_PRECISION": environ.get(
             "MHCFLURRY_MATMUL_PRECISION", "high"
+        ),
+        "MHCFLURRY_RELEASE_WORKFLOW_ID": environ.get(
+            "MHCFLURRY_RELEASE_WORKFLOW_ID", ""
         ),
         "MATMUL_PRECISION": environ.get("MATMUL_PRECISION", "high"),
         "MATMUL_PRECISION_CLI": environ.get("MATMUL_PRECISION_CLI", "high"),
@@ -308,6 +321,11 @@ def train_release_full():
     ).resolve()
     env = os.environ.copy()
     env.update({"MHCFLURRY_OUT": str(out), "REPO": str(repo)})
+    workflow_id = env.get("MHCFLURRY_RELEASE_WORKFLOW_ID", "").strip()
+    if workflow_id:
+        marker_dir = out / ".runplz"
+        marker_dir.mkdir(parents=True, exist_ok=True)
+        (marker_dir / "mhcflurry_release_workflow_id").write_text(workflow_id)
     subprocess.run(
         ["bash", "scripts/training/pan_allele_release_full.sh"],
         check=True,
@@ -413,7 +431,7 @@ def run_release_evaluation(repo, out, env):
         "--torch-compile", compare_torch_compile_value(env),
         "--matmul-precision", compare_matmul_precision_value(env),
     ]
-    compare_gpus = env.get("COMPARE_GPUS", str(NUM_GPUS))
+    compare_gpus = env.get("COMPARE_GPUS", "auto")
     if compare_gpus.strip().lower() != "auto":
         compare_args.extend(["--gpus", compare_gpus])
     subprocess.run(compare_args, check=True, cwd=repo, env=env)

@@ -862,7 +862,8 @@ def _orient_prediction_score(predictor, score):
     if (
             predictor.endswith(".ba") or
             "affinity" in predictor or
-            "presentation_percentile" in predictor):
+            "percentile" in predictor or
+            "rank" in predictor):
         return -numpy.asarray(score, dtype=float)
     return numpy.asarray(score, dtype=float)
 
@@ -1166,9 +1167,8 @@ def _plot_mean_ppv_small(
         sub = sub.loc[sub["sample_id"].isin(recent_sample_ids)]
     candidates = [
         predictors.candidate,
-        "presentation_without_flanks_processing_score",
+        "presentation_with_flanks_processing_score",
         "presentation_with_flanks_presentation_score",
-        "presentation_without_flanks_presentation_score",
     ]
     rows = []
     for predictor in candidates:
@@ -1179,11 +1179,17 @@ def _plot_mean_ppv_small(
                 predictor_info, predictor)))
     external_baselines = _external_baselines_in_predictors(
         predictors, sub["predictor"])
-    external_values = sub.loc[
-        sub["predictor"].isin([p for p, _ in external_baselines]), "ppv"
-    ].replace([numpy.inf, -numpy.inf], numpy.nan).dropna()
-    if len(external_values):
-        rows.append(("external_tools", external_values.mean(), (0.45, 0.45, 0.45)))
+    external_means = (
+        sub.loc[sub["predictor"].isin([p for p, _ in external_baselines])]
+        .assign(
+            ppv=lambda df: df["ppv"].replace(
+                [numpy.inf, -numpy.inf], numpy.nan))
+        .groupby("predictor")["ppv"]
+        .mean()
+        .dropna()
+    )
+    if len(external_means):
+        rows.append(("external_tools", external_means.mean(), (0.45, 0.45, 0.45)))
     if not rows:
         writer.skip(
             "multiallelic", name, candidates,

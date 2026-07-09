@@ -26,8 +26,7 @@
 #                              (default: this checkout)
 #   MAX_WORKERS_PER_GPU        default per-GPU worker cap for shared stages
 #   AFFINITY_MAX_WORKERS_PER_GPU
-#                              affinity per-GPU worker cap (default 3 for
-#                              mb1024 on 80GB A100s)
+#                              affinity per-GPU worker cap (default auto)
 #   DATALOADER_NUM_WORKERS     'auto' (default) lets the orchestrator pick
 #   PROCESSING_HELD_OUT_SAMPLES  (default 50; subset script uses 10)
 #   PRESENTATION_DECOYS_PER_HIT (default 99 to match release; subset uses 2)
@@ -256,6 +255,8 @@ AFFINITY_ENV=(
     "GPUS=$GPUS"
     "MAX_WORKERS_PER_GPU=$AFFINITY_MAX_WORKERS_PER_GPU"
     "DATALOADER_NUM_WORKERS=${AFFINITY_DATALOADER_NUM_WORKERS:-$DATALOADER_NUM_WORKERS_REQUESTED}"
+    "SKIP_EVAL=${SKIP_EVAL:-0}"
+    "SKIP_PLOTS=${SKIP_PLOTS:-0}"
     "TRAINING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE"
     "AFFINITY_MINIBATCH_SIZE=$AFFINITY_MINIBATCH_SIZE"
 )

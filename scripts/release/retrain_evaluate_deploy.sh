@@ -32,6 +32,7 @@ Usage:
       [--compare-presentation-torch-compile 0] \
       [--compare-baseline public:2.0.0] \
       [--compare-baseline-label "MHCflurry 2.0"] \
+      [--compare-gpus auto|N] \
       [--brev-instance NAME] [--brev-on-finish leave|stop|delete] \
       [--brev-stop-failure-action warn|delete] \
       [--brev-cleanup-timeout-seconds 60] \
@@ -335,9 +336,11 @@ run_dir_has_synced_brev_outputs() {
 brev_latest_remote_exit_code() {
     require_command brev
     local output
+    local expected
+    expected="$(printf '%q' "$WORKFLOW_RUN_ID")"
     output="$(
         run_with_timeout "$BREV_CLEANUP_TIMEOUT_SECONDS" brev exec "$BREV_INSTANCE" \
-            "bash -lc \"grep 'remote_command_exit' ~/runplz-latest/out/.runplz/events.ndjson 2>/dev/null | tail -1\"" \
+            "MHCFLURRY_RELEASE_WORKFLOW_ID=$expected bash -lc 'marker=\$(cat ~/runplz-latest/out/.runplz/mhcflurry_release_workflow_id 2>/dev/null || true); [ \"\$marker\" = \"\$MHCFLURRY_RELEASE_WORKFLOW_ID\" ] || exit 0; grep remote_command_exit ~/runplz-latest/out/.runplz/events.ndjson 2>/dev/null | tail -1'" \
             2>/dev/null || true
     )"
     printf '%s\n' "$output" | sed -n \
@@ -1249,6 +1252,7 @@ run_brev_training() {
         "PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS=$PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS"
         "PAPER_FIGURES_PRESENTATION_PANEL_BASELINES=$PAPER_FIGURES_PRESENTATION_PANEL_BASELINES"
         "RUN_LABEL=$RUN_LABEL"
+        "MHCFLURRY_RELEASE_WORKFLOW_ID=$WORKFLOW_RUN_ID"
         "RUNPLZ_BREV_AUTO_CREATE=$auto_create"
         "RUNPLZ_BREV_ON_FINISH=$runplz_on_finish"
         "RUNPLZ_BREV_INSTANCE_TYPE_FALLBACK_COUNT=$BREV_INSTANCE_TYPE_FALLBACK_COUNT"
@@ -1335,7 +1339,7 @@ COMPARE_MAX_WORKERS_PER_GPU="${COMPARE_MAX_WORKERS_PER_GPU:-auto}"
 COMPARE_MAX_TASKS_PER_WORKER="${COMPARE_MAX_TASKS_PER_WORKER:-12}"
 COMPARE_TORCH_COMPILE="${COMPARE_TORCH_COMPILE:-${MHCFLURRY_TORCH_COMPILE:-auto}}"
 COMPARE_MATMUL_PRECISION="${COMPARE_MATMUL_PRECISION:-${MHCFLURRY_MATMUL_PRECISION:-high}}"
-COMPARE_GPUS="${COMPARE_GPUS:-4}"
+COMPARE_GPUS="${COMPARE_GPUS:-auto}"
 COMPARE_PRESENTATION_NUM_JOBS="${COMPARE_PRESENTATION_NUM_JOBS:-1}"
 COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU="${COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU:-1}"
 COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER="${COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER:-1}"
@@ -1362,6 +1366,7 @@ PROCESSING_VARIANTS="with_flanks no_flank short_flanks"
 PRESENTATION_PROCESSING_WITH_FLANKS_KIND=with_flanks
 WORKFLOW_LOG_DIR=
 WORKFLOW_STATUS_LOG=
+WORKFLOW_RUN_ID="${WORKFLOW_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
 BREV_EXPECT_REMOTE_EVAL=0
 BREV_EXPECT_REMOTE_PLOTS=0
 BREV_REMOTE_EVAL_DONE=0
@@ -1502,6 +1507,10 @@ while [ $# -gt 0 ]; do
             ;;
         --compare-baseline-label)
             COMPARE_BASELINE_LABEL=$2
+            shift 2
+            ;;
+        --compare-gpus)
+            COMPARE_GPUS=$2
             shift 2
             ;;
         --paper-figures-scores-dir)
