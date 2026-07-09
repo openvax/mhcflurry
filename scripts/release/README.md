@@ -54,8 +54,13 @@ Supported backends are:
   plots, and generated configs. Use
   `--brev-sync-mode full` only when you deliberately need every unselected
   candidate model and intermediate CSV for a deep post-mortem.
-  Provisioned full-training runs default to the known 4xA100 type
-  `a2-highgpu-4g:nvidia-tesla-a100:4`; `--brev-instance-type TYPE` overrides it.
+  Provisioned full-training runs default to runplz auto-selection over current
+  Brev inventory, constrained by the launcher resource requests. Use
+  `--brev-provider gcp` to pin the old 4xA100 GCP shape, `--brev-provider denvr`
+  or `--brev-provider denvr-80gb` for the common Denvr 8xA100 shapes, or
+  `--brev-instance-type TYPE` for any exact Brev type. For auto-selection,
+  `--brev-exclude-providers PREFIXES` can remove provider/type prefixes such as
+  `oci` from the candidate list.
 - `ssh`: train on a specific remote host, with `--remote`, `--remote-repo`, and
   `--remote-run-dir`. Authentication comes from local `ssh` / `rsync`
   configuration, typically SSH keys or an SSH config `Host`.

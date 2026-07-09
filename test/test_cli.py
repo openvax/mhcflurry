@@ -155,6 +155,36 @@ def test_release_workflow_brev_prepare_uses_remote_postprocess(tmp_path):
     assert "Using plots produced on the Brev instance" in output
 
 
+def test_release_workflow_brev_provider_aliases(tmp_path):
+    cases = [
+        ("auto", "Brev type:     runplz auto-select"),
+        ("gcp", "Brev type:     a2-highgpu-4g:nvidia-tesla-a100:4"),
+        ("denvr", "Brev type:     denvr_A100_sxm4x8"),
+    ]
+    for provider, expected_type in cases:
+        result = subprocess.run(
+            [
+                "bash",
+                "scripts/release/retrain_evaluate_deploy.sh",
+                "--run-dir", str(tmp_path / ("release-run-" + provider)),
+                "--release", "2.3.0",
+                "--backend", "brev-provision",
+                "--brev-instance", "mhcflurry-dry-run-" + provider,
+                "--brev-provider", provider,
+                "--skip-train",
+                "--skip-eval",
+                "--skip-plots",
+                "--dry-run",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        output = result.stdout + result.stderr
+        assert "Brev provider: %s" % provider in output
+        assert expected_type in output
+
+
 def test_eval_help_runs(capsys):
     cli_main.main(["eval", "--help"])
     captured = capsys.readouterr().out

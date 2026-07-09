@@ -34,6 +34,7 @@ Usage:
       [--compare-baseline-label "MHCflurry 2.0"] \
       [--compare-gpus auto|N] \
       [--brev-instance NAME] [--brev-on-finish leave|stop|delete] \
+      [--brev-provider auto|gcp|denvr|denvr-80gb] \
       [--brev-stop-failure-action warn|delete] \
       [--brev-cleanup-timeout-seconds 60] \
       [--brev-create-timeout-seconds 2400] \
@@ -53,11 +54,16 @@ Backends:
                  --brev-instance. A missing instance is an error.
   brev-provision Provision a named Brev instance if it does not exist, then run
                  the same remote training job. If --brev-instance is omitted,
-                 this script generates a run-specific name. Defaults to the
-                 4xA100 instance type used for the release pipeline; override
-                 with --brev-instance-type. The release wrapper owns artifact
-                 sync and cleanup; runplz is asked to leave the instance up
-                 until those steps finish.
+                 this script generates a run-specific name. By default runplz
+                 chooses an A100 machine matching the launcher resource
+                 requirements; pass --brev-instance-type to pin a specific
+                 Brev shape for reproducibility or price control. The release
+                 wrapper owns artifact sync and cleanup; runplz is asked to
+                 leave the instance up until those steps finish.
+                 --brev-provider is a convenience alias for common release
+                 shapes: auto delegates to runplz price/availability selection,
+                 gcp pins the old 4xA100 GCP shape, and denvr / denvr-80gb pin
+                 the cheaper 8xA100 Denvr shapes when available.
   ssh            Run on a specific remote host, then rsync the run directory
                  back. Requires --remote, --remote-repo, and --remote-run-dir.
                  Authentication is whatever your local ssh/rsync configuration
@@ -191,6 +197,26 @@ validate_compare_gpus() {
     case "$value" in
         ''|*[!0-9]*)
             die "COMPARE_GPUS must be auto or a non-negative integer; got '$value'"
+            ;;
+    esac
+}
+
+brev_provider_instance_type() {
+    case "$(lowercase "$1")" in
+        auto|'')
+            printf '\n'
+            ;;
+        gcp)
+            printf 'a2-highgpu-4g:nvidia-tesla-a100:4\n'
+            ;;
+        denvr)
+            printf 'denvr_A100_sxm4x8\n'
+            ;;
+        denvr-80gb)
+            printf 'denvr_A100_sxm4_80Gx8\n'
+            ;;
+        *)
+            die "--brev-provider must be one of: auto, gcp, denvr, denvr-80gb"
             ;;
     esac
 }
@@ -1444,8 +1470,9 @@ REMOTE_RUN_DIR=
 SYNC_REMOTE_OUTPUT=1
 BREV_INSTANCE="${RUNPLZ_BREV_INSTANCE:-${BREV_INSTANCE:-}}"
 BREV_ON_FINISH="${RUNPLZ_BREV_ON_FINISH:-${BREV_ON_FINISH:-}}"
+BREV_PROVIDER="${RUNPLZ_BREV_PROVIDER:-${BREV_PROVIDER:-auto}}"
 BREV_INSTANCE_TYPE="${RUNPLZ_BREV_INSTANCE_TYPE:-${BREV_INSTANCE_TYPE:-}}"
-DEFAULT_BREV_PROVISION_INSTANCE_TYPE="${DEFAULT_BREV_PROVISION_INSTANCE_TYPE:-a2-highgpu-4g:nvidia-tesla-a100:4}"
+DEFAULT_BREV_PROVISION_INSTANCE_TYPE="${DEFAULT_BREV_PROVISION_INSTANCE_TYPE:-}"
 BREV_CONTAINER_IMAGE="${BREV_CONTAINER_IMAGE:-pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime}"
 BREV_MAX_RUNTIME_SECONDS="${RUNPLZ_BREV_MAX_RUNTIME_SECONDS:-${BREV_MAX_RUNTIME_SECONDS:-}}"
 BREV_INSTANCE_TYPE_FALLBACK_COUNT="${RUNPLZ_BREV_INSTANCE_TYPE_FALLBACK_COUNT:-3}"
@@ -1547,6 +1574,10 @@ while [ $# -gt 0 ]; do
             ;;
         --brev-on-finish)
             BREV_ON_FINISH=$2
+            shift 2
+            ;;
+        --brev-provider)
+            BREV_PROVIDER=$2
             shift 2
             ;;
         --brev-instance-type)
@@ -1826,7 +1857,15 @@ if [ "$BACKEND" = "brev-provision" ] && [ -z "$BREV_INSTANCE" ]; then
     )
     BREV_INSTANCE="mhcflurry-${RELEASE_SLUG}-$(date +%Y%m%d-%H%M%S)"
 fi
-if [ "$BACKEND" = "brev-provision" ] && [ -z "$BREV_INSTANCE_TYPE" ]; then
+if [ "$BACKEND" = "brev-provision" ] && \
+        [ "$(lowercase "$BREV_PROVIDER")" != "auto" ]; then
+    [ -z "$BREV_INSTANCE_TYPE" ] || \
+        die "--brev-provider cannot be combined with --brev-instance-type"
+    BREV_INSTANCE_TYPE="$(brev_provider_instance_type "$BREV_PROVIDER")"
+fi
+if [ "$BACKEND" = "brev-provision" ] && \
+        [ -z "$BREV_INSTANCE_TYPE" ] && \
+        [ -n "$DEFAULT_BREV_PROVISION_INSTANCE_TYPE" ]; then
     BREV_INSTANCE_TYPE=$DEFAULT_BREV_PROVISION_INSTANCE_TYPE
 fi
 case "$BACKEND" in
@@ -1866,6 +1905,7 @@ case "$BACKEND" in
     brev-existing|brev-provision)
         note "Brev instance: $BREV_INSTANCE"
         note "Brev cleanup:  $BREV_ON_FINISH"
+        note "Brev provider: $BREV_PROVIDER"
         note "Stop fallback:  $BREV_STOP_FAILURE_ACTION"
         note "Brev sync:     $BREV_SYNC_MODE"
         note "Brev type:     ${BREV_INSTANCE_TYPE:-runplz auto-select}"
