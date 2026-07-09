@@ -13,7 +13,9 @@ The suite intentionally covers several layers:
 * public-model smoke tests that require cached MHCflurry download bundles.
 
 That mix is useful before merging a release branch, but it makes a plain
-`pytest test/` run take many minutes on a laptop.
+`python -m pytest test/` run take many minutes on a laptop. On macOS, prefer
+`python -m pytest` over the generated `pytest` console script so PyTorch can
+see MPS accelerators.
 
 ## Quick local feedback
 
@@ -27,23 +29,23 @@ Run lint plus focused unit tests while iterating:
 
 ```shell
 $ ./lint.sh
-$ pytest -q test/test_amino_acid.py test/test_random_negative_peptides.py
+$ python -m pytest -q test/test_amino_acid.py test/test_random_negative_peptides.py
 ```
 
 To run the broad fast tier, skip the tests marked as slow integration,
 cached-bundle, or benchmark checks:
 
 ```shell
-$ pytest -q test -m "not slow and not downloads"
+$ python -m pytest -q test -m "not slow and not downloads"
 ```
 
 When working on training internals, add the directly affected files rather
 than jumping immediately to the full suite. Useful examples:
 
 ```shell
-$ pytest -q test/test_class1_affinity_training_data.py
-$ pytest -q test/test_pytorch_regressions.py
-$ pytest -q test/test_train_pan_allele_models_command.py::test_pretrain_network_input_iterator_compact_torch_indices
+$ python -m pytest -q test/test_class1_affinity_training_data.py
+$ python -m pytest -q test/test_pytorch_regressions.py
+$ python -m pytest -q test/test_train_pan_allele_models_command.py::test_pretrain_network_input_iterator_compact_torch_indices
 ```
 
 ## Full verification
@@ -52,13 +54,13 @@ Before calling a release-branch change complete, run:
 
 ```shell
 $ ./lint.sh
-$ pytest test/
+$ python -m pytest test/
 ```
 
 If the run is unexpectedly slow, ask pytest for the slowest tests:
 
 ```shell
-$ pytest -q test --durations=25 --durations-min=0.5
+$ python -m pytest -q test --durations=25 --durations-min=0.5
 ```
 
 ## Current slow buckets
