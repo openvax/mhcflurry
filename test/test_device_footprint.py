@@ -33,12 +33,18 @@ from mhcflurry.device_footprint import (
 RELEASE_HYPERPARAMETERS = {
     "peptide_dense_layer_sizes": [],
     "layer_sizes": [1024, 512],
+    "loss": "custom:mse_with_inequalities",
     "minibatch_size": 128,
     "peptide_encoding": {"max_length": 15, "vector_encoding_name": "BLOSUM62"},
 }
+NO_LEGACY_VALIDATION_HYPERPARAMETERS = dict(
+    RELEASE_HYPERPARAMETERS,
+    loss="mse",
+)
 RELEASE_NUM_NETWORKS = 10
 RELEASE_TRAINING_ROWS = 249802         # curated affinity rows
 RELEASE_CALIBRATION_ROWS = 800000      # 1e5/length x 8 lengths
+RC14_TRAINING_ROWS = 994948            # raw rows before train command filters
 
 
 def _write_manifest(tmp_path, n_networks, hyperparameters):
@@ -88,30 +94,59 @@ def test_calibration_scales_and_falls_back(tmp_path):
 # --------------------------------------------------------------------------
 
 def test_training_sanity_anchor():
-    # SANITY ANCHOR: ~250k rows, minibatch 128 -> measured steady state
-    # 1.85-2.4 GB; the estimate keeps a margin above the peak and below the
-    # old static 4 GB.
+    # SANITY ANCHOR: ~250k rows, minibatch 128. The estimate is above the
+    # measured 1.85-2.4 GB steady-state minibatch peak because the release
+    # pretrain path validates an inequality loss in one full-fold forward pass.
     gb = training_gb(RELEASE_HYPERPARAMETERS, RELEASE_TRAINING_ROWS)
-    assert 2.0 < gb < 4.0, gb
+    assert 9.0 < gb < 13.0, gb
 
 
 def test_training_is_base_dominated_for_index_encoded_peptides():
     # Peptides are int8 indices device-resident (the default), so the dataset
-    # barely affects the footprint at normal scale: it is base-dominated.
-    release = training_gb(RELEASE_HYPERPARAMETERS, RELEASE_TRAINING_ROWS)
-    five_million = training_gb(RELEASE_HYPERPARAMETERS, 5000000)
+    # barely affects the minibatch-only footprint at normal scale: it is
+    # base-dominated unless the legacy inequality validation path is active.
+    release = training_gb(
+        NO_LEGACY_VALIDATION_HYPERPARAMETERS, RELEASE_TRAINING_ROWS)
+    five_million = training_gb(
+        NO_LEGACY_VALIDATION_HYPERPARAMETERS, 5000000)
     assert abs(five_million - release) < 1.0           # ~flat with dataset size
 
     # Only an extreme row count materially raises the resident int8 term.
-    assert training_gb(RELEASE_HYPERPARAMETERS, 50000000) > release + 1.0
+    assert training_gb(
+        NO_LEGACY_VALIDATION_HYPERPARAMETERS, 50000000) > release + 1.0
 
     # Batch size scales the (per-batch) activation term.
-    assert (training_gb(RELEASE_HYPERPARAMETERS, RELEASE_TRAINING_ROWS,
-                        minibatch_size=32768) > release)
+    assert (training_gb(
+        NO_LEGACY_VALIDATION_HYPERPARAMETERS,
+        RELEASE_TRAINING_ROWS,
+        minibatch_size=32768) > release)
 
     # Missing hyperparameters / rows -> None.
     assert training_gb(None, RELEASE_TRAINING_ROWS) is None
     assert training_gb(RELEASE_HYPERPARAMETERS, 0) is None
+
+
+def test_training_rc14_a100_40gb_worker_cap(monkeypatch):
+    """The rc14 release recipe should not pack 4 workers onto A100-40GB."""
+    from mhcflurry.parallelism import auto_max_workers_per_gpu
+
+    rc14_small = dict(
+        RELEASE_HYPERPARAMETERS,
+        layer_sizes=[512, 256],
+        minibatch_size=1024,
+    )
+    worker_gb = training_gb(rc14_small, RC14_TRAINING_ROWS)
+    assert 23.0 < worker_gb < 27.0, worker_gb
+
+    monkeypatch.setenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "40")
+    monkeypatch.setenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP", "4")
+    assert auto_max_workers_per_gpu(
+        num_jobs="auto",
+        num_gpus=4,
+        per_worker_gb=worker_gb,
+    ) == 1
 
 
 # --------------------------------------------------------------------------

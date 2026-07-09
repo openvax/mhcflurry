@@ -28,14 +28,13 @@ aggressively than the validated baseline.
 Sanity anchors (release pan-allele config, live diagnostics from the 2026-04-28
 ``release_exact`` run):
 
-  * Affinity TRAINING — ~250k curated rows, minibatch 128 — measured steady-state
-    ~1.85-2.4 GB. Peptides are stored device-resident as compact ``(N, L)`` int8
-    indices (``peptide_amino_acid_encoding_torch``, default True) and embedded
-    per-batch, and alleles are a shared index-embedding — so the resident dataset
-    is tiny. The footprint is dominated by a fixed base (CUDA context +
-    torch.compile workspace + weights + optimizer + embedding) plus per-batch
-    activations; it barely scales with dataset size (only at extreme row
-    counts). ``estimate_affinity_training_device_worker_gb`` reproduces this.
+  * Affinity TRAINING — pretraining keeps the fold's validation tensors
+    device-resident. For inequality losses with the legacy denominator, the
+    validation pass is still single-shot, so large release folds are dominated
+    by validation activations rather than the minibatch. The 2026-07 rc14 GCP
+    smoke run (A100-40GB, minibatch 1024, ~1M rows) measured a 24+ GB worker
+    peak; ``estimate_affinity_training_device_worker_gb`` reproduces this
+    instead of the much smaller steady-state minibatch footprint.
   * Affinity CALIBRATION — 800k-row peptide universe, 10-net ensemble — the
     cached peptide-stage tensor is ~12 GB (the static profile assumed 24 GB).
     ``estimate_affinity_calibration_device_worker_gb`` reproduces this.
@@ -83,8 +82,13 @@ _TRAINING_PER_ROW_SCALAR_BYTES = 12
 # combined buffer (~2x rows). Conservative.
 _TRAINING_RANDOM_NEGATIVE_FACTOR = 2.0
 # Forward activations + gradients + backward working set, as a multiple of the
-# single-forward activation bytes.
+# single-forward minibatch activation bytes.
 _TRAINING_ACTIVATION_BACKWARD_FACTOR = 3.0
+# Conservative multiplier for the single-shot pretrain validation pass used by
+# custom:mse_with_inequalities when encoded ``>`` rows carry the legacy
+# denominator sentinel. Calibrated from the rc14 GCP smoke run where a
+# [512, 256] release worker hit ~24 GB with ~1M rows.
+_TRAINING_VALIDATION_FORWARD_FACTOR = 5.3
 _PEPTIDE_INDEX_BYTES = 1  # int8 per position (peptides are always index-encoded)
 _TRAINING_DEFAULT_MINIBATCH = 128
 _TRAINING_DEFAULT_MERGE_WIDTH = 1024      # when layer widths can't be derived
@@ -177,6 +181,12 @@ def _merge_width(hyperparameters):
     return max(candidates) if candidates else _TRAINING_DEFAULT_MERGE_WIDTH
 
 
+def _uses_legacy_inequality_validation(hyperparameters):
+    """Whether this training config can require single-shot validation."""
+    loss = str((hyperparameters or {}).get("loss", "")).lower()
+    return "mse_with_inequalities" in loss
+
+
 def estimate_affinity_calibration_device_worker_gb(models_dir, prediction_rows):
     """Per-worker VRAM (GB) for affinity percentile-rank calibration, or None.
 
@@ -217,6 +227,9 @@ def estimate_affinity_training_device_worker_gb(
       * per-batch activations: ``minibatch x (embedded_peptide + merge_width) x 4
         x backward_factor`` — the live batch's float32 embedded vectors and
         hidden activations. This is what scales with batch size / network width.
+      * pretrain validation peak: inequality losses with legacy denominator
+        rows validate in one full-fold forward pass. For release-scale folds
+        this dominates VRAM and therefore worker packing.
       * a fixed base (CUDA context + compile workspace + weights + optimizer +
         embedding table) that does not scale with either.
 
@@ -244,8 +257,16 @@ def estimate_affinity_training_device_worker_gb(
         minibatch * (embedded_row_bytes + merge_width * _FLOAT32_BYTES)
         * _TRAINING_ACTIVATION_BACKWARD_FACTOR / _GIB
     )
+    validation_gb = 0.0
+    if _uses_legacy_inequality_validation(hyperparameters):
+        validation_gb = (
+            int(num_rows)
+            * (embedded_row_bytes + merge_width * _FLOAT32_BYTES
+               + _FLOAT32_BYTES)
+            * _TRAINING_VALIDATION_FORWARD_FACTOR / _GIB
+        )
     footprint = (
-        (_TRAINING_BASE_GB + resident_gb + activation_gb)
+        (_TRAINING_BASE_GB + resident_gb + max(activation_gb, validation_gb))
         * _TRAINING_SAFETY_MARGIN
     )
     return max(_TRAINING_MIN_DEVICE_WORKER_GB, footprint)
