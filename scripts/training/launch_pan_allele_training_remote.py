@@ -151,7 +151,9 @@ def remote_training_env(environ=os.environ):
         "COMPARE_INCLUDE": environ.get(
             "COMPARE_INCLUDE", "affinity,processing,presentation"
         ),
-        "COMPARE_LIMIT_FILES": environ.get("COMPARE_LIMIT_FILES", ""),
+        "EVAL_MAX_BENCHMARK_FILES": environ.get(
+            "EVAL_MAX_BENCHMARK_FILES", ""
+        ),
         "COMPARE_BASELINE": environ.get("COMPARE_BASELINE", "public:2.0.0"),
         "COMPARE_BASELINE_LABEL": environ.get(
             "COMPARE_BASELINE_LABEL", "MHCflurry 2.0"
@@ -453,9 +455,11 @@ def run_release_evaluation(repo, out, env):
     compare_gpus = env.get("COMPARE_GPUS", "auto")
     if compare_gpus.strip().lower() != "auto":
         compare_args.extend(["--gpus", compare_gpus])
-    compare_limit_files = env.get("COMPARE_LIMIT_FILES", "").strip()
-    if compare_limit_files:
-        compare_args.extend(["--limit-files", compare_limit_files])
+    eval_max_benchmark_files = env.get(
+        "EVAL_MAX_BENCHMARK_FILES", ""
+    ).strip()
+    if eval_max_benchmark_files:
+        compare_args.extend(["--limit-files", eval_max_benchmark_files])
     subprocess.run(compare_args, check=True, cwd=repo, env=env)
 
 

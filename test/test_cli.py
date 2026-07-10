@@ -131,7 +131,7 @@ def test_release_workflow_prepare_command_is_dry_run_visible(tmp_path):
     assert "mhcflurry eval plot-comparison" in output
 
 
-def test_release_workflow_compare_limit_files_is_forwarded(tmp_path):
+def test_release_workflow_eval_max_benchmark_files_is_forwarded(tmp_path):
     result = subprocess.run(
         [
             "bash",
@@ -142,7 +142,7 @@ def test_release_workflow_compare_limit_files_is_forwarded(tmp_path):
             "--skip-train",
             "--skip-plots",
             "--compare-include", "affinity",
-            "--compare-limit-files", "1",
+            "--eval-max-benchmark-files", "1",
             "--dry-run",
         ],
         capture_output=True,
@@ -784,7 +784,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert env["COMPARE_BASELINE"] == "public:2.0.0"
     assert env["COMPARE_BASELINE_LABEL"] == "MHCflurry 2.0"
     assert env["COMPARE_BACKEND"] == "auto"
-    assert env["COMPARE_LIMIT_FILES"] == ""
+    assert env["EVAL_MAX_BENCHMARK_FILES"] == ""
     assert env["COMPARE_GPUS"] == "auto"
     assert env["COMPARE_TORCH_COMPILE"] == "auto"
     assert env["COMPARE_MATMUL_PRECISION"] == "high"
@@ -805,7 +805,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
         "COMPARE_BASELINE": "public:2.2.0",
         "COMPARE_BASELINE_LABEL": "MHCflurry 2.2",
         "COMPARE_BACKEND": "cpu",
-        "COMPARE_LIMIT_FILES": "1",
+        "EVAL_MAX_BENCHMARK_FILES": "1",
         "COMPARE_GPUS": "1",
         "COMPARE_TORCH_COMPILE": "off",
         "COMPARE_MATMUL_PRECISION": "medium",
@@ -817,7 +817,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert env["COMPARE_BASELINE"] == "public:2.2.0"
     assert env["COMPARE_BASELINE_LABEL"] == "MHCflurry 2.2"
     assert env["COMPARE_BACKEND"] == "cpu"
-    assert env["COMPARE_LIMIT_FILES"] == "1"
+    assert env["EVAL_MAX_BENCHMARK_FILES"] == "1"
     assert env["COMPARE_GPUS"] == "1"
     assert env["COMPARE_TORCH_COMPILE"] == "off"
     assert env["COMPARE_MATMUL_PRECISION"] == "medium"

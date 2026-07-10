@@ -31,7 +31,7 @@ Usage:
       [--compare-presentation-num-jobs 1] \
       [--compare-presentation-max-workers-per-gpu 1] \
       [--compare-presentation-torch-compile 0] \
-      [--compare-limit-files N] \
+      [--eval-max-benchmark-files N] \
       [--compare-baseline public:2.0.0] \
       [--compare-baseline-label "MHCflurry 2.0"] \
       [--compare-gpus auto|N] \
@@ -96,8 +96,9 @@ Evaluation:
   closest older public release available in downloads.yml, public:2.0.0; pass
   --compare-baseline public to compare against the currently configured public
   release, or pass a model-run directory / public:<release_name>.
-  --compare-limit-files limits each benchmark family to the first N input files;
-  it is intended only for smoke proofs that the end-to-end command wiring works.
+  --eval-max-benchmark-files limits each evaluation benchmark family to the
+  first N benchmark input CSV files. It is intended only for smoke proofs that
+  the end-to-end command wiring works.
   If --paper-figures-scores-dir or a saved prediction table is set, the
   plotting step also runs:
       mhcflurry eval paper-figures render --scores-dir DIR
@@ -919,7 +920,7 @@ EOF
         printf 'export COMPARE_BASELINE=%q\n' "$COMPARE_BASELINE"
         printf 'export COMPARE_BASELINE_LABEL=%q\n' "$COMPARE_BASELINE_LABEL"
         printf 'export COMPARE_INCLUDE=%q\n' "$COMPARE_INCLUDE"
-        printf 'export COMPARE_LIMIT_FILES=%q\n' "$COMPARE_LIMIT_FILES"
+        printf 'export EVAL_MAX_BENCHMARK_FILES=%q\n' "$EVAL_MAX_BENCHMARK_FILES"
         printf 'export PROCESSING_MODES=%q\n' "$PROCESSING_MODES"
         printf 'export PRESENTATION_MODES=%q\n' "$PRESENTATION_MODES"
         printf 'export COMPARE_BACKEND=%q\n' "$COMPARE_BACKEND"
@@ -1021,8 +1022,8 @@ compare_args=(
     --torch-compile "$COMPARE_TORCH_COMPILE" \
     --matmul-precision "$COMPARE_MATMUL_PRECISION"
 )
-if [ -n "${COMPARE_LIMIT_FILES:-}" ]; then
-    compare_args+=(--limit-files "$COMPARE_LIMIT_FILES")
+if [ -n "${EVAL_MAX_BENCHMARK_FILES:-}" ]; then
+    compare_args+=(--limit-files "$EVAL_MAX_BENCHMARK_FILES")
 fi
 case "$(printf '%s' "$COMPARE_GPUS" | tr '[:upper:]' '[:lower:]')" in
     auto) ;;
@@ -1416,7 +1417,7 @@ run_brev_training() {
         "RUN_RELEASE_EVAL=$run_release_eval"
         "RUN_RELEASE_PLOTS=$run_release_plots"
         "COMPARE_INCLUDE=$COMPARE_INCLUDE"
-        "COMPARE_LIMIT_FILES=$COMPARE_LIMIT_FILES"
+        "EVAL_MAX_BENCHMARK_FILES=$EVAL_MAX_BENCHMARK_FILES"
         "COMPARE_BASELINE=$COMPARE_BASELINE"
         "COMPARE_BASELINE_LABEL=$COMPARE_BASELINE_LABEL"
         "COMPARE_BACKEND=$COMPARE_BACKEND"
@@ -1565,7 +1566,7 @@ DEPLOY_MODE=none
 RELEASE_PROFILE="${RELEASE_PROFILE:-full}"
 DATA_DIR=
 COMPARE_INCLUDE=affinity,processing,presentation
-COMPARE_LIMIT_FILES="${COMPARE_LIMIT_FILES:-}"
+EVAL_MAX_BENCHMARK_FILES="${EVAL_MAX_BENCHMARK_FILES:-}"
 PROCESSING_MODES_EXPLICIT=0
 if [ -n "${PROCESSING_MODES:-}" ]; then
     PROCESSING_MODES_EXPLICIT=1
@@ -1741,8 +1742,8 @@ while [ $# -gt 0 ]; do
             COMPARE_INCLUDE=$2
             shift 2
             ;;
-        --compare-limit-files)
-            COMPARE_LIMIT_FILES=$2
+        --eval-max-benchmark-files)
+            EVAL_MAX_BENCHMARK_FILES=$2
             shift 2
             ;;
         --presentation-modes)
@@ -1898,13 +1899,13 @@ COMPARE_TORCH_COMPILE="$(normalize_compare_torch_compile "$COMPARE_TORCH_COMPILE
 COMPARE_PRESENTATION_TORCH_COMPILE="$(normalize_compare_torch_compile "$COMPARE_PRESENTATION_TORCH_COMPILE")"
 COMPARE_MATMUL_PRECISION="$(normalize_compare_matmul_precision "$COMPARE_MATMUL_PRECISION")"
 validate_compare_gpus "$COMPARE_GPUS"
-if [ -n "$COMPARE_LIMIT_FILES" ]; then
-    case "$COMPARE_LIMIT_FILES" in
+if [ -n "$EVAL_MAX_BENCHMARK_FILES" ]; then
+    case "$EVAL_MAX_BENCHMARK_FILES" in
         ''|*[!0-9]*)
-            die "--compare-limit-files must be a positive integer; got '$COMPARE_LIMIT_FILES'"
+            die "--eval-max-benchmark-files must be a positive integer; got '$EVAL_MAX_BENCHMARK_FILES'"
             ;;
         0)
-            die "--compare-limit-files must be a positive integer; got '$COMPARE_LIMIT_FILES'"
+            die "--eval-max-benchmark-files must be a positive integer; got '$EVAL_MAX_BENCHMARK_FILES'"
             ;;
     esac
 fi
@@ -2131,8 +2132,8 @@ if [ "$SKIP_EVAL" != "1" ]; then
             --matmul-precision "$COMPARE_MATMUL_PRECISION"
             --out "$EVAL_OUT"
         )
-        if [ -n "$COMPARE_LIMIT_FILES" ]; then
-            compare_args+=(--limit-files "$COMPARE_LIMIT_FILES")
+        if [ -n "$EVAL_MAX_BENCHMARK_FILES" ]; then
+            compare_args+=(--limit-files "$EVAL_MAX_BENCHMARK_FILES")
         fi
         case "$(lowercase "$COMPARE_GPUS")" in
             auto) ;;
