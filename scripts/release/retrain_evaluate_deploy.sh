@@ -75,8 +75,9 @@ Release profiles:
                       configured backend/provider.
   fast-8xa100         For throughput runs on 8xA100 / 80 GB machines. When
                       provisioning Brev and no provider/type was explicitly
-                      set, request the Denvr 8xA100 80 GB shape. Also defaults
-                      affinity training to 2 workers/GPU unless overridden.
+                      set, request the Denvr 8xA100 80 GB shape. Worker
+                      packing still uses the normal auto resolver unless
+                      explicitly overridden.
   minimal-processing  Train only with_flanks and no_flank processing artifacts
                       and evaluate only those processing modes. Use this only
                       when the short_flanks processing artifact is intentionally
@@ -240,9 +241,6 @@ apply_fast_gpu_profile() {
             [ "$BREV_PROVIDER_EXPLICIT" = "0" ] && \
             [ "$BREV_INSTANCE_TYPE_EXPLICIT" = "0" ]; then
         BREV_PROVIDER=denvr-80gb
-    fi
-    if [ "$AFFINITY_MAX_WORKERS_PER_GPU_EXPLICIT" = "0" ]; then
-        AFFINITY_MAX_WORKERS_PER_GPU=2
     fi
 }
 

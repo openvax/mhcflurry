@@ -231,7 +231,7 @@ def test_release_workflow_fast_gpu_profile(tmp_path):
 
     output = result.stdout + result.stderr
     assert "Profile:       fast-8xa100" in output
-    assert "Affinity MWPG: 2" in output
+    assert "Affinity MWPG: auto" in output
     assert "Brev provider: denvr-80gb" in output
     assert "Brev type:     denvr_A100_sxm4_80Gx8" in output
 
