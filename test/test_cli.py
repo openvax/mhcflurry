@@ -131,6 +131,31 @@ def test_release_workflow_prepare_command_is_dry_run_visible(tmp_path):
     assert "mhcflurry eval plot-comparison" in output
 
 
+def test_release_workflow_compare_limit_files_is_forwarded(tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "local",
+            "--skip-train",
+            "--skip-plots",
+            "--compare-include", "affinity",
+            "--compare-limit-files", "1",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert "mhcflurry eval compare-models" in output
+    assert "--include affinity" in output
+    assert "--limit-files 1" in output
+
+
 def test_release_workflow_brev_prepare_uses_remote_postprocess(tmp_path):
     env = dict(os.environ)
     env["PATH"] = "/usr/bin:/bin"
@@ -759,6 +784,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert env["COMPARE_BASELINE"] == "public:2.0.0"
     assert env["COMPARE_BASELINE_LABEL"] == "MHCflurry 2.0"
     assert env["COMPARE_BACKEND"] == "auto"
+    assert env["COMPARE_LIMIT_FILES"] == ""
     assert env["COMPARE_GPUS"] == "auto"
     assert env["COMPARE_TORCH_COMPILE"] == "auto"
     assert env["COMPARE_MATMUL_PRECISION"] == "high"
@@ -779,6 +805,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
         "COMPARE_BASELINE": "public:2.2.0",
         "COMPARE_BASELINE_LABEL": "MHCflurry 2.2",
         "COMPARE_BACKEND": "cpu",
+        "COMPARE_LIMIT_FILES": "1",
         "COMPARE_GPUS": "1",
         "COMPARE_TORCH_COMPILE": "off",
         "COMPARE_MATMUL_PRECISION": "medium",
@@ -790,6 +817,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert env["COMPARE_BASELINE"] == "public:2.2.0"
     assert env["COMPARE_BASELINE_LABEL"] == "MHCflurry 2.2"
     assert env["COMPARE_BACKEND"] == "cpu"
+    assert env["COMPARE_LIMIT_FILES"] == "1"
     assert env["COMPARE_GPUS"] == "1"
     assert env["COMPARE_TORCH_COMPILE"] == "off"
     assert env["COMPARE_MATMUL_PRECISION"] == "medium"
