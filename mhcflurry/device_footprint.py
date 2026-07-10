@@ -25,16 +25,17 @@ job size, so the planner falls back to the static profile default. Estimates are
 deliberately conservative (a safety multiplier + a floor) so we never pack more
 aggressively than the validated baseline.
 
-Sanity anchors (release pan-allele config, live diagnostics from the 2026-04-28
-``release_exact`` run):
+Sanity anchors (release pan-allele config, live diagnostics from release
+training runs):
 
   * Affinity TRAINING — pretraining keeps the fold's validation tensors
     device-resident. For inequality losses with the legacy denominator, the
     validation pass is still single-shot, so large release folds are dominated
-    by validation activations rather than the minibatch. The 2026-07 rc14 GCP
-    smoke run (A100-40GB, minibatch 1024, ~1M rows) measured a 24+ GB worker
-    peak; ``estimate_affinity_training_device_worker_gb`` reproduces this
-    instead of the much smaller steady-state minibatch footprint.
+    by validation activations rather than the minibatch. The 2026-07 rc14
+    worker-density benchmark (A100-80GB, minibatch 1024, ~943k rows, widest
+    [1024, 1024] architecture) measured a 24.4 GiB worker peak;
+    ``estimate_affinity_training_device_worker_gb`` reproduces this instead of
+    the much smaller steady-state minibatch footprint.
   * Affinity CALIBRATION — 400k-row rc14 peptide universe, 10-net selected
     ensemble — the merged fast path measured a ~15 GB cached peptide-stage
     tensor on A100-40GB. ``estimate_affinity_calibration_device_worker_gb``
@@ -93,9 +94,10 @@ _TRAINING_RANDOM_NEGATIVE_FACTOR = 2.0
 _TRAINING_ACTIVATION_BACKWARD_FACTOR = 3.0
 # Conservative multiplier for the single-shot pretrain validation pass used by
 # custom:mse_with_inequalities when encoded ``>`` rows carry the legacy
-# denominator sentinel. Calibrated from the rc14 GCP smoke run where a
-# [512, 256] release worker hit ~24 GB with ~1M rows.
-_TRAINING_VALIDATION_FORWARD_FACTOR = 5.3
+# denominator sentinel. Calibrated from the rc14 worker-density benchmark where
+# the widest release architecture ([1024, 1024], minibatch 1024, ~943k rows)
+# peaked at 24.4 GiB on an A100-80GB.
+_TRAINING_VALIDATION_FORWARD_FACTOR = 3.5
 _PEPTIDE_INDEX_BYTES = 1  # int8 per position (peptides are always index-encoded)
 _TRAINING_DEFAULT_MINIBATCH = 128
 _TRAINING_DEFAULT_MERGE_WIDTH = 1024      # when layer widths can't be derived

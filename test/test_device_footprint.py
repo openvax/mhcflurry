@@ -114,11 +114,13 @@ def test_calibration_rc14_a100_40gb_worker_cap(tmp_path, monkeypatch):
 # --------------------------------------------------------------------------
 
 def test_training_sanity_anchor():
-    # SANITY ANCHOR: ~250k rows, minibatch 128. The estimate is above the
-    # measured 1.85-2.4 GB steady-state minibatch peak because the release
-    # pretrain path validates an inequality loss in one full-fold forward pass.
+    # SANITY ANCHOR: ~250k rows, minibatch 128. The estimate is still above the
+    # measured steady-state minibatch peak because the release pretrain path
+    # validates an inequality loss in one full-fold forward pass, but the
+    # validation multiplier is anchored to the newer rc14 worker-density
+    # benchmark below.
     gb = training_gb(RELEASE_HYPERPARAMETERS, RELEASE_TRAINING_ROWS)
-    assert 9.0 < gb < 13.0, gb
+    assert 7.0 < gb < 9.5, gb
 
 
 def test_training_is_base_dominated_for_index_encoded_peptides():
@@ -146,17 +148,23 @@ def test_training_is_base_dominated_for_index_encoded_peptides():
     assert training_gb(RELEASE_HYPERPARAMETERS, 0) is None
 
 
-def test_training_rc14_a100_40gb_worker_cap(monkeypatch):
-    """The rc14 release recipe should not pack 4 workers onto A100-40GB."""
+def test_training_rc14_worker_density_defaults(monkeypatch):
+    """The rc14 release recipe should pick 1 worker on 40 GB, 2 on 80 GB."""
     from mhcflurry.parallelism import auto_max_workers_per_gpu
 
-    rc14_small = dict(
+    rc14_wide = dict(
         RELEASE_HYPERPARAMETERS,
-        layer_sizes=[512, 256],
+        layer_sizes=[1024, 1024],
         minibatch_size=1024,
     )
-    worker_gb = training_gb(rc14_small, RC14_TRAINING_ROWS)
-    assert 23.0 < worker_gb < 27.0, worker_gb
+    # SANITY ANCHOR: 2026-07 rc14 worker-density benchmark,
+    # A100-80GB, ~943k rows, widest release architecture. Telemetry peaked at
+    # 24.4 GiB, so the estimator should land in the same conservative band.
+    benchmark_worker_gb = training_gb(rc14_wide, 943228)
+    assert 23.0 < benchmark_worker_gb < 25.0, benchmark_worker_gb
+
+    worker_gb = training_gb(rc14_wide, RC14_TRAINING_ROWS)
+    assert 24.0 < worker_gb < 26.0, worker_gb
 
     monkeypatch.setenv(
         "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "40")
@@ -167,6 +175,14 @@ def test_training_rc14_a100_40gb_worker_cap(monkeypatch):
         num_gpus=4,
         per_worker_gb=worker_gb,
     ) == 1
+
+    monkeypatch.setenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
+    assert auto_max_workers_per_gpu(
+        num_jobs="auto",
+        num_gpus=4,
+        per_worker_gb=worker_gb,
+    ) == 2
 
 
 # --------------------------------------------------------------------------

@@ -122,12 +122,14 @@ intentionally re-benchmarking.
 ### `--max-workers-per-gpu auto` → `auto_max_workers_per_gpu`
 
 Picks the per-GPU worker concurrency from `min(num_jobs / num_gpus,
-floor(0.6 × free_vram_gb / per_worker_gb), hard_cap=4)`. Free VRAM is
+floor(vram_fraction × free_vram_gb / per_worker_gb), hard_cap=4)`. Free VRAM is
 read from `nvidia-smi` (no torch import — the parent process must not
 initialize CUDA before forking). The per-worker VRAM upper bound defaults to
 4 GB (the affinity-fit footprint) and is tunable via
-`MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`; heavier workloads (e.g.
-calibration at 24 GB) pass their own value through the planner.
+`MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`. The default VRAM fraction is
+0.65 and is tunable via
+`MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_VRAM_FRACTION`; heavier workloads (e.g.
+calibration at 24 GB) pass their own per-worker value through the planner.
 
 | Box | num_gpus | free_vram | resolved |
 |---|---|---|---|

@@ -37,10 +37,17 @@ from ..workload_planning import (
 # and was producing only 2 workers/GPU on 80 GB cards (well below the
 # hard_cap of 4). Lowered to 4.0 GB which keeps a 2x safety margin over
 # observed and unlocks the 4-worker tier on 80 GB cards. 40 GB cards also
-# reach the hard cap at full free VRAM (0.6 × 40 / 4 = 6, capped to 4); fewer
+# reach the hard cap at full free VRAM (0.65 × 40 / 4 = 6, capped to 4); fewer
 # only when free VRAM is already partly used. Override with
 # ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`` for re-benchmarking.
 _AUTO_MWPG_PER_WORKER_GB_DEFAULT = 4.0
+
+# Fraction of reported free VRAM allowed for fit workers. The remaining 35%
+# absorbs context-start races, compiler workspace, allocator fragmentation, and
+# other unmodeled pressure. Override with
+# ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_VRAM_FRACTION`` when re-benchmarking a
+# hardware tier.
+_AUTO_MWPG_VRAM_FRACTION_DEFAULT = 0.65
 
 # SM-scheduler ceiling. Beyond ~4 workers/GPU the kernel queue serializes
 # behind a single SM scheduler, so per-worker throughput drops faster than
@@ -269,8 +276,8 @@ def auto_max_workers_per_gpu(
       * Otherwise: take the minimum of three caps:
           - ``num_jobs // num_gpus`` — don't oversubscribe a GPU beyond the
             jobs that actually exist.
-          - ``floor(0.6 × free_vram_gb / per_worker_gb)`` — VRAM headroom
-            with 40% slack for activation peaks and the auto-sized
+          - ``floor(vram_fraction × free_vram_gb / per_worker_gb)`` — VRAM
+            headroom with slack for activation peaks and the auto-sized
             validation batch.
           - ``hard_cap`` (default 4) — SM-scheduler kernel-serialization
             wall.
@@ -309,6 +316,11 @@ def auto_max_workers_per_gpu(
         _AUTO_MWPG_HARD_CAP_DEFAULT,
         bounds=(1, None),
     )
+    vram_fraction = env_float(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_VRAM_FRACTION",
+        _AUTO_MWPG_VRAM_FRACTION_DEFAULT,
+        bounds=(0.0, 1.0),
+    )
 
     # Honor an explicit env override even when it resolves to 0.0 (falsy);
     # only fall through to nvidia-smi when no override was set at all.
@@ -342,7 +354,7 @@ def auto_max_workers_per_gpu(
         num_jobs_int = 0
     else:
         num_jobs_int = int(num_jobs)
-    # 40% VRAM headroom (multiply by 0.6) absorbs three sources of
+    # VRAM headroom absorbs three sources of
     # transient pressure that ``per_worker_gb`` does not model:
     #   (1) spawn-startup race — workers create their CUDA context and
     #       allocate model state in parallel, briefly holding more memory
@@ -359,7 +371,8 @@ def auto_max_workers_per_gpu(
         # still bounds the result. Mirrors host_memory_num_jobs_cap's guard.
         by_vram = hard_cap
     else:
-        by_vram = max(1, int(free_vram_gb_used * 0.6 / per_worker_gb))
+        by_vram = max(
+            1, int(free_vram_gb_used * vram_fraction / per_worker_gb))
     if num_jobs_int > 0:
         by_jobs = max(1, num_jobs_int // max(int(num_gpus), 1))
         chosen = max(1, min(by_jobs, by_vram, hard_cap))
@@ -371,7 +384,7 @@ def auto_max_workers_per_gpu(
     logging.info(
         "auto_max_workers_per_gpu: chose %d "
         "(num_jobs=%d, num_gpus=%d, by_jobs=%s, by_vram=%d at "
-        "free_vram=%.1f GB%s / %.1f GB/worker, hard_cap=%d)",
+        "free_vram=%.1f GB%s × %.2f / %.1f GB/worker, hard_cap=%d)",
         chosen,
         num_jobs_int,
         int(num_gpus),
@@ -379,6 +392,7 @@ def auto_max_workers_per_gpu(
         by_vram,
         free_vram_gb_used,
         "" if free_vram_gb is not None else " (fallback)",
+        vram_fraction,
         per_worker_gb,
         hard_cap,
     )
