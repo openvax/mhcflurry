@@ -60,11 +60,12 @@ def _write_manifest(tmp_path, n_networks, hyperparameters):
 # --------------------------------------------------------------------------
 
 def test_calibration_sanity_anchor(tmp_path):
-    # SANITY ANCHOR: 800k-row universe x 10-net ensemble -> ~12 GB cached
-    # peptide-stage tensor (the static profile assumed 24 GB).
+    # SANITY ANCHOR: 800k-row universe x 10-net ensemble. The selected
+    # release ensemble uses the merged fast path, whose cached peptide-stage
+    # tensor is wider than the raw BLOSUM62 peptide vector in manifest.csv.
     _write_manifest(tmp_path, RELEASE_NUM_NETWORKS, RELEASE_HYPERPARAMETERS)
     gb = calibration_gb(str(tmp_path), RELEASE_CALIBRATION_ROWS)
-    assert 11.0 < gb < 14.0, gb
+    assert 30.0 < gb < 33.0, gb
 
 
 def test_calibration_scales_and_falls_back(tmp_path):
@@ -87,6 +88,25 @@ def test_calibration_scales_and_falls_back(tmp_path):
     # Unreadable model / empty job -> None (planner uses the profile default).
     assert calibration_gb(str(tmp_path / "missing"), 800000) is None
     assert calibration_gb(str(tmp_path), 0) is None
+
+
+def test_calibration_rc14_a100_40gb_worker_cap(tmp_path, monkeypatch):
+    """Calibration should not pack multiple caches onto A100-40GB."""
+    from mhcflurry.parallelism import auto_max_workers_per_gpu
+
+    _write_manifest(tmp_path, RELEASE_NUM_NETWORKS, RELEASE_HYPERPARAMETERS)
+    worker_gb = calibration_gb(str(tmp_path), 400000)
+    assert 14.0 < worker_gb < 18.0, worker_gb
+
+    monkeypatch.setenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "40")
+    monkeypatch.setenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP", "4")
+    assert auto_max_workers_per_gpu(
+        num_jobs="auto",
+        num_gpus=4,
+        per_worker_gb=worker_gb,
+    ) == 1
 
 
 # --------------------------------------------------------------------------

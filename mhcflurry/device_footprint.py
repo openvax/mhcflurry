@@ -35,9 +35,11 @@ Sanity anchors (release pan-allele config, live diagnostics from the 2026-04-28
     smoke run (A100-40GB, minibatch 1024, ~1M rows) measured a 24+ GB worker
     peak; ``estimate_affinity_training_device_worker_gb`` reproduces this
     instead of the much smaller steady-state minibatch footprint.
-  * Affinity CALIBRATION — 800k-row peptide universe, 10-net ensemble — the
-    cached peptide-stage tensor is ~12 GB (the static profile assumed 24 GB).
-    ``estimate_affinity_calibration_device_worker_gb`` reproduces this.
+  * Affinity CALIBRATION — 400k-row rc14 peptide universe, 10-net selected
+    ensemble — the merged fast path measured a ~15 GB cached peptide-stage
+    tensor on A100-40GB. ``estimate_affinity_calibration_device_worker_gb``
+    reproduces the cache plus runtime headroom so worker auto-sizing does not
+    pack multiple calibration caches onto a 40 GB GPU.
 
 The per-row resident formulas track the genuinely-varying terms: full dataset /
 peptide-universe row count, the peptide encoding dims (``max_length`` x feature
@@ -63,6 +65,11 @@ _FLOAT32_BYTES = 4
 _CALIBRATION_DEFAULT_STAGE_DIM = 1024
 _CALIBRATION_OVERHEAD_GB = 3.0            # model weights + activation headroom
 _CALIBRATION_MIN_DEVICE_WORKER_GB = 4.0   # don't over-pack from a tiny estimate
+# A merged ensemble without explicit peptide-dense layers expands the raw
+# peptide vector into a wider fast-path representation than the manifest alone
+# exposes. The rc14 GCP calibration run measured a 9450-wide stage for a
+# 10-network BLOSUM62 ensemble (3x the naive 10 * 15 * 21 estimate).
+_CALIBRATION_MERGED_STAGE_FACTOR = 3.0
 
 # ---- Affinity training -----------------------------------------------------
 # Peptides are stored device-resident as compact (N, L) int8 indices
@@ -200,7 +207,12 @@ def estimate_affinity_calibration_device_worker_gb(models_dir, prediction_rows):
     if manifest is None:
         return None
     num_networks, hyperparameters = manifest
-    stage_dim = _peptide_stage_dim(hyperparameters) or _CALIBRATION_DEFAULT_STAGE_DIM
+    stage_dim = (
+        _peptide_stage_dim(hyperparameters)
+        or _CALIBRATION_DEFAULT_STAGE_DIM
+    )
+    if not (hyperparameters.get("peptide_dense_layer_sizes") or []):
+        stage_dim *= _CALIBRATION_MERGED_STAGE_FACTOR
     cache_gb = (
         num_networks * int(stage_dim) * int(prediction_rows)
         * _FLOAT32_BYTES / _GIB

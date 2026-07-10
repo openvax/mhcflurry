@@ -423,13 +423,8 @@ do
     # ceiling here, the planner must honor it as an explicit CLI override
     # and overflow workers spill to CPU when MWPG resolves lower.
     # Override with CALIBRATE_NUM_JOBS only when deliberately pinning.
-    # CALIBRATE_PER_WORKER_GB tells the resolver how much VRAM to
-    # budget per worker (default 12 — the cache + ~2 GB working
-    # set on 8-network ensembles). Bumped from the training
-    # default of 4 because the calibrate cache is much larger.
     CALIBRATE_NUM_JOBS="${CALIBRATE_NUM_JOBS:-auto}"
     CALIBRATE_MAX_WORKERS_PER_GPU="${CALIBRATE_MAX_WORKERS_PER_GPU:-auto}"
-    CALIBRATE_PER_WORKER_GB="${CALIBRATE_PER_WORKER_GB:-12}"
     CALIBRATE_PARALLELISM_ARGS=(
         --num-jobs "$CALIBRATE_NUM_JOBS"
         --max-tasks-per-worker "$MAX_TASKS_PER_WORKER"
@@ -443,7 +438,6 @@ do
         CALIBRATE_PARALLELISM_ARGS+=(--enable-timing)
     fi
     run_logged_step "calibrate_${kind}" "$CALIBRATE_LOG" \
-        env "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB=$CALIBRATE_PER_WORKER_GB" \
         mhcflurry-calibrate-percentile-ranks \
         --models-dir "$SELECTED_DIR" \
         --match-amino-acid-distribution-data "$UNSELECTED_DIR/train_data.csv.bz2" \
