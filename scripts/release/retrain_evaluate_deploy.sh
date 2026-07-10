@@ -22,6 +22,7 @@ Usage:
       --run-dir /path/to/release-run \
       --release 2.3.0 \
       [--backend local|brev-existing|brev-provision|ssh] \
+      [--release-profile full|fast-8xa100|minimal-processing|fast-minimal] \
       [--minibatch-size 1024] \
       [--affinity-minibatch-size 1024] \
       [--affinity-max-workers-per-gpu auto] \
@@ -68,6 +69,19 @@ Backends:
                  back. Requires --remote, --remote-repo, and --remote-run-dir.
                  Authentication is whatever your local ssh/rsync configuration
                  uses, typically SSH keys or an SSH config Host entry.
+
+Release profiles:
+  full                Default. Train all release processing artifacts on the
+                      configured backend/provider.
+  fast-8xa100         For throughput runs on 8xA100 / 80 GB machines. When
+                      provisioning Brev and no provider/type was explicitly
+                      set, request the Denvr 8xA100 80 GB shape. Also defaults
+                      affinity training to 2 workers/GPU unless overridden.
+  minimal-processing  Train only with_flanks and no_flank processing artifacts
+                      and evaluate only those processing modes. Use this only
+                      when the short_flanks processing artifact is intentionally
+                      out of scope for the run.
+  fast-minimal        Apply fast-8xa100 and minimal-processing together.
 
 Evaluation:
   After training, the script runs:
@@ -217,6 +231,46 @@ brev_provider_instance_type() {
             ;;
         *)
             die "--brev-provider must be one of: auto, gcp, denvr, denvr-80gb"
+            ;;
+    esac
+}
+
+apply_fast_gpu_profile() {
+    if [ "$BACKEND" = "brev-provision" ] && \
+            [ "$BREV_PROVIDER_EXPLICIT" = "0" ] && \
+            [ "$BREV_INSTANCE_TYPE_EXPLICIT" = "0" ]; then
+        BREV_PROVIDER=denvr-80gb
+    fi
+    if [ "$AFFINITY_MAX_WORKERS_PER_GPU_EXPLICIT" = "0" ]; then
+        AFFINITY_MAX_WORKERS_PER_GPU=2
+    fi
+}
+
+apply_minimal_processing_profile() {
+    if [ "$PROCESSING_VARIANTS_EXPLICIT" = "0" ]; then
+        PROCESSING_VARIANTS="with_flanks no_flank"
+    fi
+    if [ "$PROCESSING_MODES_EXPLICIT" = "0" ]; then
+        PROCESSING_MODES="with_flanks,no_flank"
+    fi
+}
+
+apply_release_profile() {
+    case "$RELEASE_PROFILE" in
+        full)
+            ;;
+        fast-8xa100)
+            apply_fast_gpu_profile
+            ;;
+        minimal-processing)
+            apply_minimal_processing_profile
+            ;;
+        fast-minimal)
+            apply_fast_gpu_profile
+            apply_minimal_processing_profile
+            ;;
+        *)
+            die "--release-profile must be one of: full, fast-8xa100, minimal-processing, fast-minimal"
             ;;
     esac
 }
@@ -1204,12 +1258,14 @@ add_glob affinity/LOG-worker.*.txt
 
 add_glob processing/models.selected.*
 add_path processing/hits_with_tpm.csv.bz2
+add_path processing/gpu_occupancy.csv
 add_path processing/hyperparameters.base.yaml
 add_glob processing/hyperparameters.*.yaml
 add_path processing/train_data.csv.bz2
 add_glob processing/LOG-worker.*.txt
 
 add_path presentation/models
+add_path presentation/gpu_occupancy.csv
 add_path presentation/make_train_data.presentation.py
 
 sort -u "$manifest" -o "$manifest"
@@ -1472,7 +1528,16 @@ REMOTE_RUN_DIR=
 SYNC_REMOTE_OUTPUT=1
 BREV_INSTANCE="${RUNPLZ_BREV_INSTANCE:-${BREV_INSTANCE:-}}"
 BREV_ON_FINISH="${RUNPLZ_BREV_ON_FINISH:-${BREV_ON_FINISH:-}}"
+BREV_PROVIDER_EXPLICIT=0
+if [ -n "${RUNPLZ_BREV_PROVIDER:-}" ] || [ -n "${BREV_PROVIDER:-}" ]; then
+    BREV_PROVIDER_EXPLICIT=1
+fi
 BREV_PROVIDER="${RUNPLZ_BREV_PROVIDER:-${BREV_PROVIDER:-gcp}}"
+BREV_INSTANCE_TYPE_EXPLICIT=0
+if [ -n "${RUNPLZ_BREV_INSTANCE_TYPE:-}" ] || \
+        [ -n "${BREV_INSTANCE_TYPE:-}" ]; then
+    BREV_INSTANCE_TYPE_EXPLICIT=1
+fi
 BREV_INSTANCE_TYPE="${RUNPLZ_BREV_INSTANCE_TYPE:-${BREV_INSTANCE_TYPE:-}}"
 DEFAULT_BREV_PROVISION_INSTANCE_TYPE="${DEFAULT_BREV_PROVISION_INSTANCE_TYPE:-}"
 BREV_CONTAINER_IMAGE="${BREV_CONTAINER_IMAGE:-pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime}"
@@ -1491,9 +1556,14 @@ SKIP_EVAL=0
 SKIP_PLOTS=0
 SKIP_DEPLOY=0
 DEPLOY_MODE=none
+RELEASE_PROFILE="${RELEASE_PROFILE:-full}"
 DATA_DIR=
 COMPARE_INCLUDE=affinity,processing,presentation
-PROCESSING_MODES=with_flanks,no_flank,short_flanks
+PROCESSING_MODES_EXPLICIT=0
+if [ -n "${PROCESSING_MODES:-}" ]; then
+    PROCESSING_MODES_EXPLICIT=1
+fi
+PROCESSING_MODES="${PROCESSING_MODES:-with_flanks,no_flank,short_flanks}"
 PRESENTATION_MODES=with_flanks,without_flanks
 COMPARE_BACKEND="${COMPARE_BACKEND:-auto}"
 COMPARE_NUM_JOBS="${COMPARE_NUM_JOBS:-auto}"
@@ -1523,12 +1593,20 @@ PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS="${PAPER_FIGURES_PRESENTATION_PANEL_
 PAPER_FIGURES_PRESENTATION_PANEL_BASELINES="${PAPER_FIGURES_PRESENTATION_PANEL_BASELINES:-}"
 RUN_LABEL="${RUN_LABEL:-}"
 DRY_RUN=0
-TRAINING_MINIBATCH_SIZE=1024
+TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-1024}"
 AFFINITY_MINIBATCH_SIZE=
+AFFINITY_MAX_WORKERS_PER_GPU_EXPLICIT=0
+if [ -n "${AFFINITY_MAX_WORKERS_PER_GPU:-}" ]; then
+    AFFINITY_MAX_WORKERS_PER_GPU_EXPLICIT=1
+fi
 AFFINITY_MAX_WORKERS_PER_GPU="${AFFINITY_MAX_WORKERS_PER_GPU:-auto}"
 PROCESSING_MINIBATCH_SIZE=
-PROCESSING_VARIANTS="with_flanks no_flank short_flanks"
-PRESENTATION_PROCESSING_WITH_FLANKS_KIND=with_flanks
+PROCESSING_VARIANTS_EXPLICIT=0
+if [ -n "${PROCESSING_VARIANTS:-}" ]; then
+    PROCESSING_VARIANTS_EXPLICIT=1
+fi
+PROCESSING_VARIANTS="${PROCESSING_VARIANTS:-with_flanks no_flank short_flanks}"
+PRESENTATION_PROCESSING_WITH_FLANKS_KIND="${PRESENTATION_PROCESSING_WITH_FLANKS_KIND:-with_flanks}"
 WORKFLOW_LOG_DIR=
 WORKFLOW_STATUS_LOG=
 WORKFLOW_RUN_ID="${WORKFLOW_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
@@ -1558,6 +1636,10 @@ while [ $# -gt 0 ]; do
             BACKEND=$2
             shift 2
             ;;
+        --release-profile)
+            RELEASE_PROFILE=$2
+            shift 2
+            ;;
         --remote)
             REMOTE=$2
             shift 2
@@ -1580,10 +1662,12 @@ while [ $# -gt 0 ]; do
             ;;
         --brev-provider)
             BREV_PROVIDER=$2
+            BREV_PROVIDER_EXPLICIT=1
             shift 2
             ;;
         --brev-instance-type)
             BREV_INSTANCE_TYPE=$2
+            BREV_INSTANCE_TYPE_EXPLICIT=1
             shift 2
             ;;
         --brev-stop-failure-action)
@@ -1743,6 +1827,7 @@ while [ $# -gt 0 ]; do
             ;;
         --affinity-max-workers-per-gpu)
             AFFINITY_MAX_WORKERS_PER_GPU=$2
+            AFFINITY_MAX_WORKERS_PER_GPU_EXPLICIT=1
             shift 2
             ;;
         --processing-minibatch-size)
@@ -1751,6 +1836,7 @@ while [ $# -gt 0 ]; do
             ;;
         --processing-variants)
             PROCESSING_VARIANTS=$2
+            PROCESSING_VARIANTS_EXPLICIT=1
             shift 2
             ;;
         --presentation-processing-with-flanks-kind)
@@ -1759,6 +1845,7 @@ while [ $# -gt 0 ]; do
             ;;
         --processing-modes)
             PROCESSING_MODES=$2
+            PROCESSING_MODES_EXPLICIT=1
             shift 2
             ;;
         -h|--help)
@@ -1795,6 +1882,7 @@ fi
 if [ -z "$PROCESSING_MINIBATCH_SIZE" ]; then
     PROCESSING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE
 fi
+apply_release_profile
 COMPARE_TORCH_COMPILE="$(normalize_compare_torch_compile "$COMPARE_TORCH_COMPILE")"
 COMPARE_PRESENTATION_TORCH_COMPILE="$(normalize_compare_torch_compile "$COMPARE_PRESENTATION_TORCH_COMPILE")"
 COMPARE_MATMUL_PRECISION="$(normalize_compare_matmul_precision "$COMPARE_MATMUL_PRECISION")"
@@ -1896,6 +1984,7 @@ fi
 note "Run directory: $RUN_DIR"
 note "Release:       $RELEASE"
 note "Backend:       $BACKEND"
+note "Profile:       $RELEASE_PROFILE"
 note "Batch sizes:   affinity=$AFFINITY_MINIBATCH_SIZE processing=$PROCESSING_MINIBATCH_SIZE"
 note "Compare:       $RUN_LABEL vs $COMPARE_BASELINE_LABEL ($COMPARE_BASELINE)"
 note "Affinity MWPG: $AFFINITY_MAX_WORKERS_PER_GPU"

@@ -13,13 +13,16 @@ one-off tuning runs do not belong here.
 - **`presentation_from_affinity.sh`** — Stages 2–3. Takes an existing
   affinity `models.combined/` and trains the with-flanks, no-flank, and short-flanks
   processing predictors, then fits + calibrates the presentation
-  predictor on top. Use this as a tail-on after a sweep.
+  predictor on top. Use this as a tail-on after a sweep. It writes
+  `processing/gpu_occupancy.csv` and `presentation/gpu_occupancy.csv` so
+  manual continuation runs have the same post-run GPU telemetry as affinity.
 - **`pan_allele_release_full.sh`** — Composition wrapper that runs Stage
   1 then inlines Stages 2–3. The full release in one invocation. Its affinity
   stage leaves `AFFINITY_MAX_WORKERS_PER_GPU=auto` so the affinity training
   command can choose worker packing from the hyperparameter grid, row count,
   minibatch, and detected VRAM. Set `AFFINITY_MAX_WORKERS_PER_GPU` to a number
   only when deliberately pinning a known-good count for a specific machine.
+  Stages 2 and 3 also write persistent GPU telemetry CSVs.
 - **`launch_pan_allele_training_remote.py`** — remote/cloud launcher for
   the same pan-allele training pipeline. It uses runplz as the transport,
   with Brev provisioning behavior controlled by `RUNPLZ_BREV_*`
@@ -72,7 +75,15 @@ implementation. Deployment is opt-in through `--deploy-mode`.
 - **`full_ensemble_minibatch_sweep.sh`** — Production minibatch sweep.
   Phase-idempotent (`.train.done` / `.select.done` / `.calibrate.done` /
   `.eval.done` sentinels) and supports `MHCFLURRY_SCALE_LR`,
-  `MHCFLURRY_SKIP_CALIBRATE` for the variants we routinely run.
+  `MHCFLURRY_SKIP_CALIBRATE` for the variants we routinely run. It is also the
+  affinity throughput benchmark: set `VALIDATION_BATCH_SIZES` to compare
+  fit-time validation memory/speed tradeoffs and set
+  `MAX_WORKERS_PER_GPU_VALUES="auto 2"` on 80 GB A100 machines to test whether
+  two concurrent affinity workers per GPU fit and improve throughput. The
+  default `VALIDATION_BATCH_SIZES=auto` and
+  `MAX_WORKERS_PER_GPU_VALUES=auto` preserve the historical `mb_<size>/`
+  output layout. Each train cell writes `gpu_occupancy.csv` for utilization and
+  VRAM analysis.
 - **`mhcflurry eval compare-models`** — Unified two-side comparator covering
   training stats (per-task wall-time / epoch / loss deltas), affinity
   (per-allele + per-length ROC/PR/PPV on `data_evaluation` monoallelic),
@@ -140,6 +151,10 @@ implementation. Deployment is opt-in through `--deploy-mode`.
   PyTorch/Inductor workers share GNU OpenMP instead of aborting on mixed
   runtimes. Sourced by the release-stage scripts before they fork training
   workers.
+- **`gpu_telemetry.sh`** — Starts/stops the persistent `nvidia-smi` CSV sampler
+  used by processing and presentation stages. Set `MHCFLURRY_GPU_TELEMETRY=0`
+  to disable it, or `MHCFLURRY_GPU_TELEMETRY_SECONDS=N` to change the sampling
+  interval.
 
 ## Profiling
 

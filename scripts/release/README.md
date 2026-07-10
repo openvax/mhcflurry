@@ -29,6 +29,7 @@ scripts/release/retrain_evaluate_deploy.sh \
     --run-dir /path/to/release-run \
     --release 2.3.0 \
     --backend local \
+    --release-profile full \
     --minibatch-size 1024 \
     --affinity-max-workers-per-gpu auto
 ```
@@ -77,6 +78,17 @@ stdout/stderr logs and a `status.tsv` file are written under
 `<run-dir>/workflow_logs/`, alongside the training logs copied from the remote
 run (`.runplz/`, `gpu_occupancy.csv`, release driver logs, and
 model-selection/evaluation artifacts).
+
+`--release-profile full` is the default and trains the complete processing
+artifact set (`with_flanks no_flank short_flanks`). Use
+`--release-profile fast-8xa100` for throughput runs on 8xA100 / 80 GB machines:
+with `--backend brev-provision`, it requests the Denvr 8xA100 80 GB shape when
+no provider/type was explicitly supplied and defaults affinity training to
+2 workers/GPU. Use `--release-profile minimal-processing` when short-flanks
+processing artifacts are intentionally out of scope; it trains and evaluates
+only `with_flanks` and `no_flank`. `--release-profile fast-minimal` combines
+both. These profiles are opt-in so the default release path keeps the full
+artifact contract on the configured provider.
 
 Training batch-size knobs are first-class release options. `--minibatch-size`
 sets the shared default (currently 1024); `--affinity-minibatch-size` and

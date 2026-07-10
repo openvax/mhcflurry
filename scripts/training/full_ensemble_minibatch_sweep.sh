@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 #
-# Full-ensemble minibatch-size sweep. For each minibatch in
-# ${MINIBATCH_SIZES}, runs the full release_affinity pipeline
-# (train -> select -> calibrate -> eval) into a per-size subdirectory
-# and records phase wall times + eval metrics into sweep_summary.csv.
+# Full-ensemble affinity throughput sweep. For each minibatch in
+# ${MINIBATCH_SIZES}, validation batch in ${VALIDATION_BATCH_SIZES}, and
+# workers-per-GPU cap in ${MAX_WORKERS_PER_GPU_VALUES}, runs the full
+# release_affinity pipeline (train -> select -> calibrate -> eval) into a
+# per-cell subdirectory and records phase wall times + eval metrics into
+# sweep_summary.csv.
 #
 # Reuses the existing v7 box's downloaded data (training data, allele
 # sequences, pretrain predictions, eval benchmarks, public predictor)
@@ -14,6 +16,14 @@
 #   MHCFLURRY_OUT     base output dir (e.g. .../out/affinity)
 #   SWEEP_OUT         sweep root (default: $MHCFLURRY_OUT/full_sweep)
 #   MINIBATCH_SIZES   space-separated list (default: "256 512 1024 2048 4096 8192 16384")
+#   VALIDATION_BATCH_SIZES
+#                     space-separated validation_batch_size values to test.
+#                     "auto" leaves the template value unchanged.
+#   MAX_WORKERS_PER_GPU_VALUES
+#                     space-separated --max-workers-per-gpu values to test.
+#                     Use "2" on 80 GB A100 boxes to test whether two
+#                     concurrent affinity workers fit; "auto" preserves the
+#                     workload-aware resolver.
 #   TRAIN_DATA        train_data.csv.bz2 from prior run
 #   HYPERPARAMS_TPL   template hyperparameters.yaml to patch
 #   ALLELE_SEQUENCES  path to a pseudosequence CSV
@@ -30,22 +40,30 @@
 #                       the sweep isolates the effect of minibatch size at
 #                       fixed LR -- run twice (once with, once without)
 #                       into separate $SWEEP_OUT roots to compare.
-# (--num-jobs and --max-workers-per-gpu auto-resolve per phase)
+# (--num-jobs auto-resolves from the requested workers-per-GPU and GPU count)
 #
 # Output layout:
 #   $SWEEP_OUT/
 #     mb_1024/{hyperparameters.yaml,train.log,select.log,calibrate.log,eval.log,
 #              models.unselected.combined/, models.combined/, eval_comparison/}
-#     mb_2048/...
+#     mb_1024__val_4096__mwpg_2/...
 #     ...
-#     sweep_summary.csv  -- one row per minibatch
+#     sweep_summary.csv  -- one row per sweep cell
 #
 set -euo pipefail
 set -x
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/gpu_telemetry.sh"
+GPU_TELEMETRY_PID=""
+trap stop_gpu_telemetry EXIT
+
 : "${MHCFLURRY_OUT:?MHCFLURRY_OUT must be set}"
 SWEEP_OUT="${SWEEP_OUT:-$MHCFLURRY_OUT/full_sweep}"
 MINIBATCH_SIZES="${MINIBATCH_SIZES:-256 512 1024 2048 4096 8192 16384}"
+VALIDATION_BATCH_SIZES="${VALIDATION_BATCH_SIZES:-auto}"
+MAX_WORKERS_PER_GPU_VALUES="${MAX_WORKERS_PER_GPU_VALUES:-auto}"
 TRAIN_DATA="${TRAIN_DATA:-$MHCFLURRY_OUT/train_data.csv.bz2}"
 HYPERPARAMS_TPL="${HYPERPARAMS_TPL:-$MHCFLURRY_OUT/hyperparameters.yaml}"
 if [ -z "${ALLELE_SEQUENCES:-}" ]; then
@@ -74,14 +92,26 @@ MHCFLURRY_SCALE_LR_BASE_MB="${MHCFLURRY_SCALE_LR_BASE_MB:-128}"
 # multi-cell sweeps where calibrate would be ~10-15min/cell of pure
 # overhead. Run calibrate manually for the winning cell at the end.
 MHCFLURRY_SKIP_CALIBRATE="${MHCFLURRY_SKIP_CALIBRATE:-0}"
-# --num-jobs and --max-workers-per-gpu are passed as ``auto`` so that
-# the resolver in mhcflurry/parallelism picks values that match
-# the box (free VRAM, GPU count, per-worker memory) instead of being
-# pinned to fixed sweep-time defaults that drift away from reality.
+# --num-jobs is passed as ``auto`` so the resolver never overflows workers to
+# CPU silently. --max-workers-per-gpu is swept explicitly so 80 GB boxes can
+# test whether 2 workers/GPU improves throughput without OOM.
 
 mkdir -p "$SWEEP_OUT"
 SUMMARY="$SWEEP_OUT/sweep_summary.csv"
-SUMMARY_HEADER="minibatch,n_models,params_M,train_seconds,select_seconds,calibrate_seconds,eval_seconds,total_seconds,n_alleles_reported,n_hits,n_rows,roc_auc_macro_new,roc_auc_macro_public,pr_auc_macro_new,pr_auc_macro_public,ppv_at_n_macro_new,ppv_at_n_macro_public,roc_auc_micro_new,roc_auc_micro_public,pr_auc_micro_new,pr_auc_micro_public,ppv_at_n_micro_new,ppv_at_n_micro_public,new_better_roc_auc,new_better_pr_auc,new_better_ppv_at_n,public_better_roc_auc,public_better_pr_auc,public_better_ppv_at_n"
+SUMMARY_HEADER="minibatch,validation_batch_size,max_workers_per_gpu,n_models,params_M,train_seconds,select_seconds,calibrate_seconds,eval_seconds,total_seconds,n_alleles_reported,n_hits,n_rows,roc_auc_macro_new,roc_auc_macro_public,pr_auc_macro_new,pr_auc_macro_public,ppv_at_n_macro_new,ppv_at_n_macro_public,roc_auc_micro_new,roc_auc_micro_public,pr_auc_micro_new,pr_auc_micro_public,ppv_at_n_micro_new,ppv_at_n_micro_public,new_better_roc_auc,new_better_pr_auc,new_better_ppv_at_n,public_better_roc_auc,public_better_pr_auc,public_better_ppv_at_n"
+
+cell_dir_name() {
+    local mb="$1"
+    local validation_batch_size="$2"
+    local max_workers_per_gpu="$3"
+    if [ "$VALIDATION_BATCH_SIZES" = "auto" ] && \
+            [ "$MAX_WORKERS_PER_GPU_VALUES" = "auto" ]; then
+        printf 'mb_%s\n' "$mb"
+    else
+        printf 'mb_%s__val_%s__mwpg_%s\n' \
+            "$mb" "$validation_batch_size" "$max_workers_per_gpu"
+    fi
+}
 
 # Rebuild sweep_summary.csv from the durable per-cell row.csv files (header +
 # each cell's row in MINIBATCH_SIZES order). Written atomically via a temp
@@ -89,24 +119,38 @@ SUMMARY_HEADER="minibatch,n_models,params_M,train_seconds,select_seconds,calibra
 # the per-cell rows every time, so a completed cell's row can never be lost.
 rebuild_summary() {
     local mb
+    local validation_batch_size
+    local max_workers_per_gpu
+    local cell_name
     {
         echo "$SUMMARY_HEADER"
         for mb in $MINIBATCH_SIZES; do
-            [ -f "$SWEEP_OUT/mb_$mb/row.csv" ] && cat "$SWEEP_OUT/mb_$mb/row.csv"
+            for validation_batch_size in $VALIDATION_BATCH_SIZES; do
+                for max_workers_per_gpu in $MAX_WORKERS_PER_GPU_VALUES; do
+                    cell_name="$(cell_dir_name \
+                        "$mb" "$validation_batch_size" "$max_workers_per_gpu")"
+                    [ -f "$SWEEP_OUT/$cell_name/row.csv" ] && \
+                        cat "$SWEEP_OUT/$cell_name/row.csv"
+                done
+            done
         done
     } > "$SUMMARY.tmp"
     mv "$SUMMARY.tmp" "$SUMMARY"
 }
 
 for MB in $MINIBATCH_SIZES; do
-    SIZE_OUT="$SWEEP_OUT/mb_$MB"
+for VALIDATION_BATCH_SIZE in $VALIDATION_BATCH_SIZES; do
+for MAX_WORKERS_PER_GPU in $MAX_WORKERS_PER_GPU_VALUES; do
+    CELL_NAME="$(cell_dir_name \
+        "$MB" "$VALIDATION_BATCH_SIZE" "$MAX_WORKERS_PER_GPU")"
+    SIZE_OUT="$SWEEP_OUT/$CELL_NAME"
     # Per-cell completion is marked by row.csv, written (atomically) only
     # after metrics are extracted -- NOT by summary.json, which compare-models
     # writes partway through eval. A cell that died after eval but before its
     # row was recorded therefore re-enters, skips every expensive phase via
     # its .<phase>.done sentinel, and just regenerates the row.
     if [ -f "$SIZE_OUT/row.csv" ]; then
-        echo "=== minibatch=$MB already complete, skipping ==="
+        echo "=== $CELL_NAME already complete, skipping ==="
         continue
     fi
     mkdir -p "$SIZE_OUT"
@@ -129,18 +173,21 @@ for MB in $MINIBATCH_SIZES; do
     # don't get downscaled because smaller batches already train fine
     # at the baseline LR.
     if [ ! -f "$SIZE_OUT/hyperparameters.yaml" ]; then
-        python3 - "$HYPERPARAMS_TPL" "$MB" "$MHCFLURRY_SCALE_LR" \
-            "$MHCFLURRY_SCALE_LR_BASE_MB" \
+        python3 - "$HYPERPARAMS_TPL" "$MB" "$VALIDATION_BATCH_SIZE" \
+            "$MHCFLURRY_SCALE_LR" "$MHCFLURRY_SCALE_LR_BASE_MB" \
             <<'PY' > "$SIZE_OUT/hyperparameters.yaml"
 import math, sys, yaml
 src = sys.argv[1]
 mb = int(sys.argv[2])
-scale_lr = sys.argv[3] == "1"
-base_mb = int(sys.argv[4])
+validation_batch_size = sys.argv[3]
+scale_lr = sys.argv[4] == "1"
+base_mb = int(sys.argv[5])
 with open(src) as f:
     specs = yaml.safe_load(f)
 for spec in specs:
     spec["minibatch_size"] = mb
+    if validation_batch_size != "auto":
+        spec["validation_batch_size"] = int(validation_batch_size)
     if (scale_lr and mb > base_mb
             and spec.get("learning_rate") is not None):
         spec["learning_rate"] = (
@@ -152,9 +199,10 @@ PY
     # ---- train ----
     if [ -f "$TRAIN_SENTINEL" ]; then
         train_sec=$(cat "$TRAIN_SENTINEL")
-        echo "=== minibatch=$MB train already complete (${train_sec}s), skipping ==="
+        echo "=== $CELL_NAME train already complete (${train_sec}s), skipping ==="
     else
     train_start=$(date +%s)
+    start_gpu_telemetry "$SIZE_OUT/gpu_occupancy.csv"
     mhcflurry-class1-train-pan-allele-models \
         --data "$TRAIN_DATA" \
         --allele-sequences "$ALLELE_SEQUENCES" \
@@ -167,12 +215,13 @@ PY
         --num-jobs auto \
         --max-tasks-per-worker "$MAX_TASKS_PER_WORKER" \
         --gpus "$GPUS" \
-        --max-workers-per-gpu auto \
+        --max-workers-per-gpu "$MAX_WORKERS_PER_GPU" \
         --dataloader-num-workers 1 \
         --torch-compile auto \
         --matmul-precision none \
         --enable-timing \
         2>&1 | tee "$SIZE_OUT/train.log"
+    stop_gpu_telemetry
     train_end=$(date +%s)
     train_sec=$(( train_end - train_start ))
     echo "$train_sec" > "$TRAIN_SENTINEL"
@@ -181,7 +230,7 @@ PY
     # ---- select ----
     if [ -f "$SELECT_SENTINEL" ]; then
         select_sec=$(cat "$SELECT_SENTINEL")
-        echo "=== minibatch=$MB select already complete (${select_sec}s), skipping ==="
+        echo "=== $CELL_NAME select already complete (${select_sec}s), skipping ==="
     else
     select_start=$(date +%s)
     cd "$SIZE_OUT"
@@ -194,7 +243,7 @@ PY
         --num-jobs auto \
         --max-tasks-per-worker "$MAX_TASKS_PER_WORKER" \
         --gpus "$GPUS" \
-        --max-workers-per-gpu auto \
+        --max-workers-per-gpu "$MAX_WORKERS_PER_GPU" \
         --dataloader-num-workers 1 \
         --torch-compile auto \
         --matmul-precision none \
@@ -209,10 +258,10 @@ PY
     if [ "$MHCFLURRY_SKIP_CALIBRATE" = "1" ]; then
         cal_sec=0
         echo "0" > "$CALIBRATE_SENTINEL"
-        echo "=== minibatch=$MB calibrate skipped (MHCFLURRY_SKIP_CALIBRATE=1) ==="
+        echo "=== $CELL_NAME calibrate skipped (MHCFLURRY_SKIP_CALIBRATE=1) ==="
     elif [ -f "$CALIBRATE_SENTINEL" ]; then
         cal_sec=$(cat "$CALIBRATE_SENTINEL")
-        echo "=== minibatch=$MB calibrate already complete (${cal_sec}s), skipping ==="
+        echo "=== $CELL_NAME calibrate already complete (${cal_sec}s), skipping ==="
     else
     cal_start=$(date +%s)
     mhcflurry-calibrate-percentile-ranks \
@@ -223,7 +272,7 @@ PY
         --num-jobs auto \
         --max-tasks-per-worker "$MAX_TASKS_PER_WORKER" \
         --gpus "$GPUS" \
-        --max-workers-per-gpu auto \
+        --max-workers-per-gpu "$MAX_WORKERS_PER_GPU" \
         --dataloader-num-workers 1 \
         --torch-compile auto \
         --matmul-precision none \
@@ -237,13 +286,13 @@ PY
     # ---- eval (compare against public 2.2.0) ----
     if [ -f "$EVAL_SENTINEL" ]; then
         eval_sec=$(cat "$EVAL_SENTINEL")
-        echo "=== minibatch=$MB eval already complete (${eval_sec}s), skipping ==="
+        echo "=== $CELL_NAME eval already complete (${eval_sec}s), skipping ==="
     else
     eval_start=$(date +%s)
     mkdir -p "$SIZE_OUT/eval_comparison"
     mhcflurry eval compare-models \
         --a "$SIZE_OUT/models.combined" \
-        --a-label "mb_$MB" \
+        --a-label "$CELL_NAME" \
         --b public \
         --data-dir "$DATA_EVAL_DIR" \
         --include affinity \
@@ -262,14 +311,15 @@ PY
     # manifest.csv gives ensemble size, and summing the element counts across
     # each weights_<name>.npz gives the total number of saved parameters (in
     # millions).
-    python3 - "$SIZE_OUT/eval_comparison/affinity/summary.json" "$MB" "$train_sec" \
+    python3 - "$SIZE_OUT/eval_comparison/affinity/summary.json" "$MB" \
+        "$VALIDATION_BATCH_SIZE" "$MAX_WORKERS_PER_GPU" "$train_sec" \
         "$select_sec" "$cal_sec" "$eval_sec" "$total_sec" "$SIZE_OUT/row.csv" \
-        "$SIZE_OUT/models.combined" <<'PY'
+        "$SIZE_OUT/models.combined" "$CELL_NAME" <<'PY'
 import json, os, sys
 import numpy
 import pandas
-(summary_path, mb, train_s, sel_s, cal_s, eval_s, tot_s, csv_path,
- models_dir) = sys.argv[1:10]
+(summary_path, mb, validation_batch_size, max_workers_per_gpu, train_s, sel_s,
+ cal_s, eval_s, tot_s, csv_path, models_dir, cell_name) = sys.argv[1:13]
 with open(summary_path) as f:
     s = json.load(f)
 mac = s["macro_mean_over_alleles"]
@@ -285,7 +335,7 @@ for name in manifest["model_name"]:
             total_params += int(wf[key].size)
 params_M = total_params / 1_000_000.0
 row = [
-    mb, n_models, f"{params_M:.3f}",
+    mb, validation_batch_size, max_workers_per_gpu, n_models, f"{params_M:.3f}",
     train_s, sel_s, cal_s, eval_s, tot_s,
     s["n_alleles_reported"], s["n_hits"], s["n_rows"],
     mac["roc_auc"]["a"], mac["roc_auc"]["b"],
@@ -305,12 +355,16 @@ with open(tmp_path, "w") as f:
     f.write(",".join(str(x) for x in row) + "\n")
 os.replace(tmp_path, csv_path)
 print(f"=== minibatch={mb} done: n_models={n_models} params={params_M:.2f}M "
+      f"validation_batch_size={validation_batch_size} "
+      f"max_workers_per_gpu={max_workers_per_gpu} cell={cell_name} "
       f"train={train_s}s select={sel_s}s calibrate={cal_s}s "
       f"eval={eval_s}s total={tot_s}s ===")
 PY
 
     rebuild_summary
     cd "$MHCFLURRY_OUT"
+done
+done
 done
 
 # Final rebuild so a run where every cell was already complete (and therefore

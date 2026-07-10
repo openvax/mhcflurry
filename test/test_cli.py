@@ -209,6 +209,89 @@ def test_release_workflow_brev_provider_aliases(tmp_path):
         assert expected_type in output
 
 
+def test_release_workflow_fast_gpu_profile(tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run-fast"),
+            "--release", "2.3.0",
+            "--backend", "brev-provision",
+            "--release-profile", "fast-8xa100",
+            "--brev-instance", "mhcflurry-dry-run-fast",
+            "--skip-train",
+            "--skip-eval",
+            "--skip-plots",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert "Profile:       fast-8xa100" in output
+    assert "Affinity MWPG: 2" in output
+    assert "Brev provider: denvr-80gb" in output
+    assert "Brev type:     denvr_A100_sxm4_80Gx8" in output
+
+
+def test_release_workflow_profiles_respect_explicit_overrides(tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run-fast-explicit"),
+            "--release", "2.3.0",
+            "--backend", "brev-provision",
+            "--release-profile", "fast-8xa100",
+            "--brev-instance", "mhcflurry-dry-run-fast-explicit",
+            "--brev-provider", "gcp",
+            "--affinity-max-workers-per-gpu", "auto",
+            "--skip-train",
+            "--skip-eval",
+            "--skip-plots",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert "Profile:       fast-8xa100" in output
+    assert "Affinity MWPG: auto" in output
+    assert "Brev provider: gcp" in output
+    assert "Brev type:     a2-highgpu-4g:nvidia-tesla-a100:4" in output
+
+
+def test_release_workflow_minimal_processing_profile(tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run-minimal"),
+            "--release", "2.3.0",
+            "--backend", "local",
+            "--release-profile", "minimal-processing",
+            "--skip-train",
+            "--skip-eval",
+            "--skip-plots",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert "Profile:       minimal-processing" in output
+    assert (
+        "Processing:    variants=with_flanks no_flank; "
+        "eval_modes=with_flanks,no_flank"
+    ) in output
+
+
 def test_eval_help_runs(capsys):
     cli_main.main(["eval", "--help"])
     captured = capsys.readouterr().out

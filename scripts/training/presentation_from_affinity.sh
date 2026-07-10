@@ -12,10 +12,12 @@
 # Optional env (all have defaults compatible with release_full):
 #   REPO, GPUS, MAX_WORKERS_PER_GPU, NUM_JOBS, DATALOADER_NUM_WORKERS,
 #   MATMUL_PRECISION, MHCFLURRY_TORCH_COMPILE,
+#   PROCESSING_NUM_JOBS, PROCESSING_MAX_WORKERS_PER_GPU,
 #   PROCESSING_HELD_OUT_SAMPLES, PRESENTATION_DECOYS_PER_HIT,
 #   PRESENTATION_FEATURE_CHUNK_SIZE, TRAINING_MINIBATCH_SIZE,
 #   PROCESSING_MINIBATCH_SIZE, PROCESSING_VARIANTS,
-#   PRESENTATION_PROCESSING_WITH_FLANKS_KIND
+#   PRESENTATION_PROCESSING_WITH_FLANKS_KIND,
+#   MHCFLURRY_GPU_TELEMETRY, MHCFLURRY_GPU_TELEMETRY_SECONDS
 set -euo pipefail
 set -x
 
@@ -26,6 +28,10 @@ RECIPE_DIR="$SCRIPT_DIR/release_exact"
 : "${REPO:=$(cd "$SCRIPT_DIR/../.." && pwd)}"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/set_cpu_threads.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/gpu_telemetry.sh"
+GPU_TELEMETRY_PID=""
+trap stop_gpu_telemetry EXIT
 
 export PYTHONUNBUFFERED=1
 export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
@@ -118,6 +124,19 @@ COMMON_PARALLELISM_ARGS=(
 )
 [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ] && COMMON_PARALLELISM_ARGS+=(--enable-timing)
 
+PROCESSING_NUM_JOBS="${PROCESSING_NUM_JOBS:-auto}"
+PROCESSING_MAX_WORKERS_PER_GPU="${PROCESSING_MAX_WORKERS_PER_GPU:-auto}"
+PROCESSING_PARALLELISM_ARGS=(
+    --num-jobs "$PROCESSING_NUM_JOBS"
+    --max-tasks-per-worker 1000
+    --gpus "$GPUS"
+    --max-workers-per-gpu "$PROCESSING_MAX_WORKERS_PER_GPU"
+    --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
+    --torch-compile auto
+    --matmul-precision "${MATMUL_PRECISION:-none}"
+)
+[ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ] && PROCESSING_PARALLELISM_ARGS+=(--enable-timing)
+
 PRESENTATION_NUM_JOBS="${PRESENTATION_NUM_JOBS:-auto}"
 PRESENTATION_MAX_WORKERS_PER_GPU="${PRESENTATION_MAX_WORKERS_PER_GPU:-1}"
 PRESENTATION_PARALLELISM_ARGS=(
@@ -163,6 +182,7 @@ compress_csv_bzip2() {
 # STAGE 2 — PROCESSING
 # ============================================================
 STAGE2_START=$(date +%s)
+start_gpu_telemetry "$BASE_OUT/processing/gpu_occupancy.csv"
 cd "$BASE_OUT/processing"
 
 mhcflurry-downloads fetch data_mass_spec_annotated data_references
@@ -202,7 +222,7 @@ for kind in $PROCESSING_VARIANTS; do
         --hyperparameters "hyperparameters.$kind.yaml" \
         --out-models-dir "$(pwd)/models.unselected.$kind" \
         --worker-log-dir "$BASE_OUT/processing" \
-        "${COMMON_PARALLELISM_ARGS[@]}"
+        "${PROCESSING_PARALLELISM_ARGS[@]}"
 
     mhcflurry-class1-select-processing-models \
         --data "$(pwd)/models.unselected.$kind/train_data.csv.bz2" \
@@ -210,17 +230,19 @@ for kind in $PROCESSING_VARIANTS; do
         --out-models-dir "$(pwd)/models.selected.$kind" \
         --min-models-per-fold 1 \
         --max-models-per-fold 2 \
-        "${COMMON_PARALLELISM_ARGS[@]}"
+        "${PROCESSING_PARALLELISM_ARGS[@]}"
     cp "$(pwd)/models.unselected.$kind/train_data.csv.bz2" \
         "$(pwd)/models.selected.$kind/train_data.csv.bz2"
 done
 
+stop_gpu_telemetry
 echo "STAGE 2 duration: $(( $(date +%s) - STAGE2_START )) sec"
 
 # ============================================================
 # STAGE 3 — PRESENTATION
 # ============================================================
 STAGE3_START=$(date +%s)
+start_gpu_telemetry "$BASE_OUT/presentation/gpu_occupancy.csv"
 cd "$BASE_OUT/presentation"
 
 cp "$RECIPE_DIR/make_train_data.presentation.py" \
@@ -263,5 +285,6 @@ cp "$BASE_OUT/processing/models.selected.$PRESENTATION_PROCESSING_WITH_FLANKS_KI
 cp "$BASE_OUT/processing/models.selected.no_flank/train_data.csv.bz2" \
     "$(pwd)/models/processing_predictor_no_flank_train_data.csv.bz2"
 
+stop_gpu_telemetry
 echo "STAGE 3 duration: $(( $(date +%s) - STAGE3_START )) sec"
 echo "=== presentation predictor at $BASE_OUT/presentation/models ==="

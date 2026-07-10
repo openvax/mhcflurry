@@ -28,6 +28,9 @@
 #   AFFINITY_MAX_WORKERS_PER_GPU
 #                              affinity per-GPU worker cap (default auto)
 #   DATALOADER_NUM_WORKERS     'auto' (default) lets the orchestrator pick
+#   PROCESSING_NUM_JOBS        processing worker count (default auto)
+#   PROCESSING_MAX_WORKERS_PER_GPU
+#                              processing per-GPU worker cap (default auto)
 #   PROCESSING_HELD_OUT_SAMPLES  (default 50; subset script uses 10)
 #   PRESENTATION_DECOYS_PER_HIT (default 99 to match release; subset uses 2)
 #   TRAINING_MINIBATCH_SIZE    shared affinity/processing default (default 1024)
@@ -38,6 +41,9 @@
 #   PRESENTATION_PROCESSING_WITH_FLANKS_KIND
 #                              processing variant used as presentation's
 #                              with-flanks predictor (default with_flanks)
+#   MHCFLURRY_GPU_TELEMETRY    0 disables processing/presentation GPU CSVs
+#   MHCFLURRY_GPU_TELEMETRY_SECONDS
+#                              telemetry sampling interval (default 30)
 set -euo pipefail
 set -x
 
@@ -47,6 +53,10 @@ RECIPE_DIR="$SCRIPT_DIR/release_exact"
 : "${REPO:=$(cd "$SCRIPT_DIR/../.." && pwd)}"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/set_cpu_threads.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/gpu_telemetry.sh"
+GPU_TELEMETRY_PID=""
+trap stop_gpu_telemetry EXIT
 
 export PYTHONUNBUFFERED=1
 # Same default as the affinity stage; the orchestrator's CLI flag
@@ -275,6 +285,7 @@ echo "affinity predictor: $AFFINITY_PREDICTOR"
 # ============================================================
 echo "=== STAGE 2: PROCESSING ==="
 STAGE2_START=$(date +%s)
+start_gpu_telemetry "$BASE_OUT/processing/gpu_occupancy.csv"
 cd "$BASE_OUT/processing"
 
 mhcflurry-downloads fetch data_mass_spec_annotated data_references
@@ -330,6 +341,7 @@ for kind in $PROCESSING_VARIANTS; do
         "$(pwd)/models.selected.$kind/train_data.csv.bz2"
 done
 
+stop_gpu_telemetry
 echo "STAGE 2 duration: $(( $(date +%s) - STAGE2_START )) sec"
 
 # ============================================================
@@ -337,6 +349,7 @@ echo "STAGE 2 duration: $(( $(date +%s) - STAGE2_START )) sec"
 # ============================================================
 echo "=== STAGE 3: PRESENTATION ==="
 STAGE3_START=$(date +%s)
+start_gpu_telemetry "$BASE_OUT/presentation/gpu_occupancy.csv"
 cd "$BASE_OUT/presentation"
 
 cp "$RECIPE_DIR/make_train_data.presentation.py" \
@@ -381,6 +394,7 @@ cp "$BASE_OUT/processing/models.selected.$PRESENTATION_PROCESSING_WITH_FLANKS_KI
 cp "$BASE_OUT/processing/models.selected.no_flank/train_data.csv.bz2" \
     "$(pwd)/models/processing_predictor_no_flank_train_data.csv.bz2"
 
+stop_gpu_telemetry
 echo "STAGE 3 duration: $(( $(date +%s) - STAGE3_START )) sec"
 
 echo "=== DONE ==="
