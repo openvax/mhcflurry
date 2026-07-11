@@ -1616,7 +1616,7 @@ BREV_REMOTE_EVAL_DONE=0
 BREV_REMOTE_PLOTS_DONE=0
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
+REPO="${REPO:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 
 while [ $# -gt 0 ]; do
     case "$1" in

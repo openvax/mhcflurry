@@ -184,6 +184,30 @@ def test_release_workflow_plots_include_paper_figures_by_default(tmp_path):
     ) in output
 
 
+def test_release_workflow_honors_repo_env_override(tmp_path):
+    env = dict(os.environ)
+    env["REPO"] = str(tmp_path / "source-tree")
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "local",
+            "--skip-eval",
+            "--skip-plots",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert "REPO=%s" % (tmp_path / "source-tree") in output
+
+
 def test_release_workflow_brev_prepare_uses_remote_postprocess(tmp_path):
     env = dict(os.environ)
     env["PATH"] = "/usr/bin:/bin"
