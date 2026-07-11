@@ -99,11 +99,11 @@ Evaluation:
   --eval-max-benchmark-files limits each evaluation benchmark family to the
   first N benchmark input CSV files. It is intended only for smoke proofs that
   the end-to-end command wiring works.
-  If --paper-figures-scores-dir or a saved prediction table is set, the
-  plotting step also runs:
-      mhcflurry eval paper-figures render --scores-dir DIR
-  and writes publication-style SVG/PDF/PNG panels under
+  The plotting step also renders publication-style SVG/PDF/PNG panels under
   RUN_DIR/eval_comparison/plots/paper_figures/.
+  By default those panels use the current compare-models output as their score
+  directory. Pass --paper-figures-scores-dir or a saved prediction table to add
+  external predictor score tables or other paper-figure inputs.
   External predictors such as NetMHCpan and MixMHCpred are not run by
   MHCflurry. To keep a one-line remote-training launch, pass
   --paper-figures-prepare-command COMMAND. The command runs locally on the
@@ -1040,38 +1040,30 @@ if [ "${RUN_RELEASE_PLOTS:-1}" = "1" ]; then
         --a-label "${RUN_LABEL:-new}"
         --b-label "${COMPARE_BASELINE_LABEL:-MHCflurry 2.0}"
         --summary-pdf "$run_dir/eval_comparison/plots/model_comparison_figures.pdf"
+        --paper-figures-out "$run_dir/eval_comparison/plots/paper_figures"
+        --paper-figures-formats "${PAPER_FIGURES_FORMATS:-svg,pdf,png}"
+        --paper-figures-scores-dir "${PAPER_FIGURES_SCORES_DIR:-$run_dir/eval_comparison}"
     )
-    if [ -n "${PAPER_FIGURES_SCORES_DIR:-}" ] || \
-            [ -n "${PAPER_FIGURES_MULTIALLELIC_PREDICTIONS:-}" ] || \
-            [ -n "${PAPER_FIGURES_MONOALLELIC_PREDICTIONS:-}" ]; then
-        plot_args+=(
-            --paper-figures-out "$run_dir/eval_comparison/plots/paper_figures"
-            --paper-figures-formats "${PAPER_FIGURES_FORMATS:-svg,pdf,png}"
-        )
-        if [ -n "${PAPER_FIGURES_SCORES_DIR:-}" ]; then
-            plot_args+=(--paper-figures-scores-dir "$PAPER_FIGURES_SCORES_DIR")
-        fi
-        if [ -n "${PAPER_FIGURES_MULTIALLELIC_PREDICTIONS:-}" ]; then
-            plot_args+=(--paper-figures-multiallelic-predictions "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS")
-        fi
-        if [ -n "${PAPER_FIGURES_MONOALLELIC_PREDICTIONS:-}" ]; then
-            plot_args+=(--paper-figures-monoallelic-predictions "$PAPER_FIGURES_MONOALLELIC_PREDICTIONS")
-        fi
-        if [ -n "${PAPER_FIGURES_CANDIDATE_PREDICTOR:-}" ]; then
-            plot_args+=(--paper-figures-candidate-predictor "$PAPER_FIGURES_CANDIDATE_PREDICTOR")
-        fi
-        if [ -n "${PAPER_FIGURES_EXTERNAL_BASELINES:-}" ]; then
-            plot_args+=(--paper-figures-external-baselines "$PAPER_FIGURES_EXTERNAL_BASELINES")
-        fi
-        if [ -n "${PAPER_FIGURES_PREFERRED_PREDICTORS:-}" ]; then
-            plot_args+=(--paper-figures-preferred-predictors "$PAPER_FIGURES_PREFERRED_PREDICTORS")
-        fi
-        if [ -n "${PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS:-}" ]; then
-            plot_args+=(--paper-figures-presentation-panel-predictors "$PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS")
-        fi
-        if [ -n "${PAPER_FIGURES_PRESENTATION_PANEL_BASELINES:-}" ]; then
-            plot_args+=(--paper-figures-presentation-panel-baselines "$PAPER_FIGURES_PRESENTATION_PANEL_BASELINES")
-        fi
+    if [ -n "${PAPER_FIGURES_MULTIALLELIC_PREDICTIONS:-}" ]; then
+        plot_args+=(--paper-figures-multiallelic-predictions "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS")
+    fi
+    if [ -n "${PAPER_FIGURES_MONOALLELIC_PREDICTIONS:-}" ]; then
+        plot_args+=(--paper-figures-monoallelic-predictions "$PAPER_FIGURES_MONOALLELIC_PREDICTIONS")
+    fi
+    if [ -n "${PAPER_FIGURES_CANDIDATE_PREDICTOR:-}" ]; then
+        plot_args+=(--paper-figures-candidate-predictor "$PAPER_FIGURES_CANDIDATE_PREDICTOR")
+    fi
+    if [ -n "${PAPER_FIGURES_EXTERNAL_BASELINES:-}" ]; then
+        plot_args+=(--paper-figures-external-baselines "$PAPER_FIGURES_EXTERNAL_BASELINES")
+    fi
+    if [ -n "${PAPER_FIGURES_PREFERRED_PREDICTORS:-}" ]; then
+        plot_args+=(--paper-figures-preferred-predictors "$PAPER_FIGURES_PREFERRED_PREDICTORS")
+    fi
+    if [ -n "${PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS:-}" ]; then
+        plot_args+=(--paper-figures-presentation-panel-predictors "$PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS")
+    fi
+    if [ -n "${PAPER_FIGURES_PRESENTATION_PANEL_BASELINES:-}" ]; then
+        plot_args+=(--paper-figures-presentation-panel-baselines "$PAPER_FIGURES_PRESENTATION_PANEL_BASELINES")
     fi
     "${plot_args[@]}"
     python scripts/training/plot_loss_curves.py \
@@ -2156,38 +2148,30 @@ if [ "$SKIP_PLOTS" != "1" ]; then
             --a-label "$RUN_LABEL"
             --b-label "$COMPARE_BASELINE_LABEL"
             --summary-pdf "$RUN_DIR/eval_comparison/plots/model_comparison_figures.pdf"
+            --paper-figures-out "$RUN_DIR/eval_comparison/plots/paper_figures"
+            --paper-figures-formats "$PAPER_FIGURES_FORMATS"
+            --paper-figures-scores-dir "${PAPER_FIGURES_SCORES_DIR:-$RUN_DIR/eval_comparison}"
         )
-        if [ -n "$PAPER_FIGURES_SCORES_DIR" ] || \
-                [ -n "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS" ] || \
-                [ -n "$PAPER_FIGURES_MONOALLELIC_PREDICTIONS" ]; then
-            plot_args+=(
-                --paper-figures-out "$RUN_DIR/eval_comparison/plots/paper_figures"
-                --paper-figures-formats "$PAPER_FIGURES_FORMATS"
-            )
-            if [ -n "$PAPER_FIGURES_SCORES_DIR" ]; then
-                plot_args+=(--paper-figures-scores-dir "$PAPER_FIGURES_SCORES_DIR")
-            fi
-            if [ -n "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS" ]; then
-                plot_args+=(--paper-figures-multiallelic-predictions "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS")
-            fi
-            if [ -n "$PAPER_FIGURES_MONOALLELIC_PREDICTIONS" ]; then
-                plot_args+=(--paper-figures-monoallelic-predictions "$PAPER_FIGURES_MONOALLELIC_PREDICTIONS")
-            fi
-            if [ -n "$PAPER_FIGURES_CANDIDATE_PREDICTOR" ]; then
-                plot_args+=(--paper-figures-candidate-predictor "$PAPER_FIGURES_CANDIDATE_PREDICTOR")
-            fi
-            if [ -n "$PAPER_FIGURES_EXTERNAL_BASELINES" ]; then
-                plot_args+=(--paper-figures-external-baselines "$PAPER_FIGURES_EXTERNAL_BASELINES")
-            fi
-            if [ -n "$PAPER_FIGURES_PREFERRED_PREDICTORS" ]; then
-                plot_args+=(--paper-figures-preferred-predictors "$PAPER_FIGURES_PREFERRED_PREDICTORS")
-            fi
-            if [ -n "$PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS" ]; then
-                plot_args+=(--paper-figures-presentation-panel-predictors "$PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS")
-            fi
-            if [ -n "$PAPER_FIGURES_PRESENTATION_PANEL_BASELINES" ]; then
-                plot_args+=(--paper-figures-presentation-panel-baselines "$PAPER_FIGURES_PRESENTATION_PANEL_BASELINES")
-            fi
+        if [ -n "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS" ]; then
+            plot_args+=(--paper-figures-multiallelic-predictions "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS")
+        fi
+        if [ -n "$PAPER_FIGURES_MONOALLELIC_PREDICTIONS" ]; then
+            plot_args+=(--paper-figures-monoallelic-predictions "$PAPER_FIGURES_MONOALLELIC_PREDICTIONS")
+        fi
+        if [ -n "$PAPER_FIGURES_CANDIDATE_PREDICTOR" ]; then
+            plot_args+=(--paper-figures-candidate-predictor "$PAPER_FIGURES_CANDIDATE_PREDICTOR")
+        fi
+        if [ -n "$PAPER_FIGURES_EXTERNAL_BASELINES" ]; then
+            plot_args+=(--paper-figures-external-baselines "$PAPER_FIGURES_EXTERNAL_BASELINES")
+        fi
+        if [ -n "$PAPER_FIGURES_PREFERRED_PREDICTORS" ]; then
+            plot_args+=(--paper-figures-preferred-predictors "$PAPER_FIGURES_PREFERRED_PREDICTORS")
+        fi
+        if [ -n "$PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS" ]; then
+            plot_args+=(--paper-figures-presentation-panel-predictors "$PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS")
+        fi
+        if [ -n "$PAPER_FIGURES_PRESENTATION_PANEL_BASELINES" ]; then
+            plot_args+=(--paper-figures-presentation-panel-baselines "$PAPER_FIGURES_PRESENTATION_PANEL_BASELINES")
         fi
         run_logged_step plot_model_comparison \
             "${plot_args[@]}"

@@ -474,47 +474,46 @@ def run_release_plots(repo, out, env):
         "--b-label", env.get("COMPARE_BASELINE_LABEL", "MHCflurry 2.0"),
         "--summary-pdf",
         str(out / "eval_comparison" / "plots" / "model_comparison_figures.pdf"),
+        "--paper-figures-out",
+        str(out / "eval_comparison" / "plots" / "paper_figures"),
+        "--paper-figures-formats",
+        env.get("PAPER_FIGURES_FORMATS", "svg,pdf,png"),
     ]
-    scores_dir = env.get("PAPER_FIGURES_SCORES_DIR", "").strip()
+    scores_dir = (
+        env.get("PAPER_FIGURES_SCORES_DIR", "").strip()
+        or str(out / "eval_comparison")
+    )
+    plot_args.extend(["--paper-figures-scores-dir", scores_dir])
     multiallelic_predictions = env.get(
         "PAPER_FIGURES_MULTIALLELIC_PREDICTIONS", "").strip()
     monoallelic_predictions = env.get(
         "PAPER_FIGURES_MONOALLELIC_PREDICTIONS", "").strip()
-    if scores_dir or multiallelic_predictions or monoallelic_predictions:
+    if multiallelic_predictions:
         plot_args.extend([
-            "--paper-figures-out",
-            str(out / "eval_comparison" / "plots" / "paper_figures"),
-            "--paper-figures-formats",
-            env.get("PAPER_FIGURES_FORMATS", "svg,pdf,png"),
+            "--paper-figures-multiallelic-predictions",
+            multiallelic_predictions,
         ])
-        if scores_dir:
-            plot_args.extend(["--paper-figures-scores-dir", scores_dir])
-        if multiallelic_predictions:
-            plot_args.extend([
-                "--paper-figures-multiallelic-predictions",
-                multiallelic_predictions,
-            ])
-        if monoallelic_predictions:
-            plot_args.extend([
-                "--paper-figures-monoallelic-predictions",
-                monoallelic_predictions,
-            ])
-        passthrough = (
-            ("PAPER_FIGURES_CANDIDATE_PREDICTOR",
-             "--paper-figures-candidate-predictor"),
-            ("PAPER_FIGURES_EXTERNAL_BASELINES",
-             "--paper-figures-external-baselines"),
-            ("PAPER_FIGURES_PREFERRED_PREDICTORS",
-             "--paper-figures-preferred-predictors"),
-            ("PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS",
-             "--paper-figures-presentation-panel-predictors"),
-            ("PAPER_FIGURES_PRESENTATION_PANEL_BASELINES",
-             "--paper-figures-presentation-panel-baselines"),
-        )
-        for env_name, flag in passthrough:
-            value = env.get(env_name, "").strip()
-            if value:
-                plot_args.extend([flag, value])
+    if monoallelic_predictions:
+        plot_args.extend([
+            "--paper-figures-monoallelic-predictions",
+            monoallelic_predictions,
+        ])
+    passthrough = (
+        ("PAPER_FIGURES_CANDIDATE_PREDICTOR",
+         "--paper-figures-candidate-predictor"),
+        ("PAPER_FIGURES_EXTERNAL_BASELINES",
+         "--paper-figures-external-baselines"),
+        ("PAPER_FIGURES_PREFERRED_PREDICTORS",
+         "--paper-figures-preferred-predictors"),
+        ("PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS",
+         "--paper-figures-presentation-panel-predictors"),
+        ("PAPER_FIGURES_PRESENTATION_PANEL_BASELINES",
+         "--paper-figures-presentation-panel-baselines"),
+    )
+    for env_name, flag in passthrough:
+        value = env.get(env_name, "").strip()
+        if value:
+            plot_args.extend([flag, value])
     subprocess.run(plot_args, check=True, cwd=repo, env=env)
 
 

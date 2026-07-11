@@ -156,6 +156,34 @@ def test_release_workflow_eval_max_benchmark_files_is_forwarded(tmp_path):
     assert "--limit-files 1" in output
 
 
+def test_release_workflow_plots_include_paper_figures_by_default(tmp_path):
+    run_dir = tmp_path / "release-run"
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(run_dir),
+            "--release", "2.3.0",
+            "--backend", "local",
+            "--skip-train",
+            "--skip-eval",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert "mhcflurry eval plot-comparison" in output
+    assert "--paper-figures-out %s" % (
+        run_dir / "eval_comparison/plots/paper_figures"
+    ) in output
+    assert "--paper-figures-scores-dir %s" % (
+        run_dir / "eval_comparison"
+    ) in output
+
+
 def test_release_workflow_brev_prepare_uses_remote_postprocess(tmp_path):
     env = dict(os.environ)
     env["PATH"] = "/usr/bin:/bin"
