@@ -214,9 +214,18 @@ def compute_prediction_batch_size(
     free = free_device_memory_bytes(device)
     workers = max(int(num_workers_per_gpu), 1)
     budget = int(free * float(free_memory_fraction) / workers)
-    budget = max(budget, peak_bytes * min_rows)
-    rows = budget // peak_bytes
-    return int(max(min_rows, min(rows, max_rows)))
+    rows = max(1, budget // peak_bytes)
+    if rows < min_rows:
+        logging.warning(
+            "Auto-sized prediction batch below the normal floor: %d rows "
+            "(free=%.2f GB, workers/GPU=%d, peak=%.1f KB/row).",
+            rows,
+            free / float(1 << 30),
+            workers,
+            peak_bytes / 1024.0,
+        )
+        return int(rows)
+    return int(min(rows, max_rows))
 
 
 def env_workers_per_gpu(default=1):

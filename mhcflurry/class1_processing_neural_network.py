@@ -883,24 +883,42 @@ class Class1ProcessingNeuralNetwork(object):
                 if train_loss_count else float("nan"))
             fit_info["loss"].append(train_loss)
 
-            # Validation
+            # Validation. Keep this batched: release-scale processing folds can
+            # hold tens of thousands of validation rows, and a single Conv1d
+            # forward over the whole fold can consume most of an A100-40GB.
             if val_split > 0:
                 validation_network = validation_forward_network(
                     network, eager_network)
                 validation_network.eval()
                 with torch.no_grad():
-                    val_seq = seq_dev.index_select(0, val_indices_dev)
-                    val_length = length_dev.index_select(0, val_indices_dev)
-                    val_targets = targets_dev.index_select(0, val_indices_dev)
+                    val_loss_sum = torch.zeros((), device=device)
+                    val_loss_count = 0
+                    for batch_start in range(0, n_val, batch_size):
+                        batch_idx = val_indices_dev[
+                            batch_start:batch_start + batch_size
+                        ]
+                        val_seq = seq_dev.index_select(0, batch_idx)
+                        val_length = length_dev.index_select(0, batch_idx)
+                        val_targets = targets_dev.index_select(0, batch_idx)
 
-                    val_inputs = {"sequence": val_seq, "peptide_length": val_length}
-                    val_predictions = validation_network(val_inputs)
-                    val_loss = loss_fn(val_predictions, val_targets)
-                    if weights_dev is not None:
-                        val_loss = val_loss * weights_dev.index_select(
-                            0, val_indices_dev,
-                        )
-                    val_loss = val_loss.mean()
+                        val_inputs = {
+                            "sequence": val_seq,
+                            "peptide_length": val_length,
+                        }
+                        val_predictions = validation_network(val_inputs)
+                        val_loss = loss_fn(val_predictions, val_targets)
+                        if weights_dev is not None:
+                            val_loss = val_loss * weights_dev.index_select(
+                                0, batch_idx,
+                            )
+                        val_loss_sum = val_loss_sum + val_loss.sum()
+                        val_loss_count += int(val_loss.numel())
+
+                    val_loss = (
+                        val_loss_sum / val_loss_count
+                        if val_loss_count
+                        else torch.tensor(float("nan"), device=device)
+                    )
                     regularization_penalty = self._regularization_penalty(
                         regularization_parameters,
                         l1=reg_l1,

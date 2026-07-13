@@ -14,6 +14,7 @@
 Train Class1 processing models.
 """
 import argparse
+import gc
 import os
 from os.path import join
 import sys
@@ -70,6 +71,26 @@ WORKER_CONTEXT = {}
 
 _PROCESSING_WORKER_RUNTIME_FLOOR_GB = 2.0
 _PROCESSING_WORKER_SAFETY_FACTOR = 1.3
+
+
+def release_unused_torch_memory():
+    """Return unused CUDA allocator blocks to the driver, best-effort."""
+    try:
+        import torch
+    except ImportError:
+        gc.collect()
+        return
+    try:
+        cuda_available = torch.cuda.is_available()
+    except RuntimeError:
+        cuda_available = False
+    if cuda_available:
+        try:
+            torch.cuda.empty_cache()
+        except RuntimeError:
+            pass
+    gc.collect()
+
 
 # Note on parallelization:
 # When running in parallel, avoid using the neural network backend in the main
@@ -238,8 +259,9 @@ def estimate_processing_worker_gb(args):
     flank tensors resident on-device, then run Conv1d models whose peak
     activation width scales with flank length and convolutional filters.
     This estimate sizes worker concurrency from the actual data row count
-    and largest architecture in the hyperparameter sweep. Prediction-time
-    AUC scoring is separately auto-batched per call.
+    and largest architecture in the hyperparameter sweep. Validation and
+    post-fit AUC scoring are batched by the trainer/predictor; the estimate is
+    therefore anchored on the largest batch, not the full fold size.
     """
     data_path = getattr(args, "data", None)
     hyperparameters_path = getattr(args, "hyperparameters", None)
@@ -684,6 +706,11 @@ def train_model(
         seed=work_item_seed,
         verbose=verbose)
 
+    # Fit can leave large unused CUDA allocator blocks reserved after the
+    # validation forward. Release those before post-fit AUC scoring so this
+    # worker's own cache does not crowd co-resident workers.
+    release_unused_torch_memory()
+
     # Save model-specific training info
     train_peptide_hash = hashlib.sha1()
     for peptide in sorted(train_data.peptide.values):
@@ -725,6 +752,7 @@ def train_model(
 
     # Delete the network to release memory
     model._network = None  # release network to free memory
+    release_unused_torch_memory()
     return predictor
 
 

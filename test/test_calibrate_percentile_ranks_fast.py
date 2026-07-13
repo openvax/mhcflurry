@@ -660,6 +660,33 @@ def test_compute_prediction_batch_size_scales_with_memory_and_workers():
         assert shared <= single
 
 
+def test_compute_prediction_batch_size_drops_below_floor_when_memory_is_tight(
+        monkeypatch):
+    """The performance floor must not force an unsafe CUDA batch."""
+    from mhcflurry import pytorch_sizing
+
+    class FakeCUDA:
+        type = "cuda"
+
+    monkeypatch.setattr(
+        pytorch_sizing,
+        "free_device_memory_bytes",
+        lambda device: 16 * (1 << 20),
+    )
+    monkeypatch.setattr(
+        pytorch_sizing,
+        "estimate_peak_bytes_per_row",
+        lambda model: 1 << 20,
+    )
+
+    batch_size = pytorch_sizing.compute_prediction_batch_size(
+        FakeCUDA(),
+        num_workers_per_gpu=4,
+    )
+
+    assert 1 <= batch_size < pytorch_sizing.AUTO_BATCH_MIN_ROWS
+
+
 def test_calibrate_auto_size_uses_reserved_headroom_not_cache_safety(monkeypatch):
     """A production-like A100-40GB calibration should not collapse to
     the minimum batch just because the exact peptide-stage cache is large.
