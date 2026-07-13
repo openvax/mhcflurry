@@ -1490,6 +1490,12 @@ run_brev_training() {
             warn "runplz exited with $runplz_status, but remote command exit_code=0; continuing after explicit sync."
         else
             warn "runplz exited with $runplz_status; remote exit_code=${remote_exit:-unknown}."
+            local remote_status
+            remote_status="$(brev_instance_status || true)"
+            if [ -z "$remote_status" ]; then
+                warn "Brev instance $BREV_INSTANCE does not exist; skipping sync and cleanup."
+                return "$runplz_status"
+            fi
             sync_brev_output || {
                 warn "Brev output sync failed; leaving $BREV_INSTANCE available to preserve artifacts."
                 return "$runplz_status"
