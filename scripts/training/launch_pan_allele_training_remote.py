@@ -252,6 +252,10 @@ def remote_training_env(environ=os.environ):
         "PROCESSING_VARIANTS": environ.get(
             "PROCESSING_VARIANTS", "with_flanks no_flank short_flanks"
         ),
+        "PROCESSING_NUM_JOBS": environ.get("PROCESSING_NUM_JOBS", "auto"),
+        "PROCESSING_MAX_WORKERS_PER_GPU": environ.get(
+            "PROCESSING_MAX_WORKERS_PER_GPU", "auto"
+        ),
         "PROCESSING_MODES": environ.get(
             "PROCESSING_MODES", "with_flanks,no_flank,short_flanks"
         ),

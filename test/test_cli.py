@@ -208,6 +208,31 @@ def test_release_workflow_honors_repo_env_override(tmp_path):
     assert "REPO=%s" % (tmp_path / "source-tree") in output
 
 
+def test_release_workflow_forwards_processing_parallelism(tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "local",
+            "--skip-eval",
+            "--skip-plots",
+            "--processing-num-jobs", "4",
+            "--processing-max-workers-per-gpu", "1",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert "PROCESSING_NUM_JOBS=4" in output
+    assert "PROCESSING_MAX_WORKERS_PER_GPU=1" in output
+    assert "jobs=4; workers/gpu=1" in output
+
+
 def test_release_workflow_brev_prepare_uses_remote_postprocess(tmp_path):
     env = dict(os.environ)
     env["PATH"] = "/usr/bin:/bin"
@@ -849,11 +874,15 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert "AFFINITY_MINIBATCH_SIZE" not in env
     assert "AFFINITY_MAX_WORKERS_PER_GPU" not in env
     assert "PROCESSING_MINIBATCH_SIZE" not in env
+    assert env["PROCESSING_NUM_JOBS"] == "auto"
+    assert env["PROCESSING_MAX_WORKERS_PER_GPU"] == "auto"
 
     env = module.remote_training_env({
         "TRAINING_MINIBATCH_SIZE": "2048",
         "AFFINITY_MINIBATCH_SIZE": "512",
         "AFFINITY_MAX_WORKERS_PER_GPU": "3",
+        "PROCESSING_NUM_JOBS": "4",
+        "PROCESSING_MAX_WORKERS_PER_GPU": "1",
         "COMPARE_BASELINE": "public:2.2.0",
         "COMPARE_BASELINE_LABEL": "MHCflurry 2.2",
         "COMPARE_BACKEND": "cpu",
@@ -866,6 +895,8 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     })
     assert env["AFFINITY_MINIBATCH_SIZE"] == "512"
     assert env["AFFINITY_MAX_WORKERS_PER_GPU"] == "3"
+    assert env["PROCESSING_NUM_JOBS"] == "4"
+    assert env["PROCESSING_MAX_WORKERS_PER_GPU"] == "1"
     assert env["COMPARE_BASELINE"] == "public:2.2.0"
     assert env["COMPARE_BASELINE_LABEL"] == "MHCflurry 2.2"
     assert env["COMPARE_BACKEND"] == "cpu"
@@ -1897,6 +1928,38 @@ def test_paper_figures_score_predictions_uses_explicit_orientation(tmp_path):
     assert all_scores.set_index("predictor").loc[
         "netmhcpan4.ba", "auc"] == 1.0
     assert "percent_change_auc_ba" in scores.columns
+
+
+def test_paper_figures_score_predictions_uses_range_index_predictor_info(
+        tmp_path):
+    predictions = tmp_path / "predictions.csv"
+    pandas.DataFrame([
+        {
+            "sample_id": "sample1",
+            "peptide": "AAAAAAAAK",
+            "hit": 1,
+            "custom_model": 0.9,
+        },
+        {
+            "sample_id": "sample1",
+            "peptide": "AAAAAAAAL",
+            "hit": 0,
+            "custom_model": 0.1,
+        },
+    ]).to_csv(predictions, index=False)
+    predictor_info = pandas.DataFrame([{
+        "predictor": "custom_model",
+        "higher_is_better": True,
+    }])
+
+    scores = paper_figures.score_saved_prediction_table(
+        predictions,
+        kind="multiallelic",
+        predictor_info=predictor_info,
+    )
+
+    all_scores = scores.loc[scores["length_label"] == "All"]
+    assert all_scores.set_index("predictor").loc["custom_model", "auc"] == 1.0
 
 
 def test_paper_figures_percent_change_columns_are_numeric():

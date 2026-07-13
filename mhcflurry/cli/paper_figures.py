@@ -669,6 +669,8 @@ def _predictor_orientations(predictor_info):
             not predictor_info.empty and
             "higher_is_better" in predictor_info.columns):
         for predictor, row in predictor_info.iterrows():
+            if "predictor" in predictor_info.columns:
+                predictor = row.get("predictor", predictor)
             value = _coerce_optional_bool(row.get("higher_is_better"))
             if value is None:
                 continue
