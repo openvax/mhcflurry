@@ -193,6 +193,10 @@ def remote_training_env(environ=os.environ):
         # a control-machine path and is handled by explicit staging instead.
         "DATA_DIR": environ.get("RUNPLZ_EVAL_DATA_DIR", ""),
         "DATALOADER_NUM_WORKERS": environ.get("DATALOADER_NUM_WORKERS", "auto"),
+        "AFFINITY_NUM_JOBS": environ.get("AFFINITY_NUM_JOBS", ""),
+        "AFFINITY_DATALOADER_NUM_WORKERS": environ.get(
+            "AFFINITY_DATALOADER_NUM_WORKERS", ""
+        ),
         "MAX_TASKS_PER_WORKER": environ.get("MAX_TASKS_PER_WORKER", "12"),
         "MAX_WORKERS_PER_GPU": environ.get("MAX_WORKERS_PER_GPU", "auto"),
         # PyTorch/Inductor workers load GNU OpenMP (libgomp). The PyTorch
@@ -200,6 +204,12 @@ def remote_training_env(environ=os.environ):
         # aborts when libgomp is already loaded.
         "MKL_THREADING_LAYER": environ.get("MKL_THREADING_LAYER", "GNU"),
         "MHCFLURRY_ENABLE_TIMING": environ.get("MHCFLURRY_ENABLE_TIMING", "1"),
+        "MHCFLURRY_GPU_TELEMETRY": environ.get(
+            "MHCFLURRY_GPU_TELEMETRY", "1"
+        ),
+        "MHCFLURRY_GPU_TELEMETRY_SECONDS": environ.get(
+            "MHCFLURRY_GPU_TELEMETRY_SECONDS", "30"
+        ),
         "MHCFLURRY_TORCH_COMPILE": environ.get("MHCFLURRY_TORCH_COMPILE", "1"),
         "MHCFLURRY_TORCH_COMPILE_LOSS": environ.get(
             "MHCFLURRY_TORCH_COMPILE_LOSS", "1"
@@ -210,10 +220,33 @@ def remote_training_env(environ=os.environ):
         "MHCFLURRY_RELEASE_WORKFLOW_ID": environ.get(
             "MHCFLURRY_RELEASE_WORKFLOW_ID", ""
         ),
+        "MHCFLURRY_RELEASE_GIT_COMMIT": environ.get(
+            "MHCFLURRY_RELEASE_GIT_COMMIT", ""
+        ),
         "MATMUL_PRECISION": environ.get("MATMUL_PRECISION", "high"),
         "MATMUL_PRECISION_CLI": environ.get("MATMUL_PRECISION_CLI", "high"),
+        "NUM_JOBS": environ.get("NUM_JOBS", "auto"),
         "PRESENTATION_PROCESSING_WITH_FLANKS_KIND": environ.get(
             "PRESENTATION_PROCESSING_WITH_FLANKS_KIND", "with_flanks"
+        ),
+        "PRESENTATION_DECOYS_PER_HIT": environ.get(
+            "PRESENTATION_DECOYS_PER_HIT", "99"
+        ),
+        "PRESENTATION_FEATURE_CHUNK_SIZE": environ.get(
+            "PRESENTATION_FEATURE_CHUNK_SIZE", "250000"
+        ),
+        "PRESENTATION_NUM_JOBS": environ.get("PRESENTATION_NUM_JOBS", "auto"),
+        "PRESENTATION_MAX_WORKERS_PER_GPU": environ.get(
+            "PRESENTATION_MAX_WORKERS_PER_GPU", "1"
+        ),
+        "PRESENTATION_CALIBRATION_NUM_JOBS": environ.get(
+            "PRESENTATION_CALIBRATION_NUM_JOBS", "auto"
+        ),
+        "PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU": environ.get(
+            "PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU", "auto"
+        ),
+        "PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE": environ.get(
+            "PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE", "auto"
         ),
         "PRESENTATION_MODES": environ.get(
             "PRESENTATION_MODES", "with_flanks,without_flanks"
@@ -251,6 +284,9 @@ def remote_training_env(environ=os.environ):
         ),
         "PROCESSING_VARIANTS": environ.get(
             "PROCESSING_VARIANTS", "with_flanks no_flank short_flanks"
+        ),
+        "PROCESSING_HELD_OUT_SAMPLES": environ.get(
+            "PROCESSING_HELD_OUT_SAMPLES", "50"
         ),
         "PROCESSING_NUM_JOBS": environ.get("PROCESSING_NUM_JOBS", "auto"),
         "PROCESSING_MAX_WORKERS_PER_GPU": environ.get(

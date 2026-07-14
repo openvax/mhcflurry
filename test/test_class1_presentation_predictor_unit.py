@@ -14,7 +14,9 @@ import warnings
 
 import numpy
 import pandas
+import pytest
 import torch
+from sklearn.metrics import roc_auc_score
 
 import mhcflurry.class1_presentation_predictor as presentation_module
 import mhcflurry.cli.train_presentation_models_command as train_presentation
@@ -181,6 +183,33 @@ def test_fit_from_scores_trains_expected_variants():
     }
 
 
+def test_percentile_calibration_preserves_compressed_score_ranking():
+    """Low presentation scores must not collapse into one percentile bin."""
+    rng = numpy.random.default_rng(42)
+    score_logits = rng.normal(loc=-9.5, scale=2.0, size=50000)
+    scores = 1.0 / (1.0 + numpy.exp(-score_logits))
+    hit_probability = 1.0 / (
+        1.0 + numpy.exp(-(numpy.log10(scores) + 4.0) * 1.5)
+    )
+    hits = rng.random(scores.size) < hit_probability
+
+    predictor = Class1PresentationPredictor()
+    predictor.calibrate_percentile_ranks(scores)
+    percentiles = predictor.percentile_ranks(scores)
+
+    raw_auc = roc_auc_score(hits, scores)
+    percentile_auc = roc_auc_score(hits, -percentiles)
+    assert abs(raw_auc - percentile_auc) < 0.001
+    assert numpy.unique(percentiles).size > 9000
+    assert (percentiles == 100.0).mean() < 0.001
+
+
+def test_percentile_calibration_rejects_constant_scores():
+    predictor = Class1PresentationPredictor()
+    with pytest.raises(ValueError, match="constant score distribution"):
+        predictor.calibrate_percentile_ranks(numpy.ones(100))
+
+
 def test_save_write_metadata_false_skips_metadata(tmp_path):
     predictor = Class1PresentationPredictor(
         metadata_dataframes={"extra": pandas.DataFrame({"x": [1]})})
@@ -196,6 +225,26 @@ def test_save_write_metadata_false_skips_metadata(tmp_path):
     )
 
     assert not (tmp_path / "extra.csv.bz2").exists()
+
+
+def test_save_info_embeds_release_provenance(tmp_path, monkeypatch):
+    monkeypatch.setenv("MHCFLURRY_RELEASE_GIT_COMMIT", "abc123")
+    monkeypatch.setenv("MHCFLURRY_RELEASE_WORKFLOW_ID", "run-123")
+    predictor = Class1PresentationPredictor()
+
+    predictor.save(
+        str(tmp_path),
+        write_affinity_predictor=False,
+        write_processing_predictor=False,
+        write_weights=False,
+        write_percent_ranks=False,
+        write_info=True,
+        write_metadata=False,
+    )
+
+    info = (tmp_path / "info.txt").read_text()
+    assert "git commit\tabc123" in info
+    assert "workflow id\trun-123" in info
 
 
 class FakePresentationPredictor:

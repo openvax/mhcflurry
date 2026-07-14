@@ -37,6 +37,7 @@ from ..pseudosequences import (
     pseudosequence_filename_for_mapping,
 )
 from ..version import __version__
+from ..model_provenance import add_release_provenance
 
 
 def _parse_mhc_name(raw_name, only_class1):
@@ -159,6 +160,7 @@ def save_predictor(predictor, models_dir, model_names_to_write=None, write_metad
                 ("hostname  ", gethostname()),
                 ("user      ", getuser()),
             ]
+            add_release_provenance(rows)
             pandas.DataFrame(rows).to_csv(
                 info_path, sep="\t", header=False, index=False)
 

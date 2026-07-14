@@ -40,6 +40,7 @@ import ast
 import glob
 import json
 import os
+import shutil
 import time
 import warnings
 from functools import partial
@@ -263,6 +264,8 @@ def register_subparser(parser):
 
 
 def run(args):
+    _validate_comparison_output_location(args)
+    _reset_comparison_outputs(args.out)
     os.makedirs(args.out, exist_ok=True)
     side_a = _resolve_side("a", args.a, args.a_label, args)
     side_b = _resolve_side("b", args.b, args.b_label, args)
@@ -289,6 +292,57 @@ def run(args):
     _write_release_summary_tables(headline, side_a, side_b, args.out, components)
     _write_summary_markdown(headline, side_a, side_b, args.out, components)
     return 0
+
+
+def _validate_comparison_output_location(args):
+    """Refuse output paths that contain either side's model inputs."""
+    out = os.path.realpath(args.out)
+    inputs = []
+    for letter in ("a", "b"):
+        spec = getattr(args, letter)
+        if isinstance(spec, str) and not (
+                spec == "public" or spec.startswith("public:")):
+            inputs.append(spec)
+        for role in ("affinity", "processing", "presentation", "training"):
+            value = getattr(args, "%s_%s_dir" % (letter, role))
+            if value:
+                inputs.append(value)
+    for value in inputs:
+        path = os.path.realpath(value)
+        try:
+            output_contains_input = os.path.commonpath([out, path]) == out
+        except ValueError:
+            output_contains_input = False
+        if output_contains_input:
+            raise ValueError(
+                "Comparison output directory cannot contain a model input: "
+                "%s contains %s" % (args.out, value))
+
+
+def _reset_comparison_outputs(out_dir):
+    """Remove outputs owned by compare-models before starting a new run.
+
+    A comparison directory is commonly reused for release retries. Leaving a
+    component directory or plot packet from the previous invocation can make a
+    narrower or failed retry look successful, so all derived outputs are
+    invalidated together before new side metadata is written.
+    """
+    for name in (
+            "training_stats", "affinity", "processing", "presentation",
+            "plots", "worker_logs"):
+        path = os.path.join(out_dir, name)
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        elif os.path.exists(path):
+            os.unlink(path)
+    for name in (
+            "side_a.json", "side_b.json", "release_summary.csv",
+            "release_summary.md", "summary.md", "summary.pdf"):
+        path = os.path.join(out_dir, name)
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -448,12 +502,53 @@ def _looks_like_processing_dir(path):
 
 
 def _side_to_json(side):
-    return {
+    result = {
         "letter": side["letter"],
         "spec": side["spec"],
         "label": side["label"],
         "paths": side["paths"],
+        "model_package_versions": _model_package_versions(side["paths"]),
     }
+    provenance_path = os.path.join(
+        side["spec"], "release_provenance.json") if os.path.isdir(
+            side["spec"]) else None
+    if provenance_path and os.path.isfile(provenance_path):
+        with open(provenance_path) as fd:
+            result["release_provenance"] = json.load(fd)
+    return result
+
+
+def _model_package_versions(paths):
+    """Return package versions recorded by each resolved model artifact."""
+    info_paths = {}
+    for role in ("affinity", "presentation"):
+        root = paths.get(role)
+        if root:
+            info_paths[role] = [os.path.join(root, "info.txt")]
+    processing = paths.get("processing")
+    if processing:
+        if os.path.basename(os.path.normpath(processing)).startswith(
+                "models.selected."):
+            info_paths["processing"] = [os.path.join(processing, "info.txt")]
+        else:
+            info_paths["processing"] = sorted(glob.glob(os.path.join(
+                processing, "models.selected.*", "info.txt")))
+
+    result = {}
+    for role, candidates in info_paths.items():
+        versions = []
+        for path in candidates:
+            if not os.path.isfile(path):
+                continue
+            with open(path) as fd:
+                for line in fd:
+                    fields = line.split()
+                    if fields[:2] == ["package", "mhcflurry"] and len(fields) > 2:
+                        versions.append(fields[2])
+                        break
+        if versions:
+            result[role] = sorted(set(versions))
+    return result
 
 
 def _resolve_components(include_arg, side_a, side_b):

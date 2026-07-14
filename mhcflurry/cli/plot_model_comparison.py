@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 from pathlib import Path
 
 import numpy
@@ -207,7 +208,16 @@ def run(args):
     if args.b_label:
         labels["b"] = args.b_label
     plot_dir = os.path.join(args.input, "plots")
+    if os.path.isdir(plot_dir):
+        shutil.rmtree(plot_dir)
+    elif os.path.exists(plot_dir):
+        os.unlink(plot_dir)
     os.makedirs(plot_dir, exist_ok=True)
+    if args.summary_pdf:
+        try:
+            os.unlink(args.summary_pdf)
+        except FileNotFoundError:
+            pass
     paper_dir = os.path.join(plot_dir, "paper")
     os.makedirs(paper_dir, exist_ok=True)
 
@@ -217,37 +227,24 @@ def run(args):
     else:
         requested = [p.strip() for p in args.components.split(",") if p]
         components = [c for c in requested if c in available]
-        for missing in set(requested) - set(available):
-            print("WARNING: %s not present in %s" % (missing, args.input))
+        missing = sorted(set(requested) - set(available))
+        if missing:
+            shutil.rmtree(plot_dir)
+            raise SystemExit(
+                "Requested component(s) not present in %s: %s" % (
+                    args.input, ", ".join(missing)))
 
     for component in components:
         if component == "affinity":
-            _safe_plot(
-                "affinity plots",
-                _plot_affinity,
-                args.input,
-                plot_dir,
-                labels,
-                args.max_scatter_points)
+            _plot_affinity(
+                args.input, plot_dir, labels, args.max_scatter_points)
         elif component == "processing":
-            _safe_plot(
-                "processing plots",
-                _plot_processing,
-                args.input,
-                plot_dir,
-                labels,
-                args.max_scatter_points)
+            _plot_processing(
+                args.input, plot_dir, labels, args.max_scatter_points)
         elif component == "presentation":
-            _safe_plot(
-                "presentation plots",
-                _plot_presentation,
-                args.input,
-                plot_dir,
-                labels,
-                args.max_scatter_points)
-    _safe_plot(
-        "release-summary plots", _plot_release_summary, args.input,
-        paper_dir, labels)
+            _plot_presentation(
+                args.input, plot_dir, labels, args.max_scatter_points)
+    _plot_release_summary(args.input, paper_dir, labels)
     paper_scores_dir = (
         args.paper_figures_scores_dir or args.paper_figures_artifacts_dir
     )
@@ -276,14 +273,16 @@ def run(args):
     if args.summary_pdf:
         paper_figures_dir = args.paper_figures_out or os.path.join(
             plot_dir, "paper_figures")
-        _safe_plot(
-            "summary PDF",
-            _write_summary_pdf,
+        _write_summary_pdf(
             plot_dir,
             args.summary_pdf,
             include_paper_figures=args.include_paper_figures_in_summary_pdf,
             paper_figures_dir=paper_figures_dir,
         )
+        if not os.path.isfile(args.summary_pdf):
+            raise RuntimeError(
+                "No plot pages were generated for summary PDF: %s" %
+                args.summary_pdf)
     return 0
 
 

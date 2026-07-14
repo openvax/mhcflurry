@@ -22,6 +22,7 @@ import argparse
 import importlib
 import json
 import os
+import pathlib
 import subprocess
 import sys
 import types
@@ -231,6 +232,54 @@ def test_release_workflow_forwards_processing_parallelism(tmp_path):
     assert "PROCESSING_NUM_JOBS=4" in output
     assert "PROCESSING_MAX_WORKERS_PER_GPU=1" in output
     assert "jobs=4; workers/gpu=1" in output
+
+
+def test_release_workflow_forwards_presentation_recipe_controls(tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "local",
+            "--skip-eval",
+            "--skip-plots",
+            "--processing-held-out-samples", "17",
+            "--presentation-decoys-per-hit", "7",
+            "--presentation-feature-chunk-size", "12345",
+            "--presentation-num-jobs", "8",
+            "--presentation-max-workers-per-gpu", "2",
+            "--presentation-calibration-num-jobs", "3",
+            "--presentation-calibration-max-workers-per-gpu", "4",
+            "--presentation-calibration-prediction-batch-size", "4096",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    output = result.stdout + result.stderr
+    for expected in (
+            "PROCESSING_HELD_OUT_SAMPLES=17",
+            "PRESENTATION_DECOYS_PER_HIT=7",
+            "PRESENTATION_FEATURE_CHUNK_SIZE=12345",
+            "PRESENTATION_NUM_JOBS=8",
+            "PRESENTATION_MAX_WORKERS_PER_GPU=2",
+            "PRESENTATION_CALIBRATION_NUM_JOBS=3",
+            "PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU=4",
+            "PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE=4096"):
+        assert expected in output
+
+
+def test_release_workflow_sync_is_workflow_id_scoped():
+    script = pathlib.Path(
+        "scripts/release/retrain_evaluate_deploy.sh").read_text()
+    assert "run_dir_matches_workflow || return 1" in script
+    assert "remote_workflow_id" in script
+    assert "Refusing to sync Brev output for workflow" in script
+    assert "add_path .runplz/mhcflurry_release_workflow_id" in script
+    assert "add_path .runplz/mhcflurry_release_workflow_exit_code" in script
 
 
 def test_release_workflow_brev_prepare_uses_remote_postprocess(tmp_path):
@@ -866,6 +915,10 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert env["COMPARE_TORCH_COMPILE"] == "auto"
     assert env["COMPARE_MATMUL_PRECISION"] == "high"
     assert env["MHCFLURRY_RELEASE_WORKFLOW_ID"] == ""
+    assert env["MHCFLURRY_RELEASE_GIT_COMMIT"] == ""
+    assert env["MHCFLURRY_GPU_TELEMETRY"] == "1"
+    assert env["MHCFLURRY_GPU_TELEMETRY_SECONDS"] == "30"
+    assert env["NUM_JOBS"] == "auto"
     assert env["MKL_THREADING_LAYER"] == "GNU"
     assert env["COMPARE_PRESENTATION_NUM_JOBS"] == "1"
     assert env["COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU"] == "1"
@@ -876,6 +929,14 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert "PROCESSING_MINIBATCH_SIZE" not in env
     assert env["PROCESSING_NUM_JOBS"] == "auto"
     assert env["PROCESSING_MAX_WORKERS_PER_GPU"] == "auto"
+    assert env["PROCESSING_HELD_OUT_SAMPLES"] == "50"
+    assert env["PRESENTATION_DECOYS_PER_HIT"] == "99"
+    assert env["PRESENTATION_FEATURE_CHUNK_SIZE"] == "250000"
+    assert env["PRESENTATION_NUM_JOBS"] == "auto"
+    assert env["PRESENTATION_MAX_WORKERS_PER_GPU"] == "1"
+    assert env["PRESENTATION_CALIBRATION_NUM_JOBS"] == "auto"
+    assert env["PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU"] == "auto"
+    assert env["PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE"] == "auto"
 
     env = module.remote_training_env({
         "TRAINING_MINIBATCH_SIZE": "2048",
@@ -883,6 +944,14 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
         "AFFINITY_MAX_WORKERS_PER_GPU": "3",
         "PROCESSING_NUM_JOBS": "4",
         "PROCESSING_MAX_WORKERS_PER_GPU": "1",
+        "PROCESSING_HELD_OUT_SAMPLES": "17",
+        "PRESENTATION_DECOYS_PER_HIT": "7",
+        "PRESENTATION_FEATURE_CHUNK_SIZE": "12345",
+        "PRESENTATION_NUM_JOBS": "8",
+        "PRESENTATION_MAX_WORKERS_PER_GPU": "2",
+        "PRESENTATION_CALIBRATION_NUM_JOBS": "3",
+        "PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU": "4",
+        "PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE": "4096",
         "COMPARE_BASELINE": "public:2.2.0",
         "COMPARE_BASELINE_LABEL": "MHCflurry 2.2",
         "COMPARE_BACKEND": "cpu",
@@ -891,12 +960,24 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
         "COMPARE_TORCH_COMPILE": "off",
         "COMPARE_MATMUL_PRECISION": "medium",
         "MHCFLURRY_RELEASE_WORKFLOW_ID": "run-123",
+        "MHCFLURRY_RELEASE_GIT_COMMIT": "abc123",
+        "MHCFLURRY_GPU_TELEMETRY": "0",
+        "MHCFLURRY_GPU_TELEMETRY_SECONDS": "5",
+        "NUM_JOBS": "6",
         "MKL_THREADING_LAYER": "TBB",
     })
     assert env["AFFINITY_MINIBATCH_SIZE"] == "512"
     assert env["AFFINITY_MAX_WORKERS_PER_GPU"] == "3"
     assert env["PROCESSING_NUM_JOBS"] == "4"
     assert env["PROCESSING_MAX_WORKERS_PER_GPU"] == "1"
+    assert env["PROCESSING_HELD_OUT_SAMPLES"] == "17"
+    assert env["PRESENTATION_DECOYS_PER_HIT"] == "7"
+    assert env["PRESENTATION_FEATURE_CHUNK_SIZE"] == "12345"
+    assert env["PRESENTATION_NUM_JOBS"] == "8"
+    assert env["PRESENTATION_MAX_WORKERS_PER_GPU"] == "2"
+    assert env["PRESENTATION_CALIBRATION_NUM_JOBS"] == "3"
+    assert env["PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU"] == "4"
+    assert env["PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE"] == "4096"
     assert env["COMPARE_BASELINE"] == "public:2.2.0"
     assert env["COMPARE_BASELINE_LABEL"] == "MHCflurry 2.2"
     assert env["COMPARE_BACKEND"] == "cpu"
@@ -905,6 +986,10 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert env["COMPARE_TORCH_COMPILE"] == "off"
     assert env["COMPARE_MATMUL_PRECISION"] == "medium"
     assert env["MHCFLURRY_RELEASE_WORKFLOW_ID"] == "run-123"
+    assert env["MHCFLURRY_RELEASE_GIT_COMMIT"] == "abc123"
+    assert env["MHCFLURRY_GPU_TELEMETRY"] == "0"
+    assert env["MHCFLURRY_GPU_TELEMETRY_SECONDS"] == "5"
+    assert env["NUM_JOBS"] == "6"
     assert env["MKL_THREADING_LAYER"] == "TBB"
 
     brev_config = module.brev_config_from_env({
@@ -1571,6 +1656,85 @@ def test_run_orchestrator_training_stats_only(tmp_path):
 
 def test_detect_available_components_empty(tmp_path):
     assert plot_model_comparison._detect_available_components(str(tmp_path)) == []
+
+
+def test_compare_models_reset_removes_only_owned_outputs(tmp_path):
+    for name in ("affinity", "processing", "plots", "worker_logs"):
+        path = tmp_path / name
+        path.mkdir()
+        (path / "stale.txt").write_text("stale")
+    (tmp_path / "release_summary.csv").write_text("stale")
+    (tmp_path / "summary.pdf").write_bytes(b"stale")
+    (tmp_path / "keep.txt").write_text("user-owned")
+
+    compare_models._reset_comparison_outputs(str(tmp_path))
+
+    assert not (tmp_path / "affinity").exists()
+    assert not (tmp_path / "processing").exists()
+    assert not (tmp_path / "plots").exists()
+    assert not (tmp_path / "worker_logs").exists()
+    assert not (tmp_path / "release_summary.csv").exists()
+    assert not (tmp_path / "summary.pdf").exists()
+    assert (tmp_path / "keep.txt").read_text() == "user-owned"
+
+
+def test_compare_models_rejects_output_that_contains_model_input(tmp_path):
+    args = compare_models.make_parser().parse_args([
+        "--a", str(tmp_path),
+        "--b", "public:2.2.0",
+        "--out", str(tmp_path),
+    ])
+
+    with pytest.raises(ValueError, match="cannot contain a model input"):
+        compare_models._validate_comparison_output_location(args)
+
+
+def test_compare_models_side_json_records_model_provenance(tmp_path):
+    paths = {}
+    for role, subdir in (
+            ("affinity", "affinity/models.combined"),
+            ("presentation", "presentation/models")):
+        path = tmp_path / subdir
+        path.mkdir(parents=True)
+        (path / "info.txt").write_text("package\tmhcflurry 2.3.0rc14\n")
+        paths[role] = str(path)
+    processing = tmp_path / "processing" / "models.selected.with_flanks"
+    processing.mkdir(parents=True)
+    (processing / "info.txt").write_text("package mhcflurry 2.3.0rc14\n")
+    paths["processing"] = str(tmp_path / "processing")
+    paths["training"] = None
+    provenance = {"release": "2.3.0", "workflow_id": "run-123"}
+    (tmp_path / "release_provenance.json").write_text(json.dumps(provenance))
+
+    result = compare_models._side_to_json({
+        "letter": "a",
+        "spec": str(tmp_path),
+        "label": "candidate",
+        "paths": paths,
+    })
+
+    assert result["model_package_versions"] == {
+        "affinity": ["2.3.0rc14"],
+        "presentation": ["2.3.0rc14"],
+        "processing": ["2.3.0rc14"],
+    }
+    assert result["release_provenance"] == provenance
+
+
+def test_plot_model_comparison_rejects_missing_requested_component(tmp_path):
+    plot_dir = tmp_path / "plots"
+    plot_dir.mkdir()
+    (plot_dir / "stale.pdf").write_bytes(b"stale")
+    args = plot_model_comparison.make_parser().parse_args([
+        "--input", str(tmp_path),
+        "--components", "affinity",
+        "--summary-pdf", str(plot_dir / "summary.pdf"),
+    ])
+
+    with pytest.raises(SystemExit, match="affinity"):
+        plot_model_comparison.run(args)
+
+    assert not plot_dir.exists()
 
 
 def test_detect_available_components_finds_affinity(tmp_path):

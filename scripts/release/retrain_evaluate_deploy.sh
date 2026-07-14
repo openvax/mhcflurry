@@ -29,7 +29,15 @@ Usage:
       [--processing-minibatch-size 1024] \
       [--processing-num-jobs auto] \
       [--processing-max-workers-per-gpu auto] \
+      [--processing-held-out-samples 50] \
       [--processing-variants "with_flanks no_flank short_flanks"] \
+      [--presentation-decoys-per-hit 99] \
+      [--presentation-feature-chunk-size 250000] \
+      [--presentation-num-jobs auto] \
+      [--presentation-max-workers-per-gpu 1] \
+      [--presentation-calibration-num-jobs auto] \
+      [--presentation-calibration-max-workers-per-gpu auto] \
+      [--presentation-calibration-prediction-batch-size auto] \
       [--compare-presentation-num-jobs 1] \
       [--compare-presentation-max-workers-per-gpu 1] \
       [--compare-presentation-torch-compile 0] \
@@ -49,6 +57,7 @@ Usage:
       [--paper-figures-monoallelic-predictions FILE] \
       [--paper-figures-prepare-command COMMAND] \
       [--brev-instance-type TYPE] \
+      [--allow-dirty-repo] \
       [--skip-train] [--skip-eval] [--skip-plots] \
       [--deploy-mode none|dry-run|draft|publish]
 
@@ -157,6 +166,30 @@ warn() {
 
 require_command() {
     command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"
+}
+
+validate_release_provenance() {
+    local step="$1"
+    local require_artifacts="$2"
+    local args=(
+        python3 "$SCRIPT_DIR/validate_release_provenance.py"
+        --repo "$REPO"
+        --run-dir "$RUN_DIR"
+        --release "$RELEASE"
+        --workflow-id "$WORKFLOW_RUN_ID"
+        --processing-variants "$PROCESSING_VARIANTS"
+        --out "$RUN_DIR/release_provenance.json"
+    )
+    if [ "$require_artifacts" = "1" ]; then
+        args+=(--require-artifacts)
+        if [ "$SKIP_TRAIN" != "1" ]; then
+            args+=(--expected-artifact-workflow-id "$WORKFLOW_RUN_ID")
+        fi
+    fi
+    if [ "$ALLOW_DIRTY_REPO" = "1" ]; then
+        args+=(--allow-dirty-repo)
+    fi
+    run_logged_step "$step" "${args[@]}"
 }
 
 lowercase() {
@@ -502,7 +535,14 @@ run_dir_has_model_artifacts() {
     return 0
 }
 
+run_dir_matches_workflow() {
+    local marker="$RUN_DIR/.runplz/mhcflurry_release_workflow_id"
+    [ -f "$marker" ] || return 1
+    [ "$(cat "$marker")" = "$WORKFLOW_RUN_ID" ]
+}
+
 run_dir_has_synced_brev_outputs() {
+    run_dir_matches_workflow || return 1
     run_dir_has_model_artifacts || return 1
     if [ "${BREV_EXPECT_REMOTE_EVAL:-0}" = "1" ] && \
             [ ! -d "$RUN_DIR/eval_comparison" ]; then
@@ -513,6 +553,19 @@ run_dir_has_synced_brev_outputs() {
         return 1
     fi
     return 0
+}
+
+brev_latest_remote_workflow_id() {
+    require_command brev
+    local output
+    output="$(
+        run_with_timeout "$BREV_CLEANUP_TIMEOUT_SECONDS" brev exec "$BREV_INSTANCE" \
+            "bash -lc 'marker=\$(cat ~/runplz-latest/out/.runplz/mhcflurry_release_workflow_id 2>/dev/null || true); printf \"MHCFLURRY_WORKFLOW_ID=%s\\n\" \"\$marker\"'" \
+            2>/dev/null || true
+    )"
+    printf '%s\n' "$output" | sed -n \
+        's/^MHCFLURRY_WORKFLOW_ID=//p' \
+        | tail -1
 }
 
 brev_latest_remote_exit_code() {
@@ -1159,6 +1212,11 @@ sync_brev_output() {
     require_command brev
     require_command rsync
     require_command tar
+    local remote_workflow_id
+    remote_workflow_id="$(brev_latest_remote_workflow_id)"
+    if [ "$remote_workflow_id" != "$WORKFLOW_RUN_ID" ]; then
+        die "Refusing to sync Brev output for workflow '${remote_workflow_id:-unknown}'; expected '$WORKFLOW_RUN_ID'"
+    fi
     run_cmd mkdir -p "$RUN_DIR"
     local sync_parent="$RUN_DIR/.brev-sync"
     local copied_out="$sync_parent/out"
@@ -1171,6 +1229,8 @@ sync_brev_output() {
     fi
     run_dir_has_model_artifacts || \
         die "Brev sync finished but expected model artifacts are missing in $RUN_DIR"
+    run_dir_matches_workflow || \
+        die "Brev sync finished but its local workflow marker does not match $WORKFLOW_RUN_ID"
 }
 
 sync_brev_full_output() {
@@ -1235,6 +1295,8 @@ add_path .runplz/last.log
 add_path .runplz/run.json
 add_path .runplz/run.sh
 add_path .runplz/run_driver.log
+add_path .runplz/mhcflurry_release_workflow_id
+add_path .runplz/mhcflurry_release_workflow_exit_code
 
 add_path eval_comparison/release_summary.csv
 add_path eval_comparison/release_summary.md
@@ -1413,8 +1475,16 @@ run_brev_training() {
         "PROCESSING_MINIBATCH_SIZE=$PROCESSING_MINIBATCH_SIZE"
         "PROCESSING_NUM_JOBS=$PROCESSING_NUM_JOBS"
         "PROCESSING_MAX_WORKERS_PER_GPU=$PROCESSING_MAX_WORKERS_PER_GPU"
+        "PROCESSING_HELD_OUT_SAMPLES=$PROCESSING_HELD_OUT_SAMPLES"
         "PROCESSING_VARIANTS=$PROCESSING_VARIANTS"
         "PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$PRESENTATION_PROCESSING_WITH_FLANKS_KIND"
+        "PRESENTATION_DECOYS_PER_HIT=$PRESENTATION_DECOYS_PER_HIT"
+        "PRESENTATION_FEATURE_CHUNK_SIZE=$PRESENTATION_FEATURE_CHUNK_SIZE"
+        "PRESENTATION_NUM_JOBS=$PRESENTATION_NUM_JOBS"
+        "PRESENTATION_MAX_WORKERS_PER_GPU=$PRESENTATION_MAX_WORKERS_PER_GPU"
+        "PRESENTATION_CALIBRATION_NUM_JOBS=$PRESENTATION_CALIBRATION_NUM_JOBS"
+        "PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU=$PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU"
+        "PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE=$PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE"
         "RUN_RELEASE_EVAL=$run_release_eval"
         "RUN_RELEASE_PLOTS=$run_release_plots"
         "COMPARE_INCLUDE=$COMPARE_INCLUDE"
@@ -1447,6 +1517,7 @@ run_brev_training() {
         "PAPER_FIGURES_PRESENTATION_PANEL_BASELINES=$PAPER_FIGURES_PRESENTATION_PANEL_BASELINES"
         "RUN_LABEL=$RUN_LABEL"
         "MHCFLURRY_RELEASE_WORKFLOW_ID=$WORKFLOW_RUN_ID"
+        "MHCFLURRY_RELEASE_GIT_COMMIT=$RELEASE_GIT_COMMIT"
         "RUNPLZ_BREV_AUTO_CREATE=$auto_create"
         "RUNPLZ_BREV_ON_FINISH=$runplz_on_finish"
         "RUNPLZ_BREV_INSTANCE_TYPE_FALLBACK_COUNT=$BREV_INSTANCE_TYPE_FALLBACK_COUNT"
@@ -1608,6 +1679,7 @@ PAPER_FIGURES_PRESENTATION_PANEL_PREDICTORS="${PAPER_FIGURES_PRESENTATION_PANEL_
 PAPER_FIGURES_PRESENTATION_PANEL_BASELINES="${PAPER_FIGURES_PRESENTATION_PANEL_BASELINES:-}"
 RUN_LABEL="${RUN_LABEL:-}"
 DRY_RUN=0
+ALLOW_DIRTY_REPO="${ALLOW_DIRTY_REPO:-0}"
 TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-1024}"
 AFFINITY_MINIBATCH_SIZE=
 AFFINITY_MAX_WORKERS_PER_GPU_EXPLICIT=0
@@ -1618,15 +1690,24 @@ AFFINITY_MAX_WORKERS_PER_GPU="${AFFINITY_MAX_WORKERS_PER_GPU:-auto}"
 PROCESSING_MINIBATCH_SIZE=
 PROCESSING_NUM_JOBS="${PROCESSING_NUM_JOBS:-auto}"
 PROCESSING_MAX_WORKERS_PER_GPU="${PROCESSING_MAX_WORKERS_PER_GPU:-auto}"
+PROCESSING_HELD_OUT_SAMPLES="${PROCESSING_HELD_OUT_SAMPLES:-50}"
 PROCESSING_VARIANTS_EXPLICIT=0
 if [ -n "${PROCESSING_VARIANTS:-}" ]; then
     PROCESSING_VARIANTS_EXPLICIT=1
 fi
 PROCESSING_VARIANTS="${PROCESSING_VARIANTS:-with_flanks no_flank short_flanks}"
 PRESENTATION_PROCESSING_WITH_FLANKS_KIND="${PRESENTATION_PROCESSING_WITH_FLANKS_KIND:-with_flanks}"
+PRESENTATION_DECOYS_PER_HIT="${PRESENTATION_DECOYS_PER_HIT:-99}"
+PRESENTATION_FEATURE_CHUNK_SIZE="${PRESENTATION_FEATURE_CHUNK_SIZE:-250000}"
+PRESENTATION_NUM_JOBS="${PRESENTATION_NUM_JOBS:-auto}"
+PRESENTATION_MAX_WORKERS_PER_GPU="${PRESENTATION_MAX_WORKERS_PER_GPU:-1}"
+PRESENTATION_CALIBRATION_NUM_JOBS="${PRESENTATION_CALIBRATION_NUM_JOBS:-auto}"
+PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU="${PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU:-auto}"
+PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE="${PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE:-auto}"
 WORKFLOW_LOG_DIR=
 WORKFLOW_STATUS_LOG=
 WORKFLOW_RUN_ID="${WORKFLOW_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
+RELEASE_GIT_COMMIT=
 BREV_EXPECT_REMOTE_EVAL=0
 BREV_EXPECT_REMOTE_PLOTS=0
 BREV_REMOTE_EVAL_DONE=0
@@ -1838,6 +1919,10 @@ while [ $# -gt 0 ]; do
             DRY_RUN=1
             shift
             ;;
+        --allow-dirty-repo)
+            ALLOW_DIRTY_REPO=1
+            shift
+            ;;
         --minibatch-size)
             TRAINING_MINIBATCH_SIZE=$2
             shift 2
@@ -1863,6 +1948,10 @@ while [ $# -gt 0 ]; do
             PROCESSING_MAX_WORKERS_PER_GPU=$2
             shift 2
             ;;
+        --processing-held-out-samples)
+            PROCESSING_HELD_OUT_SAMPLES=$2
+            shift 2
+            ;;
         --processing-variants)
             PROCESSING_VARIANTS=$2
             PROCESSING_VARIANTS_EXPLICIT=1
@@ -1870,6 +1959,34 @@ while [ $# -gt 0 ]; do
             ;;
         --presentation-processing-with-flanks-kind)
             PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$2
+            shift 2
+            ;;
+        --presentation-decoys-per-hit)
+            PRESENTATION_DECOYS_PER_HIT=$2
+            shift 2
+            ;;
+        --presentation-feature-chunk-size)
+            PRESENTATION_FEATURE_CHUNK_SIZE=$2
+            shift 2
+            ;;
+        --presentation-num-jobs)
+            PRESENTATION_NUM_JOBS=$2
+            shift 2
+            ;;
+        --presentation-max-workers-per-gpu)
+            PRESENTATION_MAX_WORKERS_PER_GPU=$2
+            shift 2
+            ;;
+        --presentation-calibration-num-jobs)
+            PRESENTATION_CALIBRATION_NUM_JOBS=$2
+            shift 2
+            ;;
+        --presentation-calibration-max-workers-per-gpu)
+            PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU=$2
+            shift 2
+            ;;
+        --presentation-calibration-prediction-batch-size)
+            PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE=$2
             shift 2
             ;;
         --processing-modes)
@@ -1934,6 +2051,13 @@ case "$DEPLOY_MODE" in
     none|dry-run|draft|publish) ;;
     *) die "--deploy-mode must be one of: none, dry-run, draft, publish" ;;
 esac
+if [ "$ALLOW_DIRTY_REPO" = "1" ]; then
+    case "$DEPLOY_MODE" in
+        draft|publish)
+            die "--allow-dirty-repo cannot be combined with --deploy-mode $DEPLOY_MODE"
+            ;;
+    esac
+fi
 if [ "$SKIP_DEPLOY" = "1" ]; then
     if [ "$DEPLOY_MODE" != "none" ]; then
         die "--skip-deploy cannot be combined with --deploy-mode $DEPLOY_MODE; deployment is opt-in, so omit --skip-deploy or use --deploy-mode none"
@@ -2028,6 +2152,7 @@ note "Batch sizes:   affinity=$AFFINITY_MINIBATCH_SIZE processing=$PROCESSING_MI
 note "Compare:       $RUN_LABEL vs $COMPARE_BASELINE_LABEL ($COMPARE_BASELINE)"
 note "Affinity MWPG: $AFFINITY_MAX_WORKERS_PER_GPU"
 note "Processing:    variants=$PROCESSING_VARIANTS; eval_modes=$PROCESSING_MODES; jobs=$PROCESSING_NUM_JOBS; workers/gpu=$PROCESSING_MAX_WORKERS_PER_GPU"
+note "Presentation:  decoys/hit=$PRESENTATION_DECOYS_PER_HIT; jobs=$PRESENTATION_NUM_JOBS; workers/gpu=$PRESENTATION_MAX_WORKERS_PER_GPU"
 if [ -n "$PAPER_FIGURES_PREPARE_COMMAND" ]; then
     note "Paper inputs:  local prepare command configured"
 fi
@@ -2043,8 +2168,19 @@ case "$BACKEND" in
         ;;
 esac
 
+validate_release_provenance source_provenance 0
+if [ "$DRY_RUN" = "1" ]; then
+    RELEASE_GIT_COMMIT='<git rev-parse HEAD>'
+else
+    RELEASE_GIT_COMMIT="$(git -C "$REPO" rev-parse HEAD)"
+fi
+
 trap cleanup_background_jobs EXIT
 start_paper_figures_prepare
+
+if [ "$SKIP_TRAIN" = "1" ]; then
+    validate_release_provenance model_provenance 1
+fi
 
 if [ "$SKIP_TRAIN" != "1" ]; then
     case "$BACKEND" in
@@ -2053,14 +2189,24 @@ if [ "$SKIP_TRAIN" != "1" ]; then
             run_logged_step train_local env \
                 "MHCFLURRY_OUT=$RUN_DIR" \
                 "REPO=$REPO" \
+                "MHCFLURRY_RELEASE_WORKFLOW_ID=$WORKFLOW_RUN_ID" \
+                "MHCFLURRY_RELEASE_GIT_COMMIT=$RELEASE_GIT_COMMIT" \
                 "TRAINING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE" \
                 "AFFINITY_MINIBATCH_SIZE=$AFFINITY_MINIBATCH_SIZE" \
                 "AFFINITY_MAX_WORKERS_PER_GPU=$AFFINITY_MAX_WORKERS_PER_GPU" \
                 "PROCESSING_MINIBATCH_SIZE=$PROCESSING_MINIBATCH_SIZE" \
                 "PROCESSING_NUM_JOBS=$PROCESSING_NUM_JOBS" \
                 "PROCESSING_MAX_WORKERS_PER_GPU=$PROCESSING_MAX_WORKERS_PER_GPU" \
+                "PROCESSING_HELD_OUT_SAMPLES=$PROCESSING_HELD_OUT_SAMPLES" \
                 "PROCESSING_VARIANTS=$PROCESSING_VARIANTS" \
                 "PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" \
+                "PRESENTATION_DECOYS_PER_HIT=$PRESENTATION_DECOYS_PER_HIT" \
+                "PRESENTATION_FEATURE_CHUNK_SIZE=$PRESENTATION_FEATURE_CHUNK_SIZE" \
+                "PRESENTATION_NUM_JOBS=$PRESENTATION_NUM_JOBS" \
+                "PRESENTATION_MAX_WORKERS_PER_GPU=$PRESENTATION_MAX_WORKERS_PER_GPU" \
+                "PRESENTATION_CALIBRATION_NUM_JOBS=$PRESENTATION_CALIBRATION_NUM_JOBS" \
+                "PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU=$PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU" \
+                "PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE=$PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE" \
                 bash "$REPO/scripts/training/pan_allele_release_full.sh"
             ;;
         brev-existing)
@@ -2078,14 +2224,24 @@ if [ "$SKIP_TRAIN" != "1" ]; then
             REMOTE_COMMAND="cd '$REMOTE_REPO'"
             REMOTE_COMMAND="$REMOTE_COMMAND && MHCFLURRY_OUT='$REMOTE_RUN_DIR'"
             REMOTE_COMMAND="$REMOTE_COMMAND REPO='$REMOTE_REPO'"
+            REMOTE_COMMAND="$REMOTE_COMMAND MHCFLURRY_RELEASE_WORKFLOW_ID='$WORKFLOW_RUN_ID'"
+            REMOTE_COMMAND="$REMOTE_COMMAND MHCFLURRY_RELEASE_GIT_COMMIT='$RELEASE_GIT_COMMIT'"
             REMOTE_COMMAND="$REMOTE_COMMAND TRAINING_MINIBATCH_SIZE='$TRAINING_MINIBATCH_SIZE'"
             REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_MINIBATCH_SIZE='$AFFINITY_MINIBATCH_SIZE'"
             REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_MAX_WORKERS_PER_GPU='$AFFINITY_MAX_WORKERS_PER_GPU'"
             REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_MINIBATCH_SIZE='$PROCESSING_MINIBATCH_SIZE'"
             REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_NUM_JOBS='$PROCESSING_NUM_JOBS'"
             REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_MAX_WORKERS_PER_GPU='$PROCESSING_MAX_WORKERS_PER_GPU'"
+            REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_HELD_OUT_SAMPLES='$PROCESSING_HELD_OUT_SAMPLES'"
             REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_VARIANTS='$PROCESSING_VARIANTS'"
             REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_PROCESSING_WITH_FLANKS_KIND='$PRESENTATION_PROCESSING_WITH_FLANKS_KIND'"
+            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_DECOYS_PER_HIT='$PRESENTATION_DECOYS_PER_HIT'"
+            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_FEATURE_CHUNK_SIZE='$PRESENTATION_FEATURE_CHUNK_SIZE'"
+            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_NUM_JOBS='$PRESENTATION_NUM_JOBS'"
+            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_MAX_WORKERS_PER_GPU='$PRESENTATION_MAX_WORKERS_PER_GPU'"
+            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_CALIBRATION_NUM_JOBS='$PRESENTATION_CALIBRATION_NUM_JOBS'"
+            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU='$PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU'"
+            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE='$PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE'"
             REMOTE_COMMAND="$REMOTE_COMMAND bash"
             REMOTE_COMMAND="$REMOTE_COMMAND scripts/training/pan_allele_release_full.sh"
             run_logged_step train_ssh ssh "$REMOTE" \
@@ -2110,6 +2266,10 @@ else
             run_brev_postprocess 1
             ;;
     esac
+fi
+
+if [ "$SKIP_TRAIN" != "1" ]; then
+    validate_release_provenance model_provenance 1
 fi
 
 if [ "$SKIP_EVAL" != "1" ]; then

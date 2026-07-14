@@ -25,6 +25,7 @@ import numpy
 import pandas
 
 from .version import __version__
+from .model_provenance import add_release_provenance
 from .pytorch_sizing import DEFAULT_PREDICT_BATCH_SIZE
 from .flanking_encoding import FlankingEncoding
 from .downloads import get_default_class1_processing_models_dir
@@ -390,6 +391,7 @@ class Class1ProcessingPredictor(object):
                 ("hostname  ", gethostname()),
                 ("user      ", getuser()),
             ]
+            add_release_provenance(rows)
             pandas.DataFrame(rows).to_csv(
                 info_path, sep="\t", header=False, index=False)
 
