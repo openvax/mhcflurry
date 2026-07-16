@@ -192,6 +192,7 @@ def test_fit_validation_interval_default_runs_every_epoch():
 
 def test_effective_validation_batch_size_uses_larger_cuda_default():
     assert effective_validation_batch_size(torch.device("cuda"), None, 512) == 4096
+    assert effective_validation_batch_size("cuda", None, 512) == 4096
     assert effective_validation_batch_size(torch.device("cuda"), None, 2048) == 8192
     assert effective_validation_batch_size(torch.device("cpu"), None, 512) == 2048
     assert effective_validation_batch_size(torch.device("cuda"), 123, 512) == 123

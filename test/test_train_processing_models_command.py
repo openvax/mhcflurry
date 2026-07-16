@@ -21,6 +21,7 @@ import tempfile
 import subprocess
 import re
 import pytest
+import torch
 from types import SimpleNamespace
 
 from sklearn.metrics import roc_auc_score
@@ -28,6 +29,7 @@ import pandas
 
 from mhcflurry.class1_processing_predictor import Class1ProcessingPredictor
 from mhcflurry.common import random_peptides
+from mhcflurry.cli import train_processing_models_command as processing_command
 from mhcflurry.train_processing_models_command import estimate_processing_worker_gb
 
 from mhcflurry.testing_utils import cleanup, startup
@@ -197,6 +199,74 @@ def test_processing_worker_estimate_uses_data_and_architecture(tmp_path):
 
     assert estimate is not None
     assert estimate >= 4.0
+
+
+def test_processing_worker_estimate_includes_validation_peak(
+        tmp_path, monkeypatch):
+    """Auto worker packing budgets the larger forward-only validation batch."""
+    data = tmp_path / "training.csv"
+    pandas.DataFrame({
+        "peptide": ["SIINFEKL", "GILGFVFTL", "NLVPMVATV"],
+    }).to_csv(data, index=False)
+    hyperparameters = tmp_path / "hyperparameters.yaml"
+
+    monkeypatch.setattr(
+        processing_command,
+        "estimate_peak_bytes_per_row",
+        lambda network: 1 << 20,
+    )
+
+    base = {
+        "minibatch_size": 512,
+        "validation_split": 0.1,
+        "n_flank_length": 5,
+        "c_flank_length": 5,
+        "convolutional_filters": 16,
+    }
+    hyperparameters.write_text(json.dumps([base]))
+    automatic = estimate_processing_worker_gb(SimpleNamespace(
+        data=str(data),
+        hyperparameters=str(hyperparameters),
+    ))
+
+    hyperparameters.write_text(json.dumps([{
+        **base,
+        "validation_batch_size": 1024,
+    }]))
+    explicitly_capped = estimate_processing_worker_gb(SimpleNamespace(
+        data=str(data),
+        hyperparameters=str(hyperparameters),
+    ))
+
+    # 1 MiB/row gives a 4 GiB default validation peak versus a 2 GiB
+    # training peak. With the 2 GiB runtime floor and 1.3x safety factor,
+    # the estimates are 7.8 GiB and 5.2 GiB respectively.
+    assert automatic == pytest.approx(7.8, rel=1e-6)
+    assert explicitly_capped == pytest.approx(5.2, rel=1e-6)
+
+
+def test_release_unused_torch_memory_collects_before_empty_cache(monkeypatch):
+    """Boundary cleanup exposes dead tensors before purging CUDA's cache."""
+    events = []
+    monkeypatch.setattr(
+        processing_command.gc,
+        "collect",
+        lambda: events.append("gc.collect"),
+    )
+    monkeypatch.setattr(
+        torch.cuda,
+        "is_available",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        torch.cuda,
+        "empty_cache",
+        lambda: events.append("torch.cuda.empty_cache"),
+    )
+
+    processing_command.release_unused_torch_memory()
+
+    assert events == ["gc.collect", "torch.cuda.empty_cache"]
 
 
 

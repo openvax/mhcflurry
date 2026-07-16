@@ -231,7 +231,8 @@ def effective_validation_batch_size(
     """
     if configured_batch_size:
         return int(configured_batch_size)
-    if device.type == "cuda":
+    device_type = getattr(device, "type", device)
+    if device_type == "cuda":
         # Forward-only validation: kernel-launch overhead matters more than
         # peak VRAM, so a much larger default batch wins over 4 * minibatch.
         return max(4 * minibatch_size, 4096)

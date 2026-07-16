@@ -37,6 +37,7 @@ from ..pytorch_sizing import (
     TRAINING_PEAK_MULTIPLIER,
     estimate_peak_bytes_per_row,
 )
+from ..pytorch_training import effective_validation_batch_size
 from ..common import (
     add_random_seed_arg,
     configure_random_seed,
@@ -75,10 +76,12 @@ _PROCESSING_WORKER_SAFETY_FACTOR = 1.3
 
 def release_unused_torch_memory():
     """Return unused CUDA allocator blocks to the driver, best-effort."""
+    # Drop unreachable Python cycles first. Any tensors released by collection
+    # can then be returned by empty_cache() in this same cleanup pass.
+    gc.collect()
     try:
         import torch
     except ImportError:
-        gc.collect()
         return
     try:
         cuda_available = torch.cuda.is_available()
@@ -89,7 +92,6 @@ def release_unused_torch_memory():
             torch.cuda.empty_cache()
         except RuntimeError:
             pass
-    gc.collect()
 
 
 # Note on parallelization:
@@ -261,7 +263,8 @@ def estimate_processing_worker_gb(args):
     This estimate sizes worker concurrency from the actual data row count
     and largest architecture in the hyperparameter sweep. Validation and
     post-fit AUC scoring are batched by the trainer/predictor; the estimate is
-    therefore anchored on the largest batch, not the full fold size.
+    therefore anchored on the larger of the training and validation peaks,
+    not the full fold size.
     """
     data_path = getattr(args, "data", None)
     hyperparameters_path = getattr(args, "hyperparameters", None)
@@ -274,8 +277,8 @@ def estimate_processing_worker_gb(args):
             return None
 
         max_sequence_bytes_per_row = 0
-        max_forward_bytes_per_row = 0
-        max_minibatch_size = 0
+        max_training_batch_bytes = 0
+        max_validation_batch_bytes = 0
         for hyperparameters in hyperparameters_lst:
             model = Class1ProcessingNeuralNetwork(**hyperparameters)
             network = model.make_network(
@@ -295,27 +298,36 @@ def estimate_processing_worker_gb(args):
                 max_sequence_bytes_per_row,
                 sequence_bytes_per_row,
             )
-            max_forward_bytes_per_row = max(
-                max_forward_bytes_per_row,
-                estimate_peak_bytes_per_row(network),
+            forward_bytes_per_row = estimate_peak_bytes_per_row(network)
+            minibatch_size = int(model.hyperparameters["minibatch_size"])
+            max_training_batch_bytes = max(
+                max_training_batch_bytes,
+                minibatch_size
+                * forward_bytes_per_row
+                * TRAINING_PEAK_MULTIPLIER,
             )
-            max_minibatch_size = max(
-                max_minibatch_size,
-                int(model.hyperparameters["minibatch_size"]),
-            )
+            if float(model.hyperparameters["validation_split"]) > 0:
+                validation_batch_size = effective_validation_batch_size(
+                    "cuda",
+                    model.hyperparameters["validation_batch_size"],
+                    minibatch_size,
+                )
+                max_validation_batch_bytes = max(
+                    max_validation_batch_bytes,
+                    validation_batch_size * forward_bytes_per_row,
+                )
 
-        if not max_forward_bytes_per_row or not max_minibatch_size:
+        if not max_training_batch_bytes:
             return None
 
         dataset_bytes = row_count * max_sequence_bytes_per_row
-        training_batch_bytes = (
-            max_minibatch_size
-            * max_forward_bytes_per_row
-            * TRAINING_PEAK_MULTIPLIER
+        peak_batch_bytes = max(
+            max_training_batch_bytes,
+            max_validation_batch_bytes,
         )
         runtime_bytes = int(_PROCESSING_WORKER_RUNTIME_FLOOR_GB * (1 << 30))
         estimate_gb = (
-            (dataset_bytes + training_batch_bytes + runtime_bytes)
+            (dataset_bytes + peak_batch_bytes + runtime_bytes)
             * _PROCESSING_WORKER_SAFETY_FACTOR
             / float(1 << 30)
         )
@@ -323,11 +335,14 @@ def estimate_processing_worker_gb(args):
         print(
             "Estimated processing worker VRAM: %.2f GB "
             "(rows=%d, sequence=%.2f GB, train_batch=%.2f GB, "
+            "validation_batch=%.2f GB, peak_batch=%.2f GB, "
             "runtime_floor=%.2f GB, safety=%.1fx)" % (
                 estimate_gb,
                 row_count,
                 dataset_bytes / float(1 << 30),
-                training_batch_bytes / float(1 << 30),
+                max_training_batch_bytes / float(1 << 30),
+                max_validation_batch_bytes / float(1 << 30),
+                peak_batch_bytes / float(1 << 30),
                 _PROCESSING_WORKER_RUNTIME_FLOOR_GB,
                 _PROCESSING_WORKER_SAFETY_FACTOR,
             )
