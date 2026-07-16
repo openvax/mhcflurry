@@ -443,6 +443,7 @@ def test_resolve_local_parallelism_args_caps_auto_num_jobs(monkeypatch):
     monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "40")
     monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "512")
     monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "512")
+    monkeypatch.setattr(planning.os, "cpu_count", lambda: 256)
     monkeypatch.setenv(
         "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", "24"
     )

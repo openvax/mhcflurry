@@ -568,6 +568,7 @@ def test_plan_host_memory_clamp_keeps_capacity_consistent(monkeypatch):
     count, not a separately rounded value."""
     monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "32.0")
     monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "22.0")
+    monkeypatch.setattr(wp.os, "cpu_count", lambda: 256)
     plan = wp.plan_local_parallelism(
         _args(),
         workload_name=wp.WORKLOAD_AFFINITY_INFERENCE,
@@ -625,6 +626,7 @@ def test_plan_auto_num_jobs_reclipped_after_dataloader_sizing(monkeypatch):
     monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "16.0")
     monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "16.0")
     monkeypatch.setenv("MHCFLURRY_AUTO_HOST_MEMORY_SAFETY_FRACTION", "1.0")
+    monkeypatch.setattr(wp.os, "cpu_count", lambda: 256)
     plan = wp.plan_local_parallelism(
         _args(),
         workload_name=wp.WORKLOAD_AFFINITY_INFERENCE,
