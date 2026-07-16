@@ -404,6 +404,34 @@ def test_warmup_measurement_can_only_tighten_an_auto_plan(monkeypatch):
     assert args.workload_plan.warmup_host_peak_gb == 4.0
 
 
+def test_warmup_host_measurement_retains_dataloader_child_allowance(
+        monkeypatch):
+    monkeypatch.setenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "40")
+    monkeypatch.setenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", "24")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "32")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "32")
+    monkeypatch.setattr(planning.os, "cpu_count", lambda: 256)
+    args = Namespace(
+        max_workers_per_gpu="auto",
+        num_jobs="auto",
+        gpus=8,
+        backend="auto",
+        dataloader_num_workers=2,
+    )
+    resolve_local_parallelism_args(args)
+
+    refine_local_parallelism_from_warmup(args, [{
+        "host_peak_rss_bytes": 4 * (1 << 30),
+    }])
+
+    expected_worker_gb = 4.0 * 1.10 + 2 * HOST_RAM_PER_DATALOADER_CHILD_GB
+    assert args.workload_plan.host_worker_gb == pytest.approx(expected_worker_gb)
+    assert args.workload_plan.host_memory_num_jobs_cap == 5
+    assert args.num_jobs == 5
+
+
 def test_warmup_measurement_never_changes_explicit_concurrency(monkeypatch):
     monkeypatch.setenv(
         "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")

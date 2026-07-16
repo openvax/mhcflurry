@@ -900,8 +900,13 @@ def refine_local_parallelism_from_warmup(args, reports):
     measured_device_worker_gb = (
         device_peak_gb * 1.15 if device_peak_gb is not None else None
     )
+    # RUSAGE_SELF measures only the warmed fit worker. Production also starts
+    # DataLoader children, so retain their analytic allowance when the
+    # measured main-process RSS becomes the binding estimate.
     measured_host_worker_gb = (
-        host_peak_gb * 1.10 if host_peak_gb is not None else None
+        host_peak_gb * 1.10
+        + int(plan.dataloader_num_workers) * HOST_RAM_PER_DATALOADER_CHILD_GB
+        if host_peak_gb is not None else None
     )
     device_candidates = [
         value for value in (

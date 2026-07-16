@@ -643,6 +643,48 @@ def test_eval_paper_figures_run_dispatches_pipeline(tmp_path, monkeypatch):
     ]
 
 
+def test_eval_paper_figures_run_preserves_rendered_paper_suite(
+        tmp_path, monkeypatch):
+    out = tmp_path / "eval"
+    combined = out / "plots" / "paper_figures" / "paper_figures.pdf"
+    summary = out / "plots" / "model_comparison_figures.pdf"
+
+    def fake_compare(args):
+        pathlib.Path(args.out).mkdir(parents=True, exist_ok=True)
+        return 0
+
+    def fake_paper(args):
+        pathlib.Path(args.out).mkdir(parents=True, exist_ok=True)
+        combined.write_bytes(b"rendered paper figures")
+        return 0
+
+    def fake_summary(
+            plot_dir, out_path, include_paper_figures=False,
+            paper_figures_dir=None):
+        assert include_paper_figures
+        assert pathlib.Path(paper_figures_dir) == combined.parent
+        assert combined.read_bytes() == b"rendered paper figures"
+        pathlib.Path(out_path).write_bytes(b"summary")
+
+    monkeypatch.setattr(compare_models, "run", fake_compare)
+    monkeypatch.setattr(paper_figures, "run", fake_paper)
+    monkeypatch.setattr(plot_model_comparison, "_apply_paper_style", lambda: None)
+    monkeypatch.setattr(
+        plot_model_comparison, "_plot_release_summary", lambda *args: None)
+    monkeypatch.setattr(
+        plot_model_comparison, "_write_summary_pdf", fake_summary)
+
+    status = eval_command.run_argv([
+        "paper-figures", "run",
+        "--a", "new-run",
+        "--out", str(out),
+    ])
+
+    assert status == 0
+    assert combined.read_bytes() == b"rendered paper figures"
+    assert summary.read_bytes() == b"summary"
+
+
 def test_compare_models_help_runs(capsys):
     """The compare-models help text exposes the documented flags.
 
@@ -2053,6 +2095,10 @@ def test_paper_figures_orients_configured_scores():
     assert numpy.allclose(
         paper_figures._orient_prediction_score("mixmhcpred", score),
         score)
+    for predictor in ["netmhcpan4.el", "netmhcpan4.2.el"]:
+        assert numpy.allclose(
+            paper_figures._orient_prediction_score(predictor, score),
+            score)
     assert numpy.allclose(
         paper_figures._orient_prediction_score(
             "custom_rank", score, {"custom_rank": True}),
@@ -2070,6 +2116,7 @@ def test_paper_figures_score_predictions_uses_explicit_orientation(tmp_path):
             "hit": 1,
             "mhcflurry_production": 20.0,
             "netmhcpan4.ba_affinity": 40.0,
+            "netmhcpan4.2.el": 0.9,
         },
         {
             "sample_id": "sample1",
@@ -2077,6 +2124,7 @@ def test_paper_figures_score_predictions_uses_explicit_orientation(tmp_path):
             "hit": 0,
             "mhcflurry_production": 2000.0,
             "netmhcpan4.ba_affinity": 4000.0,
+            "netmhcpan4.2.el": 0.1,
         },
     ]).to_csv(predictions, index=False)
 
@@ -2091,6 +2139,8 @@ def test_paper_figures_score_predictions_uses_explicit_orientation(tmp_path):
         "mhcflurry_production", "auc"] == 1.0
     assert all_scores.set_index("predictor").loc[
         "netmhcpan4.ba", "auc"] == 1.0
+    assert all_scores.set_index("predictor").loc[
+        "netmhcpan4.2.el", "auc"] == 1.0
     assert "percent_change_auc_ba" in scores.columns
 
 

@@ -208,11 +208,10 @@ def run(args):
     if args.b_label:
         labels["b"] = args.b_label
     plot_dir = os.path.join(args.input, "plots")
-    if os.path.isdir(plot_dir):
-        shutil.rmtree(plot_dir)
-    elif os.path.exists(plot_dir):
-        os.unlink(plot_dir)
-    os.makedirs(plot_dir, exist_ok=True)
+    paper_figures_dir = args.paper_figures_out or os.path.join(
+        plot_dir, "paper_figures")
+    _reset_plot_directory(
+        plot_dir, preserve_directory=paper_figures_dir)
     if args.summary_pdf:
         try:
             os.unlink(args.summary_pdf)
@@ -256,11 +255,9 @@ def run(args):
     if paper_inputs_requested:
         from . import paper_figures
 
-        out_dir = args.paper_figures_out or os.path.join(
-            plot_dir, "paper_figures")
         paper_argv = [
             "--comparison-dir", args.input,
-            "--out", out_dir,
+            "--out", paper_figures_dir,
             "--formats", args.paper_figures_formats,
         ]
         if paper_scores_dir:
@@ -271,8 +268,6 @@ def run(args):
         if status:
             return status
     if args.summary_pdf:
-        paper_figures_dir = args.paper_figures_out or os.path.join(
-            plot_dir, "paper_figures")
         _write_summary_pdf(
             plot_dir,
             args.summary_pdf,
@@ -284,6 +279,51 @@ def run(args):
                 "No plot pages were generated for summary PDF: %s" %
                 args.summary_pdf)
     return 0
+
+
+def _reset_plot_directory(plot_dir, preserve_directory=None):
+    """Remove stale plots while retaining an existing paper-figure suite."""
+    plot_dir = Path(os.path.abspath(plot_dir))
+    preserve_directory = (
+        Path(os.path.abspath(preserve_directory))
+        if preserve_directory is not None else None
+    )
+    if (
+            preserve_directory is not None
+            and not _path_is_within(preserve_directory, plot_dir)):
+        preserve_directory = None
+
+    if plot_dir.is_dir() and not plot_dir.is_symlink():
+        _clean_directory_except(plot_dir, preserve_directory)
+    elif plot_dir.exists() or plot_dir.is_symlink():
+        plot_dir.unlink()
+    plot_dir.mkdir(parents=True, exist_ok=True)
+
+
+def _clean_directory_except(directory, preserve_directory):
+    for child in directory.iterdir():
+        child = Path(os.path.abspath(child))
+        if preserve_directory is not None and child == preserve_directory:
+            continue
+        if (
+                preserve_directory is not None
+                and _path_is_within(preserve_directory, child)
+                and child.is_dir()
+                and not child.is_symlink()):
+            _clean_directory_except(child, preserve_directory)
+            continue
+        if child.is_dir() and not child.is_symlink():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
+
+
+def _path_is_within(path, directory):
+    try:
+        path.relative_to(directory)
+        return True
+    except ValueError:
+        return False
 
 
 def _append_optional_paper_figure_args(args, paper_args):
