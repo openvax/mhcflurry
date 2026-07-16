@@ -13,6 +13,7 @@
 """
 Tests for Class1ProcessingNeuralNetwork.
 """
+import gc
 import pytest
 
 import re
@@ -266,6 +267,98 @@ def test_fit_uses_eager_network_for_validation_by_default(monkeypatch):
     )
 
 
+def test_fit_uses_effective_validation_batch_size(monkeypatch):
+    """Processing validation uses the larger forward-only batch heuristic."""
+    import mhcflurry.class1_processing_neural_network as processing_module
+
+    validation_batch_sizes = []
+
+    class RecordingValidationNetwork(torch.nn.Module):
+        def __init__(self, network):
+            super().__init__()
+            self.network = network
+
+        def forward(self, inputs):
+            validation_batch_sizes.append(len(inputs["sequence"]))
+            return self.network(inputs)
+
+    monkeypatch.setattr(
+        processing_module,
+        "maybe_compile_network",
+        lambda network, device: network,
+    )
+    monkeypatch.setattr(
+        processing_module,
+        "validation_forward_network",
+        lambda network, eager_network: RecordingValidationNetwork(eager_network),
+    )
+
+    num_examples = 20
+    model = Class1ProcessingNeuralNetwork(
+        max_epochs=1,
+        validation_split=0.5,
+        early_stopping=False,
+        minibatch_size=2,
+        peptide_max_length=9,
+        n_flank_length=4,
+        c_flank_length=4,
+        convolutional_filters=4,
+        convolutional_kernel_size=3,
+        post_convolutional_dense_layer_sizes=[],
+    )
+    model.fit(
+        sequences=FlankingEncoding(
+            peptides=["SIINFEKL"] * num_examples,
+            n_flanks=["AAAA"] * num_examples,
+            c_flanks=["FFFF"] * num_examples,
+        ),
+        targets=numpy.arange(num_examples, dtype=numpy.float32) % 2,
+        verbose=-1,
+        progress_print_interval=None,
+    )
+
+    assert model.fit_info[-1]["effective_validation_batch_size"] == 8
+    assert validation_batch_sizes == [8, 2]
+
+
+def test_fit_does_not_force_full_gc_each_epoch(monkeypatch):
+    """Worker-level model cleanup owns GC; fit must not collect per epoch."""
+    import mhcflurry.class1_processing_neural_network as processing_module
+
+    collect_calls = []
+    monkeypatch.setattr(gc, "collect", lambda: collect_calls.append(True))
+    monkeypatch.setattr(
+        processing_module,
+        "maybe_compile_network",
+        lambda network, device: network,
+    )
+
+    model = Class1ProcessingNeuralNetwork(
+        max_epochs=3,
+        validation_split=0.0,
+        early_stopping=False,
+        minibatch_size=2,
+        peptide_max_length=9,
+        n_flank_length=4,
+        c_flank_length=4,
+        convolutional_filters=4,
+        convolutional_kernel_size=3,
+        post_convolutional_dense_layer_sizes=[],
+    )
+    model.fit(
+        sequences=FlankingEncoding(
+            peptides=["SIINFEKL"] * 4,
+            n_flanks=["AAAA"] * 4,
+            c_flanks=["FFFF"] * 4,
+        ),
+        targets=numpy.array([0, 1, 0, 1], dtype=numpy.float32),
+        verbose=-1,
+        progress_print_interval=None,
+    )
+
+    assert collect_calls == []
+
+
 
 
 def test_processing_peak_estimate_scales_with_conv_shape():
@@ -336,7 +429,7 @@ def test_processing_predict_auto_batch_uses_worker_env(monkeypatch):
 
 
 def test_processing_validation_is_batched(monkeypatch):
-    """Validation should not forward the whole held-out fold at once."""
+    """An explicit validation cap still prevents a whole-fold forward."""
     monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "0")
     monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE_LOSS", "0")
 
@@ -355,6 +448,7 @@ def test_processing_validation_is_batched(monkeypatch):
         c_flank_length=2,
         convolutional_filters=8,
         minibatch_size=2,
+        validation_batch_size=3,
         max_epochs=1,
         validation_split=0.5,
         early_stopping=False,
@@ -380,7 +474,7 @@ def test_processing_validation_is_batched(monkeypatch):
     )
 
     assert batch_sizes
-    assert max(batch_sizes) <= 2
+    assert max(batch_sizes) == 3
 
 
 def test_processing_predict_encoded_tensor_public_numpy_wrapper():

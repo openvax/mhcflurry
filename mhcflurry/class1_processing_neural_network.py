@@ -16,7 +16,6 @@ Antigen processing neural network implementation - PyTorch version
 
 import time
 import collections
-import gc
 import json
 import logging
 import numpy
@@ -32,6 +31,7 @@ from .flanking_encoding import FlankingEncoding
 from .common import get_pytorch_device
 from .pytorch_training import (
     configure_matmul_precision,
+    effective_validation_batch_size,
     maybe_compile_loss,
     maybe_compile_network,
     uncompiled_network,
@@ -564,6 +564,7 @@ class Class1ProcessingNeuralNetwork(object):
         validation_split=0.1,
         early_stopping=True,
         minibatch_size=512,
+        validation_batch_size=None,
     )
     """
     Hyperparameters for neural network training.
@@ -890,12 +891,18 @@ class Class1ProcessingNeuralNetwork(object):
                 validation_network = validation_forward_network(
                     network, eager_network)
                 validation_network.eval()
-                with torch.no_grad():
+                val_batch_size = effective_validation_batch_size(
+                    device,
+                    self.hyperparameters["validation_batch_size"],
+                    batch_size,
+                )
+                fit_info["effective_validation_batch_size"] = val_batch_size
+                with torch.inference_mode():
                     val_loss_sum = torch.zeros((), device=device)
                     val_loss_count = 0
-                    for batch_start in range(0, n_val, batch_size):
+                    for batch_start in range(0, n_val, val_batch_size):
                         batch_idx = val_indices_dev[
-                            batch_start:batch_start + batch_size
+                            batch_start:batch_start + val_batch_size
                         ]
                         val_seq = seq_dev.index_select(0, batch_idx)
                         val_length = length_dev.index_select(0, batch_idx)
@@ -928,8 +935,6 @@ class Class1ProcessingNeuralNetwork(object):
                         val_loss = val_loss + regularization_penalty
                     val_loss = val_loss.item()
                 fit_info["val_loss"].append(val_loss)
-
-            gc.collect()
 
             # Progress printing
             if progress_print_interval is not None and (
