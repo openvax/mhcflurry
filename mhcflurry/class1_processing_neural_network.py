@@ -26,7 +26,7 @@ import torch.nn.functional as F
 from . import amino_acid
 from .hyperparameters import HyperparameterDefaults
 from .class1_training import torch_from_numpy
-from .pytorch_sizing import DEFAULT_PREDICT_BATCH_SIZE
+from .pytorch_sizing import DEFAULT_PREDICT_BATCH_SIZE, env_workers_per_gpu
 from .flanking_encoding import FlankingEncoding
 from .common import get_pytorch_device
 from .pytorch_training import (
@@ -891,12 +891,18 @@ class Class1ProcessingNeuralNetwork(object):
                 validation_network = validation_forward_network(
                     network, eager_network)
                 validation_network.eval()
-                val_batch_size = effective_validation_batch_size(
-                    device,
-                    self.hyperparameters["validation_batch_size"],
-                    batch_size,
-                )
-                fit_info["effective_validation_batch_size"] = val_batch_size
+                if "effective_validation_batch_size" not in fit_info:
+                    fit_info["effective_validation_batch_size"] = (
+                        effective_validation_batch_size(
+                            device,
+                            self.hyperparameters["validation_batch_size"],
+                            batch_size,
+                            model=eager_network,
+                            num_workers_per_gpu=env_workers_per_gpu(),
+                            total_rows=n_val,
+                        )
+                    )
+                val_batch_size = fit_info["effective_validation_batch_size"]
                 with torch.inference_mode():
                     val_loss_sum = torch.zeros((), device=device)
                     val_loss_count = 0
@@ -1103,8 +1109,12 @@ class Class1ProcessingNeuralNetwork(object):
         """
         from .pytorch_sizing import (
             env_workers_per_gpu,
+            is_device_out_of_memory_error,
+            release_device_memory_after_oom,
             resolve_prediction_batch_size,
         )
+
+        auto_batch_size = batch_size in (None, "auto")
 
         if device is None:
             device = self.get_device()
@@ -1119,30 +1129,56 @@ class Class1ProcessingNeuralNetwork(object):
         network = maybe_compile_network(network, device)
         network.eval()
 
+        n_samples = len(x_dict["sequence"])
         batch_size = resolve_prediction_batch_size(
             batch_size,
             device,
             model=network,
             num_workers_per_gpu=env_workers_per_gpu(1),
+            total_rows=n_samples,
         )
 
-        n_samples = len(x_dict["sequence"])
         if n_samples == 0:
             return torch.empty((0,), dtype=torch.float32, device=device)
 
         predictions = torch.empty(
             (n_samples,), dtype=torch.float32, device=device)
 
-        with torch.no_grad():
-            for batch_start in range(0, n_samples, batch_size):
-                batch_end = min(batch_start + batch_size, n_samples)
+        while True:
+            try:
+                with torch.no_grad():
+                    for batch_start in range(0, n_samples, batch_size):
+                        batch_end = min(batch_start + batch_size, n_samples)
 
-                seq_batch = x_dict["sequence"][batch_start:batch_end]
-                length_batch = x_dict["peptide_length"][batch_start:batch_end]
+                        seq_batch = x_dict["sequence"][batch_start:batch_end]
+                        length_batch = x_dict[
+                            "peptide_length"][batch_start:batch_end]
 
-                inputs = {"sequence": seq_batch, "peptide_length": length_batch}
-                batch_predictions = network(inputs)
-                predictions[batch_start:batch_end] = batch_predictions
+                        inputs = {
+                            "sequence": seq_batch,
+                            "peptide_length": length_batch,
+                        }
+                        batch_predictions = network(inputs)
+                        predictions[batch_start:batch_end] = batch_predictions
+                break
+            except RuntimeError as exc:
+                if (
+                        not auto_batch_size
+                        or batch_size <= 1
+                        or not is_device_out_of_memory_error(exc)):
+                    raise
+                previous_batch_size = batch_size
+                batch_size = max(1, batch_size // 2)
+                seq_batch = None
+                length_batch = None
+                inputs = None
+                batch_predictions = None
+                release_device_memory_after_oom(device)
+                logging.warning(
+                    "Auto processing batch OOM at %d rows; retrying at %d.",
+                    previous_batch_size,
+                    batch_size,
+                )
 
         unsupported_mask = x_dict.get("unsupported_mask")
         if unsupported_mask is not None:

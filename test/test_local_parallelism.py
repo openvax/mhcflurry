@@ -27,6 +27,8 @@ from mhcflurry.parallelism import (
     non_daemon_context,
     num_workers_per_gpu_from_args,
     resolve_local_parallelism_args,
+    refine_local_parallelism_from_warmup,
+    resolve_cpu_threads_per_worker,
     resolve_max_workers_per_gpu,
     validate_worker_pool_args,
     worker_pool_with_gpu_assignments,
@@ -378,6 +380,63 @@ def test_num_workers_per_gpu_from_args_requires_resolved_value():
     assert num_workers_per_gpu_from_args(args) == 3
 
 
+def test_warmup_measurement_can_only_tighten_an_auto_plan(monkeypatch):
+    monkeypatch.setenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "512")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "512")
+    monkeypatch.setattr(planning.os, "cpu_count", lambda: 256)
+    args = Namespace(
+        max_workers_per_gpu="auto",
+        num_jobs="auto",
+        gpus=1,
+        backend="auto",
+    )
+    resolve_local_parallelism_args(args)
+    initial_workers = args.max_workers_per_gpu
+    refine_local_parallelism_from_warmup(args, [{
+        "cuda_peak_reserved_bytes": 20 * (1 << 30),
+        "host_peak_rss_bytes": 4 * (1 << 30),
+    }])
+    assert args.max_workers_per_gpu < initial_workers
+    assert args.max_workers_per_gpu == 3
+    assert args.workload_plan.warmup_device_peak_gb == 20.0
+    assert args.workload_plan.warmup_host_peak_gb == 4.0
+
+
+def test_warmup_measurement_never_changes_explicit_concurrency(monkeypatch):
+    monkeypatch.setenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "512")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "512")
+    args = Namespace(
+        max_workers_per_gpu=2,
+        num_jobs=2,
+        gpus=1,
+        backend="auto",
+    )
+    resolve_local_parallelism_args(args)
+    refine_local_parallelism_from_warmup(args, [{
+        "cuda_peak_reserved_bytes": 70 * (1 << 30),
+        "host_peak_rss_bytes": 100 * (1 << 30),
+    }])
+    assert args.max_workers_per_gpu == 2
+    assert args.num_jobs == 2
+
+
+def test_cpu_thread_budget_uses_final_worker_and_dataloader_counts(monkeypatch):
+    for name in (
+            "OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+        monkeypatch.delenv(name, raising=False)
+        monkeypatch.delenv("MHCFLURRY_%s_AUTO" % name, raising=False)
+    plan = Namespace(num_jobs=8, dataloader_num_workers=1)
+    # 34 CPUs - 2 orchestrator - 8 DataLoader children = 24; / 8 = 3.
+    assert resolve_cpu_threads_per_worker(plan, cpu_count=34) == 3
+    assert os.environ["OMP_NUM_THREADS"] == "3"
+    assert os.environ["MKL_NUM_THREADS"] == "3"
+    assert os.environ["OPENBLAS_NUM_THREADS"] == "3"
+
+
 def test_resolve_local_parallelism_args_caps_auto_num_jobs(monkeypatch):
     # Force a VRAM cap by pinning per-worker GB high so by_vram=1 and the
     # auto MWPG resolves to 1; auto num_jobs follows GPU capacity.
@@ -397,12 +456,10 @@ def test_resolve_local_parallelism_args_caps_auto_num_jobs(monkeypatch):
     assert args.max_workers_per_gpu_was_auto is True
 
 
-def test_resolve_local_parallelism_args_unlocks_4_per_gpu_on_80gb(
+def test_resolve_local_parallelism_args_has_no_default_worker_hard_cap(
     monkeypatch,
 ):
-    # The post-2026-04-28 default (per_worker=4 GB) lets 80 GB cards
-    # resolve to the hard_cap of 4 workers/GPU once num_jobs is also auto:
-    # by_vram = floor(0.65 * 80 / 4) = 13, by_jobs skipped, hard_cap=4 wins.
+    # 80 GB free minus the shared 10% reserve fits 18 complete 4 GB workers.
     monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
     monkeypatch.delenv(
         "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", raising=False
@@ -415,7 +472,7 @@ def test_resolve_local_parallelism_args_unlocks_4_per_gpu_on_80gb(
         backend="auto",
     )
     resolve_local_parallelism_args(args)
-    assert args.max_workers_per_gpu == 4
+    assert args.max_workers_per_gpu == 18
     assert args.num_jobs == 0
     assert args.max_workers_per_gpu_was_auto is True
 
@@ -440,6 +497,7 @@ def test_resolve_local_parallelism_args_honors_explicit_num_jobs_override(
 ):
     monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "512")
     monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "512")
+    monkeypatch.setattr(planning.os, "cpu_count", lambda: 256)
     monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
     args = Namespace(
         max_workers_per_gpu=1, num_jobs=16, gpus=8, backend="auto"
@@ -461,6 +519,7 @@ def test_resolve_local_parallelism_args_num_jobs_auto_resolves_to_capacity(
     monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
     monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "512")
     monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "512")
+    monkeypatch.setattr(planning.os, "cpu_count", lambda: 256)
     monkeypatch.delenv(
         "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB", raising=False
     )
@@ -472,8 +531,8 @@ def test_resolve_local_parallelism_args_num_jobs_auto_resolves_to_capacity(
         backend="auto",
     )
     resolve_local_parallelism_args(args)
-    assert args.max_workers_per_gpu == 4  # by_vram=13, hard_cap=4
-    assert args.num_jobs == 32  # 8 × 4
+    assert args.max_workers_per_gpu == 18
+    assert args.num_jobs == 144  # 8 × 18
     assert args.num_jobs_was_auto is True
 
 
@@ -653,6 +712,7 @@ def test_resolve_local_parallelism_args_auto_detects_gpus(monkeypatch):
     monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP", "4")
     monkeypatch.setattr(
         planning, "detect_num_cuda_devices_no_torch", lambda: 4)
+    monkeypatch.setattr(planning.os, "cpu_count", lambda: 64)
     args = Namespace(
         max_workers_per_gpu="auto",
         num_jobs="auto",
@@ -676,6 +736,7 @@ def test_resolve_local_parallelism_args_counts_cuda_visible_devices(monkeypatch)
     monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "512")
     monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "512")
     monkeypatch.setattr(planning.subprocess, "check_output", boom)
+    monkeypatch.setattr(planning.os, "cpu_count", lambda: 256)
     args = Namespace(
         max_workers_per_gpu="auto",
         num_jobs="auto",
@@ -685,7 +746,7 @@ def test_resolve_local_parallelism_args_counts_cuda_visible_devices(monkeypatch)
     resolve_local_parallelism_args(args)
     assert args.gpus == 2
     assert args.gpus_was_auto is True
-    assert args.num_jobs == 8
+    assert args.num_jobs == 36
 
 
 def test_resolve_local_parallelism_args_detects_gpus_before_explicit_jobs(

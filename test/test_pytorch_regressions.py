@@ -198,6 +198,52 @@ def test_effective_validation_batch_size_uses_larger_cuda_default():
     assert effective_validation_batch_size(torch.device("cuda"), 123, 512) == 123
 
 
+def test_batched_inequality_validation_preserves_heldout_training_result():
+    """Small and single-shot validation produce the same trained predictor."""
+    peptides = [
+        "AAAAAAAAA", "CCCCCCCCC", "DDDDDDDDD", "EEEEEEEEE",
+        "FFFFFFFFF", "GGGGGGGGG", "HHHHHHHHH", "IIIIIIIII",
+    ]
+    affinities = np.array(
+        [50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0])
+    inequalities = np.array(["=", ">", "<", "=", ">", "<", "=", ">"])
+    fit_kwargs = dict(
+        peptides=peptides,
+        affinities=affinities,
+        inequalities=inequalities,
+        shuffle_permutation=np.arange(len(peptides)),
+    )
+    model_kwargs = dict(
+        loss="custom:mse_with_inequalities",
+        max_epochs=4,
+        validation_split=0.5,
+        early_stopping=False,
+    )
+
+    _seed_all(101)
+    single_shot = _make_simple_affinity_model(
+        validation_batch_size=10_000, **model_kwargs)
+    single_shot.fit(**fit_kwargs)
+
+    _seed_all(101)
+    batched = _make_simple_affinity_model(
+        validation_batch_size=2, **model_kwargs)
+    batched.fit(**fit_kwargs)
+
+    np.testing.assert_allclose(
+        batched.fit_info[-1]["val_loss"],
+        single_shot.fit_info[-1]["val_loss"],
+        rtol=1e-6,
+        atol=1e-7,
+    )
+    np.testing.assert_allclose(
+        batched.predict(peptides),
+        single_shot.predict(peptides),
+        rtol=0,
+        atol=0,
+    )
+
+
 @pytest.mark.slow
 @pytest.mark.integration
 def test_sample_weights_affect_training():
@@ -1145,8 +1191,8 @@ def test_batched_validation_loss_matches_single_shot_with_tail_batch():
 def test_batched_validation_loss_inequality_imbalanced_distribution(
         loss_name, val_y_factory, description):
     """When ``2.0`` (encoded ``>``) rows are unevenly distributed across
-    batches, the batched mean would diverge from the legacy denominator.
-    Verify the fallback engages so batched == single-shot in every case."""
+    batches, naive batch means diverge from the legacy denominator. Verify
+    additive numerator/denominator accumulation stays equal to single-shot."""
 
     val_y = val_y_factory()
 
@@ -1182,24 +1228,15 @@ def test_batched_validation_loss_inequality_imbalanced_distribution(
         "batched and single-shot diverge for %s" % description)
 
 
-def test_batched_validation_loss_inequality_free_targets_use_batched_path():
-    """When the inequality loss is configured but the validation targets
-    contain no encoded inequality markers, batched is mathematically
-    equivalent to single-shot, so the fast path should be allowed to
-    run. This protects the optimization from collapsing to single-shot
-    on every validation step."""
-    from mhcflurry.class1_training import (
-        _validation_loss_has_legacy_inequality_denominator,
-    )
-
+def test_inequality_loss_exposes_additive_validation_reduction():
+    """Inequality validation can batch without changing its denominator."""
     loss_obj = get_pytorch_loss("custom:mse_with_inequalities")
-    no_inequality = torch.tensor([0.0, 0.1, 0.5, 0.9], dtype=torch.float32)
-    has_inequality = torch.tensor([0.0, 2.0, 0.5, 0.9], dtype=torch.float32)
-
-    assert _validation_loss_has_legacy_inequality_denominator(
-        loss_obj, no_inequality) is False
-    assert _validation_loss_has_legacy_inequality_denominator(
-        loss_obj, has_inequality) is True
+    y_true = torch.tensor([0.0, 2.0, 0.5, 0.9], dtype=torch.float32)
+    y_pred = torch.tensor([0.2, 0.1, 0.4, 0.8], dtype=torch.float32)
+    numerator, denominator = loss_obj.loss_numerator_and_denominator(
+        y_pred, y_true)
+    assert numerator / torch.clamp(denominator, min=1.0) == pytest.approx(
+        loss_obj(y_pred, y_true).item())
 
 
 def test_batched_validation_loss_multi_output_inequality_only_in_one_output():

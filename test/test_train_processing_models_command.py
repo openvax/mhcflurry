@@ -201,9 +201,9 @@ def test_processing_worker_estimate_uses_data_and_architecture(tmp_path):
     assert estimate >= 4.0
 
 
-def test_processing_worker_estimate_includes_validation_peak(
+def test_processing_worker_estimate_leaves_validation_to_live_budget(
         tmp_path, monkeypatch):
-    """Auto worker packing budgets the larger forward-only validation batch."""
+    """Launch packing does not hardwire an independent validation batch."""
     data = tmp_path / "training.csv"
     pandas.DataFrame({
         "peptide": ["SIINFEKL", "GILGFVFTL", "NLVPMVATV"],
@@ -238,11 +238,11 @@ def test_processing_worker_estimate_includes_validation_peak(
         hyperparameters=str(hyperparameters),
     ))
 
-    # 1 MiB/row gives a 4 GiB default validation peak versus a 2 GiB
-    # training peak. With the 2 GiB runtime floor and 1.3x safety factor,
-    # the estimates are 7.8 GiB and 5.2 GiB respectively.
-    assert automatic == pytest.approx(7.8, rel=1e-6)
-    assert explicitly_capped == pytest.approx(5.2, rel=1e-6)
+    # Both plans contain the exact training state and 2 GiB training batch.
+    # Auto validation sizes itself later from live free VRAM, so an explicit
+    # validation batch no longer changes launch-time worker concurrency.
+    assert automatic == explicitly_capped
+    assert 5.2 <= automatic < 5.21
 
 
 def test_release_unused_torch_memory_collects_before_empty_cache(monkeypatch):

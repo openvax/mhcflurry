@@ -86,6 +86,13 @@ class MSEWithInequalities(nn.Module):
         torch.Tensor
             Scalar loss value
         """
+        numerator, denominator = self.loss_numerator_and_denominator(
+            y_pred, y_true, sample_weights=sample_weights)
+        return numerator / torch.clamp(denominator, min=1.0)
+
+    def loss_numerator_and_denominator(
+            self, y_pred, y_true, sample_weights=None):
+        """Return additive reduction terms for exact batched validation."""
         y_true = y_true.reshape(-1)
         y_pred = y_pred.reshape(-1)
 
@@ -107,14 +114,12 @@ class MSEWithInequalities(nn.Module):
 
         per_sample = diff1.square() + diff2.square() + diff3.square()
         if sample_weights is None:
-            denominator = torch.clamp(
-                (y_true != 2.0).float().sum(), min=1.0
-            )
-            return per_sample.sum() / denominator
+            denominator = (y_true != 2.0).float().sum()
+            return per_sample.sum(), denominator
         sample_weights = sample_weights.reshape(-1).to(per_sample.device)
         mask = (y_true != 2.0).float()
-        denominator = torch.clamp((sample_weights * mask).sum(), min=1.0)
-        return (per_sample * sample_weights).sum() / denominator
+        denominator = (sample_weights * mask).sum()
+        return (per_sample * sample_weights).sum(), denominator
 
 
 class MSEWithInequalitiesAndMultipleOutputs(nn.Module):
@@ -174,6 +179,13 @@ class MSEWithInequalitiesAndMultipleOutputs(nn.Module):
         torch.Tensor
             Scalar loss value
         """
+        numerator, denominator = self.loss_numerator_and_denominator(
+            y_pred, y_true, sample_weights=sample_weights)
+        return numerator / torch.clamp(denominator, min=1.0)
+
+    def loss_numerator_and_denominator(
+            self, y_pred, y_true, sample_weights=None):
+        """Return additive reduction terms for exact batched validation."""
         y_true = y_true.reshape(-1)
         if y_pred.dim() == 1:
             y_pred = y_pred.unsqueeze(1)
@@ -207,14 +219,12 @@ class MSEWithInequalitiesAndMultipleOutputs(nn.Module):
 
         per_sample = diff1.square() + diff2.square() + diff3.square()
         if sample_weights is None:
-            denominator = torch.clamp(
-                (y_t != 2.0).float().sum(), min=1.0
-            )
-            return per_sample.sum() / denominator
+            denominator = (y_t != 2.0).float().sum()
+            return per_sample.sum(), denominator
         sample_weights = sample_weights.reshape(-1).to(per_sample.device)
         mask = (y_t != 2.0).float()
-        denominator = torch.clamp((sample_weights * mask).sum(), min=1.0)
-        return (per_sample * sample_weights).sum() / denominator
+        denominator = (sample_weights * mask).sum()
+        return (per_sample * sample_weights).sum(), denominator
 
 
 class MultiallelicMassSpecLoss(nn.Module):

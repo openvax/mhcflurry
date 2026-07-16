@@ -27,7 +27,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RECIPE_DIR="$SCRIPT_DIR/release_exact"
 : "${REPO:=$(cd "$SCRIPT_DIR/../.." && pwd)}"
 # shellcheck disable=SC1091
-source "$SCRIPT_DIR/set_cpu_threads.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/gpu_telemetry.sh"
 GPU_TELEMETRY_PID=""
@@ -72,21 +71,10 @@ processing_variant_enabled "$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" || {
 if [ "$GPUS" -eq 0 ]; then
     NUM_JOBS=1
     MAX_WORKERS_PER_GPU=1
-elif [ "$MAX_WORKERS_PER_GPU" = "auto" ]; then
-    MAX_WORKERS_PER_GPU="$(
-        GPUS="$GPUS" python - <<'PY'
-import os
-from mhcflurry.parallelism import auto_max_workers_per_gpu
-print(auto_max_workers_per_gpu(
-    num_jobs=0, num_gpus=int(os.environ["GPUS"]), backend="auto"))
-PY
-    )"
-    NUM_JOBS="$(( GPUS * MAX_WORKERS_PER_GPU ))"
 else
-    case "${NUM_JOBS:-auto}" in
-        auto)
-            NUM_JOBS="$(( GPUS * MAX_WORKERS_PER_GPU ))"
-            ;;
+    NUM_JOBS="${NUM_JOBS:-auto}"
+    case "$NUM_JOBS" in
+        auto) ;;
         *[!0-9]*)
             echo "NUM_JOBS must be auto or an integer; got '$NUM_JOBS'." >&2
             exit 2
@@ -96,22 +84,11 @@ else
                 echo "NUM_JOBS must be at least 1; got '$NUM_JOBS'." >&2
                 exit 2
             fi
-            capacity="$(( GPUS * MAX_WORKERS_PER_GPU ))"
-            if [ "$NUM_JOBS" -gt "$capacity" ]; then
-                echo "Clamping NUM_JOBS=$NUM_JOBS to GPU capacity $capacity." >&2
-                NUM_JOBS="$capacity"
-            fi
             ;;
     esac
 fi
 
-# Resolve DataLoader prefetch workers before building parallelism args so the
-# shell-side CPU thread budget matches the mhcflurry worker hyperparameters.
 DATALOADER_NUM_WORKERS_REQUESTED="$DATALOADER_NUM_WORKERS"
-DATALOADER_NUM_WORKERS="$(resolve_dataloader_num_workers "$NUM_JOBS")"
-printf >&2 \
-    "[presentation_from_affinity.sh] DATALOADER_NUM_WORKERS=%s resolved to %s\n" \
-    "$DATALOADER_NUM_WORKERS_REQUESTED" "$DATALOADER_NUM_WORKERS"
 
 COMMON_PARALLELISM_ARGS=(
     --num-jobs "$NUM_JOBS"
@@ -138,7 +115,7 @@ PROCESSING_PARALLELISM_ARGS=(
 [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ] && PROCESSING_PARALLELISM_ARGS+=(--enable-timing)
 
 PRESENTATION_NUM_JOBS="${PRESENTATION_NUM_JOBS:-auto}"
-PRESENTATION_MAX_WORKERS_PER_GPU="${PRESENTATION_MAX_WORKERS_PER_GPU:-1}"
+PRESENTATION_MAX_WORKERS_PER_GPU="${PRESENTATION_MAX_WORKERS_PER_GPU:-auto}"
 PRESENTATION_PARALLELISM_ARGS=(
     --num-jobs "$PRESENTATION_NUM_JOBS"
     --max-tasks-per-worker 1000
@@ -163,9 +140,6 @@ PRESENTATION_CALIBRATION_PARALLELISM_ARGS=(
     --matmul-precision "${MATMUL_PRECISION:-none}"
 )
 [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ] && PRESENTATION_CALIBRATION_PARALLELISM_ARGS+=(--enable-timing)
-
-NUM_JOBS="$NUM_JOBS" GPUS="$GPUS" MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
-    DATALOADER_NUM_WORKERS="$DATALOADER_NUM_WORKERS" set_cpu_threads
 
 compress_csv_bzip2() {
     local path="$1"

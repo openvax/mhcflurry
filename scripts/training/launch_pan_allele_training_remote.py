@@ -176,10 +176,10 @@ def remote_training_env(environ=os.environ):
             "COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER", "1"
         ),
         "COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU": environ.get(
-            "COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU", "1"
+            "COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU", "auto"
         ),
         "COMPARE_PRESENTATION_NUM_JOBS": environ.get(
-            "COMPARE_PRESENTATION_NUM_JOBS", "1"
+            "COMPARE_PRESENTATION_NUM_JOBS", "auto"
         ),
         "COMPARE_PRESENTATION_TORCH_COMPILE": environ.get(
             "COMPARE_PRESENTATION_TORCH_COMPILE", "0"
@@ -237,7 +237,7 @@ def remote_training_env(environ=os.environ):
         ),
         "PRESENTATION_NUM_JOBS": environ.get("PRESENTATION_NUM_JOBS", "auto"),
         "PRESENTATION_MAX_WORKERS_PER_GPU": environ.get(
-            "PRESENTATION_MAX_WORKERS_PER_GPU", "1"
+            "PRESENTATION_MAX_WORKERS_PER_GPU", "auto"
         ),
         "PRESENTATION_CALIBRATION_NUM_JOBS": environ.get(
             "PRESENTATION_CALIBRATION_NUM_JOBS", "auto"
@@ -476,9 +476,10 @@ def run_release_evaluation(repo, out, env):
         "--num-jobs", env.get("COMPARE_NUM_JOBS", "auto"),
         "--max-workers-per-gpu", env.get("COMPARE_MAX_WORKERS_PER_GPU", "auto"),
         "--max-tasks-per-worker", env.get("COMPARE_MAX_TASKS_PER_WORKER", "12"),
-        "--presentation-num-jobs", env.get("COMPARE_PRESENTATION_NUM_JOBS", "1"),
+        "--presentation-num-jobs", env.get(
+            "COMPARE_PRESENTATION_NUM_JOBS", "auto"),
         "--presentation-max-workers-per-gpu", env.get(
-            "COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU", "1"
+            "COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU", "auto"
         ),
         "--presentation-max-tasks-per-worker", env.get(
             "COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER", "1"

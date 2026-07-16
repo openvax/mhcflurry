@@ -1162,11 +1162,15 @@ class Class1AffinityPredictor(object):
         peptides_to_predict = EncodableSequences.create(
             peptides.sequences[supported_indices])
         peptide_input = model_obj.peptides_to_network_input(peptides_to_predict)
+        requested_batch_size = model_kwargs.get(
+            "batch_size", DEFAULT_PREDICT_BATCH_SIZE)
+        auto_batch_size = requested_batch_size in (None, "auto")
         batch_size = resolve_prediction_batch_size(
-            model_kwargs.get("batch_size", DEFAULT_PREDICT_BATCH_SIZE),
+            requested_batch_size,
             device,
             model=network,
             num_workers_per_gpu=model_kwargs.get("num_workers_per_gpu", 1),
+            total_rows=len(supported_indices) * n_alleles,
         )
         batch_size = int(batch_size)
 
@@ -1194,25 +1198,53 @@ class Class1AffinityPredictor(object):
                 batch_array = numpy.asarray(batch_array, dtype=numpy.float32)
             return torch.from_numpy(batch_array).to(device)
 
-        with torch.no_grad():
-            for start in range(0, len(peptides_to_predict), batch_size):
-                end = min(start + batch_size, len(peptides_to_predict))
-                peptide_batch = peptide_tensor(peptide_input[start:end])
-                peptide_stage = network.forward_peptide_stage(peptide_batch)
-                output = network.forward_cartesian_from_peptide_stage(
-                    peptide_stage,
-                    allele_idx,
+        while True:
+            try:
+                with torch.no_grad():
+                    for start in range(
+                            0, len(peptides_to_predict), batch_size):
+                        end = min(start + batch_size, len(peptides_to_predict))
+                        peptide_batch = peptide_tensor(peptide_input[start:end])
+                        peptide_stage = network.forward_peptide_stage(
+                            peptide_batch)
+                        output = network.forward_cartesian_from_peptide_stage(
+                            peptide_stage,
+                            allele_idx,
+                        )
+                        affinities = to_ic50(output.detach().cpu().numpy())
+                        if affinities.ndim == 3 and affinities.shape[2] > 1:
+                            log_values = numpy.log(
+                                affinities.reshape((-1, affinities.shape[2]))
+                            )
+                            centers = numpy.exp(centrality_function(log_values))
+                            affinities = centers.reshape(n_alleles, end - start)
+                        else:
+                            affinities = affinities.reshape(
+                                n_alleles, end - start)
+                        result[supported_indices[start:end]] = affinities.T
+                break
+            except RuntimeError as exc:
+                from .pytorch_sizing import (
+                    is_device_out_of_memory_error,
+                    release_device_memory_after_oom,
                 )
-                affinities = to_ic50(output.detach().cpu().numpy())
-                if affinities.ndim == 3 and affinities.shape[2] > 1:
-                    log_values = numpy.log(
-                        affinities.reshape((-1, affinities.shape[2]))
-                    )
-                    centers = numpy.exp(centrality_function(log_values))
-                    affinities = centers.reshape(n_alleles, end - start)
-                else:
-                    affinities = affinities.reshape(n_alleles, end - start)
-                result[supported_indices[start:end]] = affinities.T
+                if (
+                        not auto_batch_size
+                        or batch_size <= 1
+                        or not is_device_out_of_memory_error(exc)):
+                    raise
+                previous_batch_size = batch_size
+                batch_size = max(1, batch_size // 2)
+                peptide_batch = None
+                peptide_stage = None
+                output = None
+                affinities = None
+                release_device_memory_after_oom(device)
+                logging.warning(
+                    "Auto cartesian batch OOM at %d peptides; retrying at %d.",
+                    previous_batch_size,
+                    batch_size,
+                )
         return result
 
     def predict_to_dataframe(

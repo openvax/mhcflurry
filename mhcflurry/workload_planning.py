@@ -17,12 +17,20 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import zipfile
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
+from .memory_budget import (
+    GIB,
+    HOST_MIN_RESERVE_BYTES,
+    usable_memory_bytes,
+)
 
-GIB = float(1 << 30)
+
 HOST_RAM_PER_DATALOADER_CHILD_GB = 0.5
+DEVICE_RUNTIME_BASE_GB = 1.5
+MODEL_TENSOR_SAFETY_FACTOR = 1.2
 
 
 def env_float(name, default, bounds=None):
@@ -146,6 +154,9 @@ class LocalParallelismPlan:
     cli_overrides: Tuple[str, ...] = ()
     warnings: Tuple[str, ...] = ()
     hints: Tuple[Tuple[str, object], ...] = ()
+    warmup_device_peak_gb: Optional[float] = None
+    warmup_host_peak_gb: Optional[float] = None
+    cpu_threads_per_worker: Optional[int] = None
 
     def __str__(self):
         device_worker = (
@@ -162,7 +173,9 @@ class LocalParallelismPlan:
             "LocalParallelismPlan("
             "workload=%s, backend=%s, jobs=%d, gpus=%d, workers/gpu=%d, "
             "dataloader_workers=%d, device_worker_gb=%s, "
-            "host_worker_gb=%.1f, host_available=%s from %s)"
+            "host_worker_gb=%.1f, host_available=%s from %s, "
+            "warmup_device_peak_gb=%s, warmup_host_peak_gb=%s, "
+            "cpu_threads_per_worker=%s)"
             % (
                 self.workload_name,
                 self.backend,
@@ -174,6 +187,18 @@ class LocalParallelismPlan:
                 self.host_worker_gb,
                 host_available,
                 self.host_memory_source,
+                (
+                    "%.1f" % self.warmup_device_peak_gb
+                    if self.warmup_device_peak_gb is not None else "none"
+                ),
+                (
+                    "%.1f" % self.warmup_host_peak_gb
+                    if self.warmup_host_peak_gb is not None else "none"
+                ),
+                (
+                    str(self.cpu_threads_per_worker)
+                    if self.cpu_threads_per_worker is not None else "none"
+                ),
             )
         )
 
@@ -304,6 +329,37 @@ def path_size_bytes(path):
         return os.path.getsize(path)
     except OSError:
         return None
+
+
+def model_artifact_size_bytes(path):
+    """Best-effort uncompressed bytes for a model file or directory.
+
+    NumPy ``.npz`` weights are ZIP containers, so their on-disk size can be
+    much smaller than their resident parameter tensors. Summing ZIP member
+    sizes gives the planner a closer parameter-byte input without importing
+    torch or loading a predictor in the parent process.
+    """
+    if not path:
+        return None
+    paths = []
+    if os.path.isdir(path):
+        for root, _, filenames in os.walk(path):
+            paths.extend(os.path.join(root, name) for name in filenames)
+    else:
+        paths.append(path)
+    total = 0
+    found = False
+    for filename in paths:
+        try:
+            if zipfile.is_zipfile(filename):
+                with zipfile.ZipFile(filename) as archive:
+                    total += sum(info.file_size for info in archive.infolist())
+            else:
+                total += os.path.getsize(filename)
+            found = True
+        except (OSError, zipfile.BadZipFile):
+            continue
+    return total if found else None
 
 
 def _memory_info(total_gb=None, available_gb=None, source="unknown"):
@@ -452,6 +508,21 @@ def estimate_workload_memory(workload_name=WORKLOAD_GENERIC, hints=None):
         if device_worker_gb is not None:
             notes.append("profile default")
 
+    model_bytes = hints.get("model_bytes")
+    if model_bytes:
+        artifact_worker_gb = (
+            DEVICE_RUNTIME_BASE_GB
+            + float(model_bytes) / GIB * MODEL_TENSOR_SAFETY_FACTOR
+        )
+        if hints.get("elastic_batch"):
+            # Activations are sized later from live memory. For inference the
+            # launcher only needs parameters plus the CUDA/runtime base.
+            device_worker_gb = artifact_worker_gb
+            notes.append("uncompressed model artifacts")
+        elif device_worker_gb is None or artifact_worker_gb > device_worker_gb:
+            device_worker_gb = artifact_worker_gb
+            notes.append("uncompressed model artifact floor")
+
     data_pressure_gb = 0.0
     if hints.get("data_bytes") and device_worker_gb is not None:
         if data_gb > profile.data_pressure_start_gb:
@@ -490,19 +561,29 @@ def host_memory_num_jobs_cap(
     available_gb = memory.get("available_gb") or memory.get("total_gb")
     if available_gb is None:
         return None
-    if safety_fraction is None:
-        safety_fraction = env_float(
-            "MHCFLURRY_AUTO_HOST_MEMORY_SAFETY_FRACTION",
-            "0.70",
-            bounds=(0.0, 1.0),
-        )
     worker_gb = (
         float(host_worker_gb)
         + int(dataloader_num_workers) * HOST_RAM_PER_DATALOADER_CHILD_GB
     )
     if worker_gb <= 0:
         return None
-    return max(1, int(float(available_gb) * float(safety_fraction) / worker_gb))
+    if safety_fraction is None:
+        raw_fraction = os.environ.get(
+            "MHCFLURRY_AUTO_HOST_MEMORY_SAFETY_FRACTION")
+        if raw_fraction not in (None, ""):
+            safety_fraction = env_float(
+                "MHCFLURRY_AUTO_HOST_MEMORY_SAFETY_FRACTION",
+                raw_fraction,
+                bounds=(0.0, 1.0),
+            )
+    if safety_fraction is not None:
+        usable_gb = float(available_gb) * float(safety_fraction)
+    else:
+        usable_gb = usable_memory_bytes(
+            float(available_gb) * GIB,
+            min_reserve_bytes=HOST_MIN_RESERVE_BYTES,
+        ) / GIB
+    return max(1, int(usable_gb / worker_gb))
 
 
 def _is_auto(value):
@@ -716,6 +797,43 @@ def plan_local_parallelism(
                 "honoring CLI override" % (num_jobs, capacity)
             )
 
+    cpu_count = os.cpu_count()
+    if cap_auto_num_jobs and cpu_count and int(num_jobs) > int(cpu_count):
+        if num_jobs_was_auto:
+            warnings.append(
+                "auto num_jobs capped from %d to %d by available CPUs" % (
+                    int(num_jobs), int(cpu_count)))
+            num_jobs = int(cpu_count)
+            if mwpg_was_auto and gpus > 0:
+                max_workers_per_gpu = max(
+                    1, (num_jobs + gpus - 1) // gpus)
+            if backend in ("auto", "gpu"):
+                capacity = int(num_jobs)
+        else:
+            warnings.append(
+                "explicit num_jobs=%d exceeds detected CPUs=%d; honoring "
+                "CLI override" % (int(num_jobs), int(cpu_count)))
+
+    work_item_cap = hints.get("num_work_items")
+    if work_item_cap is None and workload_name.endswith("_inference"):
+        work_item_cap = hints.get("prediction_rows") or hints.get("num_rows")
+    if work_item_cap is not None:
+        work_item_cap = max(int(work_item_cap), 1)
+    if (
+            cap_auto_num_jobs
+            and num_jobs_was_auto
+            and work_item_cap is not None
+            and int(num_jobs) > work_item_cap):
+        warnings.append(
+            "auto num_jobs capped from %d to %d by available work items" % (
+                int(num_jobs), work_item_cap))
+        num_jobs = work_item_cap
+        if mwpg_was_auto and gpus > 0:
+            max_workers_per_gpu = max(
+                1, (num_jobs + gpus - 1) // gpus)
+        if backend in ("auto", "gpu"):
+            capacity = int(num_jobs)
+
     effective_fit_workers = max(1, int(num_jobs))
     if int(num_jobs) <= 0 and gpus > 0:
         effective_fit_workers = 1
@@ -799,6 +917,7 @@ def plan_local_parallelism(
             peptide_max_length=None,
             num_workers=effective_fit_workers,
             ram_gb=memory.get("available_gb") or memory.get("total_gb"),
+            base_worker_gb=host_worker_gb,
         ))
     else:
         random_negative_pool_epochs = int(rn_raw)

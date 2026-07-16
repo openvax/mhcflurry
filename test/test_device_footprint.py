@@ -90,8 +90,8 @@ def test_calibration_scales_and_falls_back(tmp_path):
     assert calibration_gb(str(tmp_path), 0) is None
 
 
-def test_calibration_rc14_a100_40gb_worker_cap(tmp_path, monkeypatch):
-    """Calibration should not pack multiple caches onto A100-40GB."""
+def test_calibration_rc14_a100_40gb_worker_capacity(tmp_path, monkeypatch):
+    """Calibration packs complete caches inside the shared VRAM reserve."""
     from mhcflurry.parallelism import auto_max_workers_per_gpu
 
     _write_manifest(tmp_path, RELEASE_NUM_NETWORKS, RELEASE_HYPERPARAMETERS)
@@ -100,13 +100,11 @@ def test_calibration_rc14_a100_40gb_worker_cap(tmp_path, monkeypatch):
 
     monkeypatch.setenv(
         "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "40")
-    monkeypatch.setenv(
-        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP", "4")
     assert auto_max_workers_per_gpu(
         num_jobs="auto",
         num_gpus=4,
         per_worker_gb=worker_gb,
-    ) == 1
+    ) == 2
 
 
 # --------------------------------------------------------------------------
@@ -114,13 +112,10 @@ def test_calibration_rc14_a100_40gb_worker_cap(tmp_path, monkeypatch):
 # --------------------------------------------------------------------------
 
 def test_training_sanity_anchor():
-    # SANITY ANCHOR: ~250k rows, minibatch 128. The estimate is still above the
-    # measured steady-state minibatch peak because the release pretrain path
-    # validates an inequality loss in one full-fold forward pass, but the
-    # validation multiplier is anchored to the newer rc14 worker-density
-    # benchmark below.
+    # Validation now accumulates exact numerator/denominator terms in elastic
+    # batches, so it no longer contributes a full-fold launch-time peak.
     gb = training_gb(RELEASE_HYPERPARAMETERS, RELEASE_TRAINING_ROWS)
-    assert 7.0 < gb < 9.5, gb
+    assert gb == 2.5
 
 
 def test_training_is_base_dominated_for_index_encoded_peptides():
@@ -149,7 +144,7 @@ def test_training_is_base_dominated_for_index_encoded_peptides():
 
 
 def test_training_rc14_worker_density_defaults(monkeypatch):
-    """The rc14 release recipe should pick 1 worker on 40 GB, 2 on 80 GB."""
+    """The rc14 release recipe has no obsolete full-validation VRAM peak."""
     from mhcflurry.parallelism import auto_max_workers_per_gpu
 
     rc14_wide = dict(
@@ -157,24 +152,21 @@ def test_training_rc14_worker_density_defaults(monkeypatch):
         layer_sizes=[1024, 1024],
         minibatch_size=1024,
     )
-    # SANITY ANCHOR: 2026-07 rc14 worker-density benchmark,
-    # A100-80GB, ~943k rows, widest release architecture. Telemetry peaked at
-    # 24.4 GiB, so the estimator should land in the same conservative band.
+    # The old pre-fix benchmark peaked at 24.4 GiB because validation ran the
+    # entire fold at once. Exact batched reduction removes that peak.
     benchmark_worker_gb = training_gb(rc14_wide, 943228)
-    assert 23.0 < benchmark_worker_gb < 25.0, benchmark_worker_gb
+    assert benchmark_worker_gb == 2.5
 
     worker_gb = training_gb(rc14_wide, RC14_TRAINING_ROWS)
-    assert 24.0 < worker_gb < 26.0, worker_gb
+    assert worker_gb == 2.5
 
     monkeypatch.setenv(
         "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "40")
-    monkeypatch.setenv(
-        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP", "4")
     assert auto_max_workers_per_gpu(
         num_jobs="auto",
         num_gpus=4,
         per_worker_gb=worker_gb,
-    ) == 1
+    ) == 14
 
     monkeypatch.setenv(
         "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
@@ -182,7 +174,7 @@ def test_training_rc14_worker_density_defaults(monkeypatch):
         num_jobs="auto",
         num_gpus=4,
         per_worker_gb=worker_gb,
-    ) == 2
+    ) == 28
 
 
 # --------------------------------------------------------------------------

@@ -45,6 +45,7 @@ from ..parallelism import (
     add_local_parallelism_args)
 from ..workload_planning import (
     WORKLOAD_PROCESSING_SELECTION,
+    model_artifact_size_bytes,
     path_size_bytes,
 )
 from ..cluster_parallelism import (
@@ -116,7 +117,10 @@ def run(argv=sys.argv[1:]):
         args,
         cap_auto_num_jobs=not args.cluster_parallelism,
         workload_name=WORKLOAD_PROCESSING_SELECTION,
-        workload_hints={"data_bytes": path_size_bytes(args.data)},
+        workload_hints={
+            "data_bytes": path_size_bytes(args.data),
+            "model_bytes": model_artifact_size_bytes(args.models_dir),
+        },
     )
 
     df = pandas.read_csv(args.data)

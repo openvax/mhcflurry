@@ -51,6 +51,7 @@ from ..parallelism import (
 from ..workload_planning import (
     WORKLOAD_AFFINITY_CALIBRATION,
     WORKLOAD_PRESENTATION_CALIBRATION,
+    model_artifact_size_bytes,
     path_size_bytes,
 )
 from ..device_footprint import (
@@ -291,6 +292,7 @@ def run(argv=sys.argv[1:]):
                     path_size_bytes(args.alleles_file),
                 )
             ) or None,
+            "model_bytes": model_artifact_size_bytes(args.models_dir),
             "num_work_items": (
                 args.num_genotypes
                 if args.predictor_kind == "class1_presentation"

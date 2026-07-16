@@ -132,7 +132,7 @@ def add_local_parallelism_args(parser):
         default="auto",
         help="Maximum number of workers to assign to a GPU. Pass 'auto' "
              "(default) to pick a value based on detected free VRAM, the "
-             "per-worker VRAM upper bound, and a 4-worker hard cap "
+             "estimated per-worker working set, and a shared safety reserve "
              "(see ``auto_max_workers_per_gpu``). Pass an integer to pin. "
              "Workers beyond ``--gpus * --max-workers-per-gpu`` run on CPU.")
     group.add_argument(
@@ -155,7 +155,7 @@ def add_local_parallelism_args(parser):
              "'auto' (default) to derive from box vCPUs / RAM / "
              "fit-worker plan via "
              "``mhcflurry.parallelism.auto_dataloader_num_workers`` "
-             "(empirical hard cap = 4). Pass an integer to pin (0 builds "
+             "(empirical throughput cap = 4). Pass an integer to pin (0 builds "
              "pretraining batches in-process). Overrides any "
              "``dataloader_num_workers`` set in component-model "
              "hyperparameters when applicable; non-affinity train commands "
@@ -169,7 +169,8 @@ def add_local_parallelism_args(parser):
              "random-negative pool. Pass 'auto' (default) to size from "
              "system RAM / fit-worker plan via "
              "``mhcflurry.parallelism.auto_random_negative_pool_epochs`` "
-             "(hard cap = 10). Pass an integer to pin (1 means fresh "
+             "(empirical throughput cap = 10). Pass an integer to pin (1 means "
+             "fresh "
              "random negatives every epoch). Overrides any "
              "``random_negative_pool_epochs`` set in component-model "
              "hyperparameters.")

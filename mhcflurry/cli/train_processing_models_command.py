@@ -35,9 +35,11 @@ from ..class1_processing_predictor import Class1ProcessingPredictor
 from ..class1_processing_neural_network import Class1ProcessingNeuralNetwork
 from ..pytorch_sizing import (
     TRAINING_PEAK_MULTIPLIER,
+    begin_peak_memory_measurement,
+    end_peak_memory_measurement,
     estimate_peak_bytes_per_row,
 )
-from ..pytorch_training import effective_validation_batch_size
+from ..memory_budget import training_module_bytes
 from ..common import (
     add_random_seed_arg,
     configure_random_seed,
@@ -243,6 +245,7 @@ def main(args):
         workload_name=WORKLOAD_PROCESSING_TRAINING,
         workload_hints={
             "data_bytes": path_size_bytes(args.data),
+            "num_work_items": processing_work_item_count(args),
             "per_worker_gb": processing_worker_gb,
         },
     )
@@ -254,17 +257,30 @@ def main(args):
         train_models(args)
 
 
+def processing_work_item_count(args):
+    """Best-effort number of model fits in this command."""
+    try:
+        hyperparameters_lst = yaml.safe_load(open(args.hyperparameters))
+        return (
+            len(hyperparameters_lst)
+            * int(args.num_folds)
+            * int(args.num_replicates)
+        )
+    except Exception:
+        return None
+
+
 def estimate_processing_worker_gb(args):
     """Estimate steady per-worker VRAM for processing training.
 
     Processing is not shaped like affinity training: workers keep encoded
     flank tensors resident on-device, then run Conv1d models whose peak
     activation width scales with flank length and convolutional filters.
-    This estimate sizes worker concurrency from the actual data row count
-    and largest architecture in the hyperparameter sweep. Validation and
-    post-fit AUC scoring are batched by the trainer/predictor; the estimate is
-    therefore anchored on the larger of the training and validation peaks,
-    not the full fold size.
+    This estimate sizes worker concurrency from the exact encoded dataset,
+    model/gradient/optimizer state, and training activation peak for the
+    largest architecture in the hyperparameter sweep. Validation and post-fit
+    scoring use the remaining per-worker live-memory budget at runtime, so
+    they do not need a second fixed launch-time batch assumption.
     """
     data_path = getattr(args, "data", None)
     hyperparameters_path = getattr(args, "hyperparameters", None)
@@ -278,7 +294,7 @@ def estimate_processing_worker_gb(args):
 
         max_sequence_bytes_per_row = 0
         max_training_batch_bytes = 0
-        max_validation_batch_bytes = 0
+        max_training_state_bytes = 0
         for hyperparameters in hyperparameters_lst:
             model = Class1ProcessingNeuralNetwork(**hyperparameters)
             network = model.make_network(
@@ -300,49 +316,51 @@ def estimate_processing_worker_gb(args):
             )
             forward_bytes_per_row = estimate_peak_bytes_per_row(network)
             minibatch_size = int(model.hyperparameters["minibatch_size"])
+            optimizer_state_copies = {
+                "adam": 2,
+                "rmsprop": 1,
+                "sgd": 0,
+            }.get(str(model.hyperparameters["optimizer"]).lower(), 2)
+            max_training_state_bytes = max(
+                max_training_state_bytes,
+                training_module_bytes(
+                    network,
+                    optimizer_state_copies=optimizer_state_copies,
+                ),
+            )
             max_training_batch_bytes = max(
                 max_training_batch_bytes,
                 minibatch_size
                 * forward_bytes_per_row
                 * TRAINING_PEAK_MULTIPLIER,
             )
-            if float(model.hyperparameters["validation_split"]) > 0:
-                validation_batch_size = effective_validation_batch_size(
-                    "cuda",
-                    model.hyperparameters["validation_batch_size"],
-                    minibatch_size,
-                )
-                max_validation_batch_bytes = max(
-                    max_validation_batch_bytes,
-                    validation_batch_size * forward_bytes_per_row,
-                )
 
         if not max_training_batch_bytes:
             return None
 
         dataset_bytes = row_count * max_sequence_bytes_per_row
-        peak_batch_bytes = max(
-            max_training_batch_bytes,
-            max_validation_batch_bytes,
-        )
         runtime_bytes = int(_PROCESSING_WORKER_RUNTIME_FLOOR_GB * (1 << 30))
         estimate_gb = (
-            (dataset_bytes + peak_batch_bytes + runtime_bytes)
+            (
+                dataset_bytes
+                + max_training_state_bytes
+                + max_training_batch_bytes
+                + runtime_bytes
+            )
             * _PROCESSING_WORKER_SAFETY_FACTOR
             / float(1 << 30)
         )
         estimate_gb = max(estimate_gb, 4.0)
         print(
             "Estimated processing worker VRAM: %.2f GB "
-            "(rows=%d, sequence=%.2f GB, train_batch=%.2f GB, "
-            "validation_batch=%.2f GB, peak_batch=%.2f GB, "
+            "(rows=%d, sequence=%.2f GB, training_state=%.2f GB, "
+            "train_batch=%.2f GB, "
             "runtime_floor=%.2f GB, safety=%.1fx)" % (
                 estimate_gb,
                 row_count,
                 dataset_bytes / float(1 << 30),
+                max_training_state_bytes / float(1 << 30),
                 max_training_batch_bytes / float(1 << 30),
-                max_validation_batch_bytes / float(1 << 30),
-                peak_batch_bytes / float(1 << 30),
                 _PROCESSING_WORKER_RUNTIME_FLOOR_GB,
                 _PROCESSING_WORKER_SAFETY_FACTOR,
             )
@@ -625,6 +643,7 @@ def _run_compile_warmup(hyperparameters, fold_num, constant_data):
         )
     )
     started = time.time()
+    memory_token = begin_peak_memory_measurement()
     model = Class1ProcessingNeuralNetwork(**hp)
     model.fit(
         sequences=FlankingEncoding(
@@ -634,8 +653,11 @@ def _run_compile_warmup(hyperparameters, fold_num, constant_data):
         targets=train_subset.hit.values,
         verbose=0,
     )
+    report = end_peak_memory_measurement(memory_token)
+    report["elapsed_seconds"] = time.time() - started
     print("compile_warmup_only (processing): completed in %.1f sec" % (
-        time.time() - started))
+        report["elapsed_seconds"]))
+    return report
 
 
 def train_model(
@@ -660,8 +682,7 @@ def train_model(
     from mhcflurry.flanking_encoding import FlankingEncoding
 
     if compile_warmup_only:
-        _run_compile_warmup(hyperparameters, fold_num, constant_data)
-        return None
+        return _run_compile_warmup(hyperparameters, fold_num, constant_data)
 
     df = constant_data["train_data"]
     folds_df = constant_data["folds_df"]

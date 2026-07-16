@@ -108,7 +108,7 @@ paths remain intentionally smaller.
 | **affinity (pan-allele)** | streaming DataLoader + compact torch-index peptide batches | device-resident tensors + worker-local RN pool | filter ✓; pool/cache n/a (no fit) | filter ✓; pool/cache n/a |
 | **affinity (allele-specific)** | n/a | device-resident tensors + worker-local RN pool | filter ✓ | shares calibrate command |
 | **processing** | n/a | local+cluster worker pool | local+cluster worker pool | n/a (allele-independent) |
-| **presentation** | n/a | serial only (single-process; no orchestration story today) | n/a | filter ✓ (shares calibrate command) |
+| **presentation** | n/a | parallel auto-sized feature generation + deterministic fit | n/a | filter ✓ (shares calibrate command) |
 
 ## Auto-tuned parallelism knobs
 
@@ -121,22 +121,26 @@ intentionally re-benchmarking.
 
 ### `--max-workers-per-gpu auto` → `auto_max_workers_per_gpu`
 
-Picks the per-GPU worker concurrency from `min(num_jobs / num_gpus,
-floor(vram_fraction × free_vram_gb / per_worker_gb), hard_cap=4)`. Free VRAM is
-read from `nvidia-smi` (no torch import — the parent process must not
-initialize CUDA before forking). The per-worker VRAM upper bound defaults to
-4 GB (the affinity-fit footprint) and is tunable via
-`MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`. The default VRAM fraction is
-0.65 and is tunable via
-`MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_VRAM_FRACTION`; heavier workloads (e.g.
-calibration at 24 GB) pass their own per-worker value through the planner.
+Picks per-GPU worker concurrency from the number of complete estimated worker
+working sets that fit in detected free VRAM after one shared reserve (10%, at
+least 1 GiB). There is no default worker hard cap. The working set is derived
+from model artifacts/parameters, gradients and optimizer state for training,
+resident encoded data, and the configured training minibatch where those facts
+are available; otherwise the workload profile supplies a conservative fallback.
+Free VRAM is read from `nvidia-smi` (no torch import — the parent process must
+not initialize CUDA before forking). The final job count is also bounded by
+available host RAM and vCPUs.
 
-| Box | num_gpus | free_vram | resolved |
-|---|---|---|---|
-| 8×A100-80GB | 8 | ~80 GB | **2** |
-| 8×A100-40GB | 8 | ~40 GB | **1** |
-| 1×A100-80GB | 1 | ~80 GB | **2** |
-| CPU-only | 0 | — | **1** |
+When torch compilation is enabled, the existing one-worker compile warmup also
+records CUDA peak-reserved memory and process peak RSS. A measured peak can
+tighten an automatic plan before the production pool starts, but can never
+change explicit CLI values. Runtime validation and inference batches use the
+same shared reserve against live free memory, so they do not independently
+spend VRAM already assigned to workers.
+
+For the generic 4 GiB fallback, 80 GiB free fits 18 workers and 40 GiB fits 9;
+workload-specific estimates, host RAM, vCPUs, and the number of work items can
+reduce those capacities. CPU-only execution resolves to one device worker.
 
 ### `--dataloader-num-workers auto` → `auto_dataloader_num_workers`
 

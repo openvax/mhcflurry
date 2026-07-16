@@ -60,6 +60,10 @@ from ..workload_planning import (
 from ..device_footprint import (
     estimate_affinity_training_device_worker_gb,
 )
+from ..pytorch_sizing import (
+    begin_peak_memory_measurement,
+    end_peak_memory_measurement,
+)
 from ..cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
@@ -498,6 +502,19 @@ def _estimate_training_per_worker_gb(args):
     return max(estimates) if estimates else None
 
 
+def _training_work_item_count(args):
+    """Best-effort number of model fits in this command."""
+    try:
+        hyperparameters_lst = yaml.safe_load(open(args.hyperparameters))
+        return (
+            len(hyperparameters_lst)
+            * int(args.num_folds)
+            * int(args.num_replicates)
+        )
+    except Exception:
+        return None
+
+
 def main(args):
     print("Arguments:")
     print(args)
@@ -509,7 +526,10 @@ def main(args):
         cap_auto_num_jobs=not getattr(args, "cluster_parallelism", False),
         per_worker_gb=_estimate_training_per_worker_gb(args),
         workload_name=WORKLOAD_AFFINITY_TRAINING,
-        workload_hints={"data_bytes": path_size_bytes(args.data)},
+        workload_hints={
+            "data_bytes": path_size_bytes(args.data),
+            "num_work_items": _training_work_item_count(args),
+        },
     )
 
     if not args.continue_incomplete:
@@ -898,6 +918,7 @@ def _run_compile_warmup(hyperparameters, fold_num, constant_data):
         )
     )
     started = time.time()
+    memory_token = begin_peak_memory_measurement()
     model = Class1NeuralNetwork(**hp)
     model.fit(
         peptides=train_peptides,
@@ -909,7 +930,11 @@ def _run_compile_warmup(hyperparameters, fold_num, constant_data):
         ),
         verbose=0,
     )
-    print("compile_warmup_only: completed in %.1f sec" % (time.time() - started))
+    report = end_peak_memory_measurement(memory_token)
+    report["elapsed_seconds"] = time.time() - started
+    print("compile_warmup_only: completed in %.1f sec" % (
+        report["elapsed_seconds"]))
+    return report
 
 
 def train_model(
@@ -932,8 +957,7 @@ def train_model(
         constant_data=WORKER_CONTEXT):
 
     if compile_warmup_only:
-        _run_compile_warmup(hyperparameters, fold_num, constant_data)
-        return None
+        return _run_compile_warmup(hyperparameters, fold_num, constant_data)
 
     df = constant_data["train_data"]
     folds_df = constant_data["folds_df"]

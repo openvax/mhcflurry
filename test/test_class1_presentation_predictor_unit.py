@@ -354,20 +354,15 @@ def test_estimate_presentation_feature_worker_gb_uses_model_shape(monkeypatch):
     processing_network = FakeNetwork()
     monkeypatch.setenv("MHCFLURRY_PRESENTATION_WORKER_RUNTIME_FLOOR_GB", "1")
     monkeypatch.setenv("MHCFLURRY_PRESENTATION_WORKER_SAFETY_FACTOR", "1")
-    monkeypatch.setenv("MHCFLURRY_PRESENTATION_WORKER_TRANSIENT_ROWS", "10")
-    monkeypatch.setattr(
-        train_presentation,
-        "estimate_peak_bytes_per_row",
-        lambda network: 512 * 1024 * 1024
-        if network is processing_network else 1024,
-    )
 
     estimate = train_presentation.estimate_presentation_feature_worker_gb(
         type("Args", (), {"feature_chunk_size": 20})(),
         FakePresentation(affinity_network, processing_network),
     )
 
-    assert 5.9 < estimate < 6.1
+    # The launch-time estimate contains persistent model/runtime state only;
+    # transient inference activations consume the shared live-memory budget.
+    assert estimate == 4.0
 
 
 def test_presentation_worker_estimator_uses_cartesian_merged_peak(monkeypatch):

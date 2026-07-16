@@ -267,23 +267,6 @@ MAX_TASKS_PER_WORKER="${MAX_TASKS_PER_WORKER:-12}"
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-auto}"
 
 DATALOADER_NUM_WORKERS_REQUESTED="$DATALOADER_NUM_WORKERS"
-if [ "$NUM_JOBS" = "auto" ]; then
-    if [ "$MAX_WORKERS_PER_GPU" = "auto" ]; then
-        THREAD_BUDGET_NUM_JOBS=$(( GPUS * 4 ))
-    else
-        THREAD_BUDGET_NUM_JOBS=$(( GPUS * MAX_WORKERS_PER_GPU ))
-    fi
-else
-    THREAD_BUDGET_NUM_JOBS="$NUM_JOBS"
-fi
-DATALOADER_NUM_WORKERS_FOR_THREADS="$(
-    resolve_dataloader_num_workers "$THREAD_BUDGET_NUM_JOBS"
-)"
-printf >&2 \
-    "[pan_allele_release_affinity.sh] DATALOADER_NUM_WORKERS=%s thread-budget=%s resolved-for-threads=%s\n" \
-    "$DATALOADER_NUM_WORKERS_REQUESTED" \
-    "$THREAD_BUDGET_NUM_JOBS" \
-    "$DATALOADER_NUM_WORKERS_FOR_THREADS"
 
 PARALLELISM_ARGS=(
     --num-jobs "$NUM_JOBS"
@@ -306,14 +289,18 @@ if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
     PARALLELISM_ARGS+=(--enable-timing)
 fi
 
-# Auto-configure OMP / MKL / OPENBLAS thread budget uniformly based on
-# nproc, GPU count, worker count, dataloader worker count. User can
-# override any of {OMP,MKL,OPENBLAS}_NUM_THREADS before invoking this
-# script; the helper respects manual settings.
-NUM_JOBS="$THREAD_BUDGET_NUM_JOBS" GPUS="$GPUS" \
-    MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
-    DATALOADER_NUM_WORKERS="$DATALOADER_NUM_WORKERS_FOR_THREADS" \
-    set_cpu_threads
+# The Python planner owns CPU threads when either worker count is automatic,
+# because only it knows the final workload-aware GPU/RAM/CPU plan. Retain the
+# shell helper for fully explicit expert configurations.
+if [ "$NUM_JOBS" != "auto" ] && \
+        [ "$DATALOADER_NUM_WORKERS_REQUESTED" != "auto" ]; then
+    NUM_JOBS="$NUM_JOBS" GPUS="$GPUS" \
+        MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
+        DATALOADER_NUM_WORKERS="$DATALOADER_NUM_WORKERS_REQUESTED" \
+        set_cpu_threads
+else
+    echo "CPU thread budget delegated to workload planner." >&2
+fi
 
 # ---- data ------------------------------------------------------------
 CURRENT_PHASE="data_setup"

@@ -218,22 +218,33 @@ def validation_forward_network(network, eager_network):
 
 
 def effective_validation_batch_size(
-        device, configured_batch_size, minibatch_size):
+        device,
+        configured_batch_size,
+        minibatch_size,
+        model=None,
+        num_workers_per_gpu=1,
+        total_rows=None):
     """Return the validation batch size to use for the current device.
 
-    Static heuristic. MUST be deterministic across calls — fit() /
-    fit_streaming_batches() call this per-epoch, and torch.compile caches
-    specializations by input shape. A validation batch that varies with live
-    free-VRAM (the auto-sized approach) forces the compiled graph to
-    re-codegen every epoch; with 16 training workers × 32 inductor compile
-    workers on a 128-vCPU box that pins the CPU at hundreds of concurrent
-    compile jobs — observed to stall training indefinitely.
+    CUDA validation uses the same live-memory budget as inference. Callers
+    compute this once per fit and persist it in ``fit_info`` so torch.compile
+    sees a stable shape across epochs. Explicit configured values are never
+    changed.
     """
     if configured_batch_size:
         return int(configured_batch_size)
     device_type = getattr(device, "type", device)
+    if device_type in ("cuda", "mps") and model is not None:
+        from .pytorch_sizing import compute_prediction_batch_size
+        return compute_prediction_batch_size(
+            device,
+            model=model,
+            num_workers_per_gpu=num_workers_per_gpu,
+            total_rows=total_rows,
+        )
     if device_type == "cuda":
-        # Forward-only validation: kernel-launch overhead matters more than
-        # peak VRAM, so a much larger default batch wins over 4 * minibatch.
-        return max(4 * minibatch_size, 4096)
+        # Parent-process planning cannot initialize CUDA. Keep a deterministic
+        # analytic fallback until the worker has a live model and memory view.
+        rows = max(4 * minibatch_size, 4096)
+        return min(rows, int(total_rows)) if total_rows is not None else rows
     return 4 * minibatch_size

@@ -19,9 +19,27 @@ own arithmetic is exercised without touching real GPUs.
 """
 
 import argparse
+import os
+
+import numpy
 import pytest
 
 from mhcflurry import workload_planning as wp
+
+
+def test_model_artifact_size_uses_uncompressed_npz_members(tmp_path):
+    weights = tmp_path / "weights.npz"
+    numpy.savez_compressed(weights, values=numpy.zeros(10000, dtype="float32"))
+    assert wp.model_artifact_size_bytes(tmp_path) > os.path.getsize(weights)
+
+
+def test_elastic_inference_uses_model_artifacts_not_static_profile():
+    estimate = wp.estimate_workload_memory(
+        wp.WORKLOAD_PRESENTATION_INFERENCE,
+        {"model_bytes": 10 * wp.GIB, "elastic_batch": True},
+    )
+    assert estimate["device_worker_gb"] == pytest.approx(13.5)
+    assert "uncompressed model artifacts" in estimate["notes"]
 
 
 # ---------------------------------------------------------------------------
@@ -445,7 +463,9 @@ def _planner_fakes(
         return dataloader_workers
 
     def auto_random_negative_pool_epochs(
-            num_random_negatives, peptide_max_length, num_workers, ram_gb):
+            num_random_negatives, peptide_max_length, num_workers, ram_gb,
+            base_worker_gb=0.0):
+        del base_worker_gb
         return rn_pool_epochs
 
     return {
@@ -512,6 +532,7 @@ def test_plan_8x_a100_resolved(monkeypatch):
     """8×A100-style box with MWPG=2 → 16 workers."""
     monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "1024.0")
     monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "900.0")
+    monkeypatch.setattr(wp.os, "cpu_count", lambda: 176)
     plan = wp.plan_local_parallelism(
         _args(),
         workload_name=wp.WORKLOAD_AFFINITY_INFERENCE,
@@ -521,14 +542,30 @@ def test_plan_8x_a100_resolved(monkeypatch):
     assert plan.capacity == 16
 
 
+def test_auto_plan_never_starts_more_workers_than_work_items(monkeypatch):
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "1024.0")
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "900.0")
+    monkeypatch.setattr(wp.os, "cpu_count", lambda: 176)
+    plan = wp.plan_local_parallelism(
+        _args(),
+        workload_name=wp.WORKLOAD_AFFINITY_INFERENCE,
+        workload_hints={"prediction_rows": 3},
+        **_planner_fakes(num_gpus=8, mwpg_value=2),
+    )
+    assert plan.num_jobs == 3
+    assert plan.max_workers_per_gpu == 1
+    assert plan.capacity == 3
+    assert any("available work items" in warning for warning in plan.warnings)
+
+
 def test_plan_host_memory_clamp_keeps_capacity_consistent(monkeypatch):
     """When host RAM clamps auto num_jobs to a count that doesn't divide
     evenly across GPUs, the reported capacity must equal the clamped
     num_jobs — not gpus * ceil(num_jobs / gpus), which would over-report.
 
-    GPU capacity here is 2 * 4 = 8, but ~22 GB available RAM (×0.70 / 3 GB
-    per worker) caps to 5 workers on 2 GPUs (mwpg -> ceil(5/2)=3). Before the
-    fix, capacity was recomputed as 2*3=6 > num_jobs=5."""
+    GPU capacity here is 2 * 4 = 8, but 22 GB available RAM minus the shared
+    reserve fits 6 workers on 2 GPUs. Capacity must remain the clamped job
+    count, not a separately rounded value."""
     monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", "32.0")
     monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", "22.0")
     plan = wp.plan_local_parallelism(
@@ -536,9 +573,9 @@ def test_plan_host_memory_clamp_keeps_capacity_consistent(monkeypatch):
         workload_name=wp.WORKLOAD_AFFINITY_INFERENCE,
         **_planner_fakes(num_gpus=2, mwpg_value=4),
     )
-    assert plan.num_jobs == 5
+    assert plan.num_jobs == 6
     assert plan.max_workers_per_gpu == 3
-    assert plan.capacity == plan.num_jobs == 5
+    assert plan.capacity == plan.num_jobs == 6
     assert plan.capacity <= plan.gpus * plan.max_workers_per_gpu
     assert any("capped" in w for w in plan.warnings)
 
@@ -577,9 +614,9 @@ def test_plan_auto_num_jobs_clipped_by_host_memory(monkeypatch):
         workload_name=wp.WORKLOAD_AFFINITY_INFERENCE,  # host_worker_gb=3.0
         **_planner_fakes(num_gpus=8, mwpg_value=2),
     )
-    # 8 GB * 0.70 / 3 GB ≈ 1.87 → 1 worker
-    assert plan.num_jobs == 1
-    assert plan.host_memory_num_jobs_cap == 1
+    # 8 GB minus the 2 GB host reserve leaves 6 GB → 2 workers.
+    assert plan.num_jobs == 2
+    assert plan.host_memory_num_jobs_cap == 2
     assert any("capped from" in w for w in plan.warnings), plan.warnings
 
 
@@ -665,8 +702,8 @@ def test_plan_clip_rebalances_mwpg_when_mwpg_was_auto(monkeypatch):
         workload_name=wp.WORKLOAD_AFFINITY_INFERENCE,  # host_worker_gb=3
         **_planner_fakes(num_gpus=8, mwpg_value=2),
     )
-    # 16 GB * 0.70 / 3 ≈ 3 workers across 8 GPUs → MWPG must be ceil(3/8)=1
-    assert plan.num_jobs == 3
+    # 16 GB minus the 2 GB host reserve fits 4 workers across 8 GPUs.
+    assert plan.num_jobs == 4
     assert plan.max_workers_per_gpu == 1
     assert plan.max_workers_per_gpu_was_auto
 

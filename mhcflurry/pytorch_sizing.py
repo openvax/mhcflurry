@@ -14,18 +14,87 @@
 
 import logging
 import os
+import sys
+
+from .memory_budget import per_worker_memory_budget_bytes
 
 DEFAULT_PREDICT_BATCH_SIZE = "auto"
-AUTO_BATCH_MAX_ROWS = 1_000_000  # cap past which kernel-launch savings flatten
+AUTO_BATCH_MAX_ROWS = sys.maxsize
 AUTO_BATCH_MIN_ROWS = 1024  # floor: avoid pathologically tiny batches
 AUTO_BATCH_CPU_FALLBACK = 32_768  # CPU: large batches thrash L3; stay modest
-AUTO_BATCH_FREE_FRACTION = 0.5  # half of free VRAM is the working-set budget
+AUTO_BATCH_FREE_FRACTION = None
 _MPS_PSUTIL_WARNED = False  # one-shot warning if psutil is missing on MPS
 if os.environ.get("MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"):
     DEFAULT_PREDICT_BATCH_SIZE = int(os.environ["MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"])
     logging.info(
         "Configured default predict batch size: %s" % DEFAULT_PREDICT_BATCH_SIZE
     )
+
+
+def begin_peak_memory_measurement():
+    """Reset CUDA peak counters and return an opaque measurement token."""
+    token = {"started": True}
+    try:
+        import torch
+        if torch.cuda.is_available():
+            device = torch.cuda.current_device()
+            torch.cuda.synchronize(device)
+            torch.cuda.reset_peak_memory_stats(device)
+            token["cuda_device"] = int(device)
+    except Exception as exc:
+        token["cuda_error"] = str(exc)
+    return token
+
+
+def _process_peak_rss_bytes():
+    """Best-effort process peak RSS in bytes on Linux and macOS."""
+    try:
+        import resource
+        import sys
+        value = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+        return value if sys.platform == "darwin" else value * 1024
+    except Exception:
+        return None
+
+
+def end_peak_memory_measurement(token):
+    """Finish a measurement begun by :func:`begin_peak_memory_measurement`."""
+    result = {"host_peak_rss_bytes": _process_peak_rss_bytes()}
+    device = token.get("cuda_device") if token else None
+    if device is not None:
+        try:
+            import torch
+            torch.cuda.synchronize(device)
+            result.update({
+                "cuda_peak_allocated_bytes": int(
+                    torch.cuda.max_memory_allocated(device)),
+                "cuda_peak_reserved_bytes": int(
+                    torch.cuda.max_memory_reserved(device)),
+            })
+        except Exception as exc:
+            result["cuda_error"] = str(exc)
+    return result
+
+
+def is_device_out_of_memory_error(exc):
+    """Whether ``exc`` is a CUDA/MPS allocator out-of-memory error."""
+    message = str(exc).lower()
+    return (
+        "out of memory" in message
+        and ("cuda" in message or "mps" in message or "allocator" in message)
+    )
+
+
+def release_device_memory_after_oom(device):
+    """Release cached allocator blocks before retrying a smaller auto batch."""
+    try:
+        import torch
+        if device.type == "cuda":
+            torch.cuda.empty_cache()
+        elif device.type == "mps" and hasattr(torch.mps, "empty_cache"):
+            torch.mps.empty_cache()
+    except Exception:
+        pass
 
 
 def estimate_peak_bytes_per_row(model):
@@ -197,23 +266,29 @@ def compute_prediction_batch_size(
         free_memory_fraction=AUTO_BATCH_FREE_FRACTION,
         max_rows=AUTO_BATCH_MAX_ROWS,
         min_rows=AUTO_BATCH_MIN_ROWS,
-        cpu_fallback=AUTO_BATCH_CPU_FALLBACK):
+        cpu_fallback=AUTO_BATCH_CPU_FALLBACK,
+        total_rows=None):
     """Auto-size a prediction batch for ``device`` and ``model``.
 
-    Divides free VRAM by the per-row peak activation estimate for the
-    model, scales by 1/``num_workers_per_gpu`` so co-resident workers
-    don't step on each other's budget, caps at ``max_rows`` (past which
-    kernel-launch savings flatten out), floors at ``min_rows``.
+    Divides live free VRAM (after one shared reserve) by co-resident workers
+    and the model's per-row peak activation estimate. ``max_rows`` is only an
+    optional caller limit; the default auto path has no hardwired batch cap.
 
     CPU: returns ``cpu_fallback`` — large batches on CPU thrash L3
     cache and rarely help for the small networks mhcflurry trains.
     """
     if device.type == "cpu":
-        return cpu_fallback
+        rows = int(cpu_fallback)
+        return min(rows, int(total_rows)) if total_rows is not None else rows
     peak_bytes = estimate_peak_bytes_per_row(model)
     free = free_device_memory_bytes(device)
     workers = max(int(num_workers_per_gpu), 1)
-    budget = int(free * float(free_memory_fraction) / workers)
+    if free_memory_fraction is None:
+        budget = per_worker_memory_budget_bytes(free, workers)
+    else:
+        # Backward-compatible expert API: an explicit fraction replaces the
+        # default shared reserve calculation.
+        budget = int(free * float(free_memory_fraction) / workers)
     rows = max(1, budget // peak_bytes)
     if rows < min_rows:
         logging.warning(
@@ -224,8 +299,11 @@ def compute_prediction_batch_size(
             workers,
             peak_bytes / 1024.0,
         )
-        return int(rows)
-    return int(min(rows, max_rows))
+    if max_rows is not None:
+        rows = min(rows, int(max_rows))
+    if total_rows is not None:
+        rows = min(rows, max(int(total_rows), 1))
+    return int(rows)
 
 
 def env_workers_per_gpu(default=1):
@@ -245,7 +323,7 @@ def env_workers_per_gpu(default=1):
 
 
 def resolve_prediction_batch_size(
-        value, device, model=None, num_workers_per_gpu=1):
+        value, device, model=None, num_workers_per_gpu=1, total_rows=None):
     """Resolve an explicit int or ``"auto"`` to a concrete batch size.
 
     Accepts ``None`` as a synonym for ``"auto"``. Propagates an
@@ -257,6 +335,7 @@ def resolve_prediction_batch_size(
             device,
             model=model,
             num_workers_per_gpu=num_workers_per_gpu,
+            total_rows=total_rows,
         )
     return int(value)
 
@@ -274,7 +353,7 @@ def check_training_batch_fits(
         device,
         model,
         num_workers_per_gpu=1,
-        free_memory_fraction=0.5,
+        free_memory_fraction=None,
         min_batch=64,
         logger=None):
     """Verify that ``requested_batch_size`` will fit on ``device``.
@@ -300,7 +379,10 @@ def check_training_batch_fits(
     peak_bytes = estimate_peak_bytes_per_row(model) * TRAINING_PEAK_MULTIPLIER
     free = free_device_memory_bytes(device)
     workers = max(int(num_workers_per_gpu), 1)
-    budget = int(free * float(free_memory_fraction) / workers)
+    if free_memory_fraction is None:
+        budget = per_worker_memory_budget_bytes(free, workers)
+    else:
+        budget = int(free * float(free_memory_fraction) / workers)
     max_rows = max(budget // peak_bytes, min_batch)
     requested_batch_size = int(requested_batch_size)
     if requested_batch_size <= max_rows:

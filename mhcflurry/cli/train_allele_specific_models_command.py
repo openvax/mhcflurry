@@ -29,6 +29,7 @@ from ..common import normalize_allele_name
 import tqdm  # progress bar
 
 from ..class1_affinity_predictor import Class1AffinityPredictor
+from ..device_footprint import estimate_affinity_training_device_worker_gb
 from ..common import (
     add_random_seed_arg,
     configure_logging,
@@ -253,9 +254,21 @@ def run(argv=sys.argv[1:]):
     WORKER_CONTEXT["seed"] = master_seed
     resolve_local_parallelism_args(
         args,
+        per_worker_gb=max((
+            estimate
+            for estimate in (
+                estimate_affinity_training_device_worker_gb(hp, len(df))
+                for hp in hyperparameters_lst
+            )
+            if estimate is not None
+        ), default=None),
         workload_name=WORKLOAD_AFFINITY_TRAINING,
         workload_hints={
             "data_bytes": path_size_bytes(args.data),
+            "num_work_items": int(df.allele.nunique()) * sum(
+                int(args.n_models or hp.get("n_models") or 1)
+                for hp in hyperparameters_lst
+            ),
             "num_rows": len(df),
         },
     )

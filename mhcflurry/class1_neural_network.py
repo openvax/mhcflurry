@@ -2734,12 +2734,19 @@ class Class1NeuralNetwork(object):
                 network.eval()
                 with torch.inference_mode():
                     validation_start = _timing_start(device, timing_enabled)
-                    val_batch_size = effective_validation_batch_size(
-                        device,
-                        self.hyperparameters["validation_batch_size"],
-                        self.hyperparameters["minibatch_size"],
-                    )
-                    fit_info["effective_validation_batch_size"] = val_batch_size
+                    if "effective_validation_batch_size" not in fit_info:
+                        fit_info["effective_validation_batch_size"] = (
+                            effective_validation_batch_size(
+                                device,
+                                self.hyperparameters["validation_batch_size"],
+                                self.hyperparameters["minibatch_size"],
+                                model=eager_network,
+                                num_workers_per_gpu=env_workers_per_gpu(),
+                                total_rows=len(val_peptide_device),
+                            )
+                        )
+                    val_batch_size = fit_info[
+                        "effective_validation_batch_size"]
                     val_loss = _batched_validation_loss(
                         network=validation_forward_network(network, eager_network),
                         eager_network=eager_network,
@@ -3591,12 +3598,19 @@ class Class1NeuralNetwork(object):
                         validation_materialize_time += (
                             time.perf_counter() - materialize_start
                         )
-                    val_batch_size = effective_validation_batch_size(
-                        device,
-                        self.hyperparameters["validation_batch_size"],
-                        batch_size,
-                    )
-                    fit_info["effective_validation_batch_size"] = val_batch_size
+                    if "effective_validation_batch_size" not in fit_info:
+                        fit_info["effective_validation_batch_size"] = (
+                            effective_validation_batch_size(
+                                device,
+                                self.hyperparameters["validation_batch_size"],
+                                batch_size,
+                                model=eager_network,
+                                num_workers_per_gpu=env_workers_per_gpu(),
+                                total_rows=len(val_y),
+                            )
+                        )
+                    val_batch_size = fit_info[
+                        "effective_validation_batch_size"]
                     validation_start = _timing_start(device, timing_enabled)
                     val_loss = _batched_validation_loss(
                         network=validation_forward_network(network, eager_network),
@@ -3793,6 +3807,7 @@ class Class1NeuralNetwork(object):
         -------
         numpy.array of nM affinity predictions
         """
+        auto_batch_size = batch_size in (None, "auto")
         if num_workers_per_gpu is None:
             num_workers_per_gpu = env_workers_per_gpu(1)
 
@@ -3828,12 +3843,11 @@ class Class1NeuralNetwork(object):
             device,
             model=network,
             num_workers_per_gpu=num_workers_per_gpu,
+            total_rows=len(x_dict["peptide"]),
         )
 
         # Batch prediction
         n_samples = len(x_dict["peptide"])
-        all_predictions = []
-
         peptide_is_indices = _peptide_uses_torch_encoding(self.hyperparameters)
 
         def prediction_tensor(batch_array):
@@ -3852,23 +3866,46 @@ class Class1NeuralNetwork(object):
                 batch_array = numpy.asarray(batch_array, dtype=numpy.float32)
             return torch.from_numpy(batch_array).to(device)
 
-        with torch.no_grad():
-            for batch_start in range(0, n_samples, batch_size):
-                batch_end = min(batch_start + batch_size, n_samples)
+        while True:
+            all_predictions = []
+            try:
+                with torch.no_grad():
+                    for batch_start in range(0, n_samples, batch_size):
+                        batch_end = min(batch_start + batch_size, n_samples)
 
-                peptide_batch = prediction_tensor(
-                    x_dict["peptide"][batch_start:batch_end]
+                        peptide_batch = prediction_tensor(
+                            x_dict["peptide"][batch_start:batch_end]
+                        )
+
+                        inputs = {"peptide": peptide_batch}
+                        if "allele" in x_dict:
+                            allele_batch = prediction_tensor(
+                                x_dict["allele"][batch_start:batch_end]
+                            )
+                            inputs["allele"] = allele_batch
+
+                        batch_predictions = network(inputs)
+                        all_predictions.append(batch_predictions.cpu().numpy())
+                break
+            except RuntimeError as exc:
+                if (
+                        not auto_batch_size
+                        or batch_size <= 1
+                        or not pytorch_sizing.is_device_out_of_memory_error(exc)):
+                    raise
+                previous_batch_size = batch_size
+                batch_size = max(1, batch_size // 2)
+                all_predictions = []
+                peptide_batch = None
+                allele_batch = None
+                inputs = None
+                batch_predictions = None
+                pytorch_sizing.release_device_memory_after_oom(device)
+                logging.warning(
+                    "Auto prediction batch OOM at %d rows; retrying at %d.",
+                    previous_batch_size,
+                    batch_size,
                 )
-
-                inputs = {"peptide": peptide_batch}
-                if "allele" in x_dict:
-                    allele_batch = prediction_tensor(
-                        x_dict["allele"][batch_start:batch_end]
-                    )
-                    inputs["allele"] = allele_batch
-
-                batch_predictions = network(inputs)
-                all_predictions.append(batch_predictions.cpu().numpy())
 
         raw_predictions = numpy.concatenate(all_predictions, axis=0)
         predictions = numpy.array(raw_predictions, dtype="float64")

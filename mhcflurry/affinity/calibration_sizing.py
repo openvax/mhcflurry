@@ -15,6 +15,7 @@
 import collections
 import hashlib
 import logging
+import os
 
 import numpy
 
@@ -121,20 +122,33 @@ def read_calibration_sizing_env(free_memory_fraction, safety_multiplier):
     out-of-range values raise ``ValueError`` (via ``env_float``) rather than
     being silently ignored. Returns a ``CalibrationSizingEnv``.
     """
+    from ..memory_budget import (
+        DEVICE_MIN_RESERVE_BYTES,
+        MEMORY_RESERVE_FRACTION,
+    )
     from ..workload_planning import env_float
 
+    fraction_name = "MHCFLURRY_CALIBRATE_AUTO_FREE_MEMORY_FRACTION"
+    fraction_raw = os.environ.get(fraction_name)
+    resolved_fraction = (
+        env_float(fraction_name, fraction_raw, bounds=(0.0, 1.0))
+        if fraction_raw not in (None, "")
+        else (
+            float(free_memory_fraction)
+            if free_memory_fraction is not None else None
+        )
+    )
+
     return CalibrationSizingEnv(
-        free_memory_fraction=env_float(
-            "MHCFLURRY_CALIBRATE_AUTO_FREE_MEMORY_FRACTION",
-            free_memory_fraction,
-            bounds=(0.0, 1.0),
-        ),
+        free_memory_fraction=resolved_fraction,
         reserve_fraction=env_float(
-            "MHCFLURRY_CALIBRATE_AUTO_RESERVE_FRACTION", 0.10,
+            "MHCFLURRY_CALIBRATE_AUTO_RESERVE_FRACTION",
+            MEMORY_RESERVE_FRACTION,
             bounds=(0.0, 1.0)),
         reserve_min_bytes=int(
             env_float(
-                "MHCFLURRY_CALIBRATE_AUTO_RESERVE_GB", 2.0,
+                "MHCFLURRY_CALIBRATE_AUTO_RESERVE_GB",
+                DEVICE_MIN_RESERVE_BYTES / float(1 << 30),
                 bounds=(0.0, None))
             * (1 << 30)
         ),
@@ -199,15 +213,28 @@ def cuda_calibration_total_rows(
     workers = max(int(num_workers_per_gpu), 1)
     free, total_memory = cuda_device_memory_bytes(device)
     peak_bytes = estimate_calibration_peak_bytes_per_row(model)
-    reserve_bytes = max(
-        reserve_min_bytes,
-        int(total_memory * reserve_fraction),
+    from ..memory_budget import (
+        memory_reserve_bytes,
+        per_worker_memory_budget_bytes,
     )
-    fraction_budget = int(
-        free * float(free_memory_fraction) / workers)
-    reserved_headroom_budget = int(
-        max(free - reserve_bytes, 0) / workers)
-    per_worker_budget = min(fraction_budget, reserved_headroom_budget)
+    reserve_bytes = memory_reserve_bytes(
+        free,
+        min_reserve_bytes=reserve_min_bytes,
+        reserve_fraction=reserve_fraction,
+    )
+    reserved_headroom_budget = per_worker_memory_budget_bytes(
+        free,
+        workers,
+        min_reserve_bytes=reserve_min_bytes,
+        reserve_fraction=reserve_fraction,
+    )
+    if free_memory_fraction is None:
+        fraction_budget = free // workers
+        per_worker_budget = reserved_headroom_budget
+    else:
+        fraction_budget = int(
+            free * float(free_memory_fraction) / workers)
+        per_worker_budget = min(fraction_budget, reserved_headroom_budget)
     sub_networks = getattr(model, "networks", None)
     if num_sub_networks is None:
         num_sub_networks = (
@@ -306,7 +333,7 @@ def cuda_calibration_total_rows(
 def auto_size_calibration_batches(
         model, device, n_peptides, n_alleles,
         num_workers_per_gpu=1,
-        free_memory_fraction=0.85,
+        free_memory_fraction=None,
         num_cached_networks=1,
         peptide_feature_dim=None,
         num_sub_networks=None,

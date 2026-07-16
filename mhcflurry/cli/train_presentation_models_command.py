@@ -25,6 +25,7 @@ import tqdm  # progress bar
 
 from ..affinity.calibration_sizing import estimate_calibration_peak_bytes_per_row
 from ..pytorch_sizing import estimate_peak_bytes_per_row
+from ..memory_budget import module_tensor_bytes
 from ..class1_processing_predictor import Class1ProcessingPredictor
 from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..class1_presentation_predictor import Class1PresentationPredictor
@@ -57,7 +58,6 @@ WORKER_CONTEXT = {}
 # fragmentation, and non-model torch state that is not visible from parameters.
 _PRESENTATION_WORKER_RUNTIME_FLOOR_GB = 6.0
 _PRESENTATION_WORKER_SAFETY_FACTOR = 1.3
-_PRESENTATION_WORKER_TRANSIENT_ROWS = 65_536
 
 parser = argparse.ArgumentParser(usage=__doc__)
 
@@ -215,6 +215,14 @@ def main(args):
         workload_name=WORKLOAD_PRESENTATION_TRAINING,
         workload_hints={
             "data_bytes": path_size_bytes(args.data),
+            "num_work_items": sum(
+                max(
+                    1,
+                    (len(group) + max(args.feature_chunk_size, 1) - 1)
+                    // max(args.feature_chunk_size, 1),
+                )
+                for _, group in df.groupby("experiment_id", sort=False)
+            ),
             "per_worker_gb": presentation_worker_gb,
             "transient_rows": args.feature_chunk_size,
         },
@@ -291,42 +299,22 @@ def estimate_presentation_feature_worker_gb(args, predictor):
         "MHCFLURRY_PRESENTATION_WORKER_SAFETY_FACTOR",
         _PRESENTATION_WORKER_SAFETY_FACTOR,
     )
-    transient_rows = max(
-        1,
-        min(
-            int(getattr(args, "feature_chunk_size", 0) or 0),
-            int(env_float(
-                "MHCFLURRY_PRESENTATION_WORKER_TRANSIENT_ROWS",
-                _PRESENTATION_WORKER_TRANSIENT_ROWS,
-            )),
-        ),
-    )
-
     networks = list(iter_presentation_feature_networks(predictor))
     parameter_bytes = sum(network_parameter_bytes(network) for network in networks)
-    peak_bytes_per_row = max(
-        [presentation_network_peak_bytes_per_row(network) for network in networks]
-        or [0]
-    )
-    transient_bytes = int(peak_bytes_per_row * transient_rows)
     runtime_bytes = int(runtime_floor_gb * (1 << 30))
     estimate_gb = (
-        (parameter_bytes + transient_bytes + runtime_bytes)
+        (parameter_bytes + runtime_bytes)
         * safety
         / float(1 << 30)
     )
     estimate_gb = max(estimate_gb, 4.0)
     print(
         "Estimated presentation feature worker VRAM: %.2f GB "
-        "(networks=%d, params=%.2f GB, peak_row=%.2f KB, "
-        "transient_rows=%d, transient=%.2f GB, runtime_floor=%.2f GB, "
+        "(networks=%d, params=%.2f GB, runtime_floor=%.2f GB, "
         "safety=%.1fx)" % (
             estimate_gb,
             len(networks),
             parameter_bytes / float(1 << 30),
-            peak_bytes_per_row / 1024.0,
-            transient_rows,
-            transient_bytes / float(1 << 30),
             runtime_floor_gb,
             safety,
         )
@@ -359,20 +347,7 @@ def iter_presentation_feature_networks(predictor):
 
 def network_parameter_bytes(network):
     """Return unique parameter + buffer bytes for a torch module."""
-    seen = set()
-    total = 0
-    tensors = list(network.parameters(recurse=True))
-    tensors.extend(network.buffers(recurse=True))
-    for tensor in tensors:
-        try:
-            key = (str(tensor.device), int(tensor.data_ptr()))
-        except RuntimeError:
-            key = id(tensor)
-        if key in seen:
-            continue
-        seen.add(key)
-        total += int(tensor.nelement()) * int(tensor.element_size())
-    return total
+    return module_tensor_bytes(network)
 
 
 def presentation_network_peak_bytes_per_row(network):

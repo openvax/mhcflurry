@@ -67,6 +67,7 @@ from ..workload_planning import (
     WORKLOAD_AFFINITY_INFERENCE,
     WORKLOAD_PROCESSING_INFERENCE,
     WORKLOAD_PRESENTATION_INFERENCE,
+    model_artifact_size_bytes,
 )
 
 
@@ -784,13 +785,19 @@ def _predict_affinity_chunk(predictor_dir, peptides, alleles, chunk_num):
         peptides=peptides, alleles=alleles, throw=False))
 
 
-def _parallel_affinity_predict(args, predictor_dir, peptides, alleles):
+def _parallel_affinity_predict(
+        args, predictor_dir, peptides, alleles, model_bytes=None):
     if len(peptides) == 0:
         return numpy.asarray([], dtype=float)
     worker_pool = worker_pool_with_gpu_assignments_from_args(
         args,
         workload_name=WORKLOAD_AFFINITY_INFERENCE,
-        workload_hints={"prediction_rows": len(peptides)},
+        workload_hints={
+            "elastic_batch": True,
+            "model_bytes": (
+                model_bytes or model_artifact_size_bytes(predictor_dir)),
+            "prediction_rows": len(peptides),
+        },
         start_method="spawn",
     )
     _stamp(
@@ -906,15 +913,21 @@ def _run_affinity(side_a, side_b, args):
     test = test[(test.peptide_len >= 8) & (test.peptide_len <= 15)].copy()
     _stamp("  evaluable rows: %d" % len(test))
 
+    comparison_model_bytes = max(
+        model_artifact_size_bytes(side_a["paths"]["affinity"]) or 0,
+        model_artifact_size_bytes(side_b["paths"]["affinity"]) or 0,
+    ) or None
     _stamp("predicting side A affinity...")
     test["a_pred"] = _parallel_affinity_predict(
         affinity_args, side_a["paths"]["affinity"],
         test.peptide.values, test.hla.values,
+        model_bytes=comparison_model_bytes,
     )
     _stamp("predicting side B affinity...")
     test["b_pred"] = _parallel_affinity_predict(
         affinity_args, side_b["paths"]["affinity"],
         test.peptide.values, test.hla.values,
+        model_bytes=comparison_model_bytes,
     )
     test = test.dropna(subset=["a_pred", "b_pred"])
     test["a_score"] = -numpy.log10(numpy.clip(test.a_pred, 1e-3, 1e8))
@@ -1086,13 +1099,19 @@ def _predict_processing_chunk(predictor_dir, rows, mode, chunk_num):
     return chunk_num, predictions
 
 
-def _parallel_processing_predict(args, predictor_dir, df, mode, label):
+def _parallel_processing_predict(
+        args, predictor_dir, df, mode, label, model_bytes=None):
     if len(df) == 0:
         return numpy.asarray([], dtype=float)
     worker_pool = worker_pool_with_gpu_assignments_from_args(
         args,
         workload_name=WORKLOAD_PROCESSING_INFERENCE,
-        workload_hints={"prediction_rows": len(df)},
+        workload_hints={
+            "elastic_batch": True,
+            "model_bytes": (
+                model_bytes or model_artifact_size_bytes(predictor_dir)),
+            "prediction_rows": len(df),
+        },
         start_method="spawn",
     )
     _stamp("predicting %s processing (%s, %d rows)" % (label, mode, len(df)))
@@ -1163,10 +1182,16 @@ def _run_processing(side_a, side_b, args):
             "peptide", "sample_id", "hla", "hit", "peptide_len",
             "n_flank", "c_flank",
         ]].copy()
+        comparison_model_bytes = max(
+            model_artifact_size_bytes(a_model_dir) or 0,
+            model_artifact_size_bytes(b_model_dir) or 0,
+        ) or None
         scored["a_processing_score"] = _parallel_processing_predict(
-            processing_args, a_model_dir, benchmark, mode, label="A")
+            processing_args, a_model_dir, benchmark, mode, label="A",
+            model_bytes=comparison_model_bytes)
         scored["b_processing_score"] = _parallel_processing_predict(
-            processing_args, b_model_dir, benchmark, mode, label="B")
+            processing_args, b_model_dir, benchmark, mode, label="B",
+            model_bytes=comparison_model_bytes)
 
         pred_path = os.path.join(
             component_dir, "predictions_%s.csv.bz2" % mode)
@@ -1261,13 +1286,19 @@ def _predict_presentation_chunk(predictor_dir, rows, mode, chunk_num):
     return chunk_num, out
 
 
-def _parallel_presentation_predict(args, predictor_dir, df, mode, label):
+def _parallel_presentation_predict(
+        args, predictor_dir, df, mode, label, model_bytes=None):
     if len(df) == 0:
         return pandas.DataFrame()
     worker_pool = worker_pool_with_gpu_assignments_from_args(
         args,
         workload_name=WORKLOAD_PRESENTATION_INFERENCE,
-        workload_hints={"prediction_rows": len(df)},
+        workload_hints={
+            "elastic_batch": True,
+            "model_bytes": (
+                model_bytes or model_artifact_size_bytes(predictor_dir)),
+            "prediction_rows": len(df),
+        },
         start_method="spawn",
     )
     _stamp("predicting %s presentation (%s, %d rows)" % (label, mode, len(df)))
@@ -1533,16 +1564,20 @@ def _run_presentation(side_a, side_b, args):
     summaries = {}
     summary_rows = []
     presentation_args = _parallelism_args_for_component(args, "presentation")
+    comparison_model_bytes = max(
+        model_artifact_size_bytes(side_a["paths"]["presentation"]) or 0,
+        model_artifact_size_bytes(side_b["paths"]["presentation"]) or 0,
+    ) or None
     for mode in requested_modes:
         _stamp("=== presentation mode: %s ===" % mode)
         scored = benchmark.copy()
         a_pred = _parallel_presentation_predict(
             presentation_args, side_a["paths"]["presentation"],
-            benchmark, mode, label="A",
+            benchmark, mode, label="A", model_bytes=comparison_model_bytes,
         )
         b_pred = _parallel_presentation_predict(
             presentation_args, side_b["paths"]["presentation"],
-            benchmark, mode, label="B",
+            benchmark, mode, label="B", model_bytes=comparison_model_bytes,
         )
         for prefix, pred in (("a", a_pred), ("b", b_pred)):
             for col in [
