@@ -2604,6 +2604,115 @@ def test_paper_figures_uses_current_comparison_when_scores_absent(tmp_path):
     ).any()
 
 
+def test_current_comparison_labels_counts_as_evaluation_peptides(
+        tmp_path):
+    pytest.importorskip("matplotlib")
+    import matplotlib.pyplot as plt
+
+    comparison = tmp_path / "comparison"
+    (comparison / "affinity").mkdir(parents=True)
+    pandas.DataFrame([{
+        "allele": "HLA-A*02:01",
+        "n": 40,
+        "n_pos": 10,
+        "a_roc_auc": 0.95,
+        "b_roc_auc": 0.90,
+        "a_ppv_at_n": 0.80,
+        "b_ppv_at_n": 0.70,
+    }]).to_csv(comparison / "affinity" / "per_allele.csv", index=False)
+
+    class CaptureWriter:
+        def __init__(self):
+            self.xlabels = {}
+
+        def save(self, fig, name, _family, note=""):
+            self.xlabels[name] = [ax.get_xlabel() for ax in fig.axes]
+            plt.close(fig)
+
+        def skip(self, *_args, **_kwargs):
+            pass
+
+    writer = CaptureWriter()
+    inputs = paper_figures.FigureInputs(
+        scores_dir=tmp_path / "scores",
+        comparison_dir=comparison,
+        run_dir=None,
+        multiallelic_predictions=None,
+        monoallelic_predictions=None,
+    )
+    paper_figures._generate_model_selection_figures(inputs, writer)
+
+    xlabels = writer.xlabels[
+        "fig.1_model_selection_predictor_accuracy.scores.hla_a"]
+    assert "Evaluation peptides" in xlabels
+    assert "Training peptides" not in xlabels
+
+
+def test_current_model_information_uses_only_final_manifests(tmp_path):
+    run_dir = tmp_path / "run"
+    final_paths = [
+        run_dir / "affinity" / "models.combined" / "manifest.csv",
+        run_dir / "processing" / "models.selected.with_flanks" /
+        "manifest.csv",
+        run_dir / "processing" / "models.selected.no_flank" /
+        "manifest.csv",
+    ]
+    stale_paths = [
+        run_dir / "affinity" / "models.unselected.combined" / "manifest.csv",
+        run_dir / "processing" / "models.unselected.with_flanks" /
+        "manifest.csv",
+        run_dir / "presentation" / "models" / "affinity_predictor" /
+        "manifest.csv",
+        run_dir / "scratch" / "manifest.csv",
+    ]
+    for path in final_paths + stale_paths:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("model_name\nmodel_1\n")
+
+    assert set(paper_figures._final_model_manifest_paths(run_dir)) == set(
+        final_paths)
+
+
+def test_paper_figures_rerender_clears_command_owned_outputs(tmp_path):
+    pytest.importorskip("matplotlib")
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    out = tmp_path / "paper"
+    for path in [
+            out / "svg" / "old.svg",
+            out / "pdf" / "old.pdf",
+            out / "png" / "old.png",
+            out / "assets" / "old.svg"]:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"stale")
+    for path in [
+            out / "paper_figures.pdf",
+            out / "old_custom_combined.pdf",
+            out / "manifest.csv",
+            out / "missing_inputs.md"]:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"stale")
+    unrelated = out / "README.keep"
+    unrelated.write_text("user file")
+
+    args = paper_figures.make_parser().parse_args([
+        "--artifacts-dir", str(artifacts),
+        "--out", str(out),
+        "--formats", "png",
+        "--combined-pdf", "none",
+    ])
+    assert paper_figures.run(args) == 0
+
+    assert not (out / "svg").exists()
+    assert not (out / "pdf").exists()
+    assert not (out / "png" / "old.png").exists()
+    assert not (out / "assets").exists()
+    assert not (out / "paper_figures.pdf").exists()
+    assert not (out / "old_custom_combined.pdf").exists()
+    assert pandas.read_csv(out / "manifest.csv").shape[0] > 0
+    assert unrelated.read_text() == "user file"
+
+
 def test_paper_figures_monoallelic_scatter_uses_all_length_rows(monkeypatch):
     captured = {}
 

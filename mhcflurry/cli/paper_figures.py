@@ -310,9 +310,10 @@ def run(args):
     matplotlib.use("Agg")
 
     out_dir = Path(args.out)
-    out_dir.mkdir(parents=True, exist_ok=True)
     formats = _parse_formats(args.formats)
     combined_pdf = _combined_pdf_path(args.combined_pdf, out_dir)
+    _clear_paper_figure_outputs(out_dir, combined_pdf)
+    out_dir.mkdir(parents=True, exist_ok=True)
     writer = FigureWriter(out_dir, formats, combined_pdf)
 
     try:
@@ -509,6 +510,28 @@ def _combined_pdf_path(value, out_dir):
     if value:
         return value
     return str(Path(out_dir) / "paper_figures.pdf")
+
+
+def _clear_paper_figure_outputs(out_dir, combined_pdf):
+    """Remove outputs owned by this command before a clean rerender."""
+    out_dir = Path(out_dir)
+    if out_dir.is_dir():
+        for name in (*DEFAULT_FORMATS, "assets"):
+            path = out_dir / name
+            if path.is_dir() and not path.is_symlink():
+                shutil.rmtree(path)
+            elif path.exists() or path.is_symlink():
+                path.unlink()
+        for path in out_dir.glob("*.pdf"):
+            path.unlink()
+        for name in ("manifest.csv", "missing_inputs.md"):
+            path = out_dir / name
+            if path.exists() or path.is_symlink():
+                path.unlink()
+    if combined_pdf is not None:
+        combined_pdf = Path(combined_pdf)
+        if combined_pdf.exists() or combined_pdf.is_symlink():
+            combined_pdf.unlink()
 
 
 def _resolve_figure_inputs(args, writer):
@@ -1436,6 +1459,7 @@ def _generate_model_selection_figures(inputs, writer):
     baseline_col = None
     score_label = "AUC"
     baseline_label = None
+    count_label = "Training peptides"
     source_path = path
     if path is not None:
         df = (
@@ -1479,6 +1503,7 @@ def _generate_model_selection_figures(inputs, writer):
         score_label = "%s AUROC" % labels["a"]
         baseline_label = "%s AUROC" % labels["b"]
         count_col = "n"
+        count_label = "Evaluation peptides"
         binder_col = "percent_binders"
         source_path = (
             Path(inputs.comparison_dir) / "affinity" / "per_allele.csv"
@@ -1498,7 +1523,8 @@ def _generate_model_selection_figures(inputs, writer):
     df["locus"] = df[allele_col].map(_allele_locus)
     optional_panels = []
     if count_col:
-        optional_panels.append((count_col, "Training peptides", (0.55, 0.55, 0.55), True))
+        optional_panels.append(
+            (count_col, count_label, (0.55, 0.55, 0.55), True))
     if binder_col:
         optional_panels.append((binder_col, "% binders", (0.65, 0.39, 0.67), False))
     for locus, label in (
@@ -2438,7 +2464,7 @@ def _copy_architecture_figures(inputs, writer):
 def _plot_current_model_information(inputs, writer):
     if inputs.run_dir is None:
         return False
-    manifests = sorted(Path(inputs.run_dir).glob("**/manifest.csv"))
+    manifests = _final_model_manifest_paths(inputs.run_dir)
     rows = []
     for path in manifests:
         try:
@@ -2470,7 +2496,7 @@ def _plot_current_model_information(inputs, writer):
     )
     ax.set_yticks(y)
     ax.set_yticklabels(summary["component"])
-    ax.set_xlabel("Selected / available models")
+    ax.set_xlabel("Final models")
     ax.set_title("Current model ensemble")
     _despine(ax)
     fig.tight_layout()
@@ -2478,9 +2504,22 @@ def _plot_current_model_information(inputs, writer):
         fig,
         "fig.1_predictor_model_information.model_counts",
         "architecture",
-        note="Generated from current run manifests.",
+        note="Generated from canonical final run manifests.",
     )
     return True
+
+
+def _final_model_manifest_paths(run_dir):
+    """Return model manifests that define the release's final ensembles."""
+    run_dir = Path(run_dir)
+    candidates = [
+        run_dir / "affinity" / "models.combined" / "manifest.csv",
+        run_dir / "presentation" / "models" / "manifest.csv",
+    ]
+    candidates.extend(sorted(
+        (run_dir / "processing").glob(
+            "models.selected.*/manifest.csv")))
+    return tuple(path for path in candidates if path.is_file())
 
 
 def _manifest_component_label(path, run_dir):
