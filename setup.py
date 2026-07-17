@@ -60,6 +60,7 @@ if __name__ == "__main__":
         "appdirs",
         "ahocorasick-rs",
         "scikit-learn",
+        "threadpoolctl",
         "mhcgnomes>=3.0.1",
         "numpy>=1.22.4",
         "pyyaml",

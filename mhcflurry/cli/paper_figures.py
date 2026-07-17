@@ -964,15 +964,23 @@ def _scores_for_prediction_group(
     group = group.loc[valid_labels].copy()
     y_true = labels.loc[valid_labels].astype(int).values
     tie_breaker = _prediction_tie_breaker(group)
-    rows = []
+    oriented_scores = {}
+    shared_mask = numpy.ones(len(group), dtype=bool)
     for predictor in predictor_columns:
         score = pandas.to_numeric(group[predictor], errors="coerce").values
         score = _orient_prediction_score(
             predictor, score, predictor_orientations)
-        mask = numpy.isfinite(score)
-        y = y_true[mask]
-        s = score[mask]
-        ties = tie_breaker[mask]
+        oriented_scores[predictor] = score
+        shared_mask &= numpy.isfinite(score)
+
+    # Every predictor in a comparison must be evaluated on the same examples.
+    # Otherwise an external predictor can improve its apparent AUC/PPV merely
+    # by omitting unsupported or difficult rows.
+    y = y_true[shared_mask]
+    ties = tie_breaker[shared_mask]
+    rows = []
+    for predictor in predictor_columns:
+        s = oriented_scores[predictor][shared_mask]
         if len(y) == 0 or y.sum() == 0 or y.sum() == len(y):
             auc = numpy.nan
             ppv = numpy.nan

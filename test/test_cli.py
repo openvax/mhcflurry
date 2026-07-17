@@ -107,6 +107,92 @@ def test_release_workflow_deploy_is_opt_in_by_default(tmp_path):
     assert "deploy_trained_models" not in output
 
 
+def _write_minimal_deployable_run(run_dir):
+    for relative in (
+            "affinity/models.combined",
+            "processing/models.selected.no_flank",
+            "processing/models.selected.with_flanks",
+            "processing/models.selected.short_flanks",
+            "presentation/models"):
+        (run_dir / relative).mkdir(parents=True, exist_ok=True)
+    (run_dir / "affinity/models.combined/manifest.csv").write_text(
+        "model_name\nmodel\n")
+    (run_dir / "affinity/models.combined/percent_ranks.csv").write_text(
+        "allele\nHLA-A*02:01\n")
+    for variant in ("no_flank", "with_flanks", "short_flanks"):
+        (run_dir / (
+            "processing/models.selected.%s/manifest.csv" % variant
+        )).write_text("model_name\nmodel\n")
+    (run_dir / "presentation/models/weights.csv").write_text(
+        "model_name\nmodel\n")
+    (run_dir / "presentation/models/percent_ranks.csv").write_text(
+        "allele\nHLA-A*02:01\n")
+
+
+def test_deploy_packages_only_requested_processing_variants(tmp_path):
+    run_dir = tmp_path / "release-run"
+    _write_minimal_deployable_run(run_dir)
+    base_command = [
+        "bash",
+        "scripts/release/deploy_trained_models.sh",
+        "--run-dir", str(run_dir),
+        "--release", "2.3.0",
+        "--github-release", "2.3.0",
+        "--dry-run",
+    ]
+
+    default = subprocess.run(
+        base_command, capture_output=True, text=True, check=True)
+    default_tar = next(
+        line for line in (default.stdout + default.stderr).splitlines()
+        if "models_class1_processing" in line and "tar " in line
+    )
+    assert "models.selected.no_flank" in default_tar
+    assert "models.selected.with_flanks" in default_tar
+    assert "models.selected.short_flanks" not in default_tar
+
+    all_variants = subprocess.run(
+        base_command[:-1] + [
+            "--processing-variants",
+            "no_flank with_flanks short_flanks",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    all_tar = next(
+        line for line in (all_variants.stdout + all_variants.stderr).splitlines()
+        if "models_class1_processing" in line and "tar " in line
+    )
+    assert "models.selected.short_flanks" in all_tar
+
+
+def test_release_workflow_forwards_processing_variants_to_deploy(tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "local",
+            "--processing-variants", "with_flanks no_flank",
+            "--skip-train",
+            "--skip-eval",
+            "--skip-plots",
+            "--deploy-mode", "dry-run",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert "deploy_trained_models.sh" in output
+    assert "--processing-variants with_flanks\\ no_flank" in output
+
+
 def test_release_workflow_prepare_command_is_dry_run_visible(tmp_path):
     result = subprocess.run(
         [
@@ -2849,6 +2935,32 @@ def test_paper_figures_prediction_scoring_drops_invalid_hit_rows():
     )
     assert rows[0]["auc"] == 1.0
     assert rows[0]["ppv"] == 1.0
+
+
+def test_paper_figures_prediction_scoring_uses_shared_finite_rows():
+    group = pandas.DataFrame({
+        "sample_id": ["s1"] * 4,
+        "peptide": ["AAAA", "BBBB", "CCCC", "DDDD"],
+        "hit": [1, 1, 0, 0],
+        # On all rows candidate has AUC=.75 and PPV=.5. The row baseline
+        # cannot score is a difficult positive; both predictors must use the
+        # resulting shared three-row subset, where both metrics are 1.
+        "candidate": [0.9, 0.1, 0.8, 0.0],
+        "baseline": [0.9, numpy.nan, 0.2, 0.1],
+    })
+    rows = paper_figures._scores_for_prediction_group(
+        group,
+        index_column="sample_id",
+        group_value="s1",
+        length=None,
+        length_label="All",
+        predictor_columns=["candidate", "baseline"],
+        predictor_orientations={"candidate": True, "baseline": True},
+    )
+
+    assert {row["predictor"] for row in rows} == {"candidate", "baseline"}
+    assert {row["auc"] for row in rows} == {1.0}
+    assert {row["ppv"] for row in rows} == {1.0}
 
 
 def test_paper_figures_monoallelic_scoring_prefers_allele(tmp_path):

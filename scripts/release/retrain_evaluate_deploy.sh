@@ -2382,6 +2382,7 @@ if [ "$DEPLOY_MODE" != "none" ]; then
         --run-dir "$RUN_DIR" \
         --release "$RELEASE" \
         --github-release "$GITHUB_RELEASE" \
+        --processing-variants "$PROCESSING_VARIANTS" \
         --mode "$DEPLOY_MODE"
 else
     note "Skipping deploy step. Pass --deploy-mode dry-run, draft, or publish to opt in."

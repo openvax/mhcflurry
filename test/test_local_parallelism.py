@@ -97,6 +97,27 @@ def test_worker_init_kwargs_without_gpu_scheduling_uses_backend():
     ]
 
 
+def test_worker_init_kwargs_include_resolved_cpu_thread_budget():
+    assert worker_init_kwargs_for_scheduler(
+        num_jobs=2,
+        num_gpus=0,
+        backend="cpu",
+        max_workers_per_gpu=1,
+        cpu_threads_per_worker=3,
+    ) == [
+        {
+            "backend": "cpu",
+            "max_workers_per_gpu": 1,
+            "cpu_threads_per_worker": 3,
+        },
+        {
+            "backend": "cpu",
+            "max_workers_per_gpu": 1,
+            "cpu_threads_per_worker": 3,
+        },
+    ]
+
+
 def test_worker_init_kwargs_normalizes_default_backend_alias():
     assert worker_init_kwargs_for_scheduler(
         num_jobs=2,
@@ -170,6 +191,49 @@ def test_validate_worker_pool_args_rejects_invalid_backend():
 def _is_daemon_in_pool_worker(_):
     """Run inside a pool worker; returns whether the current process is a daemon."""
     return multiprocessing.current_process().daemon
+
+
+def _runtime_thread_counts(_):
+    """Return PyTorch and native thread-pool sizes inside a pool worker."""
+    import torch
+    from threadpoolctl import threadpool_info
+
+    native = [
+        item["num_threads"]
+        for item in threadpool_info()
+        if item["user_api"] in ("blas", "openmp")
+    ]
+    return torch.get_num_threads(), native
+
+
+@pytest.mark.skipif(
+    "fork" not in multiprocessing.get_all_start_methods(),
+    reason="fork start method unavailable",
+)
+def test_forked_worker_applies_runtime_cpu_thread_budget():
+    """Forked workers resize thread pools initialized in the parent."""
+    import torch
+
+    original_threads = torch.get_num_threads()
+    torch.set_num_threads(min(max(os.cpu_count() or 2, 2), 4))
+    pool = worker_pool_with_gpu_assignments(
+        num_jobs=1,
+        num_gpus=0,
+        backend="cpu",
+        max_workers_per_gpu=1,
+        cpu_threads_per_worker=1,
+        start_method="fork",
+    )
+    try:
+        torch_threads, native_threads = pool.apply(
+            _runtime_thread_counts, (None,))
+    finally:
+        pool.close()
+        pool.join()
+        torch.set_num_threads(original_threads)
+
+    assert torch_threads == 1
+    assert all(value == 1 for value in native_threads)
 
 
 def test_nondaemonprocess_reports_not_daemon():

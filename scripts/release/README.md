@@ -18,6 +18,12 @@ Use `--mode publish` only after the GitHub release already exists; this script
 does not publish the release itself because publishing also triggers package
 release workflows.
 
+Direct deployment defaults to `--processing-variants "no_flank with_flanks"`.
+Pass `--processing-variants "no_flank with_flanks short_flanks"` only when the
+short-flank model belongs to the release being packaged. The end-to-end release
+wrapper forwards its current variant selection automatically, so leftover model
+directories from an earlier run are never included merely because they exist.
+
 The script writes the tarballs, `SHA256SUMS`, and a `downloads.yml` snippet under
 `<run-dir>/release-assets/` by default. After upload, commit the corresponding
 `mhcflurry/downloads.yml` update in the package release PR.

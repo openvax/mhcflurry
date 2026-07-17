@@ -21,9 +21,34 @@ import traceback
 from multiprocessing.util import Finalize
 
 import numpy
+from threadpoolctl import threadpool_limits
 
 from ..common import configure_pytorch
 from .planning import resolved_int
+
+
+_WORKER_THREADPOOL_LIMITER = None
+
+
+def configure_worker_cpu_threads(num_threads):
+    """Apply a fit worker's CPU-thread budget to loaded native runtimes.
+
+    Forked workers inherit already-initialized BLAS/OpenMP pools, so setting
+    only environment variables in the parent is insufficient. Keep the
+    environment synchronized for libraries loaded later and use threadpoolctl
+    to resize the native pools already present in this process.
+    """
+    global _WORKER_THREADPOOL_LIMITER
+    if num_threads is None:
+        return None
+    num_threads = resolved_int(num_threads, "cpu_threads_per_worker")
+    if num_threads < 1:
+        raise ValueError("cpu_threads_per_worker must be at least 1")
+    for name in (
+            "OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+        os.environ[name] = str(num_threads)
+    _WORKER_THREADPOOL_LIMITER = threadpool_limits(limits=num_threads)
+    return num_threads
 
 
 def worker_init_entry_point(
@@ -50,7 +75,8 @@ def worker_init_entry_point(
 
 def worker_init(
         keras_backend=None, backend=None, gpu_device_nums=None,
-        worker_log_dir=None, max_workers_per_gpu=None):
+        worker_log_dir=None, max_workers_per_gpu=None,
+        cpu_threads_per_worker=None):
     del keras_backend  # legacy argument retained for API compatibility
     if worker_log_dir:
         os.makedirs(worker_log_dir, exist_ok=True)
@@ -69,12 +95,17 @@ def worker_init(
     # Each worker needs distinct random numbers
     numpy.random.seed()
     random.seed()
+    cpu_threads_per_worker = configure_worker_cpu_threads(
+        cpu_threads_per_worker)
+    configure_kwargs = {"backend": backend}
+    if gpu_device_nums is not None:
+        configure_kwargs["gpu_device_nums"] = gpu_device_nums
+    if cpu_threads_per_worker is not None:
+        configure_kwargs["num_threads"] = cpu_threads_per_worker
     if gpu_device_nums is not None:
         print("WORKER pid=%d assigned GPU devices: %s" % (
             os.getpid(), gpu_device_nums), file=sys.stderr)
-        configure_pytorch(backend=backend, gpu_device_nums=gpu_device_nums)
-    else:
-        configure_pytorch(backend=backend)
+    configure_pytorch(**configure_kwargs)
     # Reseed torch's global RNG too (numpy/random above don't touch it).
     # Torch RNG drives weight init and any tensor op without an explicit
     # generator; without this, forked workers would share a stream. Seed

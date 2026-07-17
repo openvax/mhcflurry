@@ -348,6 +348,8 @@ def run_single_worker_torch_compile_warmup(
             max_workers_per_gpu=max(num_workers_per_gpu_from_args(args), 1),
             max_tasks_per_worker=len(unique_warmup_items) + 1,
             worker_log_dir=getattr(args, "worker_log_dir", None),
+            cpu_threads_per_worker=getattr(
+                args, "cpu_threads_per_worker", None),
             # Spawn (not fork) for parity with the production pools below;
             # forked CUDA workers break if the parent has touched CUDA.
             start_method="spawn",

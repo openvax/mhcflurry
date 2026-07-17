@@ -234,6 +234,8 @@ def worker_pool_with_gpu_assignments_from_args(
         max_workers_per_gpu=args.max_workers_per_gpu,
         max_tasks_per_worker=args.max_tasks_per_worker,
         worker_log_dir=args.worker_log_dir,
+        cpu_threads_per_worker=getattr(
+            args, "cpu_threads_per_worker", None),
         start_method=start_method,
     )
 
@@ -282,6 +284,7 @@ def worker_pool_with_gpu_assignments(
         max_workers_per_gpu=1,
         max_tasks_per_worker=None,
         worker_log_dir=None,
+        cpu_threads_per_worker=None,
         start_method=None):
     """
     Create a multiprocessing.Pool where each worker uses its own GPU.
@@ -295,6 +298,8 @@ def worker_pool_with_gpu_assignments(
     max_workers_per_gpu : int
     max_tasks_per_worker : int
     worker_log_dir : string
+    cpu_threads_per_worker : int
+        Runtime BLAS/OpenMP/PyTorch thread limit applied in each worker.
     start_method : string
         Optional multiprocessing start method, e.g. ``"spawn"`` when workers
         must not inherit PyTorch state from the parent process.
@@ -318,7 +323,8 @@ def worker_pool_with_gpu_assignments(
         num_jobs=num_jobs,
         num_gpus=num_gpus,
         backend=backend,
-        max_workers_per_gpu=max_workers_per_gpu)
+        max_workers_per_gpu=max_workers_per_gpu,
+        cpu_threads_per_worker=cpu_threads_per_worker)
     if num_gpus:
         print(
             "Assigning %d workers across %d CUDA GPUs (%d workers max per GPU). "
@@ -377,7 +383,8 @@ def worker_init_kwargs_for_scheduler(
         num_jobs,
         num_gpus=0,
         backend="auto",
-        max_workers_per_gpu=1):
+        max_workers_per_gpu=1,
+        cpu_threads_per_worker=None):
     """
     Build per-worker init kwargs from the local scheduling configuration.
 
@@ -393,10 +400,14 @@ def worker_init_kwargs_for_scheduler(
         max_workers_per_gpu=max_workers_per_gpu)
 
     if not num_gpus:
-        return [
+        result = [
             {"backend": backend, "max_workers_per_gpu": max_workers_per_gpu}
             for _ in range(num_jobs)
         ]
+        if cpu_threads_per_worker is not None:
+            for kwargs in result:
+                kwargs["cpu_threads_per_worker"] = cpu_threads_per_worker
+        return result
 
     cuda_visible_devices = cuda_visible_devices_from_env()
     if cuda_visible_devices is None:
@@ -429,6 +440,9 @@ def worker_init_kwargs_for_scheduler(
                 "gpu_device_nums": [],
                 "max_workers_per_gpu": max_workers_per_gpu,
             })
+    if cpu_threads_per_worker is not None:
+        for kwargs in worker_kwargs:
+            kwargs["cpu_threads_per_worker"] = cpu_threads_per_worker
     return worker_kwargs
 
 
