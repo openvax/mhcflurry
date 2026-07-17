@@ -1617,7 +1617,7 @@ BREV_PROVIDER_EXPLICIT=0
 if [ -n "${RUNPLZ_BREV_PROVIDER:-}" ] || [ -n "${BREV_PROVIDER:-}" ]; then
     BREV_PROVIDER_EXPLICIT=1
 fi
-BREV_PROVIDER="${RUNPLZ_BREV_PROVIDER:-${BREV_PROVIDER:-gcp}}"
+BREV_PROVIDER="${RUNPLZ_BREV_PROVIDER:-${BREV_PROVIDER:-auto}}"
 BREV_INSTANCE_TYPE_EXPLICIT=0
 if [ -n "${RUNPLZ_BREV_INSTANCE_TYPE:-}" ] || \
         [ -n "${BREV_INSTANCE_TYPE:-}" ]; then
@@ -2111,9 +2111,16 @@ if [ "$BACKEND" = "brev-provision" ] && [ -z "$BREV_INSTANCE" ]; then
     BREV_INSTANCE="mhcflurry-${RELEASE_SLUG}-$(date +%Y%m%d-%H%M%S)"
 fi
 if [ "$BACKEND" = "brev-provision" ] && \
+        [ -n "$BREV_INSTANCE_TYPE" ]; then
+    if [ "$BREV_PROVIDER_EXPLICIT" = "1" ] && \
+            [ "$(lowercase "$BREV_PROVIDER")" != "auto" ]; then
+        die "a non-auto --brev-provider cannot be combined with --brev-instance-type"
+    fi
+    # An exact type is a complete Brev selection. Do not let an implicit
+    # provider default or a release profile add a second selection mechanism.
+    BREV_PROVIDER=auto
+elif [ "$BACKEND" = "brev-provision" ] && \
         [ "$(lowercase "$BREV_PROVIDER")" != "auto" ]; then
-    [ -z "$BREV_INSTANCE_TYPE" ] || \
-        die "--brev-provider cannot be combined with --brev-instance-type"
     BREV_INSTANCE_TYPE="$(brev_provider_instance_type "$BREV_PROVIDER")"
 fi
 if [ "$BACKEND" = "brev-provision" ] && \

@@ -328,8 +328,8 @@ def test_release_workflow_brev_provider_aliases(tmp_path):
         check=True,
     )
     default_output = result.stdout + result.stderr
-    assert "Brev provider: gcp" in default_output
-    assert "Brev type:     a2-highgpu-4g:nvidia-tesla-a100:4" in default_output
+    assert "Brev provider: auto" in default_output
+    assert "Brev type:     runplz auto-select" in default_output
 
     cases = [
         ("auto", "Brev type:     runplz auto-select"),
@@ -358,6 +358,56 @@ def test_release_workflow_brev_provider_aliases(tmp_path):
         output = result.stdout + result.stderr
         assert "Brev provider: %s" % provider in output
         assert expected_type in output
+
+
+def test_release_workflow_exact_brev_type_overrides_implicit_provider(tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run-exact-type"),
+            "--release", "2.3.0",
+            "--backend", "brev-provision",
+            "--brev-instance", "mhcflurry-dry-run-exact-type",
+            "--brev-instance-type", "test.gpu",
+            "--skip-train",
+            "--skip-eval",
+            "--skip-plots",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert "Brev provider: auto" in output
+    assert "Brev type:     test.gpu" in output
+
+
+def test_release_workflow_rejects_conflicting_explicit_brev_selection(tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run-conflicting-type"),
+            "--release", "2.3.0",
+            "--backend", "brev-provision",
+            "--brev-provider", "gcp",
+            "--brev-instance-type", "test.gpu",
+            "--skip-train",
+            "--skip-eval",
+            "--skip-plots",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "non-auto --brev-provider cannot be combined" in (
+        result.stdout + result.stderr
+    )
 
 
 def test_release_workflow_fast_gpu_profile(tmp_path):

@@ -21,10 +21,15 @@ from functools import partial
 
 import pandas
 import tqdm
+from mhcgnomes import parse
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
-from mhcflurry.common import configure_logging, allele_locus_name
+from mhcflurry.common import (
+    allele_locus_name,
+    configure_logging,
+    normalize_allele_name,
+)
 from mhcflurry.parallelism import (
     add_local_parallelism_args,
     attach_constant_data_to_work_items_if_needed,
@@ -54,9 +59,54 @@ from mhcflurry.cluster_parallelism import (
 WORKER_CONTEXT = {}
 
 
-def is_human_class1_abc_allele(raw_name):
-    """Return true for HLA-A/B/C class-I alleles using mhcgnomes parsing."""
-    return allele_locus_name(raw_name) in ("HLA-A", "HLA-B", "HLA-C")
+HUMAN_CLASS1_ABC_LOCI = ("HLA-A", "HLA-B", "HLA-C")
+
+
+def canonicalize_processing_allele(raw_name):
+    """Return a sequence-resolved canonical HLA-A/B/C allele or ``None``.
+
+    Non-HLA-A/B/C names retain the historical filtering behavior and return
+    ``None``. A serotype (for example ``A2``) or one-field allele group (for
+    example ``A*02``) is an error: neither identifies one allele sequence, so
+    choosing a representative or averaging affinities would silently change
+    processing-training decoy selection.
+    """
+    raw_name = str(raw_name).strip()
+    if allele_locus_name(raw_name) not in HUMAN_CLASS1_ABC_LOCI:
+        return None
+
+    # Preserve the predictor's no-alias-first contract. Retired names can have
+    # their own pseudosequence key; the predictor applies an IMGT alias only
+    # when that original key is unavailable.
+    normalized = normalize_allele_name(
+        raw_name,
+        raise_on_error=False,
+        use_allele_aliases=False,
+    )
+    parsed = (
+        parse(normalized, only_class1=True, raise_on_error=False)
+        if normalized is not None
+        else None
+    )
+    if parsed is None or len(getattr(parsed, "allele_fields", ())) < 2:
+        raise ValueError(
+            "Processing training requires a sequence-resolved HLA-A/B/C "
+            "allele with at least two fields; got %r. Serotypes and "
+            "one-field allele groups cannot be converted without choosing "
+            "among multiple alleles." % raw_name
+        )
+    return normalized
+
+
+def predictor_allele_for_processing(affinity_predictor, allele):
+    """Resolve a normalized training allele to a supported predictor key."""
+    predictor_allele = affinity_predictor.canonicalize_allele_name(allele)
+    if predictor_allele not in affinity_predictor.supported_alleles:
+        raise ValueError(
+            "Affinity predictor does not support normalized processing "
+            "allele %s (resolved to %s)." % (allele, predictor_allele)
+        )
+    return predictor_allele
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -147,6 +197,11 @@ def do_process_samples(samples, constant_data=None):
         args.affinity_predictor)
     print("Loaded", affinity_predictor)
 
+    predictor_alleles = {
+        allele: predictor_allele_for_processing(affinity_predictor, allele)
+        for allele in hit_df.allele.unique()
+    }
+
     result_df = []
     for sample_id, sub_hit_df in tqdm.tqdm(
             hit_df.groupby("sample_id"), total=hit_df.sample_id.nunique()):
@@ -184,14 +239,16 @@ def do_process_samples(samples, constant_data=None):
         merged_df = pandas.concat(
             [sub_hit_df] + decoys_df, ignore_index=True, sort=False)
 
-        prediction_col = "%s affinity" % sample_table.loc[sample_id].hla
+        training_allele = sample_table.loc[sample_id].allele
+        predictor_allele = predictor_alleles[training_allele]
+        prediction_col = "%s affinity" % predictor_allele
         predictions_df = pandas.DataFrame(
             index=merged_df.peptide.unique(),
             columns=[prediction_col])
 
         predictions_df[prediction_col] = affinity_predictor.predict(
             predictions_df.index,
-            allele=sample_table.loc[sample_id].hla)
+            allele=predictor_allele)
 
         merged_df["affinity_prediction"] = merged_df.peptide.map(
             predictions_df[prediction_col])
@@ -251,12 +308,12 @@ def run():
     print("Loaded hits from %d samples" % hit_df.sample_id.nunique())
     hit_df = hit_df.loc[hit_df.format == "MONOALLELIC"].copy()
     print("Subselected to %d monoallelic samples" % hit_df.sample_id.nunique())
-    hit_df["allele"] = hit_df.hla
-
-    hit_df = hit_df.loc[
-        hit_df.allele.map(is_human_class1_abc_allele)
-    ].copy()
-    print("Subselected to %d HLA-A/B/C samples" % hit_df.sample_id.nunique())
+    hit_df["allele"] = hit_df.hla.map(canonicalize_processing_allele)
+    hit_df = hit_df.loc[~hit_df.allele.isnull()].copy()
+    print(
+        "Subselected to %d sequence-resolved HLA-A/B/C samples" %
+        hit_df.sample_id.nunique()
+    )
 
     if args.exclude_contig:
         new_hit_df = hit_df.loc[
@@ -272,7 +329,14 @@ def run():
             len(new_hit_df))
         hit_df = new_hit_df.copy()
     if args.alleles:
-        filter_alleles = set(args.alleles)
+        filter_alleles = set()
+        for value in args.alleles:
+            normalized = canonicalize_processing_allele(value)
+            if normalized is None:
+                raise ValueError(
+                    "--alleles requires HLA-A/B/C alleles; got %r" % value
+                )
+            filter_alleles.add(normalized)
         new_hit_df = hit_df.loc[
             hit_df.allele.isin(filter_alleles)
         ]
@@ -381,7 +445,7 @@ def run():
     print("Received all results in %0.2f sec" % (time.time() - start))
 
     result_df = pandas.concat(result_df, ignore_index=True, sort=False)
-    result_df["hla"] = result_df.sample_id.map(sample_table.hla)
+    result_df["hla"] = result_df.sample_id.map(sample_table.allele)
 
     print(result_df)
     print("Counts:")
