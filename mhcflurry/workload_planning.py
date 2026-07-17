@@ -157,6 +157,7 @@ class LocalParallelismPlan:
     warmup_device_peak_gb: Optional[float] = None
     warmup_host_peak_gb: Optional[float] = None
     cpu_threads_per_worker: Optional[int] = None
+    cpu_threads_per_worker_was_auto: bool = True
 
     def __str__(self):
         device_worker = (
@@ -175,7 +176,7 @@ class LocalParallelismPlan:
             "dataloader_workers=%d, device_worker_gb=%s, "
             "host_worker_gb=%.1f, host_available=%s from %s, "
             "warmup_device_peak_gb=%s, warmup_host_peak_gb=%s, "
-            "cpu_threads_per_worker=%s)"
+            "cpu_threads_per_worker=%s [%s])"
             % (
                 self.workload_name,
                 self.backend,
@@ -198,6 +199,11 @@ class LocalParallelismPlan:
                 (
                     str(self.cpu_threads_per_worker)
                     if self.cpu_threads_per_worker is not None else "none"
+                ),
+                (
+                    "auto"
+                    if self.cpu_threads_per_worker_was_auto
+                    else "environment"
                 ),
             )
         )

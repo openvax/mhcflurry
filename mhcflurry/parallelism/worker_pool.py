@@ -26,7 +26,11 @@ import numpy
 from ..common import configure_pytorch, normalize_pytorch_backend
 from ..workload_planning import WORKLOAD_GENERIC
 from .planning import cuda_visible_devices_from_env, resolve_local_parallelism_args
-from .worker_runtime import worker_init, worker_init_entry_point
+from .worker_runtime import (
+    configure_worker_cpu_threads,
+    worker_init,
+    worker_init_entry_point,
+)
 
 
 # ---- Non-daemonic worker pool --------------------------------------------
@@ -236,6 +240,8 @@ def worker_pool_with_gpu_assignments_from_args(
         worker_log_dir=args.worker_log_dir,
         cpu_threads_per_worker=getattr(
             args, "cpu_threads_per_worker", None),
+        cpu_threads_per_worker_was_auto=getattr(
+            args, "cpu_threads_per_worker_was_auto", True),
         start_method=start_method,
     )
 
@@ -285,6 +291,7 @@ def worker_pool_with_gpu_assignments(
         max_tasks_per_worker=None,
         worker_log_dir=None,
         cpu_threads_per_worker=None,
+        cpu_threads_per_worker_was_auto=True,
         start_method=None):
     """
     Create a multiprocessing.Pool where each worker uses its own GPU.
@@ -300,6 +307,9 @@ def worker_pool_with_gpu_assignments(
     worker_log_dir : string
     cpu_threads_per_worker : int
         Runtime BLAS/OpenMP/PyTorch thread limit applied in each worker.
+    cpu_threads_per_worker_was_auto : bool
+        Whether mhcflurry owns the uniform runtime limit. False preserves
+        caller-provided OMP/MKL/OpenBLAS settings.
     start_method : string
         Optional multiprocessing start method, e.g. ``"spawn"`` when workers
         must not inherit PyTorch state from the parent process.
@@ -316,7 +326,11 @@ def worker_pool_with_gpu_assignments(
         max_workers_per_gpu=max_workers_per_gpu)
 
     if num_jobs == 0:
-        configure_pytorch(backend=backend)
+        applied_threads = configure_worker_cpu_threads(
+            cpu_threads_per_worker,
+            auto_owned=cpu_threads_per_worker_was_auto,
+        )
+        configure_pytorch(backend=backend, num_threads=applied_threads)
         return None
 
     worker_init_kwargs = worker_init_kwargs_for_scheduler(
@@ -324,7 +338,10 @@ def worker_pool_with_gpu_assignments(
         num_gpus=num_gpus,
         backend=backend,
         max_workers_per_gpu=max_workers_per_gpu,
-        cpu_threads_per_worker=cpu_threads_per_worker)
+        cpu_threads_per_worker=cpu_threads_per_worker,
+        cpu_threads_per_worker_was_auto=(
+            cpu_threads_per_worker_was_auto
+        ))
     if num_gpus:
         print(
             "Assigning %d workers across %d CUDA GPUs (%d workers max per GPU). "
@@ -384,7 +401,8 @@ def worker_init_kwargs_for_scheduler(
         num_gpus=0,
         backend="auto",
         max_workers_per_gpu=1,
-        cpu_threads_per_worker=None):
+        cpu_threads_per_worker=None,
+        cpu_threads_per_worker_was_auto=True):
     """
     Build per-worker init kwargs from the local scheduling configuration.
 
@@ -407,6 +425,9 @@ def worker_init_kwargs_for_scheduler(
         if cpu_threads_per_worker is not None:
             for kwargs in result:
                 kwargs["cpu_threads_per_worker"] = cpu_threads_per_worker
+                kwargs["cpu_threads_per_worker_was_auto"] = (
+                    cpu_threads_per_worker_was_auto
+                )
         return result
 
     cuda_visible_devices = cuda_visible_devices_from_env()
@@ -443,6 +464,9 @@ def worker_init_kwargs_for_scheduler(
     if cpu_threads_per_worker is not None:
         for kwargs in worker_kwargs:
             kwargs["cpu_threads_per_worker"] = cpu_threads_per_worker
+            kwargs["cpu_threads_per_worker_was_auto"] = (
+                cpu_threads_per_worker_was_auto
+            )
     return worker_kwargs
 
 

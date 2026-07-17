@@ -19,7 +19,7 @@ import subprocess
 import sys
 from dataclasses import replace
 
-from ..common import normalize_pytorch_backend
+from ..common import configure_pytorch, normalize_pytorch_backend
 from ..memory_budget import memory_worker_capacity
 from ..workload_planning import (
     HOST_RAM_PER_DATALOADER_CHILD_GB,
@@ -789,13 +789,34 @@ def resolve_local_parallelism_args(
     args.random_negative_pool_epochs_was_auto = (
         plan.random_negative_pool_epochs_was_auto
     )
-    cpu_threads_per_worker = resolve_cpu_threads_per_worker(plan)
+    (
+        cpu_threads_per_worker,
+        cpu_threads_per_worker_was_auto,
+    ) = _resolve_cpu_thread_budget(plan)
     plan = replace(
         plan,
         cpu_threads_per_worker=cpu_threads_per_worker,
+        cpu_threads_per_worker_was_auto=cpu_threads_per_worker_was_auto,
     )
     args.cpu_threads_per_worker = cpu_threads_per_worker
+    args.cpu_threads_per_worker_was_auto = (
+        cpu_threads_per_worker_was_auto
+    )
     args.workload_plan = plan
+
+    if (
+            plan.num_jobs == 0
+            and not getattr(args, "cluster_parallelism", False)
+            and cpu_threads_per_worker_was_auto):
+        # Serial commands execute the work function directly in this process,
+        # so worker_init never gets a chance to resize native/PyTorch pools
+        # that were initialized before planning ran.
+        from .worker_runtime import configure_worker_cpu_threads
+        applied_threads = configure_worker_cpu_threads(
+            cpu_threads_per_worker,
+            auto_owned=True,
+        )
+        configure_pytorch(num_threads=applied_threads)
 
     # Promote orchestrator-owned tuning knobs from CLI to env so the
     # existing call sites (pytorch_training.maybe_compile_network,
@@ -838,27 +859,44 @@ def resolve_local_parallelism_args(
 
 def resolve_cpu_threads_per_worker(plan, cpu_count=None):
     """Set unset BLAS/OpenMP thread env vars from the final worker plan."""
+    threads, _was_auto = _resolve_cpu_thread_budget(plan, cpu_count=cpu_count)
+    return threads
+
+
+def _resolve_cpu_thread_budget(plan, cpu_count=None):
+    """Return the numeric thread budget and whether mhcflurry owns it.
+
+    A uniform runtime resize is safe only when all supported environment
+    variables are unset or were written by an earlier mhcflurry auto pass.
+    Any caller-owned value makes the environment authoritative; the numeric
+    auto estimate is still recorded for diagnostics but must not be applied
+    to loaded native or PyTorch pools.
+    """
     if cpu_count is None:
         cpu_count = os.cpu_count() or 1
     fit_workers = max(int(plan.num_jobs), 1)
     reserved = 2 + fit_workers * int(plan.dataloader_num_workers)
     available = max(int(cpu_count) - reserved, fit_workers)
     per_worker = max(1, available // fit_workers)
+    auto_owned = True
     for name in (
             "OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
         marker = "MHCFLURRY_%s_AUTO" % name
         if name not in os.environ or os.environ.get(marker) == "1":
             os.environ[name] = str(per_worker)
             os.environ[marker] = "1"
+        else:
+            auto_owned = False
     logging.info(
         "CPU thread budget: %d thread(s)/fit-worker "
-        "(cpus=%d, fit_workers=%d, dataloader_workers=%d)",
+        "(cpus=%d, fit_workers=%d, dataloader_workers=%d, source=%s)",
         per_worker,
         int(cpu_count),
         fit_workers,
         int(plan.dataloader_num_workers),
+        "auto" if auto_owned else "environment",
     )
-    return per_worker
+    return per_worker, auto_owned
 
 
 def refine_local_parallelism_from_warmup(args, reports):
@@ -979,15 +1017,22 @@ def refine_local_parallelism_from_warmup(args, reports):
         warmup_device_peak_gb=device_peak_gb,
         warmup_host_peak_gb=host_peak_gb,
     )
-    cpu_threads_per_worker = resolve_cpu_threads_per_worker(refined)
+    (
+        cpu_threads_per_worker,
+        cpu_threads_per_worker_was_auto,
+    ) = _resolve_cpu_thread_budget(refined)
     refined = replace(
         refined,
         cpu_threads_per_worker=cpu_threads_per_worker,
+        cpu_threads_per_worker_was_auto=cpu_threads_per_worker_was_auto,
     )
     args.workload_plan = refined
     args.max_workers_per_gpu = new_mwpg
     args.num_jobs = new_num_jobs
     args.cpu_threads_per_worker = cpu_threads_per_worker
+    args.cpu_threads_per_worker_was_auto = (
+        cpu_threads_per_worker_was_auto
+    )
     if changed:
         print(
             "Warmup memory calibration tightened local parallelism: %s" % (

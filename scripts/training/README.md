@@ -150,7 +150,10 @@ implementation. Deployment is opt-in through `--deploy-mode`.
   `MKL_THREADING_LAYER=GNU` before Python starts so numpy/MKL and
   PyTorch/Inductor workers share GNU OpenMP instead of aborting on mixed
   runtimes. Sourced by the release-stage scripts before they fork training
-  workers.
+  workers. Values already supplied by the caller remain authoritative: the
+  Python planner records its estimate but does not resize loaded thread pools
+  over an explicit environment. With `--num-jobs 0`, an auto-owned budget is
+  applied directly to the serial process because no worker initializer runs.
 - **`gpu_telemetry.sh`** — Starts/stops the persistent `nvidia-smi` CSV sampler
   used by processing and presentation stages. Set `MHCFLURRY_GPU_TELEMETRY=0`
   to disable it, or `MHCFLURRY_GPU_TELEMETRY_SECONDS=N` to change the sampling

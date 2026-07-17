@@ -37,6 +37,7 @@ from mhcflurry.parallelism import (
 )
 from mhcflurry.parallelism import cli_args, planning
 from mhcflurry.parallelism import worker_pool as worker_pool_module
+from mhcflurry.parallelism import worker_runtime as worker_runtime_module
 from mhcflurry.workload_planning import (
     GIB,
     HOST_RAM_PER_DATALOADER_CHILD_GB,
@@ -109,11 +110,13 @@ def test_worker_init_kwargs_include_resolved_cpu_thread_budget():
             "backend": "cpu",
             "max_workers_per_gpu": 1,
             "cpu_threads_per_worker": 3,
+            "cpu_threads_per_worker_was_auto": True,
         },
         {
             "backend": "cpu",
             "max_workers_per_gpu": 1,
             "cpu_threads_per_worker": 3,
+            "cpu_threads_per_worker_was_auto": True,
         },
     ]
 
@@ -206,6 +209,17 @@ def _runtime_thread_counts(_):
     return torch.get_num_threads(), native
 
 
+def _runtime_thread_state(_):
+    """Return thread settings that must survive worker initialization."""
+    import torch
+
+    names = ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS")
+    return torch.get_num_threads(), {
+        name: os.environ.get(name)
+        for name in names
+    }
+
+
 @pytest.mark.skipif(
     "fork" not in multiprocessing.get_all_start_methods(),
     reason="fork start method unavailable",
@@ -234,6 +248,50 @@ def test_forked_worker_applies_runtime_cpu_thread_budget():
 
     assert torch_threads == 1
     assert all(value == 1 for value in native_threads)
+
+
+@pytest.mark.skipif(
+    "fork" not in multiprocessing.get_all_start_methods(),
+    reason="fork start method unavailable",
+)
+def test_forked_worker_preserves_explicit_cpu_thread_settings(monkeypatch):
+    """An auto estimate must not overwrite caller-owned thread settings."""
+    import torch
+
+    expected_env = {
+        "OMP_NUM_THREADS": "7",
+        "MKL_NUM_THREADS": "5",
+        "OPENBLAS_NUM_THREADS": "3",
+    }
+    for name, value in expected_env.items():
+        monkeypatch.setenv(name, value)
+        monkeypatch.delenv("MHCFLURRY_%s_AUTO" % name, raising=False)
+
+    original_threads = torch.get_num_threads()
+    torch.set_num_threads(2)
+    pool = worker_pool_with_gpu_assignments(
+        num_jobs=1,
+        num_gpus=0,
+        backend="cpu",
+        max_workers_per_gpu=1,
+        cpu_threads_per_worker=1,
+        cpu_threads_per_worker_was_auto=False,
+        start_method="fork",
+    )
+    try:
+        torch_threads, worker_env = pool.apply(
+            _runtime_thread_state, (None,))
+    finally:
+        pool.close()
+        pool.join()
+        torch.set_num_threads(original_threads)
+
+    # PyTorch may re-read OMP_NUM_THREADS in the child or retain the parent's
+    # already-loaded runtime value, depending on its platform runtime. Either
+    # is valid; the auto-derived 1 must not replace either expert setting.
+    assert torch_threads in (2, int(expected_env["OMP_NUM_THREADS"]))
+    assert torch_threads != 1
+    assert worker_env == expected_env
 
 
 def test_nondaemonprocess_reports_not_daemon():
@@ -527,6 +585,85 @@ def test_cpu_thread_budget_uses_final_worker_and_dataloader_counts(monkeypatch):
     assert os.environ["OMP_NUM_THREADS"] == "3"
     assert os.environ["MKL_NUM_THREADS"] == "3"
     assert os.environ["OPENBLAS_NUM_THREADS"] == "3"
+
+
+def test_explicit_cpu_thread_env_is_preserved_and_propagated(monkeypatch):
+    expected_env = {
+        "OMP_NUM_THREADS": "7",
+        "MKL_NUM_THREADS": "5",
+        "OPENBLAS_NUM_THREADS": "3",
+    }
+    for name, value in expected_env.items():
+        monkeypatch.setenv(name, value)
+        monkeypatch.delenv("MHCFLURRY_%s_AUTO" % name, raising=False)
+
+    captured = {}
+
+    def fake_make_worker_pool(**kwargs):
+        captured.update(kwargs)
+        return "pool"
+
+    monkeypatch.setattr(
+        worker_pool_module, "make_worker_pool", fake_make_worker_pool)
+    args = Namespace(
+        max_workers_per_gpu=1,
+        num_jobs=1,
+        gpus=0,
+        backend="cpu",
+        max_tasks_per_worker=None,
+        worker_log_dir=None,
+    )
+
+    assert worker_pool_with_gpu_assignments_from_args(args) == "pool"
+
+    assert args.cpu_threads_per_worker_was_auto is False
+    assert {
+        name: os.environ[name]
+        for name in expected_env
+    } == expected_env
+    assert captured["initializer_kwargs_per_process"] == [{
+        "backend": "cpu",
+        "max_workers_per_gpu": 1,
+        "cpu_threads_per_worker": args.cpu_threads_per_worker,
+        "cpu_threads_per_worker_was_auto": False,
+    }]
+
+
+def test_serial_resolution_applies_auto_cpu_thread_budget(monkeypatch):
+    for name in (
+            "OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+        monkeypatch.delenv(name, raising=False)
+        monkeypatch.delenv("MHCFLURRY_%s_AUTO" % name, raising=False)
+
+    native_calls = []
+    pytorch_calls = []
+
+    def fake_configure_worker_cpu_threads(num_threads, auto_owned=True):
+        native_calls.append((num_threads, auto_owned))
+        return num_threads
+
+    monkeypatch.setattr(
+        worker_runtime_module,
+        "configure_worker_cpu_threads",
+        fake_configure_worker_cpu_threads,
+    )
+    monkeypatch.setattr(
+        planning,
+        "configure_pytorch",
+        lambda **kwargs: pytorch_calls.append(kwargs),
+    )
+    args = Namespace(
+        max_workers_per_gpu=1,
+        num_jobs=0,
+        gpus=0,
+        backend="cpu",
+    )
+
+    resolve_local_parallelism_args(args)
+
+    assert args.cpu_threads_per_worker_was_auto is True
+    assert native_calls == [(args.cpu_threads_per_worker, True)]
+    assert pytorch_calls == [{"num_threads": args.cpu_threads_per_worker}]
 
 
 def test_resolve_local_parallelism_args_caps_auto_num_jobs(monkeypatch):
@@ -869,12 +1006,33 @@ def test_worker_pool_from_args_preserves_serial_mode_with_auto_gpus(
         monkeypatch):
     """Explicit ``--num-jobs 0`` must not become invalid after GPU detect."""
     monkeypatch.delenv("MHCFLURRY_TORCH_COMPILE", raising=False)
+    for name in (
+            "OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+        monkeypatch.delenv(name, raising=False)
+        monkeypatch.delenv("MHCFLURRY_%s_AUTO" % name, raising=False)
     monkeypatch.setattr(
         planning, "detect_num_cuda_devices_no_torch", lambda: 2)
     configured = []
+    native_calls = []
+
+    def fake_configure_worker_cpu_threads(num_threads, auto_owned=True):
+        native_calls.append((num_threads, auto_owned))
+        return num_threads
+
+    monkeypatch.setattr(
+        worker_runtime_module,
+        "configure_worker_cpu_threads",
+        fake_configure_worker_cpu_threads,
+    )
+    monkeypatch.setattr(
+        worker_pool_module,
+        "configure_worker_cpu_threads",
+        fake_configure_worker_cpu_threads,
+    )
+    monkeypatch.setattr(planning, "configure_pytorch", lambda **kwargs: None)
     monkeypatch.setattr(
         worker_pool_module, "configure_pytorch",
-        lambda backend: configured.append(backend))
+        lambda **kwargs: configured.append(kwargs))
     args = Namespace(
         max_workers_per_gpu="auto",
         num_jobs=0,
@@ -889,7 +1047,14 @@ def test_worker_pool_from_args_preserves_serial_mode_with_auto_gpus(
     assert worker_pool is None
     assert args.gpus == 2
     assert args.num_jobs == 0
-    assert configured == ["auto"]
+    assert native_calls == [
+        (args.cpu_threads_per_worker, True),
+        (args.cpu_threads_per_worker, True),
+    ]
+    assert configured == [{
+        "backend": "auto",
+        "num_threads": args.cpu_threads_per_worker,
+    }]
 
 
 def test_worker_pool_creates_worker_log_dir(tmp_path, monkeypatch):

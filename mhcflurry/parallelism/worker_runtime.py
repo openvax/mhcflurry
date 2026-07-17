@@ -30,16 +30,18 @@ from .planning import resolved_int
 _WORKER_THREADPOOL_LIMITER = None
 
 
-def configure_worker_cpu_threads(num_threads):
+def configure_worker_cpu_threads(num_threads, auto_owned=True):
     """Apply a fit worker's CPU-thread budget to loaded native runtimes.
 
     Forked workers inherit already-initialized BLAS/OpenMP pools, so setting
     only environment variables in the parent is insufficient. Keep the
     environment synchronized for libraries loaded later and use threadpoolctl
-    to resize the native pools already present in this process.
+    to resize the native pools already present in this process. Caller-owned
+    OMP/MKL/OpenBLAS settings are authoritative and must not be replaced by a
+    uniform auto-derived limit.
     """
     global _WORKER_THREADPOOL_LIMITER
-    if num_threads is None:
+    if num_threads is None or not auto_owned:
         return None
     num_threads = resolved_int(num_threads, "cpu_threads_per_worker")
     if num_threads < 1:
@@ -76,7 +78,8 @@ def worker_init_entry_point(
 def worker_init(
         keras_backend=None, backend=None, gpu_device_nums=None,
         worker_log_dir=None, max_workers_per_gpu=None,
-        cpu_threads_per_worker=None):
+        cpu_threads_per_worker=None,
+        cpu_threads_per_worker_was_auto=True):
     del keras_backend  # legacy argument retained for API compatibility
     if worker_log_dir:
         os.makedirs(worker_log_dir, exist_ok=True)
@@ -96,7 +99,9 @@ def worker_init(
     numpy.random.seed()
     random.seed()
     cpu_threads_per_worker = configure_worker_cpu_threads(
-        cpu_threads_per_worker)
+        cpu_threads_per_worker,
+        auto_owned=cpu_threads_per_worker_was_auto,
+    )
     configure_kwargs = {"backend": backend}
     if gpu_device_nums is not None:
         configure_kwargs["gpu_device_nums"] = gpu_device_nums

@@ -343,6 +343,10 @@ Release recipes set only this knob. On a local 8-GPU run with
 fit-local DataLoader children while pretrain epochs are active; `2`
 means up to 32. The thread-budget helper accounts for this when sizing
 `OMP_NUM_THREADS`, `MKL_NUM_THREADS`, and `OPENBLAS_NUM_THREADS`.
+Caller-provided values remain authoritative and are not replaced by the
+planner's uniform runtime limit. For serial (`num_jobs=0`) execution, an
+auto-owned budget is applied directly to the current native and PyTorch pools
+because there is no worker initializer.
 
 The affinity `fit()` path does not use a DataLoader and therefore
 ignores this hyperparameter.
