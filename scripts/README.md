@@ -11,8 +11,8 @@ belong.
 - **`scripts/training/`** — the production training pipeline. Stage scripts
   (`pan_allele_release_*.sh`, `presentation_from_affinity.sh`) and the
   sweep + plot tools that publish artifacts. See its own README.
-- **`scripts/release/`** — packaging and deployment helpers for trained
-  model artifacts, plus the end-to-end release workflow entry point.
+- **`scripts/release/`** — internal packaging, deployment, and orchestration
+  helpers used by the end-to-end release command.
 - **`scripts/dev/`** — developer ergonomic helpers (e.g. relocating
   large run-output dirs outside the rsync source tree). Not invoked by
   CI or release.
@@ -53,11 +53,10 @@ top-level validation tools are narrow checks. The main gap was that Brev
 training and model-asset deployment were living outside this maintained
 surface. `scripts/training/launch_pan_allele_training_remote.py` is now the
 reusable remote/cloud pan-allele training entry point, and
-`scripts/release/retrain_evaluate_deploy.sh` is the single maintained
-workflow for training, evaluating, plotting, and optional deployment.
-The user-facing entry point for the same workflow is
-`mhcflurry train pan-allele-release`; it delegates to the release script so
-the shell orchestration remains the single implementation.
+`mhcflurry train pan-allele-release` is the maintained public workflow for
+training, evaluating, plotting, and optional deployment. It delegates to the
+internal `scripts/release/retrain_evaluate_deploy.sh` process-orchestration
+engine so there is still only one implementation.
 
 ## What used to live here (deleted)
 

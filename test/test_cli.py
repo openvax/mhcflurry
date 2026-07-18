@@ -295,6 +295,129 @@ def test_release_workflow_honors_repo_env_override(tmp_path):
     assert "REPO=%s" % (tmp_path / "source-tree") in output
 
 
+def test_release_workflow_ssh_preflight_is_dry_run_visible(tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "ssh",
+            "--remote", "training-host",
+            "--remote-repo", "/remote/mhcflurry",
+            "--remote-run-dir", "/remote/run",
+            "--no-sync-remote-output",
+            "--skip-eval",
+            "--skip-plots",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert "actual_commit=$(git -C" in output
+    assert "status --porcelain --untracked-files=no" in output
+    assert output.index("actual_commit=$(git -C") < output.index(
+        "pan_allele_release_full.sh")
+    assert "MHCFLURRY_RELEASE_GIT_COMMIT=\\$\\(git" in output
+
+
+@pytest.mark.parametrize(
+    ("remote_commit_matches", "remote_dirty", "expected_error"),
+    [
+        (False, False, "remote checkout commit deadbeef does not match"),
+        (True, True, "remote checkout has tracked changes"),
+    ],
+)
+def test_release_workflow_ssh_rejects_unverified_source(
+        tmp_path, remote_commit_matches, remote_dirty, expected_error):
+    source_repo = tmp_path / "source-repo"
+    (source_repo / "mhcflurry").mkdir(parents=True)
+    (source_repo / "mhcflurry" / "version.py").write_text(
+        '__version__ = "2.3.0rc14"\n')
+    subprocess.run(["git", "init", str(source_repo)], check=True)
+    subprocess.run(
+        ["git", "-C", str(source_repo), "add", "mhcflurry/version.py"],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git", "-C", str(source_repo),
+            "-c", "user.name=Test",
+            "-c", "user.email=test@example.com",
+            "commit", "-m", "test source",
+        ],
+        capture_output=True,
+        check=True,
+    )
+    control_bin = tmp_path / "control-bin"
+    remote_bin = tmp_path / "remote-bin"
+    control_bin.mkdir()
+    remote_bin.mkdir()
+    ssh_log = tmp_path / "ssh.log"
+    ssh = control_bin / "ssh"
+    ssh.write_text(
+        "#!/bin/sh\n"
+        "printf '%s\\n' \"$2\" >> \"$SSH_LOG\"\n"
+        "PATH=\"$REMOTE_BIN:$PATH\" sh -c \"$2\"\n"
+    )
+    ssh.chmod(0o755)
+    remote_git = remote_bin / "git"
+    remote_git.write_text(
+        "#!/bin/sh\n"
+        "case \"$3\" in\n"
+        "  rev-parse) printf '%s\\n' \"$REMOTE_COMMIT\" ;;\n"
+        "  status)\n"
+        "    if [ \"$REMOTE_DIRTY\" = 1 ]; then\n"
+        "      printf ' M mhcflurry/version.py\\n'\n"
+        "    fi\n"
+        "    ;;\n"
+        "  *) exit 2 ;;\n"
+        "esac\n"
+    )
+    remote_git.chmod(0o755)
+    local_commit = subprocess.check_output(
+        ["git", "-C", str(source_repo), "rev-parse", "HEAD"],
+        text=True,
+    ).strip()
+    env = dict(os.environ)
+    env.update({
+        "PATH": "%s:%s" % (control_bin, env["PATH"]),
+        "REPO": str(source_repo),
+        "SSH_LOG": str(ssh_log),
+        "REMOTE_BIN": str(remote_bin),
+        "REMOTE_COMMIT": local_commit if remote_commit_matches else "deadbeef",
+        "REMOTE_DIRTY": "1" if remote_dirty else "0",
+    })
+
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "ssh",
+            "--remote", "training-host",
+            "--remote-repo", "/remote/mhcflurry",
+            "--remote-run-dir", "/remote/run",
+            "--no-sync-remote-output",
+            "--skip-eval",
+            "--skip-plots",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode != 0
+    assert expected_error in result.stdout + result.stderr
+    commands = ssh_log.read_text()
+    assert commands.count("bash -c") == 1
+    assert "pan_allele_release_full.sh" not in commands
+
+
 def test_release_workflow_forwards_processing_parallelism(tmp_path):
     result = subprocess.run(
         [
@@ -1608,6 +1731,36 @@ def test_processing_metrics_use_shared_non_nan_rows():
     assert per_sample.iloc[0]["n_pos"] == 2
     assert summary["n_rows"] == 4
     assert summary["n_hits"] == 2
+
+
+def test_processing_comparison_rejects_missing_requested_mode(
+        monkeypatch, tmp_path):
+    side_a_root = tmp_path / "side-a-processing"
+    side_b_root = tmp_path / "side-b-processing"
+    for mode in compare_models.PROCESSING_MODES:
+        (side_a_root / ("models.selected.%s" % mode)).mkdir(parents=True)
+    for mode in ("with_flanks", "no_flank"):
+        (side_b_root / ("models.selected.%s" % mode)).mkdir(parents=True)
+    side_a = {
+        "label": "candidate",
+        "paths": {"processing": str(side_a_root)},
+    }
+    side_b = {
+        "label": "baseline",
+        "paths": {"processing": str(side_b_root)},
+    }
+    args = _make_args(out=str(tmp_path / "comparison"))
+    monkeypatch.setattr(
+        compare_models,
+        "_load_presentation_benchmark",
+        lambda *_args: pytest.fail("benchmark must not load"),
+    )
+
+    with pytest.raises(
+            SystemExit, match=r"short_flanks: side B \(baseline\)"):
+        compare_models._run_processing(side_a, side_b, args)
+
+    assert not (tmp_path / "comparison" / "processing").exists()
 
 
 def test_affinity_metrics_handle_no_reportable_alleles():

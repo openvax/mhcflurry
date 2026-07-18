@@ -15,10 +15,10 @@ set -euo pipefail
 
 usage() {
     cat <<'EOF'
-Run the release retraining workflow from one maintained entry point.
+Implementation engine for mhcflurry train pan-allele-release.
 
 Usage:
-  scripts/release/retrain_evaluate_deploy.sh \
+  mhcflurry train pan-allele-release \
       --run-dir /path/to/release-run \
       --release 2.3.0 \
       [--backend local|brev-existing|brev-provision|ssh] \
@@ -398,6 +398,39 @@ run_logged_step() {
     } | tee -a "$log_file" >&2
     record_workflow_event "$step" "$status" "log=$log_file"
     return "$status"
+}
+
+shell_quote() {
+    printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+verify_ssh_remote_checkout() {
+    local check_script
+    local remote_command
+
+    check_script='set -eu
+remote_repo=$1
+expected_commit=$2
+allow_dirty=$3
+actual_commit=$(git -C "$remote_repo" rev-parse HEAD)
+if [ "$actual_commit" != "$expected_commit" ]; then
+    printf "ERROR: remote checkout commit %s does not match local release commit %s: %s\n" "$actual_commit" "$expected_commit" "$remote_repo" >&2
+    exit 2
+fi
+if [ "$allow_dirty" != "1" ]; then
+    dirty=$(git -C "$remote_repo" status --porcelain --untracked-files=no)
+    if [ -n "$dirty" ]; then
+        printf "ERROR: remote checkout has tracked changes: %s\n" "$remote_repo" >&2
+        printf "%s\n" "$dirty" >&2
+        exit 2
+    fi
+fi
+printf "Verified remote source provenance: commit=%s repo=%s\n" "$actual_commit" "$remote_repo"'
+    remote_command="bash -c $(shell_quote "$check_script") _"
+    remote_command="$remote_command $(shell_quote "$REMOTE_REPO")"
+    remote_command="$remote_command $(shell_quote "$RELEASE_GIT_COMMIT")"
+    remote_command="$remote_command $(shell_quote "$ALLOW_DIRTY_REPO")"
+    run_logged_step ssh_source_provenance ssh "$REMOTE" "$remote_command"
 }
 
 run_with_timeout() {
@@ -2228,11 +2261,13 @@ if [ "$SKIP_TRAIN" != "1" ]; then
             [ -n "$REMOTE_REPO" ] || die "--remote-repo is required for --backend ssh"
             [ -n "$REMOTE_RUN_DIR" ] || \
                 die "--remote-run-dir is required for --backend ssh"
-            REMOTE_COMMAND="cd '$REMOTE_REPO'"
+            verify_ssh_remote_checkout
+            REMOTE_REPO_QUOTED="$(shell_quote "$REMOTE_REPO")"
+            REMOTE_COMMAND="cd $REMOTE_REPO_QUOTED"
             REMOTE_COMMAND="$REMOTE_COMMAND && MHCFLURRY_OUT='$REMOTE_RUN_DIR'"
             REMOTE_COMMAND="$REMOTE_COMMAND REPO='$REMOTE_REPO'"
             REMOTE_COMMAND="$REMOTE_COMMAND MHCFLURRY_RELEASE_WORKFLOW_ID='$WORKFLOW_RUN_ID'"
-            REMOTE_COMMAND="$REMOTE_COMMAND MHCFLURRY_RELEASE_GIT_COMMIT='$RELEASE_GIT_COMMIT'"
+            REMOTE_COMMAND="$REMOTE_COMMAND MHCFLURRY_RELEASE_GIT_COMMIT=\$(git -C $REMOTE_REPO_QUOTED rev-parse HEAD)"
             REMOTE_COMMAND="$REMOTE_COMMAND TRAINING_MINIBATCH_SIZE='$TRAINING_MINIBATCH_SIZE'"
             REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_MINIBATCH_SIZE='$AFFINITY_MINIBATCH_SIZE'"
             REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_MAX_WORKERS_PER_GPU='$AFFINITY_MAX_WORKERS_PER_GPU'"

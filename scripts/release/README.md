@@ -31,7 +31,7 @@ The script writes the tarballs, `SHA256SUMS`, and a `downloads.yml` snippet unde
 ## End-to-end release workflow
 
 ```bash
-scripts/release/retrain_evaluate_deploy.sh \
+mhcflurry train pan-allele-release \
     --run-dir /path/to/release-run \
     --release 2.3.0 \
     --backend local \
@@ -74,7 +74,7 @@ Supported backends are:
   `--remote-run-dir`. Authentication comes from local `ssh` / `rsync`
   configuration, typically SSH keys or an SSH config `Host`.
 
-The script runs training, `mhcflurry eval compare-models`, and
+The command runs training, `mhcflurry eval compare-models`, and
 `mhcflurry eval plot-comparison` in order; each training/evaluation/plot stage
 has a `--skip-*` flag for resuming. Deployment is opt-in: pass
 `--deploy-mode dry-run`, `draft`, or `publish` only when you want the
@@ -86,6 +86,11 @@ stdout/stderr logs and a `status.tsv` file are written under
 `<run-dir>/workflow_logs/`, alongside the training logs copied from the remote
 run (`.runplz/`, `gpu_occupancy.csv`, release driver logs, and
 model-selection/evaluation artifacts).
+
+The public interface is `mhcflurry train pan-allele-release`. Its current
+implementation delegates to `retrain_evaluate_deploy.sh`, an internal process
+orchestration engine for shell training stages, traps, remote lifecycle,
+telemetry, and artifact synchronization.
 
 `--release-profile full` is the default and trains the complete processing
 artifact set (`with_flanks no_flank short_flanks`). Use

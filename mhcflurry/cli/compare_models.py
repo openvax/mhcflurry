@@ -1149,34 +1149,44 @@ def _parallel_processing_predict(
 
 
 def _run_processing(side_a, side_b, args):
-    component_dir = os.path.join(args.out, "processing")
-    os.makedirs(component_dir, exist_ok=True)
-    processing_args = _parallelism_args_for_component(args, "processing")
-
-    data_dir = args.data_dir or _default_data_evaluation_dir()
     requested_modes = [m.strip() for m in args.processing_modes.split(",") if m]
     bad_modes = [m for m in requested_modes if m not in PROCESSING_MODES]
     if bad_modes:
         raise SystemExit(
             "Unknown processing modes: %s" % ", ".join(bad_modes))
 
+    model_dirs = {}
+    missing = []
+    for mode in requested_modes:
+        a_model_dir = _processing_model_dir(
+            side_a["paths"]["processing"], mode)
+        b_model_dir = _processing_model_dir(
+            side_b["paths"]["processing"], mode)
+        missing_sides = []
+        if not a_model_dir:
+            missing_sides.append("A (%s)" % side_a["label"])
+        if not b_model_dir:
+            missing_sides.append("B (%s)" % side_b["label"])
+        if missing_sides:
+            missing.append("%s: side %s" % (mode, " and ".join(missing_sides)))
+        else:
+            model_dirs[mode] = (a_model_dir, b_model_dir)
+    if missing:
+        raise SystemExit(
+            "Requested processing mode model(s) are unavailable: %s. "
+            "Every --processing-modes entry must exist on both sides." %
+            "; ".join(missing)
+        )
+
+    component_dir = os.path.join(args.out, "processing")
+    os.makedirs(component_dir, exist_ok=True)
+    processing_args = _parallelism_args_for_component(args, "processing")
+    data_dir = args.data_dir or _default_data_evaluation_dir()
     benchmark = _load_presentation_benchmark(data_dir, args.limit_files)
     summaries = {}
     summary_rows = []
     for mode in requested_modes:
-        a_model_dir = _processing_model_dir(side_a["paths"]["processing"], mode)
-        b_model_dir = _processing_model_dir(side_b["paths"]["processing"], mode)
-        if not a_model_dir or not b_model_dir:
-            _stamp(
-                "WARNING: skipping processing mode %s; missing model dir "
-                "for side %s%s%s" % (
-                    mode,
-                    "A" if not a_model_dir else "",
-                    " and " if not a_model_dir and not b_model_dir else "",
-                    "B" if not b_model_dir else "",
-                )
-            )
-            continue
+        a_model_dir, b_model_dir = model_dirs[mode]
         _stamp("=== processing mode: %s ===" % mode)
         scored = benchmark[[
             "peptide", "sample_id", "hla", "hit", "peptide_len",
