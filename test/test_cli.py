@@ -191,6 +191,31 @@ def test_release_workflow_forwards_processing_variants_to_deploy(tmp_path):
     output = result.stdout + result.stderr
     assert "deploy_trained_models.sh" in output
     assert "--processing-variants with_flanks\\ no_flank" in output
+    assert (
+        "variants=with_flanks no_flank; eval_modes=with_flanks,no_flank"
+    ) in output
+
+
+def test_release_workflow_rejects_processing_mode_not_trained(tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "local",
+            "--processing-variants", "with_flanks no_flank",
+            "--processing-modes", "with_flanks,no_flank,short_flanks",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert result.returncode != 0
+    assert "--processing-modes requests 'short_flanks'" in output
+    assert "pan_allele_release_full.sh" not in output
 
 
 def test_release_workflow_prepare_command_is_dry_run_visible(tmp_path):
@@ -3019,6 +3044,46 @@ def test_paper_figures_rerender_clears_command_owned_outputs(tmp_path):
     assert not (out / "old_custom_combined.pdf").exists()
     assert pandas.read_csv(out / "manifest.csv").shape[0] > 0
     assert unrelated.read_text() == "user file"
+
+
+def test_paper_figures_rejects_scores_output_overlap_without_cleanup(tmp_path):
+    out = tmp_path / "paper"
+    source_asset = out / "assets" / "source.svg"
+    source_pdf = out / "source.pdf"
+    source_asset.parent.mkdir(parents=True)
+    source_asset.write_bytes(b"source asset")
+    source_pdf.write_bytes(b"source pdf")
+    args = paper_figures.make_parser().parse_args([
+        "--scores-dir", str(out),
+        "--out", str(out),
+    ])
+
+    with pytest.raises(SystemExit, match="would delete input path"):
+        paper_figures.run(args)
+
+    assert source_asset.read_bytes() == b"source asset"
+    assert source_pdf.read_bytes() == b"source pdf"
+    assert not (out / "manifest.csv").exists()
+
+
+def test_paper_figures_rejects_prediction_in_cleanup_tree(tmp_path):
+    scores = tmp_path / "scores"
+    scores.mkdir()
+    out = tmp_path / "paper"
+    prediction = out / "assets" / "predictions.csv"
+    prediction.parent.mkdir(parents=True)
+    prediction.write_text("sample_id,hit,score\ns1,1,0.9\n")
+    args = paper_figures.make_parser().parse_args([
+        "--scores-dir", str(scores),
+        "--multiallelic-predictions", str(prediction),
+        "--out", str(out),
+    ])
+
+    with pytest.raises(SystemExit, match="would delete input path"):
+        paper_figures.run(args)
+
+    assert prediction.is_file()
+    assert not (out / "manifest.csv").exists()
 
 
 def test_paper_figures_monoallelic_scatter_uses_all_length_rows(monkeypatch):

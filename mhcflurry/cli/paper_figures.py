@@ -312,14 +312,27 @@ def run(args):
     out_dir = Path(args.out)
     formats = _parse_formats(args.formats)
     combined_pdf = _combined_pdf_path(args.combined_pdf, out_dir)
+    writer = FigureWriter(out_dir, formats, combined_pdf)
+    inputs = _resolve_figure_inputs(args, writer)
+    if inputs is None:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        _write_manifest(out_dir, writer.rows)
+        _write_missing_inputs(out_dir, writer.rows)
+        return 2
+
+    cleanup_conflicts = _paper_figure_cleanup_input_conflicts(
+        args, inputs, out_dir, combined_pdf)
+    if cleanup_conflicts:
+        raise SystemExit(
+            "Paper-figure output cleanup would delete input path(s): %s. "
+            "Choose a separate --out directory." %
+            ", ".join(str(path) for path in cleanup_conflicts)
+        )
+
     _clear_paper_figure_outputs(out_dir, combined_pdf)
     out_dir.mkdir(parents=True, exist_ok=True)
-    writer = FigureWriter(out_dir, formats, combined_pdf)
 
     try:
-        inputs = _resolve_figure_inputs(args, writer)
-        if inputs is None:
-            return 2
         try:
             predictors = _parse_predictor_config(args)
         except ValueError as e:
@@ -532,6 +545,62 @@ def _clear_paper_figure_outputs(out_dir, combined_pdf):
         combined_pdf = Path(combined_pdf)
         if combined_pdf.exists() or combined_pdf.is_symlink():
             combined_pdf.unlink()
+
+
+def _paper_figure_cleanup_input_conflicts(
+        args, inputs, out_dir, combined_pdf):
+    """Return inputs that command-owned cleanup would remove."""
+    out_dir = Path(out_dir).resolve()
+    cleanup_dirs = [
+        (out_dir / name).resolve()
+        for name in (*DEFAULT_FORMATS, "assets")
+    ]
+    cleanup_files = {
+        (out_dir / name).resolve()
+        for name in ("manifest.csv", "missing_inputs.md")
+    }
+    if combined_pdf is not None:
+        cleanup_files.add(Path(combined_pdf).resolve())
+
+    input_dirs = [
+        path for path in (
+            inputs.scores_dir,
+            inputs.comparison_dir,
+            inputs.run_dir,
+        ) if path is not None
+    ]
+    input_files = [
+        path for path in (
+            inputs.multiallelic_predictions,
+            inputs.monoallelic_predictions,
+            Path(args.sample_table) if args.sample_table else None,
+        ) if path is not None
+    ]
+
+    conflicts = []
+    for path in input_dirs:
+        resolved = Path(path).resolve()
+        if resolved == out_dir or any(
+                _path_is_within(resolved, directory)
+                for directory in cleanup_dirs):
+            conflicts.append(resolved)
+    for path in input_files:
+        resolved = Path(path).resolve()
+        if (
+                resolved in cleanup_files or
+                any(_path_is_within(resolved, directory)
+                    for directory in cleanup_dirs) or
+                (resolved.parent == out_dir and resolved.suffix == ".pdf")):
+            conflicts.append(resolved)
+    return tuple(dict.fromkeys(conflicts))
+
+
+def _path_is_within(path, directory):
+    try:
+        path.relative_to(directory)
+        return True
+    except ValueError:
+        return False
 
 
 def _resolve_figure_inputs(args, writer):

@@ -312,6 +312,49 @@ apply_release_profile() {
     esac
 }
 
+processing_variant_requested() {
+    case " $PROCESSING_VARIANTS " in
+        *" $1 "*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+validate_processing_configuration() {
+    local derived_modes=
+    local mode
+    local modes_seen=0
+    local variant
+
+    for variant in $PROCESSING_VARIANTS; do
+        case "$variant" in
+            with_flanks|no_flank|short_flanks) ;;
+            *) die "Unknown --processing-variants entry: $variant" ;;
+        esac
+        if [ -n "$derived_modes" ]; then
+            derived_modes="$derived_modes,$variant"
+        else
+            derived_modes=$variant
+        fi
+    done
+    [ -n "$derived_modes" ] || \
+        die "--processing-variants must contain at least one variant"
+
+    if [ "$PROCESSING_MODES_EXPLICIT" = "0" ]; then
+        PROCESSING_MODES=$derived_modes
+    fi
+    for mode in $(printf '%s' "$PROCESSING_MODES" | tr ',' ' '); do
+        modes_seen=1
+        case "$mode" in
+            with_flanks|no_flank|short_flanks) ;;
+            *) die "Unknown --processing-modes entry: $mode" ;;
+        esac
+        processing_variant_requested "$mode" || die \
+            "--processing-modes requests '$mode', but --processing-variants does not train it"
+    done
+    [ "$modes_seen" = "1" ] || \
+        die "--processing-modes must contain at least one mode"
+}
+
 paper_figure_inputs_requested() {
     [ -n "$PAPER_FIGURES_SCORES_DIR" ] || \
         [ -n "$PAPER_FIGURES_ARTIFACTS_DIR" ] || \
@@ -2062,6 +2105,7 @@ if [ -z "$PROCESSING_MINIBATCH_SIZE" ]; then
     PROCESSING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE
 fi
 apply_release_profile
+validate_processing_configuration
 COMPARE_TORCH_COMPILE="$(normalize_compare_torch_compile "$COMPARE_TORCH_COMPILE")"
 COMPARE_PRESENTATION_TORCH_COMPILE="$(normalize_compare_torch_compile "$COMPARE_PRESENTATION_TORCH_COMPILE")"
 COMPARE_MATMUL_PRECISION="$(normalize_compare_matmul_precision "$COMPARE_MATMUL_PRECISION")"
