@@ -2465,6 +2465,12 @@ def _copy_architecture_figures(inputs, writer):
                     if inputs.run_dir is not None else
                     "run/**/manifest.csv"
                 ),
+                (
+                    Path(inputs.run_dir) / "presentation" / "models" /
+                    "weights.csv"
+                    if inputs.run_dir is not None else
+                    "run/presentation/models/weights.csv"
+                ),
             ],
             "Architecture/model-information source artwork absent.")
 
@@ -2472,27 +2478,11 @@ def _copy_architecture_figures(inputs, writer):
 def _plot_current_model_information(inputs, writer):
     if inputs.run_dir is None:
         return False
-    manifests = _final_model_manifest_paths(inputs.run_dir)
-    rows = []
-    for path in manifests:
-        try:
-            df = pandas.read_csv(path, usecols=["model_name"])
-        except (OSError, ValueError):
-            continue
-        if df.empty:
-            continue
-        label = _manifest_component_label(path, inputs.run_dir)
-        rows.append((label, int(df["model_name"].nunique())))
-    if not rows:
+    summary = _current_model_counts(inputs.run_dir)
+    if summary.empty:
         return False
     import matplotlib.pyplot as plt
 
-    summary = (
-        pandas.DataFrame(rows, columns=["component", "models"])
-        .groupby("component", as_index=False)["models"]
-        .sum()
-        .sort_values("models", ascending=True)
-    )
     fig, ax = plt.subplots(figsize=(4.8, max(2.2, 0.32 * len(summary))))
     y = numpy.arange(len(summary))
     ax.barh(
@@ -2512,9 +2502,43 @@ def _plot_current_model_information(inputs, writer):
         fig,
         "fig.1_predictor_model_information.model_counts",
         "architecture",
-        note="Generated from canonical final run manifests.",
+        note="Generated from canonical final run model artifacts.",
     )
     return True
+
+
+def _current_model_counts(run_dir):
+    """Return final ensemble sizes from canonical top-level artifacts."""
+    run_dir = Path(run_dir)
+    manifests = _final_model_manifest_paths(run_dir)
+    rows = []
+    for path in manifests:
+        try:
+            df = pandas.read_csv(path, usecols=["model_name"])
+        except (OSError, ValueError):
+            continue
+        if df.empty:
+            continue
+        label = _manifest_component_label(path, run_dir)
+        rows.append((label, int(df["model_name"].nunique())))
+
+    presentation_weights = (
+        run_dir / "presentation" / "models" / "weights.csv")
+    try:
+        weights = pandas.read_csv(presentation_weights, index_col=0)
+    except (OSError, ValueError):
+        weights = pandas.DataFrame()
+    if not weights.empty:
+        rows.append(("Presentation", int(weights.index.nunique())))
+
+    if not rows:
+        return pandas.DataFrame(columns=["component", "models"])
+    return (
+        pandas.DataFrame(rows, columns=["component", "models"])
+        .groupby("component", as_index=False)["models"]
+        .sum()
+        .sort_values("models", ascending=True)
+    )
 
 
 def _final_model_manifest_paths(run_dir):
@@ -2522,7 +2546,6 @@ def _final_model_manifest_paths(run_dir):
     run_dir = Path(run_dir)
     candidates = [
         run_dir / "affinity" / "models.combined" / "manifest.csv",
-        run_dir / "presentation" / "models" / "manifest.csv",
     ]
     candidates.extend(sorted(
         (run_dir / "processing").glob(

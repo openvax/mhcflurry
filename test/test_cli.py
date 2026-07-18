@@ -1899,20 +1899,27 @@ def test_compare_models_side_json_records_model_provenance(tmp_path):
     assert result["release_provenance"] == provenance
 
 
-def test_plot_model_comparison_rejects_missing_requested_component(tmp_path):
+def test_plot_model_comparison_rejects_missing_component_without_cleanup(
+        tmp_path):
     plot_dir = tmp_path / "plots"
-    plot_dir.mkdir()
+    paper_dir = plot_dir / "paper_figures"
+    paper_dir.mkdir(parents=True)
     (plot_dir / "stale.pdf").write_bytes(b"stale")
+    (paper_dir / "paper_figures.pdf").write_bytes(b"paper")
+    summary = plot_dir / "summary.pdf"
+    summary.write_bytes(b"summary")
     args = plot_model_comparison.make_parser().parse_args([
         "--input", str(tmp_path),
         "--components", "affinity",
-        "--summary-pdf", str(plot_dir / "summary.pdf"),
+        "--summary-pdf", str(summary),
     ])
 
     with pytest.raises(SystemExit, match="affinity"):
         plot_model_comparison.run(args)
 
-    assert not plot_dir.exists()
+    assert (plot_dir / "stale.pdf").read_bytes() == b"stale"
+    assert (paper_dir / "paper_figures.pdf").read_bytes() == b"paper"
+    assert summary.read_bytes() == b"summary"
 
 
 def test_detect_available_components_finds_affinity(tmp_path):
@@ -2804,9 +2811,21 @@ def test_current_model_information_uses_only_final_manifests(tmp_path):
     for path in final_paths + stale_paths:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("model_name\nmodel_1\n")
+    presentation_weights = run_dir / "presentation" / "models" / "weights.csv"
+    presentation_weights.parent.mkdir(parents=True, exist_ok=True)
+    presentation_weights.write_text(
+        ",intercept\nwith_flanks,1.0\nwithout_flanks,2.0\n")
 
     assert set(paper_figures._final_model_manifest_paths(run_dir)) == set(
         final_paths)
+    counts = paper_figures._current_model_counts(run_dir).set_index(
+        "component")["models"].to_dict()
+    assert counts == {
+        "Affinity": 1,
+        "Presentation": 2,
+        "Processing no flank": 1,
+        "Processing with flanks": 1,
+    }
 
 
 def test_paper_figures_rerender_clears_command_owned_outputs(tmp_path):

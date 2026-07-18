@@ -207,6 +207,18 @@ def run(args):
         labels["a"] = args.a_label
     if args.b_label:
         labels["b"] = args.b_label
+    available = _detect_available_components(args.input)
+    if args.components == "auto":
+        components = available
+    else:
+        requested = [p.strip() for p in args.components.split(",") if p]
+        components = [c for c in requested if c in available]
+        missing = sorted(set(requested) - set(available))
+        if missing:
+            raise SystemExit(
+                "Requested component(s) not present in %s: %s" % (
+                    args.input, ", ".join(missing)))
+
     plot_dir = os.path.join(args.input, "plots")
     paper_figures_dir = args.paper_figures_out or os.path.join(
         plot_dir, "paper_figures")
@@ -219,19 +231,6 @@ def run(args):
             pass
     paper_dir = os.path.join(plot_dir, "paper")
     os.makedirs(paper_dir, exist_ok=True)
-
-    available = _detect_available_components(args.input)
-    if args.components == "auto":
-        components = available
-    else:
-        requested = [p.strip() for p in args.components.split(",") if p]
-        components = [c for c in requested if c in available]
-        missing = sorted(set(requested) - set(available))
-        if missing:
-            shutil.rmtree(plot_dir)
-            raise SystemExit(
-                "Requested component(s) not present in %s: %s" % (
-                    args.input, ", ".join(missing)))
 
     for component in components:
         if component == "affinity":
