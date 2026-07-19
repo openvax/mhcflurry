@@ -25,7 +25,7 @@ from socket import gethostname
 
 import numpy
 import pandas
-from mhcgnomes import parse
+from mhcgnomes import parse, parse_gene_class
 
 from ..class1_neural_network import Class1NeuralNetwork
 from ..common import (
@@ -64,13 +64,18 @@ def _is_incomplete_non_predictor_pseudosequence(name, sequence):
 
     parsed_any_class = _parse_mhc_name(name, only_class1=False)
     if parsed_any_class is None:
-        # Legacy allele_sequences.csv artifacts contain a few incomplete
-        # non-predictor rows in old spellings mhcgnomes does not parse, e.g.
-        # Caja-PS*02:01, Caja-DAB*01:01, and SLA-TAP*1*01:01. Preserve the
-        # historical skip for these rows but keep unknown incomplete names
-        # available.
+        gene_class = parse_gene_class(str(name), raise_on_error=False)
+        if gene_class is not None:
+            # Use mhcgnomes' lenient, species-aware classification for names
+            # outside its strict allele ontology, including DAA/DAB/DR-family
+            # class-II genes and known non-MHC helper genes.
+            return gene_class.is_class2 or gene_class.non_mhc
+
+        # A few old spellings remain outside mhcgnomes, including the
+        # family-level TAP form tracked in pirl-unc/mhcgnomes#86. Preserve
+        # their historical skip without classifying arbitrary unknown names.
         return bool(re.search(
-            r"(?:^|[-*])(PS|TAP|DAA|DAB)(?:[-*]|[0-9])", str(name)))
+            r"(?:^|[-*])(PS|TAP)(?:[-*]|[0-9])", str(name)))
 
     parsed_class1 = _parse_mhc_name(name, only_class1=True)
     if parsed_class1 is None:

@@ -180,6 +180,75 @@ def test_hoist_torchinductor_warmup_uses_larger_single_worker_budget(monkeypatch
     assert os.environ["TORCHINDUCTOR_COMPILE_THREADS"] == "64"
 
 
+def test_compile_warmup_preserves_numeric_return_contract(monkeypatch):
+    from mhcflurry.parallelism import torch_compile
+
+    reports = []
+
+    class FakePool:
+        def apply(self, function, args):
+            report = {"worker_peak_rss_gb": len(reports) + 1.0}
+            reports.append(report)
+            return report
+
+        def close(self):
+            pass
+
+        def join(self):
+            pass
+
+        def terminate(self):
+            raise AssertionError("successful warmup should not terminate")
+
+    refined = []
+    monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
+    monkeypatch.setenv("TORCHINDUCTOR_COMPILE_THREADS", "1")
+    monkeypatch.delenv(
+        "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", raising=False)
+    monkeypatch.setattr(
+        torch_compile, "resolve_local_parallelism_args", lambda args: None)
+    monkeypatch.setattr(
+        torch_compile, "num_workers_per_gpu_from_args", lambda args: 1)
+    monkeypatch.setattr(
+        torch_compile,
+        "worker_pool_with_gpu_assignments",
+        lambda **kwargs: FakePool(),
+    )
+    monkeypatch.setattr(
+        torch_compile,
+        "refine_local_parallelism_from_warmup",
+        lambda args, measurements: refined.extend(measurements),
+    )
+    monkeypatch.setattr(
+        torch_compile, "hoist_torchinductor_compile_threads",
+        lambda args, phase: None)
+    args = argparse.Namespace(
+        backend="gpu",
+        cluster_parallelism=False,
+        cpu_threads_per_worker=1,
+        cpu_threads_per_worker_was_auto=False,
+        gpus=1,
+        max_workers_per_gpu=1,
+        num_jobs=2,
+        worker_log_dir=None,
+    )
+    work_items = [
+        {"hyperparameters": {"layer_sizes": [16]}},
+        {"hyperparameters": {"layer_sizes": [32]}},
+        {"hyperparameters": {"layer_sizes": [16]}},
+    ]
+
+    warmed = torch_compile.run_single_worker_torch_compile_warmup(
+        args=args,
+        work_items=work_items,
+        work_function=lambda **kwargs: None,
+    )
+
+    assert warmed == 2
+    assert isinstance(warmed, int)
+    assert refined == reports
+
+
 def test_cluster_worker_compile_threads_auto(monkeypatch):
     from mhcflurry.parallelism import configure_cluster_worker_torch_compile_threads
 

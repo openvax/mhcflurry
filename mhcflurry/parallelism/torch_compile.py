@@ -387,7 +387,4 @@ def run_single_worker_torch_compile_warmup(
         hoist_torchinductor_compile_threads(args, phase="production")
 
     refine_local_parallelism_from_warmup(args, reports)
-    return {
-        "architectures": len(unique_warmup_items),
-        "measurements": tuple(reports),
-    }
+    return len(unique_warmup_items)

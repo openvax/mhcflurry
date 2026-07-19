@@ -36,7 +36,8 @@ DEFAULT_RANDOM_SEED = 42
 
 # IPD-IMGT/HLA classifies these HLA class-I loci as pseudogenes. mhcgnomes
 # exposes ``annotation_pseudogene`` for allele suffixes such as ``Ps``, but
-# does not currently set it for every allele belonging to one of these loci.
+# does not currently expose gene-level pseudogene status. Remove this fallback
+# once pirl-unc/mhcgnomes#85 provides that structured ontology property.
 _HLA_CLASS_I_PSEUDOGENE_GENES = frozenset({
     "H", "J", "K", "L", "N", "P", "R", "S", "T", "U", "V", "W", "Y",
 })
@@ -177,15 +178,6 @@ def normalize_allele_name(
             raise ValueError(message)
         return default_value
 
-    for forbidden_substring in forbidden_substrings:
-        if forbidden_substring in raw_name:
-            if raise_on_error:
-                raise ValueError(
-                    "Unsupported gene in MHC allele name: %s. MHCflurry "
-                    "affinity models support classical MHC class I alleles, "
-                    "not %s-family genes." % (raw_name, forbidden_substring)
-                )
-            return default_value
     result = parse(
         raw_name,
         only_class1=True,
@@ -214,8 +206,7 @@ def normalize_allele_name(
                 "MHCflurry does not choose or average serotype members."
                 % raw_name
             )
-        elif getattr(parsed_any_class, "mhc_class", None) in {
-                "II", "IIa", "IIb"}:
+        elif getattr(parsed_any_class, "is_class2", False):
             message = (
                 "Unsupported MHC class II allele for a class I predictor: "
                 "%s. Use an MHC class I allele and a model containing its "
@@ -235,6 +226,16 @@ def normalize_allele_name(
         if raise_on_error:
             raise ValueError(message)
         return default_value
+    gene_name = getattr(result, "gene_name", "") or ""
+    for forbidden_substring in forbidden_substrings:
+        if forbidden_substring in gene_name:
+            if raise_on_error:
+                raise ValueError(
+                    "Unsupported gene in MHC allele name: %s. MHCflurry "
+                    "affinity models support classical MHC class I alleles, "
+                    "not %s-family genes." % (raw_name, forbidden_substring)
+                )
+            return default_value
     if is_pseudogene_mhc(result):
         if raise_on_error:
             raise ValueError(

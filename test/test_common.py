@@ -118,6 +118,9 @@ def test_canonicalize_allele_series_resolves_aliases_and_drops_junk(caplog):
     ("HLA-H*02:01", "pseudogene MHC allele"),
     ("HLA-A*02:01N", "null-expression MHC allele"),
     ("HLA-A*02:01Q", "questionable-expression MHC allele"),
+    ("MICA*001:01", "Unsupported gene in MHC allele name"),
+    ("HFE*01:01", "Unsupported gene in MHC allele name"),
+    ("MIC-NONSENSE", "Invalid MHC allele name"),
     ("NONSENSE", "Invalid MHC allele name"),
 ])
 def test_normalize_allele_name_reports_specific_failure(raw_name, message):

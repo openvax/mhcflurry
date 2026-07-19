@@ -146,6 +146,9 @@ def test_load_skips_incomplete_non_class1_pseudosequences_with_mhcgnomes(
         "Caja-PS*02:01,XXLEGACYPS\n"
         "Caja-DAA*01:01,XXLEGACYDAA\n"
         "Caja-DAB*01:01,XXLEGACYDAB\n"
+        "Caja-DRA*01:01,XXLENIENTDRA\n"
+        "Caja-BLB*01:01,XXLENIENTBLB\n"
+        "Geja-F10*01:01,XXLENIENTCLASSI\n"
         "Caja-B5*01:01ps,XXPSEUDOGENE\n"
         "HLA-H*02:01,XXHLAPSEUDOGENE\n"
         "NONSENSE,XXUNKNOWN\n"
@@ -158,6 +161,9 @@ def test_load_skips_incomplete_non_class1_pseudosequences_with_mhcgnomes(
 
     assert predictor.allele_to_sequence == {
         "HLA-A*02:01": "COMPLETE",
+        # mhcgnomes classifies this otherwise-unparseable gene as class I,
+        # so it is preserved rather than mistaken for a non-predictor row.
+        "Geja-F10*01:01": "XXLENIENTCLASSI",
         # Unknown names are preserved for backwards compatibility; known
         # non-class-I / unsupported MHC rows are the ones dropped.
         "NONSENSE": "XXUNKNOWN",
