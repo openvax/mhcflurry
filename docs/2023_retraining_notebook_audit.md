@@ -1,4 +1,12 @@
-# 2023 Retraining Notebook Audit
+---
+orphan: true
+---
+
+# 2023 retraining notebook audit
+
+> Maintainer history, not a current user workflow. Use {doc}`evaluation` for
+> current evaluation commands and the release-script README for current remote
+> training and deployment behavior.
 
 This audits the copied notebook bundle in `notebooks/2023-retraining/` against
 the maintained release scripts and 2.3.x evaluation commands. The notebooks are
@@ -38,20 +46,16 @@ committed as the workflow.
   `tensorflow`, `mhcnames` in places). Ports should use the current PyTorch code,
   `mhcgnomes` / existing allele normalization helpers, and maintained CLI
   commands.
-- Current `mhcflurry eval compare-models` covers affinity, processing, and
-  presentation regression metrics, and `mhcflurry eval plot-comparison` renders
-  diagnostic plots. `mhcflurry eval paper-figures render` can render paper-style
-  panels from current compare output, saved score tables, and saved prediction
-  tables. `mhcflurry eval paper-figures score-predictions` materializes the
-  derived AUC / PPV cache tables so repeated figure runs do not recompute them.
-  The remaining non-MHCflurry prerequisites are external-predictor execution
-  (NetMHCpan / MixMHCpred binaries and licenses), exact curated split tables,
-  external supplemental source files, and hand-authored architecture artwork.
-- The current full training script trains processing `no_flank` and
-  `short_flanks` variants, then uses `short_flanks` as the with-flank processing
-  component for presentation. Older download-generation trained a separate
-  `models.selected.with_flanks` variant. That semantic difference should be
-  resolved explicitly before publishing 2.3.0 weights.
+- Current evaluation commands cover affinity, processing, and presentation
+  metrics, diagnostic plots, reusable AUC/PPV score caches, and paper-style
+  figures. The optional `external-predictors` adapter can invoke locally
+  installed NetMHCpan/MixMHCpred runners through `mhctools`; binaries and
+  licenses remain outside MHCflurry. Exact curated split tables, external
+  supplemental sources, and hand-authored architecture artwork remain separate
+  inputs.
+- The processing-variant ambiguity has been resolved. The full release trains
+  `with_flanks`, `no_flank`, and `short_flanks`, and presentation uses the true
+  `with_flanks` predictor by default.
 - Historical runplz files in `jobs/` patched scripts in place for one experiment
   and called deleted comparison scripts. Remote execution is now represented by
   maintained scripts instead of patching a remote copy.
@@ -65,9 +69,9 @@ committed as the workflow.
   orientation through a `higher_is_better` column.
 - Wide benchmark tables: saved monoallelic and multiallelic prediction tables
   can be passed directly with `--monoallelic-predictions` and
-  `--multiallelic-predictions`. The command does not yet run NetMHCpan /
-  MixMHCpred itself; those tools should write canonical saved prediction columns
-  first.
+  `--multiallelic-predictions`. The optional `external-predictors` adapter can
+  populate canonical columns through a locally installed runner; tables
+  produced by other workflows remain valid inputs.
 - Accuracy score tables: `eval paper-figures score-predictions` derives the
   notebook-style AUC / PPV / percent-change tables from canonical saved
   prediction tables. `paper-figures render` can also derive them in-process when
@@ -94,28 +98,25 @@ committed as the workflow.
 - Still deferred: the immunogenicity experiment and any exact supplemental
   source that depends on external files not present in this repository.
 
-## Porting Plan
+## Decisions and remaining work
 
-1. Keep notebooks out of the maintained path; use them only as references.
-2. Keep benchmark prediction tables canonical: one row per evaluated pMHC, a
+1. Notebooks remain references rather than the maintained workflow.
+2. Benchmark prediction tables use one canonical layout: one row per evaluated pMHC, a
    `hit` label, `sample_id` or allele columns, optional `sample_group`, and one
    numeric column per predictor. Allele parsing / normalization should use
    `mhcgnomes` or existing MHCflurry helpers, not ad hoc string matching.
-3. Run external predictor binaries outside MHCflurry's core package, then import
-   their saved prediction columns into the canonical tables. This keeps licensed
-   tools and local paths out of the release code.
+3. External predictor binaries remain outside MHCflurry's core dependencies.
+   The maintained adapter invokes an optional local runner and imports canonical
+   saved columns.
 4. Decide the 2.3.0 holdout policy in one place: PMIDs, pMHC overlap removal,
    and whether evaluation data is filtered out of affinity / processing /
    presentation training. Move any useful logic from `jobs/filter_training...`
    into maintained scripts after that decision.
-5. Resolve the processing variant naming: either train a real
-   `models.selected.with_flanks` variant again or document and test that
-   `short_flanks` is the canonical with-flank presentation input for 2.3.x.
-6. Make release retraining one command:
-   `mhcflurry train pan-allele-release` trains, evaluates, plots, and syncs
-   remote artifacts. It delegates to `scripts/release/retrain_evaluate_deploy.sh`,
-   which supports local execution, Brev/runplz capacity, and SSH-backed remote
-   machines. Deployment is opt-in through `--deploy-mode`.
+5. Processing variant naming is resolved: the release trains a real
+   `models.selected.with_flanks` artifact and uses it for presentation.
+6. Release retraining is available as one command:
+   `mhcflurry train pan-allele-release`. It trains, evaluates, plots, syncs
+   remote artifacts, and leaves deployment opt-in through `--deploy-mode`.
 
 ## Current Single-Command Entry Point
 

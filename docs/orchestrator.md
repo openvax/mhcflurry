@@ -199,15 +199,15 @@ once `auto_max_workers_per_gpu` has resolved. Pass an integer to pin it.
 |---|---|---|---|
 | Pan-allele affinity | ✓ | ✓ (pretrain only) | Default in release recipe; affinity `fit()` is device-resident |
 | Allele-specific affinity | ✓ | ✓ | Same `Class1NeuralNetwork` codebase; auto already wired |
-| Processing | ✓ | (no-op for now) | `Class1ProcessingNeuralNetwork` does not yet expose `dataloader_num_workers`; flag is accepted via shared `add_local_parallelism_args` so argv stays uniform across train_*_command, but `apply_dataloader_num_workers_to_work_items` won't change processing behavior until that hyperparameter is added. |
-| Presentation | n/a | n/a | Single-process today |
+| Processing | ✓ | n/a | Parallel model fits; the processing network has no DataLoader pretraining path. |
+| Presentation | ✓ | n/a | Parallel feature generation followed by deterministic fitting. |
 
 ### Env overrides
 
 | Env var | Default | Effect |
 |---|---|---|
-| `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB` | 4.0 | Per-worker VRAM upper bound for the MWPG resolver (affinity-fit footprint; heavier workloads pass their own via the planner) |
-| `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP` | 4 | SM-scheduler ceiling for MWPG |
+| `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB` | 4.0 generic fallback | Expert per-worker VRAM override; workload-specific estimates normally replace the fallback. |
+| `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP` | unset | Optional expert ceiling for workers per GPU. |
 | `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB` | (auto-detect) | Pin free VRAM (CSV per GPU); for tests / hidden-`nvidia-smi` launchers |
 | `MHCFLURRY_AUTO_DATALOADER_HARD_CAP` | 4 | DL child cap for `auto_dataloader_num_workers` |
 

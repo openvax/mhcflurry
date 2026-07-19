@@ -1,11 +1,127 @@
-# scripts/release/
+# Release workflows
 
-Maintainer helpers for retraining, evaluating, packaging, and publishing model
-artifacts.
+Maintainer tools for retraining, evaluating, synchronizing, packaging, and
+publishing model artifacts. Prediction users do not need these scripts.
 
-## Model deployment
+## End-to-end workflow
 
-```bash
+Use the public command rather than invoking the orchestration shell script
+directly:
+
+```shell
+mhcflurry train pan-allele-release \
+    --run-dir /path/to/release-run \
+    --release 2.3.0 \
+    --backend local
+```
+
+The workflow runs these stages in order:
+
+1. Train affinity, processing, and presentation models.
+2. Compare the new models with a configured public release or run directory.
+3. Render diagnostic plots and a combined PDF.
+4. Copy remote artifacts back when using a remote backend.
+5. Optionally package or deploy model archives.
+
+Each stage has a `--skip-*` option for controlled resumption. Logs and
+`status.tsv` are written under `<run-dir>/workflow_logs/`. Deployment is off by
+default.
+
+The command delegates process orchestration to
+`retrain_evaluate_deploy.sh`. That script remains internal because it owns shell
+training stages, traps, remote lifecycle, telemetry, and artifact
+synchronization.
+
+## Choose a backend
+
+| Backend | Use it when | Required options |
+|---|---|---|
+| `local` | The current machine has the required compute and storage. | None beyond the common arguments. |
+| `brev-existing` | A named Brev instance already exists. | `--brev-instance NAME` |
+| `brev-provision` | The workflow should select or create a Brev instance. | None; the name and shape can be automatic. |
+| `ssh` | Training should run in a specific remote checkout. | `--remote`, `--remote-repo`, `--remote-run-dir` |
+
+SSH authentication comes from the local `ssh` and `rsync` configuration. Before
+training, the workflow verifies the remote commit and tracked worktree so model
+provenance cannot be stamped from a different checkout.
+
+## Brev selection, synchronization, and cleanup
+
+`brev-provision` defaults to automatic inventory selection using the release
+workload requirements: 4 A100-class GPUs with at least 35 GB VRAM each, 32 CPUs,
+300 GB RAM, and 1 TB disk. No resource environment variables are required.
+
+Use one of these options only when the default selection is unsuitable:
+
+- `--brev-provider gcp`, `denvr`, or `denvr-80gb` selects a common release
+  shape.
+- `--brev-instance-type TYPE` selects an exact Brev type and takes precedence
+  over automatic provider selection.
+- `--brev-exclude-providers PREFIXES` removes provider/type prefixes from
+  automatic candidates.
+
+The wrapper verifies remote completion and copies artifacts before changing the
+instance state. The default `--brev-on-finish stop` stops a successful or failed
+run after synchronization. Use `delete` for disposable instances or `leave`
+only for active debugging. If a provisioned instance remains running after a
+successful stop request, the default stop-failure policy deletes it after
+artifacts are safe locally.
+
+`--brev-sync-mode release` copies the artifacts needed for evaluation and
+publication: selected models, logs, events, telemetry, comparisons, plots, and
+generated configuration. Use `--brev-sync-mode full` only for a deliberate
+post-mortem that needs every candidate model and intermediate table.
+
+## Release profiles and performance
+
+`--release-profile full` is the default. It trains the complete processing set:
+`with_flanks`, `no_flank`, and `short_flanks`. Presentation uses the true
+`with_flanks` predictor by default.
+
+Optional profiles are:
+
+- `fast-8xa100`: selects the common 8×A100 80 GB Brev shape when no machine
+  override was supplied.
+- `minimal-processing`: omits `short_flanks` from both training and evaluation.
+- `fast-minimal`: combines those two choices.
+
+The shared training minibatch defaults to 1024. Use
+`--affinity-minibatch-size` or `--processing-minibatch-size` only when a model
+family needs a different value.
+
+Affinity worker packing defaults to `--affinity-max-workers-per-gpu auto`. The
+training command estimates the complete per-worker working set from the model,
+data, configured batch, and detected memory. Pin an integer only after measuring
+a known machine; explicit values bypass automatic packing decisions.
+
+## Evaluation and figures
+
+Evaluation covers affinity, processing, and presentation. The workflow writes
+component metrics, `release_summary.csv`, `release_summary.md`, individual
+plots, and `plots/model_comparison_figures.pdf`. Its default baseline is
+`public:2.0.0`; use `--compare-baseline public` for the currently configured
+public release or provide another run directory/version.
+
+On Brev, comparison and diagnostic plotting run on the GPU instance before
+synchronization. This avoids repeating release-scale inference on a laptop.
+
+Broader paper figures can use saved prediction tables or score caches through
+`--paper-figures-scores-dir` and the explicit
+`--paper-figures-*-predictions` options. Local licensed predictors may be
+prepared while remote training runs with `--paper-figures-prepare-command`;
+their inputs remain on the control machine and render after remote artifacts
+arrive.
+
+See the [evaluation guide](../../docs/evaluation.md) for the canonical output
+map, saved-prediction schema, score orientation, and external-predictor adapter.
+Run `mhcflurry train pan-allele-release --help` for the complete release option
+list.
+
+## Package and deploy models
+
+Package a completed run without uploading it:
+
+```shell
 scripts/release/deploy_trained_models.sh \
     --run-dir /path/to/release-run \
     --release 2.3.0 \
@@ -13,200 +129,14 @@ scripts/release/deploy_trained_models.sh \
     --mode dry-run
 ```
 
-Use `--mode draft` to build archives and upload them to a draft GitHub release.
-Use `--mode publish` only after the GitHub release already exists; this script
-does not publish the release itself because publishing also triggers package
-release workflows.
+The script writes archives, `SHA256SUMS`, and a `downloads.yml` snippet under
+`<run-dir>/release-assets/` by default.
 
-Direct deployment defaults to `--processing-variants "no_flank with_flanks"`.
-Pass `--processing-variants "no_flank with_flanks short_flanks"` only when the
-short-flank model belongs to the release being packaged. The end-to-end release
-wrapper forwards its current variant selection automatically, so leftover model
-directories from an earlier run are never included merely because they exist.
+- `--mode draft` uploads to a draft GitHub release.
+- `--mode publish` uploads only after the GitHub release exists; it does not
+  publish that release because publication also triggers package workflows.
 
-The script writes the tarballs, `SHA256SUMS`, and a `downloads.yml` snippet under
-`<run-dir>/release-assets/` by default. After upload, commit the corresponding
-`mhcflurry/downloads.yml` update in the package release PR.
-
-## End-to-end release workflow
-
-```bash
-mhcflurry train pan-allele-release \
-    --run-dir /path/to/release-run \
-    --release 2.3.0 \
-    --backend local \
-    --release-profile full \
-    --minibatch-size 1024 \
-    --affinity-max-workers-per-gpu auto
-```
-
-Supported backends are:
-
-- `local`: train in the current checkout on the current machine.
-- `brev-existing`: train on a named existing Brev instance. Pass
-  `--brev-instance NAME`; a missing instance is an error.
-- `brev-provision`: train on a named Brev instance, provisioning it if it does
-  not already exist. Pass `--brev-instance NAME` to choose the name, or omit it
-  to let the script generate one from the release and timestamp. The default
-  cleanup policy is `--brev-on-finish stop`; use `leave` for interactive
-  debugging or `delete` for disposable runs. The wrapper, not runplz, owns the
-  final lifecycle: it verifies the remote exit status, syncs
-  `/root/runplz-latest/out` back into `--run-dir`, and only then applies the
-  cleanup policy. If `stop` reports success but Brev still shows the provisioned
-  instance as `RUNNING`, the default `--brev-stop-failure-action delete` removes
-  it after artifacts have synced; use `warn` to keep the instance instead.
-  The default `--brev-sync-mode release` copies only release/evaluation inputs
-  and telemetry: final selected model directories, runplz events, training logs,
-  GPU occupancy, model-comparison outputs, release plots, affinity eval/loss
-  plots, and generated configs. Use
-  `--brev-sync-mode full` only when you deliberately need every unselected
-  candidate model and intermediate CSV for a deep post-mortem.
-  Provisioned full-training runs default to automatic selection from current
-  Brev inventory using the launcher's built-in resource requirements (4x A100,
-  at least 35 GB VRAM per GPU, 32 CPUs, 300 GB RAM, and 1 TB disk). No resource
-  environment overrides are required. Use `--brev-provider gcp`, `denvr`, or
-  `denvr-80gb` for the common pinned release shapes, or
-  `--brev-instance-type TYPE` for any exact Brev type. An exact type takes
-  precedence over automatic selection. For auto-selection,
-  `--brev-exclude-providers PREFIXES` can remove provider/type prefixes such as
-  `oci` from the candidate list.
-- `ssh`: train on a specific remote host, with `--remote`, `--remote-repo`, and
-  `--remote-run-dir`. Authentication comes from local `ssh` / `rsync`
-  configuration, typically SSH keys or an SSH config `Host`.
-
-The command runs training, `mhcflurry eval compare-models`, and
-`mhcflurry eval plot-comparison` in order; each training/evaluation/plot stage
-has a `--skip-*` flag for resuming. Deployment is opt-in: pass
-`--deploy-mode dry-run`, `draft`, or `publish` only when you want the
-model-artifact release step to run. For Brev backends, the expensive
-comparison and plot steps run on the remote GPU machine before artifact sync and
-cleanup, then the local wrapper uses the synced `eval_comparison/` outputs
-instead of repeating release-scale inference on the laptop. Per-step
-stdout/stderr logs and a `status.tsv` file are written under
-`<run-dir>/workflow_logs/`, alongside the training logs copied from the remote
-run (`.runplz/`, `gpu_occupancy.csv`, release driver logs, and
-model-selection/evaluation artifacts).
-
-The public interface is `mhcflurry train pan-allele-release`. Its current
-implementation delegates to `retrain_evaluate_deploy.sh`, an internal process
-orchestration engine for shell training stages, traps, remote lifecycle,
-telemetry, and artifact synchronization.
-
-`--release-profile full` is the default and trains the complete processing
-artifact set (`with_flanks no_flank short_flanks`). Use
-`--release-profile fast-8xa100` for throughput runs on 8xA100 / 80 GB machines:
-with `--backend brev-provision`, it requests the Denvr 8xA100 80 GB shape when
-no provider/type was explicitly supplied. Worker packing still uses
-`--affinity-max-workers-per-gpu auto`; pass an explicit value such as
-`--affinity-max-workers-per-gpu 2` only after validating that it fits and
-improves throughput for that run. Use `--release-profile minimal-processing`
-when short-flanks
-processing artifacts are intentionally out of scope; it trains and evaluates
-only `with_flanks` and `no_flank`. `--release-profile fast-minimal` combines
-both. These profiles are opt-in so the default release path keeps the full
-artifact contract on the configured provider.
-
-Training batch-size knobs are first-class release options. `--minibatch-size`
-sets the shared default (currently 1024); `--affinity-minibatch-size` and
-`--processing-minibatch-size` override individual model families. Affinity
-training defaults to `--affinity-max-workers-per-gpu auto`, so the training
-command estimates per-worker VRAM from the hyperparameter grid, row count, and
-minibatch before choosing GPU worker packing; pass an integer only to pin a
-known-good worker count for a specific machine. Processing variants default to
-`with_flanks no_flank short_flanks`, and the presentation stage uses
-`with_flanks` as its with-flank processing predictor unless
-`--presentation-processing-with-flanks-kind` says otherwise.
-
-Evaluation now includes affinity, processing, and presentation by default. In
-addition to the detailed component CSV/JSON files and plots, `compare-models`
-writes `release_summary.csv` and `release_summary.md` with the release-gate
-tables used to compare newly trained weights against a configurable baseline.
-The release wrapper defaults to `--compare-baseline public:2.0.0`, the closest
-older public model bundle available in `downloads.yml`, and labels the new side
-as `MHCflurry <release>` with any `rcN` suffix stripped. Use
-`--compare-baseline public` for the currently configured public release, or pass
-another training-run directory / `public:<release_name>` plus
-`--compare-baseline-label` to tune the figure labels.
-`eval plot-comparison` now writes both release-diagnostic plots and a
-paper-style `plots/paper/` suite: per-allele affinity scatter panels,
-per-sample processing/presentation scatter panels, per-length bars, delta
-boxplots, and release-summary overview panels. The release wrapper also asks it
-to write vector-first `plots/model_comparison_figures.pdf` so remote runs sync a
-portable publication-review packet without a separate local plotting step.
-
-For the broader paper-style figure suite, pass
-`--paper-figures-scores-dir /path/to/saved/evaluation/outputs` (or set
-`PAPER_FIGURES_SCORES_DIR`). That directory may contain derived score tables
-such as `accuracy_scores.multiallelic.csv`, saved test-set prediction tables
-such as `benchmark.multiallelic.csv.bz2`, or optional metadata/artwork tables.
-You can also pass explicit saved prediction tables with
-`--paper-figures-multiallelic-predictions` and
-`--paper-figures-monoallelic-predictions`. The legacy
-`--paper-figures-artifacts-dir` / `PAPER_FIGURES_ARTIFACTS_DIR` spelling is
-still accepted as an alias for older 2023 bundle paths. The wrapper passes
-those inputs through to `mhcflurry eval plot-comparison`, which invokes
-`mhcflurry eval paper-figures render` and writes SVG/PDF/PNG panels plus
-`paper_figures.pdf`, `manifest.csv`, and `missing_inputs.md` under
-`eval_comparison/plots/paper_figures/`. Figure families whose source tables are
-absent are reported there instead of being faked. The comparator suite is
-configurable through `mhcflurry eval paper-figures render` flags such as
-`--candidate-predictor`, `--external-baselines`, and `--preferred-predictors`;
-the defaults use NetMHCpan 4.0 BA/EL and MixMHCpred when those saved
-prediction columns are available.
-
-For a local model-to-figures pass outside the release wrapper, use
-`mhcflurry eval paper-figures run --a RUN_DIR --b public --out RUN_DIR/eval`.
-That command composes compare-models, paper-figures, and the diagnostic plot
-PDF. Use `mhcflurry eval paper-figures score-predictions` to precompute
-`accuracy_scores.*.csv` caches from canonical saved prediction tables. The
-workflow does not run external predictors itself; external NetMHCpan /
-MixMHCpred outputs should be generated separately and passed as numeric columns
-in those canonical prediction tables. Score direction is explicit: built-in
-predictor names have defaults, and custom score columns should be described in
-`predictor_info.csv` with `predictor` and `higher_is_better` columns (or passed
-to `score-predictions --predictor-info`). See the
-[evaluation artifact map](../../docs/commandline_tools.md#evaluation-and-plotting-artifacts)
-for the full contract.
-
-For Brev-backed training, local paper inputs stay on the control machine by
-default. Remote MHCflurry evaluation runs on the GPU instance, syncs back, and
-then the wrapper renders paper figures locally if `--paper-figures-scores-dir`
-or explicit saved prediction tables were supplied. This is the intended path
-when NetMHCpan/MixMHCpred are installed locally but not on the Brev image. To
-prepare those local inputs during the remote training window, pass
-`--paper-figures-prepare-command "..."`; the command runs in the background on
-the control machine and must write to the directory/file paths also supplied via
-`--paper-figures-scores-dir`, `--paper-figures-multiallelic-predictions`, or
-`--paper-figures-monoallelic-predictions`. If you use `mhctools` for external
-predictors, call it through
-`mhcflurry eval paper-figures external-predictors`: `mhctools` depends on
-MHCflurry, so MHCflurry does not import it or list it as a dependency.
-
-Example:
-
-```bash
-PAPER_BENCHMARK="$PWD/notebooks/2023-retraining/artifacts/benchmark.multiallelic.csv.bz2"
-
-mhcflurry train pan-allele-release \
-    --run-dir runs/2.3.0 \
-    --release 2.3.0 \
-    --backend brev-provision \
-    --paper-figures-scores-dir "$PWD/runs/2.3.0/external_predictions" \
-    --paper-figures-external-baselines "netmhcpan4.2.ba,netmhcpan4.2.el,mixmhcpred" \
-    --paper-figures-prepare-command \
-        "mhcflurry eval paper-figures external-predictors \
-            --input '$PAPER_BENCHMARK' \
-            --out '$PWD/runs/2.3.0/external_predictions/benchmark.multiallelic.csv.bz2' \
-            --predictor netmhcpan42-ba:netmhcpan4.2.ba:affinity \
-            --predictor netmhcpan42-el:netmhcpan4.2.el:score \
-            --predictor mixmhcpred:mixmhcpred:score"
-```
-
-The same release workflow is also available from the unified CLI:
-
-```bash
-mhcflurry train pan-allele-release \
-    --run-dir /path/to/release-run \
-    --release 2.3.0 \
-    --backend brev-provision
-```
+Direct deployment packages `no_flank` and `with_flanks` by default. Include
+`short_flanks` only when it belongs to the current release. The end-to-end
+workflow forwards its exact trained variant set, so stale directories from an
+older run are never packaged merely because they exist.

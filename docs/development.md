@@ -1,6 +1,22 @@
-# Development Maintenance
+# Development
 
-## Private API and Fallback Cleanup
+This page is for contributors working from a source checkout. Prediction users
+can use the installation steps in {doc}`intro` instead.
+
+## Set up a checkout
+
+Source `develop.sh` to create and activate the editable virtual environment:
+
+```shell
+source develop.sh
+```
+
+The script must be sourced so its environment activation persists in the
+current shell. Run `./lint.sh` for lint and use {doc}`testing` to choose a focused
+or full pytest command. Contribution and pull-request expectations are in
+[CONTRIBUTING.md](https://github.com/openvax/mhcflurry/blob/master/CONTRIBUTING.md).
+
+## Private APIs and fallback cleanup
 
 MHCflurry should keep internal helpers movable. Tests and sibling modules should
 not pin underscore-prefixed functions unless the helper is truly private to the

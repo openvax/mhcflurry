@@ -25,15 +25,8 @@ We also release a number of other "downloads," such as curated training data and
 experimental models. To see what's available and what you have downloaded, run
 `mhcflurry-downloads info`.
 
-Most users will only need `models_class1_presentation`, however, as the
-presentation predictor includes a peptide / MHC I binding affinity (BA) predictor
-as well as an antigen processing (AP) predictor.
-
-```{note}
-The code we use for *generating* the downloads is in the
-`downloads_generation` directory in the repository
-(<https://github.com/openvax/mhcflurry/tree/master/downloads-generation>)
-```
+Most users need only `models_class1_presentation`, which includes both the
+binding-affinity and antigen-processing components.
 
 
 ## Generating predictions
@@ -54,8 +47,8 @@ results in a file like this:
 ```{command-output} cat /tmp/predictions.csv
 ```
 
-The binding affinity predictions are given as affinities (KD) in nM in the
-`mhcflurry_affinity` column. Lower values indicate stronger binders. A commonly-used
+The binding predictions are given as predicted affinities in nM in the
+`mhcflurry_affinity` column. Lower values indicate stronger binders. A commonly used
 threshold for peptides with a reasonable chance of being immunogenic is 500 nM.
 
 The `mhcflurry_affinity_percentile` gives the percentile of the affinity
@@ -84,30 +77,6 @@ downstream sequences of the peptides from their source proteins for potentially 
 accurate cleavage prediction. See the {ref}`mhcflurry-predict <ref-mhcflurry-predict>` docs.
 
 
-## Using the older, allele-specific models
-
-Previous versions of MHCflurry (described in the 2018 paper) used models
-trained on affinity measurements, one allele per model (i.e. allele-specific).
-Mass spec datasets were incorporated in the model selection step.
-
-These models are still available to use with the latest version of MHCflurry.
-To download these predictors, run:
-
-```shell
-$ mhcflurry-downloads fetch models_class1
-```
-
-and specify `--models` when you call `mhcflurry-predict`:
-
-```shell
-$ mhcflurry-predict \
-    --alleles HLA-A0201 HLA-A0301 \
-    --peptides SIINFEKL SIINFEKD SIINFEKQ \
-    --models "$(mhcflurry-downloads path models_class1)/models" \
-    --out /tmp/predictions.csv
-```
-
-
 ## Scanning protein sequences for predicted MHC I ligands
 
 Starting in version 1.6.0, MHCflurry supports scanning proteins for MHC-binding
@@ -119,11 +88,12 @@ sequences:
 ```{literalinclude} /example.fasta
 ```
 
-Here's the `mhcflurry-predict-scan` invocation to scan the proteins for
-binders to either of two MHC I genotypes (using a 100 nM threshold):
+Here's a `mhcflurry-predict-scan` invocation using a 100 nM affinity threshold:
 
-```{command-output} mhcflurry-predict-scan example.fasta --alleles HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:02,HLA-C*07:02 HLA-A*01:01,HLA-A*02:06,HLA-B*44:02,HLA-B*07:02,HLA-C*01:02,HLA-C*03:01 --threshold-affinity 100
-:nostderr:
+```shell
+$ mhcflurry-predict-scan example.fasta \
+    --alleles HLA-A*02:01 \
+    --threshold-affinity 100
 ```
 
 See the {ref}`mhcflurry-predict-scan <ref-mhcflurry-predict-scan>` docs for more options.
@@ -191,23 +161,9 @@ The available hyperparameters for binding predictors are defined in
 {class}`~mhcflurry.Class1NeuralNetwork`. To see exactly how
 these are used you will need to read the source code.
 
-:::{note}
-MHCflurry predictors are serialized to disk as many files in a directory. The
-model training command above will write the models to the output directory specified by the
-`--out-models-dir` argument. This directory has files like:
-
-```{program-output} ls "$(mhcflurry-downloads path models_class1)/models"
-:shell:
-:nostderr:
-:ellipsis: 4,-4
-```
-
-The `manifest.csv` file gives metadata for all the models used in the predictor.
-There will be a `weights_...` file for each model giving its weights
-(the parameters for the neural network). The `percent_ranks.csv` stores a
-histogram of model predictions for each allele over a large number of random
-peptides. It is used for generating the percent ranks at prediction time.
-:::
+The output directory is a complete predictor and can be passed to prediction
+commands with `--models`. Its `manifest.csv` records the component models; do
+not copy individual weight files out of that directory.
 
 To fit pan-allele models like the ones released with MHCflurry, you can use
 a similar tool, {ref}`mhcflurry-class1-train-pan-allele-models <ref-mhcflurry-class1-train-pan-allele-models>`. You'll probably
@@ -216,28 +172,14 @@ which are available in the *downloads-generation* directory in the MHCflurry
 repository. See the scripts in the *models_class1_pan* subdirectory to see how the
 fitting and model selection was done for models currently distributed with MHCflurry.
 
-```{note}
-The production MHCflurry models were fit using a cluster with several
-dozen GPUs over a period of about two days. If you model select over fewer
-architectures, however, it should be possible to fit a predictor using less
-resources.
-```
+Released ensembles evaluate many architectures, but smaller searches can be
+trained with substantially fewer resources.
 
 
 ## Evaluating trained models
 
-After fitting a model, evaluate it before using it as a default predictor. The
-usual workflow is:
-
-1. Compare a trained run directory against a baseline.
-2. Render diagnostic plots from the comparison output.
-3. Optionally render the broader paper-style figure suite from cached benchmark
-   predictions or saved external-predictor outputs.
-
-The command reference has a compact table of the
-{ref}`evaluation and plotting artifact layers <ref-mhcflurry-eval-artifacts>`.
-
-For a local comparison against the installed public models:
+After fitting a model, compare it with a released predictor before using it as a
+default. A local comparison and diagnostic PDF take two commands:
 
 ```shell
 $ mhcflurry eval compare-models \
@@ -250,203 +192,28 @@ $ mhcflurry eval plot-comparison \
     --summary-pdf results/new_run/eval_comparison/plots/model_comparison_figures.pdf
 ```
 
-`eval compare-models` writes detailed component CSV/JSON files plus
-`release_summary.csv` and `release_summary.md`. `eval plot-comparison` reads
-that directory and writes ROC/PR/scatter/delta plots.
+The {doc}`evaluation` guide explains the output layers, saved-prediction schema,
+paper-style figures, and remote release behavior.
 
-To include paper-style figures from saved benchmark prediction tables or
-derived score tables:
+## Using older allele-specific models
 
-```shell
-$ mhcflurry eval paper-figures score-predictions \
-    --kind multiallelic \
-    --input results/new_run/eval_inputs/benchmark.multiallelic.csv.bz2 \
-    --out results/new_run/eval_inputs/accuracy_scores.multiallelic.csv
-
-$ mhcflurry eval paper-figures render \
-    --comparison-dir results/new_run/eval_comparison/ \
-    --scores-dir results/new_run/eval_inputs/ \
-    --out results/new_run/eval_comparison/plots/paper_figures/
-```
-
-Saved prediction tables should contain a `hit` column, a grouping column such as
-`sample_id` or `allele`, optional peptide metadata, and one numeric score column
-per predictor. External tools such as NetMHCpan or MixMHCpred are run outside
-MHCflurry and enter the pipeline as additional numeric columns in those saved
-tables.
-
-Score direction is explicit. Built-in predictor names such as
-`mhcflurry_production`, `netmhcpan4.ba`, `netmhcpan4.el`, and `mixmhcpred` have
-known orientation. For custom numeric predictor columns, provide
-`predictor_info.csv` with `predictor` and `higher_is_better` columns in the
-same directory passed as `--scores-dir`, or pass it directly to
-`score-predictions`:
+MHCflurry still distributes the allele-specific predictors described in the
+2018 paper. Download them and pass their model directory explicitly:
 
 ```shell
-$ mhcflurry eval paper-figures score-predictions \
-    --kind multiallelic \
-    --input results/new_run/eval_inputs/benchmark.multiallelic.csv.bz2 \
-    --predictor-info results/new_run/eval_inputs/predictor_info.csv \
-    --out results/new_run/eval_inputs/accuracy_scores.multiallelic.csv
+$ mhcflurry-downloads fetch models_class1
+$ mhcflurry-predict \
+    --alleles HLA-A0201 HLA-A0301 \
+    --peptides SIINFEKL SIINFEKD SIINFEKQ \
+    --models "$(mhcflurry-downloads path models_class1)/models" \
+    --out /tmp/predictions.csv
 ```
 
-For the common local path, the same steps can be composed:
+Use the current pan-allele presentation bundle unless you specifically need
+these historical models.
 
-```shell
-$ mhcflurry eval paper-figures run \
-    --a results/new_run/ \
-    --b public \
-    --out results/new_run/eval_comparison/
-```
+## Configuration and command reference
 
-That command is intentionally an evaluation command, not a training or remote
-provisioning command. For full release retraining on a remote GPU machine,
-including synchronization, cleanup, evaluation, and plots, use:
-
-```shell
-$ mhcflurry train pan-allele-release \
-    --run-dir results/release-run/ \
-    --release 2.3.0 \
-    --backend brev-provision
-```
-
-Deployment is opt-in for that workflow. Add `--deploy-mode dry-run`, `draft`,
-or `publish` only when you want to package or upload model artifacts.
-
-
-## Environment variables
-
-MHCflurry behavior can be modified using these environment variables:
-
-`MHCFLURRY_DEFAULT_CLASS1_MODELS`
-: Path to models directory. If you call `Class1AffinityPredictor.load()`
-  with no arguments, the models specified in this environment variable will be
-  used. If this environment variable is undefined, the downloaded models for
-  the current MHCflurry release are used.
-
-`MHCFLURRY_OPTIMIZATION_LEVEL`
-: The pan-allele models can be somewhat slow. As an optimization, when this
-  variable is greater than 0 (default is 1), we merge the pan-allele models in
-  the ensemble into a single combined network. In our experiments
-  it gives about a 30% speed improvement. It has no effect on allele-specific
-  models. Set this variable to 0 to disable this behavior. This may be helpful
-  if you are running out of memory using the pan-allele models.
-
-`MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE`
-: Prediction batch size. By default this is `auto`, sized at runtime from
-  available GPU memory. Set this environment variable to a fixed integer to
-  pin it (affects both allele-specific and pan-allele predictors). Increasing
-  the batch size can speed up large prediction tasks; decrease it if you run
-  out of memory.
-
-## Auto-resolved training/calibration knobs
-
-Several CLI flags accept the literal string `auto` and resolve to a
-hardware-derived value at runtime. These cover the moving pieces that
-used to require manual tuning per-box:
-
-`--max-workers-per-gpu auto`
-: Number of training workers to schedule on each GPU. Resolved from
-  free VRAM and a per-worker VRAM budget. The budget defaults to 4 GB (the
-  affinity-fit footprint) and is tunable via the env var
-  `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`; the calibrate path uses a
-  larger budget (24 GB, for its `cached_stages` cache) supplied by the workload
-  planner rather than the env default.
-
-`--dataloader-num-workers auto`
-: DataLoader child count for the streaming pretraining path. Resolved
-  from cores, RAM, and the training-worker plan. Affinity fine-tuning is
-  device-resident and does not use this DataLoader.
-
-`--torch-compile auto`
-: Enables `torch.compile` only on CUDA/MPS where the warmup cost
-  amortizes; falls back to eager on CPU. Compile threads come from
-  `TORCHINDUCTOR_COMPILE_THREADS`.
-
-`--num-jobs auto`
-: Total worker pool size; resolved as `gpus × max_workers_per_gpu`.
-
-`--gpus N`
-: Number of CUDA GPUs to fan workers across (prediction and training
-  commands). Not an `auto` knob — it defaults to every visible device.
-  When `CUDA_VISIBLE_DEVICES` is set, `N` is a count *within* that set.
-  Workers are spawn-context and GPU-pinned via `CUDA_VISIBLE_DEVICES`.
-
-When these resolvers misjudge (most often the calibrate auto-sizer's
-cache-bytes estimate when the merged ensemble has many sub-networks),
-hard-pin the value with an integer instead and the resolver is
-bypassed. The auto-sizer logs every input it used at INFO so the
-post-mortem is visible in the log.
-
-## Reproducibility (`--random-seed`, new in 2.3.0)
-
-Every training and calibration command — `class1-train-pan-allele-models`,
-`class1-train-allele-specific-models`, `class1-train-processing-models`,
-`class1-train-presentation-models`, `class1-select-allele-specific-models`,
-and `calibrate-percentile-ranks` — takes a single `--random-seed N` that
-controls **all** of that command's randomness (fold assignment, dispatch/data
-shuffles, weight init, random negatives, allele sampling, and the calibration
-peptide universe). (`class1-train-presentation-models` accepts the flag for
-consistency but has no stochastic step today.)
-
-`--random-seed` defaults to **42**, so training and calibration reproduce
-bit-for-bit out of the box. Pass `--random-seed N` for a different but
-still reproducible run; the resolved master seed is logged at startup.
-Ensemble members and per-fit work derive distinct sub-seeds from the
-master, so seeding does not reduce diversity. The direct Python APIs
-(`fit()`, `fit_streaming_batches()`, `fit_allele_specific_predictors()`)
-take a matching `seed=` keyword that defaults to `None` — i.e. the prior
-stochastic behavior — so library callers are unaffected unless they opt in.
-
-## Unified `mhcflurry` command (new in 2.3.0)
-
-Every command on this page is now reachable two ways:
-
-* `mhcflurry <subcommand>` — the unified form (`mhcflurry predict`,
-  `mhcflurry downloads fetch`, `mhcflurry class1-train-pan-allele-models`,
-  etc.). One help surface via `mhcflurry --help`.
-* `mhcflurry-<subcommand>` — the historical standalone form
-  (`mhcflurry-predict`, `mhcflurry-downloads`, etc.). Still installed
-  as a compat shim; both forms run the same underlying entry point.
-
-Evaluation tools are new in 2.3.0 and live under the `eval` namespace:
-
-* {ref}`mhcflurry eval <ref-mhcflurry-eval>` — groups model comparison,
-  diagnostic plotting, and paper-style figure workflows.
-* {ref}`mhcflurry compare-models <ref-mhcflurry-compare-models>` — compatibility
-  shortcut for `mhcflurry eval compare-models`; compares
-  two ensembles (run-vs-run or run-vs-public) across affinity,
-  presentation, and training-stats components.
-* {ref}`mhcflurry plot-model-comparison <ref-mhcflurry-plot-model-comparison>`
-  — compatibility shortcut for `mhcflurry eval plot-comparison`; renders
-  ROC/PR/scatter/delta plots from a `compare-models` output directory.
-
-Example:
-
-```shell
-$ mhcflurry eval compare-models \
-        --a results/new_run/ \
-        --b public \
-        --out results/comparison/
-
-$ mhcflurry eval plot-comparison --input results/comparison/
-```
-
-`--b` defaults to `public`, which resolves to the currently-installed
-mhcflurry release. Use `public:<release_name>` to pin a specific
-release. Component autoskip: training_stats / affinity / presentation
-each run only when both sides have the corresponding artifact.
-
-## Also new in 2.3.0
-
-* Affinity `fit()` uses **device-resident** tensors on the active
-  torch backend. Real examples and the mutable random-negative slice are
-  materialized once per fit and minibatches are formed by tensor indexing.
-  Set the `fit_tensor_residency` hyperparameter to `"host"` only for
-  compatibility/debugging of the legacy host random-negative encoder path.
-* The pan-allele calibrate command has a GPU fast path
-  (`--gpu-batched`) that batches alleles into a single forward and
-  computes the percent-rank histogram + motif summary on device. ~4×
-  faster per worker than the legacy per-allele path; per-allele
-  output (`percent_ranks.csv.bz2`, `frequency_matrices.csv.bz2`,
-  `length_distributions.csv.bz2`) is bit-equal to the legacy schema.
+See {doc}`configuration` for prediction batches, hardware autosizing,
+reproducibility, and unified command aliases. The complete generated argument
+reference is in {doc}`commandline_tools`.

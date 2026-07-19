@@ -2,25 +2,11 @@
 
 See also the {ref}`tutorial <commandline_tutorial>`.
 
-Starting in 2.3.0, MHCflurry installs a unified `mhcflurry` parent
-command whose subcommands share one help surface (`mhcflurry --help`).
-Every historical `mhcflurry-*` console script is also reachable as
-`mhcflurry <subcommand>` (`mhcflurry-predict` ↔ `mhcflurry predict`,
-`mhcflurry-class1-train-pan-allele-models` ↔
-`mhcflurry class1-train-pan-allele-models`, etc.). Both forms run the
-same underlying entry point; the legacy `mhcflurry-*` scripts remain
-installed as compat shims and are not changing.
-
-The evaluation commands new in 2.3.0 are grouped under
-`mhcflurry eval`. The older top-level forms (`mhcflurry compare-models`,
-`mhcflurry plot-model-comparison`, and `mhcflurry paper-figures`) remain
-available as compatibility shortcuts.
-
-Release-training orchestration is grouped under `mhcflurry train`. The
-`pan-allele-release` workflow is a source-checkout command that delegates to
-the maintained release script, so it can provision remote machines, run
-evaluation/plots remotely, sync artifacts back, and optionally deploy model
-archives without duplicating orchestration logic in Python.
+MHCflurry 2.3.0 provides a unified `mhcflurry` command while retaining the
+historical `mhcflurry-*` names. Both forms use the same implementation. See
+{doc}`configuration` for the naming convention, {doc}`evaluation` for the
+evaluation workflow, and the generated argument reference below for every
+option.
 
 ## Prediction and data
 
@@ -144,36 +130,9 @@ Subcommands:
 
 ### Evaluation and Plotting Artifacts
 
-The plotting commands are layered so expensive prediction and metric work can
-be cached and reused:
-
-| Layer | Command | Reads | Writes | Purpose |
-|---|---|---|---|---|
-| Metrics | `mhcflurry eval compare-models` | A candidate run and a baseline run or public release | `eval_comparison/` CSV/JSON metrics, `release_summary.csv`, `release_summary.md` | Produce reusable evaluation data without importing matplotlib. |
-| Diagnostics | `mhcflurry eval plot-comparison` | `eval_comparison/` | `eval_comparison/plots/`, optional `model_comparison_figures.pdf` | Render release-review ROC/PR/scatter/delta plots. |
-| External predictor columns | `mhcflurry eval paper-figures external-predictors` | Canonical benchmark table plus an optional local external-predictor runner such as `mhctools` | Benchmark table with added NetMHCpan/MixMHCpred-style columns | Run licensed external predictors locally without adding them as MHCflurry dependencies. |
-| Score cache | `mhcflurry eval paper-figures score-predictions` | Saved benchmark prediction table | `accuracy_scores.multiallelic.csv` or `accuracy_scores.monoallelic.csv` | Cache per-sample/per-allele AUC and PPV tables for repeated figure runs. |
-| Paper figures | `mhcflurry eval paper-figures render` | `eval_comparison/`, score cache, saved prediction tables, optional metadata/artwork | SVG/PDF/PNG panels, `paper_figures.pdf`, `manifest.csv`, `missing_inputs.md` | Render publication-style panels and report unavailable optional inputs. |
-| Local composition | `mhcflurry eval paper-figures run` | Candidate/baseline model directories | A fresh comparison plus diagnostic and paper figures | One-command local eval-to-figures path for already-trained models. |
-
-Saved prediction tables use a small canonical schema: `hit`, a grouping column
-(`sample_id` for multiallelic or `allele` / `hla` for monoallelic), optional
-peptide metadata, and one numeric score column per predictor. External tools
-such as NetMHCpan or MixMHCpred should be run separately and registered as
-additional numeric columns. Score direction is explicit: built-in predictor
-names have defaults, while custom predictor columns require
-`predictor_info.csv` rows with `predictor` and `higher_is_better`.
-
-For remote release training, `mhcflurry train pan-allele-release` can run a
-local `--paper-figures-prepare-command` on the control machine while the Brev
-training job is active. Use that hook for locally installed external predictors;
-the command should write to the same `--paper-figures-scores-dir` or saved
-prediction paths passed to the release workflow.
-
-The maintained `external-predictors` adapter invokes optional runner
-executables such as `mhctools` as subprocesses. `mhctools` depends on
-MHCflurry, so it is not an MHCflurry package dependency and is never imported by
-the core library.
+The commands deliberately separate reusable metrics from rendering. See
+{doc}`evaluation` for the output map, saved-prediction schema, paper-figure
+workflow, and external-predictor integration.
 
 ```{eval-rst}
 .. _ref-mhcflurry-compare-models:
@@ -192,31 +151,8 @@ the core library.
     :prog: mhcflurry paper-figures
 ```
 
-Prefer the namespaced form in new automation:
-
-```shell
-mhcflurry eval compare-models --a results/new_run --b public --out results/eval
-mhcflurry eval plot-comparison --input results/eval
-mhcflurry eval paper-figures render --comparison-dir results/eval --out results/eval/plots/paper_figures
-mhcflurry eval paper-figures run --a results/new_run --b public --out results/eval
-```
-
-The `paper-figures` subcommands use the artifact contract above. External
-predictor binaries such as NetMHCpan and MixMHCpred still need to produce saved
-prediction columns before they enter this pipeline.
-
-For release-style training plus remote evaluation/plotting, use the training
-namespace:
-
-```shell
-mhcflurry train pan-allele-release \
-    --run-dir results/release-run \
-    --release 2.3.0 \
-    --backend brev-provision
-```
-
-Deployment is not part of the default path. Add `--deploy-mode dry-run`,
-`draft`, or `publish` only when you want to package/upload model artifacts.
+Prefer the namespaced `mhcflurry eval ...` form in new automation. Compatibility
+shortcuts remain available for existing scripts.
 
 ## Pseudosequence registry helper
 
