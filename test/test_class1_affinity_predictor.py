@@ -220,6 +220,38 @@ def test_invalid_alleles_raise_or_return_row_aligned_nans(caplog):
     assert numpy.isnan(ranks).all()
 
 
+def test_tolerant_prediction_handles_nan_normalized_allele(monkeypatch):
+    """Pandas may coerce the internal None sentinel to floating NaN."""
+    class ConstantModel:
+        supported_peptide_lengths = (8, 15)
+
+        def predict(self, peptides, **kwargs):
+            return numpy.full(len(peptides), 123.0)
+
+    predictor = Class1AffinityPredictor(
+        allele_to_allele_specific_models={
+            "HLA-A*02:01": [ConstantModel()],
+        },
+    )
+    monkeypatch.setattr(
+        predictor,
+        "_canonicalize_prediction_alleles",
+        lambda alleles, throw: ["HLA-A*02:01", numpy.nan],
+    )
+
+    result = predictor.predict_to_dataframe(
+        peptides=["SIINFEKL", "SIINFEKL"],
+        alleles=["HLA-A0201", "invalid"],
+        throw=False,
+        include_percentile_ranks=False,
+        include_confidence_intervals=False,
+    )
+
+    assert result.allele.tolist() == ["HLA-A*02:01", "invalid"]
+    assert result.prediction.iloc[0] == pytest.approx(123.0)
+    assert numpy.isnan(result.prediction.iloc[1])
+
+
 @pytest.mark.parametrize("filename,sequence", [
     (
         PSEUDOSEQUENCE_FILENAMES_BY_LENGTH[34],

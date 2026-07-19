@@ -1369,20 +1369,22 @@ class Class1AffinityPredictor(object):
                 [allele], throw=throw)[0]
             df["allele"] = (
                 normalized_allele
-                if normalized_allele is not None
+                if pandas.notna(normalized_allele)
                 else allele
             )
             df["normalized_allele"] = normalized_allele
-            unique_alleles = [normalized_allele]
         else:
             normalized_alleles = self._canonicalize_prediction_alleles(
                 alleles, throw=throw)
             df["allele"] = [
-                normalized if normalized is not None else raw
+                normalized if pandas.notna(normalized) else raw
                 for (raw, normalized) in zip(alleles, normalized_alleles)
             ]
             df["normalized_allele"] = normalized_alleles
-            unique_alleles = df.normalized_allele.unique()
+        unique_alleles = [
+            value for value in df.normalized_allele.unique()
+            if pandas.notna(value)
+        ]
 
         if len(df) == 0:
             # No predictions.
@@ -1448,7 +1450,7 @@ class Class1AffinityPredictor(object):
         max_single_allele_models = max(
             len(self.allele_to_allele_specific_models.get(allele, []))
             for allele in unique_alleles
-        )
+        ) if unique_alleles else 0
         predictions_array = numpy.zeros(
             shape=(df.shape[0], num_pan_models + max_single_allele_models),
             dtype="float64")
@@ -1457,12 +1459,8 @@ class Class1AffinityPredictor(object):
         if self.class1_pan_allele_models:
             master_allele_encoding = self.master_allele_encoding
             unsupported_alleles = [
-                allele for allele in
-                df.normalized_allele.unique()
-                if (
-                    allele is not None
-                    and allele not in self.allele_to_sequence
-                )
+                allele for allele in unique_alleles
+                if allele not in self.allele_to_sequence
             ]
             if unsupported_alleles:
                 truncate_at = 100
@@ -1525,10 +1523,7 @@ class Class1AffinityPredictor(object):
         if self.allele_to_allele_specific_models:
             unsupported_alleles = [
                 allele for allele in unique_alleles
-                if (
-                    allele is not None
-                    and not self.allele_to_allele_specific_models.get(allele)
-                )
+                if not self.allele_to_allele_specific_models.get(allele)
             ]
             if unsupported_alleles:
                 msg = (
@@ -1542,7 +1537,10 @@ class Class1AffinityPredictor(object):
 
             for allele in unique_alleles:
                 models = self.allele_to_allele_specific_models.get(allele, [])
-                if len(unique_alleles) == 1 and all_peptides_supported:
+                if (
+                        len(unique_alleles) == 1
+                        and all_peptides_supported
+                        and df.normalized_allele.notnull().all()):
                     mask = None
                 else:
                     mask = (
