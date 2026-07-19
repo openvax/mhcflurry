@@ -62,6 +62,7 @@ from ..parallelism import (
     chunk_ranges_for_local_parallelism,
     worker_pool_with_gpu_assignments_from_args,
 )
+from ..pytorch_sizing import default_prediction_batch_is_auto
 from ..pseudosequences import LEGACY_ALLELE_SEQUENCES_FILENAME
 from ..workload_planning import (
     WORKLOAD_AFFINITY_INFERENCE,
@@ -793,7 +794,7 @@ def _parallel_affinity_predict(
         args,
         workload_name=WORKLOAD_AFFINITY_INFERENCE,
         workload_hints={
-            "elastic_batch": True,
+            "elastic_batch": default_prediction_batch_is_auto(),
             "model_bytes": (
                 model_bytes or model_artifact_size_bytes(predictor_dir)),
             "prediction_rows": len(peptides),
@@ -1304,7 +1305,7 @@ def _parallel_presentation_predict(
         args,
         workload_name=WORKLOAD_PRESENTATION_INFERENCE,
         workload_hints={
-            "elastic_batch": True,
+            "elastic_batch": default_prediction_batch_is_auto(),
             "model_bytes": (
                 model_bytes or model_artifact_size_bytes(predictor_dir)),
             "prediction_rows": len(df),

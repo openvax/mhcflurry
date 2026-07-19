@@ -31,6 +31,11 @@ if os.environ.get("MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"):
     )
 
 
+def default_prediction_batch_is_auto():
+    """Whether the effective default prediction batch can shrink on OOM."""
+    return DEFAULT_PREDICT_BATCH_SIZE in (None, "auto")
+
+
 def begin_peak_memory_measurement():
     """Reset CUDA peak counters and return an opaque measurement token."""
     token = {"started": True}

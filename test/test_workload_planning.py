@@ -24,7 +24,18 @@ import os
 import numpy
 import pytest
 
-from mhcflurry import workload_planning as wp
+from mhcflurry import pytorch_sizing, workload_planning as wp
+
+
+def test_default_prediction_batch_elasticity_follows_effective_default(
+        monkeypatch):
+    monkeypatch.setattr(
+        pytorch_sizing, "DEFAULT_PREDICT_BATCH_SIZE", "auto")
+    assert pytorch_sizing.default_prediction_batch_is_auto()
+
+    monkeypatch.setattr(
+        pytorch_sizing, "DEFAULT_PREDICT_BATCH_SIZE", 8192)
+    assert not pytorch_sizing.default_prediction_batch_is_auto()
 
 
 def test_model_artifact_size_uses_uncompressed_npz_members(tmp_path):
@@ -40,6 +51,41 @@ def test_elastic_inference_uses_model_artifacts_not_static_profile():
     )
     assert estimate["device_worker_gb"] == pytest.approx(13.5)
     assert "uncompressed model artifacts" in estimate["notes"]
+
+
+def test_elastic_inference_preserves_explicit_worker_memory(monkeypatch):
+    env_name = "MHCFLURRY_WORKLOAD_AFFINITY_INFERENCE_PER_WORKER_GB"
+    monkeypatch.setenv(env_name, "12.0")
+    estimate = wp.estimate_workload_memory(
+        wp.WORKLOAD_AFFINITY_INFERENCE,
+        {"model_bytes": wp.GIB, "elastic_batch": True},
+    )
+    assert estimate["device_worker_gb"] == 12.0
+    assert "env override" in estimate["notes"]
+
+    monkeypatch.delenv(env_name)
+    estimate = wp.estimate_workload_memory(
+        wp.WORKLOAD_AFFINITY_INFERENCE,
+        {
+            "model_bytes": wp.GIB,
+            "elastic_batch": True,
+            "per_worker_gb": 11.0,
+        },
+    )
+    assert estimate["device_worker_gb"] == 11.0
+    assert "command estimate" in estimate["notes"]
+
+
+def test_elastic_inference_applies_artifact_floor_to_small_override(
+        monkeypatch):
+    env_name = "MHCFLURRY_WORKLOAD_AFFINITY_INFERENCE_PER_WORKER_GB"
+    monkeypatch.setenv(env_name, "1.0")
+    estimate = wp.estimate_workload_memory(
+        wp.WORKLOAD_AFFINITY_INFERENCE,
+        {"model_bytes": wp.GIB, "elastic_batch": True},
+    )
+    assert estimate["device_worker_gb"] == pytest.approx(2.7)
+    assert "uncompressed model artifact floor" in estimate["notes"]
 
 
 # ---------------------------------------------------------------------------

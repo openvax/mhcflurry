@@ -1758,6 +1758,74 @@ def test_processing_metrics_use_shared_non_nan_rows():
     assert summary["n_hits"] == 2
 
 
+def test_comparison_elastic_hints_follow_effective_batch_default(
+        monkeypatch):
+    captured = []
+
+    def fake_worker_pool(
+            args, workload_name, workload_hints, start_method=None):
+        del args
+        assert start_method == "spawn"
+        captured.append((workload_name, dict(workload_hints)))
+        return None
+
+    args = argparse.Namespace(
+        backend="cpu",
+        gpus=0,
+        max_workers_per_gpu=1,
+        num_jobs=1,
+    )
+    benchmark = pandas.DataFrame({
+        "peptide": ["SIINFEKL"],
+        "sample_id": ["sample"],
+        "hla": ["HLA-A*02:01"],
+        "hit": [1],
+        "peptide_len": [8],
+        "n_flank": ["NNN"],
+        "c_flank": ["CCC"],
+    })
+    monkeypatch.setattr(
+        compare_models,
+        "worker_pool_with_gpu_assignments_from_args",
+        fake_worker_pool,
+    )
+    monkeypatch.setattr(
+        compare_models, "default_prediction_batch_is_auto", lambda: False)
+    monkeypatch.setattr(
+        compare_models,
+        "_predict_affinity_chunk",
+        lambda *_args, **_kwargs: (0, numpy.asarray([1.0])),
+    )
+    monkeypatch.setattr(
+        compare_models,
+        "_predict_processing_chunk",
+        lambda *_args, **_kwargs: (0, numpy.asarray([0.5])),
+    )
+    monkeypatch.setattr(
+        compare_models,
+        "_predict_presentation_chunk",
+        lambda *_args, **_kwargs: (0, pandas.DataFrame(index=[0])),
+    )
+
+    compare_models._parallel_affinity_predict(
+        args, "models", ["SIINFEKL"], ["HLA-A*02:01"], model_bytes=1)
+    compare_models._parallel_processing_predict(
+        args, "models", benchmark, "with_flanks", "candidate",
+        model_bytes=1)
+    compare_models._parallel_presentation_predict(
+        args, "models", benchmark, "with_flanks", "candidate",
+        model_bytes=1)
+
+    assert [
+        (workload_name, hints["elastic_batch"])
+        for workload_name, hints in captured
+    ] == [
+        (compare_models.WORKLOAD_AFFINITY_INFERENCE, False),
+        (compare_models.WORKLOAD_PROCESSING_INFERENCE, True),
+        (compare_models.WORKLOAD_PRESENTATION_INFERENCE, False),
+    ]
+
+
 def test_processing_comparison_rejects_missing_requested_mode(
         monkeypatch, tmp_path):
     side_a_root = tmp_path / "side-a-processing"

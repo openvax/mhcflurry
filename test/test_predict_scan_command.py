@@ -237,6 +237,8 @@ def test_empty_and_populated_schemas_match():
 
 def test_parallel_path_does_not_load_predictor_before_pool(monkeypatch):
     """Parallel pools must be created before PyTorch predictor state loads."""
+    captured = {}
+
     class FakePool:
         def __init__(self):
             self.closed = False
@@ -274,7 +276,8 @@ def test_parallel_path_does_not_load_predictor_before_pool(monkeypatch):
             workload_name,
             workload_hints,
             start_method=None):
-        del workload_name, workload_hints
+        del workload_name
+        captured["workload_hints"] = dict(workload_hints)
         assert start_method == "spawn"
         args.num_jobs = 2
         args.max_workers_per_gpu = 1
@@ -288,6 +291,11 @@ def test_parallel_path_does_not_load_predictor_before_pool(monkeypatch):
         predict_scan_command,
         "worker_pool_with_gpu_assignments_from_args",
         fake_worker_pool)
+    monkeypatch.setattr(
+        predict_scan_command,
+        "default_prediction_batch_is_auto",
+        lambda: False,
+    )
 
     deletes = []
     try:
@@ -308,6 +316,7 @@ def test_parallel_path_does_not_load_predictor_before_pool(monkeypatch):
             os.unlink(delete)
 
     assert result.peptide.tolist() == ["ASDFGHKL"]
+    assert captured["workload_hints"]["elastic_batch"] is False
 
 
 def test_parallel_affinity_only_output_globally_sorted(monkeypatch):

@@ -501,13 +501,16 @@ def estimate_workload_memory(workload_name=WORKLOAD_GENERIC, hints=None):
     profile = get_workload_profile(workload_name)
     notes = []
     data_gb = (hints.get("data_bytes") or 0) / GIB
+    explicit_device_worker_gb = False
 
     workload_env = _workload_env_name(profile.name)
     if os.environ.get(workload_env) not in (None, ""):
         device_worker_gb = env_float(workload_env, 0.0, bounds=(0.0, None))
+        explicit_device_worker_gb = True
         notes.append("env override")
     elif hints.get("per_worker_gb") is not None:
         device_worker_gb = float(hints["per_worker_gb"])
+        explicit_device_worker_gb = True
         notes.append("command estimate")
     else:
         device_worker_gb = profile.device_worker_gb
@@ -520,7 +523,7 @@ def estimate_workload_memory(workload_name=WORKLOAD_GENERIC, hints=None):
             DEVICE_RUNTIME_BASE_GB
             + float(model_bytes) / GIB * MODEL_TENSOR_SAFETY_FACTOR
         )
-        if hints.get("elastic_batch"):
+        if hints.get("elastic_batch") and not explicit_device_worker_gb:
             # Activations are sized later from live memory. For inference the
             # launcher only needs parameters plus the CUDA/runtime base.
             device_worker_gb = artifact_worker_gb
