@@ -14,11 +14,14 @@
 
 import logging
 
+import pytest
+
 from mhcflurry.common import (
     allele_locus_name,
     filter_canonicalizable_alleles,
     AlleleKeyResolver,
     canonicalize_allele_series,
+    normalize_allele_name,
 )
 
 
@@ -66,7 +69,6 @@ def test_allele_key_resolver_priority():
 
 
 def test_allele_key_resolver_raises_on_junk():
-    import pytest
     with pytest.raises(ValueError):
         AlleleKeyResolver(set()).resolve("NONSENSE", raise_on_error=True)
     assert AlleleKeyResolver(set()).resolve(
@@ -107,3 +109,19 @@ def test_canonicalize_allele_series_resolves_aliases_and_drops_junk(caplog):
     # Every non-None result is a member of the key set.
     assert all(x in set(keys) for x in out if x is not None)
     assert "Dropping 1 training alleles" in caplog.text
+
+
+@pytest.mark.parametrize(("raw_name", "message"), [
+    ("HLA-DQA1*01:01", "MHC class II allele"),
+    ("HLA-A2", "serotype is not a specific allele"),
+    ("Caja-B5*01:01ps", "pseudogene MHC allele"),
+    ("HLA-H*02:01", "pseudogene MHC allele"),
+    ("HLA-A*02:01N", "null-expression MHC allele"),
+    ("HLA-A*02:01Q", "questionable-expression MHC allele"),
+    ("NONSENSE", "Invalid MHC allele name"),
+])
+def test_normalize_allele_name_reports_specific_failure(raw_name, message):
+    with pytest.raises(ValueError, match=message):
+        normalize_allele_name(raw_name)
+    assert normalize_allele_name(
+        raw_name, raise_on_error=False, default_value="invalid") == "invalid"

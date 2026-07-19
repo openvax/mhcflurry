@@ -336,7 +336,10 @@ class Class1PresentationPredictor(object):
         df["peptide_num"] = df.index
         if sample_names is None:
             peptides = EncodableSequences.create(peptides)
-            all_alleles = sorted({a for lst in alleles.values() for a in lst})
+            all_alleles = sorted(
+                {a for lst in alleles.values() for a in lst},
+                key=lambda value: str(value),
+            )
 
             if verbose > 0:
                 print("Predicting affinities.")

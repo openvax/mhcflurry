@@ -2168,6 +2168,70 @@ def test_plot_model_comparison_rejects_missing_component_without_cleanup(
     assert summary.read_bytes() == b"summary"
 
 
+@pytest.mark.parametrize(("option", "relative_path", "is_directory"), [
+    ("--paper-figures-scores-dir", "saved_scores", True),
+    (
+        "--paper-figures-multiallelic-predictions",
+        "saved_predictions/multiallelic.csv",
+        False,
+    ),
+    (
+        "--paper-figures-monoallelic-predictions",
+        "saved_predictions/monoallelic.csv",
+        False,
+    ),
+])
+def test_plot_model_comparison_rejects_inputs_under_cleanup_tree(
+        tmp_path, monkeypatch, option, relative_path, is_directory):
+    plot_dir = tmp_path / "plots"
+    input_path = plot_dir / relative_path
+    if is_directory:
+        input_path.mkdir(parents=True)
+        sentinel = input_path / "input.csv"
+    else:
+        input_path.parent.mkdir(parents=True)
+        sentinel = input_path
+    sentinel.write_bytes(b"paper input")
+    stale_plot = plot_dir / "stale.pdf"
+    stale_plot.write_bytes(b"stale plot")
+    monkeypatch.setattr(
+        plot_model_comparison, "_apply_paper_style", lambda: None)
+    args = plot_model_comparison.make_parser().parse_args([
+        "--input", str(tmp_path),
+        option, str(input_path),
+    ])
+
+    with pytest.raises(SystemExit, match="Refusing to delete input"):
+        plot_model_comparison.run(args)
+
+    assert sentinel.read_bytes() == b"paper input"
+    assert stale_plot.read_bytes() == b"stale plot"
+
+
+def test_plot_model_comparison_rejects_symlink_to_input_under_cleanup_tree(
+        tmp_path, monkeypatch):
+    scores_dir = tmp_path / "plots" / "saved_scores"
+    scores_dir.mkdir(parents=True)
+    sentinel = scores_dir / "input.csv"
+    sentinel.write_bytes(b"paper input")
+    scores_link = tmp_path / "scores-link"
+    try:
+        scores_link.symlink_to(scores_dir, target_is_directory=True)
+    except OSError as error:
+        pytest.skip("symlinks unavailable: %s" % error)
+    monkeypatch.setattr(
+        plot_model_comparison, "_apply_paper_style", lambda: None)
+    args = plot_model_comparison.make_parser().parse_args([
+        "--input", str(tmp_path),
+        "--paper-figures-scores-dir", str(scores_link),
+    ])
+
+    with pytest.raises(SystemExit, match="Refusing to delete input"):
+        plot_model_comparison.run(args)
+
+    assert sentinel.read_bytes() == b"paper input"
+
+
 def test_detect_available_components_finds_affinity(tmp_path):
     aff = tmp_path / "affinity"
     aff.mkdir()

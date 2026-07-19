@@ -568,6 +568,30 @@ def test_predict_cartesian_pan_allele_matches_repeated_predict():
 
     np.testing.assert_allclose(actual, expected, rtol=1e-6, atol=1e-6)
 
+    tolerant = predictor.predict_cartesian_pan_allele(
+        peptides=peptides,
+        alleles=np.asarray([
+            "HLA-A*02:01",
+            "HLA-DQA1*01:01",
+            "HLA-B*07:02",
+        ]),
+        throw=False,
+        model_kwargs={"batch_size": 2},
+    )
+    assert tolerant.shape == (len(peptides), 3)
+    np.testing.assert_allclose(
+        tolerant[:, 0], expected[:, 0], rtol=1e-6, atol=1e-6)
+    assert np.isnan(tolerant[:, 1]).all()
+    np.testing.assert_allclose(
+        tolerant[:, 2], expected[:, 1], rtol=1e-6, atol=1e-6)
+
+    with pytest.raises(ValueError, match="MHC class II allele"):
+        predictor.predict_cartesian_pan_allele(
+            peptides=peptides,
+            alleles=["HLA-DQA1*01:01"],
+            model_kwargs={"batch_size": 2},
+        )
+
 
 @pytest.mark.parametrize("layer_sizes", [
     [4, 4],            # 2 dense layers — exercises layer-1 factorization

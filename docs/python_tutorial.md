@@ -60,6 +60,13 @@ normalized to `HLA-A*02:01`, so most naming conventions can be used
 with methods such as {meth}`~mhcflurry.Class1PresentationPredictor.predict`.
 ```
 
+Invalid, ambiguous, class-II, pseudogene, null, and unsupported allele names
+raise a descriptive `ValueError` by default. For streaming or mixed-quality
+data, pass `throw=False`; affected prediction rows are retained with `NaN`
+scores (or ignored when another valid allele in the genotype supplies the
+sample's best affinity) while valid inputs are still evaluated. The
+command-line equivalent is `mhcflurry-predict --no-throw`.
+
 If you have multiple sample genotypes, you can pass a dict, where the
 keys are arbitrary sample names:
 

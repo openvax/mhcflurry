@@ -34,6 +34,26 @@ from . import amino_acid
 # to get a different, still-reproducible run.
 DEFAULT_RANDOM_SEED = 42
 
+# IPD-IMGT/HLA classifies these HLA class-I loci as pseudogenes. mhcgnomes
+# exposes ``annotation_pseudogene`` for allele suffixes such as ``Ps``, but
+# does not currently set it for every allele belonging to one of these loci.
+_HLA_CLASS_I_PSEUDOGENE_GENES = frozenset({
+    "H", "J", "K", "L", "N", "P", "R", "S", "T", "U", "V", "W", "Y",
+})
+
+
+def is_pseudogene_mhc(parsed):
+    """Return whether a parsed mhcgnomes name denotes an MHC pseudogene."""
+    species = getattr(parsed, "species", None)
+    return bool(
+        getattr(parsed, "annotation_pseudogene", False)
+        or (
+            getattr(species, "mhc_prefix", None) == "HLA"
+            and getattr(parsed, "gene_name", None)
+            in _HLA_CLASS_I_PSEUDOGENE_GENES
+        )
+    )
+
 
 def add_random_seed_arg(parser):
     """Add the standard ``--random-seed`` argument to a CLI parser.
@@ -148,12 +168,24 @@ def normalize_allele_name(
     -------
     str or None
     """
+    if not isinstance(raw_name, str) or not raw_name.strip():
+        message = (
+            "Invalid MHC allele name: %r. Expected a non-empty string."
+            % (raw_name,)
+        )
+        if raise_on_error:
+            raise ValueError(message)
+        return default_value
+
     for forbidden_substring in forbidden_substrings:
         if forbidden_substring in raw_name:
             if raise_on_error:
-                raise ValueError("Unsupported gene in MHC allele name: %s" % raw_name)
-            else:
-                return default_value
+                raise ValueError(
+                    "Unsupported gene in MHC allele name: %s. MHCflurry "
+                    "affinity models support classical MHC class I alleles, "
+                    "not %s-family genes." % (raw_name, forbidden_substring)
+                )
+            return default_value
     result = parse(
         raw_name,
         only_class1=True,
@@ -166,19 +198,67 @@ def normalize_allele_name(
         raise_on_error=False,
     )
     if result is None:
-        if raise_on_error:
-            raise ValueError("Invalid MHC allele name: %s" % raw_name)
+        parsed_any_class = parse(
+            raw_name,
+            only_class1=False,
+            use_allele_aliases=use_allele_aliases,
+            infer_class2_pairing=False,
+            collapse_singleton_haplotypes=True,
+            collapse_singleton_serotypes=True,
+            raise_on_error=False,
+        )
+        if isinstance(parsed_any_class, Serotype):
+            message = (
+                "Ambiguous MHC serotype is not a specific allele: %s. "
+                "Provide a sequence-resolved allele such as HLA-A*02:01; "
+                "MHCflurry does not choose or average serotype members."
+                % raw_name
+            )
+        elif getattr(parsed_any_class, "mhc_class", None) in {
+                "II", "IIa", "IIb"}:
+            message = (
+                "Unsupported MHC class II allele for a class I predictor: "
+                "%s. Use an MHC class I allele and a model containing its "
+                "pseudosequence." % raw_name
+            )
+        elif parsed_any_class is not None:
+            message = (
+                "Unsupported MHC name for class I allele prediction: %s "
+                "(parsed as %s, not a class I allele)."
+                % (raw_name, type(parsed_any_class).__name__)
+            )
         else:
-            return default_value
-    if (
-        result.annotation_pseudogene
-        or result.annotation_null
-        or result.annotation_questionable
-    ):
+            message = (
+                "Invalid MHC allele name: %s. Provide a sequence-resolved "
+                "MHC class I allele such as HLA-A*02:01." % raw_name
+            )
         if raise_on_error:
-            raise ValueError("Unsupported annotation on MHC allele: %s" % raw_name)
-        else:
-            return default_value
+            raise ValueError(message)
+        return default_value
+    if is_pseudogene_mhc(result):
+        if raise_on_error:
+            raise ValueError(
+                "Unsupported pseudogene MHC allele: %s. Pseudogene alleles "
+                "do not have a usable class I product for affinity "
+                "prediction." % raw_name
+            )
+        return default_value
+    if result.annotation_null:
+        if raise_on_error:
+            raise ValueError(
+                "Unsupported null-expression MHC allele: %s. Null alleles "
+                "are not expressed and are not supported for prediction."
+                % raw_name
+            )
+        return default_value
+    if result.annotation_questionable:
+        if raise_on_error:
+            raise ValueError(
+                "Unsupported questionable-expression MHC allele: %s. "
+                "Alleles with uncertain expression are not supported for "
+                "prediction." % raw_name
+            )
+        return default_value
     return result.restrict_allele_fields(2).to_string()
 
 

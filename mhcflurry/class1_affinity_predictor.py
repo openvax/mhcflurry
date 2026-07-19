@@ -306,7 +306,8 @@ class Class1AffinityPredictor(object):
         self.check_consistency()
         return new_model_names
 
-    def canonicalize_allele_name(self, raw_name):
+    def canonicalize_allele_name(
+            self, raw_name, raise_on_error=True, default_value=None):
         """
         Normalize an allele name and map it to the canonical pseudosequence
         key if possible.
@@ -315,14 +316,20 @@ class Class1AffinityPredictor(object):
         (which aliases map to C*01:02) resolve to their own pseudosequence
         when one exists.
 
-        Raises on names that cannot be normalized (loud failure for explicit
-        prediction/calibration inputs). The no-alias-first logic lives in
-        ``AlleleKeyResolver``; training ingestion shares it via
-        ``canonicalize_allele_series``.
+        By default, raises on names that cannot be normalized. Pass
+        ``raise_on_error=False`` to return ``default_value`` instead. The
+        no-alias-first logic lives in ``AlleleKeyResolver``; training ingestion
+        shares it via ``canonicalize_allele_series``.
 
         Parameters
         ----------
         raw_name : str
+        raise_on_error : bool
+            Whether to raise a descriptive ``ValueError`` for invalid,
+            ambiguous, non-class-I, or unsupported-annotation names.
+        default_value : object
+            Value returned for an invalid name when ``raise_on_error`` is
+            false.
 
         Returns
         -------
@@ -335,8 +342,37 @@ class Class1AffinityPredictor(object):
         if "allele_key_resolver" not in self._cache:
             self._cache["allele_key_resolver"] = AlleleKeyResolver(
                 self.allele_to_sequence, self.allele_to_canonical)
-        return self._cache["allele_key_resolver"].resolve(
-            raw_name, raise_on_error=True)
+        result = self._cache["allele_key_resolver"].resolve(
+            raw_name, raise_on_error=raise_on_error)
+        if result is None:
+            return default_value
+        return result
+
+    def _canonicalize_prediction_alleles(self, raw_alleles, throw):
+        """Canonicalize prediction inputs under the caller's error policy."""
+        normalized = []
+        errors = []
+        seen_errors = set()
+        for raw_name in raw_alleles:
+            try:
+                value = self.canonicalize_allele_name(raw_name)
+            except (TypeError, ValueError) as error:
+                if throw:
+                    raise
+                value = None
+                message = str(error)
+                if message not in seen_errors:
+                    seen_errors.add(message)
+                    errors.append(message)
+            normalized.append(value)
+        if errors:
+            logging.warning(
+                "%d invalid or unsupported allele name(s) will receive NaN "
+                "predictions: %s",
+                len(errors),
+                "; ".join(errors),
+            )
+        return normalized
 
     @property
     def supported_alleles(self):
@@ -876,7 +912,10 @@ class Class1AffinityPredictor(object):
         numpy.array of float
         """
         if allele is not None:
-            normalized_allele = self.canonicalize_allele_name(allele)
+            normalized_allele = self._canonicalize_prediction_alleles(
+                [allele], throw=throw)[0]
+            if normalized_allele is None:
+                return numpy.full(len(affinities), numpy.nan, dtype="float64")
             calibrated_allele = self.percent_rank_calibrated_allele(
                 normalized_allele
             )
@@ -1118,26 +1157,40 @@ class Class1AffinityPredictor(object):
             if throw:
                 raise ValueError(msg)
 
-        normalized_alleles = [
-            self.canonicalize_allele_name(allele)
-            for allele in alleles
-        ]
-        unsupported_alleles = [
+        normalized_alleles = self._canonicalize_prediction_alleles(
+            alleles, throw=throw)
+        unsupported_alleles = sorted({
             allele for allele in normalized_alleles
-            if allele not in self.allele_to_sequence
-        ]
+            if (
+                allele is not None
+                and allele not in self.allele_to_sequence
+            )
+        })
         if unsupported_alleles:
             msg = "No sequences for allele(s): %s." % " ".join(
                 unsupported_alleles)
             logging.warning(msg)
             if throw:
                 raise ValueError(msg)
-            return None
+        supported_allele_indices = numpy.asarray([
+            i for (i, allele) in enumerate(normalized_alleles)
+            if (
+                allele is not None
+                and allele in self.allele_to_sequence
+            )
+        ], dtype="int64")
+        n_peptides = len(peptides)
+        n_alleles = len(normalized_alleles)
+        result = numpy.full((n_peptides, n_alleles), numpy.nan, dtype="float64")
+        if len(supported_allele_indices) == 0:
+            return result
+        supported_alleles = [
+            normalized_alleles[i] for i in supported_allele_indices]
 
         model_obj = self.class1_pan_allele_models[0]
         master = self.master_allele_encoding
         allele_encoding = AlleleEncoding(
-            normalized_alleles,
+            supported_alleles,
             borrow_from=master,
         ).compact()
         (
@@ -1153,9 +1206,6 @@ class Class1AffinityPredictor(object):
         network = maybe_compile_network(network, device)
         network.eval()
 
-        n_peptides = len(peptides)
-        n_alleles = len(normalized_alleles)
-        result = numpy.full((n_peptides, n_alleles), numpy.nan, dtype="float64")
         supported_indices = numpy.flatnonzero(supported_peptide.to_numpy())
         if len(supported_indices) == 0:
             return result
@@ -1170,7 +1220,7 @@ class Class1AffinityPredictor(object):
             device,
             model=network,
             num_workers_per_gpu=model_kwargs.get("num_workers_per_gpu", 1),
-            total_rows=len(supported_indices) * n_alleles,
+            total_rows=len(supported_indices) * len(supported_alleles),
         )
         batch_size = int(batch_size)
 
@@ -1217,11 +1267,15 @@ class Class1AffinityPredictor(object):
                                 affinities.reshape((-1, affinities.shape[2]))
                             )
                             centers = numpy.exp(centrality_function(log_values))
-                            affinities = centers.reshape(n_alleles, end - start)
+                            affinities = centers.reshape(
+                                len(supported_alleles), end - start)
                         else:
                             affinities = affinities.reshape(
-                                n_alleles, end - start)
-                        result[supported_indices[start:end]] = affinities.T
+                                len(supported_alleles), end - start)
+                        result[numpy.ix_(
+                            supported_indices[start:end],
+                            supported_allele_indices,
+                        )] = affinities.T
                 break
             except RuntimeError as exc:
                 from .pytorch_sizing import (
@@ -1311,14 +1365,23 @@ class Class1AffinityPredictor(object):
         if allele is not None:
             if alleles is not None:
                 raise ValueError("Specify exactly one of allele or alleles")
-            normalized_allele = self.canonicalize_allele_name(allele)
-            df["allele"] = normalized_allele
+            normalized_allele = self._canonicalize_prediction_alleles(
+                [allele], throw=throw)[0]
+            df["allele"] = (
+                normalized_allele
+                if normalized_allele is not None
+                else allele
+            )
             df["normalized_allele"] = normalized_allele
             unique_alleles = [normalized_allele]
         else:
+            normalized_alleles = self._canonicalize_prediction_alleles(
+                alleles, throw=throw)
             df["allele"] = [
-                self.canonicalize_allele_name(a) for a in alleles]
-            df["normalized_allele"] = df["allele"]
+                normalized if normalized is not None else raw
+                for (raw, normalized) in zip(alleles, normalized_alleles)
+            ]
+            df["normalized_allele"] = normalized_alleles
             unique_alleles = df.normalized_allele.unique()
 
         if len(df) == 0:
@@ -1396,7 +1459,10 @@ class Class1AffinityPredictor(object):
             unsupported_alleles = [
                 allele for allele in
                 df.normalized_allele.unique()
-                if allele not in self.allele_to_sequence
+                if (
+                    allele is not None
+                    and allele not in self.allele_to_sequence
+                )
             ]
             if unsupported_alleles:
                 truncate_at = 100
@@ -1412,7 +1478,7 @@ class Class1AffinityPredictor(object):
                 logging.warning(msg)
                 if throw:
                     raise ValueError(msg)
-            mask = df.supported_peptide & (
+            mask = df.supported_peptide & df.normalized_allele.notnull() & (
                 ~df.normalized_allele.isin(unsupported_alleles))
 
             row_slice = None
@@ -1459,7 +1525,10 @@ class Class1AffinityPredictor(object):
         if self.allele_to_allele_specific_models:
             unsupported_alleles = [
                 allele for allele in unique_alleles
-                if not self.allele_to_allele_specific_models.get(allele)
+                if (
+                    allele is not None
+                    and not self.allele_to_allele_specific_models.get(allele)
+                )
             ]
             if unsupported_alleles:
                 msg = (

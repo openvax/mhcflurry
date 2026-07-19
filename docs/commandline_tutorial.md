@@ -36,6 +36,11 @@ The {ref}`mhcflurry-predict <ref-mhcflurry-predict>` command generates predictio
 default it will use the pre-trained models you downloaded above. Other
 models can be used by specifying the `--models` argument.
 
+Allele names are parsed as sequence-resolved MHC class I alleles. Invalid,
+ambiguous, class-II, pseudogene, null, or unsupported names produce a specific
+error. Add `--no-throw` when processing mixed-quality tables to keep those rows
+with `NaN` predictions instead.
+
 Running:
 
 ```{command-output} mhcflurry-predict --alleles HLA-A0201 HLA-A0301 --peptides SIINFEKL SIINFEKD SIINFEKQ --out /tmp/predictions.csv

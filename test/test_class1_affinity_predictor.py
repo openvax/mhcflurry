@@ -144,7 +144,10 @@ def test_load_skips_incomplete_non_class1_pseudosequences_with_mhcgnomes(
         "TAP1,XXTAP\n"
         "SLA-TAP*1*01:01,XXLEGACYTAP\n"
         "Caja-PS*02:01,XXLEGACYPS\n"
+        "Caja-DAA*01:01,XXLEGACYDAA\n"
+        "Caja-DAB*01:01,XXLEGACYDAB\n"
         "Caja-B5*01:01ps,XXPSEUDOGENE\n"
+        "HLA-H*02:01,XXHLAPSEUDOGENE\n"
         "NONSENSE,XXUNKNOWN\n"
     )
 
@@ -159,6 +162,62 @@ def test_load_skips_incomplete_non_class1_pseudosequences_with_mhcgnomes(
         # non-class-I / unsupported MHC rows are the ones dropped.
         "NONSENSE": "XXUNKNOWN",
     }
+
+
+def test_invalid_alleles_raise_or_return_row_aligned_nans(caplog):
+    class ConstantModel:
+        supported_peptide_lengths = (8, 15)
+
+        def predict(self, peptides, **kwargs):
+            return numpy.full(len(peptides), 123.0)
+
+    predictor = Class1AffinityPredictor(
+        allele_to_allele_specific_models={
+            "HLA-A*02:01": [ConstantModel()],
+        },
+    )
+    invalid = [
+        "HLA-DQA1*01:01",
+        "HLA-A2",
+        "Caja-B5*01:01ps",
+        "HLA-H*02:01",
+        "HLA-A*02:01N",
+        "HLA-A*02:01Q",
+        "NONSENSE",
+    ]
+
+    with pytest.raises(ValueError, match="MHC class II allele"):
+        predictor.predict(
+            peptides=["SIINFEKL"],
+            alleles=[invalid[0]],
+        )
+
+    with caplog.at_level(logging.WARNING):
+        result = predictor.predict_to_dataframe(
+            peptides=["SIINFEKL"] * (len(invalid) + 1),
+            alleles=["HLA-A0201"] + invalid,
+            throw=False,
+            include_percentile_ranks=False,
+            include_confidence_intervals=False,
+        )
+
+    assert result.allele.tolist() == ["HLA-A*02:01"] + invalid
+    assert result.prediction.iloc[0] == pytest.approx(123.0)
+    assert result.prediction.iloc[1:].isna().all()
+    for expected in [
+            "MHC class II allele",
+            "serotype is not a specific allele",
+            "pseudogene MHC allele",
+            "null-expression MHC allele",
+            "questionable-expression MHC allele",
+            "Invalid MHC allele name"]:
+        assert expected in caplog.text
+
+    assert predictor.canonicalize_allele_name(
+        invalid[0], raise_on_error=False) is None
+    ranks = predictor.percentile_ranks(
+        [123.0], allele=invalid[0], throw=False)
+    assert numpy.isnan(ranks).all()
 
 
 @pytest.mark.parametrize("filename,sequence", [

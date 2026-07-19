@@ -28,7 +28,12 @@ import pandas
 from mhcgnomes import parse
 
 from ..class1_neural_network import Class1NeuralNetwork
-from ..common import load_weights, normalize_allele_name, save_weights
+from ..common import (
+    is_pseudogene_mhc,
+    load_weights,
+    normalize_allele_name,
+    save_weights,
+)
 from ..downloads import get_default_class1_models_dir
 from ..percent_rank_transform import PercentRankTransform
 from ..pseudosequences import (
@@ -61,9 +66,11 @@ def _is_incomplete_non_predictor_pseudosequence(name, sequence):
     if parsed_any_class is None:
         # Legacy allele_sequences.csv artifacts contain a few incomplete
         # non-predictor rows in old spellings mhcgnomes does not parse, e.g.
-        # Caja-PS*02:01 and SLA-TAP*1*01:01. Preserve the historical skip for
-        # these rows but keep unknown incomplete names available.
-        return bool(re.search(r"(?:^|[-*])(PS|TAP)(?:[-*]|[0-9])", str(name)))
+        # Caja-PS*02:01, Caja-DAB*01:01, and SLA-TAP*1*01:01. Preserve the
+        # historical skip for these rows but keep unknown incomplete names
+        # available.
+        return bool(re.search(
+            r"(?:^|[-*])(PS|TAP|DAA|DAB)(?:[-*]|[0-9])", str(name)))
 
     parsed_class1 = _parse_mhc_name(name, only_class1=True)
     if parsed_class1 is None:
@@ -74,7 +81,7 @@ def _is_incomplete_non_predictor_pseudosequence(name, sequence):
     gene_name = getattr(parsed_class1, "gene_name", None)
     return (
         gene_name in {"HFE", "MICA", "MICB"}
-        or parsed_class1.annotation_pseudogene
+        or is_pseudogene_mhc(parsed_class1)
         or parsed_class1.annotation_null
         or parsed_class1.annotation_questionable
     )

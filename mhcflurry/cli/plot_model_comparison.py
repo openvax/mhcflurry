@@ -222,6 +222,21 @@ def run(args):
     plot_dir = os.path.join(args.input, "plots")
     paper_figures_dir = args.paper_figures_out or os.path.join(
         plot_dir, "paper_figures")
+    paper_scores_dir = (
+        args.paper_figures_scores_dir or args.paper_figures_artifacts_dir
+    )
+    _validate_paper_figure_inputs_outside_plot_dir(
+        plot_dir,
+        {
+            "--paper-figures-scores-dir": paper_scores_dir,
+            "--paper-figures-multiallelic-predictions": (
+                args.paper_figures_multiallelic_predictions
+            ),
+            "--paper-figures-monoallelic-predictions": (
+                args.paper_figures_monoallelic_predictions
+            ),
+        },
+    )
     _reset_plot_directory(
         plot_dir, preserve_directory=paper_figures_dir)
     if args.summary_pdf:
@@ -243,9 +258,6 @@ def run(args):
             _plot_presentation(
                 args.input, plot_dir, labels, args.max_scatter_points)
     _plot_release_summary(args.input, paper_dir, labels)
-    paper_scores_dir = (
-        args.paper_figures_scores_dir or args.paper_figures_artifacts_dir
-    )
     paper_inputs_requested = any([
         paper_scores_dir,
         args.paper_figures_multiallelic_predictions,
@@ -297,6 +309,33 @@ def _reset_plot_directory(plot_dir, preserve_directory=None):
     elif plot_dir.exists() or plot_dir.is_symlink():
         plot_dir.unlink()
     plot_dir.mkdir(parents=True, exist_ok=True)
+
+
+def _validate_paper_figure_inputs_outside_plot_dir(plot_dir, input_paths):
+    """Reject paper inputs that diagnostic cleanup would recursively remove."""
+    plot_dir = Path(os.path.abspath(plot_dir))
+    resolved_plot_dir = plot_dir.resolve(strict=False)
+    conflicts = []
+    for option, value in input_paths.items():
+        if value is None:
+            continue
+        path = Path(os.path.abspath(value))
+        if (
+                _path_is_within(path, plot_dir)
+                or _path_is_within(
+                    path.resolve(strict=False), resolved_plot_dir)
+        ):
+            conflicts.append((option, path))
+    if conflicts:
+        details = ", ".join(
+            "%s=%s" % (option, path) for (option, path) in conflicts)
+        raise SystemExit(
+            "Paper-figure input paths must be outside the diagnostic plot "
+            "output directory %s because that directory is cleared before "
+            "rendering. Refusing to delete input: %s. Move the input or "
+            "choose a different --input comparison directory."
+            % (plot_dir, details)
+        )
 
 
 def _clean_directory_except(directory, preserve_directory):
