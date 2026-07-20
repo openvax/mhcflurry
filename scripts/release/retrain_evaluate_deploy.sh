@@ -138,7 +138,8 @@ Logs:
   The wrapper writes per-step logs and a status table under:
       RUN_DIR/workflow_logs/
   Brev sync defaults to release mode: final selected model directories plus
-  runplz events, training/eval logs, GPU telemetry, and generated configs.
+  runplz events, training/eval logs, component comparison predictions, plots,
+  GPU telemetry, and generated configs.
   Use --brev-sync-mode full only for full post-mortem copies of all candidate
   pools and intermediate CSVs.
 
@@ -1237,6 +1238,7 @@ add_glob() {
     for path in "$@"; do
         [ -e "$path" ] && printf '%s\n' "$path" >> "$manifest"
     done
+    return 0
 }
 
 add_path eval_comparison/release_summary.csv
@@ -1249,6 +1251,7 @@ add_path affinity/loss_plots
 add_glob eval_comparison/*/summary.json
 add_glob eval_comparison/*/summary_table.csv
 add_glob eval_comparison/*/per_*.csv
+add_glob eval_comparison/*/predictions*.csv.bz2
 
 sort -u "$manifest" -o "$manifest"
 tar -cjf "$archive" -T "$manifest"
@@ -1363,6 +1366,7 @@ add_glob() {
     for path in "$@"; do
         [ -e "$path" ] && printf '%s\n' "$path" >> "$manifest"
     done
+    return 0
 }
 
 add_path .runplz/events.ndjson
@@ -1383,6 +1387,7 @@ add_path eval_comparison/plots
 add_glob eval_comparison/*/summary.json
 add_glob eval_comparison/*/summary_table.csv
 add_glob eval_comparison/*/per_*.csv
+add_glob eval_comparison/*/predictions*.csv.bz2
 
 add_path affinity/models.combined
 add_path affinity/eval_comparison

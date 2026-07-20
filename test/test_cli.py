@@ -516,6 +516,43 @@ def test_release_workflow_sync_is_workflow_id_scoped():
     assert "add_path .runplz/mhcflurry_release_workflow_exit_code" in script
 
 
+def test_release_sync_archive_preserves_comparison_predictions(tmp_path):
+    workflow = pathlib.Path(
+        "scripts/release/retrain_evaluate_deploy.sh").read_text()
+    marker = "cat > \"$sync_script\" <<'EOF'\n"
+    archive_script = workflow.split(marker, 1)[1].split("\nEOF", 1)[0]
+
+    out_dir = tmp_path / "runplz-latest" / "out"
+    expected = [
+        "eval_comparison/affinity/predictions.csv.bz2",
+        "eval_comparison/processing/predictions_with_flanks.csv.bz2",
+        "eval_comparison/presentation/predictions_without_flanks.csv.bz2",
+    ]
+    for relative in expected:
+        path = out_dir / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"comparison predictions")
+
+    env = dict(os.environ)
+    env["HOME"] = str(tmp_path)
+    subprocess.run(
+        ["bash"],
+        input=archive_script,
+        text=True,
+        env=env,
+        capture_output=True,
+        check=True,
+    )
+
+    manifest = (
+        out_dir / ".runplz" / "release_sync_paths.txt"
+    ).read_text().splitlines()
+    assert set(expected).issubset(manifest)
+    assert workflow.count(
+        "add_glob eval_comparison/*/predictions*.csv.bz2"
+    ) == 2
+
+
 def test_release_workflow_brev_prepare_uses_remote_postprocess(tmp_path):
     env = dict(os.environ)
     env["PATH"] = "/usr/bin:/bin"

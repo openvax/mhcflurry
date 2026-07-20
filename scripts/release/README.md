@@ -68,9 +68,11 @@ successful stop request, the default stop-failure policy deletes it after
 artifacts are safe locally.
 
 `--brev-sync-mode release` copies the artifacts needed for evaluation and
-publication: selected models, logs, events, telemetry, comparisons, plots, and
-generated configuration. Use `--brev-sync-mode full` only for a deliberate
-post-mortem that needs every candidate model and intermediate table.
+publication: selected models, logs, events, telemetry, comparison prediction
+tables and summaries, plots, and generated configuration. This keeps a synced
+run sufficient for a later plot-only resume after the remote instance is
+cleaned up. Use `--brev-sync-mode full` only for a deliberate post-mortem that
+needs every candidate model and training intermediate table.
 
 ## Release profiles and performance
 
