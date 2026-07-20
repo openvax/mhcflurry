@@ -1758,6 +1758,26 @@ def test_processing_metrics_use_shared_non_nan_rows():
     assert summary["n_hits"] == 2
 
 
+def test_processing_comparison_rejects_non_finite_scores():
+    scored = pandas.DataFrame({
+        "peptide": ["SIINFEKL", "AAAAAAAAA"],
+        "a_processing_score": [0.9, numpy.nan],
+        "b_processing_score": [0.8, 0.2],
+    })
+
+    with pytest.raises(
+            ValueError,
+            match=(
+                r"requires every benchmark peptide.*A \(candidate\): 1 "
+                r"non-finite score"
+            )):
+        compare_models._require_finite_processing_scores(
+            scored,
+            mode="with_flanks",
+            labels=("candidate", "baseline"),
+        )
+
+
 def test_comparison_elastic_hints_follow_effective_batch_default(
         monkeypatch):
     captured = []
@@ -2298,6 +2318,18 @@ def test_roc_pr_plots_skip_single_class_slices(tmp_path):
     assert pr_path.is_file()
 
 
+def test_comparison_curves_use_shared_finite_rows():
+    y, a_score, b_score = plot_model_comparison._shared_finite_curve_values(
+        y=[1, 0, 1, 0],
+        a_score=[0.9, numpy.nan, 0.8, 0.1],
+        b_score=[numpy.nan, 0.2, 0.7, 0.3],
+    )
+
+    assert y.tolist() == [1, 0]
+    assert a_score.tolist() == [0.8, 0.1]
+    assert b_score.tolist() == [0.7, 0.3]
+
+
 def test_plot_model_comparison_writes_paper_plots_from_summaries(tmp_path):
     pytest.importorskip("matplotlib")
 
@@ -2595,6 +2627,52 @@ def test_paper_figures_score_predictions_uses_explicit_orientation(tmp_path):
     assert all_scores.set_index("predictor").loc[
         "netmhcpan4.2.el", "auc"] == 1.0
     assert "percent_change_auc_ba" in scores.columns
+
+
+def test_paper_figures_score_predictions_uses_schema_not_numeric_dtype(tmp_path):
+    predictions = tmp_path / "predictions.csv"
+    pandas.DataFrame([
+        {
+            "sample_id": "sample1",
+            "peptide": "AAAAAAAAK",
+            "peptide_num": 0,
+            "hit": 1,
+            "presentation_score": 0.9,
+        },
+        {
+            "sample_id": "sample1",
+            "peptide": "AAAAAAAAL",
+            "peptide_num": 1,
+            "hit": 0,
+            "presentation_score": 0.1,
+        },
+    ]).to_csv(predictions, index=False)
+
+    scores = paper_figures.score_saved_prediction_table(
+        predictions,
+        kind="multiallelic",
+        external_baselines=(),
+    )
+
+    assert set(scores["predictor"]) == {"presentation_score"}
+    assert scores.loc[scores["length_label"] == "All", "auc"].iloc[0] == 1.0
+
+
+def test_paper_figures_score_predictions_requires_recognized_or_explicit_score(
+        tmp_path):
+    predictions = tmp_path / "predictions.csv"
+    pandas.DataFrame({
+        "sample_id": ["sample1", "sample1"],
+        "hit": [1, 0],
+        "peptide_num": [0, 1],
+    }).to_csv(predictions, index=False)
+
+    with pytest.raises(ValueError, match="no recognized predictor score columns"):
+        paper_figures.score_saved_prediction_table(
+            predictions,
+            kind="multiallelic",
+            external_baselines=(),
+        )
 
 
 def test_paper_figures_score_predictions_uses_range_index_predictor_info(

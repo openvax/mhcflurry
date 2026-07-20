@@ -271,6 +271,15 @@ def _make_score_predictions_parser(prog):
             "columns for custom score columns."
         ),
     )
+    parser.add_argument(
+        "--predictor-columns",
+        help=(
+            "Optional comma-separated predictor score columns. Without this "
+            "option, canonical score names and predictors declared in "
+            "predictor_info.csv are selected. Custom names still require a "
+            "predictor_info.csv higher_is_better value."
+        ),
+    )
     return parser
 
 
@@ -296,6 +305,10 @@ def _run_score_predictions(args):
         index_column=index_column,
         kind=args.kind,
         predictor_info=predictor_info,
+        predictor_columns=(
+            paper_figures._parse_predictor_list(args.predictor_columns)
+            if args.predictor_columns else None
+        ),
         external_baselines=external_baselines,
     )
     out = os.path.abspath(args.out)

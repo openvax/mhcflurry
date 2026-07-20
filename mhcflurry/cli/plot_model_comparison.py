@@ -1293,14 +1293,14 @@ def _save_macro_bars(plt, summary, sub_dir, label_a, label_b, title_prefix):
 def _save_roc(plt, roc_curve_fn, roc_auc_fn,
               y, a_score, b_score, label_a, label_b, out_path, title):
     fig, ax = plt.subplots(figsize=(3.2, 3.0))
+    y, a_score, b_score = _shared_finite_curve_values(y, a_score, b_score)
     for label, values, color in (
             (label_a, a_score, SIDE_A_COLOR),
             (label_b, b_score, SIDE_B_COLOR)):
-        mask = ~numpy.isnan(values)
-        if not mask.any() or len(numpy.unique(y[mask])) < 2:
+        if len(y) == 0 or len(numpy.unique(y)) < 2:
             continue
-        fpr, tpr, _ = roc_curve_fn(y[mask], values[mask])
-        auc = roc_auc_fn(y[mask], values[mask])
+        fpr, tpr, _ = roc_curve_fn(y, values)
+        auc = roc_auc_fn(y, values)
         ax.plot(
             fpr, tpr, label="%s AUC=%.3f" % (label, auc),
             color=color, linewidth=1.6)
@@ -1319,14 +1319,14 @@ def _save_roc(plt, roc_curve_fn, roc_auc_fn,
 def _save_pr(plt, pr_curve_fn, ap_fn,
              y, a_score, b_score, label_a, label_b, out_path, title):
     fig, ax = plt.subplots(figsize=(3.2, 3.0))
+    y, a_score, b_score = _shared_finite_curve_values(y, a_score, b_score)
     for label, values, color in (
             (label_a, a_score, SIDE_A_COLOR),
             (label_b, b_score, SIDE_B_COLOR)):
-        mask = ~numpy.isnan(values)
-        if not mask.any() or len(numpy.unique(y[mask])) < 2:
+        if len(y) == 0 or len(numpy.unique(y)) < 2:
             continue
-        precision, recall, _ = pr_curve_fn(y[mask], values[mask])
-        ap = ap_fn(y[mask], values[mask])
+        precision, recall, _ = pr_curve_fn(y, values)
+        ap = ap_fn(y, values)
         ax.plot(
             recall, precision, label="%s AP=%.3f" % (label, ap),
             color=color, linewidth=1.6)
@@ -1339,6 +1339,15 @@ def _save_pr(plt, pr_curve_fn, ap_fn,
     fig.tight_layout()
     _save_figure(fig, out_path)
     plt.close(fig)
+
+
+def _shared_finite_curve_values(y, a_score, b_score):
+    """Return paired finite inputs for an A/B diagnostic curve."""
+    y = numpy.asarray(y)
+    a_score = numpy.asarray(a_score, dtype=float)
+    b_score = numpy.asarray(b_score, dtype=float)
+    mask = numpy.isfinite(y) & numpy.isfinite(a_score) & numpy.isfinite(b_score)
+    return y[mask], a_score[mask], b_score[mask]
 
 
 def _save_scatter(plt, x_score, y_score, x_label, y_label,

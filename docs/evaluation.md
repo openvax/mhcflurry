@@ -58,7 +58,8 @@ prediction table has one row per evaluated peptide–MHC example and contains:
 - `hit`;
 - `sample_id` for multiallelic data, or `allele`/`hla` for monoallelic data;
 - optional peptide and flank metadata; and
-- one numeric column per predictor.
+- canonical predictor score columns, or custom score columns declared in
+  `predictor_info.csv`.
 
 Derive reusable AUC and PPV score tables with:
 
@@ -71,7 +72,11 @@ mhcflurry eval paper-figures score-predictions \
 
 Score direction must be explicit. Common MHCflurry, NetMHCpan, and MixMHCpred
 column names have built-in orientation. Describe custom columns in
-`predictor_info.csv` using `predictor` and `higher_is_better`.
+`predictor_info.csv` using `predictor` and `higher_is_better`; those rows also
+select the custom columns. `--predictor-columns` can restrict scoring to an
+explicit subset, but custom names still need their direction in
+`predictor_info.csv`. Other numeric columns are treated as metadata rather than
+guessed to be predictor scores.
 
 Optional licensed predictors run outside the MHCflurry core package. The
 `paper-figures external-predictors` adapter can invoke a locally installed

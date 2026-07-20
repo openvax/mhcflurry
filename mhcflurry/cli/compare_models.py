@@ -1204,6 +1204,12 @@ def _run_processing(side_a, side_b, args):
             processing_args, b_model_dir, benchmark, mode, label="B",
             model_bytes=comparison_model_bytes)
 
+        _require_finite_processing_scores(
+            scored,
+            mode=mode,
+            labels=(side_a["label"], side_b["label"]),
+        )
+
         pred_path = os.path.join(
             component_dir, "predictions_%s.csv.bz2" % mode)
         scored.to_csv(pred_path, index=False)
@@ -1419,11 +1425,41 @@ def _shared_score_rows(scored, score_kind):
     """Return rows where both sides have a score for ``score_kind``.
 
     A/B release metrics are only meaningful when both sides are scored on the
-    same examples. Predictors run with ``throw=False`` can emit NaNs for
-    unsupported peptides, so filter on both side-specific score columns before
-    computing support counts or metric differences.
+    same examples. Predictors run with ``throw=False`` can emit non-finite
+    values for unsupported peptides, so filter on both side-specific score
+    columns before computing support counts or metric differences.
     """
-    return scored.dropna(subset=list(_score_pair_columns(score_kind)))
+    columns = list(_score_pair_columns(score_kind))
+    finite = numpy.ones(len(scored), dtype=bool)
+    for column in columns:
+        finite &= numpy.isfinite(pandas.to_numeric(
+            scored[column], errors="coerce").values)
+    return scored.loc[finite].copy()
+
+
+def _require_finite_processing_scores(scored, mode, labels):
+    """Fail a release comparison when either model misses benchmark rows."""
+    failures = []
+    for side, label in zip(("a", "b"), labels):
+        column = "%s_processing_score" % side
+        values = pandas.to_numeric(scored[column], errors="coerce").values
+        bad = ~numpy.isfinite(values)
+        if not bad.any():
+            continue
+        examples = scored.loc[bad, "peptide"].astype(str).head(3).tolist()
+        failures.append(
+            "%s (%s): %d non-finite score(s), examples: %s" % (
+                side.upper(), label, int(bad.sum()), ", ".join(examples)
+            )
+        )
+    if failures:
+        raise ValueError(
+            "Processing comparison mode %s requires every benchmark peptide "
+            "to be scored by both models. %s. Check peptide validity and each "
+            "model's supported peptide-length range." % (
+                mode, "; ".join(failures)
+            )
+        )
 
 
 def _presentation_per_sample(scored, score_kind):

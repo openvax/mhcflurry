@@ -47,6 +47,11 @@ from ..common import allele_locus_name
 CANDIDATE_PREDICTOR = "mhcflurry_production"
 
 DEFAULT_PREDICTOR_HIGHER_IS_BETTER = {
+    "affinity": False,
+    "affinity_percentile": False,
+    "processing_score": True,
+    "presentation_score": True,
+    "presentation_percentile": False,
     "mhcflurry_production": False,
     "mhcflurry_production_affinity": False,
     "mhcflurry_production_percentile": False,
@@ -102,21 +107,6 @@ PREFERRED_PREDICTORS = (
 
 LENGTH_LABEL_ORDER = ("All", "8-mer", "9-mer", "10-mer", "11-mer")
 DEFAULT_FORMATS = ("svg", "pdf", "png")
-PREDICTION_METADATA_COLUMNS = {
-    "protein_accession",
-    "peptide",
-    "sample_id",
-    "sample",
-    "sample_group",
-    "n_flank",
-    "c_flank",
-    "hit",
-    "hla",
-    "allele",
-    "length",
-    "peptide_len",
-    "source_file",
-}
 
 
 @dataclass(frozen=True)
@@ -160,7 +150,7 @@ Figure input contract:
     benchmark.multiallelic.csv(.bz2), benchmark.monoallelic.csv(.bz2),
     sample_table.csv, and predictor_info.csv.
   * saved prediction tables: include hit, sample_id or allele/hla, optional
-    peptide metadata, and one numeric score column per predictor.
+    peptide metadata, and canonical or explicitly declared score columns.
   * score direction is explicit. Built-in predictor names have defaults; custom
     score columns require predictor_info.csv rows with predictor and
     higher_is_better.
@@ -840,6 +830,7 @@ def _read_multiallelic_scores(inputs, writer, figure, predictors, predictor_info
             figure=figure,
             writer=writer,
             predictor_orientations=_predictor_orientations(predictor_info),
+            declared_predictors=_predictor_info_names(predictor_info),
             external_baselines=predictors.external_baselines,
         )
     writer.skip(
@@ -864,6 +855,7 @@ def _read_monoallelic_scores(inputs, writer, figure, predictors, predictor_info)
             figure=figure,
             writer=writer,
             predictor_orientations=_predictor_orientations(predictor_info),
+            declared_predictors=_predictor_info_names(predictor_info),
             external_baselines=predictors.external_baselines,
         )
     return None
@@ -872,6 +864,8 @@ def _read_monoallelic_scores(inputs, writer, figure, predictors, predictor_info)
 def _scores_from_saved_predictions(
         path, index_column, family, figure, writer, row_filter=None, kind=None,
         predictor_orientations=None,
+        predictor_columns=None,
+        declared_predictors=(),
         external_baselines=EXTERNAL_BASELINES):
     path = Path(path)
     if not path.is_file():
@@ -901,11 +895,24 @@ def _scores_from_saved_predictions(
         else:
             df["length"] = numpy.nan
 
-    predictor_columns = _prediction_score_columns(df)
+    try:
+        predictor_columns = _prediction_score_columns(
+            df,
+            predictor_columns=predictor_columns,
+            declared_predictors=declared_predictors,
+        )
+    except ValueError as error:
+        writer.skip(family, figure, [path], str(error))
+        return None
     if not predictor_columns:
         writer.skip(
             family, figure, [path],
-            "Saved prediction table has no numeric predictor score columns.")
+            (
+                "Saved prediction table has no recognized predictor score "
+                "columns. Use canonical score names, declare custom columns "
+                "and their direction in predictor_info.csv, or explicitly "
+                "select declared columns with --predictor-columns."
+            ))
         return None
     predictor_orientations = (
         predictor_orientations
@@ -967,15 +974,17 @@ class _ScoreTableErrorCollector:
 
 def score_saved_prediction_table(
         path, index_column=None, kind=None, predictor_info=None,
-        external_baselines=EXTERNAL_BASELINES):
+        external_baselines=EXTERNAL_BASELINES,
+        predictor_columns=None):
     """Return notebook-style AUC/PPV rows from a saved prediction table.
 
     The input table must contain ``hit`` and one grouping column
     (``sample_id``, ``allele``, or ``hla`` unless ``index_column`` is passed).
-    Every other numeric column is treated as a predictor score. Score
-    direction comes from the built-in predictor registry, or from a
-    ``predictor_info`` DataFrame with ``predictor`` and ``higher_is_better``
-    columns for custom predictors.
+    Canonical score columns are selected from the built-in predictor registry.
+    Custom columns must be declared in a ``predictor_info`` DataFrame with
+    ``predictor`` and ``higher_is_better`` columns. ``predictor_columns`` can
+    explicitly restrict selection to canonical or declared columns. Numeric
+    metadata is never inferred to be a predictor score.
     When ``kind="monoallelic"``, allele identifiers are preferred over
     ``sample_id`` for automatic grouping.
     """
@@ -988,6 +997,8 @@ def score_saved_prediction_table(
         writer=writer,
         kind=kind,
         predictor_orientations=_predictor_orientations(predictor_info),
+        predictor_columns=predictor_columns,
+        declared_predictors=_predictor_info_names(predictor_info),
         external_baselines=external_baselines,
     )
     if scores is None:
@@ -1006,20 +1017,48 @@ def _prediction_index_column(df, kind=None):
     return None
 
 
-def _prediction_score_columns(df):
-    excluded = set(PREDICTION_METADATA_COLUMNS)
-    excluded.update(
-        column for column in df.columns
-        if column.endswith("_best_allele") or column.endswith(" allele")
-    )
+def _predictor_info_names(predictor_info):
+    if predictor_info is None or predictor_info.empty:
+        return ()
+    if "predictor" in predictor_info.columns:
+        values = predictor_info["predictor"]
+    else:
+        values = predictor_info.index
+    return tuple(str(value) for value in values if not pandas.isnull(value))
+
+
+def _prediction_score_columns(
+        df, predictor_columns=None, declared_predictors=()):
+    """Select score columns from the canonical or explicitly declared schema."""
+    if predictor_columns is None:
+        expected = set(DEFAULT_PREDICTOR_HIGHER_IS_BETTER)
+        expected.update(str(value) for value in declared_predictors)
+        selected = [column for column in df.columns if column in expected]
+    else:
+        selected = list(dict.fromkeys(str(value) for value in predictor_columns))
+        if not selected:
+            raise ValueError("--predictor-columns must contain at least one column.")
+        missing = [column for column in selected if column not in df.columns]
+        if missing:
+            raise ValueError(
+                "Requested predictor score column(s) are absent: %s." %
+                ", ".join(missing)
+            )
+
     result = []
-    for column in df.columns:
-        if column in excluded:
-            continue
+    nonnumeric = []
+    for column in selected:
         values = pandas.to_numeric(df[column], errors="coerce")
         if values.notnull().any():
             df[column] = values
             result.append(column)
+        else:
+            nonnumeric.append(column)
+    if nonnumeric:
+        raise ValueError(
+            "Predictor score column(s) contain no numeric values: %s." %
+            ", ".join(nonnumeric)
+        )
     return result
 
 
@@ -1891,6 +1930,7 @@ def _read_cysteine_removed_scores(
         figure="fig.4_processing_predictor_plots.auc.ap.c_removed.scatter",
         writer=writer,
         predictor_orientations=_predictor_orientations(predictor_info),
+        declared_predictors=_predictor_info_names(predictor_info),
         external_baselines=predictors.external_baselines,
         row_filter=lambda df: df.loc[
             ~df.get("peptide", pandas.Series("", index=df.index))
