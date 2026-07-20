@@ -143,7 +143,9 @@ def test_load_skips_incomplete_non_class1_pseudosequences_with_mhcgnomes(
         "HLA-DQA1*01:01,XXCLASSII\n"
         "TAP1,XXTAP\n"
         "SLA-TAP*1*01:01,XXLEGACYTAP\n"
+        "SLA-TAP0,XXNEARBYTAP\n"
         "Caja-PS*02:01,XXLEGACYPS\n"
+        "Caja-PS0*02:01,XXNEARBYPS\n"
         "Caja-DAA*01:01,XXLEGACYDAA\n"
         "Caja-DAB*01:01,XXLEGACYDAB\n"
         "Caja-DRA*01:01,XXLENIENTDRA\n"
@@ -151,6 +153,9 @@ def test_load_skips_incomplete_non_class1_pseudosequences_with_mhcgnomes(
         "Geja-F10*01:01,XXLENIENTCLASSI\n"
         "Caja-B5*01:01ps,XXPSEUDOGENE\n"
         "HLA-H*02:01,XXHLAPSEUDOGENE\n"
+        "Mamu-G*01:01,XXINHERITEDPSEUDOGENE\n"
+        "Popy-Ap*01:01,XXINHERITEDPSEUDOGENE\n"
+        "Poab-Ap*01:01,XXSCOPEDNONPSEUDOGENE\n"
         "NONSENSE,XXUNKNOWN\n"
     )
 
@@ -164,6 +169,11 @@ def test_load_skips_incomplete_non_class1_pseudosequences_with_mhcgnomes(
         # mhcgnomes classifies this otherwise-unparseable gene as class I,
         # so it is preserved rather than mistaken for a non-predictor row.
         "Geja-F10*01:01": "XXLENIENTCLASSI",
+        # Nearby names are not classified by substring, and inherited gene
+        # properties remain scoped to the exact species/locus ontology entry.
+        "SLA-TAP0": "XXNEARBYTAP",
+        "Caja-PS0*02:01": "XXNEARBYPS",
+        "Poab-Ap*01:01": "XXSCOPEDNONPSEUDOGENE",
         # Unknown names are preserved for backwards compatibility; known
         # non-class-I / unsupported MHC rows are the ones dropped.
         "NONSENSE": "XXUNKNOWN",

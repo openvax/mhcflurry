@@ -15,7 +15,6 @@
 import collections
 import json
 import logging
-import re
 import time
 from functools import partial
 from getpass import getuser
@@ -28,12 +27,7 @@ import pandas
 from mhcgnomes import parse, parse_gene_class
 
 from ..class1_neural_network import Class1NeuralNetwork
-from ..common import (
-    is_pseudogene_mhc,
-    load_weights,
-    normalize_allele_name,
-    save_weights,
-)
+from ..common import load_weights, normalize_allele_name, save_weights
 from ..downloads import get_default_class1_models_dir
 from ..percent_rank_transform import PercentRankTransform
 from ..pseudosequences import (
@@ -43,6 +37,14 @@ from ..pseudosequences import (
 )
 from ..version import __version__
 from ..model_provenance import add_release_provenance
+
+
+# The public 2.2.0 model artifact contains this malformed spelling of the
+# official Caja-PS2*01 processed-pseudogene allele. Keep only this exact
+# artifact compatibility case until pirl-unc/mhcgnomes#88 supplies the
+# ontology property and, if appropriate, the historical alias. Do not infer
+# pseudogene status from a ``PS`` substring.
+_LEGACY_NON_PREDICTOR_PSEUDOSEQUENCE_KEYS = frozenset({"Caja-PS*02:01"})
 
 
 def _parse_mhc_name(raw_name, only_class1):
@@ -71,11 +73,7 @@ def _is_incomplete_non_predictor_pseudosequence(name, sequence):
             # class-II genes and known non-MHC helper genes.
             return gene_class.is_class2 or gene_class.non_mhc
 
-        # A few old spellings remain outside mhcgnomes, including the
-        # family-level TAP form tracked in pirl-unc/mhcgnomes#86. Preserve
-        # their historical skip without classifying arbitrary unknown names.
-        return bool(re.search(
-            r"(?:^|[-*])(PS|TAP)(?:[-*]|[0-9])", str(name)))
+        return str(name) in _LEGACY_NON_PREDICTOR_PSEUDOSEQUENCE_KEYS
 
     parsed_class1 = _parse_mhc_name(name, only_class1=True)
     if parsed_class1 is None:
@@ -86,7 +84,7 @@ def _is_incomplete_non_predictor_pseudosequence(name, sequence):
     gene_name = getattr(parsed_class1, "gene_name", None)
     return (
         gene_name in {"HFE", "MICA", "MICB"}
-        or is_pseudogene_mhc(parsed_class1)
+        or getattr(parsed_class1, "is_pseudogene", False)
         or parsed_class1.annotation_null
         or parsed_class1.annotation_questionable
     )

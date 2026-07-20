@@ -116,6 +116,8 @@ def test_canonicalize_allele_series_resolves_aliases_and_drops_junk(caplog):
     ("HLA-A2", "serotype is not a specific allele"),
     ("Caja-B5*01:01ps", "pseudogene MHC allele"),
     ("HLA-H*02:01", "pseudogene MHC allele"),
+    ("Mamu-G*01:01", "pseudogene MHC allele"),
+    ("Popy-Ap*01:01", "pseudogene MHC allele"),
     ("HLA-A*02:01N", "null-expression MHC allele"),
     ("HLA-A*02:01Q", "questionable-expression MHC allele"),
     ("MICA*001:01", "Unsupported gene in MHC allele name"),
@@ -128,3 +130,9 @@ def test_normalize_allele_name_reports_specific_failure(raw_name, message):
         normalize_allele_name(raw_name)
     assert normalize_allele_name(
         raw_name, raise_on_error=False, default_value="invalid") == "invalid"
+
+
+def test_normalize_allele_name_scopes_inherited_pseudogene_status():
+    # mhcgnomes marks Popy-Ap as a pseudogene but does not leak that property
+    # to the similarly named Poab-Ap locus in a sibling orangutan species.
+    assert normalize_allele_name("Poab-Ap*01:01") == "Poab-Ap*01:01"

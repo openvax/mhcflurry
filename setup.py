@@ -61,7 +61,7 @@ if __name__ == "__main__":
         "ahocorasick-rs",
         "scikit-learn",
         "threadpoolctl",
-        "mhcgnomes>=3.18.0",
+        "mhcgnomes>=3.33.0",
         "numpy>=1.22.4",
         "pyyaml",
         "tqdm",

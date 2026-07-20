@@ -34,28 +34,6 @@ from . import amino_acid
 # to get a different, still-reproducible run.
 DEFAULT_RANDOM_SEED = 42
 
-# IPD-IMGT/HLA classifies these HLA class-I loci as pseudogenes. mhcgnomes
-# exposes ``annotation_pseudogene`` for allele suffixes such as ``Ps``, but
-# does not currently expose gene-level pseudogene status. Remove this fallback
-# once pirl-unc/mhcgnomes#85 provides that structured ontology property.
-_HLA_CLASS_I_PSEUDOGENE_GENES = frozenset({
-    "H", "J", "K", "L", "N", "P", "R", "S", "T", "U", "V", "W", "Y",
-})
-
-
-def is_pseudogene_mhc(parsed):
-    """Return whether a parsed mhcgnomes name denotes an MHC pseudogene."""
-    species = getattr(parsed, "species", None)
-    return bool(
-        getattr(parsed, "annotation_pseudogene", False)
-        or (
-            getattr(species, "mhc_prefix", None) == "HLA"
-            and getattr(parsed, "gene_name", None)
-            in _HLA_CLASS_I_PSEUDOGENE_GENES
-        )
-    )
-
-
 def add_random_seed_arg(parser):
     """Add the standard ``--random-seed`` argument to a CLI parser.
 
@@ -236,7 +214,7 @@ def normalize_allele_name(
                     "not %s-family genes." % (raw_name, forbidden_substring)
                 )
             return default_value
-    if is_pseudogene_mhc(result):
+    if getattr(result, "is_pseudogene", False):
         if raise_on_error:
             raise ValueError(
                 "Unsupported pseudogene MHC allele: %s. Pseudogene alleles "

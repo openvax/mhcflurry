@@ -24,9 +24,10 @@ The orchestrator-as-locus-of-control architecture is documented in
 "who owns what" picture across parallelism, tensor residency, and env
 knobs.
 
-No changes to the prediction interface. **Saved 2.2.x model bundles
-load and predict identically — the changes are entirely in how new
-models are trained.**
+No changes to the prediction interface. **Saved 2.2.x model bundles remain
+compatible, and predictions for valid class-I alleles are unchanged.** Loading
+now omits incomplete pseudosequences that mhcgnomes identifies as pseudogene,
+class-II, or non-MHC records; these rows were never valid prediction targets.
 
 ## Performance
 
@@ -199,6 +200,16 @@ kept = filter_canonicalizable_alleles(all_alleles)
 dropped = sorted(set(all_alleles) - set(kept))
 print(f"{len(dropped)} dropped:", dropped[:10])
 ```
+
+### MHC classification comes from mhcgnomes 3.33
+
+MHCflurry now requires mhcgnomes 3.33 and uses its ontology-backed
+`is_pseudogene` and gene-family classification directly. This removes the
+local HLA pseudogene table and name-based TAP/`PS` regular expression, while
+also recognizing pseudogene loci in macaque and orangutan species. One exact
+compatibility entry remains for the malformed `Caja-PS*02:01` key shipped in
+the public 2.2.0 pseudosequence artifact; upstream ontology/alias support is
+tracked in [pirl-unc/mhcgnomes#88](https://github.com/pirl-unc/mhcgnomes/issues/88).
 
 ### `validation_interval > 1` and the saved val_loss
 
