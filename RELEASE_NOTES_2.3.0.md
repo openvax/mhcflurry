@@ -239,6 +239,10 @@ negatives are refilled into the top slice of that row space each epoch.
 | `mhcflurry plot-model-comparison` | Render ROC/PR/scatter/delta plots from a `compare-models` output directory. |
 | `scripts/training/plot_loss_curves.py` | Per-model train + val loss curves from manifest (no weight files needed). Three PNGs + summary CSV. |
 
+`matplotlib` is now an installed package dependency, so the documented
+evaluation and paper-figure commands work in a clean MHCflurry installation;
+remote launchers no longer install it as an undeclared workaround.
+
 When to use which:
 - **`compare-models --b public`** — a single run vs the published 2.2.0
   baseline (`--b` defaults to `public`). The eval stage of

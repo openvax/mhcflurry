@@ -332,7 +332,7 @@ image = (
         "libxslt1-dev",
         "procps",
     )
-    .pip_install("matplotlib", "pypdf")
+    .pip_install("pypdf")
     .pip_install("runplz>=3.11.0")
     .pip_install_local_dir(".", editable=True)
 )

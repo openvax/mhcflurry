@@ -1099,7 +1099,7 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libhdf5-dev libxml2-dev libxslt1-dev procps
 
 python -m pip install --upgrade pip
-python -m pip install matplotlib pypdf
+python -m pip install pypdf
 
 rm -rf "$repo_dir" "$run_dir"
 mkdir -p "$repo_dir" "$run_dir"

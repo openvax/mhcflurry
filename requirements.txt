@@ -4,6 +4,7 @@ torch>=2.0.0
 appdirs
 scikit-learn
 threadpoolctl
+matplotlib
 mhcgnomes>=3.33.0
 pyyaml
 tqdm

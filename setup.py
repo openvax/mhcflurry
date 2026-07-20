@@ -61,6 +61,7 @@ if __name__ == "__main__":
         "ahocorasick-rs",
         "scikit-learn",
         "threadpoolctl",
+        "matplotlib",
         "mhcgnomes>=3.33.0",
         "numpy>=1.22.4",
         "pyyaml",
