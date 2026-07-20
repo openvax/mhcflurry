@@ -567,7 +567,11 @@ def _make_paper_figures_run_parser(prog):
     )
     parser.add_argument(
         "--paper-figures-out",
-        help="Paper-figure output directory. Default: <out>/plots/paper_figures.",
+        help=(
+            "Dedicated paper-figure output directory. Default: "
+            "<out>/plots/paper_figures. Cannot be <out>/plots or a "
+            "diagnostic component directory."
+        ),
     )
     parser.add_argument(
         "--formats",
@@ -576,7 +580,11 @@ def _make_paper_figures_run_parser(prog):
     )
     parser.add_argument(
         "--summary-pdf",
-        help="Combined diagnostic PDF. Default: <out>/plots/model_comparison_figures.pdf.",
+        help=(
+            "Combined diagnostic PDF. Default: "
+            "<out>/plots/model_comparison_figures.pdf. Must not be inside "
+            "the paper-figure or diagnostic component directories."
+        ),
     )
     parser.add_argument(
         "--candidate-predictor",
@@ -612,6 +620,14 @@ def _run_paper_figures_pipeline(args):
     from . import paper_figures
     from . import plot_model_comparison
 
+    paper_out = args.paper_figures_out or os.path.join(
+        args.out, "plots", "paper_figures")
+    summary_pdf = args.summary_pdf or os.path.join(
+        args.out, "plots", "model_comparison_figures.pdf")
+    if not args.skip_comparison_plots:
+        plot_model_comparison._validate_plot_output_paths(
+            os.path.join(args.out, "plots"), paper_out, summary_pdf)
+
     os.makedirs(args.out, exist_ok=True)
     compare_argv = [
         "--a", args.a,
@@ -631,8 +647,6 @@ def _run_paper_figures_pipeline(args):
     if compare_status:
         return compare_status
 
-    paper_out = args.paper_figures_out or os.path.join(
-        args.out, "plots", "paper_figures")
     paper_argv = [
         "--comparison-dir", args.out,
         "--out", paper_out,
@@ -659,8 +673,6 @@ def _run_paper_figures_pipeline(args):
     if args.skip_comparison_plots:
         return 0
 
-    summary_pdf = args.summary_pdf or os.path.join(
-        args.out, "plots", "model_comparison_figures.pdf")
     plot_argv = [
         "--input", args.out,
         "--summary-pdf", summary_pdf,

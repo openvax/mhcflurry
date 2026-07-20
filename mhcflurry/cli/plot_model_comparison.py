@@ -95,7 +95,9 @@ Plotting layers:
         "--summary-pdf",
         help=(
             "Optional PDF path. When set, generated plots are collected into "
-            "a single PDF, preserving vector plots where possible."
+            "a single PDF, preserving vector plots where possible. Use a "
+            "top-level file under <input>/plots or a path outside the plot "
+            "tree; paper and diagnostic subdirectories are reserved."
         ),
     )
     parser.add_argument(
@@ -131,7 +133,8 @@ Plotting layers:
         "--paper-figures-out",
         help=(
             "Output directory for paper-style figures. Default: "
-            "<input>/plots/paper_figures."
+            "<input>/plots/paper_figures. Must be a dedicated directory, "
+            "not <input>/plots or a diagnostic component directory."
         ),
     )
     parser.add_argument(
@@ -237,6 +240,8 @@ def run(args):
             ),
         },
     )
+    _validate_plot_output_paths(
+        plot_dir, paper_figures_dir, args.summary_pdf)
     _reset_plot_directory(
         plot_dir, preserve_directory=paper_figures_dir)
     if args.summary_pdf:
@@ -320,11 +325,8 @@ def _validate_paper_figure_inputs_outside_plot_dir(plot_dir, input_paths):
         if value is None:
             continue
         path = Path(os.path.abspath(value))
-        if (
-                _path_is_within(path, plot_dir)
-                or _path_is_within(
-                    path.resolve(strict=False), resolved_plot_dir)
-        ):
+        if _path_is_within_location(
+                path, plot_dir, resolved_directory=resolved_plot_dir):
             conflicts.append((option, path))
     if conflicts:
         details = ", ".join(
@@ -336,6 +338,68 @@ def _validate_paper_figure_inputs_outside_plot_dir(plot_dir, input_paths):
             "choose a different --input comparison directory."
             % (plot_dir, details)
         )
+
+
+def _validate_plot_output_paths(
+        plot_dir, paper_figures_dir, summary_pdf=None):
+    """Reject overlapping command-owned output locations before cleanup."""
+    plot_dir = Path(os.path.abspath(plot_dir))
+    paper_figures_dir = Path(os.path.abspath(paper_figures_dir))
+    diagnostic_dirs = tuple(
+        plot_dir / name
+        for name in ("affinity", "processing", "presentation", "paper")
+    )
+
+    if _same_location(paper_figures_dir, plot_dir) or any(
+            _path_is_within_location(paper_figures_dir, directory)
+            for directory in diagnostic_dirs):
+        raise SystemExit(
+            "--paper-figures-out must be a dedicated directory distinct "
+            "from the diagnostic plot directory and its command-owned "
+            "component directories. Refusing unsafe output: %s"
+            % paper_figures_dir
+        )
+
+    if summary_pdf is None:
+        return
+    summary_pdf = Path(os.path.abspath(summary_pdf))
+    conflicting_dirs = (paper_figures_dir,) + diagnostic_dirs
+    if (
+            _same_location(summary_pdf, plot_dir)
+            or any(
+                _path_is_within_location(summary_pdf, directory)
+                for directory in conflicting_dirs)
+    ):
+        raise SystemExit(
+            "--summary-pdf collides with command-owned figure output: %s. "
+            "Use a top-level file under %s (for example, %s) or a path "
+            "outside the paper and diagnostic output directories."
+            % (
+                summary_pdf,
+                plot_dir,
+                plot_dir / "model_comparison_figures.pdf",
+            )
+        )
+
+
+def _same_location(left, right):
+    left = Path(os.path.abspath(left))
+    right = Path(os.path.abspath(right))
+    return (
+        left == right
+        or left.resolve(strict=False) == right.resolve(strict=False)
+    )
+
+
+def _path_is_within_location(path, directory, resolved_directory=None):
+    path = Path(os.path.abspath(path))
+    directory = Path(os.path.abspath(directory))
+    if _path_is_within(path, directory):
+        return True
+    if resolved_directory is None:
+        resolved_directory = directory.resolve(strict=False)
+    return _path_is_within(
+        path.resolve(strict=False), resolved_directory)
 
 
 def _clean_directory_except(directory, preserve_directory):

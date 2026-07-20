@@ -242,6 +242,9 @@ negatives are refilled into the top slice of that row space each epoch.
 `matplotlib` is now an installed package dependency, so the documented
 evaluation and paper-figure commands work in a clean MHCflurry installation;
 remote launchers no longer install it as an undeclared workaround.
+Paper and diagnostic output paths are validated before comparison, cleanup, or
+rendering, preventing a custom summary path or paper directory from deleting or
+overwriting command-owned PDFs.
 
 When to use which:
 - **`compare-models --b public`** — a single run vs the published 2.2.0

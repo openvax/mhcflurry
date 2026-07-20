@@ -1006,6 +1006,43 @@ def test_eval_paper_figures_run_preserves_rendered_paper_suite(
     assert summary.read_bytes() == b"summary"
 
 
+@pytest.mark.parametrize(
+    "extra_args",
+    [
+        ["--paper-figures-out", "{out}/plots"],
+        [
+            "--summary-pdf",
+            "{out}/plots/paper_figures/paper_figures.pdf",
+        ],
+    ],
+)
+def test_eval_paper_figures_run_rejects_output_collisions_before_work(
+        tmp_path, monkeypatch, extra_args):
+    calls = []
+    out = tmp_path / "eval"
+    rendered = out / "plots" / "paper_figures.pdf"
+    rendered.parent.mkdir(parents=True)
+    rendered.write_bytes(b"existing output")
+
+    monkeypatch.setattr(
+        compare_models, "run", lambda args: calls.append("compare"))
+    monkeypatch.setattr(
+        paper_figures, "run", lambda args: calls.append("paper"))
+    monkeypatch.setattr(
+        plot_model_comparison, "run", lambda args: calls.append("plot"))
+    argv = [
+        "paper-figures", "run",
+        "--a", "new-run",
+        "--out", str(out),
+    ] + [value.format(out=out) for value in extra_args]
+
+    with pytest.raises(SystemExit, match="command-owned|dedicated directory"):
+        eval_command.run_argv(argv)
+
+    assert calls == []
+    assert rendered.read_bytes() == b"existing output"
+
+
 def test_compare_models_help_runs(capsys):
     """The compare-models help text exposes the documented flags.
 
@@ -2287,6 +2324,61 @@ def test_plot_model_comparison_rejects_symlink_to_input_under_cleanup_tree(
         plot_model_comparison.run(args)
 
     assert sentinel.read_bytes() == b"paper input"
+
+
+def test_plot_model_comparison_rejects_paper_output_equal_to_plot_directory(
+        tmp_path, monkeypatch):
+    plot_dir = tmp_path / "plots"
+    combined = plot_dir / "paper_figures.pdf"
+    panel = plot_dir / "pdf" / "panel.pdf"
+    panel.parent.mkdir(parents=True)
+    combined.write_bytes(b"combined paper figures")
+    panel.write_bytes(b"paper panel")
+    monkeypatch.setattr(
+        plot_model_comparison, "_apply_paper_style", lambda: None)
+    args = plot_model_comparison.make_parser().parse_args([
+        "--input", str(tmp_path),
+        "--paper-figures-out", str(plot_dir),
+    ])
+
+    with pytest.raises(SystemExit, match="dedicated directory"):
+        plot_model_comparison.run(args)
+
+    assert combined.read_bytes() == b"combined paper figures"
+    assert panel.read_bytes() == b"paper panel"
+
+
+@pytest.mark.parametrize(("owner", "relative_path"), [
+    ("paper", "paper_figures.pdf"),
+    ("plots", "affinity/roc.pdf"),
+    ("plots", "paper/release_summary_macro.pdf"),
+])
+def test_plot_model_comparison_rejects_summary_pdf_output_collisions(
+        tmp_path, monkeypatch, owner, relative_path):
+    comparison_dir = tmp_path / "comparison"
+    plot_dir = comparison_dir / "plots"
+    paper_dir = tmp_path / "external-paper"
+    summary = (
+        paper_dir if owner == "paper" else plot_dir
+    ) / relative_path
+    summary.parent.mkdir(parents=True)
+    summary.write_bytes(b"generated figure")
+    stale_plot = plot_dir / "stale.pdf"
+    stale_plot.parent.mkdir(parents=True, exist_ok=True)
+    stale_plot.write_bytes(b"stale plot")
+    monkeypatch.setattr(
+        plot_model_comparison, "_apply_paper_style", lambda: None)
+    args = plot_model_comparison.make_parser().parse_args([
+        "--input", str(comparison_dir),
+        "--paper-figures-out", str(paper_dir),
+        "--summary-pdf", str(summary),
+    ])
+
+    with pytest.raises(SystemExit, match="collides with command-owned"):
+        plot_model_comparison.run(args)
+
+    assert summary.read_bytes() == b"generated figure"
+    assert stale_plot.read_bytes() == b"stale plot"
 
 
 def test_detect_available_components_finds_affinity(tmp_path):

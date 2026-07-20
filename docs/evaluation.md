@@ -40,6 +40,13 @@ model artifacts; explicitly requested processing modes must exist on both sides.
 The metrics directory is the reusable contract between evaluation and plotting.
 Keep it when iterating on figure style or assembling a review packet.
 
+Keep paper figures in their own directory (the default is
+`<out>/plots/paper_figures`). The combined diagnostic `--summary-pdf` may be a
+top-level file under `<out>/plots` or live outside the plot tree, but it cannot
+be placed inside the paper-figure, affinity, processing, presentation, or
+diagnostic-paper subdirectories. Commands reject overlapping output paths
+before clearing or rendering anything.
+
 ## Paper-style figures
 
 For an already-trained local model, compose comparison, diagnostics, and any
