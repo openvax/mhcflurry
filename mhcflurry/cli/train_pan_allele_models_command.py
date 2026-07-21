@@ -42,13 +42,14 @@ from ..common import (
     derive_seed,
     install_sigusr1_stack_trace_handler,
     normalize_allele_name,
+    positive_int_arg,
     write_generate_sh,
 )
 from ..parallelism import (
     add_local_parallelism_args,
     apply_resolved_training_hyperparameters_to_work_items,
-    attach_constant_data_to_work_items_if_needed,
     call_wrapped_kwargs,
+    refine_local_parallelism_from_worker_context,
     resolve_local_parallelism_args,
     run_single_worker_torch_compile_warmup,
     worker_pool_with_gpu_assignments_from_args,
@@ -171,20 +172,20 @@ parser.add_argument(
     help="Do not use affinity value inequalities even when present in data")
 parser.add_argument(
     "--num-folds",
-    type=int,
+    type=positive_int_arg,
     default=4,
     metavar="N",
     help="Number of training folds.")
 parser.add_argument(
     "--num-replicates",
-    type=int,
+    type=positive_int_arg,
     metavar="N",
     default=1,
     help="Number of replicates per (architecture, fold) pair to train.")
 add_random_seed_arg(parser)
 parser.add_argument(
     "--max-epochs",
-    type=int,
+    type=positive_int_arg,
     metavar="N",
     help="Max training epochs. If specified here it overrides any 'max_epochs' "
     "specified in the hyperparameters.")
@@ -465,6 +466,19 @@ def run(argv=sys.argv[1:]):
     install_sigusr1_stack_trace_handler()
 
     args = parser.parse_args(argv)
+    held_out_fraction, held_out_max = (
+        args.held_out_measurements_per_allele_fraction_and_max)
+    if not numpy.isfinite(held_out_fraction) or not 0 <= held_out_fraction <= 1:
+        parser.error(
+            "--held-out-measurements-per-allele-fraction-and-max fraction "
+            "must be in [0, 1]; got %r" % held_out_fraction)
+    if (
+            not numpy.isfinite(held_out_max)
+            or held_out_max < 0
+            or not float(held_out_max).is_integer()):
+        parser.error(
+            "--held-out-measurements-per-allele-fraction-and-max maximum "
+            "must be a non-negative integer; got %r" % held_out_max)
 
     if args.debug:
         try:
@@ -487,7 +501,8 @@ def _estimate_training_per_worker_gb(args):
     failure returns None -> the planner uses the static profile default.
     """
     try:
-        hyperparameters_lst = yaml.safe_load(open(args.hyperparameters))
+        with open(args.hyperparameters) as fd:
+            hyperparameters_lst = yaml.safe_load(fd)
         # One-column read just to count rows; ``initialize_training`` re-reads
         # the full file later. A deliberate, one-time decompression pass at
         # planning time (negligible against a multi-hour training run).
@@ -505,7 +520,8 @@ def _estimate_training_per_worker_gb(args):
 def _training_work_item_count(args):
     """Best-effort number of model fits in this command."""
     try:
-        hyperparameters_lst = yaml.safe_load(open(args.hyperparameters))
+        with open(args.hyperparameters) as fd:
+            hyperparameters_lst = yaml.safe_load(fd)
         return (
             len(hyperparameters_lst)
             * int(args.num_folds)
@@ -559,7 +575,8 @@ def initialize_training(args):
     # Extract deltas by grepping stdout for ``TIMING_MARKER``.
     print(f"TIMING_MARKER start {time.time():.3f}")
     print("Initializing training.")
-    hyperparameters_lst = yaml.safe_load(open(args.hyperparameters))
+    with open(args.hyperparameters) as fd:
+        hyperparameters_lst = yaml.safe_load(fd)
     assert isinstance(hyperparameters_lst, list)
     print("Loaded hyperparameters list:")
     pprint.pprint(hyperparameters_lst)
@@ -734,7 +751,11 @@ def train_models(args):
         WORKER_CONTEXT.update(pickle.load(fd))
     print("Loaded training init info.")
 
-    all_work_items = WORKER_CONTEXT["work_items"]
+    # Work items are dispatched separately. Do not copy the complete queue
+    # into every spawn worker as part of its read-only training context.
+    all_work_items = WORKER_CONTEXT.pop("work_items")
+    if not args.cluster_parallelism:
+        refine_local_parallelism_from_worker_context(args, WORKER_CONTEXT)
 
     apply_resolved_training_hyperparameters_to_work_items(all_work_items, args)
 
@@ -771,7 +792,10 @@ def train_models(args):
     start = time.time()
 
     worker_pool = None
-    if serial_run:
+    if not work_items:
+        print("No incomplete work items; skipping warmup and worker startup.")
+        results_generator = None
+    elif serial_run:
         # Run in serial. Every worker is passed the same predictor,
         # which it adds models to, so no merging is required. It also saves
         # as it goes so no saving is required at the end.
@@ -798,7 +822,11 @@ def train_models(args):
             constant_data=WORKER_CONTEXT,
         )
 
-        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+        worker_pool = worker_pool_with_gpu_assignments_from_args(
+            args,
+            worker_context_module=__name__,
+            worker_context_data=WORKER_CONTEXT,
+        )
         print("Worker pool", worker_pool)
         assert worker_pool is not None
 
@@ -809,13 +837,6 @@ def train_models(args):
 
     try:
         if worker_pool is not None:
-            # Attach constant data and launch the work inside the try so a
-            # failure here (e.g. copying large constant data to workers) still
-            # tears the pool down via the finally rather than leaking
-            # non-daemon workers.
-            attach_constant_data_to_work_items_if_needed(
-                work_items, WORKER_CONTEXT, worker_pool
-            )
             results_generator = worker_pool.imap_unordered(
                 partial(call_wrapped_kwargs, train_model),
                 work_items,

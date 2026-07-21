@@ -45,7 +45,8 @@ import tempfile
 
 import pandas
 
-from ..common import normalize_allele_name
+from ..common import positive_int_arg
+from ..common import normalize_sequence_resolved_allele_name
 
 
 def make_parser(prog="mhcflurry eval"):
@@ -407,10 +408,23 @@ def _split_benchmark_alleles(value):
         item for item in re.split(r"[,\s]+", str(value).strip())
         if item
     ]
+    if not alleles:
+        raise ValueError(
+            "Benchmark genotype %r contains no class-I alleles." % value
+        )
     normalized = []
     for allele in alleles:
-        normalized.append(
-            normalize_allele_name(allele, raise_on_error=False) or allele)
+        try:
+            canonical = normalize_sequence_resolved_allele_name(allele)
+        except ValueError as error:
+            # Never pass an unparsed user token through to an external
+            # predictor. It may interpret the spelling differently or fail
+            # after a long grouped run; surface the offending genotype now.
+            raise ValueError(
+                "Invalid, ambiguous, or unsupported class-I allele in "
+                "benchmark genotype %r: %r (%s)" % (value, allele, error)
+            ) from error
+        normalized.append(canonical)
     return normalized
 
 
@@ -467,27 +481,50 @@ def _run_external_predictors(args):
     for column in [args.peptide_column, allele_column]:
         if column not in benchmark.columns:
             raise ValueError("Input table lacks required column: %s" % column)
+    output_columns = [spec[1] for spec in predictor_specs]
+    generated_columns = output_columns + [
+        "%s_best_allele" % column for column in output_columns
+    ]
+    duplicates = sorted({
+        column for column in generated_columns
+        if generated_columns.count(column) > 1
+    })
+    if duplicates:
+        raise ValueError("Colliding external predictor output column(s): %s" % (
+            ", ".join(duplicates)))
+    collisions = sorted(set(benchmark.columns).intersection(generated_columns))
+    if collisions:
+        raise ValueError(
+            "External predictor output column(s) would overwrite existing "
+            "benchmark data: %s" % ", ".join(collisions)
+        )
 
     raw_dir = args.keep_raw_dir
     if raw_dir:
         os.makedirs(raw_dir, exist_ok=True)
     output = benchmark.copy()
 
-    grouped = list(output.groupby(allele_column, sort=False))
+    grouped = []
+    for allele_value, group in output.groupby(
+            allele_column, sort=False, dropna=False):
+        # Validate every group up front, including missing/blank values that
+        # pandas groupby would otherwise omit. Reuse the canonical values so
+        # no raw benchmark token can reach the external predictor.
+        grouped.append((group, _split_benchmark_alleles(allele_value)))
     with tempfile.TemporaryDirectory() as tmp_dir:
-        for predictor_name, output_column, value_field in predictor_specs:
+        for predictor_num, (
+                predictor_name, output_column, value_field,
+        ) in enumerate(predictor_specs):
             best_values = pandas.Series(index=output.index, dtype=float)
             best_alleles = pandas.Series(index=output.index, dtype=object)
-            for group_num, (allele_value, group) in enumerate(grouped):
-                alleles = _split_benchmark_alleles(allele_value)
-                if not alleles:
-                    continue
+            for group_num, (group, alleles) in enumerate(grouped):
                 peptides = sorted(group[args.peptide_column].dropna().unique())
                 if not peptides:
                     continue
                 raw_csv = os.path.join(
                     raw_dir or tmp_dir,
-                    "%s.%04d.csv" % (output_column, group_num))
+                    "predictor.%04d.group.%04d.csv" % (
+                        predictor_num, group_num))
                 print(
                     "Running %s external predictor %s for %d peptides and %d alleles" %
                     (args.runner, predictor_name, len(peptides), len(alleles)))
@@ -550,7 +587,7 @@ def _make_paper_figures_run_parser(prog):
     )
     parser.add_argument(
         "--limit-files",
-        type=int,
+        type=positive_int_arg,
         help="Smoke-test: only read first N benchmark files.",
     )
     parser.add_argument(
@@ -624,6 +661,7 @@ def _run_paper_figures_pipeline(args):
         args.out, "plots", "paper_figures")
     summary_pdf = args.summary_pdf or os.path.join(
         args.out, "plots", "model_comparison_figures.pdf")
+    _validate_pipeline_paper_inputs(args)
     if not args.skip_comparison_plots:
         plot_model_comparison._validate_plot_output_paths(
             os.path.join(args.out, "plots"), paper_out, summary_pdf)
@@ -681,6 +719,42 @@ def _run_paper_figures_pipeline(args):
     ]
     return plot_model_comparison.run(
         plot_model_comparison.make_parser().parse_args(plot_argv))
+
+
+def _validate_pipeline_paper_inputs(args):
+    """Reject paper inputs that compare-models would clear before rendering."""
+    out = os.path.realpath(args.out)
+    cleanup_dirs = [
+        os.path.join(out, name)
+        for name in (
+            "training_stats", "affinity", "processing", "presentation",
+            "plots", "worker_logs",
+        )
+    ]
+    inputs = {
+        "--scores-dir": args.scores_dir,
+        "--multiallelic-predictions": args.multiallelic_predictions,
+        "--monoallelic-predictions": args.monoallelic_predictions,
+    }
+    conflicts = []
+    for option, value in inputs.items():
+        if not value:
+            continue
+        path = os.path.realpath(value)
+        for directory in cleanup_dirs:
+            try:
+                within = os.path.commonpath([path, directory]) == directory
+            except ValueError:
+                within = False
+            if within:
+                conflicts.append("%s=%s" % (option, value))
+                break
+    if conflicts:
+        raise SystemExit(
+            "Paper-figure input path(s) would be deleted when compare-models "
+            "clears stale outputs under %s: %s. Move these inputs outside the "
+            "comparison output directory." % (args.out, ", ".join(conflicts))
+        )
 
 
 if __name__ == "__main__":

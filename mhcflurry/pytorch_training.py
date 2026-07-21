@@ -232,7 +232,10 @@ def effective_validation_batch_size(
     changed.
     """
     if configured_batch_size:
-        return int(configured_batch_size)
+        configured_batch_size = int(configured_batch_size)
+        if configured_batch_size < 1:
+            raise ValueError("validation batch size must be at least 1")
+        return configured_batch_size
     device_type = getattr(device, "type", device)
     if device_type in ("cuda", "mps") and model is not None:
         from .pytorch_sizing import compute_prediction_batch_size

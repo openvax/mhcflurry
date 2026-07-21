@@ -23,6 +23,7 @@ Usage:
       --release 2.3.0 \
       --github-release 2.3.0 \
       [--processing-variants "no_flank with_flanks [short_flanks]"] \
+      [--repo /path/to/mhcflurry] [--allow-dirty-repo] \
       [--date YYYYMMDD] \
       [--assets-dir /path/to/assets] \
       [--dry-run | --draft | --publish | --mode MODE]
@@ -104,6 +105,9 @@ RUN_DIR=
 RELEASE=
 GITHUB_RELEASE=
 ASSETS_DIR=
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="${REPO:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+ALLOW_DIRTY_REPO=0
 ASSET_DATE=$(date -u +%Y%m%d)
 MODE=dry-run
 PROCESSING_VARIANTS="no_flank with_flanks"
@@ -133,6 +137,14 @@ while [ $# -gt 0 ]; do
         --processing-variants)
             PROCESSING_VARIANTS=$2
             shift 2
+            ;;
+        --repo)
+            REPO=$2
+            shift 2
+            ;;
+        --allow-dirty-repo)
+            ALLOW_DIRTY_REPO=1
+            shift
             ;;
         --dry-run)
             MODE=dry-run
@@ -222,9 +234,23 @@ SHA_FILE="SHA256SUMS"
 SNIPPET_FILE="downloads.${RELEASE}.snippet.yml"
 
 require_command tar
+require_command python3
 if [ "$MODE" != "dry-run" ]; then
     require_command gh
 fi
+
+PROVENANCE_ARGS=(
+    python3 "$REPO/scripts/release/validate_release_provenance.py"
+    --repo "$REPO"
+    --run-dir "$RUN_DIR"
+    --release "$RELEASE"
+    --processing-variants "$PROCESSING_VARIANTS"
+    --require-artifacts
+)
+if [ "$ALLOW_DIRTY_REPO" = "1" ]; then
+    PROVENANCE_ARGS+=(--allow-dirty-repo)
+fi
+"${PROVENANCE_ARGS[@]}" >/dev/null
 
 require_dir "$AFFINITY_MODELS"
 require_file "$AFFINITY_MODELS/manifest.csv"

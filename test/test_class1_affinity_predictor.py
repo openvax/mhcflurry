@@ -140,6 +140,7 @@ def test_load_skips_incomplete_non_class1_pseudosequences_with_mhcgnomes(
     (tmp_path / LEGACY_ALLELE_SEQUENCES_FILENAME).write_text(
         "allele,sequence\n"
         "HLA-A*02:01,COMPLETE\n"
+        "HLA-DQB1*06:02,COMPLETECLASSII\n"
         "HLA-DQA1*01:01,XXCLASSII\n"
         "TAP1,XXTAP\n"
         "SLA-TAP*1*01:01,XXLEGACYTAP\n"
@@ -166,18 +167,11 @@ def test_load_skips_incomplete_non_class1_pseudosequences_with_mhcgnomes(
 
     assert predictor.allele_to_sequence == {
         "HLA-A*02:01": "COMPLETE",
-        # mhcgnomes classifies this otherwise-unparseable gene as class I,
-        # so it is preserved rather than mistaken for a non-predictor row.
-        "Geja-F10*01:01": "XXLENIENTCLASSI",
-        # Nearby names are not classified by substring, and inherited gene
-        # properties remain scoped to the exact species/locus ontology entry.
-        "SLA-TAP0": "XXNEARBYTAP",
-        "Caja-PS0*02:01": "XXNEARBYPS",
+        # Inherited gene properties remain scoped to the exact species/locus
+        # ontology entry.
         "Poab-Ap*01:01": "XXSCOPEDNONPSEUDOGENE",
-        # Unknown names are preserved for backwards compatibility; known
-        # non-class-I / unsupported MHC rows are the ones dropped.
-        "NONSENSE": "XXUNKNOWN",
     }
+    assert "NONSENSE" not in predictor.supported_alleles
 
 
 def test_invalid_alleles_raise_or_return_row_aligned_nans(caplog):

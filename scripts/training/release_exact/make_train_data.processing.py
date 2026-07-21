@@ -29,10 +29,11 @@ from mhcflurry.common import (
     allele_locus_name,
     configure_logging,
     normalize_allele_name,
+    positive_float_arg,
+    positive_int_arg,
 )
 from mhcflurry.parallelism import (
     add_local_parallelism_args,
-    attach_constant_data_to_work_items_if_needed,
     resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
@@ -135,12 +136,12 @@ proteome_source_group.add_argument(
         "materializing a proteome peptide CSV."))
 parser.add_argument(
     "--hit-multiplier-to-take",
-    type=float,
+    type=positive_float_arg,
     default=1,
     help="")
 parser.add_argument(
     "--ppv-multiplier",
-    type=int,
+    type=positive_int_arg,
     metavar="N",
     default=1000,
     help="Take top 1/N predictions.")
@@ -349,6 +350,12 @@ def run():
             len(new_hit_df))
         hit_df = new_hit_df.copy()
 
+    if hit_df.empty:
+        raise ValueError(
+            "No sequence-resolved HLA-A/B/C monoallelic hits remain after "
+            "the requested filters."
+        )
+
     sample_table = hit_df.drop_duplicates("sample_id").set_index("sample_id")
     grouped = hit_df.groupby("sample_id").nunique()
     for col in sample_table.columns:
@@ -417,14 +424,13 @@ def run():
             result_serialization_method="pickle",
             clear_constant_data=False)
     else:
-        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+        worker_pool = worker_pool_with_gpu_assignments_from_args(
+            args,
+            worker_context_module=__name__,
+            worker_context_data=WORKER_CONTEXT,
+        )
         print("Worker pool", worker_pool)
         assert worker_pool is not None
-        attach_constant_data_to_work_items_if_needed(
-            tasks,
-            WORKER_CONTEXT,
-            worker_pool,
-        )
         results = worker_pool.imap_unordered(
             partial(call_wrapped_kwargs, do_process_samples),
             tasks,
@@ -433,14 +439,23 @@ def run():
     print("Reading results")
 
     result_df = []
-    for worker_result in tqdm.tqdm(results, total=len(tasks)):
-        for sample_id, selected_df in worker_result.groupby("sample_id"):
-            print(
-                "Received result for sample",
-                sample_id,
-                "with hit and decoys:\n",
-                selected_df.hit.value_counts())
-        result_df.append(worker_result)
+    try:
+        for worker_result in tqdm.tqdm(results, total=len(tasks)):
+            for sample_id, selected_df in worker_result.groupby("sample_id"):
+                print(
+                    "Received result for sample",
+                    sample_id,
+                    "with hit and decoys:\n",
+                    selected_df.hit.value_counts())
+            result_df.append(worker_result)
+        if worker_pool:
+            worker_pool.close()
+            worker_pool.join()
+            worker_pool = None
+    finally:
+        if worker_pool:
+            worker_pool.terminate()
+            worker_pool.join()
 
     print("Received all results in %0.2f sec" % (time.time() - start))
 
@@ -462,11 +477,6 @@ def run():
 
     result_df.to_csv(args.out, index=False)
     print("Wrote: ", args.out)
-
-    if worker_pool:
-        worker_pool.close()
-        worker_pool.join()
-
 
 if __name__ == '__main__':
     run()

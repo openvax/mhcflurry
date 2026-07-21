@@ -12,6 +12,7 @@
 
 """Tests for common helpers."""
 
+import argparse
 import logging
 
 import pytest
@@ -21,8 +22,43 @@ from mhcflurry.common import (
     filter_canonicalizable_alleles,
     AlleleKeyResolver,
     canonicalize_allele_series,
+    fraction_arg,
     normalize_allele_name,
+    normalize_class1_genotype,
+    normalize_sequence_resolved_allele_name,
+    positive_float_arg,
+    positive_int_arg,
 )
+
+
+@pytest.mark.parametrize(
+    "value", ["0", "-1", "1.5", "junk", 1.5, True]
+)
+def test_positive_int_arg_rejects_invalid_values(value):
+    with pytest.raises(argparse.ArgumentTypeError):
+        positive_int_arg(value)
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "nan", "inf", "junk"])
+def test_positive_float_arg_rejects_invalid_values(value):
+    with pytest.raises(argparse.ArgumentTypeError):
+        positive_float_arg(value)
+
+
+def test_positive_arg_helpers_accept_values():
+    assert positive_int_arg("12") == 12
+    assert positive_float_arg("1e-3") == 1e-3
+
+
+@pytest.mark.parametrize("value", ["0", "-0.1", "1.1", "nan", "junk"])
+def test_fraction_arg_rejects_invalid_values(value):
+    with pytest.raises(argparse.ArgumentTypeError):
+        fraction_arg(value)
+
+
+def test_fraction_arg_accepts_fraction_and_one():
+    assert fraction_arg("0.25") == 0.25
+    assert fraction_arg("1") == 1.0
 
 
 def test_filter_canonicalizable_alleles_logs_instead_of_stdout(
@@ -56,6 +92,31 @@ def test_allele_locus_name_uses_mhcgnomes():
     assert allele_locus_name("A2") == "HLA-A"
     assert allele_locus_name("H-2-Kb") == "H2"
     assert allele_locus_name("NONSENSE") == "other"
+
+
+def test_normalize_allele_name_uses_exact_gene_classification():
+    with pytest.raises(ValueError, match="MIC-family"):
+        normalize_allele_name("HLA-MICA*001")
+    with pytest.raises(ValueError, match="HFE-family"):
+        normalize_allele_name("HLA-HFE*01:01")
+    # A forbidden token appearing only as part of an unrelated gene name must
+    # not trigger legacy substring inference.
+    assert normalize_allele_name(
+        "HLA-A*02:01", forbidden_substrings=("A0",)
+    ) == "HLA-A*02:01"
+
+
+def test_sequence_resolved_allele_and_genotype_normalization():
+    assert normalize_sequence_resolved_allele_name("A0201") == "HLA-A*02:01"
+    assert normalize_sequence_resolved_allele_name("H-2-Kb") == "H2-K*b"
+    assert normalize_class1_genotype("B0702 A0201 A0201") == (
+        "HLA-B*07:02", "HLA-A*02:01")
+    for value in ("HLA-A2", "A*02", "HLA-DQA1*01:01", "NONSENSE"):
+        with pytest.raises(ValueError):
+            normalize_sequence_resolved_allele_name(value)
+    for value in (None, float("nan"), ""):
+        with pytest.raises(ValueError, match="non-empty"):
+            normalize_class1_genotype(value)
 
 
 def test_allele_key_resolver_priority():

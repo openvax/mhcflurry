@@ -34,17 +34,19 @@ from ..common import (
     configure_logging,
     configure_random_seed,
     install_sigusr1_stack_trace_handler,
+    positive_int_arg,
     write_generate_sh,
 )
 from ..parallelism import (
     add_local_parallelism_args,
-    attach_constant_data_to_work_items_if_needed,
     call_wrapped_kwargs,
+    refine_local_parallelism_from_worker_context,
     resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
 )
 from ..workload_planning import (
     WORKLOAD_PRESENTATION_TRAINING,
+    env_float,
     path_size_bytes,
 )
 
@@ -105,7 +107,7 @@ parser.add_argument(
     help="Column in data giving hit (1) vs decoy (0)")
 parser.add_argument(
     "--feature-chunk-size",
-    type=int,
+    type=positive_int_arg,
     default=250000,
     metavar="N",
     help=(
@@ -278,26 +280,15 @@ def estimate_presentation_feature_worker_gb(args, predictor):
     resolver still needs a per-worker base footprint so it does not schedule
     too many independent processes onto one GPU.
     """
-    import os
-
-    def env_float(name, default):
-        try:
-            return float(os.environ.get(name, default))
-        except (TypeError, ValueError):
-            print(
-                "Ignoring invalid %s=%r; using %.2f" % (
-                    name, os.environ.get(name), float(default),
-                )
-            )
-            return float(default)
-
     runtime_floor_gb = env_float(
         "MHCFLURRY_PRESENTATION_WORKER_RUNTIME_FLOOR_GB",
         _PRESENTATION_WORKER_RUNTIME_FLOOR_GB,
+        bounds=(0.0, None),
     )
     safety = env_float(
         "MHCFLURRY_PRESENTATION_WORKER_SAFETY_FACTOR",
         _PRESENTATION_WORKER_SAFETY_FACTOR,
+        bounds=(0.0, None),
     )
     networks = list(iter_presentation_feature_networks(predictor))
     parameter_bytes = sum(network_parameter_bytes(network) for network in networks)
@@ -397,15 +388,16 @@ def predict_features_parallel(args, predictor, df, experiment_to_alleles):
         "data": df,
         "experiment_to_alleles": experiment_to_alleles,
     })
+    refine_local_parallelism_from_worker_context(args, WORKER_CONTEXT)
 
     worker_pool = None
     try:
-        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
-        print("Worker pool", worker_pool)
-        assert worker_pool is not None
-        attach_constant_data_to_work_items_if_needed(
-            work_items, WORKER_CONTEXT, worker_pool
+        worker_pool = worker_pool_with_gpu_assignments_from_args(
+            args,
+            worker_context_module=__name__,
+            worker_context_data=WORKER_CONTEXT,
         )
+        print("Worker pool", worker_pool)
 
         affinity = numpy.empty(len(df), dtype="float64")
         processing_scores_by_model = {}
@@ -416,11 +408,17 @@ def predict_features_parallel(args, predictor, df, experiment_to_alleles):
             processing_scores_by_model["with_flanks"] = numpy.empty(
                 len(df), dtype="float64")
 
-        results = worker_pool.imap_unordered(
-            partial(call_wrapped_kwargs, predict_feature_chunk),
-            work_items,
-            chunksize=1,
-        )
+        if worker_pool is None:
+            print("Feature prediction is running serially in the loaded parent.")
+            results = (
+                predict_feature_chunk(**item) for item in work_items
+            )
+        else:
+            results = worker_pool.imap_unordered(
+                partial(call_wrapped_kwargs, predict_feature_chunk),
+                work_items,
+                chunksize=1,
+            )
         for result in tqdm.tqdm(results, total=len(work_items)):
             start = result["start"]
             end = result["end"]
@@ -428,9 +426,10 @@ def predict_features_parallel(args, predictor, df, experiment_to_alleles):
             for (model_name, values) in result["processing_scores"].items():
                 processing_scores_by_model[model_name][start:end] = values
 
-        worker_pool.close()
-        worker_pool.join()
-        worker_pool = None
+        if worker_pool is not None:
+            worker_pool.close()
+            worker_pool.join()
+            worker_pool = None
 
         return {
             "affinity": affinity,

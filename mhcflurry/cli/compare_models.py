@@ -50,6 +50,12 @@ import numpy
 import pandas
 from sklearn.metrics import average_precision_score, roc_auc_score
 
+from ..common import (
+    normalize_class1_genotype,
+    normalize_allele_name,
+    normalize_sequence_resolved_allele_name,
+    positive_int_arg,
+)
 from .model_comparison_constants import (
     METRIC_NAMES,
     PRESENTATION_MODES,
@@ -209,7 +215,7 @@ def register_subparser(parser):
         ),
     )
     parser.add_argument(
-        "--limit-files", type=int, default=None,
+        "--limit-files", type=positive_int_arg, default=None,
         help="Smoke-test: only read first N benchmark files.",
     )
     parser.add_argument(
@@ -252,7 +258,7 @@ def register_subparser(parser):
     )
     parser.add_argument(
         "--presentation-max-tasks-per-worker",
-        type=int,
+        type=positive_int_arg,
         default=None,
         help="Override --max-tasks-per-worker for presentation inference.",
     )
@@ -267,17 +273,22 @@ def register_subparser(parser):
 
 def run(args):
     _validate_comparison_output_location(args)
-    _reset_comparison_outputs(args.out)
-    os.makedirs(args.out, exist_ok=True)
     side_a = _resolve_side("a", args.a, args.a_label, args)
     side_b = _resolve_side("b", args.b, args.b_label, args)
+    components = _resolve_components(args.include, side_a, side_b)
+    _validate_component_configuration(args, components, side_a, side_b)
+
+    # Resolve and validate every requested input before invalidating a previous
+    # comparison in this output directory. This keeps a typo or an incomplete
+    # candidate artifact from destroying the last usable review packet.
+    _reset_comparison_outputs(args.out)
+    os.makedirs(args.out, exist_ok=True)
 
     with open(os.path.join(args.out, "side_a.json"), "w") as fd:
         json.dump(_side_to_json(side_a), fd, indent=2, sort_keys=True)
     with open(os.path.join(args.out, "side_b.json"), "w") as fd:
         json.dump(_side_to_json(side_b), fd, indent=2, sort_keys=True)
 
-    components = _resolve_components(args.include, side_a, side_b)
     _stamp("running components: %s" % (", ".join(components) or "(none)"))
 
     headline = {"side_a": side_a["label"], "side_b": side_b["label"]}
@@ -297,19 +308,19 @@ def run(args):
 
 
 def _validate_comparison_output_location(args):
-    """Refuse output paths that contain either side's model inputs."""
+    """Refuse output paths that contain model or benchmark inputs."""
     out = os.path.realpath(args.out)
-    inputs = []
+    inputs = [("--data-dir", args.data_dir)] if args.data_dir else []
     for letter in ("a", "b"):
         spec = getattr(args, letter)
         if isinstance(spec, str) and not (
                 spec == "public" or spec.startswith("public:")):
-            inputs.append(spec)
+            inputs.append(("--%s" % letter, spec))
         for role in ("affinity", "processing", "presentation", "training"):
             value = getattr(args, "%s_%s_dir" % (letter, role))
             if value:
-                inputs.append(value)
-    for value in inputs:
+                inputs.append(("--%s-%s-dir" % (letter, role), value))
+    for option, value in inputs:
         path = os.path.realpath(value)
         try:
             output_contains_input = os.path.commonpath([out, path]) == out
@@ -317,8 +328,8 @@ def _validate_comparison_output_location(args):
             output_contains_input = False
         if output_contains_input:
             raise ValueError(
-                "Comparison output directory cannot contain a model input: "
-                "%s contains %s" % (args.out, value))
+                "Comparison output directory cannot contain an input path: "
+                "%s contains %s=%s" % (args.out, option, value))
 
 
 def _reset_comparison_outputs(out_dir):
@@ -565,16 +576,89 @@ def _resolve_components(include_arg, side_a, side_b):
         available.append("presentation")
 
     if include_arg == "auto":
+        if not available:
+            raise SystemExit(
+                "No comparable model components are available on both sides."
+            )
         return available
-    requested = [p.strip() for p in include_arg.split(",") if p.strip()]
+    pieces = [p.strip() for p in include_arg.split(",")]
+    if any(not piece for piece in pieces):
+        raise SystemExit("--include contains an empty component")
+    requested = pieces
+    if not requested:
+        raise SystemExit("--include must name at least one component or be 'auto'")
     bad = [p for p in requested if p not in _COMPONENT_NAMES]
     if bad:
         raise SystemExit("Unknown --include components: %s" % ", ".join(bad))
+    duplicates = sorted({p for p in requested if requested.count(p) > 1})
+    if duplicates:
+        raise SystemExit("Duplicate --include components: %s" % (
+            ", ".join(duplicates)))
     missing = [p for p in requested if p not in available]
     if missing:
-        for p in missing:
-            _stamp("WARNING: %s requested but unavailable on both sides" % p)
-    return [p for p in requested if p in available]
+        raise SystemExit(
+            "Requested comparison component(s) are unavailable on both sides: "
+            "%s. Every explicit --include component must exist on both the "
+            "candidate and baseline." % ", ".join(missing)
+        )
+    return requested
+
+
+def _requested_modes(value, allowed, option):
+    """Parse and validate a comma-separated comparison-mode option."""
+    requested = [mode.strip() for mode in value.split(",")]
+    if not requested or any(not mode for mode in requested):
+        raise SystemExit("%s contains an empty mode" % option)
+    bad = [mode for mode in requested if mode not in allowed]
+    if bad:
+        raise SystemExit("Unknown %s modes: %s" % (
+            option.removeprefix("--"), ", ".join(bad)))
+    duplicates = sorted({
+        mode for mode in requested if requested.count(mode) > 1
+    })
+    if duplicates:
+        raise SystemExit("Duplicate %s modes: %s" % (
+            option.removeprefix("--"), ", ".join(duplicates)))
+    return requested
+
+
+def _processing_model_dirs(side_a, side_b, requested_modes):
+    """Resolve requested processing variants or fail with both missing sides."""
+    model_dirs = {}
+    missing = []
+    for mode in requested_modes:
+        a_model_dir = _processing_model_dir(
+            side_a["paths"]["processing"], mode)
+        b_model_dir = _processing_model_dir(
+            side_b["paths"]["processing"], mode)
+        missing_sides = []
+        if not a_model_dir:
+            missing_sides.append("A (%s)" % side_a["label"])
+        if not b_model_dir:
+            missing_sides.append("B (%s)" % side_b["label"])
+        if missing_sides:
+            missing.append("%s: side %s" % (mode, " and ".join(missing_sides)))
+        else:
+            model_dirs[mode] = (a_model_dir, b_model_dir)
+    if missing:
+        raise SystemExit(
+            "Requested processing mode model(s) are unavailable: %s. "
+            "Every --processing-modes entry must exist on both sides." %
+            "; ".join(missing)
+        )
+    return model_dirs
+
+
+def _validate_component_configuration(args, components, side_a, side_b):
+    """Validate component-specific options before output cleanup begins."""
+    if "processing" in components:
+        modes = _requested_modes(
+            args.processing_modes, PROCESSING_MODES, "--processing-modes")
+        _processing_model_dirs(side_a, side_b, modes)
+    if "presentation" in components:
+        _requested_modes(
+            args.presentation_modes, PRESENTATION_MODES,
+            "--presentation-modes")
 
 
 # ---------------------------------------------------------------------------
@@ -594,7 +678,7 @@ def _ppv_at_n(y_true, y_score, n):
 def _metrics(y_true, y_score):
     y_true = numpy.asarray(y_true)
     y_score = numpy.asarray(y_score)
-    mask = ~numpy.isnan(y_score)
+    mask = numpy.isfinite(y_score)
     y_true = y_true[mask]
     y_score = y_score[mask]
     n_pos = int(y_true.sum())
@@ -611,6 +695,54 @@ def _metrics(y_true, y_score):
         pr_auc=float(average_precision_score(y_true, y_score)),
         ppv_at_n=_ppv_at_n(y_true, y_score, n_pos),
     )
+
+
+def _require_binary_comparison_rows(df, context):
+    """Require at least one positive and one negative evaluation row."""
+    if "hit" not in df:
+        raise ValueError("%s is missing the hit column" % context)
+    hits = pandas.to_numeric(df["hit"], errors="coerce")
+    valid_binary = numpy.isfinite(hits.values) & hits.isin([0, 1]).values
+    if not valid_binary.all():
+        raise ValueError(
+            "%s contains %d non-binary or missing hit value(s); expected "
+            "only 0 and 1" % (context, int((~valid_binary).sum()))
+        )
+    n_rows = int(len(hits))
+    n_pos = int((hits == 1).sum())
+    n_neg = int((hits == 0).sum())
+    if n_rows == 0 or n_pos == 0 or n_neg == 0:
+        raise ValueError(
+            "%s has no valid binary comparison set after shared-row "
+            "filtering (rows=%d, positives=%d, negatives=%d)" % (
+                context, n_rows, n_pos, n_neg
+            )
+        )
+
+
+def _require_complete_benchmark_rows(df, columns, context):
+    """Reject missing/blank required inputs instead of silently dropping rows."""
+    missing_columns = sorted(set(columns) - set(df.columns))
+    if missing_columns:
+        raise ValueError(
+            "%s missing required column(s): %s" % (
+                context, ", ".join(missing_columns))
+        )
+    failures = []
+    for column in columns:
+        values = df[column]
+        invalid = values.isnull()
+        if values.dtype == object:
+            invalid |= values.map(
+                lambda value: isinstance(value, str) and not value.strip())
+        if invalid.any():
+            failures.append("%s=%d" % (column, int(invalid.sum())))
+    if failures:
+        raise ValueError(
+            "%s contains missing or blank required values (%s). Benchmark "
+            "rows must not be silently discarded." % (
+                context, ", ".join(failures))
+        )
 
 
 def _add_diffs(df, metric_names, a_prefix="a", b_prefix="b"):
@@ -848,10 +980,47 @@ def _parallel_affinity_predict(
 def _read_supported_alleles(predictor_dir):
     path = os.path.join(predictor_dir, LEGACY_ALLELE_SEQUENCES_FILENAME)
     if not os.path.exists(path):
-        return set()
+        raise ValueError(
+            "Affinity predictor is missing its allele sequence registry: %s" %
+            path
+        )
     df = pandas.read_csv(path)
+    if df.empty:
+        raise ValueError("Affinity allele sequence registry is empty: %s" % path)
     col = "normalized_allele" if "normalized_allele" in df.columns else df.columns[0]
-    return set(df[col].astype(str).tolist())
+    sequence_col = next(
+        (name for name in df.columns if name != col), None)
+    result = set()
+    skipped = []
+    for _, row in df.iterrows():
+        raw = row[col]
+        sequence = str(row[sequence_col]) if sequence_col else ""
+        normalized = normalize_allele_name(
+            raw, raise_on_error=False, use_allele_aliases=False)
+        if normalized is None or "X" in sequence:
+            alias_normalized = normalize_allele_name(
+                raw, raise_on_error=False, use_allele_aliases=True)
+            if alias_normalized is not None:
+                normalized = alias_normalized
+        if normalized is None:
+            skipped.append(str(raw))
+            continue
+        result.add(normalized)
+    if skipped:
+        _stamp(
+            "WARNING: ignored %d pseudosequence registry key(s) that the "
+            "predictor API cannot canonicalize: %s%s" % (
+                len(skipped),
+                ", ".join(skipped[:3]),
+                " ..." if len(skipped) > 3 else "",
+            )
+        )
+    if not result:
+        raise ValueError(
+            "Affinity allele sequence registry has no canonicalizable "
+            "class-I alleles: %s" % path
+        )
+    return result
 
 
 def _load_affinity_benchmark(data_dir, source, limit_files):
@@ -888,30 +1057,35 @@ def _run_affinity(side_a, side_b, args):
     data_dir = args.data_dir or _default_data_evaluation_dir()
     test = _load_affinity_benchmark(
         data_dir, args.affinity_source, args.limit_files)
+    _require_complete_benchmark_rows(
+        test, ("peptide", "hla", "hit"), "Affinity benchmark")
+    try:
+        test["hla"] = test["hla"].map(
+            normalize_sequence_resolved_allele_name)
+    except ValueError as error:
+        raise ValueError(
+            "Affinity benchmark contains an invalid class-I allele: %s" % error
+        ) from error
 
     a_alleles = _read_supported_alleles(side_a["paths"]["affinity"])
     b_alleles = _read_supported_alleles(side_b["paths"]["affinity"])
-    if not a_alleles or not b_alleles:
-        _stamp(
-            "WARNING: supported-allele set empty for %s%s%s; skipping "
-            "allele-intersection filter -- the two models may be scored on "
-            "different allele supports" % (
-                "side A" if not a_alleles else "",
-                " and " if not a_alleles and not b_alleles else "",
-                "side B" if not b_alleles else "",
-            )
+    both = a_alleles & b_alleles
+    if not both:
+        raise ValueError(
+            "Affinity predictors have no shared sequence-resolved alleles; "
+            "a fair comparison cannot be computed."
         )
-    both = a_alleles & b_alleles if (a_alleles and b_alleles) else None
-    if both is not None:
-        before = len(test)
-        test = test[test.hla.isin(both)].copy()
-        if len(test) < before:
-            _stamp(
-                "  dropped %d rows outside the %d-allele intersect"
-                % (before - len(test), len(both))
-            )
+    before = len(test)
+    test = test[test.hla.isin(both)].copy()
+    if len(test) < before:
+        _stamp(
+            "  dropped %d rows outside the %d-allele intersect"
+            % (before - len(test), len(both))
+        )
     test["peptide_len"] = test["peptide"].str.len()
     test = test[(test.peptide_len >= 8) & (test.peptide_len <= 15)].copy()
+    test["hit"] = pandas.to_numeric(test["hit"], errors="coerce")
+    _require_binary_comparison_rows(test, "Affinity benchmark")
     _stamp("  evaluable rows: %d" % len(test))
 
     comparison_model_bytes = max(
@@ -930,7 +1104,14 @@ def _run_affinity(side_a, side_b, args):
         test.peptide.values, test.hla.values,
         model_bytes=comparison_model_bytes,
     )
-    test = test.dropna(subset=["a_pred", "b_pred"])
+    _require_valid_affinity_predictions(
+        test,
+        labels=(side_a["label"], side_b["label"]),
+    )
+    _require_binary_comparison_rows(
+        test, "Affinity comparison for %s versus %s" % (
+            side_a["label"], side_b["label"]
+        ))
     test["a_score"] = -numpy.log10(numpy.clip(test.a_pred, 1e-3, 1e8))
     test["b_score"] = -numpy.log10(numpy.clip(test.b_pred, 1e-3, 1e8))
     test.to_csv(
@@ -961,7 +1142,7 @@ def _run_affinity(side_a, side_b, args):
 def _affinity_per_allele(test):
     rows = []
     for allele, group in test.groupby("hla"):
-        if len(group) < 30 or group.hit.sum() == 0:
+        if len(group) < 30 or group.hit.nunique() < 2:
             continue
         m_a = _metrics(group.hit.values, group.a_score.values)
         m_b = _metrics(group.hit.values, group.b_score.values)
@@ -1150,34 +1331,9 @@ def _parallel_processing_predict(
 
 
 def _run_processing(side_a, side_b, args):
-    requested_modes = [m.strip() for m in args.processing_modes.split(",") if m]
-    bad_modes = [m for m in requested_modes if m not in PROCESSING_MODES]
-    if bad_modes:
-        raise SystemExit(
-            "Unknown processing modes: %s" % ", ".join(bad_modes))
-
-    model_dirs = {}
-    missing = []
-    for mode in requested_modes:
-        a_model_dir = _processing_model_dir(
-            side_a["paths"]["processing"], mode)
-        b_model_dir = _processing_model_dir(
-            side_b["paths"]["processing"], mode)
-        missing_sides = []
-        if not a_model_dir:
-            missing_sides.append("A (%s)" % side_a["label"])
-        if not b_model_dir:
-            missing_sides.append("B (%s)" % side_b["label"])
-        if missing_sides:
-            missing.append("%s: side %s" % (mode, " and ".join(missing_sides)))
-        else:
-            model_dirs[mode] = (a_model_dir, b_model_dir)
-    if missing:
-        raise SystemExit(
-            "Requested processing mode model(s) are unavailable: %s. "
-            "Every --processing-modes entry must exist on both sides." %
-            "; ".join(missing)
-        )
+    requested_modes = _requested_modes(
+        args.processing_modes, PROCESSING_MODES, "--processing-modes")
+    model_dirs = _processing_model_dirs(side_a, side_b, requested_modes)
 
     component_dir = os.path.join(args.out, "processing")
     os.makedirs(component_dir, exist_ok=True)
@@ -1380,12 +1536,34 @@ def _load_presentation_benchmark(data_dir, limit_files):
     missing = sorted(required - set(result.columns))
     if missing:
         raise ValueError("Presentation benchmark missing columns: %s" % missing)
-    result = result.dropna(subset=["peptide", "sample_id", "hla", "hit"]).copy()
+    _require_complete_benchmark_rows(
+        result,
+        ("peptide", "sample_id", "hla", "hit"),
+        "Presentation benchmark",
+    )
+    result = result.copy()
+    result["hit"] = pandas.to_numeric(result["hit"], errors="coerce")
+    _require_binary_comparison_rows(result, "Presentation benchmark")
+    result["hla"] = result["hla"].map(_normalize_benchmark_genotype)
+    genotype_counts = result.groupby("sample_id", dropna=False).hla.nunique()
+    inconsistent_samples = genotype_counts[genotype_counts > 1]
+    if not inconsistent_samples.empty:
+        examples = ", ".join(
+            "%s (%d genotypes)" % (sample_id, count)
+            for sample_id, count in inconsistent_samples.head(3).items()
+        )
+        raise ValueError(
+            "Presentation benchmark maps %d sample_id value(s) to multiple "
+            "HLA genotypes; examples: %s" % (
+                len(inconsistent_samples), examples)
+        )
     result["hit"] = result["hit"].astype(int)
     result["peptide_len"] = result.peptide.str.len()
     result = result[
         (result.peptide_len >= 8) & (result.peptide_len <= 15)
     ].reset_index(drop=True)
+    _require_binary_comparison_rows(
+        result, "Presentation benchmark after peptide-length filtering")
     for col in ("n_flank", "c_flank"):
         if col not in result:
             result[col] = ""
@@ -1398,6 +1576,18 @@ def _load_presentation_benchmark(data_dir, limit_files):
         )
     )
     return result
+
+
+def _normalize_benchmark_genotype(value):
+    """Canonicalize a whitespace-delimited class-I genotype deterministically."""
+    try:
+        normalized = sorted(normalize_class1_genotype(value))
+    except ValueError as exc:
+        raise ValueError(
+            "Invalid presentation benchmark HLA genotype %r: %s" % (
+                value, exc)
+        ) from exc
+    return " ".join(normalized)
 
 
 def _score_values(df, prefix, score_kind):
@@ -1459,6 +1649,58 @@ def _require_finite_processing_scores(scored, mode, labels):
             "model's supported peptide-length range." % (
                 mode, "; ".join(failures)
             )
+        )
+
+
+def _require_valid_affinity_predictions(scored, labels):
+    """Fail when either affinity model omits or corrupts a benchmark row."""
+    failures = []
+    for side, label in zip(("a", "b"), labels):
+        column = "%s_pred" % side
+        values = pandas.to_numeric(scored[column], errors="coerce").values
+        bad = ~numpy.isfinite(values) | (values <= 0)
+        if not bad.any():
+            continue
+        examples = [
+            "%s:%s" % (row.hla, row.peptide)
+            for row in scored.loc[bad, ["hla", "peptide"]].head(3).itertuples()
+        ]
+        failures.append(
+            "%s (%s): %d invalid IC50 prediction(s), examples: %s" % (
+                side.upper(), label, int(bad.sum()), ", ".join(examples)
+            )
+        )
+    if failures:
+        raise ValueError(
+            "Affinity comparison requires a finite, positive IC50 prediction "
+            "for every benchmark row on both sides. %s. Check allele support, "
+            "peptide validity, and model output integrity." % "; ".join(failures)
+        )
+
+
+def _require_finite_presentation_scores(scored, mode, labels):
+    """Fail when either presentation model omits a release benchmark row."""
+    failures = []
+    for side, label in zip(("a", "b"), labels):
+        for score_kind in PRESENTATION_SCORE_KINDS:
+            column = "%s_%s" % (side, score_kind)
+            values = pandas.to_numeric(scored[column], errors="coerce").values
+            bad = ~numpy.isfinite(values)
+            if not bad.any():
+                continue
+            examples = scored.loc[bad, "peptide"].astype(str).head(3).tolist()
+            failures.append(
+                "%s (%s) %s: %d non-finite score(s), examples: %s" % (
+                    side.upper(), label, score_kind, int(bad.sum()),
+                    ", ".join(examples),
+                )
+            )
+    if failures:
+        raise ValueError(
+            "Presentation comparison mode %s requires every benchmark row to "
+            "have both a presentation score and percentile on both sides. %s. "
+            "Check allele support, peptide validity, and percentile "
+            "calibration." % (mode, "; ".join(failures))
         )
 
 
@@ -1601,11 +1843,8 @@ def _run_presentation(side_a, side_b, args):
     os.makedirs(component_dir, exist_ok=True)
 
     data_dir = args.data_dir or _default_data_evaluation_dir()
-    requested_modes = [m.strip() for m in args.presentation_modes.split(",") if m]
-    bad_modes = [m for m in requested_modes if m not in PRESENTATION_MODES]
-    if bad_modes:
-        raise SystemExit(
-            "Unknown presentation modes: %s" % ", ".join(bad_modes))
+    requested_modes = _requested_modes(
+        args.presentation_modes, PRESENTATION_MODES, "--presentation-modes")
 
     benchmark = _load_presentation_benchmark(data_dir, args.limit_files)
     summaries = {}
@@ -1632,6 +1871,11 @@ def _run_presentation(side_a, side_b, args):
                 "affinity", "processing_score",
             ]:
                 scored["%s_%s" % (prefix, col)] = pred[col].values
+        _require_finite_presentation_scores(
+            scored,
+            mode=mode,
+            labels=(side_a["label"], side_b["label"]),
+        )
         pred_path = os.path.join(
             component_dir, "predictions_%s.csv.bz2" % mode)
         scored.to_csv(pred_path, index=False)
@@ -1640,6 +1884,11 @@ def _run_presentation(side_a, side_b, args):
         summaries[mode] = {}
         for score_kind in PRESENTATION_SCORE_KINDS:
             shared_scored = _shared_score_rows(scored, score_kind)
+            _require_binary_comparison_rows(
+                shared_scored,
+                "Presentation comparison mode %s score %s" % (
+                    mode, score_kind),
+            )
             per_sample = _presentation_per_sample(shared_scored, score_kind)
             per_sample.to_csv(
                 os.path.join(

@@ -37,9 +37,11 @@ from ..flanking_encoding import FlankingEncoding
 from ..common import (
     configure_logging,
     install_sigusr1_stack_trace_handler,
+    positive_int_arg,
     write_generate_sh,
 )
 from ..parallelism import (
+    refine_local_parallelism_from_worker_context,
     resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
     add_local_parallelism_args)
@@ -84,13 +86,15 @@ parser.add_argument(
     help="Directory to write selected models")
 parser.add_argument(
     "--min-models-per-fold",
-    type=int,
-    default=2,
+    type=positive_int_arg,
+    default=None,
     metavar="N",
-    help="Min number of models to select per fold")
+    help=(
+        "Min number of models to select per fold. Default: 2, or the "
+        "requested maximum when it is smaller."))
 parser.add_argument(
     "--max-models-per-fold",
-    type=int,
+    type=positive_int_arg,
     default=1000,
     metavar="N",
     help="Max number of models to select per fold")
@@ -109,6 +113,11 @@ def run(argv=sys.argv[1:]):
     install_sigusr1_stack_trace_handler()
 
     args = parser.parse_args(argv)
+    if args.min_models_per_fold is None:
+        args.min_models_per_fold = min(2, args.max_models_per_fold)
+    if args.min_models_per_fold > args.max_models_per_fold:
+        parser.error(
+            "--min-models-per-fold must not exceed --max-models-per-fold")
 
     args.out_models_dir = os.path.abspath(args.out_models_dir)
 
@@ -176,6 +185,8 @@ def run(argv=sys.argv[1:]):
 
     WORKER_CONTEXT["data"] = df
     WORKER_CONTEXT["input_predictor"] = input_predictor
+    if not args.cluster_parallelism:
+        refine_local_parallelism_from_worker_context(args, WORKER_CONTEXT)
 
     if not os.path.exists(args.out_models_dir):
         print("Attempting to create directory: %s" % args.out_models_dir)
@@ -203,7 +214,11 @@ def run(argv=sys.argv[1:]):
             constant_data=WORKER_CONTEXT,
             result_serialization_method="pickle")
     else:
-        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+        worker_pool = worker_pool_with_gpu_assignments_from_args(
+            args,
+            worker_context_module=__name__,
+            worker_context_data=WORKER_CONTEXT,
+        )
         print("Worker pool", worker_pool)
         assert worker_pool is not None
 
@@ -218,23 +233,32 @@ def run(argv=sys.argv[1:]):
 
     models_by_fold = {}
     summary_dfs = []
-    for result in tqdm.tqdm(results, total=len(work_items)):
-        pprint(result)
-        fold_num = result['fold_num']
-        (all_models_for_fold, _) = folds_to_predictors[fold_num]
-        models = [
-            all_models_for_fold[i]
-            for i in result['selected_indices']
-        ]
-        summary_df = result['summary'].copy()
-        summary_df.index = summary_df.index.map(
-            lambda idx: all_models_for_fold[idx])
-        summary_dfs.append(summary_df)
+    try:
+        for result in tqdm.tqdm(results, total=len(work_items)):
+            pprint(result)
+            fold_num = result['fold_num']
+            (all_models_for_fold, _) = folds_to_predictors[fold_num]
+            models = [
+                all_models_for_fold[i]
+                for i in result['selected_indices']
+            ]
+            summary_df = result['summary'].copy()
+            summary_df.index = summary_df.index.map(
+                lambda idx: all_models_for_fold[idx])
+            summary_dfs.append(summary_df)
 
-        print("Selected %d models for fold %d: %s" % (
-            len(models), fold_num, result['selected_indices']))
-        models_by_fold[fold_num] = models
-        result_predictor.add_models(models)
+            print("Selected %d models for fold %d: %s" % (
+                len(models), fold_num, result['selected_indices']))
+            models_by_fold[fold_num] = models
+            result_predictor.add_models(models)
+        if worker_pool:
+            worker_pool.close()
+            worker_pool.join()
+            worker_pool = None
+    finally:
+        if worker_pool is not None:
+            worker_pool.terminate()
+            worker_pool.join()
 
     summary_df = pandas.concat(summary_dfs, ignore_index=False)
     summary_df["model_config"] = summary_df.index.map(lambda m: m.get_config())
@@ -245,10 +269,6 @@ def run(argv=sys.argv[1:]):
     write_generate_sh(args.out_models_dir)
 
     model_selection_time = time.time() - start
-
-    if worker_pool:
-        worker_pool.close()
-        worker_pool.join()
 
     print("Model selection time %0.2f min." % (model_selection_time / 60.0))
     print("Predictor [%d models] written to: %s" % (

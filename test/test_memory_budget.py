@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 from mhcflurry.memory_budget import (
@@ -19,6 +20,9 @@ def test_shared_memory_reserve_scales_but_has_a_floor():
 def test_memory_worker_capacity_has_no_default_performance_cap():
     assert memory_worker_capacity(80, 4) == 18
     assert memory_worker_capacity(40, 17) == 2
+    for available, per_worker in ((float("nan"), 4), (80, float("inf"))):
+        with pytest.raises(ValueError, match="must be finite"):
+            memory_worker_capacity(available, per_worker)
 
 
 def test_module_and_training_state_bytes_are_shape_derived():

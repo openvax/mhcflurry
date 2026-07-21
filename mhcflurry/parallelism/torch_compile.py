@@ -23,12 +23,21 @@ from .planning import (
     refine_local_parallelism_from_warmup,
     resolve_local_parallelism_args,
 )
-from .worker_pool import worker_pool_uses_fork, worker_pool_with_gpu_assignments
+from .worker_pool import worker_pool_with_gpu_assignments
 from .worker_runtime import call_wrapped_kwargs
 
 
 _INDUCTOR_THREAD_HARD_CAP = 16
 _INDUCTOR_WARMUP_THREAD_HARD_CAP = 64
+WORKER_CONTEXT = {}
+
+
+def _run_compile_warmup_item(work_function, work_item):
+    """Run one warmup using constant data installed once in this process."""
+    item = dict(work_item)
+    if "constant_data" not in item and "constant_data" in WORKER_CONTEXT:
+        item["constant_data"] = WORKER_CONTEXT["constant_data"]
+    return call_wrapped_kwargs(work_function, item)
 
 
 def _torch_compile_enabled():
@@ -355,18 +364,18 @@ def run_single_worker_torch_compile_warmup(
             # Spawn (not fork) for parity with the production pools below;
             # forked CUDA workers break if the parent has touched CUDA.
             start_method="spawn",
+            worker_context_module=(__name__ if constant_data is not None else None),
+            worker_context_data=(
+                {"constant_data": constant_data}
+                if constant_data is not None else None
+            ),
         )
         warmup_started_at = time.time()
         for warmup_item in unique_warmup_items:
             item_for_worker = dict(warmup_item)
             item_for_worker["compile_warmup_only"] = True
-            if (
-                    constant_data is not None
-                    and not worker_pool_uses_fork(warmup_pool)
-                    and "constant_data" not in item_for_worker):
-                item_for_worker["constant_data"] = constant_data
             report = warmup_pool.apply(
-                call_wrapped_kwargs, (work_function, item_for_worker)
+                _run_compile_warmup_item, (work_function, item_for_worker)
             )
             if report:
                 reports.append(report)

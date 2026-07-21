@@ -13,6 +13,7 @@
 """Prediction and training batch-size helpers."""
 
 import logging
+import math
 import os
 import sys
 
@@ -25,7 +26,19 @@ AUTO_BATCH_CPU_FALLBACK = 32_768  # CPU: large batches thrash L3; stay modest
 AUTO_BATCH_FREE_FRACTION = None
 _MPS_PSUTIL_WARNED = False  # one-shot warning if psutil is missing on MPS
 if os.environ.get("MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"):
-    DEFAULT_PREDICT_BATCH_SIZE = int(os.environ["MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"])
+    raw_default_batch_size = os.environ["MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"]
+    try:
+        DEFAULT_PREDICT_BATCH_SIZE = int(raw_default_batch_size)
+    except ValueError:
+        raise ValueError(
+            "MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE must be a positive integer; "
+            "got %r" % raw_default_batch_size
+        ) from None
+    if DEFAULT_PREDICT_BATCH_SIZE < 1:
+        raise ValueError(
+            "MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE must be a positive integer; "
+            "got %r" % raw_default_batch_size
+        )
     logging.info(
         "Configured default predict batch size: %s" % DEFAULT_PREDICT_BATCH_SIZE
     )
@@ -260,7 +273,12 @@ def free_device_memory_bytes(device):
             # Any other psutil failure (broken install, etc.) — skip
             # the cap but don't fail the whole batch-size query.
             pass
-        return free if free > 0 else 4 * (1 << 30)
+        # Zero is a valid and important measurement: on unified-memory Macs it
+        # means the process has no safe headroom. Replacing it with the 4 GiB
+        # API fallback would make auto-sizing attempt another large allocation
+        # under peak memory pressure. The caller turns a zero budget into its
+        # one-row minimum batch.
+        return free
     return 2 * (1 << 30)
 
 
@@ -282,18 +300,35 @@ def compute_prediction_batch_size(
     CPU: returns ``cpu_fallback`` — large batches on CPU thrash L3
     cache and rarely help for the small networks mhcflurry trains.
     """
+    workers = int(num_workers_per_gpu)
+    if workers < 1:
+        raise ValueError("num_workers_per_gpu must be at least 1")
+    if max_rows is not None and int(max_rows) < 1:
+        raise ValueError("max_rows must be at least 1")
+    if total_rows is not None and int(total_rows) < 0:
+        raise ValueError("total_rows must be non-negative")
+    if free_memory_fraction is not None:
+        free_memory_fraction = float(free_memory_fraction)
+        if (
+                not math.isfinite(free_memory_fraction)
+                or not 0 < free_memory_fraction <= 1):
+            raise ValueError("free_memory_fraction must be in (0, 1]")
     if device.type == "cpu":
         rows = int(cpu_fallback)
-        return min(rows, int(total_rows)) if total_rows is not None else rows
+        if rows < 1:
+            raise ValueError("cpu_fallback must be at least 1")
+        return (
+            min(rows, max(int(total_rows), 1))
+            if total_rows is not None else rows
+        )
     peak_bytes = estimate_peak_bytes_per_row(model)
     free = free_device_memory_bytes(device)
-    workers = max(int(num_workers_per_gpu), 1)
     if free_memory_fraction is None:
         budget = per_worker_memory_budget_bytes(free, workers)
     else:
         # Backward-compatible expert API: an explicit fraction replaces the
         # default shared reserve calculation.
-        budget = int(free * float(free_memory_fraction) / workers)
+        budget = int(free * free_memory_fraction / workers)
     rows = max(1, budget // peak_bytes)
     if rows < min_rows:
         logging.warning(
@@ -342,7 +377,10 @@ def resolve_prediction_batch_size(
             num_workers_per_gpu=num_workers_per_gpu,
             total_rows=total_rows,
         )
-    return int(value)
+    result = int(value)
+    if result < 1:
+        raise ValueError("prediction batch size must be at least 1")
+    return result
 
 
 # Inference keeps only activations of the current layer alive (input +
@@ -370,8 +408,10 @@ def check_training_batch_fits(
     Returns ``(effective_batch_size, shrunk: bool)``. When the
     requested batch is too large for the available VRAM — partitioned
     across co-resident workers — the batch is shrunk to the largest
-    power-of-two that fits (floored at ``min_batch``) and a loud
-    warning is emitted via ``logger`` / stderr explaining that the
+    power-of-two that fits. ``min_batch`` is a normal-performance floor, not
+    a memory-safety floor: under severe pressure the result may be smaller so
+    the guard does not knowingly force an OOM. A loud warning is emitted via
+    ``logger`` / stderr explaining that the
     training dynamics (BN running stats, gradient noise scale) now
     differ from what the caller configured.
 
@@ -379,23 +419,33 @@ def check_training_batch_fits(
     can catch. Returns ``(requested_batch_size, False)`` in that case.
     """
     import sys
-    if device.type == "cpu" or requested_batch_size <= min_batch:
-        return int(requested_batch_size), False
+    requested_batch_size = int(requested_batch_size)
+    if requested_batch_size < 1:
+        raise ValueError("requested training batch size must be at least 1")
+    if device.type == "cpu":
+        return requested_batch_size, False
+    workers = int(num_workers_per_gpu)
+    if workers < 1:
+        raise ValueError("num_workers_per_gpu must be at least 1")
+    if free_memory_fraction is not None:
+        free_memory_fraction = float(free_memory_fraction)
+        if (
+                not math.isfinite(free_memory_fraction)
+                or not 0 < free_memory_fraction <= 1):
+            raise ValueError("free_memory_fraction must be in (0, 1]")
     peak_bytes = estimate_peak_bytes_per_row(model) * TRAINING_PEAK_MULTIPLIER
     free = free_device_memory_bytes(device)
-    workers = max(int(num_workers_per_gpu), 1)
     if free_memory_fraction is None:
         budget = per_worker_memory_budget_bytes(free, workers)
     else:
-        budget = int(free * float(free_memory_fraction) / workers)
-    max_rows = max(budget // peak_bytes, min_batch)
-    requested_batch_size = int(requested_batch_size)
+        budget = int(free * free_memory_fraction / workers)
+    max_rows = max(budget // peak_bytes, 1)
     if requested_batch_size <= max_rows:
         return requested_batch_size, False
     shrunk = 1
     while shrunk * 2 <= max_rows:
         shrunk *= 2
-    shrunk = max(shrunk, min_batch)
+    below_normal_floor = shrunk < int(min_batch)
     message = (
         "!!! TRAINING BATCH WILL NOT FIT !!!  "
         "Requested minibatch_size=%d on %s with %d worker(s)/GPU. "
@@ -406,12 +456,17 @@ def check_training_batch_fits(
         "all depend on batch size. Re-check convergence before "
         "trusting the trained model. To pin an explicit size and "
         "silence this guard, set a minibatch_size the caller knows "
-        "fits." % (
+        "fits.%s" % (
             requested_batch_size, device, workers,
             requested_batch_size * peak_bytes / 1e9,
             free / 1e9,
             budget / 1e9,
             shrunk,
+            (
+                " Available memory requires going below the normal "
+                "performance floor of %d." % int(min_batch)
+                if below_normal_floor else ""
+            ),
         )
     )
     if logger is not None:

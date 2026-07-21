@@ -1215,13 +1215,34 @@ class Class1AffinityPredictor(object):
         requested_batch_size = model_kwargs.get(
             "batch_size", DEFAULT_PREDICT_BATCH_SIZE)
         auto_batch_size = requested_batch_size in (None, "auto")
-        batch_size = resolve_prediction_batch_size(
-            requested_batch_size,
-            device,
-            model=network,
-            num_workers_per_gpu=model_kwargs.get("num_workers_per_gpu", 1),
-            total_rows=len(supported_indices) * len(supported_alleles),
-        )
+        if auto_batch_size:
+            # The network expands each peptide chunk across every allele. The
+            # generic batch resolver returns a safe *network-row* budget, so
+            # convert that cartesian-row budget back to peptides. Treating it
+            # directly as a peptide count overstates the safe allocation by the
+            # number of alleles and starts large-genotype calls with avoidable
+            # OOM retries.
+            cartesian_rows = resolve_prediction_batch_size(
+                requested_batch_size,
+                device,
+                model=network,
+                num_workers_per_gpu=model_kwargs.get("num_workers_per_gpu", 1),
+                total_rows=len(supported_indices) * len(supported_alleles),
+            )
+            batch_size = max(
+                1,
+                int(cartesian_rows) // len(supported_alleles),
+            )
+        else:
+            # An explicit batch size retains the public API's historical
+            # meaning: number of peptides per cartesian forward.
+            batch_size = resolve_prediction_batch_size(
+                requested_batch_size,
+                device,
+                model=network,
+                num_workers_per_gpu=model_kwargs.get("num_workers_per_gpu", 1),
+                total_rows=len(supported_indices),
+            )
         batch_size = int(batch_size)
 
         allele_encoding_input = numpy.asarray(allele_encoding_input)
@@ -1878,6 +1899,24 @@ class Class1AffinityPredictor(object):
                 "calibrate_percentile_ranks_fast requires a one-dimensional "
                 "sequence of at least two IC50 bin edges."
             )
+
+        for name, value in (
+                ("peptide_batch_size", peptide_batch_size),
+                ("allele_batch_size", allele_batch_size)):
+            if value not in (None, "auto"):
+                try:
+                    normalized = int(value)
+                except (TypeError, ValueError):
+                    raise ValueError(
+                        "%s must be 'auto' or a positive integer, got %r" % (
+                            name, value)
+                    ) from None
+                if normalized < 1:
+                    raise ValueError("%s must be at least 1" % name)
+                if name == "peptide_batch_size":
+                    peptide_batch_size = normalized
+                else:
+                    allele_batch_size = normalized
 
         if device is None:
             from .common import get_pytorch_device

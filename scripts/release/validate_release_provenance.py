@@ -24,6 +24,7 @@ import subprocess
 VERSION_RE = re.compile(r'^__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', re.MULTILINE)
 PACKAGE_RE = re.compile(r"^package\s+mhcflurry\s+(\S+)\s*$", re.MULTILINE)
 BASE_VERSION_RE = re.compile(r"^(\d+\.\d+\.\d+)")
+PROCESSING_VARIANTS = ("no_flank", "with_flanks", "short_flanks")
 
 
 def base_version(version):
@@ -80,6 +81,21 @@ def tracked_worktree_is_dirty(repo):
 def artifact_info_paths(run_dir, processing_variants):
     """Return expected top-level model info paths keyed by artifact role."""
     run_dir = pathlib.Path(run_dir)
+    processing_variants = tuple(processing_variants)
+    invalid = sorted(set(processing_variants) - set(PROCESSING_VARIANTS))
+    if invalid:
+        raise ValueError(
+            "Unknown processing variant(s): %s. Expected: %s" % (
+                ", ".join(invalid), ", ".join(PROCESSING_VARIANTS))
+        )
+    duplicates = sorted({
+        value for value in processing_variants
+        if processing_variants.count(value) > 1
+    })
+    if duplicates:
+        raise ValueError(
+            "Duplicate processing variant(s): %s" % ", ".join(duplicates)
+        )
     result = {
         "affinity": run_dir / "affinity" / "models.combined" / "info.txt",
         "presentation": run_dir / "presentation" / "models" / "info.txt",
@@ -90,6 +106,54 @@ def artifact_info_paths(run_dir, processing_variants):
             "info.txt"
         )
     return result
+
+
+def collect_artifact_provenance(
+        run_dir, release, processing_variants=(), require_artifacts=False,
+        expected_artifact_git_commit="",
+        expected_artifact_workflow_id=""):
+    """Validate model metadata without requiring a Git checkout."""
+    run_dir = pathlib.Path(run_dir).resolve()
+    release_base = base_version(release)
+    artifact_provenance = {}
+    missing = []
+    for role, path in artifact_info_paths(
+            run_dir, processing_variants).items():
+        if path.is_file():
+            version = model_package_version(path)
+            if base_version(version) != release_base:
+                raise ValueError(
+                    "%s artifact was trained by MHCflurry %s, not release %s: "
+                    "%s" % (role, version, release, path))
+            metadata = model_metadata(path)
+            artifact_commit = metadata.get("git commit", "")
+            artifact_workflow_id = metadata.get("workflow id", "")
+            if require_artifacts and expected_artifact_git_commit and (
+                    artifact_commit != expected_artifact_git_commit):
+                raise ValueError(
+                    "%s artifact git commit '%s' does not match source commit "
+                    "'%s': %s" % (
+                        role, artifact_commit or "missing",
+                        expected_artifact_git_commit, path))
+            if require_artifacts and expected_artifact_workflow_id and (
+                    artifact_workflow_id != expected_artifact_workflow_id):
+                raise ValueError(
+                    "%s artifact workflow id '%s' does not match workflow "
+                    "'%s': %s" % (
+                        role, artifact_workflow_id or "missing",
+                        expected_artifact_workflow_id, path))
+            artifact_provenance[role] = {
+                "package_version": version,
+                "git_commit": artifact_commit,
+                "workflow_id": artifact_workflow_id,
+            }
+        elif require_artifacts:
+            missing.append(str(path))
+    if missing:
+        raise ValueError(
+            "Missing required model provenance file(s): %s" %
+            ", ".join(missing))
+    return artifact_provenance
 
 
 def collect_provenance(
@@ -113,42 +177,14 @@ def collect_provenance(
             "or use --allow-dirty-repo for a deliberately non-release run")
 
     source_commit = git_output(repo, "rev-parse", "HEAD")
-    artifact_provenance = {}
-    missing = []
-    for role, path in artifact_info_paths(
-            run_dir, processing_variants).items():
-        if path.is_file():
-            version = model_package_version(path)
-            if base_version(version) != release_base:
-                raise ValueError(
-                    "%s artifact was trained by MHCflurry %s, not release %s: "
-                    "%s" % (role, version, release, path))
-            metadata = model_metadata(path)
-            artifact_commit = metadata.get("git commit", "")
-            artifact_workflow_id = metadata.get("workflow id", "")
-            if require_artifacts and artifact_commit != source_commit:
-                raise ValueError(
-                    "%s artifact git commit '%s' does not match source commit "
-                    "'%s': %s" % (
-                        role, artifact_commit or "missing", source_commit, path))
-            if require_artifacts and expected_artifact_workflow_id and (
-                    artifact_workflow_id != expected_artifact_workflow_id):
-                raise ValueError(
-                    "%s artifact workflow id '%s' does not match workflow "
-                    "'%s': %s" % (
-                        role, artifact_workflow_id or "missing",
-                        expected_artifact_workflow_id, path))
-            artifact_provenance[role] = {
-                "package_version": version,
-                "git_commit": artifact_commit,
-                "workflow_id": artifact_workflow_id,
-            }
-        elif require_artifacts:
-            missing.append(str(path))
-    if missing:
-        raise ValueError(
-            "Missing required model provenance file(s): %s" %
-            ", ".join(missing))
+    artifact_provenance = collect_artifact_provenance(
+        run_dir=run_dir,
+        release=release,
+        processing_variants=processing_variants,
+        require_artifacts=require_artifacts,
+        expected_artifact_git_commit=(source_commit if require_artifacts else ""),
+        expected_artifact_workflow_id=expected_artifact_workflow_id,
+    )
 
     return {
         "schema_version": 2,
@@ -167,10 +203,12 @@ def collect_provenance(
 
 def make_parser():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo", required=True)
+    parser.add_argument("--repo")
     parser.add_argument("--run-dir", required=True)
     parser.add_argument("--release", required=True)
     parser.add_argument("--workflow-id", default="")
+    parser.add_argument("--artifact-only", action="store_true")
+    parser.add_argument("--expected-artifact-git-commit", default="")
     parser.add_argument("--expected-artifact-workflow-id", default="")
     parser.add_argument(
         "--processing-variants",
@@ -185,16 +223,57 @@ def make_parser():
 def main(argv=None):
     args = make_parser().parse_args(argv)
     try:
-        provenance = collect_provenance(
-            repo=args.repo,
-            run_dir=args.run_dir,
-            release=args.release,
-            workflow_id=args.workflow_id,
-            processing_variants=args.processing_variants.split(),
-            require_artifacts=args.require_artifacts,
-            allow_dirty_repo=args.allow_dirty_repo,
-            expected_artifact_workflow_id=args.expected_artifact_workflow_id,
-        )
+        if args.artifact_only:
+            if args.repo:
+                raise ValueError(
+                    "--repo is not used with --artifact-only; omit it")
+            if not args.require_artifacts:
+                raise ValueError(
+                    "--artifact-only requires --require-artifacts")
+            if not args.expected_artifact_git_commit:
+                raise ValueError(
+                    "--artifact-only requires --expected-artifact-git-commit")
+            if not args.expected_artifact_workflow_id:
+                raise ValueError(
+                    "--artifact-only requires "
+                    "--expected-artifact-workflow-id")
+            artifacts = collect_artifact_provenance(
+                run_dir=args.run_dir,
+                release=args.release,
+                processing_variants=args.processing_variants.split(),
+                require_artifacts=True,
+                expected_artifact_git_commit=(
+                    args.expected_artifact_git_commit),
+                expected_artifact_workflow_id=(
+                    args.expected_artifact_workflow_id),
+            )
+            provenance = {
+                "schema_version": 2,
+                "recorded_at": datetime.datetime.now(
+                    datetime.timezone.utc).isoformat(),
+                "release": args.release,
+                "release_base_version": base_version(args.release),
+                "source": {
+                    "expected_git_commit": (
+                        args.expected_artifact_git_commit),
+                },
+                "workflow_id": args.workflow_id,
+                "artifacts": artifacts,
+            }
+        else:
+            if not args.repo:
+                raise ValueError("--repo is required unless --artifact-only")
+            provenance = collect_provenance(
+                repo=args.repo,
+                run_dir=args.run_dir,
+                release=args.release,
+                workflow_id=args.workflow_id,
+                processing_variants=args.processing_variants.split(),
+                require_artifacts=args.require_artifacts,
+                allow_dirty_repo=args.allow_dirty_repo,
+                expected_artifact_workflow_id=(
+                    args.expected_artifact_workflow_id),
+            )
     except (OSError, RuntimeError, ValueError) as error:
         raise SystemExit("ERROR: %s" % error) from error
     text = json.dumps(provenance, indent=2, sort_keys=True) + "\n"

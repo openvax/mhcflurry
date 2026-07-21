@@ -495,6 +495,27 @@ def test_check_training_batch_fits_shrinks_loudly_on_oom(caplog):
         pytorch_sizing.free_device_memory_bytes = saved
 
 
+def test_check_training_batch_fits_does_not_force_unsafe_floor(monkeypatch):
+    from mhcflurry import pytorch_sizing
+
+    class FakeCUDA:
+        type = "cuda"
+
+        def __str__(self):
+            return "cuda:0"
+
+    monkeypatch.setattr(
+        pytorch_sizing, "free_device_memory_bytes", lambda device: 0)
+    effective, shrunk = pytorch_sizing.check_training_batch_fits(
+        64,
+        FakeCUDA(),
+        model=None,
+        min_batch=64,
+    )
+    assert shrunk
+    assert effective == 1
+
+
 @pytest.mark.parametrize(
     "backend,device_type",
     available_torch_accelerators(),
@@ -559,9 +580,9 @@ def test_fit_end_to_end_shrinks_minibatch_when_vram_too_small(
         info = predictor.fit_info[-1]
         assert info.get("minibatch_size_shrunk_from") == 524288
         effective = info.get("minibatch_size_shrunk_to")
-        assert effective is not None and 64 <= effective < 524288, (
-            "shrunk minibatch must be between the floor (64) and the "
-            "requested size, got %r" % effective
+        assert effective is not None and 1 <= effective < 524288, (
+            "shrunk minibatch must be positive and below the requested "
+            "size, got %r" % effective
         )
         assert info.get("effective_minibatch_size") == effective
         # Hyperparameters dict must NOT be mutated — the saved config
@@ -1045,6 +1066,34 @@ def test_calibrate_fast_rejects_scalar_bins_before_model_work():
             allele_batch_size=1,
             device="cpu",
         )
+
+
+@pytest.mark.parametrize(
+    ("keyword", "value"),
+    [
+        ("peptide_batch_size", 0),
+        ("peptide_batch_size", -1),
+        ("allele_batch_size", 0),
+        ("allele_batch_size", -1),
+    ],
+)
+def test_calibrate_fast_rejects_nonpositive_batches_before_model_work(
+        keyword, value):
+    predictor = Class1AffinityPredictor(
+        class1_pan_allele_models=[object()],
+        allele_to_sequence={"A": "AAAAAAAA"},
+    )
+    kwargs = {
+        "peptides": ["AAAA"],
+        "alleles": ["A"],
+        "bins": [1.0, 2.0],
+        "peptide_batch_size": "auto",
+        "allele_batch_size": "auto",
+        "device": "cpu",
+    }
+    kwargs[keyword] = value
+    with pytest.raises(ValueError, match="%s must be at least 1" % keyword):
+        predictor.calibrate_percentile_ranks_fast(**kwargs)
 
 
 def test_calibrate_fast_cache_signature_cleared_if_rebuild_fails():

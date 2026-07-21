@@ -65,11 +65,13 @@ def test_generate_scripts_keep_packaged_proteome_peptide_artifacts():
     assert "proteome_peptides.$subset.csv.bz2" in predictions_generate
 
 
-def test_processing_train_data_canonicalizes_alleles_before_prediction():
-    module = load_script(
-        REPO_ROOT / "scripts/training/release_exact"
-        / "make_train_data.processing.py"
-    )
+@pytest.mark.parametrize("relative_path", [
+    "scripts/training/release_exact/make_train_data.processing.py",
+    "downloads-generation/models_class1_processing/make_train_data.py",
+])
+def test_processing_train_data_canonicalizes_alleles_before_prediction(
+        relative_path):
+    module = load_script(REPO_ROOT / relative_path)
 
     assert module.canonicalize_processing_allele("HLA-A0201") == (
         "HLA-A*02:01"
@@ -110,6 +112,16 @@ def test_processing_train_data_canonicalizes_alleles_before_prediction():
             predictor, "HLA-B*07:02"
         )
 
+    required = [
+        "--hits", "hits.csv",
+        "--affinity-predictor", "models",
+        "--proteome-peptides", "proteome.csv",
+        "--out", "out.csv",
+    ]
+    for option in ("--hit-multiplier-to-take", "--ppv-multiplier"):
+        with pytest.raises(SystemExit):
+            module.parser.parse_args(required + [option, "0"])
+
 
 def test_presentation_train_data_canonicalizes_genotype_tokens():
     module = load_script(
@@ -122,10 +134,25 @@ def test_presentation_train_data_canonicalizes_genotype_tokens():
         "HLA-B*07:02",
         "H2-K*b",
     )
-    # Serotypes are still useful locus labels but not predictor keys; preserve
-    # them rather than guessing a two-field allele.
-    assert module.split_hla_genotype("HLA-A2") == ("HLA-A2",)
-    assert module.split_hla_genotype(float("nan")) == ()
+    for invalid in ("HLA-A2", "A*02", "NONSENSE", float("nan"), ""):
+        with pytest.raises(ValueError):
+            module.split_hla_genotype(invalid)
+
+    with pytest.raises(SystemExit):
+        module.parser.parse_args([
+            "--hits", "hits.csv",
+            "--proteome-peptides", "proteome.csv",
+            "--out", "out.csv",
+            "--decoys-per-hit", "0",
+        ])
+    for fraction in ("0", "1.1"):
+        with pytest.raises(SystemExit):
+            module.parser.parse_args([
+                "--hits", "hits.csv",
+                "--proteome-peptides", "proteome.csv",
+                "--out", "out.csv",
+                "--sample-fraction", fraction,
+            ])
 
 
 def test_annotate_tpm_matches_rowwise_expression_sum():
@@ -351,6 +378,7 @@ def assert_reference_decoy_output(result):
     assert len(result) == 5
     assert result.hit.value_counts().to_dict() == {0: 4, 1: 1}
     assert set(result.protein_accession) == {"P1"}
+    assert set(result.hla) == {"HLA-A*02:01 HLA-B*07:02"}
 
 
 def test_release_presentation_train_data_uses_reference_csv_decoys(tmp_path):

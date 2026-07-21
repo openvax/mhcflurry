@@ -16,6 +16,8 @@ Regression tests for PyTorch conversion gaps vs master behavior.
 import json
 import os
 import random
+import sys
+import types
 
 import pytest
 
@@ -48,6 +50,7 @@ from mhcflurry.pytorch_training import (
     maybe_compile_loss,
     validation_forward_network,
 )
+from mhcflurry import pytorch_sizing
 from mhcflurry.testing_utils import startup, cleanup
 
 
@@ -95,6 +98,53 @@ def _seed_all(seed=1):
 def _plain_or_shared_tensor(value):
     """Convenience: produce a plain tensor (legacy SHM path is gone)."""
     return torch.from_numpy(np.ascontiguousarray(value)).clone()
+
+
+def test_mps_free_memory_preserves_zero_headroom(monkeypatch):
+    monkeypatch.setattr(torch.mps, "recommended_max_memory", lambda: 8 << 30)
+    monkeypatch.setattr(torch.mps, "driver_allocated_memory", lambda: 8 << 30)
+    monkeypatch.setitem(
+        sys.modules,
+        "psutil",
+        types.SimpleNamespace(
+            virtual_memory=lambda: types.SimpleNamespace(available=0)),
+    )
+
+    free = pytorch_sizing.free_device_memory_bytes(torch.device("mps"))
+
+    assert free == 0
+    assert pytorch_sizing.compute_prediction_batch_size(
+        torch.device("mps"), total_rows=10000) == 1
+    assert pytorch_sizing.compute_prediction_batch_size(
+        torch.device("cpu"), total_rows=0) == 1
+
+
+def test_explicit_batch_size_helpers_reject_nonpositive_values():
+    device = torch.device("cpu")
+    with pytest.raises(ValueError, match="prediction batch size"):
+        pytorch_sizing.resolve_prediction_batch_size(0, device)
+    with pytest.raises(ValueError, match="training batch size"):
+        pytorch_sizing.check_training_batch_fits(0, device, model=None)
+
+
+@pytest.mark.parametrize(
+    ("keyword", "value", "message"),
+    [
+        ("num_workers_per_gpu", 0, "num_workers_per_gpu"),
+        ("max_rows", 0, "max_rows"),
+        ("total_rows", -1, "total_rows"),
+        ("cpu_fallback", 0, "cpu_fallback"),
+        ("free_memory_fraction", 0, "free_memory_fraction"),
+        ("free_memory_fraction", 1.1, "free_memory_fraction"),
+        ("free_memory_fraction", float("nan"), "free_memory_fraction"),
+    ],
+)
+def test_prediction_batch_sizing_rejects_unsafe_inputs(
+        keyword, value, message):
+    kwargs = {keyword: value}
+    with pytest.raises(ValueError, match=message):
+        pytorch_sizing.compute_prediction_batch_size(
+            torch.device("cpu"), **kwargs)
 
 
 def test_maybe_compile_loss_defaults_on_with_network_compile_cuda(monkeypatch):
@@ -196,6 +246,8 @@ def test_effective_validation_batch_size_uses_larger_cuda_default():
     assert effective_validation_batch_size(torch.device("cuda"), None, 2048) == 8192
     assert effective_validation_batch_size(torch.device("cpu"), None, 512) == 2048
     assert effective_validation_batch_size(torch.device("cuda"), 123, 512) == 123
+    with pytest.raises(ValueError, match="validation batch size"):
+        effective_validation_batch_size(torch.device("cuda"), -1, 512)
 
 
 def test_batched_inequality_validation_preserves_heldout_training_result():
@@ -513,7 +565,7 @@ def test_forward_cartesian_from_peptide_stage_matches_expanded_path(merge_method
     )
 
 
-def test_predict_cartesian_pan_allele_matches_repeated_predict():
+def test_predict_cartesian_pan_allele_matches_repeated_predict(monkeypatch):
     _seed_all(7)
     allele_to_sequence = {
         "HLA-A*02:01": "ACDEFG",
@@ -567,6 +619,38 @@ def test_predict_cartesian_pan_allele_matches_repeated_predict():
     expected = expected_flat.reshape(len(alleles), len(peptides)).T
 
     np.testing.assert_allclose(actual, expected, rtol=1e-6, atol=1e-6)
+
+    sizing_calls = []
+
+    def fixed_cartesian_row_budget(
+            requested, device, model=None, num_workers_per_gpu=1,
+            total_rows=None):
+        sizing_calls.append(total_rows)
+        return 2
+
+    monkeypatch.setattr(
+        pytorch_sizing,
+        "resolve_prediction_batch_size",
+        fixed_cartesian_row_budget,
+    )
+    network = predictor.class1_pan_allele_models[0].network(borrow=True)
+    original_forward_peptide_stage = network.forward_peptide_stage
+    peptide_batch_lengths = []
+
+    def record_peptide_batch(peptide_batch):
+        peptide_batch_lengths.append(len(peptide_batch))
+        return original_forward_peptide_stage(peptide_batch)
+
+    monkeypatch.setattr(
+        network, "forward_peptide_stage", record_peptide_batch)
+    auto_actual = predictor.predict_cartesian_pan_allele(
+        peptides=peptides,
+        alleles=alleles,
+        model_kwargs={"batch_size": "auto"},
+    )
+    assert sizing_calls == [len(peptides) * len(alleles)]
+    assert peptide_batch_lengths == [1, 1]
+    np.testing.assert_allclose(auto_actual, expected, rtol=1e-6, atol=1e-6)
 
     tolerant = predictor.predict_cartesian_pan_allele(
         peptides=peptides,

@@ -87,6 +87,23 @@ def _random_negative_pool_epochs_arg(value):
         )
     return v
 
+
+def _positive_int_arg(value):
+    """argparse type for strictly positive worker-lifecycle counts."""
+    import argparse
+    try:
+        v = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            "expected an integer >= 1, got %r" % (value,)
+        ) from None
+    if v < 1:
+        raise argparse.ArgumentTypeError(
+            "expected an integer >= 1, got %r" % (value,)
+        )
+    return v
+
+
 def add_local_parallelism_args(parser):
     """
     Add local parallelism arguments to the given argparse.ArgumentParser.
@@ -137,7 +154,7 @@ def add_local_parallelism_args(parser):
              "Workers beyond ``--gpus * --max-workers-per-gpu`` run on CPU.")
     group.add_argument(
         "--max-tasks-per-worker",
-        type=int,
+        type=_positive_int_arg,
         metavar="N",
         default=None,
         help="Restart workers after N tasks. Workaround for memory leaks.")
@@ -254,7 +271,7 @@ def add_prediction_parallelism_args(parser):
              "to pin.")
     group.add_argument(
         "--max-tasks-per-worker",
-        type=int,
+        type=_positive_int_arg,
         metavar="N",
         default=None,
         help="Restart workers after N prediction chunks.")

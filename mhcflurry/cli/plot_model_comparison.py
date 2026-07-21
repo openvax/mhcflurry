@@ -42,6 +42,7 @@ from .model_comparison_constants import (
     PRESENTATION_SCORE_KINDS,
     PROCESSING_MODES,
 )
+from ..common import positive_int_arg
 
 
 METRIC_DISPLAY_NAMES = {
@@ -81,7 +82,7 @@ Plotting layers:
         help="Output directory produced by ``mhcflurry compare-models``.",
     )
     parser.add_argument(
-        "--max-scatter-points", type=int, default=100_000,
+        "--max-scatter-points", type=positive_int_arg, default=100_000,
         help="Subsample scatter plots above this many points (default 100k).",
     )
     parser.add_argument(
@@ -214,7 +215,16 @@ def run(args):
     if args.components == "auto":
         components = available
     else:
-        requested = [p.strip() for p in args.components.split(",") if p]
+        requested = [p.strip() for p in args.components.split(",")]
+        if not requested or any(not component for component in requested):
+            raise SystemExit("--components contains an empty component")
+        duplicates = sorted({
+            component for component in requested
+            if requested.count(component) > 1
+        })
+        if duplicates:
+            raise SystemExit("Duplicate --components entries: %s" % (
+                ", ".join(duplicates)))
         components = [c for c in requested if c in available]
         missing = sorted(set(requested) - set(available))
         if missing:
@@ -349,6 +359,7 @@ def _validate_plot_output_paths(
         plot_dir / name
         for name in ("affinity", "processing", "presentation", "paper")
     )
+    comparison_dir = plot_dir.parent
 
     if _same_location(paper_figures_dir, plot_dir) or any(
             _path_is_within_location(paper_figures_dir, directory)
@@ -358,6 +369,13 @@ def _validate_plot_output_paths(
             "from the diagnostic plot directory and its command-owned "
             "component directories. Refusing unsafe output: %s"
             % paper_figures_dir
+        )
+    if (
+            _path_is_within_location(paper_figures_dir, comparison_dir)
+            and not _path_is_within_location(paper_figures_dir, plot_dir)):
+        raise SystemExit(
+            "--paper-figures-out cannot be inside the comparison input tree "
+            "but outside its plots directory: %s" % paper_figures_dir
         )
 
     if summary_pdf is None:
@@ -379,6 +397,13 @@ def _validate_plot_output_paths(
                 plot_dir,
                 plot_dir / "model_comparison_figures.pdf",
             )
+        )
+    if (
+            _path_is_within_location(summary_pdf, comparison_dir)
+            and not _path_is_within_location(summary_pdf, plot_dir)):
+        raise SystemExit(
+            "--summary-pdf cannot overwrite files in the comparison input "
+            "tree outside its plots directory: %s" % summary_pdf
         )
 
 
@@ -904,7 +929,7 @@ def _save_metric_scatter_grid(
                 continue
             x = df[b_col].to_numpy(dtype=float)
             y = df[a_col].to_numpy(dtype=float)
-            mask = ~(numpy.isnan(x) | numpy.isnan(y))
+            mask = numpy.isfinite(x) & numpy.isfinite(y)
             if not mask.any():
                 ax.axis("off")
                 continue
@@ -1075,7 +1100,7 @@ def _style_boxplot(artists):
 
 def _metric_ylim(metric, values):
     values = numpy.asarray(values, dtype=float)
-    values = values[~numpy.isnan(values)]
+    values = values[numpy.isfinite(values)]
     if values.size == 0:
         return 0.0, 1.0
     if metric == "roc_auc":
@@ -1416,7 +1441,7 @@ def _shared_finite_curve_values(y, a_score, b_score):
 
 def _save_scatter(plt, x_score, y_score, x_label, y_label,
                   out_path, title, max_points):
-    mask = ~(numpy.isnan(x_score) | numpy.isnan(y_score))
+    mask = numpy.isfinite(x_score) & numpy.isfinite(y_score)
     idx = numpy.flatnonzero(mask)
     if len(idx) == 0:
         return

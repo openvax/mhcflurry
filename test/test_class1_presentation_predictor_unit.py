@@ -11,6 +11,7 @@
 # limitations under the License.
 
 import warnings
+from argparse import Namespace
 
 import numpy
 import pandas
@@ -317,6 +318,50 @@ def test_presentation_feature_chunks_use_global_data():
         result["processing_scores"]["with_flanks"], [200.0, 201.0])
 
 
+def test_presentation_feature_prediction_supports_serial_fallback(monkeypatch):
+    df = pandas.DataFrame({
+        "experiment_id": ["s1", "s1", "s1"],
+        "peptide": ["A", "B", "C"],
+    })
+    predictor = FakePresentationPredictor()
+    predictor.processing_predictor_without_flanks = None
+    predictor.processing_predictor_with_flanks = None
+    monkeypatch.setattr(
+        train_presentation,
+        "refine_local_parallelism_from_worker_context",
+        lambda args, context: args,
+    )
+    monkeypatch.setattr(
+        train_presentation,
+        "worker_pool_with_gpu_assignments_from_args",
+        lambda *args, **kwargs: None,
+    )
+
+    result = train_presentation.predict_features_parallel(
+        Namespace(
+            feature_chunk_size=2,
+            num_jobs=0,
+            gpus=0,
+            max_workers_per_gpu=1,
+        ),
+        predictor,
+        df,
+        {"s1": ["A*01:01"]},
+    )
+
+    numpy.testing.assert_equal(result["affinity"], [10.0, 11.0, 10.0])
+    assert result["processing_scores_by_model"] == {}
+
+
+def test_presentation_training_rejects_nonpositive_feature_chunk_size():
+    with pytest.raises(SystemExit):
+        train_presentation.parser.parse_args([
+            "--out-models-dir", "out",
+            "--affinity-predictor", "affinity",
+            "--processing-predictor-with-flanks", "with",
+            "--processing-predictor-without-flanks", "without",
+            "--feature-chunk-size", "0",
+        ])
 class FakeNetwork(torch.nn.Module):
     def __init__(self):
         super().__init__()
@@ -363,6 +408,31 @@ def test_estimate_presentation_feature_worker_gb_uses_model_shape(monkeypatch):
     # The launch-time estimate contains persistent model/runtime state only;
     # transient inference activations consume the shared live-memory budget.
     assert estimate == 4.0
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("MHCFLURRY_PRESENTATION_WORKER_RUNTIME_FLOOR_GB", "nan"),
+        ("MHCFLURRY_PRESENTATION_WORKER_SAFETY_FACTOR", "inf"),
+        ("MHCFLURRY_PRESENTATION_WORKER_SAFETY_FACTOR", "-1"),
+    ],
+)
+def test_presentation_worker_estimator_rejects_unsafe_env(
+        monkeypatch, name, value):
+    monkeypatch.setenv(name, value)
+    with pytest.raises(ValueError, match=name):
+        train_presentation.estimate_presentation_feature_worker_gb(
+            type("Args", (), {"feature_chunk_size": 20})(),
+            type("FakePresentation", (), {
+                "affinity_predictor": type("FakeAffinity", (), {
+                    "class1_pan_allele_models": [],
+                    "allele_to_allele_specific_models": {},
+                })(),
+                "processing_predictor_without_flanks": None,
+                "processing_predictor_with_flanks": None,
+            })(),
+        )
 
 
 def test_presentation_worker_estimator_uses_cartesian_merged_peak(monkeypatch):

@@ -18,6 +18,7 @@ import multiprocessing
 import multiprocessing.pool
 import os
 import sys
+import types
 from multiprocessing import cpu_count
 from pprint import pprint
 
@@ -25,7 +26,11 @@ import numpy
 
 from ..common import configure_pytorch, normalize_pytorch_backend
 from ..workload_planning import WORKLOAD_GENERIC
-from .planning import cuda_visible_devices_from_env, resolve_local_parallelism_args
+from .planning import (
+    cuda_visible_devices_from_env,
+    refine_local_parallelism_from_spawn_context,
+    resolve_local_parallelism_args,
+)
 from .worker_runtime import (
     configure_worker_cpu_threads,
     worker_init,
@@ -194,7 +199,9 @@ def worker_pool_with_gpu_assignments_from_args(
         args,
         workload_name=WORKLOAD_GENERIC,
         workload_hints=None,
-        start_method=None):
+        start_method=None,
+        worker_context_module=None,
+        worker_context_data=None):
     """
     Create a multiprocessing.Pool where each worker uses its own GPU.
 
@@ -215,6 +222,11 @@ def worker_pool_with_gpu_assignments_from_args(
         args,
         workload_name=workload_name,
         workload_hints=workload_hints,
+    )
+    refine_local_parallelism_from_worker_context(
+        args,
+        worker_context_data,
+        start_method=start_method,
     )
 
     # --gpus only takes effect when there are worker processes to assign it to.
@@ -243,7 +255,89 @@ def worker_pool_with_gpu_assignments_from_args(
         cpu_threads_per_worker_was_auto=getattr(
             args, "cpu_threads_per_worker_was_auto", True),
         start_method=start_method,
+        worker_context_module=worker_context_module,
+        worker_context_data=worker_context_data,
     )
+
+
+def refine_local_parallelism_from_worker_context(
+        args, worker_context_data, start_method=None):
+    """Apply spawn-context host sizing before code chooses serial/parallel."""
+    effective_start_method = (
+        start_method
+        or multiprocessing.get_start_method(allow_none=True)
+        or multiprocessing.get_context().get_start_method()
+    )
+    refinement_key = (id(worker_context_data), effective_start_method)
+    if getattr(args, "_worker_context_memory_refinement_key", None) == (
+            refinement_key):
+        return args
+    if (
+            worker_context_data is not None
+            and effective_start_method != "fork"
+            and int(args.num_jobs) > 0):
+        refine_local_parallelism_from_spawn_context(
+            args,
+            estimate_worker_context_bytes(worker_context_data),
+        )
+    args._worker_context_memory_refinement_key = refinement_key
+    return args
+
+
+def estimate_worker_context_bytes(value, _seen=None):
+    """Best-effort deep resident size for data copied into spawn workers."""
+    if _seen is None:
+        _seen = set()
+    identity = id(value)
+    if identity in _seen:
+        return 0
+    _seen.add(identity)
+
+    if value is None or isinstance(value, (bool, int, float, complex)):
+        return sys.getsizeof(value)
+    if isinstance(value, (str, bytes, bytearray)):
+        return sys.getsizeof(value)
+    if isinstance(value, numpy.ndarray):
+        # Owned ndarrays usually include their buffer in getsizeof; views do
+        # not. Taking the maximum avoids double-counting the common case.
+        return max(sys.getsizeof(value), int(value.nbytes))
+    if isinstance(value, (types.ModuleType, types.FunctionType, type)):
+        return 0
+
+    # pandas DataFrame/Series/Index expose accurate deep payload accounting.
+    memory_usage = getattr(value, "memory_usage", None)
+    if callable(memory_usage):
+        try:
+            usage = memory_usage(deep=True)
+            return int(usage.sum() if hasattr(usage, "sum") else usage)
+        except (AttributeError, TypeError, ValueError):
+            pass
+
+    # Torch tensors are optional and must not force a torch import in the
+    # orchestrator. Duck-type their exact storage payload when already loaded.
+    if (
+            value.__class__.__module__.startswith("torch")
+            and hasattr(value, "nelement")
+            and hasattr(value, "element_size")):
+        try:
+            return int(value.nelement()) * int(value.element_size())
+        except (RuntimeError, TypeError, ValueError):
+            pass
+
+    size = sys.getsizeof(value)
+    if isinstance(value, dict):
+        return size + sum(
+            estimate_worker_context_bytes(item, _seen)
+            for pair in value.items() for item in pair
+        )
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return size + sum(
+            estimate_worker_context_bytes(item, _seen) for item in value
+        )
+    attributes = getattr(value, "__dict__", None)
+    if isinstance(attributes, dict):
+        size += estimate_worker_context_bytes(attributes, _seen)
+    return size
 
 
 def worker_pool_uses_fork(worker_pool=None):
@@ -292,7 +386,9 @@ def worker_pool_with_gpu_assignments(
         worker_log_dir=None,
         cpu_threads_per_worker=None,
         cpu_threads_per_worker_was_auto=True,
-        start_method=None):
+        start_method=None,
+        worker_context_module=None,
+        worker_context_data=None):
     """
     Create a multiprocessing.Pool where each worker uses its own GPU.
 
@@ -313,12 +409,24 @@ def worker_pool_with_gpu_assignments(
     start_method : string
         Optional multiprocessing start method, e.g. ``"spawn"`` when workers
         must not inherit PyTorch state from the parent process.
+    worker_context_module : string, optional
+        Module containing a ``WORKER_CONTEXT`` dictionary used by worker
+        functions.
+    worker_context_data : dict, optional
+        Constant data to install once per process during initialization. This
+        avoids serializing the same large payload with every queued task on
+        spawn-based platforms.
 
     Returns
     -------
     multiprocessing.Pool
     """
     backend = normalize_pytorch_backend(backend or "auto")
+    if (worker_context_module is None) != (worker_context_data is None):
+        raise ValueError(
+            "worker_context_module and worker_context_data must be supplied "
+            "together"
+        )
     validate_worker_pool_args(
         num_jobs=num_jobs,
         num_gpus=num_gpus,
@@ -365,6 +473,14 @@ def worker_pool_with_gpu_assignments(
         processes=num_jobs,
         initializer=worker_init,
         initializer_kwargs_per_process=worker_init_kwargs,
+        initializer_shared_kwargs=(
+            {
+                "worker_context_module": worker_context_module,
+                "worker_context_data": worker_context_data,
+            }
+            if worker_context_module is not None
+            else None
+        ),
         max_tasks_per_worker=max_tasks_per_worker,
         start_method=start_method)
     return worker_pool
@@ -474,6 +590,7 @@ def make_worker_pool(
         processes=None,
         initializer=None,
         initializer_kwargs_per_process=None,
+        initializer_shared_kwargs=None,
         max_tasks_per_worker=None,
         start_method=None):
     """
@@ -510,6 +627,10 @@ def make_worker_pool(
         Arguments to pass to initializer function for each worker. Length of
         list must equal the number of workers.
 
+    initializer_shared_kwargs : dict, optional
+        Arguments passed once to every worker initializer. Unlike work-item
+        arguments, large values here are serialized only once per process.
+
     max_tasks_per_worker : int, optional
         Restart workers after this many tasks.
 
@@ -521,21 +642,62 @@ def make_worker_pool(
     multiprocessing.Pool
     """
 
-    if not processes:
+    if processes is None:
         processes = cpu_count()
+    if int(processes) < 1:
+        raise ValueError("processes must be a positive integer")
+    processes = int(processes)
+    if max_tasks_per_worker is not None:
+        max_tasks_per_worker = int(max_tasks_per_worker)
+        if max_tasks_per_worker < 1:
+            raise ValueError("max_tasks_per_worker must be a positive integer")
+    if initializer_shared_kwargs is not None:
+        if initializer is None:
+            raise ValueError(
+                "initializer_shared_kwargs requires an initializer"
+            )
+        if not isinstance(initializer_shared_kwargs, dict):
+            raise TypeError("initializer_shared_kwargs must be a dict")
+    if initializer_kwargs_per_process is not None:
+        if initializer is None:
+            raise ValueError(
+                "initializer_kwargs_per_process requires an initializer"
+            )
+        if len(initializer_kwargs_per_process) != processes:
+            raise ValueError(
+                "initializer_kwargs_per_process must contain one mapping "
+                "per worker (%d expected, %d received)" % (
+                    processes, len(initializer_kwargs_per_process))
+            )
+        if not all(
+                isinstance(kwargs, dict)
+                for kwargs in initializer_kwargs_per_process):
+            raise TypeError(
+                "initializer_kwargs_per_process entries must be dicts"
+            )
+        if initializer_shared_kwargs:
+            overlaps = [
+                sorted(set(kwargs).intersection(initializer_shared_kwargs))
+                for kwargs in initializer_kwargs_per_process
+            ]
+            overlaps = [values for values in overlaps if values]
+            if overlaps:
+                raise ValueError(
+                    "Initializer arguments supplied as both shared and "
+                    "per-process values: %s" % ", ".join(overlaps[0])
+                )
 
     pool_context = non_daemon_context(start_method) if start_method else None
     pool_kwargs = {
         'processes': processes,
     }
-    if max_tasks_per_worker:
+    if max_tasks_per_worker is not None:
         pool_kwargs["maxtasksperchild"] = max_tasks_per_worker
     if start_method:
         pool_kwargs["context"] = pool_context
 
     if initializer:
         if initializer_kwargs_per_process:
-            assert len(initializer_kwargs_per_process) == processes
             queue_context = pool_context or multiprocessing.get_context()
             kwargs_queue = queue_context.Queue()
             kwargs_queue_backup = queue_context.Queue()
@@ -544,7 +706,19 @@ def make_worker_pool(
                 kwargs_queue_backup.put(kwargs)
             pool_kwargs["initializer"] = worker_init_entry_point
             pool_kwargs["initargs"] = (
-                initializer, kwargs_queue, kwargs_queue_backup)
+                initializer,
+                kwargs_queue,
+                kwargs_queue_backup,
+                initializer_shared_kwargs,
+            )
+        elif initializer_shared_kwargs:
+            pool_kwargs["initializer"] = worker_init_entry_point
+            pool_kwargs["initargs"] = (
+                initializer,
+                None,
+                None,
+                initializer_shared_kwargs,
+            )
         else:
             pool_kwargs["initializer"] = initializer
 
@@ -552,5 +726,14 @@ def make_worker_pool(
     # See NonDaemonPool for the rationale.
     worker_pool = NonDaemonPool(**pool_kwargs)
     print("Started pool: %s" % str(worker_pool), file=sys.stderr)
-    pprint(pool_kwargs, stream=sys.stderr)
+    printable_pool_kwargs = dict(pool_kwargs)
+    if initializer_shared_kwargs:
+        printable_pool_kwargs["initargs"] = (
+            initializer,
+            "<per-worker argument queues>",
+            "<shared initializer data: %s>" % ", ".join(
+                sorted(initializer_shared_kwargs)
+            ),
+        )
+    pprint(printable_pool_kwargs, stream=sys.stderr)
     return worker_pool

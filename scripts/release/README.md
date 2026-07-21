@@ -45,6 +45,16 @@ SSH authentication comes from the local `ssh` and `rsync` configuration. Before
 training, the workflow verifies the remote commit and tracked worktree so model
 provenance cannot be stamped from a different checkout.
 
+By default every remote backend synchronizes its outputs before local
+evaluation, plotting, or deployment. `--no-sync-remote-output` is an explicit
+training-only mode: combine it with `--skip-eval --skip-plots` and leave
+deployment disabled. SSH runs validate the completed models on the remote host
+before returning success, and the Brev launcher performs the same artifact-only
+validation inside the remote job. This mode therefore does not depend on
+nonexistent local `info.txt` files. For Brev, deletion and
+delete-on-stop-failure cleanup are rejected because the instance disk holds the
+only artifact copy.
+
 ## Brev selection, synchronization, and cleanup
 
 `brev-provision` defaults to automatic inventory selection using the release

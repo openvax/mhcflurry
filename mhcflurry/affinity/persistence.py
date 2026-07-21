@@ -59,11 +59,8 @@ def _parse_mhc_name(raw_name, only_class1):
     )
 
 
-def _is_incomplete_non_predictor_pseudosequence(name, sequence):
-    """Return true for incomplete pseudosequences we should drop on load."""
-    if "X" not in sequence:
-        return False
-
+def _is_non_predictor_pseudosequence(name):
+    """Return true for known non-class-I predictor pseudosequence rows."""
     parsed_any_class = _parse_mhc_name(name, only_class1=False)
     if parsed_any_class is None:
         gene_class = parse_gene_class(str(name), raise_on_error=False)
@@ -306,10 +303,12 @@ def load_predictor(
         # retry with aliases — retired allele names like B*44:01 (an
         # IMGT error reassigned to B*44:02 in 1994) often have
         # incomplete pseudosequences, and the alias target may have a
-        # complete one. If mhcgnomes can't parse either way, keep the
-        # raw name so the pseudosequence remains available.
+        # complete one. Keys that mhcgnomes cannot parse are omitted: keeping
+        # them would make supported_alleles advertise a value that the public
+        # prediction API cannot canonicalize back to that key.
         renormalized = {}
         skipped_non_class1 = []
+        skipped_unparseable = []
         for (name, value) in allele_to_sequence.items():
             normalized = normalize_allele_name(
                 name, raise_on_error=False, use_allele_aliases=False)
@@ -319,13 +318,14 @@ def load_predictor(
                 if alias_normalized is not None:
                     normalized = alias_normalized
             if normalized is None:
-                # Detect class II, TAP, and pseudogene entries —
-                # these don't belong in a class I predictor and
-                # always have incomplete pseudosequences.
-                if _is_incomplete_non_predictor_pseudosequence(name, value):
+                # Detect class II, TAP, and pseudogene entries. Unknown raw
+                # keys are also unusable because prediction inputs cannot be
+                # canonicalized to them.
+                if _is_non_predictor_pseudosequence(name):
                     skipped_non_class1.append(name)
-                    continue
-                normalized = name
+                else:
+                    skipped_unparseable.append(name)
+                continue
             if normalized in renormalized and name != normalized:
                 existing = renormalized[normalized]
                 if value.count("X") < existing.count("X"):
@@ -341,6 +341,13 @@ def load_predictor(
                 len(skipped_non_class1),
                 ", ".join(sorted(skipped_non_class1)[:10])
                 + (" ..." if len(skipped_non_class1) > 10 else ""))
+        if skipped_unparseable:
+            logging.warning(
+                "Skipped %d unparseable pseudosequence allele key(s) that "
+                "cannot be resolved by the predictor API: %s",
+                len(skipped_unparseable),
+                ", ".join(sorted(skipped_unparseable)[:10])
+                + (" ..." if len(skipped_unparseable) > 10 else ""))
 
         # Map mhcgnomes-aliased forms back to pseudosequence keys.
         # e.g. Mamu-A1*007:01 -> Mamu-A*07:01

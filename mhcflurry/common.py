@@ -11,6 +11,7 @@
 # limitations under the License.
 
 import collections
+import argparse
 import datetime
 import hashlib
 import logging
@@ -19,11 +20,19 @@ import shlex
 import sys
 import os
 import json
+import math
 import warnings
 
 import numpy
 import pandas
-from mhcgnomes import parse, Allele, AlleleWithoutGene, Gene, Serotype
+from mhcgnomes import (
+    parse,
+    parse_gene_class,
+    Allele,
+    AlleleWithoutGene,
+    Gene,
+    Serotype,
+)
 
 
 from . import amino_acid
@@ -33,6 +42,55 @@ from . import amino_acid
 # (not entropy) so runs are reproducible out of the box; pass --random-seed N
 # to get a different, still-reproducible run.
 DEFAULT_RANDOM_SEED = 42
+
+
+def positive_int_arg(value):
+    """Parse an argparse value as an integer greater than zero."""
+    if isinstance(value, bool):
+        raise argparse.ArgumentTypeError(
+            "expected a positive integer, got %r" % (value,)
+        )
+    try:
+        result = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            "expected a positive integer, got %r" % (value,)
+        ) from None
+    if isinstance(value, (float, numpy.floating)) and not value.is_integer():
+        raise argparse.ArgumentTypeError(
+            "expected a positive integer, got %r" % (value,)
+        )
+    if result < 1:
+        raise argparse.ArgumentTypeError(
+            "expected a positive integer, got %r" % (value,)
+        )
+    return result
+
+
+def positive_float_arg(value):
+    """Parse an argparse value as a finite float greater than zero."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            "expected a positive number, got %r" % (value,)
+        ) from None
+    if not math.isfinite(result) or result <= 0:
+        raise argparse.ArgumentTypeError(
+            "expected a positive number, got %r" % (value,)
+        )
+    return result
+
+
+def fraction_arg(value):
+    """Parse an argparse value as a finite fraction in ``(0, 1]``."""
+    result = positive_float_arg(value)
+    if result > 1:
+        raise argparse.ArgumentTypeError(
+            "expected a fraction in (0, 1], got %r" % (value,)
+        )
+    return result
+
 
 def add_random_seed_arg(parser):
     """Add the standard ``--random-seed`` argument to a CLI parser.
@@ -126,7 +184,9 @@ def normalize_allele_name(
         Input string to normalize
 
     forbidden_substrings : tuple of str
-        Fail on inputs which contain any of these strings
+        Legacy argument naming retained for compatibility. Values identify
+        exact genes; ``MIC`` identifies the mhcgnomes class-Ic family. Input
+        names are never rejected by substring matching.
 
     raise_on_error : bool
         If an allele fails to parse raise an exception if this argument is True
@@ -205,13 +265,21 @@ def normalize_allele_name(
             raise ValueError(message)
         return default_value
     gene_name = getattr(result, "gene_name", "") or ""
-    for forbidden_substring in forbidden_substrings:
-        if forbidden_substring in gene_name:
+    gene_class = parse_gene_class(raw_name, raise_on_error=False)
+    for forbidden_gene in forbidden_substrings:
+        is_forbidden = (
+            gene_name == forbidden_gene
+            or (
+                forbidden_gene == "MIC"
+                and getattr(gene_class, "mhc_class", None) == "Ic"
+            )
+        )
+        if is_forbidden:
             if raise_on_error:
                 raise ValueError(
                     "Unsupported gene in MHC allele name: %s. MHCflurry "
                     "affinity models support classical MHC class I alleles, "
-                    "not %s-family genes." % (raw_name, forbidden_substring)
+                    "not %s-family genes." % (raw_name, forbidden_gene)
                 )
             return default_value
     if getattr(result, "is_pseudogene", False):
@@ -239,6 +307,46 @@ def normalize_allele_name(
             )
         return default_value
     return result.restrict_allele_fields(2).to_string()
+
+
+def normalize_sequence_resolved_allele_name(raw_name):
+    """Return a canonical, sequence-resolved class-I allele name.
+
+    HLA allele groups require at least two fields because a one-field group
+    can contain multiple protein sequences. Other species require at least one
+    allele field. Serotypes, genes, class-II names, pseudogenes, and invalid
+    spellings fail through :func:`normalize_allele_name` with its specific
+    diagnostic.
+    """
+    normalized = normalize_allele_name(raw_name)
+    parsed = parse(normalized, only_class1=True, raise_on_error=False)
+    species = getattr(parsed, "species", None)
+    required_fields = 2 if getattr(species, "mhc_prefix", None) == "HLA" else 1
+    if (
+            parsed is None or
+            len(getattr(parsed, "allele_fields", ())) < required_fields):
+        raise ValueError(
+            "Expected a sequence-resolved class-I allele with at least %d "
+            "field%s; got %r." % (
+                required_fields,
+                "" if required_fields == 1 else "s",
+                raw_name,
+            )
+        )
+    return normalized
+
+
+def normalize_class1_genotype(value):
+    """Canonicalize a whitespace-delimited class-I genotype into a tuple."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(
+            "Expected a non-empty whitespace-delimited class-I genotype; "
+            "got %r." % value
+        )
+    return tuple(dict.fromkeys(
+        normalize_sequence_resolved_allele_name(allele)
+        for allele in value.split()
+    ))
 
 
 def allele_locus_name(

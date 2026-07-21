@@ -18,7 +18,6 @@ import os
 import sys
 import time
 import random
-from functools import partial
 from pprint import pprint
 
 import numpy
@@ -37,6 +36,7 @@ from ..common import (
     derive_seed,
     filter_canonicalizable_alleles,
     install_sigusr1_stack_trace_handler,
+    positive_int_arg,
     normalize_allele_name,
     random_peptides,
     write_generate_sh,
@@ -97,7 +97,7 @@ parser.add_argument(
     default="combined:mass-spec,mse")
 parser.add_argument(
     "--unselected-accuracy-scorer-num-samples",
-    type=int,
+    type=positive_int_arg,
     default=1000)
 parser.add_argument(
     "--unselected-accuracy-percentile-threshold",
@@ -112,13 +112,13 @@ parser.add_argument(
     "enough measurements will be used.")
 parser.add_argument(
     "--combined-min-models",
-    type=int,
+    type=positive_int_arg,
     default=8,
     metavar="N",
     help="Min number of models to select per allele when using combined selector")
 parser.add_argument(
     "--combined-max-models",
-    type=int,
+    type=positive_int_arg,
     default=1000,
     metavar="N",
     help="Max number of models to select per allele when using combined selector")
@@ -132,39 +132,39 @@ parser.add_argument(
 
 parser.add_argument(
     "--mass-spec-min-measurements",
-    type=int,
+    type=positive_int_arg,
     metavar="N",
     default=1,
     help="Min number of measurements required for an allele to use mass-spec model "
     "selection")
 parser.add_argument(
     "--mass-spec-min-models",
-    type=int,
+    type=positive_int_arg,
     default=8,
     metavar="N",
     help="Min number of models to select per allele when using mass-spec selector")
 parser.add_argument(
     "--mass-spec-max-models",
-    type=int,
+    type=positive_int_arg,
     default=1000,
     metavar="N",
     help="Max number of models to select per allele when using mass-spec selector")
 parser.add_argument(
     "--mse-min-measurements",
-    type=int,
+    type=positive_int_arg,
     metavar="N",
     default=1,
     help="Min number of measurements required for an allele to use MSE model "
     "selection")
 parser.add_argument(
     "--mse-min-models",
-    type=int,
+    type=positive_int_arg,
     default=8,
     metavar="N",
     help="Min number of models to select per allele when using MSE selector")
 parser.add_argument(
     "--mse-max-models",
-    type=int,
+    type=positive_int_arg,
     default=1000,
     metavar="N",
     help="Max number of models to select per allele when using MSE selector")
@@ -175,19 +175,19 @@ parser.add_argument(
     help="Scoring procedures to use in order")
 parser.add_argument(
     "--consensus-min-models",
-    type=int,
+    type=positive_int_arg,
     default=8,
     metavar="N",
     help="Min number of models to select per allele when using consensus selector")
 parser.add_argument(
     "--consensus-max-models",
-    type=int,
+    type=positive_int_arg,
     default=1000,
     metavar="N",
     help="Max number of models to select per allele when using consensus selector")
 parser.add_argument(
     "--consensus-num-peptides-per-length",
-    type=int,
+    type=positive_int_arg,
     default=10000,
     help="Num peptides per length to use for consensus scoring")
 parser.add_argument(
@@ -210,6 +210,13 @@ def run(argv=sys.argv[1:]):
     install_sigusr1_stack_trace_handler()
 
     args = parser.parse_args(argv)
+    for prefix in ("combined", "mass_spec", "mse", "consensus"):
+        minimum = getattr(args, "%s_min_models" % prefix)
+        maximum = getattr(args, "%s_max_models" % prefix)
+        if minimum > maximum:
+            parser.error(
+                "--%s-min-models must not exceed --%s-max-models" % (
+                    prefix.replace("_", "-"), prefix.replace("_", "-")))
 
     args.out_models_dir = os.path.abspath(args.out_models_dir)
 
@@ -396,6 +403,8 @@ def run(argv=sys.argv[1:]):
                 )
             ) or None,
         },
+        worker_context_module=__name__,
+        worker_context_data=WORKER_CONTEXT,
     )
 
     start = time.time()
@@ -409,24 +418,33 @@ def run(argv=sys.argv[1:]):
         # Parallel run
         random.shuffle(alleles)
         results = worker_pool.imap_unordered(
-            partial(model_select, constant_data=WORKER_CONTEXT),
+            model_select,
             alleles,
             chunksize=1)
 
     unselected_summary = []
     model_selection_dfs = []
-    for result in tqdm.tqdm(results, total=len(alleles)):
-        pprint(result)
+    try:
+        for result in tqdm.tqdm(results, total=len(alleles)):
+            pprint(result)
 
-        summary_dict = dict(result)
-        summary_dict["retained"] = result["selected"] is not None
-        del summary_dict["selected"]
+            summary_dict = dict(result)
+            summary_dict["retained"] = result["selected"] is not None
+            del summary_dict["selected"]
 
-        unselected_summary.append(summary_dict)
-        if result['selected'] is not None:
-            model_selection_dfs.append(
-                result['selected'].metadata_dataframes['model_selection'])
-            result_predictor.merge_in_place([result['selected']])
+            unselected_summary.append(summary_dict)
+            if result['selected'] is not None:
+                model_selection_dfs.append(
+                    result['selected'].metadata_dataframes['model_selection'])
+                result_predictor.merge_in_place([result['selected']])
+        if worker_pool:
+            worker_pool.close()
+            worker_pool.join()
+            worker_pool = None
+    finally:
+        if worker_pool is not None:
+            worker_pool.terminate()
+            worker_pool.join()
 
     if model_selection_dfs:
         model_selection_df = pandas.concat(
@@ -444,10 +462,6 @@ def run(argv=sys.argv[1:]):
     write_generate_sh(args.out_models_dir)
 
     model_selection_time = time.time() - start
-
-    if worker_pool:
-        worker_pool.close()
-        worker_pool.join()
 
     print("Model selection time %0.2f min." % (model_selection_time / 60.0))
     print("Predictor written to: %s" % args.out_models_dir)

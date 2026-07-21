@@ -19,6 +19,8 @@ free of torch imports so the parent process can size a spawn/fork worker pool
 without initializing CUDA.
 """
 
+import math
+
 GIB = float(1 << 30)
 
 # Keep one shared reserve for CUDA contexts, allocator fragmentation, and
@@ -88,8 +90,15 @@ def memory_worker_capacity(
     worker and let its normal preflight produce the detailed undersized-device
     warning. There is intentionally no default performance hard cap here.
     """
-    available_bytes = max(float(available_gb), 0.0) * GIB
-    per_worker_bytes = max(float(per_worker_gb), 0.0) * GIB
+    available_gb = float(available_gb)
+    per_worker_gb = float(per_worker_gb)
+    if not math.isfinite(available_gb) or not math.isfinite(per_worker_gb):
+        raise ValueError(
+            "Memory capacity inputs must be finite; got available_gb=%r, "
+            "per_worker_gb=%r" % (available_gb, per_worker_gb)
+        )
+    available_bytes = max(available_gb, 0.0) * GIB
+    per_worker_bytes = max(per_worker_gb, 0.0) * GIB
     if per_worker_bytes <= 0:
         return 1
     return max(

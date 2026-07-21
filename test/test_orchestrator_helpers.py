@@ -184,9 +184,13 @@ def test_compile_warmup_preserves_numeric_return_contract(monkeypatch):
     from mhcflurry.parallelism import torch_compile
 
     reports = []
+    applied_items = []
+    pool_kwargs = {}
 
     class FakePool:
         def apply(self, function, args):
+            del function
+            applied_items.append(args[1])
             report = {"worker_peak_rss_gb": len(reports) + 1.0}
             reports.append(report)
             return report
@@ -209,11 +213,12 @@ def test_compile_warmup_preserves_numeric_return_contract(monkeypatch):
         torch_compile, "resolve_local_parallelism_args", lambda args: None)
     monkeypatch.setattr(
         torch_compile, "num_workers_per_gpu_from_args", lambda args: 1)
+    def fake_worker_pool(**kwargs):
+        pool_kwargs.update(kwargs)
+        return FakePool()
+
     monkeypatch.setattr(
-        torch_compile,
-        "worker_pool_with_gpu_assignments",
-        lambda **kwargs: FakePool(),
-    )
+        torch_compile, "worker_pool_with_gpu_assignments", fake_worker_pool)
     monkeypatch.setattr(
         torch_compile,
         "refine_local_parallelism_from_warmup",
@@ -238,15 +243,22 @@ def test_compile_warmup_preserves_numeric_return_contract(monkeypatch):
         {"hyperparameters": {"layer_sizes": [16]}},
     ]
 
+    constant_data = {"large": object()}
     warmed = torch_compile.run_single_worker_torch_compile_warmup(
         args=args,
         work_items=work_items,
         work_function=lambda **kwargs: None,
+        constant_data=constant_data,
     )
 
     assert warmed == 2
     assert isinstance(warmed, int)
     assert refined == reports
+    assert pool_kwargs["worker_context_module"] == torch_compile.__name__
+    assert pool_kwargs["worker_context_data"] == {
+        "constant_data": constant_data,
+    }
+    assert all("constant_data" not in item for item in applied_items)
 
 
 def test_cluster_worker_compile_threads_auto(monkeypatch):

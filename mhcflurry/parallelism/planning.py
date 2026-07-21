@@ -13,6 +13,7 @@
 """Hardware planning helpers for local parallelism."""
 
 import logging
+import math
 import os
 import re
 import subprocess
@@ -20,15 +21,21 @@ import sys
 from dataclasses import replace
 
 from ..common import configure_pytorch, normalize_pytorch_backend
-from ..memory_budget import memory_worker_capacity
+from ..memory_budget import (
+    HOST_MIN_RESERVE_BYTES,
+    memory_worker_capacity,
+    usable_memory_bytes,
+)
 from ..workload_planning import (
     HOST_RAM_PER_DATALOADER_CHILD_GB,
     WORKLOAD_GENERIC,
+    available_or_total_memory_gb,
     capacity_warnings,
     env_float,
     env_int,
     host_memory_num_jobs_cap,
     plan_local_parallelism,
+    system_memory_info_gb,
 )
 
 
@@ -125,6 +132,11 @@ def free_vram_per_gpu_override_gb(num_gpus):
             "Environment variable %s=%r contains a non-float entry: %s"
             % (name, value, exc)
         ) from None
+    if any(not math.isfinite(item) or item < 0 for item in vals):
+        raise ValueError(
+            "Environment variable %s=%r must contain finite non-negative "
+            "free-VRAM values" % (name, value)
+        )
     if len(vals) == 1:
         # A single value applies to every GPU.
         vals = vals * max(int(num_gpus), 1)
@@ -286,6 +298,11 @@ def auto_max_workers_per_gpu(
         )
     else:
         per_worker_gb = float(per_worker_gb)
+    if not math.isfinite(per_worker_gb) or per_worker_gb < 0:
+        raise ValueError(
+            "per_worker_gb must be a finite non-negative number; got %r" %
+            per_worker_gb
+        )
     hard_cap_raw = os.environ.get(
         "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP")
     hard_cap = (
@@ -882,9 +899,19 @@ def _resolve_cpu_thread_budget(plan, cpu_count=None):
     for name in (
             "OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
         marker = "MHCFLURRY_%s_AUTO" % name
-        if name not in os.environ or os.environ.get(marker) == "1":
+        marker_value = os.environ.get(marker)
+        current_value = os.environ.get(name)
+        # Record the exact value written by the auto planner. A boolean marker
+        # is insufficient: after an earlier auto pass, a caller can replace
+        # OMP_NUM_THREADS while the inherited marker remains in the
+        # environment. Treat the value as auto-owned only while it still
+        # matches what MHCflurry wrote.
+        marker_matches = (
+            marker_value is not None and marker_value == current_value
+        )
+        if current_value is None or marker_matches:
             os.environ[name] = str(per_worker)
-            os.environ[marker] = "1"
+            os.environ[marker] = str(per_worker)
         else:
             auto_owned = False
     logging.info(
@@ -1043,6 +1070,138 @@ def refine_local_parallelism_from_warmup(args, reports):
         print(
             "Warmup memory calibration confirmed local parallelism: %s" % (
                 refined,),
+            file=sys.stderr,
+        )
+    return args
+
+
+def refine_local_parallelism_from_spawn_context(
+        args, context_bytes, memory=None):
+    """Cap automatic spawn workers using the loaded per-process context.
+
+    Spawn serializes the full worker initializer context into every process,
+    unlike fork's copy-on-write inheritance. Input files may be compressed, so
+    their on-disk size is not a reliable host-RAM estimate. This refinement is
+    deliberately performed after the dataset/model context has been loaded but
+    before any workers start.
+    """
+    plan = getattr(args, "workload_plan", None)
+    if plan is None or int(getattr(args, "num_jobs", 0) or 0) <= 0:
+        return args
+    context_bytes = int(context_bytes)
+    if context_bytes < 0:
+        raise ValueError("context_bytes must be non-negative")
+    if not context_bytes:
+        return args
+    if memory is None:
+        memory = system_memory_info_gb()
+    available_gb = available_or_total_memory_gb(memory)
+    if available_gb is None:
+        return args
+
+    # Deep object-size accounting captures resident array/string payloads. The
+    # multiplier covers pickle reconstruction, indexes, allocator overhead,
+    # and transient copies while the child imports its runtime. The runtime
+    # floor prevents a tiny context from erasing the workload profile's normal
+    # Python/torch allowance.
+    context_gb = context_bytes / float(1 << 30)
+    context_host_worker_gb = (
+        1.0
+        + context_gb * 1.5
+        + int(plan.dataloader_num_workers)
+        * HOST_RAM_PER_DATALOADER_CHILD_GB
+    )
+    host_worker_gb = max(float(plan.host_worker_gb), context_host_worker_gb)
+    host_cap = host_memory_num_jobs_cap(memory, host_worker_gb)
+    usable_host_gb = usable_memory_bytes(
+        float(available_gb) * (1 << 30),
+        min_reserve_bytes=HOST_MIN_RESERVE_BYTES,
+    ) / float(1 << 30)
+    # The generic host-cap helper deliberately returns at least one worker so
+    # GPU planning can attempt a minimally viable launch. Spawn is different:
+    # the parent already owns the loaded context, and starting even one child
+    # makes another full copy. If the safe remaining budget cannot hold that
+    # copy, execute serially in the parent instead of forcing a likely OOM.
+    if usable_host_gb < host_worker_gb:
+        host_cap = 0
+    warnings = list(plan.warnings)
+    new_num_jobs = int(plan.num_jobs)
+    new_mwpg = int(plan.max_workers_per_gpu)
+    host_cap_applied = False
+    if (
+            host_cap is not None
+            and plan.num_jobs_was_auto
+            and new_num_jobs > int(host_cap)):
+        host_cap_applied = True
+        warnings.append(
+            "auto num_jobs capped from %d to %d by loaded spawn context "
+            "(%.1f GB available from %s, %.1f GB context, %.1f GB/worker)" % (
+                new_num_jobs,
+                int(host_cap),
+                float(available_gb),
+                memory.get("source", "unknown"),
+                context_gb,
+                host_worker_gb,
+            )
+        )
+        new_num_jobs = int(host_cap)
+        if plan.max_workers_per_gpu_was_auto and plan.gpus > 0:
+            new_mwpg = min(
+                new_mwpg,
+                max(1, (new_num_jobs + plan.gpus - 1) // plan.gpus),
+            )
+    elif (
+            host_cap is not None
+            and not plan.num_jobs_was_auto
+            and new_num_jobs > int(host_cap)):
+        warnings.append(
+            "explicit num_jobs=%d exceeds loaded spawn-context host-memory "
+            "estimate %d; honoring CLI override" % (new_num_jobs, host_cap)
+        )
+
+    refined = replace(
+        plan,
+        max_workers_per_gpu=new_mwpg,
+        num_jobs=new_num_jobs,
+        capacity=(
+            new_num_jobs
+            if host_cap_applied
+            else plan.capacity
+        ),
+        host_worker_gb=host_worker_gb,
+        host_memory_total_gb=memory.get("total_gb"),
+        host_memory_available_gb=memory.get("available_gb"),
+        host_memory_source=memory.get("source", "unknown"),
+        host_memory_num_jobs_cap=host_cap,
+        warnings=tuple(warnings),
+    )
+    (
+        cpu_threads_per_worker,
+        cpu_threads_per_worker_was_auto,
+    ) = _resolve_cpu_thread_budget(refined)
+    refined = replace(
+        refined,
+        cpu_threads_per_worker=cpu_threads_per_worker,
+        cpu_threads_per_worker_was_auto=cpu_threads_per_worker_was_auto,
+    )
+    args.workload_plan = refined
+    args.max_workers_per_gpu = new_mwpg
+    args.num_jobs = new_num_jobs
+    args.cpu_threads_per_worker = cpu_threads_per_worker
+    args.cpu_threads_per_worker_was_auto = cpu_threads_per_worker_was_auto
+    if new_num_jobs == 0 and int(plan.num_jobs) > 0:
+        # Commands decide between their serial and parallel branches
+        # immediately after this late, context-aware refinement. Apply the
+        # runtime limit here because no worker initializer will run.
+        from .worker_runtime import configure_worker_cpu_threads
+        applied_threads = configure_worker_cpu_threads(
+            cpu_threads_per_worker,
+            auto_owned=cpu_threads_per_worker_was_auto,
+        )
+        configure_pytorch(num_threads=applied_threads)
+    if refined != plan:
+        print(
+            "Loaded spawn-context memory refinement: %s" % refined,
             file=sys.stderr,
         )
     return args

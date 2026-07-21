@@ -57,6 +57,7 @@ Usage:
       [--paper-figures-monoallelic-predictions FILE] \
       [--paper-figures-prepare-command COMMAND] \
       [--brev-instance-type TYPE] \
+      [--no-sync-remote-output] \
       [--allow-dirty-repo] \
       [--skip-train] [--skip-eval] [--skip-plots] \
       [--deploy-mode none|dry-run|draft|publish]
@@ -81,6 +82,12 @@ Backends:
                  back. Requires --remote, --remote-repo, and --remote-run-dir.
                  Authentication is whatever your local ssh/rsync configuration
                  uses, typically SSH keys or an SSH config Host entry.
+
+Remote output:
+  --no-sync-remote-output intentionally leaves newly trained artifacts on the
+  remote machine. It is a training-only mode and therefore requires
+  --skip-eval, --skip-plots, and --deploy-mode none. SSH and Brev artifacts are
+  still provenance-validated remotely before this command succeeds.
 
 Release profiles:
   full                Default. Train all release processing artifacts on the
@@ -193,6 +200,32 @@ validate_release_provenance() {
     run_logged_step "$step" "${args[@]}"
 }
 
+validate_ssh_remote_release_provenance() {
+    local args=(
+        python3 "$REMOTE_REPO/scripts/release/validate_release_provenance.py"
+        --repo "$REMOTE_REPO"
+        --run-dir "$REMOTE_RUN_DIR"
+        --release "$RELEASE"
+        --workflow-id "$WORKFLOW_RUN_ID"
+        --processing-variants "$PROCESSING_VARIANTS"
+        --out "$REMOTE_RUN_DIR/release_provenance.json"
+        --require-artifacts
+        --expected-artifact-workflow-id "$WORKFLOW_RUN_ID"
+    )
+    if [ "$ALLOW_DIRTY_REPO" = "1" ]; then
+        args+=(--allow-dirty-repo)
+    fi
+    local arg
+    local remote_command=
+    for arg in "${args[@]}"; do
+        if [ -n "$remote_command" ]; then
+            remote_command="$remote_command "
+        fi
+        remote_command="$remote_command$(shell_quote "$arg")"
+    done
+    run_logged_step ssh_model_provenance ssh "$REMOTE" "$remote_command"
+}
+
 lowercase() {
     printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
@@ -254,6 +287,47 @@ validate_compare_gpus() {
             die "COMPARE_GPUS must be auto or a non-negative integer; got '$value'"
             ;;
     esac
+}
+
+validate_positive_integer() {
+    local option=$1
+    local value=$2
+    if ! [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
+        die "$option must be a positive integer; got '$value'"
+    fi
+}
+
+validate_nonnegative_integer() {
+    local option=$1
+    local value=$2
+    if ! [[ "$value" =~ ^[0-9]+$ ]]; then
+        die "$option must be a non-negative integer; got '$value'"
+    fi
+}
+
+validate_auto_or_nonnegative_integer() {
+    local option=$1
+    local value=$2
+    if [ "$(lowercase "$value")" != "auto" ]; then
+        validate_nonnegative_integer "$option" "$value"
+    fi
+}
+
+validate_auto_or_positive_integer() {
+    local option=$1
+    local value=$2
+    if [ "$(lowercase "$value")" != "auto" ]; then
+        validate_positive_integer "$option" "$value"
+    fi
+}
+
+validate_positive_number() {
+    local option=$1
+    local value=$2
+    if ! [[ "$value" =~ ^([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$ ]] || \
+            ! awk -v value="$value" 'BEGIN { exit !(value > 0) }'; then
+        die "$option must be a finite positive number; got '$value'"
+    fi
 }
 
 brev_provider_instance_type() {
@@ -323,7 +397,10 @@ processing_variant_requested() {
 validate_processing_configuration() {
     local derived_modes=
     local mode
+    local modes_list
     local modes_seen=0
+    local seen_modes=" "
+    local seen_variants=" "
     local variant
 
     for variant in $PROCESSING_VARIANTS; do
@@ -331,6 +408,10 @@ validate_processing_configuration() {
             with_flanks|no_flank|short_flanks) ;;
             *) die "Unknown --processing-variants entry: $variant" ;;
         esac
+        case "$seen_variants" in
+            *" $variant "*) die "Duplicate --processing-variants entry: $variant" ;;
+        esac
+        seen_variants="$seen_variants$variant "
         if [ -n "$derived_modes" ]; then
             derived_modes="$derived_modes,$variant"
         else
@@ -343,17 +424,41 @@ validate_processing_configuration() {
     if [ "$PROCESSING_MODES_EXPLICIT" = "0" ]; then
         PROCESSING_MODES=$derived_modes
     fi
-    for mode in $(printf '%s' "$PROCESSING_MODES" | tr ',' ' '); do
+    case "$PROCESSING_MODES" in
+        ,*|*,|*,,*) die "--processing-modes contains an empty entry" ;;
+    esac
+    modes_list=$(printf '%s' "$PROCESSING_MODES" | tr ',' ' ')
+    for mode in $modes_list; do
         modes_seen=1
         case "$mode" in
             with_flanks|no_flank|short_flanks) ;;
             *) die "Unknown --processing-modes entry: $mode" ;;
         esac
+        case "$seen_modes" in
+            *" $mode "*) die "Duplicate --processing-modes entry: $mode" ;;
+        esac
+        seen_modes="$seen_modes$mode "
         processing_variant_requested "$mode" || die \
             "--processing-modes requests '$mode', but --processing-variants does not train it"
     done
     [ "$modes_seen" = "1" ] || \
         die "--processing-modes must contain at least one mode"
+
+    if [ "$SKIP_TRAIN" != "1" ]; then
+        processing_variant_requested no_flank || die \
+            "--processing-variants must include no_flank for presentation training"
+        case "$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" in
+            with_flanks|short_flanks) ;;
+            *) die "--presentation-processing-with-flanks-kind must be with_flanks or short_flanks" ;;
+        esac
+        processing_variant_requested \
+            "$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" || die \
+            "--processing-variants must include the presentation with-flanks variant '$PRESENTATION_PROCESSING_WITH_FLANKS_KIND'"
+    fi
+    if [ "$DEPLOY_MODE" != "none" ]; then
+        processing_variant_requested with_flanks || die \
+            "--deploy-mode $DEPLOY_MODE requires the canonical with_flanks processing artifact"
+    fi
 }
 
 paper_figure_inputs_requested() {
@@ -1599,6 +1704,7 @@ run_brev_training() {
         "RUN_LABEL=$RUN_LABEL"
         "MHCFLURRY_RELEASE_WORKFLOW_ID=$WORKFLOW_RUN_ID"
         "MHCFLURRY_RELEASE_GIT_COMMIT=$RELEASE_GIT_COMMIT"
+        "MHCFLURRY_RELEASE_VERSION=$RELEASE"
         "RUNPLZ_BREV_AUTO_CREATE=$auto_create"
         "RUNPLZ_BREV_ON_FINISH=$runplz_on_finish"
         "RUNPLZ_BREV_INSTANCE_TYPE_FALLBACK_COUNT=$BREV_INSTANCE_TYPE_FALLBACK_COUNT"
@@ -1710,6 +1816,10 @@ BREV_CONTAINER_IMAGE="${BREV_CONTAINER_IMAGE:-pytorch/pytorch:2.4.0-cuda12.1-cud
 BREV_MAX_RUNTIME_SECONDS="${RUNPLZ_BREV_MAX_RUNTIME_SECONDS:-${BREV_MAX_RUNTIME_SECONDS:-}}"
 BREV_INSTANCE_TYPE_FALLBACK_COUNT="${RUNPLZ_BREV_INSTANCE_TYPE_FALLBACK_COUNT:-3}"
 BREV_EXCLUDE_PROVIDERS="${RUNPLZ_BREV_EXCLUDE_PROVIDERS:-oci}"
+BREV_STOP_FAILURE_ACTION_EXPLICIT=0
+if [ -n "${BREV_STOP_FAILURE_ACTION:-}" ]; then
+    BREV_STOP_FAILURE_ACTION_EXPLICIT=1
+fi
 BREV_STOP_FAILURE_ACTION="${BREV_STOP_FAILURE_ACTION:-}"
 BREV_CLEANUP_TIMEOUT_SECONDS="${BREV_CLEANUP_TIMEOUT_SECONDS:-60}"
 BREV_CREATE_TIMEOUT_SECONDS="${BREV_CREATE_TIMEOUT_SECONDS:-2400}"
@@ -1851,6 +1961,7 @@ while [ $# -gt 0 ]; do
             ;;
         --brev-stop-failure-action)
             BREV_STOP_FAILURE_ACTION=$2
+            BREV_STOP_FAILURE_ACTION_EXPLICIT=1
             shift 2
             ;;
         --brev-cleanup-timeout-seconds)
@@ -2111,6 +2222,34 @@ if [ -z "$PROCESSING_MINIBATCH_SIZE" ]; then
 fi
 apply_release_profile
 validate_processing_configuration
+validate_positive_integer "--affinity-minibatch-size" "$AFFINITY_MINIBATCH_SIZE"
+validate_positive_integer "--processing-minibatch-size" "$PROCESSING_MINIBATCH_SIZE"
+validate_positive_integer "--processing-held-out-samples" "$PROCESSING_HELD_OUT_SAMPLES"
+validate_positive_number "--presentation-decoys-per-hit" "$PRESENTATION_DECOYS_PER_HIT"
+validate_positive_integer "--presentation-feature-chunk-size" "$PRESENTATION_FEATURE_CHUNK_SIZE"
+validate_auto_or_positive_integer "--affinity-max-workers-per-gpu" "$AFFINITY_MAX_WORKERS_PER_GPU"
+validate_auto_or_nonnegative_integer "--processing-num-jobs" "$PROCESSING_NUM_JOBS"
+validate_auto_or_positive_integer "--processing-max-workers-per-gpu" "$PROCESSING_MAX_WORKERS_PER_GPU"
+validate_auto_or_nonnegative_integer "--presentation-num-jobs" "$PRESENTATION_NUM_JOBS"
+validate_auto_or_positive_integer "--presentation-max-workers-per-gpu" "$PRESENTATION_MAX_WORKERS_PER_GPU"
+validate_auto_or_nonnegative_integer "--presentation-calibration-num-jobs" "$PRESENTATION_CALIBRATION_NUM_JOBS"
+validate_auto_or_positive_integer "--presentation-calibration-max-workers-per-gpu" "$PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU"
+validate_auto_or_positive_integer "--presentation-calibration-prediction-batch-size" "$PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE"
+validate_auto_or_nonnegative_integer "COMPARE_NUM_JOBS" "$COMPARE_NUM_JOBS"
+validate_auto_or_positive_integer "COMPARE_MAX_WORKERS_PER_GPU" "$COMPARE_MAX_WORKERS_PER_GPU"
+validate_positive_integer "COMPARE_MAX_TASKS_PER_WORKER" "$COMPARE_MAX_TASKS_PER_WORKER"
+validate_auto_or_nonnegative_integer "COMPARE_PRESENTATION_NUM_JOBS" "$COMPARE_PRESENTATION_NUM_JOBS"
+validate_auto_or_positive_integer "COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU" "$COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU"
+validate_positive_integer "COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER" "$COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER"
+validate_positive_number "--brev-cleanup-timeout-seconds" "$BREV_CLEANUP_TIMEOUT_SECONDS"
+validate_positive_number "--brev-create-timeout-seconds" "$BREV_CREATE_TIMEOUT_SECONDS"
+validate_positive_number "BREV_POSTPROCESS_TIMEOUT_SECONDS" "$BREV_POSTPROCESS_TIMEOUT_SECONDS"
+validate_positive_integer "BREV_SHELL_READY_ATTEMPTS" "$BREV_SHELL_READY_ATTEMPTS"
+validate_positive_number "BREV_SHELL_READY_DELAY_SECONDS" "$BREV_SHELL_READY_DELAY_SECONDS"
+validate_nonnegative_integer "BREV_INSTANCE_TYPE_FALLBACK_COUNT" "$BREV_INSTANCE_TYPE_FALLBACK_COUNT"
+if [ -n "$BREV_MAX_RUNTIME_SECONDS" ]; then
+    validate_positive_number "--brev-max-runtime-seconds" "$BREV_MAX_RUNTIME_SECONDS"
+fi
 COMPARE_TORCH_COMPILE="$(normalize_compare_torch_compile "$COMPARE_TORCH_COMPILE")"
 COMPARE_PRESENTATION_TORCH_COMPILE="$(normalize_compare_torch_compile "$COMPARE_PRESENTATION_TORCH_COMPILE")"
 COMPARE_MATMUL_PRECISION="$(normalize_compare_matmul_precision "$COMPARE_MATMUL_PRECISION")"
@@ -2133,6 +2272,21 @@ case "$DEPLOY_MODE" in
     none|dry-run|draft|publish) ;;
     *) die "--deploy-mode must be one of: none, dry-run, draft, publish" ;;
 esac
+if [ "$SYNC_REMOTE_OUTPUT" != "1" ] && [ "$SKIP_TRAIN" != "1" ]; then
+    case "$BACKEND" in
+        local)
+            die "--no-sync-remote-output requires a remote backend"
+            ;;
+        ssh|brev-existing|brev-provision)
+            [ "$SKIP_EVAL" = "1" ] || die \
+                "--no-sync-remote-output requires --skip-eval because the trained models will not exist locally"
+            [ "$SKIP_PLOTS" = "1" ] || die \
+                "--no-sync-remote-output requires --skip-plots because the evaluation artifacts will not exist locally"
+            [ "$DEPLOY_MODE" = "none" ] || die \
+                "--no-sync-remote-output requires --deploy-mode none because deployment reads local artifacts"
+            ;;
+    esac
+fi
 if [ "$ALLOW_DIRTY_REPO" = "1" ]; then
     case "$DEPLOY_MODE" in
         draft|publish)
@@ -2169,19 +2323,39 @@ case "$BREV_ON_FINISH" in
     *) die "--brev-on-finish must be one of: leave, stop, delete" ;;
 esac
 if [ -z "$BREV_STOP_FAILURE_ACTION" ]; then
-    case "$BACKEND" in
-        brev-provision)
-            BREV_STOP_FAILURE_ACTION=delete
-            ;;
-        *)
-            BREV_STOP_FAILURE_ACTION=warn
-            ;;
-    esac
+    if [ "$SYNC_REMOTE_OUTPUT" != "1" ]; then
+        # A failed stop must never fall through to deletion while the only
+        # artifact copy still lives on the remote disk.
+        BREV_STOP_FAILURE_ACTION=warn
+    else
+        case "$BACKEND" in
+            brev-provision)
+                BREV_STOP_FAILURE_ACTION=delete
+                ;;
+            *)
+                BREV_STOP_FAILURE_ACTION=warn
+                ;;
+        esac
+    fi
 fi
 case "$BREV_STOP_FAILURE_ACTION" in
     warn|delete) ;;
     *) die "--brev-stop-failure-action must be one of: warn, delete" ;;
 esac
+if [ "$SYNC_REMOTE_OUTPUT" != "1" ]; then
+    case "$BACKEND" in
+        brev-existing|brev-provision)
+            [ "$BREV_ON_FINISH" != "delete" ] || die \
+                "--no-sync-remote-output cannot be combined with --brev-on-finish delete because that would destroy the only artifact copy"
+            if [ "$BREV_STOP_FAILURE_ACTION" = "delete" ]; then
+                if [ "$BREV_STOP_FAILURE_ACTION_EXPLICIT" = "1" ]; then
+                    die "--no-sync-remote-output cannot be combined with --brev-stop-failure-action delete because that could destroy the only artifact copy"
+                fi
+                BREV_STOP_FAILURE_ACTION=warn
+            fi
+            ;;
+    esac
+fi
 case "$BREV_SYNC_MODE" in
     release|full) ;;
     *) die "--brev-sync-mode must be one of: release, full" ;;
@@ -2313,26 +2487,26 @@ if [ "$SKIP_TRAIN" != "1" ]; then
             verify_ssh_remote_checkout
             REMOTE_REPO_QUOTED="$(shell_quote "$REMOTE_REPO")"
             REMOTE_COMMAND="cd $REMOTE_REPO_QUOTED"
-            REMOTE_COMMAND="$REMOTE_COMMAND && MHCFLURRY_OUT='$REMOTE_RUN_DIR'"
-            REMOTE_COMMAND="$REMOTE_COMMAND REPO='$REMOTE_REPO'"
-            REMOTE_COMMAND="$REMOTE_COMMAND MHCFLURRY_RELEASE_WORKFLOW_ID='$WORKFLOW_RUN_ID'"
+            REMOTE_COMMAND="$REMOTE_COMMAND && MHCFLURRY_OUT=$(shell_quote "$REMOTE_RUN_DIR")"
+            REMOTE_COMMAND="$REMOTE_COMMAND REPO=$(shell_quote "$REMOTE_REPO")"
+            REMOTE_COMMAND="$REMOTE_COMMAND MHCFLURRY_RELEASE_WORKFLOW_ID=$(shell_quote "$WORKFLOW_RUN_ID")"
             REMOTE_COMMAND="$REMOTE_COMMAND MHCFLURRY_RELEASE_GIT_COMMIT=\$(git -C $REMOTE_REPO_QUOTED rev-parse HEAD)"
-            REMOTE_COMMAND="$REMOTE_COMMAND TRAINING_MINIBATCH_SIZE='$TRAINING_MINIBATCH_SIZE'"
-            REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_MINIBATCH_SIZE='$AFFINITY_MINIBATCH_SIZE'"
-            REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_MAX_WORKERS_PER_GPU='$AFFINITY_MAX_WORKERS_PER_GPU'"
-            REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_MINIBATCH_SIZE='$PROCESSING_MINIBATCH_SIZE'"
-            REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_NUM_JOBS='$PROCESSING_NUM_JOBS'"
-            REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_MAX_WORKERS_PER_GPU='$PROCESSING_MAX_WORKERS_PER_GPU'"
-            REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_HELD_OUT_SAMPLES='$PROCESSING_HELD_OUT_SAMPLES'"
-            REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_VARIANTS='$PROCESSING_VARIANTS'"
-            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_PROCESSING_WITH_FLANKS_KIND='$PRESENTATION_PROCESSING_WITH_FLANKS_KIND'"
-            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_DECOYS_PER_HIT='$PRESENTATION_DECOYS_PER_HIT'"
-            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_FEATURE_CHUNK_SIZE='$PRESENTATION_FEATURE_CHUNK_SIZE'"
-            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_NUM_JOBS='$PRESENTATION_NUM_JOBS'"
-            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_MAX_WORKERS_PER_GPU='$PRESENTATION_MAX_WORKERS_PER_GPU'"
-            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_CALIBRATION_NUM_JOBS='$PRESENTATION_CALIBRATION_NUM_JOBS'"
-            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU='$PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU'"
-            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE='$PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE'"
+            REMOTE_COMMAND="$REMOTE_COMMAND TRAINING_MINIBATCH_SIZE=$(shell_quote "$TRAINING_MINIBATCH_SIZE")"
+            REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_MINIBATCH_SIZE=$(shell_quote "$AFFINITY_MINIBATCH_SIZE")"
+            REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_MAX_WORKERS_PER_GPU=$(shell_quote "$AFFINITY_MAX_WORKERS_PER_GPU")"
+            REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_MINIBATCH_SIZE=$(shell_quote "$PROCESSING_MINIBATCH_SIZE")"
+            REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_NUM_JOBS=$(shell_quote "$PROCESSING_NUM_JOBS")"
+            REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_MAX_WORKERS_PER_GPU=$(shell_quote "$PROCESSING_MAX_WORKERS_PER_GPU")"
+            REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_HELD_OUT_SAMPLES=$(shell_quote "$PROCESSING_HELD_OUT_SAMPLES")"
+            REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_VARIANTS=$(shell_quote "$PROCESSING_VARIANTS")"
+            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$(shell_quote "$PRESENTATION_PROCESSING_WITH_FLANKS_KIND")"
+            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_DECOYS_PER_HIT=$(shell_quote "$PRESENTATION_DECOYS_PER_HIT")"
+            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_FEATURE_CHUNK_SIZE=$(shell_quote "$PRESENTATION_FEATURE_CHUNK_SIZE")"
+            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_NUM_JOBS=$(shell_quote "$PRESENTATION_NUM_JOBS")"
+            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_MAX_WORKERS_PER_GPU=$(shell_quote "$PRESENTATION_MAX_WORKERS_PER_GPU")"
+            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_CALIBRATION_NUM_JOBS=$(shell_quote "$PRESENTATION_CALIBRATION_NUM_JOBS")"
+            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU=$(shell_quote "$PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU")"
+            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE=$(shell_quote "$PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE")"
             REMOTE_COMMAND="$REMOTE_COMMAND bash"
             REMOTE_COMMAND="$REMOTE_COMMAND scripts/training/pan_allele_release_full.sh"
             run_logged_step train_ssh ssh "$REMOTE" \
@@ -2360,7 +2534,13 @@ else
 fi
 
 if [ "$SKIP_TRAIN" != "1" ]; then
-    validate_release_provenance model_provenance 1
+    if [ "$BACKEND" = "ssh" ] && [ "$SYNC_REMOTE_OUTPUT" != "1" ]; then
+        validate_ssh_remote_release_provenance
+    elif [ "$BACKEND" != "local" ] && [ "$SYNC_REMOTE_OUTPUT" != "1" ]; then
+        note "Using model provenance validation completed by the remote Brev launcher."
+    else
+        validate_release_provenance model_provenance 1
+    fi
 fi
 
 if [ "$SKIP_EVAL" != "1" ]; then
@@ -2461,13 +2641,20 @@ else
 fi
 
 if [ "$DEPLOY_MODE" != "none" ]; then
-    run_logged_step deploy_trained_models \
-        "$SCRIPT_DIR/deploy_trained_models.sh" \
-        --run-dir "$RUN_DIR" \
-        --release "$RELEASE" \
-        --github-release "$GITHUB_RELEASE" \
-        --processing-variants "$PROCESSING_VARIANTS" \
+    deploy_args=(
+        "$SCRIPT_DIR/deploy_trained_models.sh"
+        --run-dir "$RUN_DIR"
+        --release "$RELEASE"
+        --github-release "$GITHUB_RELEASE"
+        --processing-variants "$PROCESSING_VARIANTS"
+        --repo "$REPO"
         --mode "$DEPLOY_MODE"
+    )
+    if [ "$ALLOW_DIRTY_REPO" = "1" ]; then
+        deploy_args+=(--allow-dirty-repo)
+    fi
+    run_logged_step deploy_trained_models \
+        "${deploy_args[@]}"
 else
     note "Skipping deploy step. Pass --deploy-mode dry-run, draft, or publish to opt in."
 fi

@@ -17,6 +17,8 @@ from copy import deepcopy
 
 import yaml
 
+from ..common import positive_int_arg
+
 
 DEFAULT_MINIBATCH_SIZE = 1024
 PROCESSING_VARIANT_CHOICES = (
@@ -185,6 +187,13 @@ def build_processing_base_grid(minibatch_size=DEFAULT_MINIBATCH_SIZE):
 
 def transform_processing_hyperparameters(kind, hyperparameters):
     """Return one processing flank variant for a hyperparameter dict."""
+    if kind not in PROCESSING_VARIANT_CHOICES:
+        raise ValueError(
+            "Unknown processing variant %r; expected one of: %s" % (
+                kind,
+                ", ".join(PROCESSING_VARIANT_CHOICES),
+            )
+        )
     new_hyperparameters = deepcopy(hyperparameters)
     if kind in ("no_n_flank", "no_flank"):
         new_hyperparameters["n_flank_length"] = 0
@@ -226,7 +235,7 @@ def add_minibatch_argument(parser):
     """Add the common training-minibatch-size argument to ``parser``."""
     parser.add_argument(
         "--minibatch-size",
-        type=int,
+        type=positive_int_arg,
         default=DEFAULT_MINIBATCH_SIZE,
         help=(
             "Training minibatch size to write into every architecture. "

@@ -46,11 +46,12 @@ from ..common import (
     configure_logging,
     derive_seed,
     install_sigusr1_stack_trace_handler,
+    positive_int_arg,
     write_generate_sh,
 )
 from ..parallelism import (
     add_local_parallelism_args,
-    attach_constant_data_to_work_items_if_needed,
+    refine_local_parallelism_from_worker_context,
     resolve_local_parallelism_args,
     run_single_worker_torch_compile_warmup,
     worker_pool_with_gpu_assignments_from_args,
@@ -117,26 +118,26 @@ parser.add_argument(
     help="JSON or YAML of hyperparameters")
 parser.add_argument(
     "--held-out-samples",
-    type=int,
+    type=positive_int_arg,
     metavar="N",
     default=10,
     help="Number of experiments to hold out per fold")
 parser.add_argument(
     "--num-folds",
-    type=int,
+    type=positive_int_arg,
     default=4,
     metavar="N",
     help="Number of training folds.")
 parser.add_argument(
     "--num-replicates",
-    type=int,
+    type=positive_int_arg,
     metavar="N",
     default=1,
     help="Number of replicates per (architecture, fold) pair to train.")
 add_random_seed_arg(parser)
 parser.add_argument(
     "--max-epochs",
-    type=int,
+    type=positive_int_arg,
     metavar="N",
     help="Max training epochs. If specified here it overrides any 'max_epochs' "
     "specified in the hyperparameters.")
@@ -260,7 +261,8 @@ def main(args):
 def processing_work_item_count(args):
     """Best-effort number of model fits in this command."""
     try:
-        hyperparameters_lst = yaml.safe_load(open(args.hyperparameters))
+        with open(args.hyperparameters) as fd:
+            hyperparameters_lst = yaml.safe_load(fd)
         return (
             len(hyperparameters_lst)
             * int(args.num_folds)
@@ -481,7 +483,11 @@ def train_models(args):
         WORKER_CONTEXT.update(pickle.load(fd))
     print("Loaded training init info.")
 
-    all_work_items = WORKER_CONTEXT["work_items"]
+    # Work items are dispatched separately. Do not copy the complete queue
+    # into every spawn worker as part of its read-only training context.
+    all_work_items = WORKER_CONTEXT.pop("work_items")
+    if not args.cluster_parallelism:
+        refine_local_parallelism_from_worker_context(args, WORKER_CONTEXT)
     complete_work_item_names = [
         network.fit_info[-1]["training_info"]["work_item_name"]
         for network in predictor.models
@@ -513,7 +519,10 @@ def train_models(args):
     start = time.time()
 
     worker_pool = None
-    if serial_run:
+    if not work_items:
+        print("No incomplete work items; skipping warmup and worker startup.")
+        results_generator = None
+    elif serial_run:
         # Run in serial. Every worker is passed the same predictor,
         # which it adds models to, so no merging is required. It also saves
         # as it goes so no saving is required at the end.
@@ -541,7 +550,11 @@ def train_models(args):
             constant_data=WORKER_CONTEXT,
         )
 
-        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+        worker_pool = worker_pool_with_gpu_assignments_from_args(
+            args,
+            worker_context_module=__name__,
+            worker_context_data=WORKER_CONTEXT,
+        )
         print("Worker pool", worker_pool)
         assert worker_pool is not None
 
@@ -552,13 +565,6 @@ def train_models(args):
 
     try:
         if worker_pool is not None:
-            # Attach constant data and launch the work inside the try so a
-            # failure here (e.g. copying large constant data to workers) still
-            # tears the pool down via the finally rather than leaking
-            # non-daemon workers.
-            attach_constant_data_to_work_items_if_needed(
-                work_items, WORKER_CONTEXT, worker_pool
-            )
             results_generator = worker_pool.imap_unordered(
                 partial(call_wrapped_kwargs, train_model),
                 work_items,

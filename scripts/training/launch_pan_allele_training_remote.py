@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 try:
@@ -223,6 +224,9 @@ def remote_training_env(environ=os.environ):
         "MHCFLURRY_RELEASE_GIT_COMMIT": environ.get(
             "MHCFLURRY_RELEASE_GIT_COMMIT", ""
         ),
+        "MHCFLURRY_RELEASE_VERSION": environ.get(
+            "MHCFLURRY_RELEASE_VERSION", ""
+        ),
         "MATMUL_PRECISION": environ.get("MATMUL_PRECISION", "high"),
         "MATMUL_PRECISION_CLI": environ.get("MATMUL_PRECISION_CLI", "high"),
         "NUM_JOBS": environ.get("NUM_JOBS", "auto"),
@@ -382,6 +386,7 @@ def train_release_full():
             cwd=repo,
             env=env,
         )
+        validate_remote_release_artifacts(repo, out, env)
         if env_bool(env, "RUN_RELEASE_EVAL", default=False):
             run_release_evaluation(repo, out, env)
         if env_bool(env, "RUN_RELEASE_PLOTS", default=False):
@@ -397,6 +402,46 @@ def train_release_full():
     else:
         if exit_path is not None:
             exit_path.write_text("0")
+
+
+def validate_remote_release_artifacts(repo, out, env):
+    """Validate remote outputs before runplz reports training success."""
+    release = env.get("MHCFLURRY_RELEASE_VERSION", "").strip()
+    commit = env.get("MHCFLURRY_RELEASE_GIT_COMMIT", "").strip()
+    workflow_id = env.get("MHCFLURRY_RELEASE_WORKFLOW_ID", "").strip()
+    missing = [
+        name for name, value in (
+            ("MHCFLURRY_RELEASE_VERSION", release),
+            ("MHCFLURRY_RELEASE_GIT_COMMIT", commit),
+            ("MHCFLURRY_RELEASE_WORKFLOW_ID", workflow_id),
+        ) if not value
+    ]
+    if missing:
+        raise ValueError(
+            "Remote release validation requires: %s" % ", ".join(missing)
+        )
+    subprocess.run(
+        [
+            sys.executable,
+            str(repo / "scripts" / "release" /
+                "validate_release_provenance.py"),
+            "--artifact-only",
+            "--run-dir", str(out),
+            "--release", release,
+            "--workflow-id", workflow_id,
+            "--processing-variants", env.get(
+                "PROCESSING_VARIANTS",
+                "with_flanks no_flank short_flanks",
+            ),
+            "--require-artifacts",
+            "--expected-artifact-git-commit", commit,
+            "--expected-artifact-workflow-id", workflow_id,
+            "--out", str(out / "release_provenance.json"),
+        ],
+        check=True,
+        cwd=repo,
+        env=env,
+    )
 
 
 def run_release_evaluation(repo, out, env):

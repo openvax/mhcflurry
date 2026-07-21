@@ -37,6 +37,7 @@ from mhcflurry.cli import eval_command
 from mhcflurry.cli import paper_figures
 from mhcflurry.cli import plot_model_comparison
 from mhcflurry.cli import train_command
+from mhcflurry.version import __version__
 
 
 def test_top_level_parser_lists_subcommands():
@@ -47,6 +48,69 @@ def test_top_level_parser_lists_subcommands():
     assert "compare-models" in help_text
     assert "plot-model-comparison" in help_text
     assert "paper-figures" in help_text
+
+
+def test_allele_specific_training_count_threshold_is_inclusive():
+    from mhcflurry.cli import train_allele_specific_models_command as command
+
+    counts = pandas.Series({"HLA-A*02:01": 50, "HLA-B*07:02": 49})
+    assert command._alleles_with_minimum_measurements(counts, 50) == [
+        "HLA-A*02:01"
+    ]
+
+    required = [
+        "--data", "train.csv",
+        "--out-models-dir", "models",
+        "--hyperparameters", "hyperparameters.yaml",
+    ]
+    for option, value in (
+            ("--min-measurements-per-allele", "0"),
+            ("--held-out-fraction-reciprocal", "1"),
+            ("--n-models", "0"),
+            ("--save-interval", "nan")):
+        with pytest.raises(SystemExit):
+            command.parser.parse_args(required + [option, value])
+
+
+def test_training_and_selection_commands_reject_invalid_sizes_early():
+    from mhcflurry.cli import calibrate_percentile_ranks_command as calibrate
+    from mhcflurry.cli import select_allele_specific_models_command as select_allele
+    from mhcflurry.cli import select_pan_allele_models_command as select_pan
+    from mhcflurry.cli import select_processing_models_command as select_processing
+    from mhcflurry.cli import train_pan_allele_models_command as train_pan
+
+    with pytest.raises(SystemExit):
+        calibrate.parser.parse_args([
+            "--models-dir", "models",
+            "--num-peptides-per-length", "0",
+        ])
+    with pytest.raises(SystemExit):
+        calibrate.run([
+            "--models-dir", "models",
+            "--length-range", "15", "8",
+        ])
+
+    train_base = ["--out-models-dir", "models"]
+    with pytest.raises(SystemExit):
+        train_pan.parser.parse_args(train_base + ["--num-folds", "0"])
+    for values in (("nan", "100"), ("1.1", "100"), ("0.25", "1.5")):
+        with pytest.raises(SystemExit):
+            train_pan.run(train_base + [
+                "--held-out-measurements-per-allele-fraction-and-max",
+                *values,
+            ])
+
+    selection_commands = (
+        (select_pan, "--min-models-per-fold", "--max-models-per-fold"),
+        (select_processing, "--min-models-per-fold", "--max-models-per-fold"),
+        (select_allele, "--combined-min-models", "--combined-max-models"),
+    )
+    for command, minimum_option, maximum_option in selection_commands:
+        base = ["--models-dir", "models", "--out-models-dir", "selected"]
+        with pytest.raises(SystemExit):
+            command.parser.parse_args(base + [minimum_option, "0"])
+        with pytest.raises(SystemExit):
+            command.run(base + [minimum_option, "3", maximum_option, "2"])
 
 
 def test_train_help_runs(capsys):
@@ -108,13 +172,22 @@ def test_release_workflow_deploy_is_opt_in_by_default(tmp_path):
 
 
 def _write_minimal_deployable_run(run_dir):
-    for relative in (
+    model_directories = (
             "affinity/models.combined",
             "processing/models.selected.no_flank",
             "processing/models.selected.with_flanks",
             "processing/models.selected.short_flanks",
-            "presentation/models"):
+            "presentation/models")
+    for relative in model_directories:
         (run_dir / relative).mkdir(parents=True, exist_ok=True)
+    source_commit = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], text=True).strip()
+    info = (
+        "package\tmhcflurry %s\n"
+        "git commit\t%s\n" % (__version__, source_commit)
+    )
+    for relative in model_directories:
+        (run_dir / relative / "info.txt").write_text(info)
     (run_dir / "affinity/models.combined/manifest.csv").write_text(
         "model_name\nmodel\n")
     (run_dir / "affinity/models.combined/percent_ranks.csv").write_text(
@@ -138,6 +211,8 @@ def test_deploy_packages_only_requested_processing_variants(tmp_path):
         "--run-dir", str(run_dir),
         "--release", "2.3.0",
         "--github-release", "2.3.0",
+        "--repo", ".",
+        "--allow-dirty-repo",
         "--dry-run",
     ]
 
@@ -166,6 +241,32 @@ def test_deploy_packages_only_requested_processing_variants(tmp_path):
         if "models_class1_processing" in line and "tar " in line
     )
     assert "models.selected.short_flanks" in all_tar
+
+
+def test_deploy_rejects_artifacts_from_a_different_commit(tmp_path):
+    run_dir = tmp_path / "release-run"
+    _write_minimal_deployable_run(run_dir)
+    (run_dir / "affinity/models.combined/info.txt").write_text(
+        "package\tmhcflurry 2.3.0rc14\n"
+        "git commit\tdeadbeef\n"
+    )
+
+    result = subprocess.run(
+        [
+            "bash", "scripts/release/deploy_trained_models.sh",
+            "--run-dir", str(run_dir),
+            "--release", "2.3.0",
+            "--repo", ".",
+            "--allow-dirty-repo",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "artifact git commit 'deadbeef'" in result.stdout + result.stderr
+    assert "tar -C" not in result.stdout + result.stderr
 
 
 def test_release_workflow_forwards_processing_variants_to_deploy(tmp_path):
@@ -215,6 +316,117 @@ def test_release_workflow_rejects_processing_mode_not_trained(tmp_path):
     output = result.stdout + result.stderr
     assert result.returncode != 0
     assert "--processing-modes requests 'short_flanks'" in output
+    assert "pan_allele_release_full.sh" not in output
+
+
+def test_release_workflow_rejects_undeployable_processing_subset_before_train(
+        tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "local",
+            "--processing-variants", "no_flank short_flanks",
+            "--presentation-processing-with-flanks-kind", "short_flanks",
+            "--deploy-mode", "dry-run",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert result.returncode == 2
+    assert "requires the canonical with_flanks processing artifact" in output
+    assert "pan_allele_release_full.sh" not in output
+
+
+@pytest.mark.parametrize(
+    ("extra_args", "expected_error"),
+    [
+        (
+            ["--processing-variants", "with_flanks no_flank no_flank"],
+            "Duplicate --processing-variants entry: no_flank",
+        ),
+        (
+            ["--processing-modes", "with_flanks,with_flanks"],
+            "Duplicate --processing-modes entry: with_flanks",
+        ),
+        (
+            ["--processing-variants", "with_flanks short_flanks"],
+            "must include no_flank for presentation training",
+        ),
+        (
+            [
+                "--processing-variants", "with_flanks no_flank",
+                "--presentation-processing-with-flanks-kind", "no_flank",
+            ],
+            "must be with_flanks or short_flanks",
+        ),
+    ],
+)
+def test_release_workflow_rejects_invalid_processing_configuration_before_train(
+        tmp_path, extra_args, expected_error):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "local",
+            "--dry-run",
+        ] + extra_args,
+        capture_output=True,
+        text=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert result.returncode == 2
+    assert expected_error in output
+    assert "pan_allele_release_full.sh" not in output
+
+
+@pytest.mark.parametrize(
+    ("extra_args", "expected_error"),
+    [
+        (
+            ["--processing-minibatch-size", "0"],
+            "--processing-minibatch-size must be a positive integer",
+        ),
+        (
+            ["--processing-held-out-samples", "-1"],
+            "--processing-held-out-samples must be a positive integer",
+        ),
+        (
+            ["--presentation-decoys-per-hit", "nan"],
+            "--presentation-decoys-per-hit must be a finite positive number",
+        ),
+        (
+            ["--presentation-feature-chunk-size", "0"],
+            "--presentation-feature-chunk-size must be a positive integer",
+        ),
+    ],
+)
+def test_release_workflow_rejects_invalid_training_sizes_before_train(
+        tmp_path, extra_args, expected_error):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "local",
+            "--dry-run",
+        ] + extra_args,
+        capture_output=True,
+        text=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert result.returncode == 2
+    assert expected_error in output
     assert "pan_allele_release_full.sh" not in output
 
 
@@ -441,6 +653,143 @@ def test_release_workflow_ssh_rejects_unverified_source(
     commands = ssh_log.read_text()
     assert commands.count("bash -c") == 1
     assert "pan_allele_release_full.sh" not in commands
+
+
+def test_release_workflow_ssh_no_sync_validates_models_remotely(tmp_path):
+    source_repo = tmp_path / "source-repo"
+    (source_repo / "mhcflurry").mkdir(parents=True)
+    (source_repo / "mhcflurry" / "version.py").write_text(
+        '__version__ = "2.3.0rc14"\n')
+    subprocess.run(["git", "init", str(source_repo)], check=True)
+    subprocess.run(
+        ["git", "-C", str(source_repo), "add", "mhcflurry/version.py"],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git", "-C", str(source_repo),
+            "-c", "user.name=Test",
+            "-c", "user.email=test@example.com",
+            "commit", "-m", "test source",
+        ],
+        capture_output=True,
+        check=True,
+    )
+    ssh_log = tmp_path / "ssh.log"
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    ssh = fake_bin / "ssh"
+    ssh.write_text(
+        "#!/bin/sh\n"
+        "printf '%s\\n' \"$2\" >> \"$SSH_LOG\"\n"
+        "case \"$2\" in\n"
+        "  *ssh_source_provenance*) exit 2 ;;\n"
+        "  *'actual_commit=$(git -C'*)\n"
+        "    printf '%s\\n' 'Verified remote source provenance' ;;\n"
+        "esac\n"
+    )
+    ssh.chmod(0o755)
+    env = dict(os.environ)
+    env.update({
+        "PATH": "%s:%s" % (fake_bin, env["PATH"]),
+        "REPO": str(source_repo),
+        "SSH_LOG": str(ssh_log),
+    })
+
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "ssh",
+            "--remote", "training-host",
+            "--remote-repo", "/remote/mhcflurry",
+            "--remote-run-dir", "/remote/run",
+            "--no-sync-remote-output",
+            "--skip-eval",
+            "--skip-plots",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=True,
+    )
+
+    commands = ssh_log.read_text()
+    assert "pan_allele_release_full.sh" in commands
+    assert "validate_release_provenance.py" in commands
+    assert "--run-dir' '/remote/run" in commands
+    local_provenance = json.loads(
+        (tmp_path / "release-run" / "release_provenance.json").read_text())
+    assert local_provenance["artifacts"] == {}
+    assert "step=model_provenance " not in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    ("extra_args", "expected_error"),
+    [
+        ([], "requires --skip-eval"),
+        (["--skip-eval"], "requires --skip-plots"),
+        (
+            ["--skip-eval", "--skip-plots", "--deploy-mode", "dry-run"],
+            "requires --deploy-mode none",
+        ),
+    ],
+)
+def test_release_workflow_no_sync_rejects_local_stages_before_training(
+        tmp_path, extra_args, expected_error):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "ssh",
+            "--no-sync-remote-output",
+        ] + extra_args,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    assert expected_error in result.stdout + result.stderr
+    assert "pan_allele_release_full.sh" not in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    ("cleanup_args", "expected_error"),
+    [
+        (
+            ["--brev-on-finish", "delete"],
+            "cannot be combined with --brev-on-finish delete",
+        ),
+        (
+            ["--brev-stop-failure-action", "delete"],
+            "cannot be combined with --brev-stop-failure-action delete",
+        ),
+    ],
+)
+def test_release_workflow_no_sync_preserves_only_brev_artifact_copy(
+        tmp_path, cleanup_args, expected_error):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "brev-provision",
+            "--brev-instance", "test-no-sync",
+            "--no-sync-remote-output",
+            "--skip-eval",
+            "--skip-plots",
+        ] + cleanup_args,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    assert expected_error in result.stdout + result.stderr
 
 
 def test_release_workflow_forwards_processing_parallelism(tmp_path):
@@ -899,6 +1248,82 @@ pandas.DataFrame([
         "HLA-A*02:01", "HLA-B*07:02"]
 
 
+@pytest.mark.parametrize("invalid", ["HLA-A2", "NONSENSE"])
+def test_external_predictors_reject_unnormalized_alleles(invalid):
+    with pytest.raises(ValueError, match="Invalid, ambiguous, or unsupported"):
+        eval_command._split_benchmark_alleles(
+            "HLA-A*02:01 %s" % invalid)
+
+
+@pytest.mark.parametrize("invalid", ["", "   "])
+def test_external_predictors_reject_empty_genotypes(invalid):
+    with pytest.raises(ValueError, match="contains no class-I alleles"):
+        eval_command._split_benchmark_alleles(invalid)
+
+
+@pytest.mark.parametrize(
+    "predictor_specs",
+    [
+        ["one:score_a:score", "two:score_a:score"],
+        ["one:score_a:score", "two:score_a_best_allele:score"],
+        ["one:peptide:score"],
+        ["one:hit:score"],
+    ],
+)
+def test_external_predictors_rejects_output_column_collisions(
+        tmp_path, predictor_specs):
+    benchmark = tmp_path / "benchmark.csv"
+    pandas.DataFrame([{
+        "peptide": "SIINFEKL",
+        "hla": "HLA-A*02:01",
+        "hit": 1,
+    }]).to_csv(benchmark, index=False)
+    argv = [
+        "--input", str(benchmark),
+        "--out", str(tmp_path / "out.csv"),
+    ]
+    for spec in predictor_specs:
+        argv.extend(["--predictor", spec])
+    args = eval_command._make_external_predictors_parser(
+        "external-predictors").parse_args(argv)
+
+    with pytest.raises(ValueError, match="output column"):
+        eval_command._run_external_predictors(args)
+
+
+def test_external_predictor_raw_filenames_do_not_use_output_column(
+        tmp_path, monkeypatch):
+    benchmark = tmp_path / "benchmark.csv"
+    pandas.DataFrame([{
+        "peptide": "SIINFEKL",
+        "hla": "HLA-A*02:01",
+        "hit": 1,
+    }]).to_csv(benchmark, index=False)
+    raw_dir = tmp_path / "raw"
+    captured = []
+
+    def fake_runner(_command, _predictor, _alleles, peptides, out_csv):
+        captured.append(pathlib.Path(out_csv))
+        pandas.DataFrame([{
+            "peptide": peptides[0],
+            "allele": "HLA-A*02:01",
+            "score": 0.5,
+        }]).to_csv(out_csv, index=False)
+
+    monkeypatch.setattr(eval_command, "_run_mhctools_for_group", fake_runner)
+    args = eval_command._make_external_predictors_parser(
+        "external-predictors").parse_args([
+            "--input", str(benchmark),
+            "--out", str(tmp_path / "out.csv"),
+            "--keep-raw-dir", str(raw_dir),
+            "--predictor", "fake:../../unsafe-name:score",
+        ])
+
+    assert eval_command._run_external_predictors(args) == 0
+    assert captured == [raw_dir / "predictor.0000.group.0000.csv"]
+    assert not (tmp_path / "unsafe-name.0000.csv").exists()
+
+
 def test_eval_paper_figures_run_dispatches_pipeline(tmp_path, monkeypatch):
     calls = []
 
@@ -1041,6 +1466,45 @@ def test_eval_paper_figures_run_rejects_output_collisions_before_work(
 
     assert calls == []
     assert rendered.read_bytes() == b"existing output"
+
+
+@pytest.mark.parametrize(
+    ("option", "relative"),
+    [
+        ("--scores-dir", "plots/saved-scores"),
+        ("--multiallelic-predictions", "affinity/saved-predictions.csv"),
+        ("--monoallelic-predictions", "worker_logs/saved-predictions.csv"),
+    ],
+)
+def test_eval_paper_figures_run_preserves_inputs_during_compare_reset(
+        tmp_path, monkeypatch, option, relative):
+    calls = []
+    out = tmp_path / "eval"
+    source = out / relative
+    if source.suffix:
+        source.parent.mkdir(parents=True)
+        source.write_text("saved input")
+    else:
+        source.mkdir(parents=True)
+        (source / "saved.csv").write_text("saved input")
+
+    monkeypatch.setattr(
+        compare_models, "run", lambda args: calls.append("compare"))
+    monkeypatch.setattr(
+        paper_figures, "run", lambda args: calls.append("paper"))
+    monkeypatch.setattr(
+        plot_model_comparison, "run", lambda args: calls.append("plot"))
+
+    with pytest.raises(SystemExit, match="would be deleted"):
+        eval_command.run_argv([
+            "paper-figures", "run",
+            "--a", "new-run",
+            "--out", str(out),
+            option, str(source),
+        ])
+
+    assert calls == []
+    assert source.exists()
 
 
 def test_compare_models_help_runs(capsys):
@@ -1244,6 +1708,18 @@ def test_training_hyperparameter_cli_generates_processing_variant(tmp_path, caps
     assert {item["c_flank_length"] for item in variant} == {5}
 
 
+def test_training_hyperparameter_helpers_reject_invalid_configuration():
+    from mhcflurry.cli import generate_training_hyperparameters as generator
+
+    with pytest.raises(ValueError, match="Unknown processing variant"):
+        generator.transform_processing_hyperparameters(
+            "typo", {"n_flank_length": 15, "c_flank_length": 15})
+    with pytest.raises(SystemExit):
+        generator.make_parser().parse_args([
+            "affinity", "--minibatch-size", "0",
+        ])
+
+
 def test_reassign_mass_spec_training_data_cli(tmp_path):
     input_path = tmp_path / "train.csv"
     output_path = tmp_path / "out.csv"
@@ -1316,6 +1792,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert env["COMPARE_MATMUL_PRECISION"] == "high"
     assert env["MHCFLURRY_RELEASE_WORKFLOW_ID"] == ""
     assert env["MHCFLURRY_RELEASE_GIT_COMMIT"] == ""
+    assert env["MHCFLURRY_RELEASE_VERSION"] == ""
     assert env["MHCFLURRY_GPU_TELEMETRY"] == "1"
     assert env["MHCFLURRY_GPU_TELEMETRY_SECONDS"] == "30"
     assert env["NUM_JOBS"] == "auto"
@@ -1361,6 +1838,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
         "COMPARE_MATMUL_PRECISION": "medium",
         "MHCFLURRY_RELEASE_WORKFLOW_ID": "run-123",
         "MHCFLURRY_RELEASE_GIT_COMMIT": "abc123",
+        "MHCFLURRY_RELEASE_VERSION": "2.3.0",
         "MHCFLURRY_GPU_TELEMETRY": "0",
         "MHCFLURRY_GPU_TELEMETRY_SECONDS": "5",
         "NUM_JOBS": "6",
@@ -1387,6 +1865,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert env["COMPARE_MATMUL_PRECISION"] == "medium"
     assert env["MHCFLURRY_RELEASE_WORKFLOW_ID"] == "run-123"
     assert env["MHCFLURRY_RELEASE_GIT_COMMIT"] == "abc123"
+    assert env["MHCFLURRY_RELEASE_VERSION"] == "2.3.0"
     assert env["MHCFLURRY_GPU_TELEMETRY"] == "0"
     assert env["MHCFLURRY_GPU_TELEMETRY_SECONDS"] == "5"
     assert env["NUM_JOBS"] == "6"
@@ -1746,7 +2225,7 @@ def test_resolve_components_auto_includes_processing():
     assert compare_models._resolve_components("auto", side, side) == ["processing"]
 
 
-def test_resolve_components_explicit_drops_unavailable(capsys):
+def test_resolve_components_explicit_rejects_unavailable():
     side_a = {
         "label": "a", "letter": "a", "spec": "a",
         "paths": {"training": "/tmp/x", "affinity": None,
@@ -1757,11 +2236,9 @@ def test_resolve_components_explicit_drops_unavailable(capsys):
         "paths": {"training": "/tmp/y", "affinity": None,
                   "presentation": None, "processing": None},
     }
-    # affinity requested but unavailable -> dropped with warning.
-    components = compare_models._resolve_components(
-        "affinity,training_stats", side_a, side_b)
-    assert "training_stats" in components
-    assert "affinity" not in components
+    with pytest.raises(SystemExit, match="affinity"):
+        compare_models._resolve_components(
+            "affinity,training_stats", side_a, side_b)
 
 
 def test_resolve_components_bad_name_raises():
@@ -1770,6 +2247,17 @@ def test_resolve_components_bad_name_raises():
                       ("training", "affinity", "processing", "presentation")}}
     with pytest.raises(SystemExit):
         compare_models._resolve_components("nope", side, side)
+
+
+@pytest.mark.parametrize("include", ["affinity,affinity", "affinity,"])
+def test_resolve_components_rejects_duplicate_or_empty_entries(include):
+    side = {
+        "label": "a", "letter": "a", "spec": "a",
+        "paths": {"training": None, "affinity": "/tmp/affinity",
+                  "processing": None, "presentation": None},
+    }
+    with pytest.raises(SystemExit):
+        compare_models._resolve_components(include, side, side)
 
 
 # ---------------------------------------------------------------------------
@@ -1799,6 +2287,75 @@ def test_metrics_ignores_nans_in_scores():
     s = [0.9, np.nan, 0.1, np.nan]
     m = compare_models._metrics(y, s)
     assert m["n"] == 2
+
+
+@pytest.mark.parametrize(
+    "hits",
+    [[], [1, 1], [0, 0]],
+)
+def test_comparison_requires_positive_and_negative_rows(hits):
+    with pytest.raises(ValueError, match="no valid binary comparison set"):
+        compare_models._require_binary_comparison_rows(
+            pandas.DataFrame({"hit": hits}), "test comparison")
+
+
+@pytest.mark.parametrize("hits", [[numpy.nan], [0, 1, 2]])
+def test_comparison_rejects_invalid_hit_values(hits):
+    with pytest.raises(ValueError, match="non-binary or missing hit"):
+        compare_models._require_binary_comparison_rows(
+            pandas.DataFrame({"hit": hits}), "test comparison")
+
+
+def test_comparison_rejects_incomplete_benchmark_rows():
+    frame = pandas.DataFrame({
+        "peptide": ["SIINFEKL", ""],
+        "hla": ["HLA-A*02:01", None],
+        "hit": [1, 0],
+    })
+    with pytest.raises(
+            ValueError,
+            match=r"missing or blank required values.*peptide=1.*hla=1"):
+        compare_models._require_complete_benchmark_rows(
+            frame, ("peptide", "hla", "hit"), "Affinity benchmark")
+
+
+def test_affinity_supported_alleles_are_normalized_and_required(tmp_path):
+    model_dir = tmp_path / "models"
+    model_dir.mkdir()
+    with pytest.raises(ValueError, match="missing its allele sequence registry"):
+        compare_models._read_supported_alleles(str(model_dir))
+
+    pandas.DataFrame({
+        "allele": ["A0201", "HLA-B*07:02", "BoLA-NC*01:01"],
+        "sequence": ["A" * 34, "B" * 34, "C" * 34],
+    }).to_csv(model_dir / "allele_sequences.csv", index=False)
+    assert compare_models._read_supported_alleles(str(model_dir)) == {
+        "HLA-A*02:01", "HLA-B*07:02",
+    }
+
+
+def test_affinity_per_allele_excludes_single_class_groups():
+    frame = pandas.DataFrame({
+        "hla": ["HLA-A*02:01"] * 30 + ["HLA-B*07:02"] * 30,
+        "hit": [1] * 30 + [0, 1] * 15,
+        "a_score": numpy.linspace(0, 1, 60),
+        "b_score": numpy.linspace(1, 0, 60),
+    })
+    result = compare_models._affinity_per_allele(frame)
+    assert result.allele.tolist() == ["HLA-B*07:02"]
+
+
+@pytest.mark.parametrize(
+    "modes",
+    ["with_flanks,with_flanks", "with_flanks,"],
+)
+def test_requested_modes_rejects_duplicate_or_empty_entries(modes):
+    with pytest.raises(SystemExit):
+        compare_models._requested_modes(
+            modes,
+            compare_models.PROCESSING_MODES,
+            "--processing-modes",
+        )
 
 
 def test_compare_models_pct_change_is_numeric():
@@ -1846,6 +2403,45 @@ def test_processing_comparison_rejects_non_finite_scores():
                 r"non-finite score"
             )):
         compare_models._require_finite_processing_scores(
+            scored,
+            mode="with_flanks",
+            labels=("candidate", "baseline"),
+        )
+
+
+def test_affinity_comparison_rejects_invalid_predictions():
+    scored = pandas.DataFrame({
+        "peptide": ["SIINFEKL", "AAAAAAAAA", "SLYNTVATL"],
+        "hla": ["HLA-A*02:01"] * 3,
+        "a_pred": [20.0, numpy.nan, 0.0],
+        "b_pred": [30.0, 40.0, 50.0],
+    })
+
+    with pytest.raises(
+            ValueError,
+            match=(
+                r"finite, positive IC50.*A \(candidate\): 2 invalid IC50"
+            )):
+        compare_models._require_valid_affinity_predictions(
+            scored, labels=("candidate", "baseline"))
+
+
+def test_presentation_comparison_rejects_non_finite_scores():
+    scored = pandas.DataFrame({
+        "peptide": ["SIINFEKL", "AAAAAAAAA"],
+        "a_presentation_score": [0.9, numpy.nan],
+        "b_presentation_score": [0.8, 0.2],
+        "a_presentation_percentile": [1.0, 2.0],
+        "b_presentation_percentile": [1.5, 2.5],
+    })
+
+    with pytest.raises(
+            ValueError,
+            match=(
+                r"requires every benchmark row.*A \(candidate\) "
+                r"presentation_score: 1 non-finite score"
+            )):
+        compare_models._require_finite_presentation_scores(
             scored,
             mode="with_flanks",
             labels=("candidate", "baseline"),
@@ -1948,6 +2544,64 @@ def test_processing_comparison_rejects_missing_requested_mode(
         compare_models._run_processing(side_a, side_b, args)
 
     assert not (tmp_path / "comparison" / "processing").exists()
+
+
+@pytest.mark.parametrize(
+    ("hits", "hlas", "expected_error"),
+    [
+        ([1, 0.5], ["HLA-A*02:01"] * 2, "non-binary or missing hit"),
+        (
+            [1, 0],
+            ["HLA-A*02:01", "HLA-B*07:02"],
+            "sample_id.*multiple HLA genotypes",
+        ),
+    ],
+)
+def test_presentation_benchmark_rejects_invalid_evaluation_rows(
+        tmp_path, hits, hlas, expected_error):
+    pandas.DataFrame({
+        "peptide": ["SIINFEKL", "SLYNTVATL"],
+        "sample_id": ["sample"] * 2,
+        "hla": hlas,
+        "hit": hits,
+    }).to_csv(
+        tmp_path / "benchmark.multiallelic.train_excluded.test.csv.bz2",
+        index=False,
+    )
+
+    with pytest.raises(ValueError, match=expected_error):
+        compare_models._load_presentation_benchmark(str(tmp_path), None)
+
+
+def test_presentation_benchmark_normalizes_equivalent_genotypes(tmp_path):
+    pandas.DataFrame({
+        "peptide": ["SIINFEKL", "SLYNTVATL"],
+        "sample_id": ["sample"] * 2,
+        "hla": ["B0702 A0201", "HLA-A*02:01 HLA-B*07:02"],
+        "hit": [1, 0],
+    }).to_csv(
+        tmp_path / "benchmark.multiallelic.train_excluded.test.csv.bz2",
+        index=False,
+    )
+
+    result = compare_models._load_presentation_benchmark(str(tmp_path), None)
+
+    assert result.hla.unique().tolist() == ["HLA-A*02:01 HLA-B*07:02"]
+
+
+def test_presentation_benchmark_rechecks_classes_after_length_filter(tmp_path):
+    pandas.DataFrame({
+        "peptide": ["SIINFEKL", "TOO-LONG-AND-INVALID"],
+        "sample_id": ["sample"] * 2,
+        "hla": ["HLA-A*02:01"] * 2,
+        "hit": [1, 0],
+    }).to_csv(
+        tmp_path / "benchmark.multiallelic.train_excluded.test.csv.bz2",
+        index=False,
+    )
+
+    with pytest.raises(ValueError, match="after peptide-length filtering"):
+        compare_models._load_presentation_benchmark(str(tmp_path), None)
 
 
 def test_affinity_metrics_handle_no_reportable_alleles():
@@ -2196,6 +2850,29 @@ def test_compare_models_reset_removes_only_owned_outputs(tmp_path):
     assert (tmp_path / "keep.txt").read_text() == "user-owned"
 
 
+def test_compare_models_invalid_component_preserves_previous_outputs(tmp_path):
+    for letter in ("a", "b"):
+        target = tmp_path / ("run_" + letter) / "models.unselected.combined"
+        _write_synthetic_manifest(
+            target, "model_" + letter,
+            wall_time_sec=10.0, n_finetune_epochs=1)
+    out_dir = tmp_path / "out"
+    stale = out_dir / "affinity" / "predictions.csv.bz2"
+    stale.parent.mkdir(parents=True)
+    stale.write_bytes(b"previous comparison")
+    args = _make_args(
+        a=str(tmp_path / "run_a"),
+        b=str(tmp_path / "run_b"),
+        out=str(out_dir),
+        include="training_stats,affinity",
+    )
+
+    with pytest.raises(SystemExit, match="affinity"):
+        compare_models.run(args)
+
+    assert stale.read_bytes() == b"previous comparison"
+
+
 def test_compare_models_rejects_output_that_contains_model_input(tmp_path):
     args = compare_models.make_parser().parse_args([
         "--a", str(tmp_path),
@@ -2203,7 +2880,21 @@ def test_compare_models_rejects_output_that_contains_model_input(tmp_path):
         "--out", str(tmp_path),
     ])
 
-    with pytest.raises(ValueError, match="cannot contain a model input"):
+    with pytest.raises(ValueError, match="cannot contain an input path"):
+        compare_models._validate_comparison_output_location(args)
+
+
+def test_compare_models_rejects_output_that_contains_benchmark_input(tmp_path):
+    data_dir = tmp_path / "processing" / "benchmarks"
+    data_dir.mkdir(parents=True)
+    args = compare_models.make_parser().parse_args([
+        "--a", "public:2.3.0",
+        "--b", "public:2.2.0",
+        "--data-dir", str(data_dir),
+        "--out", str(tmp_path),
+    ])
+
+    with pytest.raises(ValueError, match="--data-dir"):
         compare_models._validate_comparison_output_location(args)
 
 
@@ -2348,6 +3039,39 @@ def test_plot_model_comparison_rejects_paper_output_equal_to_plot_directory(
     assert panel.read_bytes() == b"paper panel"
 
 
+@pytest.mark.parametrize(
+    ("option", "relative_path"),
+    [
+        ("--summary-pdf", "release_summary.csv"),
+        ("--paper-figures-out", "affinity"),
+    ],
+)
+def test_plot_model_comparison_rejects_outputs_inside_comparison_inputs(
+        tmp_path, monkeypatch, option, relative_path):
+    comparison_dir = tmp_path / "comparison"
+    target = comparison_dir / relative_path
+    if option == "--summary-pdf":
+        target.parent.mkdir(parents=True)
+        target.write_bytes(b"comparison input")
+    else:
+        target.mkdir(parents=True)
+        (target / "predictions.csv.bz2").write_bytes(b"comparison input")
+    monkeypatch.setattr(
+        plot_model_comparison, "_apply_paper_style", lambda: None)
+    args = plot_model_comparison.make_parser().parse_args([
+        "--input", str(comparison_dir),
+        option, str(target),
+    ])
+
+    with pytest.raises(SystemExit, match="comparison input tree"):
+        plot_model_comparison.run(args)
+
+    if target.is_file():
+        assert target.read_bytes() == b"comparison input"
+    else:
+        assert (target / "predictions.csv.bz2").read_bytes() == b"comparison input"
+
+
 @pytest.mark.parametrize(("owner", "relative_path"), [
     ("paper", "paper_figures.pdf"),
     ("plots", "affinity/roc.pdf"),
@@ -2406,6 +3130,23 @@ def test_detect_available_components_finds_presentation(tmp_path):
     (tmp_path / "presentation").mkdir()
     assert "presentation" in plot_model_comparison._detect_available_components(
         str(tmp_path))
+
+
+@pytest.mark.parametrize("components", ["affinity,affinity", "affinity,"])
+def test_plot_model_comparison_rejects_duplicate_or_empty_components(
+        tmp_path, monkeypatch, components):
+    affinity = tmp_path / "affinity"
+    affinity.mkdir()
+    (affinity / "summary.json").write_text("{}")
+    monkeypatch.setattr(
+        plot_model_comparison, "_apply_paper_style", lambda: None)
+    args = plot_model_comparison.make_parser().parse_args([
+        "--input", str(tmp_path),
+        "--components", components,
+    ])
+
+    with pytest.raises(SystemExit):
+        plot_model_comparison.run(args)
 
 
 def test_load_side_labels_falls_back_when_missing(tmp_path):
@@ -2797,6 +3538,22 @@ def test_paper_figures_score_predictions_requires_recognized_or_explicit_score(
     }).to_csv(predictions, index=False)
 
     with pytest.raises(ValueError, match="no recognized predictor score columns"):
+        paper_figures.score_saved_prediction_table(
+            predictions,
+            kind="multiallelic",
+            external_baselines=(),
+        )
+
+
+def test_paper_figures_score_predictions_rejects_nonbinary_labels(tmp_path):
+    predictions = tmp_path / "predictions.csv"
+    pandas.DataFrame({
+        "sample_id": ["sample1", "sample1"],
+        "hit": [1, 0.5],
+        "presentation_score": [0.9, 0.1],
+    }).to_csv(predictions, index=False)
+
+    with pytest.raises(ValueError, match="non-binary or missing hit"):
         paper_figures.score_saved_prediction_table(
             predictions,
             kind="multiallelic",
@@ -3535,6 +4292,8 @@ def test_paper_figures_prediction_scoring_uses_shared_finite_rows():
     )
 
     assert {row["predictor"] for row in rows} == {"candidate", "baseline"}
+    assert {row["n"] for row in rows} == {3}
+    assert {row["n_pos"] for row in rows} == {1}
     assert {row["auc"] for row in rows} == {1.0}
     assert {row["ppv"] for row in rows} == {1.0}
 
@@ -3691,6 +4450,31 @@ def test_paper_figures_external_baseline_geometry_is_configurable(tmp_path):
     }
 
 
+def test_paper_figures_render_failure_returns_nonzero(
+        tmp_path, monkeypatch):
+    scores_dir = tmp_path / "scores"
+    scores_dir.mkdir()
+
+    def fail_render(*_args, **_kwargs):
+        raise RuntimeError("render exploded")
+
+    monkeypatch.setattr(
+        paper_figures, "_generate_multiallelic_figures", fail_render)
+    args = paper_figures.make_parser().parse_args([
+        "--scores-dir", str(scores_dir),
+        "--out", str(tmp_path / "paper"),
+        "--formats", "png",
+        "--combined-pdf", "none",
+    ])
+
+    assert paper_figures.run(args) == 2
+    manifest = pandas.read_csv(tmp_path / "paper" / "manifest.csv")
+    failed = manifest.loc[manifest.status == "failed"]
+    assert len(failed) == 1
+    assert failed.iloc[0]["family"] == "multiallelic"
+    assert "render exploded" in failed.iloc[0]["note"]
+
+
 def test_paper_figures_bad_predictor_config_writes_manifest(tmp_path):
     artifacts = tmp_path / "artifacts"
     artifacts.mkdir()
@@ -3704,6 +4488,42 @@ def test_paper_figures_bad_predictor_config_writes_manifest(tmp_path):
     assert manifest.iloc[0]["family"] == "configuration"
     assert manifest.iloc[0]["figure"] == "predictor_config"
     assert manifest.iloc[0]["status"] == "failed"
+
+
+def test_paper_figures_bad_predictor_config_preserves_existing_suite(tmp_path):
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    out_dir = tmp_path / "paper"
+    out_dir.mkdir()
+    combined = out_dir / "paper_figures.pdf"
+    manifest = out_dir / "manifest.csv"
+    combined.write_bytes(b"existing suite")
+    manifest.write_text("existing manifest\n")
+    args = paper_figures.make_parser().parse_args([
+        "--artifacts-dir", str(artifacts),
+        "--out", str(out_dir),
+        "--external-baselines", "",
+    ])
+
+    assert paper_figures.run(args) == 2
+    assert combined.read_bytes() == b"existing suite"
+    assert manifest.read_text() == "existing manifest\n"
+
+
+@pytest.mark.parametrize("formats", ["pdf,pdf", "pdf,"])
+def test_paper_figures_rejects_duplicate_or_empty_formats(formats):
+    with pytest.raises(ValueError):
+        paper_figures._parse_formats(formats)
+
+
+@pytest.mark.parametrize("reserved_name", [
+    "manifest.csv", "missing_inputs.md", "pdf", "assets", "pdf/figure.pdf",
+])
+def test_paper_figures_rejects_combined_pdf_metadata_collisions(
+        tmp_path, reserved_name):
+    with pytest.raises(SystemExit, match="collides"):
+        paper_figures._validate_paper_output_paths(
+            tmp_path, tmp_path / reserved_name)
 
 
 def test_paper_figures_predictor_config_parser():

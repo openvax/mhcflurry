@@ -27,7 +27,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RECIPE_DIR="$SCRIPT_DIR/release_exact"
 : "${REPO:=$(cd "$SCRIPT_DIR/../.." && pwd)}"
 # shellcheck disable=SC1091
-# shellcheck disable=SC1091
 source "$SCRIPT_DIR/gpu_telemetry.sh"
 GPU_TELEMETRY_PID=""
 trap stop_gpu_telemetry EXIT
@@ -59,10 +58,34 @@ processing_variant_enabled() {
     esac
 }
 
+seen_processing_variants=" "
+for processing_variant in $PROCESSING_VARIANTS; do
+    case "$processing_variant" in
+        with_flanks|no_flank|short_flanks) ;;
+        *)
+            echo "Unknown PROCESSING_VARIANTS entry: $processing_variant" >&2
+            exit 2
+            ;;
+    esac
+    case "$seen_processing_variants" in
+        *" $processing_variant "*)
+            echo "Duplicate PROCESSING_VARIANTS entry: $processing_variant" >&2
+            exit 2
+            ;;
+    esac
+    seen_processing_variants="$seen_processing_variants$processing_variant "
+done
 processing_variant_enabled no_flank || {
     echo "PROCESSING_VARIANTS must include no_flank for presentation training." >&2
     exit 2
 }
+case "$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" in
+    with_flanks|short_flanks) ;;
+    *)
+        echo "PRESENTATION_PROCESSING_WITH_FLANKS_KIND must be with_flanks or short_flanks." >&2
+        exit 2
+        ;;
+esac
 processing_variant_enabled "$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" || {
     echo "PROCESSING_VARIANTS must include PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$PRESENTATION_PROCESSING_WITH_FLANKS_KIND." >&2
     exit 2

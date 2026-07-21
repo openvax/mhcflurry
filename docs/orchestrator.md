@@ -25,13 +25,13 @@ orchestrator process               training worker process
 ─────────────────────              ───────────────────────
 
 parse args                         (forked / spawned)
-load training data                  inherit WORKER_CONTEXT
+load training data                  receive WORKER_CONTEXT once
 build WORKER_CONTEXT        ─┐
                              │
 hoist env knobs              │
   TORCHINDUCTOR_COMPILE_THREADS
                              │
-fork worker pool             ─┘
+start worker pool            ─┘
                                     fit() builds device-resident
                                       AffinityDeviceTrainingData
                                       (peptide/allele/y/weights and
@@ -87,7 +87,12 @@ Two backends, one CLI surface:
   `--max-workers-per-gpu=auto` and `--dataloader-num-workers=auto`
   without touching CUDA, caps local `--num-jobs` to GPU capacity when
   auto was requested, and hoists torch.compile's thread cap before the
-  Pool forks. Explicit numeric `--max-workers-per-gpu` keeps the
+  Pool starts. Fork workers inherit `WORKER_CONTEXT` through copy-on-write;
+  spawn workers receive it once in their initializer, never once per queued
+  task. Before a spawn pool starts, the planner deep-sizes that loaded context
+  and rechecks current host RAM, so worker copies are capped even when the
+  source CSV was compressed or torch compilation is disabled. Explicit numeric
+  `--max-workers-per-gpu` keeps the
   historical CPU-overflow behavior.
 - **Cluster** (`cluster_parallelism.py`): one job per work-item
   submitted via `bsub` / `sbatch` / `sh`. Workers serialize
@@ -129,7 +134,12 @@ resident encoded data, and the configured training minibatch where those facts
 are available; otherwise the workload profile supplies a conservative fallback.
 Free VRAM is read from `nvidia-smi` (no torch import — the parent process must
 not initialize CUDA before forking). The final job count is also bounded by
-available host RAM and vCPUs.
+available host RAM and vCPUs. In containers, host-memory sizing honors the
+current cgroup limit and usage rather than the physical host's `/proc/meminfo`.
+Spawn pools then refine the host cap from the loaded per-worker context and
+current available RAM; fork pools retain copy-on-write sharing and skip that
+copy multiplier. If no additional spawn copy fits safely, automatic local
+execution falls back to serial work in the parent instead of forcing one child.
 
 When torch compilation is enabled, the existing one-worker compile warmup also
 records CUDA peak-reserved memory and process peak RSS. A measured peak can
@@ -277,8 +287,9 @@ before compiling losses to avoid the PyTorch 2.4 / Triton
    existing ones in `train_pan_allele_models_command.py`.
 2. Stash the result in `WORKER_CONTEXT["<name>"]`.
 3. Document the lookup key. Workers retrieve via
-   `constant_data["<name>"]` (forked workers inherit; spawned/cluster
-   workers receive via pickle).
+   `constant_data["<name>"]` (forked workers inherit; spawned workers receive
+   one initializer payload per process; cluster workers receive the serialized
+   context through the shared filesystem).
 4. Add a `getattr(args, "<flag>", None)` gate so the helper is opt-in
    on the CLI side.
 

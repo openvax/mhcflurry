@@ -76,6 +76,20 @@ def test_elastic_inference_preserves_explicit_worker_memory(monkeypatch):
     assert "command estimate" in estimate["notes"]
 
 
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("per_worker_gb", float("nan")),
+        ("model_bytes", float("inf")),
+        ("data_bytes", -1),
+    ],
+)
+def test_workload_estimator_rejects_invalid_programmatic_hints(name, value):
+    with pytest.raises(ValueError, match="finite non-negative"):
+        wp.estimate_workload_memory(
+            wp.WORKLOAD_AFFINITY_INFERENCE, {name: value})
+
+
 def test_elastic_inference_applies_artifact_floor_to_small_override(
         monkeypatch):
     env_name = "MHCFLURRY_WORKLOAD_AFFINITY_INFERENCE_PER_WORKER_GB"
@@ -114,6 +128,13 @@ def test_env_float_bad_value_names_variable(monkeypatch):
         wp.env_float("MHCFLURRY_TEST_X", 0.0)
     assert "MHCFLURRY_TEST_X" in str(exc_info.value)
     assert "nope" in str(exc_info.value)
+
+
+@pytest.mark.parametrize("value", ["nan", "inf", "-inf"])
+def test_env_float_rejects_nonfinite_values(monkeypatch, value):
+    monkeypatch.setenv("MHCFLURRY_TEST_X", value)
+    with pytest.raises(ValueError, match="MHCFLURRY_TEST_X.*finite"):
+        wp.env_float("MHCFLURRY_TEST_X", 0.0)
 
 
 def test_env_float_bounds_lower(monkeypatch):
@@ -258,7 +279,49 @@ def test_system_memory_info_gb_falls_through_to_platform(monkeypatch):
     info = wp.system_memory_info_gb()
     # Will be /proc/meminfo on linux, vm_stat on mac, or the empty dict on
     # platforms with neither — all three are valid shapes here.
-    assert info["source"] in ("/proc/meminfo", "vm_stat", "unknown")
+    assert info["source"] in (
+        "/proc/meminfo", "cgroup", "vm_stat", "unknown")
+
+
+def test_linux_cgroup_memory_info_uses_limit_and_current(monkeypatch):
+    values = iter([16 * wp.GIB, 10 * wp.GIB])
+    monkeypatch.setattr(
+        wp, "_read_cgroup_memory_value", lambda paths: next(values))
+
+    info = wp._linux_cgroup_memory_info_gb()
+
+    assert info == {
+        "total_gb": 16.0,
+        "available_gb": 6.0,
+        "source": "cgroup",
+    }
+
+
+def test_linux_cgroup_memory_info_ignores_unlimited_v1_sentinel(monkeypatch):
+    monkeypatch.setattr(
+        wp,
+        "_read_cgroup_memory_value",
+        lambda paths: 2 ** 62,
+    )
+    assert wp._linux_cgroup_memory_info_gb() is None
+
+
+def test_macos_memory_info_preserves_zero_available_pages(monkeypatch):
+    def fake_check_output(command, **kwargs):
+        del kwargs
+        if command[0] == "sysctl":
+            return str(int(16 * wp.GIB)).encode()
+        return (
+            b"Mach Virtual Memory Statistics: (page size of 4096 bytes)\n"
+            b"Pages free: 0.\n"
+            b"Pages inactive: 0.\n"
+            b"Pages speculative: 0.\n"
+        )
+
+    monkeypatch.setattr(wp.subprocess, "check_output", fake_check_output)
+    info = wp._macos_memory_info_gb()
+    assert info["total_gb"] == 16.0
+    assert info["available_gb"] == 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -396,6 +459,15 @@ def test_host_memory_num_jobs_cap_uses_available_over_total():
         safety_fraction=1.0,
     )
     assert cap == 12  # 50 / 4 = 12.5 → 12
+
+
+def test_host_memory_num_jobs_cap_does_not_replace_zero_available_with_total():
+    cap = wp.host_memory_num_jobs_cap(
+        memory={"available_gb": 0.0, "total_gb": 128.0, "source": "env"},
+        host_worker_gb=4.0,
+        safety_fraction=1.0,
+    )
+    assert cap == 1
 
 
 def test_host_memory_num_jobs_cap_falls_back_to_total():

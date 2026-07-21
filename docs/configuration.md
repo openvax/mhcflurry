@@ -27,7 +27,13 @@ specific machine.
 Prediction, training, calibration, selection, and evaluation commands share a
 workload-aware planner. Depending on the command, it considers available GPU
 memory, model and data size, the configured training batch, host RAM, CPU count,
-and remaining work items.
+and remaining work items. Container memory limits are detected through cgroups,
+so a job does not size itself from RAM that belongs to the physical host but is
+unavailable inside the container. On spawn-based platforms, the planner also
+measures the loaded worker context before starting the pool; this prevents a
+compressed input file from hiding the much larger in-memory copy created in
+each worker. If the remaining safe RAM cannot hold even one additional spawn
+copy, an automatic plan runs serially in the already-loaded parent process.
 
 The common automatic options are:
 

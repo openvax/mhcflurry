@@ -26,6 +26,7 @@ import argparse
 import json
 import os
 import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -41,7 +42,7 @@ from .figure_style import (
     predictor_color as _predictor_color,
     short_label as _short_label,
 )
-from ..common import allele_locus_name
+from ..common import allele_locus_name, positive_int_arg
 
 
 CANDIDATE_PREDICTOR = "mhcflurry_production"
@@ -279,7 +280,7 @@ missing_inputs.md instead of being silently fabricated.
     )
     parser.add_argument(
         "--max-scatter-points",
-        type=int,
+        type=positive_int_arg,
         default=20_000,
         help="Subsample scatter plots above this many points.",
     )
@@ -302,7 +303,19 @@ def run(args):
     out_dir = Path(args.out)
     formats = _parse_formats(args.formats)
     combined_pdf = _combined_pdf_path(args.combined_pdf, out_dir)
+    _validate_paper_output_paths(out_dir, combined_pdf)
     writer = FigureWriter(out_dir, formats, combined_pdf)
+    try:
+        predictors = _parse_predictor_config(args)
+    except ValueError as error:
+        writer.fail("configuration", "predictor_config", str(error))
+        print("Invalid paper-figure configuration: %s" % error, file=sys.stderr)
+        if not out_dir.exists():
+            out_dir.mkdir(parents=True, exist_ok=True)
+            _write_manifest(out_dir, writer.rows)
+            _write_missing_inputs(out_dir, writer.rows)
+        return 2
+    _apply_paper_style()
     inputs = _resolve_figure_inputs(args, writer)
     if inputs is None:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -323,13 +336,6 @@ def run(args):
     out_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        try:
-            predictors = _parse_predictor_config(args)
-        except ValueError as e:
-            writer.fail("configuration", "predictor_config", str(e))
-            return 2
-
-        _apply_paper_style()
         predictor_info = _read_predictor_info(
             inputs.scores_dir / "predictor_info.csv", writer)
         sample_ids = _read_sample_group_ids(args, inputs, writer)
@@ -360,6 +366,12 @@ def run(args):
         _write_manifest(out_dir, writer.rows)
         _write_missing_inputs(out_dir, writer.rows)
 
+    # A rendering/computation exception is never an optional-input condition:
+    # returning success would let release automation publish an incomplete PDF.
+    # ``--strict`` additionally turns documented optional-input skips into an
+    # error for callers that require every figure family.
+    if any(row["status"] == "failed" for row in writer.rows):
+        return 2
     if args.strict and any(_strict_failure_row(row) for row in writer.rows):
         return 2
     return 0
@@ -448,16 +460,19 @@ class FigureWriter:
 
 
 def _parse_formats(value):
-    formats = tuple(
-        part.strip().lower() for part in value.split(",") if part.strip())
-    if not formats:
-        raise ValueError("--formats must contain at least one format")
+    formats = tuple(part.strip().lower() for part in value.split(","))
+    if not formats or any(not fmt for fmt in formats):
+        raise ValueError("--formats contains an empty format")
     allowed = {"svg", "pdf", "png"}
     unknown = set(formats) - allowed
     if unknown:
         raise ValueError(
             "Unsupported figure formats: %s. Allowed: %s" % (
                 ", ".join(sorted(unknown)), ", ".join(sorted(allowed))))
+    duplicates = sorted({fmt for fmt in formats if formats.count(fmt) > 1})
+    if duplicates:
+        raise ValueError("Duplicate figure formats: %s" % (
+            ", ".join(duplicates)))
     return formats
 
 
@@ -513,6 +528,34 @@ def _combined_pdf_path(value, out_dir):
     if value:
         return value
     return str(Path(out_dir) / "paper_figures.pdf")
+
+
+def _validate_paper_output_paths(out_dir, combined_pdf):
+    """Reject output aliases that overwrite command metadata or directories."""
+    out_dir = Path(out_dir).resolve()
+    if out_dir.exists() and not out_dir.is_dir():
+        raise SystemExit("Paper-figure --out must be a directory: %s" % out_dir)
+    if combined_pdf is None:
+        return
+    combined_pdf = Path(combined_pdf).resolve()
+    reserved = {
+        out_dir,
+        (out_dir / "manifest.csv").resolve(),
+        (out_dir / "missing_inputs.md").resolve(),
+    }
+    reserved.update((out_dir / fmt).resolve() for fmt in DEFAULT_FORMATS)
+    reserved.add((out_dir / "assets").resolve())
+    command_owned_dirs = [
+        (out_dir / name).resolve()
+        for name in (*DEFAULT_FORMATS, "assets")
+    ]
+    if combined_pdf in reserved or any(
+            _path_is_within(combined_pdf, directory)
+            for directory in command_owned_dirs):
+        raise SystemExit(
+            "--combined-pdf collides with a command-owned directory or "
+            "metadata path: %s" % combined_pdf
+        )
 
 
 def _clear_paper_figure_outputs(out_dir, combined_pdf):
@@ -881,6 +924,15 @@ def _scores_from_saved_predictions(
             family, figure, [path],
             "Saved prediction table must contain a hit column.")
         return None
+    hit = pandas.to_numeric(df["hit"], errors="coerce")
+    invalid_hit = ~hit.isin([0, 1])
+    if invalid_hit.any():
+        writer.skip(
+            family, figure, [path],
+            "Saved prediction table contains %d non-binary or missing hit "
+            "value(s); expected only 0 and 1." % int(invalid_hit.sum()))
+        return None
+    df["hit"] = hit.astype(int)
     index_column = index_column or _prediction_index_column(df, kind=kind)
     if index_column is None:
         writer.skip(
@@ -1101,6 +1153,8 @@ def _scores_for_prediction_group(
             "length": length,
             "length_label": length_label,
             "predictor": predictor,
+            "n": int(len(y)),
+            "n_pos": int(y.sum()),
             "ppv": ppv,
             "auc": auc,
         })

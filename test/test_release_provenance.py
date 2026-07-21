@@ -103,6 +103,20 @@ def test_collect_provenance_rejects_missing_model_info(tmp_path):
         )
 
 
+@pytest.mark.parametrize(
+    ("variants", "message"),
+    [
+        (["with_flanks", "../../outside"], "Unknown processing variant"),
+        (["with_flanks", "with_flanks"], "Duplicate processing variant"),
+    ],
+)
+def test_artifact_paths_reject_invalid_processing_variants(
+        tmp_path, variants, message):
+    module = load_module()
+    with pytest.raises(ValueError, match=message):
+        module.artifact_info_paths(tmp_path, variants)
+
+
 def test_collect_provenance_rejects_model_from_another_commit(tmp_path):
     module = load_module()
     write_model_info(tmp_path, "2.3.0rc14", commit="deadbeef")
@@ -136,3 +150,37 @@ def test_collect_provenance_allows_later_evaluation_workflow(tmp_path):
 
     assert result["workflow_id"] == "evaluation-run"
     assert result["artifacts"]["affinity"]["workflow_id"] == "training-run"
+
+
+def test_collect_artifact_provenance_without_git_checkout(tmp_path):
+    module = load_module()
+    write_model_info(
+        tmp_path,
+        "2.3.0rc14",
+        commit="remote-commit",
+        workflow_id="remote-run",
+    )
+
+    result = module.collect_artifact_provenance(
+        run_dir=tmp_path,
+        release="2.3.0",
+        processing_variants=["with_flanks"],
+        require_artifacts=True,
+        expected_artifact_git_commit="remote-commit",
+        expected_artifact_workflow_id="remote-run",
+    )
+
+    assert result["affinity"]["git_commit"] == "remote-commit"
+
+
+def test_artifact_only_cli_requires_expected_identity(tmp_path):
+    module = load_module()
+    write_model_info(tmp_path, "2.3.0rc14")
+
+    with pytest.raises(SystemExit, match="expected-artifact-git-commit"):
+        module.main([
+            "--artifact-only",
+            "--run-dir", str(tmp_path),
+            "--release", "2.3.0",
+            "--require-artifacts",
+        ])
