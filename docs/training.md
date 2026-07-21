@@ -63,6 +63,7 @@ Save it as `hyperparameters.yaml`, then run:
 mhcflurry class1-train-allele-specific-models \
     --data "$(mhcflurry downloads path data_curated)/curated_training_data.csv.bz2" \
     --hyperparameters hyperparameters.yaml \
+    --allele 'HLA-A*02:01' \
     --min-measurements-per-allele 75 \
     --out-models-dir models
 ```

@@ -7,6 +7,10 @@ on:
     branches: ["master"]
   workflow_dispatch:
 
+concurrency:
+  group: documentation-pages-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -70,11 +74,21 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout archived documentation
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: archived-docs
+          sparse-checkout: previous-versions
+
       - name: Download rendered documentation
         uses: actions/download-artifact@v4
         with:
           name: documentation-html
           path: documentation-html
+
+      - name: Preserve archived documentation
+        run: cp -R archived-docs/previous-versions documentation-html/
 
       - name: Publish GitHub Pages branch
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453
