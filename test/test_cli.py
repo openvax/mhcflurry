@@ -2308,8 +2308,8 @@ def test_comparison_rejects_invalid_hit_values(hits):
 
 def test_comparison_rejects_incomplete_benchmark_rows():
     frame = pandas.DataFrame({
-        "peptide": ["SIINFEKL", ""],
-        "hla": ["HLA-A*02:01", None],
+        "peptide": pandas.Series(["SIINFEKL", ""], dtype="string"),
+        "hla": pandas.Series(["HLA-A*02:01", None], dtype="string"),
         "hit": [1, 0],
     })
     with pytest.raises(

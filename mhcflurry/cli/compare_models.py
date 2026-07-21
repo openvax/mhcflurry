@@ -732,9 +732,10 @@ def _require_complete_benchmark_rows(df, columns, context):
     for column in columns:
         values = df[column]
         invalid = values.isnull()
-        if values.dtype == object:
-            invalid |= values.map(
-                lambda value: isinstance(value, str) and not value.strip())
+        # pandas 3 defaults text columns to ``StringDtype`` rather than
+        # ``object``. Normalize every scalar column to its nullable string view
+        # so blank detection is independent of the pandas dtype policy.
+        invalid |= values.astype("string").str.strip().eq("").fillna(False)
         if invalid.any():
             failures.append("%s=%d" % (column, int(invalid.sum())))
     if failures:
