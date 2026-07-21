@@ -45,6 +45,7 @@ from mhcflurry.cluster_parallelism import (
 # processes upon fork() call, allowing us to share large data with the workers
 # via shared memory.
 GLOBAL_DATA = {}
+WORKER_CONTEXT = GLOBAL_DATA
 
 parser = argparse.ArgumentParser(usage=__doc__)
 
@@ -318,7 +319,11 @@ def run(argv=sys.argv[1:]):
             result_serialization_method="pickle",
             clear_constant_data=True)
     else:
-        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+        worker_pool = worker_pool_with_gpu_assignments_from_args(
+            args,
+            worker_context_module=__name__,
+            worker_context_data=GLOBAL_DATA,
+        )
         print("Worker pool", worker_pool)
         assert worker_pool is not None
         results = worker_pool.imap_unordered(
@@ -346,24 +351,29 @@ def run(argv=sys.argv[1:]):
         last_write_time_per_column[col] = time.time()
     print("Done writing all columns. Reading results.")
 
-    for worker_results in tqdm.tqdm(results, total=len(work_items)):
-        for (work_item_num, col_to_predictions) in worker_results:
-            for (col, predictions) in col_to_predictions.items():
-                result_df.loc[
-                    work_items[work_item_num]['peptides'],
-                    col
-                ] = predictions
-                if time.time() - last_write_time_per_column[col] > 180:
-                    write_col(col)
-                    last_write_time_per_column[col] = time.time()
+    try:
+        for worker_results in tqdm.tqdm(results, total=len(work_items)):
+            for (work_item_num, col_to_predictions) in worker_results:
+                for (col, predictions) in col_to_predictions.items():
+                    result_df.loc[
+                        work_items[work_item_num]['peptides'],
+                        col
+                    ] = predictions
+                    if time.time() - last_write_time_per_column[col] > 180:
+                        write_col(col)
+                        last_write_time_per_column[col] = time.time()
+        if worker_pool:
+            worker_pool.close()
+            worker_pool.join()
+            worker_pool = None
+    finally:
+        if worker_pool:
+            worker_pool.terminate()
+            worker_pool.join()
 
     print("Done processing. Final write for each column.")
     for col in result_df.columns:
         write_col(col)
-
-    if worker_pool:
-        worker_pool.close()
-        worker_pool.join()
 
     prediction_time = time.time() - start
     print("Done generating predictions in %0.2f min." % (

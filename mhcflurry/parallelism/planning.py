@@ -13,40 +13,36 @@
 """Hardware planning helpers for local parallelism."""
 
 import logging
+import math
 import os
 import re
 import subprocess
 import sys
+from dataclasses import replace
 
-from ..common import normalize_pytorch_backend
+from ..common import configure_pytorch, normalize_pytorch_backend
+from ..memory_budget import (
+    HOST_MIN_RESERVE_BYTES,
+    memory_worker_capacity,
+    usable_memory_bytes,
+)
 from ..workload_planning import (
     HOST_RAM_PER_DATALOADER_CHILD_GB,
     WORKLOAD_GENERIC,
+    available_or_total_memory_gb,
     capacity_warnings,
     env_float,
     env_int,
+    host_memory_num_jobs_cap,
     plan_local_parallelism,
+    system_memory_info_gb,
 )
 
 
-# Per-worker VRAM upper bound (gigabytes) used by ``auto_max_workers_per_gpu``
-# to budget how many workers fit on each GPU. Live diagnostics from the
-# 2026-04-28 release_exact run showed actual per-worker steady-state VRAM
-# is 1.85-2.4 GB on the 4096-batch torch.compile path; the 16.0 GB historical
-# value was set before the fixed-encoding + indices-on-device work landed
-# and was producing only 2 workers/GPU on 80 GB cards (well below the
-# hard_cap of 4). Lowered to 4.0 GB which keeps a 2x safety margin over
-# observed and unlocks the 4-worker tier on 80 GB cards. 40 GB cards also
-# reach the hard cap at full free VRAM (0.6 × 40 / 4 = 6, capped to 4); fewer
-# only when free VRAM is already partly used. Override with
-# ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`` for re-benchmarking.
+# Generic per-worker VRAM fallback when a command cannot provide an analytic
+# model/dataset estimate. Workload-aware commands replace it; compile warmup
+# measurements may only raise the estimate. Override remains for expert use.
 _AUTO_MWPG_PER_WORKER_GB_DEFAULT = 4.0
-
-# SM-scheduler ceiling. Beyond ~4 workers/GPU the kernel queue serializes
-# behind a single SM scheduler, so per-worker throughput drops faster than
-# you gain from more parallelism. Tunable via env, but the empirical sweet
-# spot is 2-4 for small MLP workloads.
-_AUTO_MWPG_HARD_CAP_DEFAULT = 4
 
 # Fallback free-VRAM estimate per GPU (gigabytes) when ``nvidia-smi`` is not
 # available. This path deliberately does not import torch: local pools use fork
@@ -76,16 +72,12 @@ _AUTO_MWPG_FREE_VRAM_FALLBACK_GB = 16.0
 #   * total vCPUs (default ``os.cpu_count()``)
 #   * fit-worker count (NUM_JOBS or num_gpus × max_workers_per_gpu)
 #   * total RAM in GB (optional, for tight-RAM boxes)
-#   * SM-scheduler-style hard cap (default 4, env-overridable)
+#   * optional expert hard cap (none by default)
 #
 # Intent: the recipe pins ``DATALOADER_NUM_WORKERS=auto`` and the orchestrator
 # computes the right value per box. Hardware tier mismatches like the
 # L40S-tuned "1" landing on a 176-vCPU 8×A100 box can't recur.
 
-# Per-fit-worker DataLoader child cap for streaming pretraining. Past 4,
-# PyTorch queue/process overhead hit diminishing returns on tested boxes
-# (8xA100 / L40S / single-A100). Override with
-# ``MHCFLURRY_AUTO_DATALOADER_HARD_CAP``.
 _AUTO_DATALOADER_HARD_CAP_DEFAULT = 4
 
 # Approximate RSS that one DataLoader child holds: torch + mhcflurry imports
@@ -140,6 +132,11 @@ def free_vram_per_gpu_override_gb(num_gpus):
             "Environment variable %s=%r contains a non-float entry: %s"
             % (name, value, exc)
         ) from None
+    if any(not math.isfinite(item) or item < 0 for item in vals):
+        raise ValueError(
+            "Environment variable %s=%r must contain finite non-negative "
+            "free-VRAM values" % (name, value)
+        )
     if len(vals) == 1:
         # A single value applies to every GPU.
         vals = vals * max(int(num_gpus), 1)
@@ -266,20 +263,17 @@ def auto_max_workers_per_gpu(
     Returns an int ≥ 1. Logic:
 
       * ``num_gpus == 0`` (CPU-only) → 1.
-      * Otherwise: take the minimum of three caps:
+      * Otherwise: take the minimum of two capacity limits:
           - ``num_jobs // num_gpus`` — don't oversubscribe a GPU beyond the
             jobs that actually exist.
-          - ``floor(0.6 × free_vram_gb / per_worker_gb)`` — VRAM headroom
-            with 40% slack for activation peaks and the auto-sized
-            validation batch.
-          - ``hard_cap`` (default 4) — SM-scheduler kernel-serialization
-            wall.
+          - complete per-worker working sets that fit in free VRAM after the
+            shared allocator/context reserve.
 
     Free VRAM is read from ``nvidia-smi`` (or from
     ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB``). It deliberately
     avoids ``torch.cuda`` so resolving local parallelism before forking does
     not initialize CUDA in the parent process. Per-worker VRAM upper bound and
-    the hard cap are overridable via
+    the optional expert hard cap are overridable via
     ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`` and
     ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP``.
 
@@ -304,10 +298,34 @@ def auto_max_workers_per_gpu(
         )
     else:
         per_worker_gb = float(per_worker_gb)
-    hard_cap = env_int(
-        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP",
-        _AUTO_MWPG_HARD_CAP_DEFAULT,
-        bounds=(1, None),
+    if not math.isfinite(per_worker_gb) or per_worker_gb < 0:
+        raise ValueError(
+            "per_worker_gb must be a finite non-negative number; got %r" %
+            per_worker_gb
+        )
+    hard_cap_raw = os.environ.get(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP")
+    hard_cap = (
+        env_int(
+            "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP",
+            hard_cap_raw,
+            bounds=(1, None),
+        )
+        if hard_cap_raw not in (None, "")
+        else None
+    )
+    # Backward-compatible expert override. The default path uses the shared
+    # reserve calculation instead of a fixed spendable fraction.
+    vram_fraction_raw = os.environ.get(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_VRAM_FRACTION")
+    vram_fraction = (
+        env_float(
+            "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_VRAM_FRACTION",
+            vram_fraction_raw,
+            bounds=(0.0, 1.0),
+        )
+        if vram_fraction_raw not in (None, "")
+        else None
     )
 
     # Honor an explicit env override even when it resolves to 0.0 (falsy);
@@ -333,8 +351,8 @@ def auto_max_workers_per_gpu(
     # and the resolver pins itself to whatever happens to be in args
     # before the resolver runs. Practical effect on the 8x80GB tier:
     # without the user-explicit guard, by_jobs would clamp MWPG to 2
-    # (16//8) when production sets num_jobs=16; with the guard, MWPG can
-    # rise to the hard_cap of 4 if VRAM allows.
+    # (16//8) when production sets num_jobs=16; with the guard, memory and
+    # host/CPU capacity determine concurrency.
     # ``num_jobs`` may arrive as ``"auto"`` when called from
     # ``resolve_local_parallelism_args`` (which resolves MWPG before
     # num_jobs); treat that as "user delegated" — same as ``num_jobs=0``.
@@ -342,36 +360,32 @@ def auto_max_workers_per_gpu(
         num_jobs_int = 0
     else:
         num_jobs_int = int(num_jobs)
-    # 40% VRAM headroom (multiply by 0.6) absorbs three sources of
-    # transient pressure that ``per_worker_gb`` does not model:
-    #   (1) spawn-startup race — workers create their CUDA context and
-    #       allocate model state in parallel, briefly holding more memory
-    #       than steady-state;
-    #   (2) activation peaks during torch.compile inductor codegen;
-    #   (3) nvidia-smi's reported ``free`` lags actual contention when
-    #       another process on the same card is also allocating.
-    # The headroom is intentionally generous: an OOM during a multi-hour
-    # training run costs far more than leaving a worker slot on the
-    # table, and the cap is bounded above by ``hard_cap`` anyway.
     if per_worker_gb <= 0:
-        # A non-positive per-worker budget (e.g. the env override set to 0)
-        # disables the VRAM-based cap rather than dividing by zero; ``hard_cap``
-        # still bounds the result. Mirrors host_memory_num_jobs_cap's guard.
-        by_vram = hard_cap
+        by_vram = 1
+    elif vram_fraction is not None:
+        by_vram = max(
+            1,
+            int(free_vram_gb_used * vram_fraction / per_worker_gb),
+        )
     else:
-        by_vram = max(1, int(free_vram_gb_used * 0.6 / per_worker_gb))
+        by_vram = memory_worker_capacity(
+            free_vram_gb_used,
+            per_worker_gb,
+        )
+    if hard_cap is not None:
+        by_vram = min(by_vram, hard_cap)
     if num_jobs_int > 0:
         by_jobs = max(1, num_jobs_int // max(int(num_gpus), 1))
-        chosen = max(1, min(by_jobs, by_vram, hard_cap))
+        chosen = max(1, min(by_jobs, by_vram))
         by_jobs_log = str(by_jobs)
     else:
-        chosen = max(1, min(by_vram, hard_cap))
+        chosen = max(1, by_vram)
         by_jobs_log = "skipped (num_jobs auto)"
 
     logging.info(
         "auto_max_workers_per_gpu: chose %d "
         "(num_jobs=%d, num_gpus=%d, by_jobs=%s, by_vram=%d at "
-        "free_vram=%.1f GB%s / %.1f GB/worker, hard_cap=%d)",
+        "free_vram=%.1f GB%s, %.1f GB/worker, budget=%s, hard_cap=%s)",
         chosen,
         num_jobs_int,
         int(num_gpus),
@@ -380,7 +394,11 @@ def auto_max_workers_per_gpu(
         free_vram_gb_used,
         "" if free_vram_gb is not None else " (fallback)",
         per_worker_gb,
-        hard_cap,
+        (
+            "legacy %.2f fraction" % vram_fraction
+            if vram_fraction is not None else "shared reserve"
+        ),
+        hard_cap if hard_cap is not None else "none",
     )
     return chosen
 
@@ -410,7 +428,8 @@ def auto_dataloader_num_workers(
         decision).
     hard_cap : int, optional
         Maximum DL children per fit-worker. Default 4 (overridable via
-        ``MHCFLURRY_AUTO_DATALOADER_HARD_CAP``).
+        ``MHCFLURRY_AUTO_DATALOADER_HARD_CAP``); beyond this, process/queue
+        overhead reduced measured throughput.
 
     Heuristic
     ---------
@@ -427,7 +446,7 @@ def auto_dataloader_num_workers(
        torch+mhcflurry imports; the main fit-worker baseline is
        ~``_AUTO_DATALOADER_RAM_BASELINE_PER_FIT_GB`` (=2.0) GB.
        ``ram_cap = max(0, (ram_per_fit_gb - 2.0) / 0.5)``.
-    5. **Hard cap**: ``min(cpu_cap, ram_cap, hard_cap)``.
+    5. **Throughput cap**: ``min(cpu_cap, ram_cap, hard_cap)``.
     6. **Floor**: 0 only when ``cpu_cap == 0`` (i.e. fewer cores than
        fit-workers — rare, only on tight clusters). Otherwise the floor
        is 1 because in-process batching on a multi-GPU box almost always
@@ -500,7 +519,7 @@ def auto_dataloader_num_workers(
 
     logging.info(
         "auto_dataloader_num_workers: chose %d (num_fit_workers=%d, vcpus=%d, "
-        "ram_gb=%s, cpu_per_fit=%d, cpu_cap=%d, ram_cap=%s, hard_cap=%d)",
+        "ram_gb=%s, cpu_per_fit=%d, cpu_cap=%d, ram_cap=%s, hard_cap=%s)",
         chosen, num_fit_workers, vcpus,
         f"{ram_gb:.1f}" if ram_gb is not None else "?",
         cpu_per_fit, cpu_cap,
@@ -550,7 +569,8 @@ def auto_random_negative_pool_epochs(
         *,
         safety_fraction=None,
         per_pool_epoch_per_worker_bytes=None,
-        hard_cap=None):
+        hard_cap=None,
+        base_worker_gb=0.0):
     """Pick ``random_negative_pool_epochs`` from box capacity.
 
     The pool sits in the heap of every fit-worker process. Per-pool-epoch
@@ -587,24 +607,24 @@ def auto_random_negative_pool_epochs(
         Total system RAM in GB. ``None`` returns ``1`` (safe default —
         we don't know the budget so don't bump pool_epochs above legacy).
     safety_fraction : float, optional
-        Fraction of total RAM available to RN pools across all workers.
-        Default ``0.5`` (half of system RAM, leaving 50% for the rest).
-        Override via ``MHCFLURRY_AUTO_RN_POOL_SAFETY_FRACTION``.
+        Expert fraction of RAM available to RN pools across all workers. By
+        default the shared host reserve is used and ``base_worker_gb`` is
+        subtracted first. Override via
+        ``MHCFLURRY_AUTO_RN_POOL_SAFETY_FRACTION``.
     per_pool_epoch_per_worker_bytes : float, optional
         Empirical per-pool-epoch per-worker RAM cost in bytes. Default
         ``1 GB`` (conservative — captures the int8 indices + transient
         pandas + encoder buffers seen on the 2026-04 run). Override via
         ``MHCFLURRY_AUTO_RN_POOL_PER_EPOCH_PER_WORKER_GB``.
     hard_cap : int, optional
-        Maximum pool_epochs regardless of memory budget. Default ``10``
-        (overridable via ``MHCFLURRY_AUTO_RN_POOL_HARD_CAP``). Past 10
-        the diminishing-return curve flattens — RN gen overhead is
-        already amortized to <1 sec/epoch by then.
+        Maximum pool epochs. Default 10 (expert-overridable); larger pools
+        add startup/memory cost after generation overhead is already amortized.
 
     Heuristic
     ---------
-    Total available bytes for RN pools across the box:
-        ``ram_gb × 1e9 × safety_fraction``
+    Total available bytes for RN pools across the box is usable host memory
+    after the shared reserve and fit-worker base RSS. An explicit
+    ``safety_fraction`` replaces that calculation.
     Per-worker budget:
         ``available / max(num_workers, 1)``
     Pool epochs that fit:
@@ -613,23 +633,27 @@ def auto_random_negative_pool_epochs(
 
     Cross-checks
     ------------
-    * 8×A100-80GB Verda (400 GB / 32 fit-workers, 1 GB/pool-epoch):
-        400 × 0.5 / 32 / 1 = 6.25 → 6
-    * Single A100 80G Lambda (200 GB / 2 fit-workers):
-        200 × 0.5 / 2 / 1 = 50 → clamped to ``hard_cap``=10
-    * Tight cluster node (64 GB / 16 fit-workers):
-        64 × 0.5 / 16 / 1 = 2 → 2
-    * RAM-starved (32 GB / 16 fit-workers):
-        32 × 0.5 / 16 / 1 = 1 → 1 (legacy regen-every-epoch)
+    * 8×A100-80GB Verda shares the same reserve and worker-RSS estimate as
+      the outer process planner, then stops at the throughput cap.
+    * Single A100 80G Lambda uses the shared host reserve minus the two
+      workers' base RSS, then fills the remaining per-worker pool budget.
+    * Tight and RAM-starved nodes naturally fall back toward one pooled epoch
+      as the fit-worker base RSS consumes the shared usable budget.
     """
     if num_workers is None or int(num_workers) <= 0:
         return 1
     if ram_gb is None:
         return 1
     if safety_fraction is None:
-        safety_fraction = env_float(
-            "MHCFLURRY_AUTO_RN_POOL_SAFETY_FRACTION", "0.5",
-            bounds=(0.0, 1.0),
+        raw_fraction = os.environ.get(
+            "MHCFLURRY_AUTO_RN_POOL_SAFETY_FRACTION")
+        safety_fraction = (
+            env_float(
+                "MHCFLURRY_AUTO_RN_POOL_SAFETY_FRACTION",
+                raw_fraction,
+                bounds=(0.0, 1.0),
+            )
+            if raw_fraction not in (None, "") else None
         )
     if per_pool_epoch_per_worker_bytes is None:
         per_pool_epoch_per_worker_bytes = env_float(
@@ -638,11 +662,25 @@ def auto_random_negative_pool_epochs(
         ) * (1024 ** 3)
     if hard_cap is None:
         hard_cap = env_int(
-            "MHCFLURRY_AUTO_RN_POOL_HARD_CAP", "10",
+            "MHCFLURRY_AUTO_RN_POOL_HARD_CAP",
+            "10",
             bounds=(1, None),
         )
-    available_bytes = float(ram_gb) * (1024 ** 3) * float(safety_fraction)
-    per_worker_budget = available_bytes / max(int(num_workers), 1)
+    from ..memory_budget import HOST_MIN_RESERVE_BYTES, usable_memory_bytes
+    available_bytes = float(ram_gb) * (1024 ** 3)
+    if safety_fraction is not None:
+        pool_budget = available_bytes * float(safety_fraction)
+    else:
+        pool_budget = usable_memory_bytes(
+            available_bytes,
+            min_reserve_bytes=HOST_MIN_RESERVE_BYTES,
+        )
+        pool_budget -= (
+            max(float(base_worker_gb), 0.0)
+            * max(int(num_workers), 1)
+            * (1024 ** 3)
+        )
+    per_worker_budget = max(pool_budget, 0.0) / max(int(num_workers), 1)
     by_memory = max(1, int(per_worker_budget / max(
         per_pool_epoch_per_worker_bytes, 1.0)))
     # The `num_random_negatives` and `peptide_max_length` inputs are
@@ -768,7 +806,34 @@ def resolve_local_parallelism_args(
     args.random_negative_pool_epochs_was_auto = (
         plan.random_negative_pool_epochs_was_auto
     )
+    (
+        cpu_threads_per_worker,
+        cpu_threads_per_worker_was_auto,
+    ) = _resolve_cpu_thread_budget(plan)
+    plan = replace(
+        plan,
+        cpu_threads_per_worker=cpu_threads_per_worker,
+        cpu_threads_per_worker_was_auto=cpu_threads_per_worker_was_auto,
+    )
+    args.cpu_threads_per_worker = cpu_threads_per_worker
+    args.cpu_threads_per_worker_was_auto = (
+        cpu_threads_per_worker_was_auto
+    )
     args.workload_plan = plan
+
+    if (
+            plan.num_jobs == 0
+            and not getattr(args, "cluster_parallelism", False)
+            and cpu_threads_per_worker_was_auto):
+        # Serial commands execute the work function directly in this process,
+        # so worker_init never gets a chance to resize native/PyTorch pools
+        # that were initialized before planning ran.
+        from .worker_runtime import configure_worker_cpu_threads
+        applied_threads = configure_worker_cpu_threads(
+            cpu_threads_per_worker,
+            auto_owned=True,
+        )
+        configure_pytorch(num_threads=applied_threads)
 
     # Promote orchestrator-owned tuning knobs from CLI to env so the
     # existing call sites (pytorch_training.maybe_compile_network,
@@ -806,6 +871,339 @@ def resolve_local_parallelism_args(
     hoist_torchinductor_compile_threads(args)
     print("Local workload plan:", plan, file=sys.stderr)
     args._local_parallelism_args_resolved = True
+    return args
+
+
+def resolve_cpu_threads_per_worker(plan, cpu_count=None):
+    """Set unset BLAS/OpenMP thread env vars from the final worker plan."""
+    threads, _was_auto = _resolve_cpu_thread_budget(plan, cpu_count=cpu_count)
+    return threads
+
+
+def _resolve_cpu_thread_budget(plan, cpu_count=None):
+    """Return the numeric thread budget and whether mhcflurry owns it.
+
+    A uniform runtime resize is safe only when all supported environment
+    variables are unset or were written by an earlier mhcflurry auto pass.
+    Any caller-owned value makes the environment authoritative; the numeric
+    auto estimate is still recorded for diagnostics but must not be applied
+    to loaded native or PyTorch pools.
+    """
+    if cpu_count is None:
+        cpu_count = os.cpu_count() or 1
+    fit_workers = max(int(plan.num_jobs), 1)
+    reserved = 2 + fit_workers * int(plan.dataloader_num_workers)
+    available = max(int(cpu_count) - reserved, fit_workers)
+    per_worker = max(1, available // fit_workers)
+    auto_owned = True
+    for name in (
+            "OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+        marker = "MHCFLURRY_%s_AUTO" % name
+        marker_value = os.environ.get(marker)
+        current_value = os.environ.get(name)
+        # Record the exact value written by the auto planner. A boolean marker
+        # is insufficient: after an earlier auto pass, a caller can replace
+        # OMP_NUM_THREADS while the inherited marker remains in the
+        # environment. Treat the value as auto-owned only while it still
+        # matches what MHCflurry wrote.
+        marker_matches = (
+            marker_value is not None and marker_value == current_value
+        )
+        if current_value is None or marker_matches:
+            os.environ[name] = str(per_worker)
+            os.environ[marker] = str(per_worker)
+        else:
+            auto_owned = False
+    logging.info(
+        "CPU thread budget: %d thread(s)/fit-worker "
+        "(cpus=%d, fit_workers=%d, dataloader_workers=%d, source=%s)",
+        per_worker,
+        int(cpu_count),
+        fit_workers,
+        int(plan.dataloader_num_workers),
+        "auto" if auto_owned else "environment",
+    )
+    return per_worker, auto_owned
+
+
+def refine_local_parallelism_from_warmup(args, reports):
+    """Tighten an automatic plan using representative warmup measurements.
+
+    The analytic estimate remains the floor because a one-batch warmup does
+    not contain a full resident dataset or validation. Measured CUDA reserved
+    memory and process peak RSS can only increase the estimated working set and
+    reduce automatic concurrency. Explicit ``--num-jobs`` and
+    ``--max-workers-per-gpu`` values are never changed.
+    """
+    reports = [report for report in (reports or []) if report]
+    plan = getattr(args, "workload_plan", None)
+    if plan is None or not reports:
+        return args
+
+    gib = float(1 << 30)
+    device_values = [
+        max(
+            int(report.get("cuda_peak_allocated_bytes") or 0),
+            int(report.get("cuda_peak_reserved_bytes") or 0),
+        ) / gib
+        for report in reports
+        if (
+            report.get("cuda_peak_allocated_bytes") is not None
+            or report.get("cuda_peak_reserved_bytes") is not None
+        )
+    ]
+    host_values = [
+        int(report["host_peak_rss_bytes"]) / gib
+        for report in reports
+        if report.get("host_peak_rss_bytes") is not None
+    ]
+    device_peak_gb = max(device_values) if device_values else None
+    host_peak_gb = max(host_values) if host_values else None
+
+    # Peak counters are exact for the representative step; the margin covers
+    # later allocator fragmentation and small input-shape differences.
+    measured_device_worker_gb = (
+        device_peak_gb * 1.15 if device_peak_gb is not None else None
+    )
+    # RUSAGE_SELF measures only the warmed fit worker. Production also starts
+    # DataLoader children, so retain their analytic allowance when the
+    # measured main-process RSS becomes the binding estimate.
+    measured_host_worker_gb = (
+        host_peak_gb * 1.10
+        + int(plan.dataloader_num_workers) * HOST_RAM_PER_DATALOADER_CHILD_GB
+        if host_peak_gb is not None else None
+    )
+    device_candidates = [
+        value for value in (
+            plan.device_worker_gb,
+            measured_device_worker_gb,
+        ) if value is not None
+    ]
+    host_candidates = [
+        value for value in (
+            plan.host_worker_gb,
+            measured_host_worker_gb,
+        ) if value is not None
+    ]
+    device_worker_gb = (
+        max(device_candidates) if device_candidates else None
+    )
+    host_worker_gb = max(host_candidates) if host_candidates else 0.0
+
+    new_mwpg = int(plan.max_workers_per_gpu)
+    if (
+            plan.max_workers_per_gpu_was_auto
+            and plan.gpus > 0
+            and device_worker_gb is not None):
+        measured_mwpg = auto_max_workers_per_gpu(
+            num_jobs="auto",
+            num_gpus=plan.gpus,
+            backend=plan.backend,
+            per_worker_gb=device_worker_gb,
+        )
+        new_mwpg = min(new_mwpg, int(measured_mwpg))
+
+    new_num_jobs = int(plan.num_jobs)
+    if plan.num_jobs_was_auto and new_num_jobs > 0 and plan.gpus > 0:
+        new_num_jobs = min(new_num_jobs, plan.gpus * new_mwpg)
+    host_cap = plan.host_memory_num_jobs_cap
+    if plan.host_memory_available_gb is not None:
+        host_cap = host_memory_num_jobs_cap(
+            {
+                "available_gb": plan.host_memory_available_gb,
+                "total_gb": plan.host_memory_total_gb,
+            },
+            host_worker_gb,
+        )
+        if (
+                plan.num_jobs_was_auto
+                and host_cap is not None
+                and new_num_jobs > 0):
+            new_num_jobs = min(new_num_jobs, int(host_cap))
+            if plan.max_workers_per_gpu_was_auto and plan.gpus > 0:
+                new_mwpg = min(
+                    new_mwpg,
+                    max(1, (new_num_jobs + plan.gpus - 1) // plan.gpus),
+                )
+
+    changed = (
+        new_mwpg != plan.max_workers_per_gpu
+        or new_num_jobs != plan.num_jobs
+    )
+    refined = replace(
+        plan,
+        max_workers_per_gpu=new_mwpg,
+        num_jobs=new_num_jobs,
+        capacity=(
+            min(new_num_jobs, plan.gpus * new_mwpg)
+            if new_num_jobs > 0 and plan.gpus > 0 else plan.capacity
+        ),
+        device_worker_gb=device_worker_gb,
+        host_worker_gb=host_worker_gb,
+        host_memory_num_jobs_cap=host_cap,
+        warmup_device_peak_gb=device_peak_gb,
+        warmup_host_peak_gb=host_peak_gb,
+    )
+    (
+        cpu_threads_per_worker,
+        cpu_threads_per_worker_was_auto,
+    ) = _resolve_cpu_thread_budget(refined)
+    refined = replace(
+        refined,
+        cpu_threads_per_worker=cpu_threads_per_worker,
+        cpu_threads_per_worker_was_auto=cpu_threads_per_worker_was_auto,
+    )
+    args.workload_plan = refined
+    args.max_workers_per_gpu = new_mwpg
+    args.num_jobs = new_num_jobs
+    args.cpu_threads_per_worker = cpu_threads_per_worker
+    args.cpu_threads_per_worker_was_auto = (
+        cpu_threads_per_worker_was_auto
+    )
+    if changed:
+        print(
+            "Warmup memory calibration tightened local parallelism: %s" % (
+                refined,),
+            file=sys.stderr,
+        )
+    else:
+        print(
+            "Warmup memory calibration confirmed local parallelism: %s" % (
+                refined,),
+            file=sys.stderr,
+        )
+    return args
+
+
+def refine_local_parallelism_from_spawn_context(
+        args, context_bytes, memory=None):
+    """Cap automatic spawn workers using the loaded per-process context.
+
+    Spawn serializes the full worker initializer context into every process,
+    unlike fork's copy-on-write inheritance. Input files may be compressed, so
+    their on-disk size is not a reliable host-RAM estimate. This refinement is
+    deliberately performed after the dataset/model context has been loaded but
+    before any workers start.
+    """
+    plan = getattr(args, "workload_plan", None)
+    if plan is None or int(getattr(args, "num_jobs", 0) or 0) <= 0:
+        return args
+    context_bytes = int(context_bytes)
+    if context_bytes < 0:
+        raise ValueError("context_bytes must be non-negative")
+    if not context_bytes:
+        return args
+    if memory is None:
+        memory = system_memory_info_gb()
+    available_gb = available_or_total_memory_gb(memory)
+    if available_gb is None:
+        return args
+
+    # Deep object-size accounting captures resident array/string payloads. The
+    # multiplier covers pickle reconstruction, indexes, allocator overhead,
+    # and transient copies while the child imports its runtime. The runtime
+    # floor prevents a tiny context from erasing the workload profile's normal
+    # Python/torch allowance.
+    context_gb = context_bytes / float(1 << 30)
+    context_host_worker_gb = (
+        1.0
+        + context_gb * 1.5
+        + int(plan.dataloader_num_workers)
+        * HOST_RAM_PER_DATALOADER_CHILD_GB
+    )
+    host_worker_gb = max(float(plan.host_worker_gb), context_host_worker_gb)
+    host_cap = host_memory_num_jobs_cap(memory, host_worker_gb)
+    usable_host_gb = usable_memory_bytes(
+        float(available_gb) * (1 << 30),
+        min_reserve_bytes=HOST_MIN_RESERVE_BYTES,
+    ) / float(1 << 30)
+    # The generic host-cap helper deliberately returns at least one worker so
+    # GPU planning can attempt a minimally viable launch. Spawn is different:
+    # the parent already owns the loaded context, and starting even one child
+    # makes another full copy. If the safe remaining budget cannot hold that
+    # copy, execute serially in the parent instead of forcing a likely OOM.
+    if usable_host_gb < host_worker_gb:
+        host_cap = 0
+    warnings = list(plan.warnings)
+    new_num_jobs = int(plan.num_jobs)
+    new_mwpg = int(plan.max_workers_per_gpu)
+    host_cap_applied = False
+    if (
+            host_cap is not None
+            and plan.num_jobs_was_auto
+            and new_num_jobs > int(host_cap)):
+        host_cap_applied = True
+        warnings.append(
+            "auto num_jobs capped from %d to %d by loaded spawn context "
+            "(%.1f GB available from %s, %.1f GB context, %.1f GB/worker)" % (
+                new_num_jobs,
+                int(host_cap),
+                float(available_gb),
+                memory.get("source", "unknown"),
+                context_gb,
+                host_worker_gb,
+            )
+        )
+        new_num_jobs = int(host_cap)
+        if plan.max_workers_per_gpu_was_auto and plan.gpus > 0:
+            new_mwpg = min(
+                new_mwpg,
+                max(1, (new_num_jobs + plan.gpus - 1) // plan.gpus),
+            )
+    elif (
+            host_cap is not None
+            and not plan.num_jobs_was_auto
+            and new_num_jobs > int(host_cap)):
+        warnings.append(
+            "explicit num_jobs=%d exceeds loaded spawn-context host-memory "
+            "estimate %d; honoring CLI override" % (new_num_jobs, host_cap)
+        )
+
+    refined = replace(
+        plan,
+        max_workers_per_gpu=new_mwpg,
+        num_jobs=new_num_jobs,
+        capacity=(
+            new_num_jobs
+            if host_cap_applied
+            else plan.capacity
+        ),
+        host_worker_gb=host_worker_gb,
+        host_memory_total_gb=memory.get("total_gb"),
+        host_memory_available_gb=memory.get("available_gb"),
+        host_memory_source=memory.get("source", "unknown"),
+        host_memory_num_jobs_cap=host_cap,
+        warnings=tuple(warnings),
+    )
+    (
+        cpu_threads_per_worker,
+        cpu_threads_per_worker_was_auto,
+    ) = _resolve_cpu_thread_budget(refined)
+    refined = replace(
+        refined,
+        cpu_threads_per_worker=cpu_threads_per_worker,
+        cpu_threads_per_worker_was_auto=cpu_threads_per_worker_was_auto,
+    )
+    args.workload_plan = refined
+    args.max_workers_per_gpu = new_mwpg
+    args.num_jobs = new_num_jobs
+    args.cpu_threads_per_worker = cpu_threads_per_worker
+    args.cpu_threads_per_worker_was_auto = cpu_threads_per_worker_was_auto
+    if new_num_jobs == 0 and int(plan.num_jobs) > 0:
+        # Commands decide between their serial and parallel branches
+        # immediately after this late, context-aware refinement. Apply the
+        # runtime limit here because no worker initializer will run.
+        from .worker_runtime import configure_worker_cpu_threads
+        applied_threads = configure_worker_cpu_threads(
+            cpu_threads_per_worker,
+            auto_owned=cpu_threads_per_worker_was_auto,
+        )
+        configure_pytorch(num_threads=applied_threads)
+    if refined != plan:
+        print(
+            "Loaded spawn-context memory refinement: %s" % refined,
+            file=sys.stderr,
+        )
     return args
 
 

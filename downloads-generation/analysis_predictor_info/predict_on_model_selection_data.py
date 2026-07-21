@@ -43,6 +43,7 @@ from mhcflurry.cluster_parallelism import (
 # processes upon fork() call, allowing us to share large data with the workers
 # via shared memory.
 GLOBAL_DATA = {}
+WORKER_CONTEXT = GLOBAL_DATA
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
@@ -167,7 +168,11 @@ def run():
             result_serialization_method="pickle",
             clear_constant_data=False)
     else:
-        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+        worker_pool = worker_pool_with_gpu_assignments_from_args(
+            args,
+            worker_context_module=__name__,
+            worker_context_data=GLOBAL_DATA,
+        )
         print("Worker pool", worker_pool)
         assert worker_pool is not None
         results = worker_pool.imap_unordered(
@@ -177,24 +182,28 @@ def run():
 
     print("Reading results")
 
-    for worker_result in tqdm.tqdm(results, total=len(tasks)):
-        print("Received worker result:", worker_result['key'])
-        print(worker_result)
+    try:
+        for worker_result in tqdm.tqdm(results, total=len(tasks)):
+            print("Received worker result:", worker_result['key'])
+            print(worker_result)
 
-        eval_df.loc[
-            worker_result['index'],
-            "prediction"
-        ] = worker_result["prediction"]
+            eval_df.loc[
+                worker_result['index'],
+                "prediction"
+            ] = worker_result["prediction"]
+        if worker_pool:
+            worker_pool.close()
+            worker_pool.join()
+            worker_pool = None
+    finally:
+        if worker_pool:
+            worker_pool.terminate()
+            worker_pool.join()
 
     print("Received all results in %0.2f sec" % (time.time() - start))
 
     eval_df.to_csv(args.out, index=False)
     print("Wrote: ", args.out)
-
-    if worker_pool:
-        worker_pool.close()
-        worker_pool.join()
-
 
 if __name__ == '__main__':
     run()

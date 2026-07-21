@@ -25,13 +25,13 @@ orchestrator process               training worker process
 ─────────────────────              ───────────────────────
 
 parse args                         (forked / spawned)
-load training data                  inherit WORKER_CONTEXT
+load training data                  receive WORKER_CONTEXT once
 build WORKER_CONTEXT        ─┐
                              │
 hoist env knobs              │
   TORCHINDUCTOR_COMPILE_THREADS
                              │
-fork worker pool             ─┘
+start worker pool            ─┘
                                     fit() builds device-resident
                                       AffinityDeviceTrainingData
                                       (peptide/allele/y/weights and
@@ -87,7 +87,12 @@ Two backends, one CLI surface:
   `--max-workers-per-gpu=auto` and `--dataloader-num-workers=auto`
   without touching CUDA, caps local `--num-jobs` to GPU capacity when
   auto was requested, and hoists torch.compile's thread cap before the
-  Pool forks. Explicit numeric `--max-workers-per-gpu` keeps the
+  Pool starts. Fork workers inherit `WORKER_CONTEXT` through copy-on-write;
+  spawn workers receive it once in their initializer, never once per queued
+  task. Before a spawn pool starts, the planner deep-sizes that loaded context
+  and rechecks current host RAM, so worker copies are capped even when the
+  source CSV was compressed or torch compilation is disabled. Explicit numeric
+  `--max-workers-per-gpu` keeps the
   historical CPU-overflow behavior.
 - **Cluster** (`cluster_parallelism.py`): one job per work-item
   submitted via `bsub` / `sbatch` / `sh`. Workers serialize
@@ -108,7 +113,7 @@ paths remain intentionally smaller.
 | **affinity (pan-allele)** | streaming DataLoader + compact torch-index peptide batches | device-resident tensors + worker-local RN pool | filter ✓; pool/cache n/a (no fit) | filter ✓; pool/cache n/a |
 | **affinity (allele-specific)** | n/a | device-resident tensors + worker-local RN pool | filter ✓ | shares calibrate command |
 | **processing** | n/a | local+cluster worker pool | local+cluster worker pool | n/a (allele-independent) |
-| **presentation** | n/a | serial only (single-process; no orchestration story today) | n/a | filter ✓ (shares calibrate command) |
+| **presentation** | n/a | parallel auto-sized feature generation + deterministic fit | n/a | filter ✓ (shares calibrate command) |
 
 ## Auto-tuned parallelism knobs
 
@@ -121,20 +126,31 @@ intentionally re-benchmarking.
 
 ### `--max-workers-per-gpu auto` → `auto_max_workers_per_gpu`
 
-Picks the per-GPU worker concurrency from `min(num_jobs / num_gpus,
-floor(0.6 × free_vram_gb / per_worker_gb), hard_cap=4)`. Free VRAM is
-read from `nvidia-smi` (no torch import — the parent process must not
-initialize CUDA before forking). The per-worker VRAM upper bound defaults to
-4 GB (the affinity-fit footprint) and is tunable via
-`MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`; heavier workloads (e.g.
-calibration at 24 GB) pass their own value through the planner.
+Picks per-GPU worker concurrency from the number of complete estimated worker
+working sets that fit in detected free VRAM after one shared reserve (10%, at
+least 1 GiB). There is no default worker hard cap. The working set is derived
+from model artifacts/parameters, gradients and optimizer state for training,
+resident encoded data, and the configured training minibatch where those facts
+are available; otherwise the workload profile supplies a conservative fallback.
+Free VRAM is read from `nvidia-smi` (no torch import — the parent process must
+not initialize CUDA before forking). The final job count is also bounded by
+available host RAM and vCPUs. In containers, host-memory sizing honors the
+current cgroup limit and usage rather than the physical host's `/proc/meminfo`.
+Spawn pools then refine the host cap from the loaded per-worker context and
+current available RAM; fork pools retain copy-on-write sharing and skip that
+copy multiplier. If no additional spawn copy fits safely, automatic local
+execution falls back to serial work in the parent instead of forcing one child.
 
-| Box | num_gpus | free_vram | resolved |
-|---|---|---|---|
-| 8×A100-80GB | 8 | ~80 GB | **2** |
-| 8×A100-40GB | 8 | ~40 GB | **1** |
-| 1×A100-80GB | 1 | ~80 GB | **2** |
-| CPU-only | 0 | — | **1** |
+When torch compilation is enabled, the existing one-worker compile warmup also
+records CUDA peak-reserved memory and process peak RSS. A measured peak can
+tighten an automatic plan before the production pool starts, but can never
+change explicit CLI values. Runtime validation and inference batches use the
+same shared reserve against live free memory, so they do not independently
+spend VRAM already assigned to workers.
+
+For the generic 4 GiB fallback, 80 GiB free fits 18 workers and 40 GiB fits 9;
+workload-specific estimates, host RAM, vCPUs, and the number of work items can
+reduce those capacities. CPU-only execution resolves to one device worker.
 
 ### `--dataloader-num-workers auto` → `auto_dataloader_num_workers`
 
@@ -193,15 +209,15 @@ once `auto_max_workers_per_gpu` has resolved. Pass an integer to pin it.
 |---|---|---|---|
 | Pan-allele affinity | ✓ | ✓ (pretrain only) | Default in release recipe; affinity `fit()` is device-resident |
 | Allele-specific affinity | ✓ | ✓ | Same `Class1NeuralNetwork` codebase; auto already wired |
-| Processing | ✓ | (no-op for now) | `Class1ProcessingNeuralNetwork` does not yet expose `dataloader_num_workers`; flag is accepted via shared `add_local_parallelism_args` so argv stays uniform across train_*_command, but `apply_dataloader_num_workers_to_work_items` won't change processing behavior until that hyperparameter is added. |
-| Presentation | n/a | n/a | Single-process today |
+| Processing | ✓ | n/a | Parallel model fits; the processing network has no DataLoader pretraining path. |
+| Presentation | ✓ | n/a | Parallel feature generation followed by deterministic fitting. |
 
 ### Env overrides
 
 | Env var | Default | Effect |
 |---|---|---|
-| `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB` | 4.0 | Per-worker VRAM upper bound for the MWPG resolver (affinity-fit footprint; heavier workloads pass their own via the planner) |
-| `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP` | 4 | SM-scheduler ceiling for MWPG |
+| `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB` | 4.0 generic fallback | Expert per-worker VRAM override; workload-specific estimates normally replace the fallback. |
+| `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP` | unset | Optional expert ceiling for workers per GPU. |
 | `MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB` | (auto-detect) | Pin free VRAM (CSV per GPU); for tests / hidden-`nvidia-smi` launchers |
 | `MHCFLURRY_AUTO_DATALOADER_HARD_CAP` | 4 | DL child cap for `auto_dataloader_num_workers` |
 
@@ -271,8 +287,9 @@ before compiling losses to avoid the PyTorch 2.4 / Triton
    existing ones in `train_pan_allele_models_command.py`.
 2. Stash the result in `WORKER_CONTEXT["<name>"]`.
 3. Document the lookup key. Workers retrieve via
-   `constant_data["<name>"]` (forked workers inherit; spawned/cluster
-   workers receive via pickle).
+   `constant_data["<name>"]` (forked workers inherit; spawned workers receive
+   one initializer payload per process; cluster workers receive the serialized
+   context through the shared filesystem).
 4. Add a `getattr(args, "<flag>", None)` gate so the helper is opt-in
    on the CLI side.
 
@@ -337,6 +354,10 @@ Release recipes set only this knob. On a local 8-GPU run with
 fit-local DataLoader children while pretrain epochs are active; `2`
 means up to 32. The thread-budget helper accounts for this when sizing
 `OMP_NUM_THREADS`, `MKL_NUM_THREADS`, and `OPENBLAS_NUM_THREADS`.
+Caller-provided values remain authoritative and are not replaced by the
+planner's uniform runtime limit. For serial (`num_jobs=0`) execution, an
+auto-owned budget is applied directly to the current native and PyTorch pools
+because there is no worker initializer.
 
 The affinity `fit()` path does not use a DataLoader and therefore
 ignores this hyperparameter.

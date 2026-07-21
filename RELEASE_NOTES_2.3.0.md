@@ -24,9 +24,10 @@ The orchestrator-as-locus-of-control architecture is documented in
 "who owns what" picture across parallelism, tensor residency, and env
 knobs.
 
-No changes to the prediction interface. **Saved 2.2.x model bundles
-load and predict identically — the changes are entirely in how new
-models are trained.**
+No changes to the prediction interface. **Saved 2.2.x model bundles remain
+compatible, and predictions for valid class-I alleles are unchanged.** Loading
+now omits incomplete pseudosequences that mhcgnomes identifies as pseudogene,
+class-II, or non-MHC records; these rows were never valid prediction targets.
 
 ## Performance
 
@@ -200,6 +201,16 @@ dropped = sorted(set(all_alleles) - set(kept))
 print(f"{len(dropped)} dropped:", dropped[:10])
 ```
 
+### MHC classification comes from mhcgnomes 3.33
+
+MHCflurry now requires mhcgnomes 3.33 and uses its ontology-backed
+`is_pseudogene` and gene-family classification directly. This removes the
+local HLA pseudogene table and name-based TAP/`PS` regular expression, while
+also recognizing pseudogene loci in macaque and orangutan species. One exact
+compatibility entry remains for the malformed `Caja-PS*02:01` key shipped in
+the public 2.2.0 pseudosequence artifact; upstream ontology/alias support is
+tracked in [pirl-unc/mhcgnomes#88](https://github.com/pirl-unc/mhcgnomes/issues/88).
+
 ### `validation_interval > 1` and the saved val_loss
 
 When `validation_interval > 1`, `fit_info["val_loss"]` is still one
@@ -227,6 +238,13 @@ negatives are refilled into the top slice of that row space each epoch.
 | `mhcflurry compare-models` | Compare two ensembles (run-vs-run or run-vs-public) across affinity, presentation, and training-stats components. Markdown to stdout, CSVs to `--out`. Each component runs only when both sides have the matching artifact. |
 | `mhcflurry plot-model-comparison` | Render ROC/PR/scatter/delta plots from a `compare-models` output directory. |
 | `scripts/training/plot_loss_curves.py` | Per-model train + val loss curves from manifest (no weight files needed). Three PNGs + summary CSV. |
+
+`matplotlib` is now an installed package dependency, so the documented
+evaluation and paper-figure commands work in a clean MHCflurry installation;
+remote launchers no longer install it as an undeclared workaround.
+Paper and diagnostic output paths are validated before comparison, cleanup, or
+rendering, preventing a custom summary path or paper directory from deleting or
+overwriting command-owned PDFs.
 
 When to use which:
 - **`compare-models --b public`** — a single run vs the published 2.2.0

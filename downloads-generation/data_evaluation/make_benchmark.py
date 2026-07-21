@@ -23,6 +23,11 @@ import pandas
 import tqdm
 
 import mhcflurry
+from mhcflurry.common import (
+    fraction_arg,
+    normalize_class1_genotype,
+    positive_float_arg,
+)
 from mhcflurry.proteome_decoys import (
     infer_flanking_length,
     load_reference_sequences,
@@ -51,7 +56,7 @@ proteome_source_group.add_argument(
         "a materialized proteome peptide CSV."))
 parser.add_argument(
     "--decoys-per-hit",
-    type=float,
+    type=positive_float_arg,
     metavar="N",
     default=99,
     help="Decoys per hit")
@@ -76,7 +81,7 @@ parser.add_argument(
     help="Include only data of the given format")
 parser.add_argument(
     "--sample-fraction",
-    type=float,
+    type=fraction_arg,
     help="Subsample data by specified fraction (e.g. 0.1)")
 parser.add_argument(
     "--out",
@@ -99,7 +104,8 @@ def run():
         (hit_df.peptide.str.match("^[%s]+$" % "".join(
             mhcflurry.amino_acid.COMMON_AMINO_ACIDS)))
     ]
-    hit_df['alleles'] = hit_df.hla.str.split().map(tuple)
+    hit_df['alleles'] = hit_df.hla.map(normalize_class1_genotype)
+    hit_df["hla"] = hit_df["alleles"].map(" ".join)
     print("Loaded hits from %d samples" % hit_df.sample_id.nunique())
     if args.only_format:
         hit_df = hit_df.loc[hit_df.format == args.only_format].copy()

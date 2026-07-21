@@ -22,6 +22,12 @@ import pandas
 import tqdm
 
 import mhcflurry
+from mhcflurry.common import (
+    fraction_arg,
+    normalize_class1_genotype,
+    normalize_sequence_resolved_allele_name,
+    positive_float_arg,
+)
 from mhcflurry.proteome_decoys import (
     infer_flanking_length,
     load_reference_sequences,
@@ -50,7 +56,7 @@ proteome_source_group.add_argument(
         "a materialized proteome peptide CSV."))
 parser.add_argument(
     "--decoys-per-hit",
-    type=float,
+    type=positive_float_arg,
     metavar="N",
     default=99,
     help="Decoys per hit")
@@ -75,13 +81,23 @@ parser.add_argument(
     help="Include only data of the given format")
 parser.add_argument(
     "--sample-fraction",
-    type=float,
+    type=fraction_arg,
     help="Subsample data by specified fraction (e.g. 0.1)")
 parser.add_argument(
     "--out",
     metavar="CSV",
     required=True,
     help="File to write")
+
+
+def canonicalize_training_allele(raw_name):
+    """Return a sequence-resolved class-I allele or fail immediately."""
+    return normalize_sequence_resolved_allele_name(raw_name)
+
+
+def split_hla_genotype(value):
+    """Split a whitespace-delimited genotype and canonicalize allele tokens."""
+    return normalize_class1_genotype(value)
 
 
 def run():
@@ -98,7 +114,11 @@ def run():
         (hit_df.peptide.str.match("^[%s]+$" % "".join(
             mhcflurry.amino_acid.COMMON_AMINO_ACIDS)))
     ]
-    hit_df['alleles'] = hit_df.hla.str.split().map(tuple)
+    hit_df['alleles'] = hit_df.hla.map(split_hla_genotype)
+    # Every downstream predictor input comes from this canonical spelling.
+    # Keep the tuple for exclusion checks and the space-delimited column for
+    # the presentation training/prediction APIs.
+    hit_df["hla"] = hit_df["alleles"].map(" ".join)
     print("Loaded hits from %d samples" % hit_df.sample_id.nunique())
     if args.only_format:
         hit_df = hit_df.loc[hit_df.format == args.only_format].copy()
@@ -133,7 +153,8 @@ def run():
             continue
         print("Excluding hits from", train_dataset)
         train_df = pandas.read_csv(train_dataset)
-        for (allele, peptides) in train_df.groupby("allele").peptide.unique().iteritems():
+        train_df["allele"] = train_df.allele.map(canonicalize_training_allele)
+        for (allele, peptides) in train_df.groupby("allele").peptide.unique().items():
             allele_to_excluded_peptides[allele].update(peptides)
         train_counts = train_df.groupby(
             ["allele", "peptide"]).measurement_value.count().to_dict()

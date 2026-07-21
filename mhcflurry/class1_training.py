@@ -12,7 +12,6 @@
 
 """Training and validation helpers for class I neural networks."""
 
-import logging
 import multiprocessing
 import os
 import time
@@ -441,30 +440,6 @@ def _make_streaming_batch_dataloader(
     return torch.utils.data.DataLoader(**kwargs)
 
 
-_VALIDATION_INEQUALITY_FALLBACK_WARNED = False
-
-
-def _warn_validation_inequality_fallback_once(loss_name):
-    """Log once per process when val_loss drops to the single-shot inequality path.
-
-    The fallback exists to preserve 2.1.x semantics: ``MSEWithInequalities`` and
-    its multi-output variant exclude encoded ``2.0`` targets from the
-    denominator, and batchwise averaging would change that count. Users should
-    know that validation is then unbatched so they can size ``batch_size``
-    knowing the cost.
-    """
-    global _VALIDATION_INEQUALITY_FALLBACK_WARNED
-    if _VALIDATION_INEQUALITY_FALLBACK_WARNED:
-        return
-    _VALIDATION_INEQUALITY_FALLBACK_WARNED = True
-    logging.warning(
-        "validation loss running single-shot (no batching) because "
-        "%s has inequality targets that would change the legacy denominator "
-        "if split across batches. This log fires once per process.",
-        loss_name,
-    )
-
-
 def _batched_validation_loss(
     *,
     network,
@@ -491,11 +466,10 @@ def _batched_validation_loss(
     batch runs through ``eager_network`` to avoid recompiling on an odd
     shape.
 
-    Weighted validation and cross-example losses fall back to the
-    original single-shot computation to preserve exact semantics:
-    averaging per-batch weighted means is not the same as taking the
-    weighted mean over the whole validation set, and losses like
-    ``MultiallelicMassSpecLoss`` couple samples within a batch.
+    Losses with additive numerator/denominator terms accumulate those terms
+    across batches, preserving the exact global reduction for inequality and
+    weighted losses. Cross-example losses still fall back to single-shot
+    computation because samples genuinely couple within the loss.
 
     Returns a Python float (already detached from autograd).
     """
@@ -503,23 +477,17 @@ def _batched_validation_loss(
     if n_val == 0:
         return float("nan")
 
-    # Short-circuit cheap predicates first so we only sync the device for the
-    # inequality-denominator check when none of the basic conditions apply.
-    needs_basic_fallback = (
-        n_val < batch_size
-        or val_weights is not None
-        or not getattr(loss_obj, "supports_independent_samples", True)
+    # A compiled loss keeps its additive reduction helper on the original
+    # module; use it directly for validation aggregation.
+    reduction_loss = getattr(loss_obj, "_orig_mod", loss_obj)
+    reduction_terms = getattr(
+        reduction_loss, "loss_numerator_and_denominator", None)
+    needs_single_shot = (
+        not getattr(reduction_loss, "supports_independent_samples", True)
+        or (val_weights is not None and reduction_terms is None)
     )
-    inequality_fallback = (
-        not needs_basic_fallback
-        and _validation_loss_has_legacy_inequality_denominator(loss_obj, val_y)
-    )
-    if needs_basic_fallback or inequality_fallback:
-        # Fallback for tiny val sets (typical in unit tests) and for
-        # weighted / cross-example / inequality losses whose reductions are
-        # not decomposable batchwise without changing the legacy denominator.
-        if inequality_fallback:
-            _warn_validation_inequality_fallback_once(type(loss_obj).__name__)
+    if needs_single_shot:
+        # Cross-example and unknown weighted reductions are not decomposable.
         inputs = {"peptide": val_peptide}
         if val_allele is not None:
             inputs["allele"] = val_allele
@@ -528,6 +496,8 @@ def _batched_validation_loss(
         return batch_loss.item()
 
     n_full = (n_val // batch_size) * batch_size
+    numerator_accum = None
+    denominator_accum = None
     loss_accum = 0.0
     weight_accum = 0.0
     for start in range(0, n_full, batch_size):
@@ -539,39 +509,56 @@ def _batched_validation_loss(
         weights_slice = (
             val_weights[start:end] if val_weights is not None else None
         )
-        batch_loss = loss_obj(
-            preds, val_y[start:end], sample_weights=weights_slice
-        )
-        loss_accum += batch_loss.item() * batch_size
-        weight_accum += batch_size
+        if reduction_terms is not None:
+            numerator, denominator = reduction_terms(
+                preds, val_y[start:end], sample_weights=weights_slice)
+            numerator_accum = (
+                numerator if numerator_accum is None
+                else numerator_accum + numerator
+            )
+            denominator_accum = (
+                denominator if denominator_accum is None
+                else denominator_accum + denominator
+            )
+        else:
+            batch_loss = loss_obj(
+                preds, val_y[start:end], sample_weights=weights_slice
+            )
+            loss_accum += batch_loss.item() * batch_size
+            weight_accum += batch_size
     if n_full < n_val:
         inputs = {"peptide": val_peptide[n_full:n_val]}
         if val_allele is not None:
             inputs["allele"] = val_allele[n_full:n_val]
-        tail_loss = loss_obj(
-            eager_network(inputs),
-            val_y[n_full:n_val],
-            sample_weights=None,
-        )
+        tail_predictions = eager_network(inputs)
         tail_size = n_val - n_full
-        loss_accum += tail_loss.item() * tail_size
-        weight_accum += tail_size
+        weights_slice = (
+            val_weights[n_full:n_val] if val_weights is not None else None
+        )
+        if reduction_terms is not None:
+            numerator, denominator = reduction_terms(
+                tail_predictions,
+                val_y[n_full:n_val],
+                sample_weights=weights_slice,
+            )
+            numerator_accum = (
+                numerator if numerator_accum is None
+                else numerator_accum + numerator
+            )
+            denominator_accum = (
+                denominator if denominator_accum is None
+                else denominator_accum + denominator
+            )
+        else:
+            tail_loss = loss_obj(
+                tail_predictions,
+                val_y[n_full:n_val],
+                sample_weights=weights_slice,
+            )
+            loss_accum += tail_loss.item() * tail_size
+            weight_accum += tail_size
+    if numerator_accum is not None:
+        return (
+            numerator_accum / torch.clamp(denominator_accum, min=1.0)
+        ).item()
     return loss_accum / weight_accum
-
-
-def _validation_loss_has_legacy_inequality_denominator(loss_obj, val_y):
-    """Return True when batch-size weighting would change inequality loss.
-
-    ``MSEWithInequalities`` and its multi-output variant keep 2.1.x behavior:
-    encoded ``2.0`` targets are excluded from the denominator. If such rows
-    are split unevenly across validation batches, averaging batch means by raw
-    batch size changes ``val_loss``. Use the old single-shot path only for that
-    case; all other independent-sample inequality rows remain batchable.
-    """
-    if not getattr(loss_obj, "supports_inequalities", False):
-        return False
-    y_t = val_y.reshape(-1)
-    if getattr(loss_obj, "supports_multiple_outputs", False):
-        output_indices = (y_t / 10.0).long()
-        y_t = y_t - output_indices.to(y_t.dtype) * 10.0
-    return bool(torch.any(y_t == 2.0).item())

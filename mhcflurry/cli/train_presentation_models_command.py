@@ -25,6 +25,7 @@ import tqdm  # progress bar
 
 from ..affinity.calibration_sizing import estimate_calibration_peak_bytes_per_row
 from ..pytorch_sizing import estimate_peak_bytes_per_row
+from ..memory_budget import module_tensor_bytes
 from ..class1_processing_predictor import Class1ProcessingPredictor
 from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..class1_presentation_predictor import Class1PresentationPredictor
@@ -33,17 +34,19 @@ from ..common import (
     configure_logging,
     configure_random_seed,
     install_sigusr1_stack_trace_handler,
+    positive_int_arg,
     write_generate_sh,
 )
 from ..parallelism import (
     add_local_parallelism_args,
-    attach_constant_data_to_work_items_if_needed,
     call_wrapped_kwargs,
+    refine_local_parallelism_from_worker_context,
     resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
 )
 from ..workload_planning import (
     WORKLOAD_PRESENTATION_TRAINING,
+    env_float,
     path_size_bytes,
 )
 
@@ -57,7 +60,6 @@ WORKER_CONTEXT = {}
 # fragmentation, and non-model torch state that is not visible from parameters.
 _PRESENTATION_WORKER_RUNTIME_FLOOR_GB = 6.0
 _PRESENTATION_WORKER_SAFETY_FACTOR = 1.3
-_PRESENTATION_WORKER_TRANSIENT_ROWS = 65_536
 
 parser = argparse.ArgumentParser(usage=__doc__)
 
@@ -105,7 +107,7 @@ parser.add_argument(
     help="Column in data giving hit (1) vs decoy (0)")
 parser.add_argument(
     "--feature-chunk-size",
-    type=int,
+    type=positive_int_arg,
     default=250000,
     metavar="N",
     help=(
@@ -215,6 +217,14 @@ def main(args):
         workload_name=WORKLOAD_PRESENTATION_TRAINING,
         workload_hints={
             "data_bytes": path_size_bytes(args.data),
+            "num_work_items": sum(
+                max(
+                    1,
+                    (len(group) + max(args.feature_chunk_size, 1) - 1)
+                    // max(args.feature_chunk_size, 1),
+                )
+                for _, group in df.groupby("experiment_id", sort=False)
+            ),
             "per_worker_gb": presentation_worker_gb,
             "transient_rows": args.feature_chunk_size,
         },
@@ -270,63 +280,32 @@ def estimate_presentation_feature_worker_gb(args, predictor):
     resolver still needs a per-worker base footprint so it does not schedule
     too many independent processes onto one GPU.
     """
-    import os
-
-    def env_float(name, default):
-        try:
-            return float(os.environ.get(name, default))
-        except (TypeError, ValueError):
-            print(
-                "Ignoring invalid %s=%r; using %.2f" % (
-                    name, os.environ.get(name), float(default),
-                )
-            )
-            return float(default)
-
     runtime_floor_gb = env_float(
         "MHCFLURRY_PRESENTATION_WORKER_RUNTIME_FLOOR_GB",
         _PRESENTATION_WORKER_RUNTIME_FLOOR_GB,
+        bounds=(0.0, None),
     )
     safety = env_float(
         "MHCFLURRY_PRESENTATION_WORKER_SAFETY_FACTOR",
         _PRESENTATION_WORKER_SAFETY_FACTOR,
+        bounds=(0.0, None),
     )
-    transient_rows = max(
-        1,
-        min(
-            int(getattr(args, "feature_chunk_size", 0) or 0),
-            int(env_float(
-                "MHCFLURRY_PRESENTATION_WORKER_TRANSIENT_ROWS",
-                _PRESENTATION_WORKER_TRANSIENT_ROWS,
-            )),
-        ),
-    )
-
     networks = list(iter_presentation_feature_networks(predictor))
     parameter_bytes = sum(network_parameter_bytes(network) for network in networks)
-    peak_bytes_per_row = max(
-        [presentation_network_peak_bytes_per_row(network) for network in networks]
-        or [0]
-    )
-    transient_bytes = int(peak_bytes_per_row * transient_rows)
     runtime_bytes = int(runtime_floor_gb * (1 << 30))
     estimate_gb = (
-        (parameter_bytes + transient_bytes + runtime_bytes)
+        (parameter_bytes + runtime_bytes)
         * safety
         / float(1 << 30)
     )
     estimate_gb = max(estimate_gb, 4.0)
     print(
         "Estimated presentation feature worker VRAM: %.2f GB "
-        "(networks=%d, params=%.2f GB, peak_row=%.2f KB, "
-        "transient_rows=%d, transient=%.2f GB, runtime_floor=%.2f GB, "
+        "(networks=%d, params=%.2f GB, runtime_floor=%.2f GB, "
         "safety=%.1fx)" % (
             estimate_gb,
             len(networks),
             parameter_bytes / float(1 << 30),
-            peak_bytes_per_row / 1024.0,
-            transient_rows,
-            transient_bytes / float(1 << 30),
             runtime_floor_gb,
             safety,
         )
@@ -359,20 +338,7 @@ def iter_presentation_feature_networks(predictor):
 
 def network_parameter_bytes(network):
     """Return unique parameter + buffer bytes for a torch module."""
-    seen = set()
-    total = 0
-    tensors = list(network.parameters(recurse=True))
-    tensors.extend(network.buffers(recurse=True))
-    for tensor in tensors:
-        try:
-            key = (str(tensor.device), int(tensor.data_ptr()))
-        except RuntimeError:
-            key = id(tensor)
-        if key in seen:
-            continue
-        seen.add(key)
-        total += int(tensor.nelement()) * int(tensor.element_size())
-    return total
+    return module_tensor_bytes(network)
 
 
 def presentation_network_peak_bytes_per_row(network):
@@ -422,15 +388,16 @@ def predict_features_parallel(args, predictor, df, experiment_to_alleles):
         "data": df,
         "experiment_to_alleles": experiment_to_alleles,
     })
+    refine_local_parallelism_from_worker_context(args, WORKER_CONTEXT)
 
     worker_pool = None
     try:
-        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
-        print("Worker pool", worker_pool)
-        assert worker_pool is not None
-        attach_constant_data_to_work_items_if_needed(
-            work_items, WORKER_CONTEXT, worker_pool
+        worker_pool = worker_pool_with_gpu_assignments_from_args(
+            args,
+            worker_context_module=__name__,
+            worker_context_data=WORKER_CONTEXT,
         )
+        print("Worker pool", worker_pool)
 
         affinity = numpy.empty(len(df), dtype="float64")
         processing_scores_by_model = {}
@@ -441,11 +408,17 @@ def predict_features_parallel(args, predictor, df, experiment_to_alleles):
             processing_scores_by_model["with_flanks"] = numpy.empty(
                 len(df), dtype="float64")
 
-        results = worker_pool.imap_unordered(
-            partial(call_wrapped_kwargs, predict_feature_chunk),
-            work_items,
-            chunksize=1,
-        )
+        if worker_pool is None:
+            print("Feature prediction is running serially in the loaded parent.")
+            results = (
+                predict_feature_chunk(**item) for item in work_items
+            )
+        else:
+            results = worker_pool.imap_unordered(
+                partial(call_wrapped_kwargs, predict_feature_chunk),
+                work_items,
+                chunksize=1,
+            )
         for result in tqdm.tqdm(results, total=len(work_items)):
             start = result["start"]
             end = result["end"]
@@ -453,9 +426,10 @@ def predict_features_parallel(args, predictor, df, experiment_to_alleles):
             for (model_name, values) in result["processing_scores"].items():
                 processing_scores_by_model[model_name][start:end] = values
 
-        worker_pool.close()
-        worker_pool.join()
-        worker_pool = None
+        if worker_pool is not None:
+            worker_pool.close()
+            worker_pool.join()
+            worker_pool = None
 
         return {
             "affinity": affinity,

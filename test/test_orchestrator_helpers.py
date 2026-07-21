@@ -180,6 +180,87 @@ def test_hoist_torchinductor_warmup_uses_larger_single_worker_budget(monkeypatch
     assert os.environ["TORCHINDUCTOR_COMPILE_THREADS"] == "64"
 
 
+def test_compile_warmup_preserves_numeric_return_contract(monkeypatch):
+    from mhcflurry.parallelism import torch_compile
+
+    reports = []
+    applied_items = []
+    pool_kwargs = {}
+
+    class FakePool:
+        def apply(self, function, args):
+            del function
+            applied_items.append(args[1])
+            report = {"worker_peak_rss_gb": len(reports) + 1.0}
+            reports.append(report)
+            return report
+
+        def close(self):
+            pass
+
+        def join(self):
+            pass
+
+        def terminate(self):
+            raise AssertionError("successful warmup should not terminate")
+
+    refined = []
+    monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
+    monkeypatch.setenv("TORCHINDUCTOR_COMPILE_THREADS", "1")
+    monkeypatch.delenv(
+        "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", raising=False)
+    monkeypatch.setattr(
+        torch_compile, "resolve_local_parallelism_args", lambda args: None)
+    monkeypatch.setattr(
+        torch_compile, "num_workers_per_gpu_from_args", lambda args: 1)
+    def fake_worker_pool(**kwargs):
+        pool_kwargs.update(kwargs)
+        return FakePool()
+
+    monkeypatch.setattr(
+        torch_compile, "worker_pool_with_gpu_assignments", fake_worker_pool)
+    monkeypatch.setattr(
+        torch_compile,
+        "refine_local_parallelism_from_warmup",
+        lambda args, measurements: refined.extend(measurements),
+    )
+    monkeypatch.setattr(
+        torch_compile, "hoist_torchinductor_compile_threads",
+        lambda args, phase: None)
+    args = argparse.Namespace(
+        backend="gpu",
+        cluster_parallelism=False,
+        cpu_threads_per_worker=1,
+        cpu_threads_per_worker_was_auto=False,
+        gpus=1,
+        max_workers_per_gpu=1,
+        num_jobs=2,
+        worker_log_dir=None,
+    )
+    work_items = [
+        {"hyperparameters": {"layer_sizes": [16]}},
+        {"hyperparameters": {"layer_sizes": [32]}},
+        {"hyperparameters": {"layer_sizes": [16]}},
+    ]
+
+    constant_data = {"large": object()}
+    warmed = torch_compile.run_single_worker_torch_compile_warmup(
+        args=args,
+        work_items=work_items,
+        work_function=lambda **kwargs: None,
+        constant_data=constant_data,
+    )
+
+    assert warmed == 2
+    assert isinstance(warmed, int)
+    assert refined == reports
+    assert pool_kwargs["worker_context_module"] == torch_compile.__name__
+    assert pool_kwargs["worker_context_data"] == {
+        "constant_data": constant_data,
+    }
+    assert all("constant_data" not in item for item in applied_items)
+
+
 def test_cluster_worker_compile_threads_auto(monkeypatch):
     from mhcflurry.parallelism import configure_cluster_worker_torch_compile_threads
 
@@ -346,28 +427,22 @@ def test_auto_dataloader_num_workers_hard_cap_env_override(monkeypatch):
 def test_auto_random_negative_pool_epochs_hardware_tiers():
     """Cross-check the RN-pool-epoch heuristic across production hardware tiers.
 
-    With default safety_fraction=0.5 and per-pool-epoch=1 GB/worker, the
-    pool epochs scale inversely with ``num_workers / ram_gb``. The hard
-    cap of 10 prevents marginal-return values from running away.
+    The default shares the host reserve with the rest of the planner and uses
+    1 GB per pool epoch/worker. The throughput cap of 10 prevents
+    marginal-return startup work from running away.
     """
     from mhcflurry.parallelism import auto_random_negative_pool_epochs
 
     cases = [
         # (label, ram_gb, num_workers, expected)
-        # 8x80GB Verda (32 fit-workers, 400 GB): 400*0.5/32 = 6.25 → 6
-        ("Verda 8xA100-80GB (32 workers / 400G)", 400, 32, 6),
-        # 8x40GB (16 fit-workers, 400 GB): 400*0.5/16 = 12.5 → cap=10
+        # Shared reserve leaves 90% on large hosts; the throughput cap binds.
+        ("Verda 8xA100-80GB (32 workers / 400G)", 400, 32, 10),
         ("8xA100-40GB (16 workers / 400G)", 400, 16, 10),
-        # 8xL40S (16 fit-workers, 200 GB): 200*0.5/16 = 6.25 → 6
-        ("8xL40S (16 workers / 200G)", 200, 16, 6),
-        # Single A100-80G Lambda (2 fit-workers, 200 GB): 200*0.5/2 = 50 → cap=10
+        ("8xL40S (16 workers / 200G)", 200, 16, 10),
         ("Single A100-80G Lambda (2/200G)", 200, 2, 10),
-        # Tight cluster (16 fit-workers, 64 GB): 64*0.5/16 = 2 → 2
-        ("Tight cluster (16/64G)", 64, 16, 2),
-        # RAM-starved (16 fit-workers, 32 GB): 32*0.5/16 = 1 → 1 (legacy)
+        ("Tight cluster (16/64G)", 64, 16, 3),
         ("RAM-starved (16/32G)", 32, 16, 1),
-        # Single T4 (1 fit-worker, 16 GB): 16*0.5/1 = 8 → 8
-        ("Single T4 (1/16G)", 16, 1, 8),
+        ("Single T4 (1/16G)", 16, 1, 10),
     ]
     for label, ram, workers, want in cases:
         got = auto_random_negative_pool_epochs(
@@ -407,10 +482,10 @@ def test_auto_random_negative_pool_epochs_env_overrides(monkeypatch):
     """Env knobs let operators tighten or loosen the heuristic."""
     from mhcflurry.parallelism import auto_random_negative_pool_epochs
 
-    # Verda baseline: 6.
+    # The shared reserve reaches the throughput cap on this large box.
     assert auto_random_negative_pool_epochs(
         num_random_negatives=1_500_000, peptide_max_length=15,
-        num_workers=32, ram_gb=400) == 6
+        num_workers=32, ram_gb=400) == 10
 
     # Halve the safety fraction → halves the budget.
     monkeypatch.setenv("MHCFLURRY_AUTO_RN_POOL_SAFETY_FRACTION", "0.25")
@@ -419,9 +494,9 @@ def test_auto_random_negative_pool_epochs_env_overrides(monkeypatch):
         num_workers=32, ram_gb=400) == 3
     monkeypatch.delenv("MHCFLURRY_AUTO_RN_POOL_SAFETY_FRACTION")
 
-    # Lower the per-pool cost estimate → higher pool epochs.
+    # Lower the per-pool cost estimate still stops at the throughput cap.
     monkeypatch.setenv("MHCFLURRY_AUTO_RN_POOL_PER_EPOCH_PER_WORKER_GB", "0.25")
-    # 400*0.5/32/0.25 = 25 → cap=10.
+    # Shared budget / 0.25 GB exceeds the cap.
     assert auto_random_negative_pool_epochs(
         num_random_negatives=1_500_000, peptide_max_length=15,
         num_workers=32, ram_gb=400) == 10
@@ -429,7 +504,7 @@ def test_auto_random_negative_pool_epochs_env_overrides(monkeypatch):
 
     # Lower the hard cap.
     monkeypatch.setenv("MHCFLURRY_AUTO_RN_POOL_HARD_CAP", "3")
-    # 400*0.5/32/1 = 6.25 → cap=3.
+    # The explicit cap wins.
     assert auto_random_negative_pool_epochs(
         num_random_negatives=1_500_000, peptide_max_length=15,
         num_workers=32, ram_gb=400) == 3

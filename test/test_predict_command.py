@@ -179,6 +179,26 @@ def test_default_auto_workers_are_resolved_before_prediction_kwargs(
         "_load_predictor_for_command",
         lambda models_dir: (FakePredictor(), True),
     )
+    original_worker_pool = (
+        predict_command.worker_pool_with_gpu_assignments_from_args)
+
+    def capture_worker_pool(
+            args, workload_name, workload_hints, start_method=None):
+        captured["workload_hints"] = dict(workload_hints)
+        return original_worker_pool(
+            args,
+            workload_name=workload_name,
+            workload_hints=workload_hints,
+            start_method=start_method,
+        )
+
+    monkeypatch.setattr(
+        predict_command,
+        "worker_pool_with_gpu_assignments_from_args",
+        capture_worker_pool,
+    )
+    monkeypatch.setattr(
+        predict_command, "default_prediction_batch_is_auto", lambda: False)
 
     predict_command.run([
         "--models", str(models_dir),
@@ -189,6 +209,7 @@ def test_default_auto_workers_are_resolved_before_prediction_kwargs(
     ])
 
     assert captured["model_kwargs"]["num_workers_per_gpu"] == 1
+    assert captured["workload_hints"]["elastic_batch"] is False
 
 
 def test_predict_columns_schema_parity_for_affinity_only():

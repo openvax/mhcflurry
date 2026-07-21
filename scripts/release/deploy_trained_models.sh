@@ -22,6 +22,8 @@ Usage:
       --run-dir /path/to/release-run \
       --release 2.3.0 \
       --github-release 2.3.0 \
+      [--processing-variants "no_flank with_flanks [short_flanks]"] \
+      [--repo /path/to/mhcflurry] [--allow-dirty-repo] \
       [--date YYYYMMDD] \
       [--assets-dir /path/to/assets] \
       [--dry-run | --draft | --publish | --mode MODE]
@@ -37,7 +39,8 @@ Modes:
 Expected run layout:
   <run-dir>/affinity/models.combined
   <run-dir>/processing/models.selected.no_flank
-  <run-dir>/processing/models.selected.short_flanks
+  <run-dir>/processing/models.selected.with_flanks
+  <run-dir>/processing/models.selected.short_flanks  (when requested)
   <run-dir>/presentation/models
 
 The script writes SHA256SUMS and a downloads.yml snippet beside the assets.
@@ -49,10 +52,6 @@ EOF
 die() {
     echo "ERROR: $*" >&2
     exit 2
-}
-
-warn() {
-    echo "WARNING: $*" >&2
 }
 
 note() {
@@ -106,8 +105,12 @@ RUN_DIR=
 RELEASE=
 GITHUB_RELEASE=
 ASSETS_DIR=
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="${REPO:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+ALLOW_DIRTY_REPO=0
 ASSET_DATE=$(date -u +%Y%m%d)
 MODE=dry-run
+PROCESSING_VARIANTS="no_flank with_flanks"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -130,6 +133,18 @@ while [ $# -gt 0 ]; do
         --date)
             ASSET_DATE=$2
             shift 2
+            ;;
+        --processing-variants)
+            PROCESSING_VARIANTS=$2
+            shift 2
+            ;;
+        --repo)
+            REPO=$2
+            shift 2
+            ;;
+        --allow-dirty-repo)
+            ALLOW_DIRTY_REPO=1
+            shift
             ;;
         --dry-run)
             MODE=dry-run
@@ -173,6 +188,31 @@ if [ -z "$ASSETS_DIR" ]; then
     ASSETS_DIR="$RUN_DIR/release-assets"
 fi
 
+NORMALIZED_PROCESSING_VARIANTS=
+for kind in $PROCESSING_VARIANTS; do
+    case "$kind" in
+        no_flank|with_flanks|short_flanks) ;;
+        *)
+            die "--processing-variants contains unsupported variant: $kind"
+            ;;
+    esac
+    case " $NORMALIZED_PROCESSING_VARIANTS " in
+        *" $kind "*)
+            die "--processing-variants contains duplicate variant: $kind"
+            ;;
+    esac
+    NORMALIZED_PROCESSING_VARIANTS="${NORMALIZED_PROCESSING_VARIANTS:+$NORMALIZED_PROCESSING_VARIANTS }$kind"
+done
+PROCESSING_VARIANTS=$NORMALIZED_PROCESSING_VARIANTS
+case " $PROCESSING_VARIANTS " in
+    *" no_flank "*) ;;
+    *) die "--processing-variants must include no_flank" ;;
+esac
+case " $PROCESSING_VARIANTS " in
+    *" with_flanks "*) ;;
+    *) die "--processing-variants must include with_flanks" ;;
+esac
+
 require_dir "$RUN_DIR"
 RUN_DIR=$(cd "$RUN_DIR" && pwd)
 case "$ASSETS_DIR" in
@@ -185,9 +225,6 @@ AFFINITY_DIR="$RUN_DIR/affinity"
 PROCESSING_DIR="$RUN_DIR/processing"
 PRESENTATION_DIR="$RUN_DIR/presentation"
 AFFINITY_MODELS="$AFFINITY_DIR/models.combined"
-PROCESSING_NO_FLANK="$PROCESSING_DIR/models.selected.no_flank"
-PROCESSING_SHORT_FLANKS="$PROCESSING_DIR/models.selected.short_flanks"
-PROCESSING_WITH_FLANKS="$PROCESSING_DIR/models.selected.with_flanks"
 PRESENTATION_MODELS="$PRESENTATION_DIR/models"
 
 PAN_ASSET="models_class1_pan.selected.${ASSET_DATE}.tar.bz2"
@@ -197,9 +234,23 @@ SHA_FILE="SHA256SUMS"
 SNIPPET_FILE="downloads.${RELEASE}.snippet.yml"
 
 require_command tar
+require_command python3
 if [ "$MODE" != "dry-run" ]; then
     require_command gh
 fi
+
+PROVENANCE_ARGS=(
+    python3 "$REPO/scripts/release/validate_release_provenance.py"
+    --repo "$REPO"
+    --run-dir "$RUN_DIR"
+    --release "$RELEASE"
+    --processing-variants "$PROCESSING_VARIANTS"
+    --require-artifacts
+)
+if [ "$ALLOW_DIRTY_REPO" = "1" ]; then
+    PROVENANCE_ARGS+=(--allow-dirty-repo)
+fi
+"${PROVENANCE_ARGS[@]}" >/dev/null
 
 require_dir "$AFFINITY_MODELS"
 require_file "$AFFINITY_MODELS/manifest.csv"
@@ -207,14 +258,13 @@ require_one_file "affinity percent ranks" \
     "$AFFINITY_MODELS/percent_ranks.csv" \
     "$AFFINITY_MODELS/percent_ranks.csv.bz2"
 
-require_dir "$PROCESSING_NO_FLANK"
-require_file "$PROCESSING_NO_FLANK/manifest.csv"
-require_dir "$PROCESSING_SHORT_FLANKS"
-require_file "$PROCESSING_SHORT_FLANKS/manifest.csv"
-if [ ! -d "$PROCESSING_WITH_FLANKS" ]; then
-    warn "Processing models.selected.with_flanks is absent."
-    warn "The archive will contain no_flank and short_flanks only."
-fi
+PROCESSING_ARCHIVE_DIRS=()
+for kind in $PROCESSING_VARIANTS; do
+    processing_models="$PROCESSING_DIR/models.selected.$kind"
+    require_dir "$processing_models"
+    require_file "$processing_models/manifest.csv"
+    PROCESSING_ARCHIVE_DIRS+=("models.selected.$kind")
+done
 
 require_dir "$PRESENTATION_MODELS"
 require_file "$PRESENTATION_MODELS/weights.csv"
@@ -227,6 +277,7 @@ note "GitHub release:   $GITHUB_RELEASE"
 note "Run directory:    $RUN_DIR"
 note "Assets directory: $ASSETS_DIR"
 note "Mode:             $MODE"
+note "Processing:       $PROCESSING_VARIANTS"
 note ""
 note "Assets:"
 note "  $PAN_ASSET"
@@ -238,14 +289,8 @@ if [ "$MODE" = "dry-run" ]; then
     note "Dry run only. Commands that would run:"
     quote_cmd mkdir -p "$ASSETS_DIR"
     quote_cmd tar -C "$AFFINITY_DIR" -cjf "$ASSETS_DIR/$PAN_ASSET" models.combined
-    if [ -d "$PROCESSING_WITH_FLANKS" ]; then
-        quote_cmd tar -C "$PROCESSING_DIR" -cjf "$ASSETS_DIR/$PROCESSING_ASSET" \
-            models.selected.no_flank models.selected.short_flanks \
-            models.selected.with_flanks
-    else
-        quote_cmd tar -C "$PROCESSING_DIR" -cjf "$ASSETS_DIR/$PROCESSING_ASSET" \
-            models.selected.no_flank models.selected.short_flanks
-    fi
+    quote_cmd tar -C "$PROCESSING_DIR" -cjf "$ASSETS_DIR/$PROCESSING_ASSET" \
+        "${PROCESSING_ARCHIVE_DIRS[@]}"
     quote_cmd tar -C "$PRESENTATION_DIR" -cjf "$ASSETS_DIR/$PRESENTATION_ASSET" models
     quote_cmd gh release upload "$GITHUB_RELEASE" \
         "$ASSETS_DIR/$PAN_ASSET" \
@@ -258,14 +303,8 @@ fi
 
 mkdir -p "$ASSETS_DIR"
 tar -C "$AFFINITY_DIR" -cjf "$ASSETS_DIR/$PAN_ASSET" models.combined
-if [ -d "$PROCESSING_WITH_FLANKS" ]; then
-    tar -C "$PROCESSING_DIR" -cjf "$ASSETS_DIR/$PROCESSING_ASSET" \
-        models.selected.no_flank models.selected.short_flanks \
-        models.selected.with_flanks
-else
-    tar -C "$PROCESSING_DIR" -cjf "$ASSETS_DIR/$PROCESSING_ASSET" \
-        models.selected.no_flank models.selected.short_flanks
-fi
+tar -C "$PROCESSING_DIR" -cjf "$ASSETS_DIR/$PROCESSING_ASSET" \
+    "${PROCESSING_ARCHIVE_DIRS[@]}"
 tar -C "$PRESENTATION_DIR" -cjf "$ASSETS_DIR/$PRESENTATION_ASSET" models
 
 (

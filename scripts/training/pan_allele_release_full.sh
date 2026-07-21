@@ -24,10 +24,26 @@
 #   MHCFLURRY_OUT              required — root for all artifacts
 #   REPO                       path to the mhcflurry repo
 #                              (default: this checkout)
-#   MAX_WORKERS_PER_GPU        per-GPU worker cap (default 2 on 80GB cards)
+#   MAX_WORKERS_PER_GPU        default per-GPU worker cap for shared stages
+#   AFFINITY_MAX_WORKERS_PER_GPU
+#                              affinity per-GPU worker cap (default auto)
 #   DATALOADER_NUM_WORKERS     'auto' (default) lets the orchestrator pick
+#   PROCESSING_NUM_JOBS        processing worker count (default auto)
+#   PROCESSING_MAX_WORKERS_PER_GPU
+#                              processing per-GPU worker cap (default auto)
 #   PROCESSING_HELD_OUT_SAMPLES  (default 50; subset script uses 10)
 #   PRESENTATION_DECOYS_PER_HIT (default 99 to match release; subset uses 2)
+#   TRAINING_MINIBATCH_SIZE    shared affinity/processing default (default 1024)
+#   AFFINITY_MINIBATCH_SIZE    affinity-specific override
+#   PROCESSING_MINIBATCH_SIZE  processing-specific override
+#   PROCESSING_VARIANTS        space-separated variants to train
+#                              (default "with_flanks no_flank short_flanks")
+#   PRESENTATION_PROCESSING_WITH_FLANKS_KIND
+#                              processing variant used as presentation's
+#                              with-flanks predictor (default with_flanks)
+#   MHCFLURRY_GPU_TELEMETRY    0 disables processing/presentation GPU CSVs
+#   MHCFLURRY_GPU_TELEMETRY_SECONDS
+#                              telemetry sampling interval (default 30)
 set -euo pipefail
 set -x
 
@@ -35,6 +51,10 @@ set -x
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RECIPE_DIR="$SCRIPT_DIR/release_exact"
 : "${REPO:=$(cd "$SCRIPT_DIR/../.." && pwd)}"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/gpu_telemetry.sh"
+GPU_TELEMETRY_PID=""
+trap stop_gpu_telemetry EXIT
 
 export PYTHONUNBUFFERED=1
 # Same default as the affinity stage; the orchestrator's CLI flag
@@ -50,57 +70,88 @@ if command -v nvidia-smi >/dev/null 2>&1; then
 else
     GPUS=0
 fi
-# Default to auto so the new (2.3.0) full release exercises the
-# orchestrator's hardware-aware resolver. On 8x80GB this lands at 4
-# workers/GPU = 32 fit workers (vs the affinity-only release_exact's
-# pinned 2/GPU = 16, which preserves bit-for-bit replication of 2.2.0).
+# Default to auto so each training command exercises the orchestrator's
+# workload-aware resolver. Affinity training in particular has a
+# minibatch-sensitive validation footprint; leave worker packing to the
+# in-process training command, which sees the hyperparameters and row count.
 MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-auto}"
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-auto}"
 PROCESSING_HELD_OUT_SAMPLES="${PROCESSING_HELD_OUT_SAMPLES:-50}"
 PRESENTATION_DECOYS_PER_HIT="${PRESENTATION_DECOYS_PER_HIT:-99}"
 PRESENTATION_FEATURE_CHUNK_SIZE="${PRESENTATION_FEATURE_CHUNK_SIZE:-250000}"
+TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-1024}"
+AFFINITY_MINIBATCH_SIZE="${AFFINITY_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
+AFFINITY_MAX_WORKERS_PER_GPU="${AFFINITY_MAX_WORKERS_PER_GPU:-auto}"
+PROCESSING_MINIBATCH_SIZE="${PROCESSING_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
+PROCESSING_VARIANTS="${PROCESSING_VARIANTS:-with_flanks no_flank short_flanks}"
+PRESENTATION_PROCESSING_WITH_FLANKS_KIND="${PRESENTATION_PROCESSING_WITH_FLANKS_KIND:-with_flanks}"
+
+processing_variant_enabled() {
+    case " $PROCESSING_VARIANTS " in
+        *" $1 "*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+seen_processing_variants=" "
+for processing_variant in $PROCESSING_VARIANTS; do
+    case "$processing_variant" in
+        with_flanks|no_flank|short_flanks) ;;
+        *)
+            echo "Unknown PROCESSING_VARIANTS entry: $processing_variant" >&2
+            exit 2
+            ;;
+    esac
+    case "$seen_processing_variants" in
+        *" $processing_variant "*)
+            echo "Duplicate PROCESSING_VARIANTS entry: $processing_variant" >&2
+            exit 2
+            ;;
+    esac
+    seen_processing_variants="$seen_processing_variants$processing_variant "
+done
+processing_variant_enabled no_flank || {
+    echo "PROCESSING_VARIANTS must include no_flank for presentation training." >&2
+    exit 2
+}
+case "$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" in
+    with_flanks|short_flanks) ;;
+    *)
+        echo "PRESENTATION_PROCESSING_WITH_FLANKS_KIND must be with_flanks or short_flanks." >&2
+        exit 2
+        ;;
+esac
+processing_variant_enabled "$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" || {
+    echo "PROCESSING_VARIANTS must include PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$PRESENTATION_PROCESSING_WITH_FLANKS_KIND." >&2
+    exit 2
+}
 
 if [ "$GPUS" -eq 0 ]; then
     NUM_JOBS=1
     MAX_WORKERS_PER_GPU=1
-elif [ "$MAX_WORKERS_PER_GPU" = "auto" ]; then
-    # Pre-resolve via the orchestrator's helper so the rest of the
-    # script (set_cpu_threads helper, COMMON_PARALLELISM_ARGS, log
-    # banners) can use a numeric value. Pass num_jobs=0 to skip the
-    # by_jobs clamp inside auto_max_workers_per_gpu — we want the
-    # resolver to pick on VRAM + hard_cap alone, then derive num_jobs
-    # from the picked MWPG.
-    MAX_WORKERS_PER_GPU="$(
-        GPUS="$GPUS" python - <<'PY'
-import os
-from mhcflurry.parallelism import auto_max_workers_per_gpu
-print(auto_max_workers_per_gpu(
-    num_jobs=0,
-    num_gpus=int(os.environ["GPUS"]),
-    backend="auto",
-))
-PY
-    )"
-    NUM_JOBS="$(( GPUS * MAX_WORKERS_PER_GPU ))"
-    echo "Resolved MAX_WORKERS_PER_GPU=auto to $MAX_WORKERS_PER_GPU; NUM_JOBS=$NUM_JOBS"
 else
-    NUM_JOBS="${NUM_JOBS:-$(( GPUS * MAX_WORKERS_PER_GPU ))}"
+    NUM_JOBS="${NUM_JOBS:-auto}"
+    case "$NUM_JOBS" in
+        auto) ;;
+        *[!0-9]*)
+            echo "NUM_JOBS must be auto or an integer; got '$NUM_JOBS'." >&2
+            exit 2
+            ;;
+        *)
+            if [ "$NUM_JOBS" -lt 1 ]; then
+                echo "NUM_JOBS must be at least 1; got '$NUM_JOBS'." >&2
+                exit 2
+            fi
+            ;;
+    esac
 fi
 
-# Resolve DataLoader prefetch workers before building parallelism args so the
-# shell-side CPU thread budget matches the mhcflurry worker hyperparameters.
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/set_cpu_threads.sh"
 DATALOADER_NUM_WORKERS_REQUESTED="$DATALOADER_NUM_WORKERS"
-DATALOADER_NUM_WORKERS="$(resolve_dataloader_num_workers "$NUM_JOBS")"
-printf >&2 \
-    "[pan_allele_release_full.sh] DATALOADER_NUM_WORKERS=%s resolved to %s\n" \
-    "$DATALOADER_NUM_WORKERS_REQUESTED" "$DATALOADER_NUM_WORKERS"
 
-# Same parallelism args as stage 1; processing/presentation stages
-# below pick this up. --torch-compile auto reads MHCFLURRY_TORCH_COMPILE
-# env (set above), so the env path and the CLI path produce identical
-# orchestrator state.
+# Shared parallelism args for the later stages. The affinity stage uses its own
+# worker cap and job count below. --torch-compile auto reads
+# MHCFLURRY_TORCH_COMPILE env (set above), so the env path and the CLI path
+# produce identical orchestrator state.
 COMMON_PARALLELISM_ARGS=(
     --num-jobs "$NUM_JOBS"
     --max-tasks-per-worker 1000
@@ -136,10 +187,8 @@ fi
 
 # Presentation training is mostly feature generation over a large
 # presentation CSV. Each worker loads the merged affinity predictor plus the
-# processing ensembles, so default to one worker per GPU; callers can raise
-# this after validating VRAM headroom for a given release artifact.
 PRESENTATION_NUM_JOBS="${PRESENTATION_NUM_JOBS:-auto}"
-PRESENTATION_MAX_WORKERS_PER_GPU="${PRESENTATION_MAX_WORKERS_PER_GPU:-1}"
+PRESENTATION_MAX_WORKERS_PER_GPU="${PRESENTATION_MAX_WORKERS_PER_GPU:-auto}"
 PRESENTATION_PARALLELISM_ARGS=(
     --num-jobs "$PRESENTATION_NUM_JOBS"
     --max-tasks-per-worker 1000
@@ -173,9 +222,6 @@ if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
     PRESENTATION_CALIBRATION_PARALLELISM_ARGS+=(--enable-timing)
 fi
 
-NUM_JOBS="$NUM_JOBS" GPUS="$GPUS" MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
-    DATALOADER_NUM_WORKERS="$DATALOADER_NUM_WORKERS" set_cpu_threads
-
 compress_csv_bzip2() {
     local path="$1"
     if command -v lbzip2 >/dev/null 2>&1; then
@@ -192,30 +238,45 @@ compress_csv_bzip2() {
 # ============================================================
 echo "=== STAGE 1: AFFINITY ==="
 STAGE1_START=$(date +%s)
-MHCFLURRY_OUT="$BASE_OUT/affinity" \
-    NUM_JOBS="$NUM_JOBS" \
-    GPUS="$GPUS" \
-    MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
-    DATALOADER_NUM_WORKERS="$DATALOADER_NUM_WORKERS" \
-    bash "$SCRIPT_DIR/pan_allele_release_affinity.sh"
+AFFINITY_NUM_JOBS="${AFFINITY_NUM_JOBS:-}"
+if [ -z "$AFFINITY_NUM_JOBS" ] && [ "$GPUS" -eq 0 ]; then
+    AFFINITY_NUM_JOBS=1
+elif [ -z "$AFFINITY_NUM_JOBS" ] && \
+        [ "$AFFINITY_MAX_WORKERS_PER_GPU" != "auto" ]; then
+    AFFINITY_NUM_JOBS="$(( GPUS * AFFINITY_MAX_WORKERS_PER_GPU ))"
+fi
+AFFINITY_ENV=(
+    "MHCFLURRY_OUT=$BASE_OUT/affinity"
+    "GPUS=$GPUS"
+    "MAX_WORKERS_PER_GPU=$AFFINITY_MAX_WORKERS_PER_GPU"
+    "DATALOADER_NUM_WORKERS=${AFFINITY_DATALOADER_NUM_WORKERS:-$DATALOADER_NUM_WORKERS_REQUESTED}"
+    "SKIP_EVAL=${SKIP_EVAL:-0}"
+    "SKIP_PLOTS=${SKIP_PLOTS:-0}"
+    "TRAINING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE"
+    "AFFINITY_MINIBATCH_SIZE=$AFFINITY_MINIBATCH_SIZE"
+)
+if [ -n "$AFFINITY_NUM_JOBS" ]; then
+    AFFINITY_ENV+=("NUM_JOBS=$AFFINITY_NUM_JOBS")
+fi
+env "${AFFINITY_ENV[@]}" bash "$SCRIPT_DIR/pan_allele_release_affinity.sh"
 AFFINITY_PREDICTOR="$BASE_OUT/affinity/models.combined"
 echo "STAGE 1 duration: $(( $(date +%s) - STAGE1_START )) sec"
 echo "affinity predictor: $AFFINITY_PREDICTOR"
 
 # ============================================================
-# STAGE 2 — PROCESSING (no_flank + short_flanks variants)
-# Both variants are inputs to the presentation predictor.
+# STAGE 2 — PROCESSING
+# Trains the configured processing variants. Presentation consumes no_flank and
+# the configured with-flanks source (with_flanks by default).
 # ============================================================
 echo "=== STAGE 2: PROCESSING ==="
 STAGE2_START=$(date +%s)
+start_gpu_telemetry "$BASE_OUT/processing/gpu_occupancy.csv"
 cd "$BASE_OUT/processing"
 
 mhcflurry-downloads fetch data_mass_spec_annotated data_references
 
 cp "$REPO/downloads-generation/models_class1_processing/annotate_hits_with_expression.py" .
 cp "$RECIPE_DIR/make_train_data.processing.py" .
-cp "$RECIPE_DIR/generate_hyperparameters.base.py" .
-cp "$RECIPE_DIR/generate_hyperparameters.variants.py" .
 
 python annotate_hits_with_expression.py \
     --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
@@ -233,26 +294,17 @@ python make_train_data.processing.py \
     "${COMMON_PARALLELISM_ARGS[@]}"
 compress_csv_bzip2 "$(pwd)/train_data.csv"
 
-python generate_hyperparameters.base.py > hyperparameters.base.yaml
+mhcflurry class1-generate-training-hyperparameters processing-base \
+    --minibatch-size "$PROCESSING_MINIBATCH_SIZE" \
+    > hyperparameters.base.yaml
 
-for kind in no_flank short_flanks; do
-    python generate_hyperparameters.variants.py hyperparameters.base.yaml "$kind" \
-        > "hyperparameters.$kind.full.yaml"
-    # Round-trip through safe_dump to strip python/tuple tags so
-    # downstream readers can use yaml.safe_load.
-    python - "$kind" <<'PY'
-import sys, yaml
-kind = sys.argv[1]
-hp = yaml.unsafe_load(open(f"hyperparameters.{kind}.full.yaml"))
-def detuple(x):
-    if isinstance(x, tuple): return list(x)
-    if isinstance(x, list):  return [detuple(e) for e in x]
-    if isinstance(x, dict):  return {k: detuple(v) for k, v in x.items()}
-    return x
-with open(f"hyperparameters.{kind}.yaml", "w") as f:
-    yaml.safe_dump([detuple(d) for d in hp], f)
-print(f"processing.{kind}: using {len(hp)} architectures")
-PY
+for kind in $PROCESSING_VARIANTS; do
+    mhcflurry class1-generate-training-hyperparameters processing-variant \
+        hyperparameters.base.yaml "$kind" \
+        > "hyperparameters.$kind.yaml"
+    ARCH_COUNT=$(python -c \
+        "import yaml; print(len(yaml.safe_load(open('hyperparameters.$kind.yaml'))))")
+    echo "processing.$kind: using $ARCH_COUNT architectures"
 
     mhcflurry-class1-train-processing-models \
         --data "$(pwd)/train_data.csv.bz2" \
@@ -274,6 +326,7 @@ PY
         "$(pwd)/models.selected.$kind/train_data.csv.bz2"
 done
 
+stop_gpu_telemetry
 echo "STAGE 2 duration: $(( $(date +%s) - STAGE2_START )) sec"
 
 # ============================================================
@@ -281,6 +334,7 @@ echo "STAGE 2 duration: $(( $(date +%s) - STAGE2_START )) sec"
 # ============================================================
 echo "=== STAGE 3: PRESENTATION ==="
 STAGE3_START=$(date +%s)
+start_gpu_telemetry "$BASE_OUT/presentation/gpu_occupancy.csv"
 cd "$BASE_OUT/presentation"
 
 cp "$RECIPE_DIR/make_train_data.presentation.py" \
@@ -298,7 +352,7 @@ compress_csv_bzip2 "$(pwd)/train_data.csv"
 mhcflurry-class1-train-presentation-models \
     --data "$(pwd)/train_data.csv.bz2" \
     --affinity-predictor "$AFFINITY_PREDICTOR" \
-    --processing-predictor-with-flanks "$BASE_OUT/processing/models.selected.short_flanks" \
+    --processing-predictor-with-flanks "$BASE_OUT/processing/models.selected.$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" \
     --processing-predictor-without-flanks "$BASE_OUT/processing/models.selected.no_flank" \
     --out-models-dir "$(pwd)/models" \
     --feature-chunk-size "$PRESENTATION_FEATURE_CHUNK_SIZE" \
@@ -320,15 +374,16 @@ mhcflurry-calibrate-percentile-ranks \
 # so it's self-contained for distribution.
 cp "$AFFINITY_PREDICTOR/train_data.csv.bz2" \
     "$(pwd)/models/affinity_predictor_train_data.csv.bz2"
-cp "$BASE_OUT/processing/models.selected.short_flanks/train_data.csv.bz2" \
+cp "$BASE_OUT/processing/models.selected.$PRESENTATION_PROCESSING_WITH_FLANKS_KIND/train_data.csv.bz2" \
     "$(pwd)/models/processing_predictor_with_flanks_train_data.csv.bz2"
 cp "$BASE_OUT/processing/models.selected.no_flank/train_data.csv.bz2" \
     "$(pwd)/models/processing_predictor_no_flank_train_data.csv.bz2"
 
+stop_gpu_telemetry
 echo "STAGE 3 duration: $(( $(date +%s) - STAGE3_START )) sec"
 
 echo "=== DONE ==="
 echo "affinity:     $AFFINITY_PREDICTOR"
-echo "processing:   $BASE_OUT/processing/models.selected.{no_flank,short_flanks}"
+echo "processing:   $BASE_OUT/processing/models.selected.{${PROCESSING_VARIANTS// /,}}"
 echo "presentation: $BASE_OUT/presentation/models"
 ls -la "$BASE_OUT/presentation/models" | head -20

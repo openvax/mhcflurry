@@ -2,17 +2,11 @@
 
 See also the {ref}`tutorial <commandline_tutorial>`.
 
-Starting in 2.3.0, MHCflurry installs a unified `mhcflurry` parent
-command whose subcommands share one help surface (`mhcflurry --help`).
-Every historical `mhcflurry-*` console script is also reachable as
-`mhcflurry <subcommand>` (`mhcflurry-predict` ↔ `mhcflurry predict`,
-`mhcflurry-class1-train-pan-allele-models` ↔
-`mhcflurry class1-train-pan-allele-models`, etc.). Both forms run the
-same underlying entry point; the legacy `mhcflurry-*` scripts remain
-installed as compat shims and are not changing.
-
-The two commands new in 2.3.0 — `mhcflurry compare-models` and
-`mhcflurry plot-model-comparison` — only have the parent-command form.
+MHCflurry 2.3.0 provides a unified `mhcflurry` command while retaining the
+historical `mhcflurry-*` names. Both forms use the same implementation. See
+{doc}`configuration` for the naming convention, {doc}`evaluation` for the
+evaluation workflow, and the generated argument reference below for every
+option.
 
 ## Prediction and data
 
@@ -43,6 +37,30 @@ The two commands new in 2.3.0 — `mhcflurry compare-models` and
 ```
 
 ## Class I training and selection
+
+```{eval-rst}
+.. _ref-mhcflurry-train:
+```
+
+### `mhcflurry train`
+
+`mhcflurry train` groups release-training workflows. It is a namespace command;
+run `mhcflurry train --help` or the concrete subcommand help for the complete
+argument list.
+
+```console
+$ mhcflurry train --help
+usage: mhcflurry train <subcommand> [args]
+
+Subcommands:
+  pan-allele-release  Run the retrain/evaluate/plot/release workflow.
+```
+
+The release workflow delegates to the maintained release script:
+
+```console
+$ mhcflurry train pan-allele-release --help
+```
 
 ```{eval-rst}
 .. _ref-mhcflurry-class1-train-allele-specific-models:
@@ -81,7 +99,40 @@ The two commands new in 2.3.0 — `mhcflurry compare-models` and
     :prog: mhcflurry class1-train-presentation-models
 ```
 
-## Model comparison (new in 2.3.0)
+## Evaluation and figures (new in 2.3.0)
+
+```{eval-rst}
+.. _ref-mhcflurry-eval:
+```
+
+### `mhcflurry eval`
+
+`mhcflurry eval` groups model comparison, diagnostic plotting, reusable score
+generation, and paper-style figure rendering. It is a namespace command; run
+the concrete subcommand help for the complete argument list.
+
+```console
+$ mhcflurry eval --help
+usage: mhcflurry eval <subcommand> [args]
+
+Subcommands:
+  compare-models                 Compare two model ensembles.
+  plot-comparison                Render diagnostic plots from compare output.
+  paper-figures render           Render paper figures from saved inputs.
+  paper-figures score-predictions
+                                 Derive score tables from saved predictions.
+  paper-figures run              Compare, render paper figures, and write PDFs.
+```
+
+```{eval-rst}
+.. _ref-mhcflurry-eval-artifacts:
+```
+
+### Evaluation and Plotting Artifacts
+
+The commands deliberately separate reusable metrics from rendering. See
+{doc}`evaluation` for the output map, saved-prediction schema, paper-figure
+workflow, and external-predictor integration.
 
 ```{eval-rst}
 .. _ref-mhcflurry-compare-models:
@@ -93,7 +144,15 @@ The two commands new in 2.3.0 — `mhcflurry compare-models` and
 
 .. autoprogram:: mhcflurry.cli.plot_model_comparison:parser
     :prog: mhcflurry plot-model-comparison
+
+.. _ref-mhcflurry-paper-figures:
+
+.. autoprogram:: mhcflurry.cli.paper_figures:parser
+    :prog: mhcflurry paper-figures
 ```
+
+Prefer the namespaced `mhcflurry eval ...` form in new automation. Compatibility
+shortcuts remain available for existing scripts.
 
 ## Pseudosequence registry helper
 

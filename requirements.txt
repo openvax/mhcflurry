@@ -3,6 +3,8 @@ pandas>=2.0
 torch>=2.0.0
 appdirs
 scikit-learn
-mhcgnomes>=3.0.1
+threadpoolctl
+matplotlib
+mhcgnomes>=3.33.0
 pyyaml
 tqdm

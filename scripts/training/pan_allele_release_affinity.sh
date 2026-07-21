@@ -2,11 +2,10 @@
 #
 # Exact replication of the public mhcflurry pan-allele release training
 # recipe (models_class1_pan, 2.2.0's GENERATE.sh — local mode, not
-# cluster). Uses the same `generate_hyperparameters.py`,
-# `reassign_mass_spec_training_data.py`, `additional_alleles.txt`, the
-# same curated_training_data and pretrain data (random_peptide_predictions),
-# same 4 folds, same architecture sweep, same min/max-models-per-fold
-# selection, and runs percentile-rank calibration on the final ensemble.
+# cluster). Uses the same curated_training_data and pretrain data
+# (random_peptide_predictions), same 4 folds, same architecture sweep,
+# same min/max-models-per-fold selection, and runs percentile-rank
+# calibration on the final ensemble.
 #
 # Env:
 #   MHCFLURRY_OUT              required — where artifacts are written.
@@ -15,12 +14,11 @@
 #   NUM_JOBS=N                 parallelism (default: $GPUS). Controls
 #                              how many networks train concurrently;
 #                              mhcflurry pairs jobs 1:1 with GPUs.
+#   TRAINING_MINIBATCH_SIZE    shared release-training minibatch default
+#                              (default 1024)
+#   AFFINITY_MINIBATCH_SIZE    affinity-specific override
 set -euo pipefail
 set -x
-
-pseudosequence_lookup() {
-    python -c 'from mhcflurry.pseudosequences import main; main()' "$@"
-}
 
 : "${MHCFLURRY_OUT:?MHCFLURRY_OUT must be set}"
 
@@ -42,7 +40,8 @@ export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
 
 SCRIPT_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_ABSOLUTE_PATH")"
-RECIPE_DIR="$SCRIPT_DIR/release_exact"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/set_cpu_threads.sh"
 
 mkdir -p "$MHCFLURRY_OUT"
 cd "$MHCFLURRY_OUT"
@@ -226,40 +225,35 @@ echo "Detected GPUS: $GPUS"
 PROCESSORS=$(getconf _NPROCESSORS_ONLN)
 echo "Detected processors: $PROCESSORS"
 
-# Default to "auto" so the shared Python resolver picks from the actual
-# hardware budget. Resolve it here before shell arithmetic so every downstream
-# consumer (Pool size, BLAS thread budget, CLI args) sees one numeric plan.
 MAX_WORKERS_PER_GPU_REQUESTED="${MAX_WORKERS_PER_GPU:-auto}"
 if [ "$GPUS" -eq "0" ]; then
-    NUM_JOBS="${NUM_JOBS-1}"
+    NUM_JOBS="${NUM_JOBS:-1}"
     MAX_WORKERS_PER_GPU=1
-elif [ "$MAX_WORKERS_PER_GPU_REQUESTED" = "auto" ]; then
-    # When NUM_JOBS is explicit, honor it: by_jobs clamps MWPG to
-    # NUM_JOBS // GPUS. When NUM_JOBS is unset (the typical "auto"
-    # case), pass 0 so the orchestrator skips the by_jobs clamp and
-    # picks MWPG on VRAM + hard_cap alone — otherwise the historical
-    # _NUM_JOBS_FOR_AUTO=GPUS*2 default pinned MWPG to 2 even when
-    # VRAM allowed 4.
-    _NUM_JOBS_FOR_AUTO="${NUM_JOBS:-0}"
-    MAX_WORKERS_PER_GPU="$(
-        NUM_JOBS="$_NUM_JOBS_FOR_AUTO" GPUS="$GPUS" python - <<'PY'
-import os
-from mhcflurry.parallelism import auto_max_workers_per_gpu
-print(auto_max_workers_per_gpu(
-    num_jobs=int(os.environ["NUM_JOBS"]),
-    num_gpus=int(os.environ["GPUS"]),
-    backend="auto",
-))
-PY
-    )"
-    _GPU_WORKER_CAP=$(( GPUS * MAX_WORKERS_PER_GPU ))
-    if [ -z "${NUM_JOBS+x}" ] || [ "$NUM_JOBS" -gt "$_GPU_WORKER_CAP" ]; then
-        NUM_JOBS="$_GPU_WORKER_CAP"
-    fi
-    echo "Resolved MAX_WORKERS_PER_GPU=auto to $MAX_WORKERS_PER_GPU; NUM_JOBS=$NUM_JOBS"
 else
     MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU_REQUESTED"
-    NUM_JOBS="${NUM_JOBS-$(( GPUS * MAX_WORKERS_PER_GPU ))}"
+    NUM_JOBS="${NUM_JOBS:-auto}"
+fi
+if [ "$GPUS" -gt 0 ] && [ "$NUM_JOBS" != "auto" ]; then
+    case "$NUM_JOBS" in
+        *[!0-9]*)
+            echo "NUM_JOBS must be auto or an integer; got '$NUM_JOBS'." >&2
+            exit 2
+            ;;
+    esac
+    if [ "$NUM_JOBS" -lt 1 ]; then
+        echo "NUM_JOBS must be at least 1; got '$NUM_JOBS'." >&2
+        exit 2
+    fi
+    if [ "$MAX_WORKERS_PER_GPU" = "auto" ]; then
+        echo "NUM_JOBS=$NUM_JOBS with MAX_WORKERS_PER_GPU=auto is unsafe for affinity training; using NUM_JOBS=auto so the training orchestrator can size workers from the minibatch-aware VRAM estimate." >&2
+        NUM_JOBS=auto
+    else
+        capacity="$(( GPUS * MAX_WORKERS_PER_GPU ))"
+        if [ "$NUM_JOBS" -gt "$capacity" ]; then
+            echo "Clamping NUM_JOBS=$NUM_JOBS to GPU capacity $capacity." >&2
+            NUM_JOBS="$capacity"
+        fi
+    fi
 fi
 echo "Num jobs: $NUM_JOBS (max-workers-per-gpu=$MAX_WORKERS_PER_GPU; requested=$MAX_WORKERS_PER_GPU_REQUESTED)"
 # Recycle after a bounded number of tasks so compile is still amortized
@@ -272,21 +266,14 @@ MAX_TASKS_PER_WORKER="${MAX_TASKS_PER_WORKER:-12}"
 # budget and the training hyperparameters stay in lockstep.
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-auto}"
 
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/set_cpu_threads.sh"
 DATALOADER_NUM_WORKERS_REQUESTED="$DATALOADER_NUM_WORKERS"
-DATALOADER_NUM_WORKERS="$(resolve_dataloader_num_workers "$NUM_JOBS")"
-printf >&2 \
-    "[pan_allele_release_affinity.sh] DATALOADER_NUM_WORKERS=%s resolved to %s\n" \
-    "$DATALOADER_NUM_WORKERS_REQUESTED" "$DATALOADER_NUM_WORKERS"
 
-# Now that DATALOADER_NUM_WORKERS is a resolved int, build PARALLELISM_ARGS.
 PARALLELISM_ARGS=(
     --num-jobs "$NUM_JOBS"
     --max-tasks-per-worker "$MAX_TASKS_PER_WORKER"
     --gpus "$GPUS"
     --max-workers-per-gpu "$MAX_WORKERS_PER_GPU"
-    --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
+    --dataloader-num-workers "$DATALOADER_NUM_WORKERS_REQUESTED"
     # Orchestrator-owned tuning knobs. CLI-resolved values are propagated
     # to env (MHCFLURRY_TORCH_COMPILE / MHCFLURRY_MATMUL_PRECISION /
     # MHCFLURRY_ENABLE_TIMING) inside resolve_local_parallelism_args, so
@@ -302,23 +289,25 @@ if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
     PARALLELISM_ARGS+=(--enable-timing)
 fi
 
-# Auto-configure OMP / MKL / OPENBLAS thread budget uniformly based on
-# nproc, GPU count, worker count, dataloader worker count. User can
-# override any of {OMP,MKL,OPENBLAS}_NUM_THREADS before invoking this
-# script; the helper respects manual settings.
-NUM_JOBS="$NUM_JOBS" GPUS="$GPUS" MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
-    DATALOADER_NUM_WORKERS="$DATALOADER_NUM_WORKERS" set_cpu_threads
+# The Python planner owns CPU threads when either worker count is automatic,
+# because only it knows the final workload-aware GPU/RAM/CPU plan. Retain the
+# shell helper for fully explicit expert configurations.
+if [ "$NUM_JOBS" != "auto" ] && \
+        [ "$DATALOADER_NUM_WORKERS_REQUESTED" != "auto" ]; then
+    NUM_JOBS="$NUM_JOBS" GPUS="$GPUS" \
+        MAX_WORKERS_PER_GPU="$MAX_WORKERS_PER_GPU" \
+        DATALOADER_NUM_WORKERS="$DATALOADER_NUM_WORKERS_REQUESTED" \
+        set_cpu_threads
+else
+    echo "CPU thread budget delegated to workload planner." >&2
+fi
 
 # ---- data ------------------------------------------------------------
 CURRENT_PHASE="data_setup"
 log_release_event phase_info "starting data download and preprocessing"
 mhcflurry-downloads fetch data_curated allele_sequences random_peptide_predictions
 
-# Reassign mass-spec training rows per release recipe.
-cp "$RECIPE_DIR/reassign_mass_spec_training_data.py" .
-cp "$RECIPE_DIR/additional_alleles.txt" .
-
-python reassign_mass_spec_training_data.py \
+mhcflurry class1-reassign-mass-spec-training-data \
     "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
     --set-measurement-value 100 \
     --out-csv "$(pwd)/train_data.csv"
@@ -327,8 +316,11 @@ TRAINING_DATA="$(pwd)/train_data.csv.bz2"
 
 # ---- hyperparameters -------------------------------------------------
 CURRENT_PHASE="hyperparameters"
-cp "$RECIPE_DIR/generate_hyperparameters.py" .
-python generate_hyperparameters.py > hyperparameters.yaml
+TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-1024}"
+AFFINITY_MINIBATCH_SIZE="${AFFINITY_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
+mhcflurry class1-generate-training-hyperparameters affinity \
+    --minibatch-size "$AFFINITY_MINIBATCH_SIZE" \
+    > hyperparameters.yaml
 # ``dataloader_num_workers`` is no longer injected here. The orchestrator
 # overrides each work item's hyperparameters via the
 # ``--dataloader-num-workers`` CLI flag at planning time (see
@@ -339,7 +331,7 @@ ARCH_COUNT=$(python -c "import yaml; print(len(yaml.safe_load(open('hyperparamet
 echo "Architectures in sweep: $ARCH_COUNT"
 
 ALLELE_SEQUENCES_DIR="$(mhcflurry-downloads path allele_sequences)"
-ALLELE_SEQUENCES="$(pseudosequence_lookup path \
+ALLELE_SEQUENCES="$(mhcflurry pseudosequences path \
     --directory "$ALLELE_SEQUENCES_DIR" \
     --length 39 \
     --fallback-legacy)"
@@ -418,13 +410,8 @@ do
     # ceiling here, the planner must honor it as an explicit CLI override
     # and overflow workers spill to CPU when MWPG resolves lower.
     # Override with CALIBRATE_NUM_JOBS only when deliberately pinning.
-    # CALIBRATE_PER_WORKER_GB tells the resolver how much VRAM to
-    # budget per worker (default 12 — the cache + ~2 GB working
-    # set on 8-network ensembles). Bumped from the training
-    # default of 4 because the calibrate cache is much larger.
     CALIBRATE_NUM_JOBS="${CALIBRATE_NUM_JOBS:-auto}"
     CALIBRATE_MAX_WORKERS_PER_GPU="${CALIBRATE_MAX_WORKERS_PER_GPU:-auto}"
-    CALIBRATE_PER_WORKER_GB="${CALIBRATE_PER_WORKER_GB:-12}"
     CALIBRATE_PARALLELISM_ARGS=(
         --num-jobs "$CALIBRATE_NUM_JOBS"
         --max-tasks-per-worker "$MAX_TASKS_PER_WORKER"
@@ -438,7 +425,6 @@ do
         CALIBRATE_PARALLELISM_ARGS+=(--enable-timing)
     fi
     run_logged_step "calibrate_${kind}" "$CALIBRATE_LOG" \
-        env "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB=$CALIBRATE_PER_WORKER_GB" \
         mhcflurry-calibrate-percentile-ranks \
         --models-dir "$SELECTED_DIR" \
         --match-amino-acid-distribution-data "$UNSELECTED_DIR/train_data.csv.bz2" \
@@ -473,7 +459,7 @@ else
     EVAL_OUT="$MHCFLURRY_OUT/eval_comparison"
     mkdir -p "$EVAL_OUT"
     run_logged_step "eval_compare_new_vs_public" "$EVAL_LOG" \
-        mhcflurry compare-models \
+        mhcflurry eval compare-models \
             --a "$MHCFLURRY_OUT/models.combined" \
             --a-label new \
             --b public \

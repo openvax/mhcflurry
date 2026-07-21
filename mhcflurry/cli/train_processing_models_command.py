@@ -14,6 +14,7 @@
 Train Class1 processing models.
 """
 import argparse
+import gc
 import os
 from os.path import join
 import sys
@@ -34,19 +35,23 @@ from ..class1_processing_predictor import Class1ProcessingPredictor
 from ..class1_processing_neural_network import Class1ProcessingNeuralNetwork
 from ..pytorch_sizing import (
     TRAINING_PEAK_MULTIPLIER,
+    begin_peak_memory_measurement,
+    end_peak_memory_measurement,
     estimate_peak_bytes_per_row,
 )
+from ..memory_budget import training_module_bytes
 from ..common import (
     add_random_seed_arg,
     configure_random_seed,
     configure_logging,
     derive_seed,
     install_sigusr1_stack_trace_handler,
+    positive_int_arg,
     write_generate_sh,
 )
 from ..parallelism import (
     add_local_parallelism_args,
-    attach_constant_data_to_work_items_if_needed,
+    refine_local_parallelism_from_worker_context,
     resolve_local_parallelism_args,
     run_single_worker_torch_compile_warmup,
     worker_pool_with_gpu_assignments_from_args,
@@ -71,6 +76,27 @@ WORKER_CONTEXT = {}
 _PROCESSING_WORKER_RUNTIME_FLOOR_GB = 2.0
 _PROCESSING_WORKER_SAFETY_FACTOR = 1.3
 
+
+def release_unused_torch_memory():
+    """Return unused CUDA allocator blocks to the driver, best-effort."""
+    # Drop unreachable Python cycles first. Any tensors released by collection
+    # can then be returned by empty_cache() in this same cleanup pass.
+    gc.collect()
+    try:
+        import torch
+    except ImportError:
+        return
+    try:
+        cuda_available = torch.cuda.is_available()
+    except RuntimeError:
+        cuda_available = False
+    if cuda_available:
+        try:
+            torch.cuda.empty_cache()
+        except RuntimeError:
+            pass
+
+
 # Note on parallelization:
 # When running in parallel, avoid using the neural network backend in the main
 # process. Model loading and inference should happen in worker processes.
@@ -92,26 +118,26 @@ parser.add_argument(
     help="JSON or YAML of hyperparameters")
 parser.add_argument(
     "--held-out-samples",
-    type=int,
+    type=positive_int_arg,
     metavar="N",
     default=10,
     help="Number of experiments to hold out per fold")
 parser.add_argument(
     "--num-folds",
-    type=int,
+    type=positive_int_arg,
     default=4,
     metavar="N",
     help="Number of training folds.")
 parser.add_argument(
     "--num-replicates",
-    type=int,
+    type=positive_int_arg,
     metavar="N",
     default=1,
     help="Number of replicates per (architecture, fold) pair to train.")
 add_random_seed_arg(parser)
 parser.add_argument(
     "--max-epochs",
-    type=int,
+    type=positive_int_arg,
     metavar="N",
     help="Max training epochs. If specified here it overrides any 'max_epochs' "
     "specified in the hyperparameters.")
@@ -220,6 +246,7 @@ def main(args):
         workload_name=WORKLOAD_PROCESSING_TRAINING,
         workload_hints={
             "data_bytes": path_size_bytes(args.data),
+            "num_work_items": processing_work_item_count(args),
             "per_worker_gb": processing_worker_gb,
         },
     )
@@ -231,15 +258,31 @@ def main(args):
         train_models(args)
 
 
+def processing_work_item_count(args):
+    """Best-effort number of model fits in this command."""
+    try:
+        with open(args.hyperparameters) as fd:
+            hyperparameters_lst = yaml.safe_load(fd)
+        return (
+            len(hyperparameters_lst)
+            * int(args.num_folds)
+            * int(args.num_replicates)
+        )
+    except Exception:
+        return None
+
+
 def estimate_processing_worker_gb(args):
     """Estimate steady per-worker VRAM for processing training.
 
     Processing is not shaped like affinity training: workers keep encoded
     flank tensors resident on-device, then run Conv1d models whose peak
     activation width scales with flank length and convolutional filters.
-    This estimate sizes worker concurrency from the actual data row count
-    and largest architecture in the hyperparameter sweep. Prediction-time
-    AUC scoring is separately auto-batched per call.
+    This estimate sizes worker concurrency from the exact encoded dataset,
+    model/gradient/optimizer state, and training activation peak for the
+    largest architecture in the hyperparameter sweep. Validation and post-fit
+    scoring use the remaining per-worker live-memory budget at runtime, so
+    they do not need a second fixed launch-time batch assumption.
     """
     data_path = getattr(args, "data", None)
     hyperparameters_path = getattr(args, "hyperparameters", None)
@@ -252,8 +295,8 @@ def estimate_processing_worker_gb(args):
             return None
 
         max_sequence_bytes_per_row = 0
-        max_forward_bytes_per_row = 0
-        max_minibatch_size = 0
+        max_training_batch_bytes = 0
+        max_training_state_bytes = 0
         for hyperparameters in hyperparameters_lst:
             model = Class1ProcessingNeuralNetwork(**hyperparameters)
             network = model.make_network(
@@ -273,39 +316,53 @@ def estimate_processing_worker_gb(args):
                 max_sequence_bytes_per_row,
                 sequence_bytes_per_row,
             )
-            max_forward_bytes_per_row = max(
-                max_forward_bytes_per_row,
-                estimate_peak_bytes_per_row(network),
+            forward_bytes_per_row = estimate_peak_bytes_per_row(network)
+            minibatch_size = int(model.hyperparameters["minibatch_size"])
+            optimizer_state_copies = {
+                "adam": 2,
+                "rmsprop": 1,
+                "sgd": 0,
+            }.get(str(model.hyperparameters["optimizer"]).lower(), 2)
+            max_training_state_bytes = max(
+                max_training_state_bytes,
+                training_module_bytes(
+                    network,
+                    optimizer_state_copies=optimizer_state_copies,
+                ),
             )
-            max_minibatch_size = max(
-                max_minibatch_size,
-                int(model.hyperparameters["minibatch_size"]),
+            max_training_batch_bytes = max(
+                max_training_batch_bytes,
+                minibatch_size
+                * forward_bytes_per_row
+                * TRAINING_PEAK_MULTIPLIER,
             )
 
-        if not max_forward_bytes_per_row or not max_minibatch_size:
+        if not max_training_batch_bytes:
             return None
 
         dataset_bytes = row_count * max_sequence_bytes_per_row
-        training_batch_bytes = (
-            max_minibatch_size
-            * max_forward_bytes_per_row
-            * TRAINING_PEAK_MULTIPLIER
-        )
         runtime_bytes = int(_PROCESSING_WORKER_RUNTIME_FLOOR_GB * (1 << 30))
         estimate_gb = (
-            (dataset_bytes + training_batch_bytes + runtime_bytes)
+            (
+                dataset_bytes
+                + max_training_state_bytes
+                + max_training_batch_bytes
+                + runtime_bytes
+            )
             * _PROCESSING_WORKER_SAFETY_FACTOR
             / float(1 << 30)
         )
         estimate_gb = max(estimate_gb, 4.0)
         print(
             "Estimated processing worker VRAM: %.2f GB "
-            "(rows=%d, sequence=%.2f GB, train_batch=%.2f GB, "
+            "(rows=%d, sequence=%.2f GB, training_state=%.2f GB, "
+            "train_batch=%.2f GB, "
             "runtime_floor=%.2f GB, safety=%.1fx)" % (
                 estimate_gb,
                 row_count,
                 dataset_bytes / float(1 << 30),
-                training_batch_bytes / float(1 << 30),
+                max_training_state_bytes / float(1 << 30),
+                max_training_batch_bytes / float(1 << 30),
                 _PROCESSING_WORKER_RUNTIME_FLOOR_GB,
                 _PROCESSING_WORKER_SAFETY_FACTOR,
             )
@@ -426,7 +483,11 @@ def train_models(args):
         WORKER_CONTEXT.update(pickle.load(fd))
     print("Loaded training init info.")
 
-    all_work_items = WORKER_CONTEXT["work_items"]
+    # Work items are dispatched separately. Do not copy the complete queue
+    # into every spawn worker as part of its read-only training context.
+    all_work_items = WORKER_CONTEXT.pop("work_items")
+    if not args.cluster_parallelism:
+        refine_local_parallelism_from_worker_context(args, WORKER_CONTEXT)
     complete_work_item_names = [
         network.fit_info[-1]["training_info"]["work_item_name"]
         for network in predictor.models
@@ -458,7 +519,10 @@ def train_models(args):
     start = time.time()
 
     worker_pool = None
-    if serial_run:
+    if not work_items:
+        print("No incomplete work items; skipping warmup and worker startup.")
+        results_generator = None
+    elif serial_run:
         # Run in serial. Every worker is passed the same predictor,
         # which it adds models to, so no merging is required. It also saves
         # as it goes so no saving is required at the end.
@@ -486,7 +550,11 @@ def train_models(args):
             constant_data=WORKER_CONTEXT,
         )
 
-        worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+        worker_pool = worker_pool_with_gpu_assignments_from_args(
+            args,
+            worker_context_module=__name__,
+            worker_context_data=WORKER_CONTEXT,
+        )
         print("Worker pool", worker_pool)
         assert worker_pool is not None
 
@@ -497,13 +565,6 @@ def train_models(args):
 
     try:
         if worker_pool is not None:
-            # Attach constant data and launch the work inside the try so a
-            # failure here (e.g. copying large constant data to workers) still
-            # tears the pool down via the finally rather than leaking
-            # non-daemon workers.
-            attach_constant_data_to_work_items_if_needed(
-                work_items, WORKER_CONTEXT, worker_pool
-            )
             results_generator = worker_pool.imap_unordered(
                 partial(call_wrapped_kwargs, train_model),
                 work_items,
@@ -588,6 +649,7 @@ def _run_compile_warmup(hyperparameters, fold_num, constant_data):
         )
     )
     started = time.time()
+    memory_token = begin_peak_memory_measurement()
     model = Class1ProcessingNeuralNetwork(**hp)
     model.fit(
         sequences=FlankingEncoding(
@@ -597,8 +659,11 @@ def _run_compile_warmup(hyperparameters, fold_num, constant_data):
         targets=train_subset.hit.values,
         verbose=0,
     )
+    report = end_peak_memory_measurement(memory_token)
+    report["elapsed_seconds"] = time.time() - started
     print("compile_warmup_only (processing): completed in %.1f sec" % (
-        time.time() - started))
+        report["elapsed_seconds"]))
+    return report
 
 
 def train_model(
@@ -623,8 +688,7 @@ def train_model(
     from mhcflurry.flanking_encoding import FlankingEncoding
 
     if compile_warmup_only:
-        _run_compile_warmup(hyperparameters, fold_num, constant_data)
-        return None
+        return _run_compile_warmup(hyperparameters, fold_num, constant_data)
 
     df = constant_data["train_data"]
     folds_df = constant_data["folds_df"]
@@ -684,6 +748,11 @@ def train_model(
         seed=work_item_seed,
         verbose=verbose)
 
+    # Fit can leave large unused CUDA allocator blocks reserved after the
+    # validation forward. Release those before post-fit AUC scoring so this
+    # worker's own cache does not crowd co-resident workers.
+    release_unused_torch_memory()
+
     # Save model-specific training info
     train_peptide_hash = hashlib.sha1()
     for peptide in sorted(train_data.peptide.values):
@@ -725,6 +794,7 @@ def train_model(
 
     # Delete the network to release memory
     model._network = None  # release network to free memory
+    release_unused_torch_memory()
     return predictor
 
 

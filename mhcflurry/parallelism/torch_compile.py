@@ -20,19 +20,24 @@ from ..common import normalize_pytorch_backend
 from ..workload_planning import env_int
 from .planning import (
     num_workers_per_gpu_from_args,
+    refine_local_parallelism_from_warmup,
     resolve_local_parallelism_args,
 )
-from .worker_pool import worker_pool_uses_fork, worker_pool_with_gpu_assignments
+from .worker_pool import worker_pool_with_gpu_assignments
 from .worker_runtime import call_wrapped_kwargs
 
 
-# Inductor's compile worker pool defaults to ``os.cpu_count()``; that's fine
-# for one process but stacks badly when N fit() workers each spawn their own
-# pool. Production auto-sizing budgets roughly ``cpu_count // num_jobs`` helper
-# threads per worker and caps the result. The one-worker cache warmup can use a
-# much larger cap because only one compiler-heavy process exists.
 _INDUCTOR_THREAD_HARD_CAP = 16
 _INDUCTOR_WARMUP_THREAD_HARD_CAP = 64
+WORKER_CONTEXT = {}
+
+
+def _run_compile_warmup_item(work_function, work_item):
+    """Run one warmup using constant data installed once in this process."""
+    item = dict(work_item)
+    if "constant_data" not in item and "constant_data" in WORKER_CONTEXT:
+        item["constant_data"] = WORKER_CONTEXT["constant_data"]
+    return call_wrapped_kwargs(work_function, item)
 
 
 def _torch_compile_enabled():
@@ -43,18 +48,21 @@ def _auto_torchinductor_compile_threads(num_jobs, phase="production"):
     """Return auto-sized Inductor compile helper count for this phase."""
     cpu_count_ = os.cpu_count() or 1
     if phase == "warmup":
-        cap = env_int(
-            "MHCFLURRY_TORCHINDUCTOR_WARMUP_COMPILE_THREADS_CAP",
-            _INDUCTOR_WARMUP_THREAD_HARD_CAP,
-            bounds=(1, None),
+        threads = min(cpu_count_, _INDUCTOR_WARMUP_THREAD_HARD_CAP)
+        cap_name = "MHCFLURRY_TORCHINDUCTOR_WARMUP_COMPILE_THREADS_CAP"
+    else:
+        threads = min(
+            _INDUCTOR_THREAD_HARD_CAP,
+            max(1, cpu_count_ // max(int(num_jobs), 1)),
         )
-        return max(1, min(cap, cpu_count_))
-    cap = env_int(
-        "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_CAP",
-        _INDUCTOR_THREAD_HARD_CAP,
-        bounds=(1, None),
-    )
-    return max(1, min(cap, cpu_count_ // max(int(num_jobs), 1)))
+        cap_name = "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_CAP"
+    raw_cap = os.environ.get(cap_name)
+    if raw_cap not in (None, ""):
+        threads = min(
+            threads,
+            env_int(cap_name, raw_cap, bounds=(1, None)),
+        )
+    return max(1, threads)
 
 
 def _compile_threads_env_is_auto_owned():
@@ -340,6 +348,7 @@ def run_single_worker_torch_compile_warmup(
         )
 
     warmup_pool = None
+    reports = []
     try:
         warmup_pool = worker_pool_with_gpu_assignments(
             num_jobs=1,
@@ -348,22 +357,28 @@ def run_single_worker_torch_compile_warmup(
             max_workers_per_gpu=max(num_workers_per_gpu_from_args(args), 1),
             max_tasks_per_worker=len(unique_warmup_items) + 1,
             worker_log_dir=getattr(args, "worker_log_dir", None),
+            cpu_threads_per_worker=getattr(
+                args, "cpu_threads_per_worker", None),
+            cpu_threads_per_worker_was_auto=getattr(
+                args, "cpu_threads_per_worker_was_auto", True),
             # Spawn (not fork) for parity with the production pools below;
             # forked CUDA workers break if the parent has touched CUDA.
             start_method="spawn",
+            worker_context_module=(__name__ if constant_data is not None else None),
+            worker_context_data=(
+                {"constant_data": constant_data}
+                if constant_data is not None else None
+            ),
         )
         warmup_started_at = time.time()
         for warmup_item in unique_warmup_items:
             item_for_worker = dict(warmup_item)
             item_for_worker["compile_warmup_only"] = True
-            if (
-                    constant_data is not None
-                    and not worker_pool_uses_fork(warmup_pool)
-                    and "constant_data" not in item_for_worker):
-                item_for_worker["constant_data"] = constant_data
-            warmup_pool.apply(
-                call_wrapped_kwargs, (work_function, item_for_worker)
+            report = warmup_pool.apply(
+                _run_compile_warmup_item, (work_function, item_for_worker)
             )
+            if report:
+                reports.append(report)
         warmup_pool.close()
         warmup_pool.join()
         warmup_pool = None
@@ -380,4 +395,5 @@ def run_single_worker_torch_compile_warmup(
             warmup_pool.join()
         hoist_torchinductor_compile_threads(args, phase="production")
 
+    refine_local_parallelism_from_warmup(args, reports)
     return len(unique_warmup_items)

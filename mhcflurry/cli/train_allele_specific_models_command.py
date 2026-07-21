@@ -25,22 +25,24 @@ import pandas
 import yaml
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.model_selection import StratifiedKFold
-from ..common import normalize_allele_name
 import tqdm  # progress bar
 
 from ..class1_affinity_predictor import Class1AffinityPredictor
+from ..device_footprint import estimate_affinity_training_device_worker_gb
 from ..common import (
     add_random_seed_arg,
     configure_logging,
     configure_random_seed,
     derive_seed,
     install_sigusr1_stack_trace_handler,
+    normalize_allele_name,
+    positive_float_arg,
+    positive_int_arg,
     write_generate_sh,
 )
 from ..parallelism import (
     add_local_parallelism_args,
     apply_resolved_training_hyperparameters_to_work_items,
-    attach_constant_data_to_work_items_if_needed,
     resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
@@ -60,6 +62,20 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # processes upon fork() call, allowing local workers to read the same
 # copy-on-write pages instead of receiving a pickled copy.
 WORKER_CONTEXT = {}
+
+
+def _held_out_fraction_reciprocal_arg(value):
+    result = positive_int_arg(value)
+    if result < 2:
+        raise argparse.ArgumentTypeError(
+            "held-out fraction reciprocal must be at least 2"
+        )
+    return result
+
+
+def _alleles_with_minimum_measurements(allele_counts, minimum):
+    """Return alleles meeting the documented inclusive count threshold."""
+    return list(allele_counts.loc[allele_counts >= minimum].index)
 
 # Note on parallelization:
 # When running in parallel, avoid using the neural network backend in the main
@@ -92,13 +108,13 @@ parser.add_argument(
     "enough measurements will be used.")
 parser.add_argument(
     "--min-measurements-per-allele",
-    type=int,
+    type=positive_int_arg,
     metavar="N",
     default=50,
     help="Train models for alleles with >=N measurements.")
 parser.add_argument(
     "--held-out-fraction-reciprocal",
-    type=int,
+    type=_held_out_fraction_reciprocal_arg,
     metavar="N",
     default=None,
     help="Hold out 1/N fraction of data (for e.g. subsequent model selection. "
@@ -122,14 +138,14 @@ parser.add_argument(
     help="Do not use affinity value inequalities even when present in data")
 parser.add_argument(
     "--n-models",
-    type=int,
+    type=positive_int_arg,
     metavar="N",
     help="Ensemble size, i.e. how many models to train for each architecture. "
     "If specified here it overrides any 'n_models' specified in the "
     "hyperparameters.")
 parser.add_argument(
     "--max-epochs",
-    type=int,
+    type=positive_int_arg,
     metavar="N",
     help="Max training epochs. If specified here it overrides any 'max_epochs' "
     "specified in the hyperparameters.")
@@ -139,7 +155,7 @@ parser.add_argument(
     help="Allele sequences file. Used for computing allele similarity matrix.")
 parser.add_argument(
     "--save-interval",
-    type=float,
+    type=positive_float_arg,
     metavar="N",
     default=60,
     help="Write models to disk every N seconds. Only affects parallel runs; "
@@ -179,12 +195,66 @@ def run(argv=sys.argv[1:]):
     master_seed = configure_random_seed(
         args.random_seed, name="train-allele-specific")
 
-    hyperparameters_lst = yaml.safe_load(open(args.hyperparameters))
-    assert isinstance(hyperparameters_lst, list), hyperparameters_lst
+    with open(args.hyperparameters) as fd:
+        hyperparameters_lst = yaml.safe_load(fd)
+    if not isinstance(hyperparameters_lst, list) or not hyperparameters_lst:
+        raise ValueError(
+            "Hyperparameters file must contain a non-empty list of mappings"
+        )
+    if not all(isinstance(item, dict) for item in hyperparameters_lst):
+        raise ValueError("Every hyperparameter entry must be a mapping")
+    for index, hyperparameters in enumerate(hyperparameters_lst):
+        if args.n_models is None:
+            if "n_models" not in hyperparameters:
+                raise ValueError(
+                    "Hyperparameter entry %d must specify a positive n_models "
+                    "or --n-models must be supplied" % index
+                )
+            try:
+                hyperparameters["n_models"] = positive_int_arg(
+                    hyperparameters["n_models"])
+            except argparse.ArgumentTypeError as error:
+                raise ValueError(
+                    "Hyperparameter entry %d has invalid n_models: %s" % (
+                        index, error)
+                ) from error
+        if "max_epochs" in hyperparameters:
+            value = hyperparameters["max_epochs"]
+            try:
+                parsed = int(value)
+            except (TypeError, ValueError):
+                parsed = -1
+            if (
+                    isinstance(value, bool)
+                    or parsed < 0
+                    or (isinstance(value, float) and not value.is_integer())):
+                raise ValueError(
+                    "Hyperparameter entry %d has invalid max_epochs: expected "
+                    "a non-negative integer, got %r" % (index, value)
+                )
+            hyperparameters["max_epochs"] = parsed
+        if "minibatch_size" in hyperparameters:
+            try:
+                hyperparameters["minibatch_size"] = positive_int_arg(
+                    hyperparameters["minibatch_size"])
+            except argparse.ArgumentTypeError as error:
+                raise ValueError(
+                    "Hyperparameter entry %d has invalid minibatch_size: %s" % (
+                        index, error)
+                ) from error
     print("Loaded hyperparameters list: %s" % str(hyperparameters_lst))
 
     df = pandas.read_csv(args.data)
     print("Loaded training data: %s" % (str(df.shape)))
+    required_columns = {
+        "allele", "peptide", "measurement_value", "measurement_type",
+    }
+    missing_columns = sorted(required_columns.difference(df.columns))
+    if missing_columns:
+        raise ValueError(
+            "Training data is missing required column(s): %s" %
+            ", ".join(missing_columns)
+        )
 
     df = df.loc[
         (df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)
@@ -221,12 +291,28 @@ def run(argv=sys.argv[1:]):
     if args.allele:
         alleles = [normalize_allele_name(a) for a in args.allele]
     else:
-        alleles = list(allele_counts.loc[
-            allele_counts > args.min_measurements_per_allele
-        ].index)
+        alleles = _alleles_with_minimum_measurements(
+            allele_counts, args.min_measurements_per_allele)
 
     print("Selected %d/%d alleles: %s" % (len(alleles), df.allele.nunique(), ' '.join(alleles)))
-    df = df.loc[df.allele.isin(alleles)].dropna()
+    essential_columns = [
+        "allele", "peptide", "measurement_value", "measurement_type",
+    ]
+    if "measurement_inequality" in df.columns:
+        essential_columns.append("measurement_inequality")
+    df = df.loc[df.allele.isin(alleles)].dropna(subset=essential_columns)
+    if "measurement_inequality" in df.columns:
+        invalid_inequalities = ~df.measurement_inequality.isin(["=", "<", ">"])
+        if invalid_inequalities.any():
+            raise ValueError(
+                "Training data contains %d invalid measurement_inequality "
+                "value(s); expected only =, <, or >" %
+                int(invalid_inequalities.sum())
+            )
+    if not alleles or df.empty:
+        raise ValueError(
+            "No training rows remain for the requested allele/count filters"
+        )
 
     if args.held_out_fraction_reciprocal:
         # An explicit --held-out-fraction-seed controls the split directly
@@ -253,9 +339,21 @@ def run(argv=sys.argv[1:]):
     WORKER_CONTEXT["seed"] = master_seed
     resolve_local_parallelism_args(
         args,
+        per_worker_gb=max((
+            estimate
+            for estimate in (
+                estimate_affinity_training_device_worker_gb(hp, len(df))
+                for hp in hyperparameters_lst
+            )
+            if estimate is not None
+        ), default=None),
         workload_name=WORKLOAD_AFFINITY_TRAINING,
         workload_hints={
             "data_bytes": path_size_bytes(args.data),
+            "num_work_items": int(df.allele.nunique()) * sum(
+                int(args.n_models or hp.get("n_models") or 1)
+                for hp in hyperparameters_lst
+            ),
             "num_rows": len(df),
         },
     )
@@ -278,9 +376,7 @@ def run(argv=sys.argv[1:]):
             n_models = hyperparameters.pop("n_models")
         if args.n_models:
             n_models = args.n_models
-        if not n_models:
-            raise ValueError(
-                "Specify --ensemble-size or n_models hyperparameter")
+        n_models = positive_int_arg(n_models)
 
         if args.max_epochs:
             hyperparameters['max_epochs'] = args.max_epochs
@@ -339,7 +435,20 @@ def run(argv=sys.argv[1:]):
 
     start = time.time()
 
-    worker_pool = worker_pool_with_gpu_assignments_from_args(args)
+    worker_pool = worker_pool_with_gpu_assignments_from_args(
+        args,
+        worker_context_module=__name__,
+        worker_context_data=WORKER_CONTEXT,
+    )
+    if args.num_jobs == 0 and not serial_run:
+        # Loaded spawn-context sizing can safely tighten an automatic pool all
+        # the way to serial execution. Reconfigure work items that were built
+        # before the final in-memory context size was known.
+        serial_run = True
+        for item in work_items:
+            item["progress_print_interval"] = 5.0
+            item["predictor"] = predictor
+            item["save_to"] = args.out_models_dir
     if args.num_jobs != 0:
         print("Processing %d work items in parallel." % len(work_items))
 
@@ -357,9 +466,6 @@ def run(argv=sys.argv[1:]):
         # which is acceptable for this trainer's smaller sweeps.
 
         assert worker_pool is not None
-        attach_constant_data_to_work_items_if_needed(
-            work_items, WORKER_CONTEXT, worker_pool
-        )
         results_generator = worker_pool.imap_unordered(
             partial(call_wrapped_kwargs, train_model),
             work_items,

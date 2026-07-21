@@ -37,3 +37,4 @@ def test_setup_packages_cli_subpackage(monkeypatch):
     assert not any(
         p == "test" or p.startswith("test.") for p in packages
     ), "setup.py must not ship the test package: %r" % packages
+    assert "matplotlib" in captured["install_requires"]

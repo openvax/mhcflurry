@@ -1,86 +1,96 @@
-# Introduction and setup
+# Introduction and installation
 
-MHCflurry is an open source package for peptide/MHC I binding affinity prediction. It
-aims to provide competitive accuracy with a fast and documented implementation.
+MHCflurry predicts which peptides are likely to be displayed by MHC class I
+molecules. It includes pretrained models and tools for three related tasks:
 
-You can download pre-trained MHCflurry models fit to mass spec-identified MHC I
-ligands and peptide/MHC affinity measurements deposited in IEDB (plus a few other
-sources) or train a MHCflurry predictor on your own data.
+| Prediction | What it answers | Output direction |
+|---|---|---|
+| Binding affinity | How strongly does this peptide bind this MHC allele? | Lower affinity in nM is stronger. |
+| Antigen processing | Does cellular processing favor this peptide? | Higher score is stronger. |
+| Presentation | Is this peptide likely to be presented, considering binding and processing? | Higher score is stronger. |
 
-Starting in version 1.6.0, the default MHCflurry binding affinity predictors
-are "pan-allele" models that support most sequenced MHC I alleles across humans
-and a few other species (about 14,000 alleles in total). This version also
-introduces two experimental predictors, an "antigen processing" predictor
-that attempts to model MHC allele-independent effects such as proteosomal
-cleavage and a "presentation" predictor that integrates processing predictions
-with binding affinity predictions to give a composite "presentation score." Both
-models are trained on mass spec-identified MHC ligands.
+For most epitope-prioritization work, start with the **presentation** predictor.
+Use binding affinity when you specifically need peptide–MHC binding estimates,
+or processing alone when you do not have an allele or genotype.
 
-MHCflurry supports Python 3.10+. It uses the [PyTorch](https://pytorch.org/)
-neural network library. GPUs and Apple Silicon (MPS) may optionally be used for
-a speed improvement and are auto-detected.
+The default pan-allele models support most sequenced human MHC I alleles and
+several other species. GPUs and Apple Silicon (MPS) are optional and are
+detected automatically.
 
-If you find MHCflurry useful in your research, please cite:
+## Install MHCflurry
 
-> T. J. O'Donnell, et al. "MHCflurry 2.0: Improved pan-allele prediction of MHC
-> I-presented peptides by incorporating antigen processing,"
-> *Cell Systems*, 2020. <https://doi.org/10.1016/j.cels.2020.06.010>
->
-> T. J. O'Donnell, et al., "MHCflurry: Open-Source Class I MHC Binding Affinity
-> Prediction," *Cell Systems*, 2018. <https://doi.org/10.1016/j.cels.2018.05.014>
-
-If you have questions or encounter problems, please file an issue at the
-MHCflurry github repo: <https://github.com/openvax/mhcflurry>
-
-
-## Installation (pip)
-
-Install the package:
+Install the latest stable release:
 
 ```shell
-$ pip install mhcflurry
+pip install mhcflurry
 ```
 
-Then download our datasets and trained models:
+The current documentation also covers the 2.3.0 release candidate. To use its
+new unified command and training/evaluation features, install the prerelease:
 
 ```shell
-$ mhcflurry-downloads fetch
+pip install --pre mhcflurry
 ```
 
-From a checkout, source `develop.sh` to create and activate the editable
-environment:
+Download the pretrained presentation models:
 
 ```shell
-$ source develop.sh
+mhcflurry-downloads fetch models_class1_presentation
 ```
 
-For quick feedback, run lint plus a focused unit subset:
+This bundle includes the binding-affinity and antigen-processing components
+needed for presentation prediction.
+
+## Make a first prediction
 
 ```shell
-$ ./lint.sh
-$ pytest -q test/test_amino_acid.py test/test_random_negative_peptides.py
+mhcflurry-predict \
+    --alleles HLA-A0201 HLA-A0301 \
+    --peptides SIINFEKL SIINFEKD SIINFEKQ \
+    --out predictions.csv
 ```
 
-The full command, `pytest test/`, includes integration-style training,
-command, and public-model smoke tests that require cached MHCflurry download
-bundles. It can take many minutes. See {doc}`testing` for the test tiers,
-marker expressions such as `pytest -q test -m "not slow and not downloads"`,
-and profiling commands.
+The output contains one row per peptide and allele/sample combination. The main
+columns are:
 
+- `mhcflurry_affinity`: predicted binding affinity in nM; lower is stronger.
+- `mhcflurry_affinity_percentile`: allele-specific rank from 0–100; lower is
+  stronger.
+- `mhcflurry_processing_score`: processing score from 0–1; higher is stronger.
+- `mhcflurry_presentation_score`: combined presentation score from 0–1; higher
+  is stronger.
+
+With MHCflurry 2.3.0, the equivalent unified command is `mhcflurry predict`.
+The historical `mhcflurry-*` commands remain supported.
+
+## Where to go next
+
+- {doc}`commandline_tutorial`: predict peptides, scan proteins, and train models.
+- {doc}`python_tutorial`: use predictors from Python.
+- {doc}`evaluation`: compare trained models and generate evaluation figures.
+- {doc}`commandline_tools`: complete generated command reference.
+- {doc}`configuration`: runtime defaults, hardware autosizing, and
+  reproducibility.
 
 ## Using conda
 
-You can alternatively get up and running with a [conda](https://conda.io/docs/)
-environment as follows.
+You can install into a conda environment and then use pip normally:
 
 ```shell
-$ conda create -q -n mhcflurry-env python=3.10
-$ source activate mhcflurry-env
+conda create -q -n mhcflurry-env python=3.10
+conda activate mhcflurry-env
+pip install mhcflurry
+mhcflurry-downloads fetch models_class1_presentation
 ```
 
-Then continue as above:
+MHCflurry supports Python 3.10+ on Linux and macOS. Windows may work but is not
+currently part of the supported test matrix.
 
-```shell
-$ pip install mhcflurry
-$ mhcflurry-downloads fetch
-```
+## Getting help and citing MHCflurry
+
+For questions and bug reports, use the
+[GitHub issue tracker](https://github.com/openvax/mhcflurry/issues).
+
+If you use MHCflurry in research, cite the MHCflurry 2.0 presentation-model
+paper and the original binding-affinity paper listed in the
+[project README](https://github.com/openvax/mhcflurry#citing-mhcflurry).

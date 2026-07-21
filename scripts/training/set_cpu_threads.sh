@@ -34,6 +34,13 @@
 # Prints one human-readable summary line on stderr so logs show the
 # decision and inputs that led to it.
 
+# MKL uses INTEL threading by default in some conda images, which aborts when
+# PyTorch's GNU libgomp is already loaded ("MKL_THREADING_LAYER=INTEL is
+# incompatible with libgomp.so.1"). Pin GNU so MKL and torch share one OpenMP
+# runtime. This must be set before Python imports numpy/torch.
+: "${MKL_THREADING_LAYER:=GNU}"
+export MKL_THREADING_LAYER
+
 resolve_dataloader_num_workers() {
     local num_fit_workers=${1:-${NUM_JOBS:-}}
     local requested=${DATALOADER_NUM_WORKERS:-auto}

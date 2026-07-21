@@ -30,7 +30,7 @@ If you want to add `test.sh` / `deploy.sh` / `format.sh` to match the other open
 Before telling the user a change is "complete":
 
 1. **`./lint.sh`** — must pass (ruff check)
-2. **Run tests**: `pytest test/` (no `test.sh` wrapper). For the slow ML suite you may need downloaded models — see `docker/` or `test-environment.yml`.
+2. **Run tests**: `python -m pytest test/` (no `test.sh` wrapper). On macOS this matters: the generated `pytest` console script can hide PyTorch MPS accelerators. For the slow ML suite you may need downloaded models — see `docker/` or `test-environment.yml`.
 3. For a PR: **CI must be green on GitHub**, then merge, then release (see Golden Rule 3).
 
 ## Code Style

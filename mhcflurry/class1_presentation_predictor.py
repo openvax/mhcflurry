@@ -27,6 +27,7 @@ import sklearn.linear_model
 import tqdm
 
 from .version import __version__
+from .model_provenance import add_release_provenance
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_processing_predictor import Class1ProcessingPredictor
 from .pytorch_sizing import (
@@ -65,6 +66,51 @@ _PRESENTATION_LOGISTIC_REGRESSION_KWARGS = {
     "solver": "newton-cg",
     "max_iter": 1000,
 }
+
+# Presentation scores are probabilities, but their useful dynamic range depends
+# on the class balance used to fit the logistic combiner. Release training with
+# many decoys can place most scores far below 0.001. Uniform bins over [0, 1]
+# collapse that entire region to one percentile and destroy rank-based metrics.
+# Quantile bins give the transform consistent resolution wherever the fitted
+# model places its scores.
+PRESENTATION_PERCENT_RANK_NUM_BINS = 10000
+
+
+def presentation_percent_rank_bins(
+        scores, num_bins=PRESENTATION_PERCENT_RANK_NUM_BINS):
+    """Return data-adaptive bins for presentation percentile calibration.
+
+    Parameters
+    ----------
+    scores : sequence of float
+        Calibration presentation scores.
+    num_bins : int
+        Maximum number of quantile bins.
+
+    Returns
+    -------
+    numpy.ndarray
+        Strictly increasing histogram edges spanning the finite scores.
+    """
+    scores = numpy.asarray(scores, dtype=float)
+    scores = scores[numpy.isfinite(scores)]
+    if scores.size == 0:
+        raise ValueError("Cannot calibrate presentation percentiles without scores")
+    if num_bins < 1:
+        raise ValueError("num_bins must be at least 1")
+
+    quantile_count = min(int(num_bins), scores.size) + 1
+    edges = numpy.quantile(
+        scores,
+        numpy.linspace(0.0, 1.0, quantile_count),
+    )
+    edges = numpy.unique(edges)
+    if edges.size < 2:
+        raise ValueError(
+            "Cannot calibrate presentation percentiles from a constant score "
+            "distribution"
+        )
+    return edges
 
 
 class Class1PresentationPredictor(object):
@@ -290,7 +336,10 @@ class Class1PresentationPredictor(object):
         df["peptide_num"] = df.index
         if sample_names is None:
             peptides = EncodableSequences.create(peptides)
-            all_alleles = sorted({a for lst in alleles.values() for a in lst})
+            all_alleles = sorted(
+                {a for lst in alleles.values() for a in lst},
+                key=lambda value: str(value),
+            )
 
             if verbose > 0:
                 print("Predicting affinities.")
@@ -1267,6 +1316,7 @@ class Class1PresentationPredictor(object):
                 ("hostname  ", gethostname()),
                 ("user      ", getuser()),
             ]
+            add_release_provenance(rows)
             pandas.DataFrame(rows).to_csv(
                 info_path, sep="\t", header=False, index=False)
 
@@ -1399,10 +1449,11 @@ class Class1PresentationPredictor(object):
         bins : object
             Anything that can be passed to numpy.histogram's "bins" argument
             can be used here, i.e. either an integer or a sequence giving bin
-            edges.
+            edges. By default, data-adaptive quantile bins are used so models
+            with compressed probability ranges retain ranking resolution.
         """
         if bins is None:
-            bins = numpy.linspace(0, 1, 1000)
+            bins = presentation_percent_rank_bins(scores)
 
         self.percent_rank_transform = PercentRankTransform()
         self.percent_rank_transform.fit(scores, bins=bins)

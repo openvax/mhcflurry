@@ -13,6 +13,7 @@
 """
 Tests for Class1ProcessingNeuralNetwork.
 """
+import gc
 import pytest
 
 import re
@@ -21,7 +22,10 @@ import torch
 from sklearn.metrics import roc_auc_score
 import pandas
 
-from mhcflurry.class1_processing_neural_network import Class1ProcessingNeuralNetwork
+from mhcflurry.class1_processing_neural_network import (
+    Class1ProcessingModel,
+    Class1ProcessingNeuralNetwork,
+)
 from mhcflurry.common import random_peptides
 from mhcflurry.amino_acid import AMINO_ACIDS, BLOSUM62_MATRIX
 from mhcflurry.flanking_encoding import FlankingEncoding
@@ -263,6 +267,98 @@ def test_fit_uses_eager_network_for_validation_by_default(monkeypatch):
     )
 
 
+def test_fit_uses_effective_validation_batch_size(monkeypatch):
+    """Processing validation uses the larger forward-only batch heuristic."""
+    import mhcflurry.class1_processing_neural_network as processing_module
+
+    validation_batch_sizes = []
+
+    class RecordingValidationNetwork(torch.nn.Module):
+        def __init__(self, network):
+            super().__init__()
+            self.network = network
+
+        def forward(self, inputs):
+            validation_batch_sizes.append(len(inputs["sequence"]))
+            return self.network(inputs)
+
+    monkeypatch.setattr(
+        processing_module,
+        "maybe_compile_network",
+        lambda network, device: network,
+    )
+    monkeypatch.setattr(
+        processing_module,
+        "validation_forward_network",
+        lambda network, eager_network: RecordingValidationNetwork(eager_network),
+    )
+
+    num_examples = 20
+    model = Class1ProcessingNeuralNetwork(
+        max_epochs=1,
+        validation_split=0.5,
+        early_stopping=False,
+        minibatch_size=2,
+        peptide_max_length=9,
+        n_flank_length=4,
+        c_flank_length=4,
+        convolutional_filters=4,
+        convolutional_kernel_size=3,
+        post_convolutional_dense_layer_sizes=[],
+    )
+    model.fit(
+        sequences=FlankingEncoding(
+            peptides=["SIINFEKL"] * num_examples,
+            n_flanks=["AAAA"] * num_examples,
+            c_flanks=["FFFF"] * num_examples,
+        ),
+        targets=numpy.arange(num_examples, dtype=numpy.float32) % 2,
+        verbose=-1,
+        progress_print_interval=None,
+    )
+
+    assert model.fit_info[-1]["effective_validation_batch_size"] == 8
+    assert validation_batch_sizes == [8, 2]
+
+
+def test_fit_does_not_force_full_gc_each_epoch(monkeypatch):
+    """Worker-level model cleanup owns GC; fit must not collect per epoch."""
+    import mhcflurry.class1_processing_neural_network as processing_module
+
+    collect_calls = []
+    monkeypatch.setattr(gc, "collect", lambda: collect_calls.append(True))
+    monkeypatch.setattr(
+        processing_module,
+        "maybe_compile_network",
+        lambda network, device: network,
+    )
+
+    model = Class1ProcessingNeuralNetwork(
+        max_epochs=3,
+        validation_split=0.0,
+        early_stopping=False,
+        minibatch_size=2,
+        peptide_max_length=9,
+        n_flank_length=4,
+        c_flank_length=4,
+        convolutional_filters=4,
+        convolutional_kernel_size=3,
+        post_convolutional_dense_layer_sizes=[],
+    )
+    model.fit(
+        sequences=FlankingEncoding(
+            peptides=["SIINFEKL"] * 4,
+            n_flanks=["AAAA"] * 4,
+            c_flanks=["FFFF"] * 4,
+        ),
+        targets=numpy.array([0, 1, 0, 1], dtype=numpy.float32),
+        verbose=-1,
+        progress_print_interval=None,
+    )
+
+    assert collect_calls == []
+
+
 
 
 def test_processing_peak_estimate_scales_with_conv_shape():
@@ -303,8 +399,10 @@ def test_processing_predict_auto_batch_uses_worker_env(monkeypatch):
 
     captured = {}
 
-    def fake_resolve(value, device, model=None, num_workers_per_gpu=1):
-        del value, device, model
+    def fake_resolve(
+            value, device, model=None, num_workers_per_gpu=1,
+            total_rows=None):
+        del value, device, model, total_rows
         captured["num_workers_per_gpu"] = num_workers_per_gpu
         return 2
 
@@ -330,6 +428,97 @@ def test_processing_predict_auto_batch_uses_worker_env(monkeypatch):
 
     assert len(predictions) == len(peptides)
     assert captured["num_workers_per_gpu"] == 4
+
+
+def test_processing_predict_auto_batch_retries_device_oom(monkeypatch):
+    """Only auto batches halve and retry after an allocator OOM."""
+    from mhcflurry import pytorch_sizing
+
+    class OOMOnce(torch.nn.Module):
+        def __init__(self, network):
+            super().__init__()
+            self.network = network
+            self.raised = False
+
+        def forward(self, inputs):
+            if not self.raised and len(inputs["sequence"]) > 1:
+                self.raised = True
+                raise RuntimeError("CUDA out of memory in test allocator")
+            return self.network(inputs)
+
+    monkeypatch.setattr(
+        pytorch_sizing,
+        "resolve_prediction_batch_size",
+        lambda *args, **kwargs: 2,
+    )
+    model = Class1ProcessingNeuralNetwork(
+        peptide_max_length=12,
+        n_flank_length=2,
+        c_flank_length=2,
+        convolutional_filters=8,
+    )
+    network = model.make_network(
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
+    )
+    model._network = OOMOnce(network)
+    peptides = ["SIINFEKL", "GILGFVFTL", "NLVPMVATV"]
+    predictions = model.predict(
+        peptides=peptides,
+        n_flanks=["AA"] * len(peptides),
+        c_flanks=["GG"] * len(peptides),
+        batch_size="auto",
+    )
+    assert len(predictions) == len(peptides)
+    assert model._network.raised
+
+
+def test_processing_validation_is_batched(monkeypatch):
+    """An explicit validation cap still prevents a whole-fold forward."""
+    monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "0")
+    monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE_LOSS", "0")
+
+    batch_sizes = []
+    original_forward = Class1ProcessingModel.forward
+
+    def recording_forward(self, inputs):
+        batch_sizes.append(int(inputs["sequence"].shape[0]))
+        return original_forward(self, inputs)
+
+    monkeypatch.setattr(Class1ProcessingModel, "forward", recording_forward)
+
+    model = Class1ProcessingNeuralNetwork(
+        peptide_max_length=9,
+        n_flank_length=2,
+        c_flank_length=2,
+        convolutional_filters=8,
+        minibatch_size=2,
+        validation_batch_size=3,
+        max_epochs=1,
+        validation_split=0.5,
+        early_stopping=False,
+    )
+    peptides = [
+        "SIINFEKL",
+        "GILGFVFTL",
+        "NLVPMVATV",
+        "LLFGYPVYV",
+        "GLCTLVAML",
+        "KLGGALQAK",
+        "VYFLQSINF",
+        "YVLDHLIVV",
+    ]
+    model.fit(
+        sequences=FlankingEncoding(
+            peptides=peptides,
+            n_flanks=["AA"] * len(peptides),
+            c_flanks=["GG"] * len(peptides),
+        ),
+        targets=[1, 0, 1, 0, 1, 0, 1, 0],
+        verbose=-1,
+    )
+
+    assert batch_sizes
+    assert max(batch_sizes) == 3
 
 
 def test_processing_predict_encoded_tensor_public_numpy_wrapper():

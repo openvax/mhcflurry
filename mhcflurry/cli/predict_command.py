@@ -69,9 +69,11 @@ from ..parallelism import (
     num_workers_per_gpu_from_args,
     worker_pool_with_gpu_assignments_from_args,
 )
+from ..pytorch_sizing import default_prediction_batch_is_auto
 from ..workload_planning import (
     WORKLOAD_AFFINITY_INFERENCE,
     WORKLOAD_PRESENTATION_INFERENCE,
+    model_artifact_size_bytes,
     path_size_bytes,
 )
 from ..version import __version__
@@ -392,6 +394,8 @@ def run(argv=sys.argv[1:]):
     )
     workload_hints = {
         "data_bytes": path_size_bytes(args.input),
+        "elastic_batch": default_prediction_batch_is_auto(),
+        "model_bytes": model_artifact_size_bytes(models_dir),
         "prediction_rows": len(df),
     }
 

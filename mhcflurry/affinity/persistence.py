@@ -24,6 +24,7 @@ from socket import gethostname
 
 import numpy
 import pandas
+from mhcgnomes import parse, parse_gene_class
 
 from ..class1_neural_network import Class1NeuralNetwork
 from ..common import load_weights, normalize_allele_name, save_weights
@@ -35,6 +36,55 @@ from ..pseudosequences import (
     pseudosequence_filename_for_mapping,
 )
 from ..version import __version__
+from ..model_provenance import add_release_provenance
+
+
+# The public 2.2.0 model artifact contains this malformed spelling of the
+# official Caja-PS2*01 processed-pseudogene allele. Keep only this exact
+# artifact compatibility case until pirl-unc/mhcgnomes#88 supplies the
+# ontology property and, if appropriate, the historical alias. Do not infer
+# pseudogene status from a ``PS`` substring.
+_LEGACY_NON_PREDICTOR_PSEUDOSEQUENCE_KEYS = frozenset({"Caja-PS*02:01"})
+
+
+def _parse_mhc_name(raw_name, only_class1):
+    """Parse an MHC name with mhcgnomes, returning None on failure."""
+    return parse(
+        str(raw_name),
+        only_class1=only_class1,
+        infer_class2_pairing=False,
+        collapse_singleton_haplotypes=True,
+        collapse_singleton_serotypes=True,
+        raise_on_error=False,
+    )
+
+
+def _is_non_predictor_pseudosequence(name):
+    """Return true for known non-class-I predictor pseudosequence rows."""
+    parsed_any_class = _parse_mhc_name(name, only_class1=False)
+    if parsed_any_class is None:
+        gene_class = parse_gene_class(str(name), raise_on_error=False)
+        if gene_class is not None:
+            # Use mhcgnomes' lenient, species-aware classification for names
+            # outside its strict allele ontology, including DAA/DAB/DR-family
+            # class-II genes and known non-MHC helper genes.
+            return gene_class.is_class2 or gene_class.non_mhc
+
+        return str(name) in _LEGACY_NON_PREDICTOR_PSEUDOSEQUENCE_KEYS
+
+    parsed_class1 = _parse_mhc_name(name, only_class1=True)
+    if parsed_class1 is None:
+        # Known non-class-I MHC names such as class II and TAP entries do not
+        # belong in a class-I predictor.
+        return True
+
+    gene_name = getattr(parsed_class1, "gene_name", None)
+    return (
+        gene_name in {"HFE", "MICA", "MICB"}
+        or getattr(parsed_class1, "is_pseudogene", False)
+        or parsed_class1.annotation_null
+        or parsed_class1.annotation_questionable
+    )
 
 
 def save_predictor(predictor, models_dir, model_names_to_write=None, write_metadata=True):
@@ -117,6 +167,7 @@ def save_predictor(predictor, models_dir, model_names_to_write=None, write_metad
                 ("hostname  ", gethostname()),
                 ("user      ", getuser()),
             ]
+            add_release_provenance(rows)
             pandas.DataFrame(rows).to_csv(
                 info_path, sep="\t", header=False, index=False)
 
@@ -252,10 +303,12 @@ def load_predictor(
         # retry with aliases — retired allele names like B*44:01 (an
         # IMGT error reassigned to B*44:02 in 1994) often have
         # incomplete pseudosequences, and the alias target may have a
-        # complete one. If mhcgnomes can't parse either way, keep the
-        # raw name so the pseudosequence remains available.
+        # complete one. Keys that mhcgnomes cannot parse are omitted: keeping
+        # them would make supported_alleles advertise a value that the public
+        # prediction API cannot canonicalize back to that key.
         renormalized = {}
         skipped_non_class1 = []
+        skipped_unparseable = []
         for (name, value) in allele_to_sequence.items():
             normalized = normalize_allele_name(
                 name, raise_on_error=False, use_allele_aliases=False)
@@ -265,16 +318,14 @@ def load_predictor(
                 if alias_normalized is not None:
                     normalized = alias_normalized
             if normalized is None:
-                # Detect class II, TAP, and pseudogene entries —
-                # these don't belong in a class I predictor and
-                # always have incomplete pseudosequences.
-                gene = name.split("*")[0].split("-")[-1] if "-" in name else ""
-                if ("X" in value and
-                        any(tag in gene
-                            for tag in ("DAA", "DAB", "TAP", "PS"))):
+                # Detect class II, TAP, and pseudogene entries. Unknown raw
+                # keys are also unusable because prediction inputs cannot be
+                # canonicalized to them.
+                if _is_non_predictor_pseudosequence(name):
                     skipped_non_class1.append(name)
-                    continue
-                normalized = name
+                else:
+                    skipped_unparseable.append(name)
+                continue
             if normalized in renormalized and name != normalized:
                 existing = renormalized[normalized]
                 if value.count("X") < existing.count("X"):
@@ -290,6 +341,13 @@ def load_predictor(
                 len(skipped_non_class1),
                 ", ".join(sorted(skipped_non_class1)[:10])
                 + (" ..." if len(skipped_non_class1) > 10 else ""))
+        if skipped_unparseable:
+            logging.warning(
+                "Skipped %d unparseable pseudosequence allele key(s) that "
+                "cannot be resolved by the predictor API: %s",
+                len(skipped_unparseable),
+                ", ".join(sorted(skipped_unparseable)[:10])
+                + (" ..." if len(skipped_unparseable) > 10 else ""))
 
         # Map mhcgnomes-aliased forms back to pseudosequence keys.
         # e.g. Mamu-A1*007:01 -> Mamu-A*07:01

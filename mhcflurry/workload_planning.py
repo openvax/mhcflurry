@@ -15,14 +15,23 @@
 from __future__ import annotations
 
 import os
+import math
 import re
 import subprocess
+import zipfile
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
+from .memory_budget import (
+    GIB,
+    HOST_MIN_RESERVE_BYTES,
+    usable_memory_bytes,
+)
 
-GIB = float(1 << 30)
+
 HOST_RAM_PER_DATALOADER_CHILD_GB = 0.5
+DEVICE_RUNTIME_BASE_GB = 1.5
+MODEL_TENSOR_SAFETY_FACTOR = 1.2
 
 
 def env_float(name, default, bounds=None):
@@ -43,6 +52,11 @@ def env_float(name, default, bounds=None):
                 "Environment variable %s=%r is not a valid float: %s"
                 % (name, raw, exc)
             ) from None
+    if not math.isfinite(value):
+        raise ValueError(
+            "Environment variable %s=%r must be finite"
+            % (name, raw if raw not in (None, "") else value)
+        )
     if bounds is not None:
         low, high = bounds
         if (low is not None and value < low) or (
@@ -146,6 +160,10 @@ class LocalParallelismPlan:
     cli_overrides: Tuple[str, ...] = ()
     warnings: Tuple[str, ...] = ()
     hints: Tuple[Tuple[str, object], ...] = ()
+    warmup_device_peak_gb: Optional[float] = None
+    warmup_host_peak_gb: Optional[float] = None
+    cpu_threads_per_worker: Optional[int] = None
+    cpu_threads_per_worker_was_auto: bool = True
 
     def __str__(self):
         device_worker = (
@@ -162,7 +180,9 @@ class LocalParallelismPlan:
             "LocalParallelismPlan("
             "workload=%s, backend=%s, jobs=%d, gpus=%d, workers/gpu=%d, "
             "dataloader_workers=%d, device_worker_gb=%s, "
-            "host_worker_gb=%.1f, host_available=%s from %s)"
+            "host_worker_gb=%.1f, host_available=%s from %s, "
+            "warmup_device_peak_gb=%s, warmup_host_peak_gb=%s, "
+            "cpu_threads_per_worker=%s [%s])"
             % (
                 self.workload_name,
                 self.backend,
@@ -174,6 +194,23 @@ class LocalParallelismPlan:
                 self.host_worker_gb,
                 host_available,
                 self.host_memory_source,
+                (
+                    "%.1f" % self.warmup_device_peak_gb
+                    if self.warmup_device_peak_gb is not None else "none"
+                ),
+                (
+                    "%.1f" % self.warmup_host_peak_gb
+                    if self.warmup_host_peak_gb is not None else "none"
+                ),
+                (
+                    str(self.cpu_threads_per_worker)
+                    if self.cpu_threads_per_worker is not None else "none"
+                ),
+                (
+                    "auto"
+                    if self.cpu_threads_per_worker_was_auto
+                    else "environment"
+                ),
             )
         )
 
@@ -306,6 +343,37 @@ def path_size_bytes(path):
         return None
 
 
+def model_artifact_size_bytes(path):
+    """Best-effort uncompressed bytes for a model file or directory.
+
+    NumPy ``.npz`` weights are ZIP containers, so their on-disk size can be
+    much smaller than their resident parameter tensors. Summing ZIP member
+    sizes gives the planner a closer parameter-byte input without importing
+    torch or loading a predictor in the parent process.
+    """
+    if not path:
+        return None
+    paths = []
+    if os.path.isdir(path):
+        for root, _, filenames in os.walk(path):
+            paths.extend(os.path.join(root, name) for name in filenames)
+    else:
+        paths.append(path)
+    total = 0
+    found = False
+    for filename in paths:
+        try:
+            if zipfile.is_zipfile(filename):
+                with zipfile.ZipFile(filename) as archive:
+                    total += sum(info.file_size for info in archive.infolist())
+            else:
+                total += os.path.getsize(filename)
+            found = True
+        except (OSError, zipfile.BadZipFile):
+            continue
+    return total if found else None
+
+
 def _memory_info(total_gb=None, available_gb=None, source="unknown"):
     return {
         "total_gb": total_gb,
@@ -342,11 +410,56 @@ def _linux_memory_info_gb():
     except (OSError, ValueError, IndexError):
         return None
     if not values:
-        return None
-    return _memory_info(
+        return _linux_cgroup_memory_info_gb()
+    host = _memory_info(
         total_gb=values.get("MemTotal"),
         available_gb=values.get("MemAvailable"),
         source="/proc/meminfo",
+    )
+    cgroup = _linux_cgroup_memory_info_gb()
+    if cgroup is None:
+        return host
+    host_total = host["total_gb"]
+    if host_total is not None and cgroup["total_gb"] >= host_total:
+        return host
+    return cgroup
+
+
+def _read_cgroup_memory_value(paths):
+    for path in paths:
+        try:
+            with open(path, "r") as fh:
+                raw = fh.read().strip()
+        except OSError:
+            continue
+        if not raw or raw == "max":
+            continue
+        try:
+            return int(raw)
+        except ValueError:
+            continue
+    return None
+
+
+def _linux_cgroup_memory_info_gb():
+    """Return the container memory budget when a finite cgroup limit exists."""
+    limit = _read_cgroup_memory_value((
+        "/sys/fs/cgroup/memory.max",
+        "/sys/fs/cgroup/memory/memory.limit_in_bytes",
+    ))
+    # Cgroup v1 represents an unlimited controller with a huge near-int64
+    # sentinel. It is not a usable machine-memory estimate.
+    if limit is None or limit <= 0 or limit >= 2 ** 60:
+        return None
+    current = _read_cgroup_memory_value((
+        "/sys/fs/cgroup/memory.current",
+        "/sys/fs/cgroup/memory/memory.usage_in_bytes",
+    ))
+    available = None if current is None else max(limit - current, 0)
+    return _memory_info(
+        total_gb=limit / GIB,
+        available_gb=available / GIB if available is not None else None,
+        source="cgroup",
     )
 
 
@@ -391,12 +504,14 @@ def _macos_memory_info_gb():
             pages[key.strip()] = int(value.strip().rstrip("."))
         except ValueError:
             continue
+    available_page_names = (
+        "Pages free", "Pages inactive", "Pages speculative")
     available_pages = sum(
-        pages.get(name, 0)
-        for name in ("Pages free", "Pages inactive", "Pages speculative")
-    )
+        pages.get(name, 0) for name in available_page_names)
     available_bytes = (
-        available_pages * page_size if available_pages else None
+        available_pages * page_size
+        if any(name in pages for name in available_page_names)
+        else None
     )
     if total_bytes is None and available_bytes is None:
         return None
@@ -419,6 +534,14 @@ def system_memory_info_gb():
     )
 
 
+def available_or_total_memory_gb(memory):
+    """Return available RAM when measured, including a valid zero value."""
+    available_gb = memory.get("available_gb")
+    if available_gb is not None:
+        return available_gb
+    return memory.get("total_gb")
+
+
 def _workload_env_name(workload_name):
     return "MHCFLURRY_WORKLOAD_%s_PER_WORKER_GB" % (
         workload_name.upper().replace("-", "_"),
@@ -433,27 +556,66 @@ def _normalize_hints(hints=None, **extra_hints):
     return values
 
 
+def _finite_nonnegative_hint(hints, name):
+    """Return a numeric planning hint or fail before capacity arithmetic."""
+    raw = hints.get(name)
+    if raw is None:
+        return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        raise ValueError(
+            "Workload hint %s must be a finite non-negative number; got %r" %
+            (name, raw)
+        ) from None
+    if not math.isfinite(value) or value < 0:
+        raise ValueError(
+            "Workload hint %s must be a finite non-negative number; got %r" %
+            (name, raw)
+        )
+    return value
+
+
 def estimate_workload_memory(workload_name=WORKLOAD_GENERIC, hints=None):
     """Estimate device and host memory for a workload."""
     hints = _normalize_hints(hints)
     profile = get_workload_profile(workload_name)
     notes = []
-    data_gb = (hints.get("data_bytes") or 0) / GIB
+    data_bytes = _finite_nonnegative_hint(hints, "data_bytes") or 0.0
+    model_bytes = _finite_nonnegative_hint(hints, "model_bytes")
+    data_gb = data_bytes / GIB
+    explicit_device_worker_gb = False
 
     workload_env = _workload_env_name(profile.name)
     if os.environ.get(workload_env) not in (None, ""):
         device_worker_gb = env_float(workload_env, 0.0, bounds=(0.0, None))
+        explicit_device_worker_gb = True
         notes.append("env override")
     elif hints.get("per_worker_gb") is not None:
-        device_worker_gb = float(hints["per_worker_gb"])
+        device_worker_gb = _finite_nonnegative_hint(hints, "per_worker_gb")
+        explicit_device_worker_gb = True
         notes.append("command estimate")
     else:
         device_worker_gb = profile.device_worker_gb
         if device_worker_gb is not None:
             notes.append("profile default")
 
+    if model_bytes:
+        artifact_worker_gb = (
+            DEVICE_RUNTIME_BASE_GB
+            + float(model_bytes) / GIB * MODEL_TENSOR_SAFETY_FACTOR
+        )
+        if hints.get("elastic_batch") and not explicit_device_worker_gb:
+            # Activations are sized later from live memory. For inference the
+            # launcher only needs parameters plus the CUDA/runtime base.
+            device_worker_gb = artifact_worker_gb
+            notes.append("uncompressed model artifacts")
+        elif device_worker_gb is None or artifact_worker_gb > device_worker_gb:
+            device_worker_gb = artifact_worker_gb
+            notes.append("uncompressed model artifact floor")
+
     data_pressure_gb = 0.0
-    if hints.get("data_bytes") and device_worker_gb is not None:
+    if data_bytes and device_worker_gb is not None:
         if data_gb > profile.data_pressure_start_gb:
             data_pressure_gb = min(
                 profile.data_pressure_cap_gb,
@@ -487,22 +649,32 @@ def host_memory_num_jobs_cap(
         dataloader_num_workers=0,
         safety_fraction=None):
     """Return worker cap from currently available host memory."""
-    available_gb = memory.get("available_gb") or memory.get("total_gb")
+    available_gb = available_or_total_memory_gb(memory)
     if available_gb is None:
         return None
-    if safety_fraction is None:
-        safety_fraction = env_float(
-            "MHCFLURRY_AUTO_HOST_MEMORY_SAFETY_FRACTION",
-            "0.70",
-            bounds=(0.0, 1.0),
-        )
     worker_gb = (
         float(host_worker_gb)
         + int(dataloader_num_workers) * HOST_RAM_PER_DATALOADER_CHILD_GB
     )
     if worker_gb <= 0:
         return None
-    return max(1, int(float(available_gb) * float(safety_fraction) / worker_gb))
+    if safety_fraction is None:
+        raw_fraction = os.environ.get(
+            "MHCFLURRY_AUTO_HOST_MEMORY_SAFETY_FRACTION")
+        if raw_fraction not in (None, ""):
+            safety_fraction = env_float(
+                "MHCFLURRY_AUTO_HOST_MEMORY_SAFETY_FRACTION",
+                raw_fraction,
+                bounds=(0.0, 1.0),
+            )
+    if safety_fraction is not None:
+        usable_gb = float(available_gb) * float(safety_fraction)
+    else:
+        usable_gb = usable_memory_bytes(
+            float(available_gb) * GIB,
+            min_reserve_bytes=HOST_MIN_RESERVE_BYTES,
+        ) / GIB
+    return max(1, int(usable_gb / worker_gb))
 
 
 def _is_auto(value):
@@ -537,7 +709,7 @@ def _clip_auto_num_jobs_to_host_memory(
         "(%.1f GB from %s, workload=%s, %.1f GB/worker)" % (
             int(num_jobs),
             cap,
-            memory.get("available_gb") or memory.get("total_gb"),
+            available_or_total_memory_gb(memory),
             memory.get("source"),
             memory_plan["workload_name"],
             worker_gb,
@@ -716,6 +888,43 @@ def plan_local_parallelism(
                 "honoring CLI override" % (num_jobs, capacity)
             )
 
+    cpu_count = os.cpu_count()
+    if cap_auto_num_jobs and cpu_count and int(num_jobs) > int(cpu_count):
+        if num_jobs_was_auto:
+            warnings.append(
+                "auto num_jobs capped from %d to %d by available CPUs" % (
+                    int(num_jobs), int(cpu_count)))
+            num_jobs = int(cpu_count)
+            if mwpg_was_auto and gpus > 0:
+                max_workers_per_gpu = max(
+                    1, (num_jobs + gpus - 1) // gpus)
+            if backend in ("auto", "gpu"):
+                capacity = int(num_jobs)
+        else:
+            warnings.append(
+                "explicit num_jobs=%d exceeds detected CPUs=%d; honoring "
+                "CLI override" % (int(num_jobs), int(cpu_count)))
+
+    work_item_cap = hints.get("num_work_items")
+    if work_item_cap is None and workload_name.endswith("_inference"):
+        work_item_cap = hints.get("prediction_rows") or hints.get("num_rows")
+    if work_item_cap is not None:
+        work_item_cap = max(int(work_item_cap), 1)
+    if (
+            cap_auto_num_jobs
+            and num_jobs_was_auto
+            and work_item_cap is not None
+            and int(num_jobs) > work_item_cap):
+        warnings.append(
+            "auto num_jobs capped from %d to %d by available work items" % (
+                int(num_jobs), work_item_cap))
+        num_jobs = work_item_cap
+        if mwpg_was_auto and gpus > 0:
+            max_workers_per_gpu = max(
+                1, (num_jobs + gpus - 1) // gpus)
+        if backend in ("auto", "gpu"):
+            capacity = int(num_jobs)
+
     effective_fit_workers = max(1, int(num_jobs))
     if int(num_jobs) <= 0 and gpus > 0:
         effective_fit_workers = 1
@@ -726,7 +935,7 @@ def plan_local_parallelism(
         dataloader_num_workers = int(resolve_dataloader_num_workers(
             dl_raw,
             num_fit_workers=effective_fit_workers,
-            ram_gb=memory.get("available_gb") or memory.get("total_gb"),
+            ram_gb=available_or_total_memory_gb(memory),
         ))
     else:
         dataloader_num_workers = int(dl_raw)
@@ -798,7 +1007,8 @@ def plan_local_parallelism(
             num_random_negatives=None,
             peptide_max_length=None,
             num_workers=effective_fit_workers,
-            ram_gb=memory.get("available_gb") or memory.get("total_gb"),
+            ram_gb=available_or_total_memory_gb(memory),
+            base_worker_gb=host_worker_gb,
         ))
     else:
         random_negative_pool_epochs = int(rn_raw)

@@ -39,13 +39,14 @@ loaded above. This method returns a {class}`pandas.DataFrame` with binding affin
 predictions:
 
 ```{doctest}
->>> predictor.predict(
+>>> predictions = predictor.predict(
 ...     peptides=["SIINFEKL", "NLVPMVATV"],
 ...     alleles=["HLA-A0201", "HLA-A0301"],
 ...     verbose=0)
-     peptide  peptide_num sample_name      affinity best_allele  processing_score  presentation_score  presentation_percentile
-0   SIINFEKL            0     sample1  11927.173394   HLA-A0201          0.264710            0.020690                11.630326
-1  NLVPMVATV            1     sample1     16.570969   HLA-A0201          0.533008            0.970187                 0.018723
+>>> [(row.peptide, str(row.best_allele)) for row in predictions.itertuples()]
+[('SIINFEKL', 'HLA-A0201'), ('NLVPMVATV', 'HLA-A0201')]
+>>> predictions.presentation_score.round(2).tolist()
+[0.02, 0.97]
 ```
 
 Here, the list of alleles is taken to be an individual's MHC I genotype (i.e. up
@@ -53,41 +54,43 @@ to 6 alleles), and the strongest binder across alleles for each peptide is
 reported.
 
 ```{note}
-MHCflurry normalizes allele names using the [mhcgnomes](https://github.com/til-unc/mhcgnomes)
+MHCflurry normalizes allele names using the [mhcgnomes](https://github.com/pirl-unc/mhcgnomes)
 package. Names like `HLA-A0201` or `A*02:01` will be
 normalized to `HLA-A*02:01`, so most naming conventions can be used
 with methods such as {meth}`~mhcflurry.Class1PresentationPredictor.predict`.
 ```
 
+Invalid, ambiguous, class-II, pseudogene, null, and unsupported allele names
+raise a descriptive `ValueError` by default. For streaming or mixed-quality
+data, pass `throw=False`; affected prediction rows are retained with `NaN`
+scores (or ignored when another valid allele in the genotype supplies the
+sample's best affinity) while valid inputs are still evaluated. The
+command-line equivalent is `mhcflurry-predict --no-throw`.
+
 If you have multiple sample genotypes, you can pass a dict, where the
 keys are arbitrary sample names:
 
 ```{doctest}
->>> predictor.predict(
+>>> predictions = predictor.predict(
 ...     peptides=["KSEYMTSWFY", "NLVPMVATV"],
 ...     alleles={
 ...        "sample1": ["A0201", "A0301", "B0702", "B4402", "C0201", "C0702"],
 ...        "sample2": ["A0101", "A0206", "B5701", "C0202"],
 ...     },
 ...     verbose=0)
-      peptide  peptide_num sample_name     affinity best_allele  processing_score  presentation_score  presentation_percentile
-0  KSEYMTSWFY            0     sample1  8292.186793       C0201          0.542474            0.074376                 3.639185
-1   NLVPMVATV            1     sample1    16.570969       A0201          0.533008            0.970187                 0.018723
-2  KSEYMTSWFY            0     sample2    88.898412       A0101          0.542474            0.868106                 0.171848
-3   NLVPMVATV            1     sample2    17.406640       A0206          0.533008            0.968773                 0.021413
+>>> [(row.sample_name, row.peptide, str(row.best_allele))
+...  for row in predictions.itertuples()]
+[('sample1', 'KSEYMTSWFY', 'C0201'), ('sample1', 'NLVPMVATV', 'A0201'), ('sample2', 'KSEYMTSWFY', 'A0101'), ('sample2', 'NLVPMVATV', 'A0206')]
 ```
 
 Here the strongest binder for each sample / peptide pair is returned.
 
-Many users will focus on the binding affinity predictions, as the
-processing and presentation predictions are experimental. If you do use the latter
-scores, however, when available you should provide the upstream (N-flank)
-and downstream (C-flank) sequences from the source proteins of the peptides for
-a small boost in accuracy. To do so, specify the `n_flank` and `c_flank`
-arguments, which give the flanking sequences for the corresponding peptides:
+Processing and presentation predictions can use the upstream (N-flank) and
+downstream (C-flank) sequence from the source protein for better cleavage
+context. Pass those sequences with `n_flanks` and `c_flanks`:
 
 ```{doctest}
->>> predictor.predict(
+>>> predictions = predictor.predict(
 ...     peptides=["KSEYMTSWFY", "NLVPMVATV"],
 ...     n_flanks=["NNNNNNN", "SSSSSSSS"],
 ...     c_flanks=["CCCCCCCC", "YYYAAAA"],
@@ -96,11 +99,10 @@ arguments, which give the flanking sequences for the corresponding peptides:
 ...        "sample2": ["A0101", "A0206", "B5701", "C0202"],
 ...     },
 ...     verbose=0)
-      peptide   n_flank   c_flank  peptide_num sample_name     affinity best_allele  processing_score  presentation_score  presentation_percentile
-0  KSEYMTSWFY   NNNNNNN  CCCCCCCC            0     sample1  8292.186793       C0201          0.626173            0.097041                 2.991685
-1   NLVPMVATV  SSSSSSSS   YYYAAAA            1     sample1    16.570969       A0201          0.436871            0.956961                 0.036957
-2  KSEYMTSWFY   NNNNNNN  CCCCCCCC            0     sample2    88.898412       A0101          0.626173            0.898967                 0.122663
-3   NLVPMVATV  SSSSSSSS   YYYAAAA            1     sample2    17.406640       A0206          0.436871            0.954945                 0.041168
+>>> predictions[["n_flank", "c_flank"]].drop_duplicates().to_dict("records")
+[{'n_flank': 'NNNNNNN', 'c_flank': 'CCCCCCCC'}, {'n_flank': 'SSSSSSSS', 'c_flank': 'YYYAAAA'}]
+>>> predictions.presentation_score.round(2).tolist()
+[0.1, 0.96, 0.9, 0.95]
 ```
 
 ## Scanning protein sequences
@@ -111,7 +113,7 @@ peptides with a predicted binding affinity of 500 nM or tighter to any allele
 across two sample genotypes and two short peptide sequences.
 
 ```{doctest}
->>> predictor.predict_sequences(
+>>> scan = predictor.predict_sequences(
 ...    sequences={
 ...        'protein1': "MDSKGSSQKGSRLLLLLVVSNLL",
 ...        'protein2': "SSLPTPEDKEQAQQTHH",
@@ -124,17 +126,12 @@ across two sample genotypes and two short peptide sequences.
 ...    comparison_quantity="affinity",
 ...    filter_value=500,
 ...    verbose=0)
-  sequence_name  pos     peptide n_flank c_flank sample_name    affinity best_allele  affinity_percentile  processing_score  presentation_score  presentation_percentile
-0      protein1   14   LLLVVSNLL   GSRLL             sample1   57.180447       A0201             0.398125          0.233159            0.754186                 0.351359
-1      protein1   13   LLLLVVSNL   KGSRL       L     sample1   57.338895       A0201             0.398125          0.030920            0.586465                 0.642908
-2      protein1    5   SSQKGSRLL   MDSKG   LLLVV     sample2  110.778519       C0202             0.781875          0.060995            0.455738                 0.920299
-3      protein1    6   SQKGSRLLL   DSKGS   LLVVS     sample2  254.479925       C0202             1.734875          0.101657            0.303070                 1.356196
-4      protein1   13  LLLLVVSNLL   KGSRL             sample1  260.390251       A0201             1.012500          0.158010            0.345066                 1.214701
-5      protein1   12  LLLLLVVSNL   QKGSR       L     sample1  308.149631       A0201             1.093750          0.015113            0.206176                 1.801603
-6      protein2    0   SSLPTPEDK           EQAQQ     sample2  410.354088       C0202             2.398000          0.003090            0.158057                 2.154946
-7      protein1    5    SSQKGSRL   MDSKG   LLLLV     sample2  444.320680       C0202             2.511750          0.026198            0.159450                 2.137962
-8      protein2    0   SSLPTPEDK           EQAQQ     sample1  459.295763       A0301             0.970625          0.003090            0.143999                 2.292011
-9      protein1    4   GSSQKGSRL    MDSK   LLLLV     sample2  469.052760       C0202             2.594750          0.013744            0.146487                 2.261060
+>>> len(scan)
+10
+>>> bool(scan.affinity.le(500).all())
+True
+>>> scan[["sequence_name", "peptide", "best_allele"]].head(2).to_dict("records")
+[{'sequence_name': 'protein1', 'peptide': 'LLLVVSNLL', 'best_allele': 'A0201'}, {'sequence_name': 'protein1', 'peptide': 'LLLLVVSNL', 'best_allele': 'A0201'}]
 ```
 
 When using `predict_sequences`, the flanking sequences for each peptide are
@@ -155,10 +152,13 @@ Here's an example:
 ```{doctest}
 >>> from mhcflurry import Class1AffinityPredictor
 >>> predictor = Class1AffinityPredictor.load()
->>> predictor.predict_to_dataframe(allele="HLA-A0201", peptides=["SIINFEKL", "SIINFEQL"])
-    peptide       allele    prediction  prediction_low  prediction_high  prediction_percentile
-0  SIINFEKL  HLA-A*02:01  11927.160672     6901.075753     18127.365636               6.296000
-1  SIINFEQL  HLA-A*02:01  12070.888207     7362.362111     18465.971144               6.354125
+>>> affinities = predictor.predict_to_dataframe(
+...     allele="HLA-A0201", peptides=["SIINFEKL", "SIINFEQL"])
+>>> affinities[["peptide", "allele"]].to_dict("records")
+[{'peptide': 'SIINFEKL', 'allele': 'HLA-A*02:01'}, {'peptide': 'SIINFEQL', 'allele': 'HLA-A*02:01'}]
+>>> bool(((affinities.prediction_low < affinities.prediction) &
+...       (affinities.prediction < affinities.prediction_high)).all())
+True
 ```
 
 The `prediction_low` and `prediction_high` fields give the 5-95 percentile

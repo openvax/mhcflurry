@@ -134,6 +134,134 @@ def test_load_accepts_legacy_class1_pseudosequences_file(tmp_path):
     }
 
 
+def test_load_skips_incomplete_non_class1_pseudosequences_with_mhcgnomes(
+        tmp_path):
+    (tmp_path / "manifest.csv").write_text("model_name,allele,config_json\n")
+    (tmp_path / LEGACY_ALLELE_SEQUENCES_FILENAME).write_text(
+        "allele,sequence\n"
+        "HLA-A*02:01,COMPLETE\n"
+        "HLA-DQB1*06:02,COMPLETECLASSII\n"
+        "HLA-DQA1*01:01,XXCLASSII\n"
+        "TAP1,XXTAP\n"
+        "SLA-TAP*1*01:01,XXLEGACYTAP\n"
+        "SLA-TAP0,XXNEARBYTAP\n"
+        "Caja-PS*02:01,XXLEGACYPS\n"
+        "Caja-PS0*02:01,XXNEARBYPS\n"
+        "Caja-DAA*01:01,XXLEGACYDAA\n"
+        "Caja-DAB*01:01,XXLEGACYDAB\n"
+        "Caja-DRA*01:01,XXLENIENTDRA\n"
+        "Caja-BLB*01:01,XXLENIENTBLB\n"
+        "Geja-F10*01:01,XXLENIENTCLASSI\n"
+        "Caja-B5*01:01ps,XXPSEUDOGENE\n"
+        "HLA-H*02:01,XXHLAPSEUDOGENE\n"
+        "Mamu-G*01:01,XXINHERITEDPSEUDOGENE\n"
+        "Popy-Ap*01:01,XXINHERITEDPSEUDOGENE\n"
+        "Poab-Ap*01:01,XXSCOPEDNONPSEUDOGENE\n"
+        "NONSENSE,XXUNKNOWN\n"
+    )
+
+    predictor = Class1AffinityPredictor.load(
+        str(tmp_path),
+        optimization_level=0,
+    )
+
+    assert predictor.allele_to_sequence == {
+        "HLA-A*02:01": "COMPLETE",
+        # Inherited gene properties remain scoped to the exact species/locus
+        # ontology entry.
+        "Poab-Ap*01:01": "XXSCOPEDNONPSEUDOGENE",
+    }
+    assert "NONSENSE" not in predictor.supported_alleles
+
+
+def test_invalid_alleles_raise_or_return_row_aligned_nans(caplog):
+    class ConstantModel:
+        supported_peptide_lengths = (8, 15)
+
+        def predict(self, peptides, **kwargs):
+            return numpy.full(len(peptides), 123.0)
+
+    predictor = Class1AffinityPredictor(
+        allele_to_allele_specific_models={
+            "HLA-A*02:01": [ConstantModel()],
+        },
+    )
+    invalid = [
+        "HLA-DQA1*01:01",
+        "HLA-A2",
+        "Caja-B5*01:01ps",
+        "HLA-H*02:01",
+        "HLA-A*02:01N",
+        "HLA-A*02:01Q",
+        "NONSENSE",
+    ]
+
+    with pytest.raises(ValueError, match="MHC class II allele"):
+        predictor.predict(
+            peptides=["SIINFEKL"],
+            alleles=[invalid[0]],
+        )
+
+    with caplog.at_level(logging.WARNING):
+        result = predictor.predict_to_dataframe(
+            peptides=["SIINFEKL"] * (len(invalid) + 1),
+            alleles=["HLA-A0201"] + invalid,
+            throw=False,
+            include_percentile_ranks=False,
+            include_confidence_intervals=False,
+        )
+
+    assert result.allele.tolist() == ["HLA-A*02:01"] + invalid
+    assert result.prediction.iloc[0] == pytest.approx(123.0)
+    assert result.prediction.iloc[1:].isna().all()
+    for expected in [
+            "MHC class II allele",
+            "serotype is not a specific allele",
+            "pseudogene MHC allele",
+            "null-expression MHC allele",
+            "questionable-expression MHC allele",
+            "Invalid MHC allele name"]:
+        assert expected in caplog.text
+
+    assert predictor.canonicalize_allele_name(
+        invalid[0], raise_on_error=False) is None
+    ranks = predictor.percentile_ranks(
+        [123.0], allele=invalid[0], throw=False)
+    assert numpy.isnan(ranks).all()
+
+
+def test_tolerant_prediction_handles_nan_normalized_allele(monkeypatch):
+    """Pandas may coerce the internal None sentinel to floating NaN."""
+    class ConstantModel:
+        supported_peptide_lengths = (8, 15)
+
+        def predict(self, peptides, **kwargs):
+            return numpy.full(len(peptides), 123.0)
+
+    predictor = Class1AffinityPredictor(
+        allele_to_allele_specific_models={
+            "HLA-A*02:01": [ConstantModel()],
+        },
+    )
+    monkeypatch.setattr(
+        predictor,
+        "_canonicalize_prediction_alleles",
+        lambda alleles, throw: ["HLA-A*02:01", numpy.nan],
+    )
+
+    result = predictor.predict_to_dataframe(
+        peptides=["SIINFEKL", "SIINFEKL"],
+        alleles=["HLA-A0201", "invalid"],
+        throw=False,
+        include_percentile_ranks=False,
+        include_confidence_intervals=False,
+    )
+
+    assert result.allele.tolist() == ["HLA-A*02:01", "invalid"]
+    assert result.prediction.iloc[0] == pytest.approx(123.0)
+    assert numpy.isnan(result.prediction.iloc[1])
+
+
 @pytest.mark.parametrize("filename,sequence", [
     (
         PSEUDOSEQUENCE_FILENAMES_BY_LENGTH[34],

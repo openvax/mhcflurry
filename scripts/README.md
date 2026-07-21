@@ -1,71 +1,42 @@
-# scripts/
+# Maintained scripts
 
-Each file here is a long-lived utility. **Anything transient — debugging
-runs, one-off parity checks, smoketests, GPU-variant launchers tied to a
-single provisioning incident — must not live here.** If it isn't useful
-for the next person who clones the repo six months from now, it doesn't
-belong.
+This directory contains reusable training, release, validation, and developer
+utilities. Transient experiments, incident-specific launchers, and smoke tests
+belong in the ignored `jobs/` directory or in the test suite.
 
-## Layout
+## Directory map
 
-- **`scripts/training/`** — the production training pipeline. Stage scripts
-  (`pan_allele_release_*.sh`, `presentation_from_affinity.sh`) and the
-  sweep + plot tools that publish artifacts. See its own README.
-- **`scripts/release/`** — packaging and deployment helpers for trained
-  model artifacts, plus the end-to-end release workflow entry point.
-- **`scripts/dev/`** — developer ergonomic helpers (e.g. relocating
-  large run-output dirs outside the rsync source tree). Not invoked by
-  CI or release.
-- **Top level** — model-validation utilities. Each compares a freshly-
-  trained predictor against a baseline (the public release, a fixture,
-  or its own pseudosequence loader) and is meant to be re-run by any
-  future contributor doing the same diligence.
+- **`training/`** — production training stages, remote transport, sweeps, and
+  profiling. See [training/README.md](training/README.md).
+- **`release/`** — end-to-end release orchestration, provenance validation,
+  packaging, and deployment. See [release/README.md](release/README.md).
+- **`dev/`** — developer ergonomics that are not invoked by CI or releases.
+- **Top-level Python files** — focused validation tools for comparing a newly
+  trained predictor with a release or fixture.
 
-## Boundary with local jobs and downloads
+The maintained public workflow for training, evaluation, plots, remote cleanup,
+and optional deployment is:
 
-- **`jobs/`** is intentionally ignored. Use it for local run launchers,
-  Brev/runplz scratch scripts, interrupted experiments, and other
-  machine-specific work. Do not add it to source control.
-- Promote anything worth maintaining from `jobs/` into `scripts/`.
-- Promote anything that produces a reproducible artifact users or
-  reviewers should fetch into `downloads-generation/<download_name>/`
-  with a `GENERATE.sh`.
+```shell
+mhcflurry train pan-allele-release --help
+```
 
-## Top-level files
+## Validation tools
 
-- **`validate_against_public.py`** — affinity + presentation rank-correlation
-  against the public mhcflurry release on a peptide × allele grid. Quick
-  smell test that a new training run hasn't regressed.
-- **`validate_allele_sequences.py`** — confirms the model-shipped
-  pseudosequence CSV (`allele_sequences.csv` in older artifacts,
-  `pseudosequences.<source>.<length>aa.csv` in newer artifacts) is
-  bit-stable across releases. Catches regressions in the mhcgnomes parse
-  layer that would silently misroute predictions.
-- **`validate_presentation_with_flanks.py`** — fixed 10-peptide regression
-  set including SLLQHLIGL (PRAME) with real flanks; rank correlation vs
-  public release. Cheap acceptance test before publishing a new bundle.
+- **`validate_against_public.py`** checks affinity and presentation rank
+  correlation against a public release on a peptide-by-allele grid.
+- **`validate_allele_sequences.py`** verifies that shipped pseudosequences are
+  stable across model bundles.
+- **`validate_presentation_with_flanks.py`** runs a small fixed presentation
+  regression set with real flanks.
 
-## Current audit
+These are acceptance checks for model work. General behavior tests belong in
+`test/`.
 
-The maintained scripts are generally well scoped: release training lives
-under `training/`, development helpers live under `dev/`, and the
-top-level validation tools are narrow checks. The main gap was that Brev
-training and model-asset deployment were living outside this maintained
-surface. `scripts/training/launch_pan_allele_training_remote.py` is now the
-reusable remote/cloud pan-allele training entry point, and
-`scripts/release/retrain_evaluate_deploy.sh` is the single maintained
-workflow for training, evaluating, plotting, and deployment validation.
+## Where new work belongs
 
-## What used to live here (deleted)
-
-- TF→PyTorch parity scripts (`compare_tf_pytorch_random_outputs.py`,
-  `cross_allele_parity_analysis.py`, `extract_high_presentation_fixture.py`,
-  `plot_fixture_diffs.py`, `generate_fixture_error_report.py`) — finished
-  serving the 2.0 → 2.1 migration; not enduring.
-- Per-GPU-shape job launchers (`jobs/pan_allele_release_exact_l40s.py`
-  etc.) — wrote them during 8×A100 provisioning incidents that have
-  since cleared.
-- `modal_train_mhcflurry.py` — Modal-specific training launcher. Modal
-  isn't part of the live training path (Brev + local boxes via runplz
-  are); recreate from git when needed.
-- Smoketests of every kind. Tests live in `test/`.
+- Use ignored `jobs/` for local launchers, interrupted experiments, and
+  machine-specific debugging.
+- Promote reusable operational tools from `jobs/` into `scripts/`.
+- Put reproducible user/release artifacts under
+  `downloads-generation/<download_name>/` with a `GENERATE.sh` entry point.

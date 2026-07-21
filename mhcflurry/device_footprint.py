@@ -25,20 +25,20 @@ job size, so the planner falls back to the static profile default. Estimates are
 deliberately conservative (a safety multiplier + a floor) so we never pack more
 aggressively than the validated baseline.
 
-Sanity anchors (release pan-allele config, live diagnostics from the 2026-04-28
-``release_exact`` run):
+Sanity anchors (release pan-allele config, live diagnostics from release
+training runs):
 
-  * Affinity TRAINING — ~250k curated rows, minibatch 128 — measured steady-state
-    ~1.85-2.4 GB. Peptides are stored device-resident as compact ``(N, L)`` int8
-    indices (``peptide_amino_acid_encoding_torch``, default True) and embedded
-    per-batch, and alleles are a shared index-embedding — so the resident dataset
-    is tiny. The footprint is dominated by a fixed base (CUDA context +
-    torch.compile workspace + weights + optimizer + embedding) plus per-batch
-    activations; it barely scales with dataset size (only at extreme row
-    counts). ``estimate_affinity_training_device_worker_gb`` reproduces this.
-  * Affinity CALIBRATION — 800k-row peptide universe, 10-net ensemble — the
-    cached peptide-stage tensor is ~12 GB (the static profile assumed 24 GB).
-    ``estimate_affinity_calibration_device_worker_gb`` reproduces this.
+  * Affinity TRAINING — pretraining keeps the fold's validation tensors
+    device-resident, but validation is now batched from the live shared-memory
+    budget. The launch-time working set therefore consists of the exact
+    resident encodings plus model/optimizer/runtime state and the configured
+    training minibatch; it no longer bakes an obsolete full-fold validation
+    peak into every worker.
+  * Affinity CALIBRATION — 400k-row rc14 peptide universe, 10-net selected
+    ensemble — the merged fast path measured a ~15 GB cached peptide-stage
+    tensor on A100-40GB. ``estimate_affinity_calibration_device_worker_gb``
+    reproduces the cache plus runtime headroom so worker auto-sizing does not
+    pack multiple calibration caches onto a 40 GB GPU.
 
 The per-row resident formulas track the genuinely-varying terms: full dataset /
 peptide-universe row count, the peptide encoding dims (``max_length`` x feature
@@ -64,6 +64,11 @@ _FLOAT32_BYTES = 4
 _CALIBRATION_DEFAULT_STAGE_DIM = 1024
 _CALIBRATION_OVERHEAD_GB = 3.0            # model weights + activation headroom
 _CALIBRATION_MIN_DEVICE_WORKER_GB = 4.0   # don't over-pack from a tiny estimate
+# A merged ensemble without explicit peptide-dense layers expands the raw
+# peptide vector into a wider fast-path representation than the manifest alone
+# exposes. The rc14 GCP calibration run measured a 9450-wide stage for a
+# 10-network BLOSUM62 ensemble (3x the naive 10 * 15 * 21 estimate).
+_CALIBRATION_MERGED_STAGE_FACTOR = 3.0
 
 # ---- Affinity training -----------------------------------------------------
 # Peptides are stored device-resident as compact (N, L) int8 indices
@@ -83,7 +88,7 @@ _TRAINING_PER_ROW_SCALAR_BYTES = 12
 # combined buffer (~2x rows). Conservative.
 _TRAINING_RANDOM_NEGATIVE_FACTOR = 2.0
 # Forward activations + gradients + backward working set, as a multiple of the
-# single-forward activation bytes.
+# single-forward minibatch activation bytes.
 _TRAINING_ACTIVATION_BACKWARD_FACTOR = 3.0
 _PEPTIDE_INDEX_BYTES = 1  # int8 per position (peptides are always index-encoded)
 _TRAINING_DEFAULT_MINIBATCH = 128
@@ -190,7 +195,12 @@ def estimate_affinity_calibration_device_worker_gb(models_dir, prediction_rows):
     if manifest is None:
         return None
     num_networks, hyperparameters = manifest
-    stage_dim = _peptide_stage_dim(hyperparameters) or _CALIBRATION_DEFAULT_STAGE_DIM
+    stage_dim = (
+        _peptide_stage_dim(hyperparameters)
+        or _CALIBRATION_DEFAULT_STAGE_DIM
+    )
+    if not (hyperparameters.get("peptide_dense_layer_sizes") or []):
+        stage_dim *= _CALIBRATION_MERGED_STAGE_FACTOR
     cache_gb = (
         num_networks * int(stage_dim) * int(prediction_rows)
         * _FLOAT32_BYTES / _GIB
@@ -219,6 +229,10 @@ def estimate_affinity_training_device_worker_gb(
         hidden activations. This is what scales with batch size / network width.
       * a fixed base (CUDA context + compile workspace + weights + optimizer +
         embedding table) that does not scale with either.
+
+    Forward-only validation is intentionally absent: its batch is selected at
+    runtime from the same live per-worker budget as inference, after the fixed
+    tensors represented here have been allocated.
 
     A safety multiplier and a floor keep it conservative.
     """

@@ -1,121 +1,90 @@
-# scripts/training/
+# Training scripts
 
-Production training pipeline for the pan-allele release. Every file
-here has an enduring role; transient sweep cells, smoketests, and
-one-off tuning runs do not belong here.
+Maintained scripts for building the pan-allele release models. For a complete
+retrain, evaluation, synchronization, and optional deployment, start with:
 
-## Release pipeline (run in order, or use `pan_allele_release_full.sh`)
-
-- **`pan_allele_release_affinity.sh`** — Stage 1. Trains the affinity
-  ensemble end-to-end (data fetch → train → select → calibrate). Carries
-  the heartbeat / write_snapshot / log_release_event instrumentation,
-  `--continue-incomplete` resume, and the eval-against-public step.
-- **`presentation_from_affinity.sh`** — Stages 2–3. Takes an existing
-  affinity `models.combined/` and trains the no-flank + short-flanks
-  processing predictors, then fits + calibrates the presentation
-  predictor on top. Use this as a tail-on after a sweep.
-- **`pan_allele_release_full.sh`** — Composition wrapper that runs Stage
-  1 then inlines Stages 2–3. The full release in one invocation.
-- **`launch_pan_allele_training_remote.py`** — remote/cloud launcher for
-  the same pan-allele training pipeline. It currently uses runplz, with
-  Brev configuration when runplz is pointed at Brev instances. Use this
-  when training remotely; keep machine-specific patching or interrupted-
-  run recovery in ignored `jobs/`.
-
-For Brev/runplz execution:
-
-```bash
-runplz --outputs-dir /path/to/output scripts/training/launch_pan_allele_training_remote.py
+```shell
+mhcflurry train pan-allele-release --help
 ```
 
-For the full release gate (training, comparison, plots, and deployment
-validation), prefer `scripts/release/retrain_evaluate_deploy.sh`.
+The files in this directory are the lower-level stages and profiling tools used
+by that command. One-off experiments and machine-specific launchers belong in
+the ignored `jobs/` directory, not here.
 
-## Hyperparameter generation (consumed by the release scripts)
+## Release training stages
 
-- **`release_exact/generate_hyperparameters.py`** — The 35-architecture
-  pan-allele recipe (lr=1e-3, mb=128, 1024×512 dense, with-skip-
-  connections). Pinned bit-for-bit with the 2.2.0 release.
-- **`release_exact/generate_hyperparameters.base.py`** /
-  **`generate_hyperparameters.variants.py`** — Processing-network
-  hyperparameter base + no_flank / short_flanks variant emitters.
-- **`release_exact/make_train_data.processing.py`** /
-  **`make_train_data.presentation.py`** — Per-stage train-data
-  preparation (annotated mass-spec hits, decoy generation, format
-  filters). Run by the release scripts.
-- **`release_exact/reassign_mass_spec_training_data.py`** — One-time
-  remapping kept in tree because rerunning the release sometimes
-  surfaces stale assignments and we'd want it again.
-- **`release_exact/additional_alleles.txt`** — Curated allele list
-  augmenting the auto-derived set; baked into the release.
+- **`pan_allele_release_affinity.sh`** trains, selects, and calibrates the
+  affinity ensemble. It supports incomplete-run continuation and writes
+  heartbeat, snapshot, event, and evaluation records.
+- **`presentation_from_affinity.sh`** starts from an affinity
+  `models.combined/`, trains the configured processing variants, then fits and
+  calibrates presentation models.
+- **`pan_allele_release_full.sh`** runs both stages in order for a complete
+  local training pass.
+- **`launch_pan_allele_training_remote.py`** transports the same stages through
+  runplz. Use it directly only when debugging transport; normal remote releases
+  should use `mhcflurry train pan-allele-release`.
 
-## Sweep + analysis tooling
+Affinity, processing, and presentation stages write persistent GPU telemetry.
+Worker packing defaults to workload-aware `auto`; pin a count only for a measured
+machine-specific benchmark.
 
-- **`full_ensemble_minibatch_sweep.sh`** — Production minibatch sweep.
-  Phase-idempotent (`.train.done` / `.select.done` / `.calibrate.done` /
-  `.eval.done` sentinels) and supports `MHCFLURRY_SCALE_LR`,
-  `MHCFLURRY_SKIP_CALIBRATE` for the variants we routinely run.
-- **`mhcflurry compare-models`** — Unified two-side comparator covering
-  training stats (per-task wall-time / epoch / loss deltas), affinity
-  (per-allele + per-length ROC/PR/PPV on `data_evaluation` monoallelic),
-  and presentation (per-sample + per-length on multiallelic with/without
-  flanks). Each side can be a training-run directory, `public` (current
-  install), or `public:<release_name>`. Default `--b public`. Replaces
-  the three legacy `scripts/training/compare_*.py` tools.
-- **`mhcflurry plot-model-comparison`** — Renders ROC/PR/scatter/delta
-  plots from a `compare-models` output directory. Separate subcommand so
-  the metric pipeline doesn't pay the matplotlib import cost.
-- **`plot_minibatch_sweep.py`** — Stylized plots from a `sweep_summary.csv`
-  (gradient-color dots by mb, lin-lin + log-log only, adjustText
-  de-overlap). Invoked by the sweep wrapper after completion.
-- **`plot_loss_curves.py`** — Per-architecture loss curves from a
-  trained ensemble's `manifest.csv` + `weights_*.npz` series.
+For a direct runplz debugging session:
 
-## Performance helpers (sourced, not invoked directly)
+```shell
+RUNPLZ_BREV_AUTO_CREATE=0 runplz brev \
+    --outputs-dir /path/to/output \
+    --instance existing-brev-instance \
+    scripts/training/launch_pan_allele_training_remote.py
+```
 
-- **`set_cpu_threads.sh`** — Auto-computes the per-training-worker BLAS
-  thread budget and uniformly sets `OMP_NUM_THREADS` /
-  `MKL_NUM_THREADS` / `OPENBLAS_NUM_THREADS`. Sourced by
-  the release-stage scripts before they fork training workers.
+## Training data and hyperparameters
 
-## Profiling
+- **`mhcflurry class1-generate-training-hyperparameters`** generates the
+  maintained affinity and processing grids. The base minibatch defaults to 1024
+  and can be changed with `--minibatch-size`.
+- **`release_exact/generate_hyperparameters*.py`** are compatibility shims for
+  historical direct-script workflows.
+- **`release_exact/make_train_data.processing.py`** and
+  **`make_train_data.presentation.py`** prepare annotated hits, decoys, and
+  model-family input tables.
+- **`mhcflurry class1-reassign-mass-spec-training-data`** reruns the maintained
+  mass-spec affinity remapping step. Its file under `release_exact/` is a
+  compatibility shim.
+- **`release_exact/additional_alleles.txt`** is an archived input from an older
+  recipe and is not read by the current release stages.
 
-- **`benchmark_training_profile.py`** — Thin CLI wrapper around
-  `mhcflurry.training_benchmark`. Emits per-phase timings (data load,
-  encode, fit, save) for any architecture. Used during perf
-  regressions; the long-lived value is that it's the documented entry
-  point if/when someone needs to repeat the analysis.
+## Evaluation
 
-## Candidates for `downloads-generation/`
+Model comparison and plotting are package commands, not training scripts. Use
+`mhcflurry eval ...` after a standalone stage run, or let
+`mhcflurry train pan-allele-release` invoke them automatically.
 
-Keep scripts here while they are maintainer tooling. Move or wrap them
-with a `downloads-generation/<download_name>/GENERATE.sh` once their
-outputs are release artifacts that should be reproducible and
-downloadable.
+See the [evaluation guide](../../docs/evaluation.md) for comparison outputs,
+paper figures, saved-prediction tables, and external predictors.
 
-- **`mhcflurry compare-models`** (affinity + presentation components) —
-  if the summary tables, plots, or row-level new-vs-public predictions
-  are used as release evidence, make a generated analysis download that
-  pins the new model paths, public download versions, data-evaluation
-  version, git SHA, and command arguments.
-- **`pan_allele_release_full.sh`** /
-  **`pan_allele_release_affinity.sh`** /
-  **`presentation_from_affinity.sh`** — once the 2.3.x recipe is final,
-  fold the canonical recipe back into the relevant model
-  `downloads-generation/` directories rather than relying only on this
-  maintainer pipeline.
-- **`full_ensemble_minibatch_sweep.sh`** and
-  **`plot_minibatch_sweep.py`** — keep as scripts unless the sweep CSV,
-  plots, or conclusions are published as a downloadable analysis
-  artifact.
+## Sweeps and profiling
 
-## What used to live here (deleted)
+- **`full_ensemble_minibatch_sweep.sh`** runs resumable minibatch and validation
+  batch experiments. It writes per-cell completion sentinels, summaries, and GPU
+  occupancy data. Defaults stay on the automatic worker and validation-batch
+  paths; explicit values are for controlled comparisons.
+- **`plot_minibatch_sweep.py`** renders throughput and loss plots from
+  `sweep_summary.csv`.
+- **`plot_loss_curves.py`** renders per-architecture loss curves from a trained
+  ensemble.
+- **`benchmark_training_profile.py`** reports data-load, encoding, fit, and save
+  timings for one architecture.
 
-- `pan_allele_smoketest.sh`, `pan_allele_omp_smoketest.sh` — smoketests.
-- `minibatch_sweep_experiment.sh`, `sweep_workers.sh`,
-  `sweep_workers_cpu_extension.sh` — exploratory sweeps superseded by
-  `full_ensemble_minibatch_sweep.sh`.
-- `pan_allele_ensemble.sh`, `pan_allele_single.sh` — older single-
-  ensemble + single-network runners superseded by the release pipeline.
-- `pan_allele_presentation_subset.sh` — subset variant superseded by
-  `presentation_from_affinity.sh`.
+When an experiment becomes published release evidence, move or wrap it under
+`downloads-generation/<download_name>/GENERATE.sh` so the artifact records its
+inputs, command, version, and Git commit.
+
+## Shared performance helpers
+
+- **`set_cpu_threads.sh`** sets automatic BLAS/OpenMP thread budgets before
+  Python imports native runtimes. Explicit caller settings remain authoritative,
+  and serial execution applies an automatic runtime limit in-process.
+- **`gpu_telemetry.sh`** records `nvidia-smi` samples for training stages. Set
+  `MHCFLURRY_GPU_TELEMETRY=0` to disable it or
+  `MHCFLURRY_GPU_TELEMETRY_SECONDS=N` to change the interval.

@@ -30,26 +30,30 @@ from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..class1_presentation_predictor import Class1PresentationPredictor
 from ..common import (
     add_random_seed_arg,
+    allele_locus_name,
     amino_acid_distribution,
     configure_logging,
     configure_pytorch,
     configure_random_seed,
     filter_canonicalizable_alleles,
+    fraction_arg,
     install_sigusr1_stack_trace_handler,
+    positive_int_arg,
     random_peptides,
     write_generate_sh,
 )
 from ..encodable_sequences import EncodableSequences
 from ..parallelism import (
-    attach_constant_data_to_work_items_if_needed,
     add_local_parallelism_args,
     chunk_ranges_for_local_parallelism,
     num_workers_per_gpu_from_args,
+    refine_local_parallelism_from_worker_context,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
 from ..workload_planning import (
     WORKLOAD_AFFINITY_CALIBRATION,
     WORKLOAD_PRESENTATION_CALIBRATION,
+    model_artifact_size_bytes,
     path_size_bytes,
 )
 from ..device_footprint import (
@@ -113,21 +117,21 @@ parser.add_argument(
     "calibration.")
 parser.add_argument(
     "--num-peptides-per-length",
-    type=int,
+    type=positive_int_arg,
     metavar="N",
     default=int(1e5),
     help="Number of peptides per length to use to calibrate percent ranks. "
     "Default: %(default)s.")
 parser.add_argument(
     "--num-genotypes",
-    type=int,
+    type=positive_int_arg,
     metavar="N",
     default=25,
     help="Used when calibrating a presentation predictor. Number of genotypes"
     "to sample")
 parser.add_argument(
     "--alleles-per-genotype",
-    type=int,
+    type=positive_int_arg,
     metavar="N",
     default=6,
     help="Used when calibrating a presentation predictor. Number of alleles "
@@ -141,14 +145,14 @@ parser.add_argument(
     "--summary-top-peptide-fraction",
     default=[0.0001, 0.001, 0.01, 0.1, 1.0],
     nargs="+",
-    type=float,
+    type=fraction_arg,
     metavar="X",
     help="The top X fraction of predictions (i.e. tightest binders) to use to "
     "generate motifs and length preferences. Default: %(default)s")
 parser.add_argument(
     "--length-range",
     default=(8, 15),
-    type=int,
+    type=positive_int_arg,
     nargs=2,
     help="Min and max peptide length to calibrate, inclusive. "
     "Default: %(default)s")
@@ -164,7 +168,7 @@ def _batch_size_arg(value):
     """
     if isinstance(value, str) and value.strip().lower() in ("auto", ""):
         return "auto"
-    return int(value)
+    return positive_int_arg(value)
 
 
 parser.add_argument(
@@ -176,7 +180,7 @@ parser.add_argument(
          "mhcflurry.pytorch_sizing.compute_prediction_batch_size.")
 parser.add_argument(
     "--alleles-per-work-chunk",
-    type=int,
+    type=positive_int_arg,
     metavar="N",
     default=1,
     help="Number of alleles per work chunk. Default: %(default)s.")
@@ -229,6 +233,11 @@ add_random_seed_arg(parser)
 
 def run(argv=sys.argv[1:]):
     args = parser.parse_args(argv)
+    if args.length_range[0] > args.length_range[1]:
+        parser.error(
+            "--length-range minimum must not exceed maximum: %s" %
+            (args.length_range,)
+        )
 
     if not args.list_percent_rank_status:
         install_sigusr1_stack_trace_handler()
@@ -290,6 +299,7 @@ def run(argv=sys.argv[1:]):
                     path_size_bytes(args.alleles_file),
                 )
             ) or None,
+            "model_bytes": model_artifact_size_bytes(args.models_dir),
             "num_work_items": (
                 args.num_genotypes
                 if args.predictor_kind == "class1_presentation"
@@ -433,8 +443,10 @@ def run_class1_presentation_predictor(args, peptides):
     if args.alleles_per_genotype == 6:
         gene_to_alleles = collections.defaultdict(list)
         for a in alleles:
-            for gene in ["A", "B", "C"]:
-                if a.startswith("HLA-%s" % gene):
+            locus = allele_locus_name(a)
+            for gene, expected_locus in [
+                    ("A", "HLA-A"), ("B", "HLA-B"), ("C", "HLA-C")]:
+                if locus == expected_locus:
                     gene_to_alleles[gene].append(a)
 
         for _ in range(args.num_genotypes):
@@ -465,6 +477,9 @@ def run_class1_presentation_predictor(args, peptides):
     }
     WORKER_CONTEXT.pop("_presentation_predictor", None)
     WORKER_CONTEXT.pop("_presentation_predictor_models_dir", None)
+    if not args.cluster_parallelism:
+        refine_local_parallelism_from_worker_context(
+            args, WORKER_CONTEXT, start_method="spawn")
 
     serial_run = not args.cluster_parallelism and args.num_jobs == 0
     if serial_run:
@@ -503,6 +518,8 @@ def run_class1_presentation_predictor(args, peptides):
             # they don't inherit any PyTorch / CUDA state from the parent,
             # matching predict / predict-scan.
             start_method="spawn",
+            worker_context_module=__name__,
+            worker_context_data=WORKER_CONTEXT,
         )
         print("Worker pool", worker_pool)
         assert worker_pool is not None
@@ -510,13 +527,6 @@ def run_class1_presentation_predictor(args, peptides):
 
     try:
         if worker_pool is not None:
-            # Attach constant data and launch the work inside the try so a
-            # failure here (e.g. copying large constant data to workers) still
-            # tears the pool down via the finally rather than leaking
-            # non-daemon workers.
-            attach_constant_data_to_work_items_if_needed(
-                work_items, WORKER_CONTEXT, worker_pool
-            )
             results = worker_pool.imap_unordered(
                 partial(call_wrapped_kwargs,
                         do_class1_presentation_percent_rank_scores),
@@ -672,6 +682,9 @@ def run_class1_affinity_predictor(args, peptides):
         'num_workers_per_gpu': num_workers_per_gpu,
     }
     del encoded_peptides
+    if not args.cluster_parallelism:
+        refine_local_parallelism_from_worker_context(
+            args, WORKER_CONTEXT, start_method="spawn")
 
     serial_run = not args.cluster_parallelism and args.num_jobs == 0
     worker_pool = None
@@ -704,6 +717,8 @@ def run_class1_affinity_predictor(args, peptides):
             args,
             # Same CUDA-fork-safety rationale as the presentation path above.
             start_method="spawn",
+            worker_context_module=__name__,
+            worker_context_data=WORKER_CONTEXT,
         )
         print("Worker pool", worker_pool)
         assert worker_pool is not None
@@ -712,13 +727,6 @@ def run_class1_affinity_predictor(args, peptides):
 
     try:
         if worker_pool is not None:
-            # Attach constant data and launch the work inside the try so a
-            # failure here (e.g. copying large constant data to workers) still
-            # tears the pool down via the finally rather than leaking
-            # non-daemon workers.
-            attach_constant_data_to_work_items_if_needed(
-                work_items, WORKER_CONTEXT, worker_pool
-            )
             results = worker_pool.imap_unordered(
                 partial(call_wrapped_kwargs, do_class1_affinity_calibrate_percentile_ranks),
                 work_items,

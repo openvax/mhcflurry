@@ -13,19 +13,106 @@
 """Prediction and training batch-size helpers."""
 
 import logging
+import math
 import os
+import sys
+
+from .memory_budget import per_worker_memory_budget_bytes
 
 DEFAULT_PREDICT_BATCH_SIZE = "auto"
-AUTO_BATCH_MAX_ROWS = 1_000_000  # cap past which kernel-launch savings flatten
+AUTO_BATCH_MAX_ROWS = sys.maxsize
 AUTO_BATCH_MIN_ROWS = 1024  # floor: avoid pathologically tiny batches
 AUTO_BATCH_CPU_FALLBACK = 32_768  # CPU: large batches thrash L3; stay modest
-AUTO_BATCH_FREE_FRACTION = 0.5  # half of free VRAM is the working-set budget
+AUTO_BATCH_FREE_FRACTION = None
 _MPS_PSUTIL_WARNED = False  # one-shot warning if psutil is missing on MPS
 if os.environ.get("MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"):
-    DEFAULT_PREDICT_BATCH_SIZE = int(os.environ["MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"])
+    raw_default_batch_size = os.environ["MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"]
+    try:
+        DEFAULT_PREDICT_BATCH_SIZE = int(raw_default_batch_size)
+    except ValueError:
+        raise ValueError(
+            "MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE must be a positive integer; "
+            "got %r" % raw_default_batch_size
+        ) from None
+    if DEFAULT_PREDICT_BATCH_SIZE < 1:
+        raise ValueError(
+            "MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE must be a positive integer; "
+            "got %r" % raw_default_batch_size
+        )
     logging.info(
         "Configured default predict batch size: %s" % DEFAULT_PREDICT_BATCH_SIZE
     )
+
+
+def default_prediction_batch_is_auto():
+    """Whether the effective default prediction batch can shrink on OOM."""
+    return DEFAULT_PREDICT_BATCH_SIZE in (None, "auto")
+
+
+def begin_peak_memory_measurement():
+    """Reset CUDA peak counters and return an opaque measurement token."""
+    token = {"started": True}
+    try:
+        import torch
+        if torch.cuda.is_available():
+            device = torch.cuda.current_device()
+            torch.cuda.synchronize(device)
+            torch.cuda.reset_peak_memory_stats(device)
+            token["cuda_device"] = int(device)
+    except Exception as exc:
+        token["cuda_error"] = str(exc)
+    return token
+
+
+def _process_peak_rss_bytes():
+    """Best-effort process peak RSS in bytes on Linux and macOS."""
+    try:
+        import resource
+        import sys
+        value = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+        return value if sys.platform == "darwin" else value * 1024
+    except Exception:
+        return None
+
+
+def end_peak_memory_measurement(token):
+    """Finish a measurement begun by :func:`begin_peak_memory_measurement`."""
+    result = {"host_peak_rss_bytes": _process_peak_rss_bytes()}
+    device = token.get("cuda_device") if token else None
+    if device is not None:
+        try:
+            import torch
+            torch.cuda.synchronize(device)
+            result.update({
+                "cuda_peak_allocated_bytes": int(
+                    torch.cuda.max_memory_allocated(device)),
+                "cuda_peak_reserved_bytes": int(
+                    torch.cuda.max_memory_reserved(device)),
+            })
+        except Exception as exc:
+            result["cuda_error"] = str(exc)
+    return result
+
+
+def is_device_out_of_memory_error(exc):
+    """Whether ``exc`` is a CUDA/MPS allocator out-of-memory error."""
+    message = str(exc).lower()
+    return (
+        "out of memory" in message
+        and ("cuda" in message or "mps" in message or "allocator" in message)
+    )
+
+
+def release_device_memory_after_oom(device):
+    """Release cached allocator blocks before retrying a smaller auto batch."""
+    try:
+        import torch
+        if device.type == "cuda":
+            torch.cuda.empty_cache()
+        elif device.type == "mps" and hasattr(torch.mps, "empty_cache"):
+            torch.mps.empty_cache()
+    except Exception:
+        pass
 
 
 def estimate_peak_bytes_per_row(model):
@@ -186,7 +273,12 @@ def free_device_memory_bytes(device):
             # Any other psutil failure (broken install, etc.) — skip
             # the cap but don't fail the whole batch-size query.
             pass
-        return free if free > 0 else 4 * (1 << 30)
+        # Zero is a valid and important measurement: on unified-memory Macs it
+        # means the process has no safe headroom. Replacing it with the 4 GiB
+        # API fallback would make auto-sizing attempt another large allocation
+        # under peak memory pressure. The caller turns a zero budget into its
+        # one-row minimum batch.
+        return free
     return 2 * (1 << 30)
 
 
@@ -197,26 +289,61 @@ def compute_prediction_batch_size(
         free_memory_fraction=AUTO_BATCH_FREE_FRACTION,
         max_rows=AUTO_BATCH_MAX_ROWS,
         min_rows=AUTO_BATCH_MIN_ROWS,
-        cpu_fallback=AUTO_BATCH_CPU_FALLBACK):
+        cpu_fallback=AUTO_BATCH_CPU_FALLBACK,
+        total_rows=None):
     """Auto-size a prediction batch for ``device`` and ``model``.
 
-    Divides free VRAM by the per-row peak activation estimate for the
-    model, scales by 1/``num_workers_per_gpu`` so co-resident workers
-    don't step on each other's budget, caps at ``max_rows`` (past which
-    kernel-launch savings flatten out), floors at ``min_rows``.
+    Divides live free VRAM (after one shared reserve) by co-resident workers
+    and the model's per-row peak activation estimate. ``max_rows`` is only an
+    optional caller limit; the default auto path has no hardwired batch cap.
 
     CPU: returns ``cpu_fallback`` — large batches on CPU thrash L3
     cache and rarely help for the small networks mhcflurry trains.
     """
+    workers = int(num_workers_per_gpu)
+    if workers < 1:
+        raise ValueError("num_workers_per_gpu must be at least 1")
+    if max_rows is not None and int(max_rows) < 1:
+        raise ValueError("max_rows must be at least 1")
+    if total_rows is not None and int(total_rows) < 0:
+        raise ValueError("total_rows must be non-negative")
+    if free_memory_fraction is not None:
+        free_memory_fraction = float(free_memory_fraction)
+        if (
+                not math.isfinite(free_memory_fraction)
+                or not 0 < free_memory_fraction <= 1):
+            raise ValueError("free_memory_fraction must be in (0, 1]")
     if device.type == "cpu":
-        return cpu_fallback
+        rows = int(cpu_fallback)
+        if rows < 1:
+            raise ValueError("cpu_fallback must be at least 1")
+        return (
+            min(rows, max(int(total_rows), 1))
+            if total_rows is not None else rows
+        )
     peak_bytes = estimate_peak_bytes_per_row(model)
     free = free_device_memory_bytes(device)
-    workers = max(int(num_workers_per_gpu), 1)
-    budget = int(free * float(free_memory_fraction) / workers)
-    budget = max(budget, peak_bytes * min_rows)
-    rows = budget // peak_bytes
-    return int(max(min_rows, min(rows, max_rows)))
+    if free_memory_fraction is None:
+        budget = per_worker_memory_budget_bytes(free, workers)
+    else:
+        # Backward-compatible expert API: an explicit fraction replaces the
+        # default shared reserve calculation.
+        budget = int(free * free_memory_fraction / workers)
+    rows = max(1, budget // peak_bytes)
+    if rows < min_rows:
+        logging.warning(
+            "Auto-sized prediction batch below the normal floor: %d rows "
+            "(free=%.2f GB, workers/GPU=%d, peak=%.1f KB/row).",
+            rows,
+            free / float(1 << 30),
+            workers,
+            peak_bytes / 1024.0,
+        )
+    if max_rows is not None:
+        rows = min(rows, int(max_rows))
+    if total_rows is not None:
+        rows = min(rows, max(int(total_rows), 1))
+    return int(rows)
 
 
 def env_workers_per_gpu(default=1):
@@ -236,7 +363,7 @@ def env_workers_per_gpu(default=1):
 
 
 def resolve_prediction_batch_size(
-        value, device, model=None, num_workers_per_gpu=1):
+        value, device, model=None, num_workers_per_gpu=1, total_rows=None):
     """Resolve an explicit int or ``"auto"`` to a concrete batch size.
 
     Accepts ``None`` as a synonym for ``"auto"``. Propagates an
@@ -248,8 +375,12 @@ def resolve_prediction_batch_size(
             device,
             model=model,
             num_workers_per_gpu=num_workers_per_gpu,
+            total_rows=total_rows,
         )
-    return int(value)
+    result = int(value)
+    if result < 1:
+        raise ValueError("prediction batch size must be at least 1")
+    return result
 
 
 # Inference keeps only activations of the current layer alive (input +
@@ -265,7 +396,7 @@ def check_training_batch_fits(
         device,
         model,
         num_workers_per_gpu=1,
-        free_memory_fraction=0.5,
+        free_memory_fraction=None,
         min_batch=64,
         logger=None):
     """Verify that ``requested_batch_size`` will fit on ``device``.
@@ -277,8 +408,10 @@ def check_training_batch_fits(
     Returns ``(effective_batch_size, shrunk: bool)``. When the
     requested batch is too large for the available VRAM — partitioned
     across co-resident workers — the batch is shrunk to the largest
-    power-of-two that fits (floored at ``min_batch``) and a loud
-    warning is emitted via ``logger`` / stderr explaining that the
+    power-of-two that fits. ``min_batch`` is a normal-performance floor, not
+    a memory-safety floor: under severe pressure the result may be smaller so
+    the guard does not knowingly force an OOM. A loud warning is emitted via
+    ``logger`` / stderr explaining that the
     training dynamics (BN running stats, gradient noise scale) now
     differ from what the caller configured.
 
@@ -286,20 +419,33 @@ def check_training_batch_fits(
     can catch. Returns ``(requested_batch_size, False)`` in that case.
     """
     import sys
-    if device.type == "cpu" or requested_batch_size <= min_batch:
-        return int(requested_batch_size), False
+    requested_batch_size = int(requested_batch_size)
+    if requested_batch_size < 1:
+        raise ValueError("requested training batch size must be at least 1")
+    if device.type == "cpu":
+        return requested_batch_size, False
+    workers = int(num_workers_per_gpu)
+    if workers < 1:
+        raise ValueError("num_workers_per_gpu must be at least 1")
+    if free_memory_fraction is not None:
+        free_memory_fraction = float(free_memory_fraction)
+        if (
+                not math.isfinite(free_memory_fraction)
+                or not 0 < free_memory_fraction <= 1):
+            raise ValueError("free_memory_fraction must be in (0, 1]")
     peak_bytes = estimate_peak_bytes_per_row(model) * TRAINING_PEAK_MULTIPLIER
     free = free_device_memory_bytes(device)
-    workers = max(int(num_workers_per_gpu), 1)
-    budget = int(free * float(free_memory_fraction) / workers)
-    max_rows = max(budget // peak_bytes, min_batch)
-    requested_batch_size = int(requested_batch_size)
+    if free_memory_fraction is None:
+        budget = per_worker_memory_budget_bytes(free, workers)
+    else:
+        budget = int(free * free_memory_fraction / workers)
+    max_rows = max(budget // peak_bytes, 1)
     if requested_batch_size <= max_rows:
         return requested_batch_size, False
     shrunk = 1
     while shrunk * 2 <= max_rows:
         shrunk *= 2
-    shrunk = max(shrunk, min_batch)
+    below_normal_floor = shrunk < int(min_batch)
     message = (
         "!!! TRAINING BATCH WILL NOT FIT !!!  "
         "Requested minibatch_size=%d on %s with %d worker(s)/GPU. "
@@ -310,12 +456,17 @@ def check_training_batch_fits(
         "all depend on batch size. Re-check convergence before "
         "trusting the trained model. To pin an explicit size and "
         "silence this guard, set a minibatch_size the caller knows "
-        "fits." % (
+        "fits.%s" % (
             requested_batch_size, device, workers,
             requested_batch_size * peak_bytes / 1e9,
             free / 1e9,
             budget / 1e9,
             shrunk,
+            (
+                " Available memory requires going below the normal "
+                "performance floor of %d." % int(min_batch)
+                if below_normal_floor else ""
+            ),
         )
     )
     if logger is not None:
