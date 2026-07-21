@@ -1,28 +1,15 @@
 # Python library tutorial
 
-The MHCflurry Python API exposes additional options and features beyond those
-supported by the commandline tools and can be more convenient for interactive
-analyses and bioinformatic pipelines. This tutorial gives a basic overview
-of the most important functionality. See the {ref}`API-documentation` for further
-details.
+Use the Python API to add MHCflurry predictions to notebooks and analysis
+pipelines. This page covers the common presentation and affinity calls; the
+{ref}`API-documentation` contains the complete interfaces.
 
 ## Loading a predictor
 
-Most prediction tasks can be performed using the
-{class}`~mhcflurry.Class1PresentationPredictor` class, which provides a programmatic API
-to the functionality in the {ref}`mhcflurry-predict <ref-mhcflurry-predict>` and
-{ref}`mhcflurry-predict-scan <ref-mhcflurry-predict-scan>` commands.
-
-Instances of {class}`~mhcflurry.Class1PresentationPredictor` wrap a
-{class}`~mhcflurry.Class1AffinityPredictor` to generate binding affinity predictions
-and a {class}`~mhcflurry.Class1ProcessingPredictor` to generate antigen processing
-predictions. The presentation score is computed using a logistic regression
-model over binding affinity and processing predictions.
-
-Use the {meth}`~mhcflurry.Class1PresentationPredictor.load` static method to load a
-trained predictor from disk. With no arguments this method will load the predictor
-released with MHCflurry (see {ref}`downloading`). If you pass a path to a
-models directory, then it will load that predictor instead.
+{class}`~mhcflurry.Class1PresentationPredictor` provides binding, processing,
+and combined presentation predictions. Calling `load()` without a path uses
+the downloaded release model (see {ref}`downloading`); pass a model directory
+to load a custom predictor.
 
 ```{doctest}
 >>> from mhcflurry import Class1PresentationPredictor
@@ -49,9 +36,15 @@ predictions:
 [0.02, 0.97]
 ```
 
-Here, the list of alleles is taken to be an individual's MHC I genotype (i.e. up
-to 6 alleles), and the strongest binder across alleles for each peptide is
-reported.
+Here, the allele list is one MHC I genotype (up to six alleles), and the
+strongest binder across that genotype is reported for each peptide.
+
+| Python input | Meaning |
+|---|---|
+| `alleles=["A0201", "A0301"]` | One genotype; one result per peptide. |
+| `alleles={"sample1": [...], "sample2": [...]}` | Multiple named genotypes; one result per sample and peptide. |
+| `Class1AffinityPredictor.predict_to_dataframe(allele="A0201", ...)` | Score every peptide against one allele. |
+| `Class1AffinityPredictor.predict_to_dataframe(alleles=[...], ...)` | Pair each peptide with the allele at the same position. |
 
 ```{note}
 MHCflurry normalizes allele names using the [mhcgnomes](https://github.com/pirl-unc/mhcgnomes)
@@ -65,7 +58,7 @@ raise a descriptive `ValueError` by default. For streaming or mixed-quality
 data, pass `throw=False`; affected prediction rows are retained with `NaN`
 scores (or ignored when another valid allele in the genotype supplies the
 sample's best affinity) while valid inputs are still evaluated. The
-command-line equivalent is `mhcflurry-predict --no-throw`.
+command-line equivalent is `mhcflurry predict --no-throw`.
 
 If you have multiple sample genotypes, you can pass a dict, where the
 keys are arbitrary sample names:

@@ -22,9 +22,7 @@ Examples:
 Scan a set of sequences in a FASTA file for binders to any alleles in a MHC I
 genotype:
 
-$ mhcflurry-predict-scan \
-    test/data/example.fasta \
-    --alleles HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:01,HLA-C*07:02
+$ mhcflurry predict-scan test/data/example.fasta --alleles 'HLA-A*02:01;HLA-A*03:01'
 
 Instead of a FASTA, you can also pass a CSV that has "sequence_id" and "sequence"
 columns.
@@ -32,19 +30,13 @@ columns.
 You can also specify multiple MHC I genotypes to scan as space-separated
 arguments to the --alleles option:
 
-$ mhcflurry-predict-scan \
-    test/data/example.fasta \
-    --alleles \
-        HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:02,HLA-C*07:02 \
-        HLA-A*01:01,HLA-A*02:06,HLA-B*44:02,HLA-B*07:02,HLA-C*01:02,HLA-C*03:01
+$ mhcflurry predict-scan example.fasta --alleles 'A0201;A0301' 'B0702;B0801'
 
 If `--out` is not specified, results are written to standard out.
 
 You can also specify sequences on the commandline:
 
-mhcflurry-predict-scan \
-    --sequences MGYINVFAFPFTIYSLLLCRMNSRNYIAQVDVVNFNLT \
-    --alleles HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:02,HLA-C*07:02
+mhcflurry predict-scan --sequences MGYINVFAFPFTIYSLLLCRMNSRNYIAQVDVVNFNLT --alleles HLA-A*02:01
 
 """
 import sys
@@ -118,7 +110,8 @@ input_args.add_argument(
     "--alleles",
     metavar="ALLELE",
     nargs="+",
-    help="Alleles to predict")
+    help="Sample allele or genotype queries. Each argument is one sample; "
+    "delimit alleles within a sample with ',' or ';'.")
 input_args.add_argument(
     "--sequences",
     metavar="SEQ",
@@ -198,7 +191,7 @@ model_args.add_argument(
     "--models",
     metavar="DIR",
     default=None,
-    help="Directory containing presentation models."
+    help="Directory containing presentation models. "
     "Default: %s" % get_default_class1_presentation_models_dir(
         test_exists=False))
 model_args.add_argument(
@@ -371,7 +364,7 @@ def run(argv=sys.argv[1:]):
     df = df.set_index(args.sequence_id_column)
 
     if args.alleles:
-        genotypes = pandas.Series(args.alleles).str.split(r"[,\s]+")
+        genotypes = pandas.Series(args.alleles).str.split(r"[;,\s]+")
         genotypes.index = genotypes.index.map(lambda i: "genotype_%02d" % i)
         alleles = genotypes.to_dict()
     else:

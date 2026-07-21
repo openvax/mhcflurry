@@ -117,7 +117,7 @@ def test_fasta_percentile():
 def test_commandline_sequences():
     args = [
         "--sequences", "ASDFGHKL", "QWERTYIPCVNM",
-        "--alleles", "HLA-A0201,HLA-A0301", "H-2-Kb",
+        "--alleles", "HLA-A0201;HLA-A0301", "H-2-Kb",
         "--peptide-lengths", "8",
         "--results-all",
     ]

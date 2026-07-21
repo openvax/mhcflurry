@@ -4,88 +4,79 @@
 
 (downloading)=
 
-## Downloading models
+## Download models
 
-Most users will use pre-trained MHCflurry models that we release. These models
-are distributed separately from the pip package and may be downloaded with the
-{ref}`mhcflurry-downloads <ref-mhcflurry-downloads>` tool:
+Most users need only the presentation bundle. It includes the binding-affinity
+and antigen-processing components:
 
 ```shell
-$ mhcflurry-downloads fetch models_class1_presentation
+$ mhcflurry downloads fetch models_class1_presentation
 ```
 
-Files downloaded with {ref}`mhcflurry-downloads <ref-mhcflurry-downloads>` are stored in a platform-specific
-directory. To get the path to downloaded data, you can use:
+Downloads are stored outside the Python package in a platform-specific data
+directory. Use `info` to list available bundles and `path` to locate one:
 
-```{command-output} mhcflurry-downloads path models_class1_presentation
+```{command-output} mhcflurry downloads path models_class1_presentation
 :nostderr:
 ```
 
-We also release a number of other "downloads," such as curated training data and some
-experimental models. To see what's available and what you have downloaded, run
-`mhcflurry-downloads info`.
+## Predict peptides
 
-Most users need only `models_class1_presentation`, which includes both the
-binding-affinity and antigen-processing components.
-
-
-## Generating predictions
-
-The {ref}`mhcflurry-predict <ref-mhcflurry-predict>` command generates predictions for individual peptides
-(see the next section for how to scan protein sequences for epitopes). By
-default it will use the pre-trained models you downloaded above. Other
-models can be used by specifying the `--models` argument.
+`mhcflurry predict` scores individual peptides with the downloaded models:
 
 Allele names are parsed as sequence-resolved MHC class I alleles. Invalid,
 ambiguous, class-II, pseudogene, null, or unsupported names produce a specific
 error. Add `--no-throw` when processing mixed-quality tables to keep those rows
 with `NaN` predictions instead.
 
-Running:
-
-```{command-output} mhcflurry-predict --alleles HLA-A0201 HLA-A0301 --peptides SIINFEKL SIINFEKD SIINFEKQ --out /tmp/predictions.csv
+```{command-output} mhcflurry predict --alleles HLA-A0201 HLA-A0301 --peptides SIINFEKL SIINFEKD SIINFEKQ --out /tmp/predictions.csv
 :nostderr:
 ```
-
-results in a file like this:
 
 ```{command-output} cat /tmp/predictions.csv
 ```
 
-The binding predictions are given as predicted affinities in nM in the
-`mhcflurry_affinity` column. Lower values indicate stronger binders. A commonly used
-threshold for peptides with a reasonable chance of being immunogenic is 500 nM.
+| Output | Interpretation |
+|---|---|
+| `mhcflurry_affinity` | Predicted nM affinity; lower is stronger. |
+| `mhcflurry_affinity_percentile` | Allele-specific rank from 0–100; lower is stronger. |
+| `mhcflurry_processing_score` | Allele-independent processing score; higher is stronger. |
+| `mhcflurry_presentation_score` | Combined binding and processing score; higher is stronger. |
 
-The `mhcflurry_affinity_percentile` gives the percentile of the affinity
-prediction among a large number of random peptides tested on that allele (range
-0 - 100). Lower is stronger. Two percent is a commonly-used threshold.
+Affinity thresholds of 500 nM or 2nd percentile are common screening choices.
+Presentation scores are useful for ranking candidates, but there is no
+universal presentation-score threshold.
 
-The last two columns give the antigen processing and presentation scores,
-respectively. These range from 0 to 1 with higher values indicating more
-favorable processing or presentation.
+(allele-input-semantics)=
 
-```{note}
-The processing predictor is experimental. It models allele-independent
-effects that influence whether a
-peptide will be detected in a mass spec experiment. The presentation score is
-a simple logistic regression model that combines the (log) binding affinity
-prediction with the processing score to give a composite prediction. The resulting
-prediction may be useful for prioritizing potential epitopes, but no
-thresholds have been established for what constitutes a "high enough"
-presentation score.
-```
+### Alleles, genotypes, and samples
 
-In most cases you'll want to specify the input as a CSV file instead of passing
-peptides and alleles as commandline arguments. If you're relying on the
-processing or presentation scores, you may also want to pass the upstream and
-downstream sequences of the peptides from their source proteins for potentially more
-accurate cleavage prediction. See the {ref}`mhcflurry-predict <ref-mhcflurry-predict>` docs.
+MHCflurry treats each allele argument or CSV cell as one query. Delimiters
+inside a query (`;`, `,`, or whitespace) combine alleles into one genotype;
+separate command-line arguments remain separate queries.
+
+| Input | Meaning |
+|---|---|
+| `--alleles A0201 A0301 --peptides P1 P2` | Four independent allele–peptide rows. |
+| `--alleles 'A0201;A0301' --peptides P1 P2` | Two genotype–peptide rows; `best_allele` identifies the stronger allele. |
+| CSV rows `P1,A0201` and `P1,A0301` | Two independent rows. |
+| CSV row `P1,A0201;A0301` | One genotype row with the strongest allele reported. |
+
+`mhcflurry predict-scan` uses the same rule: each `--alleles` argument names
+one sample. A quoted comma-separated panel is scored as one group and reports
+the best allele across that group; separate arguments keep per-allele or
+per-genotype results. A large population panel is therefore not the same thing
+as one person's genotype.
+
+For CSV prediction, optional `n_flank` and `c_flank` columns provide source
+protein context for cleavage prediction. See the
+{ref}`command reference <ref-mhcflurry-predict>` for the complete input schema.
 
 
 ## Scanning protein sequences for predicted MHC I ligands
 
-Starting in version 1.6.0, MHCflurry supports scanning proteins for MHC-binding
-peptides using the `mhcflurry-predict-scan` command.
+Use `mhcflurry predict-scan` to score every supported peptide window in a
+protein sequence.
 
 We'll generate predictions across `example.fasta`, a FASTA file with two short
 sequences:
@@ -93,92 +84,31 @@ sequences:
 ```{literalinclude} /example.fasta
 ```
 
-Here's a `mhcflurry-predict-scan` invocation using a 100 nM affinity threshold:
+This invocation keeps peptides predicted to bind at 100 nM or tighter:
 
 ```shell
-$ mhcflurry-predict-scan example.fasta \
+$ mhcflurry predict-scan example.fasta \
     --alleles HLA-A*02:01 \
     --threshold-affinity 100
 ```
 
-See the {ref}`mhcflurry-predict-scan <ref-mhcflurry-predict-scan>` docs for more options.
+See the {ref}`command reference <ref-mhcflurry-predict-scan>` for FASTA/CSV
+input, presentation-score filtering, peptide lengths, and output options.
 
 
-## Fitting your own models
+## Training models
 
-If you have your own data and want to fit your own MHCflurry models, you have
-a few options. If you have data for only one or a few MHC I alleles, the best
-approach is to use the
-{ref}`mhcflurry-class1-train-allele-specific-models <ref-mhcflurry-class1-train-allele-specific-models>` command to fit an
-"allele-specific" predictor, in which separate neural networks are used for
-each allele.
+Training is an advanced workflow; most users should use the released models.
+If you have custom measurements, choose the smallest workflow that matches the
+data:
 
-To call {ref}`mhcflurry-class1-train-allele-specific-models <ref-mhcflurry-class1-train-allele-specific-models>` you'll need some
-training data. The data we use for our released predictors can be downloaded with
-{ref}`mhcflurry-downloads <ref-mhcflurry-downloads>`:
+- allele-specific affinity models for one or a few well-covered alleles;
+- pan-allele affinity models for measurements spanning many alleles; or
+- `mhcflurry train pan-allele-release` for a complete retrain, selection,
+  calibration, and evaluation run.
 
-```shell
-$ mhcflurry-downloads fetch data_curated
-```
-
-It looks like this:
-
-```{command-output} bzcat "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" | head -n 3
-:shell:
-:nostderr:
-```
-
-Here's an example invocation to fit a predictor:
-
-```shell
-$ mhcflurry-class1-train-allele-specific-models \
-    --data curated_training_data.csv.bz2 \
-    --hyperparameters hyperparameters.yaml \
-    --min-measurements-per-allele 75 \
-    --out-models-dir models
-```
-
-The `hyperparameters.yaml` file gives the list of neural network architectures
-to train models for. Here's an example specifying a single architecture:
-
-```yaml
-- activation: tanh
-  dense_layer_l1_regularization: 0.0
-  dropout_probability: 0.0
-  early_stopping: true
-  layer_sizes: [8]
-  locally_connected_layers: []
-  loss: custom:mse_with_inequalities
-  max_epochs: 500
-  minibatch_size: 16384
-  n_models: 4
-  output_activation: sigmoid
-  patience: 20
-  peptide_amino_acid_encoding: BLOSUM62
-  random_negative_affinity_max: 50000.0
-  random_negative_affinity_min: 20000.0
-  random_negative_constant: 25
-  random_negative_rate: 0.0
-  validation_split: 0.1
-```
-
-The available hyperparameters for binding predictors are defined in
-{class}`~mhcflurry.Class1NeuralNetwork`. To see exactly how
-these are used you will need to read the source code.
-
-The output directory is a complete predictor and can be passed to prediction
-commands with `--models`. Its `manifest.csv` records the component models; do
-not copy individual weight files out of that directory.
-
-To fit pan-allele models like the ones released with MHCflurry, you can use
-a similar tool, {ref}`mhcflurry-class1-train-pan-allele-models <ref-mhcflurry-class1-train-pan-allele-models>`. You'll probably
-also want to take a look at the scripts used to generate the production models,
-which are available in the *downloads-generation* directory in the MHCflurry
-repository. See the scripts in the *models_class1_pan* subdirectory to see how the
-fitting and model selection was done for models currently distributed with MHCflurry.
-
-Released ensembles evaluate many architectures, but smaller searches can be
-trained with substantially fewer resources.
+The {doc}`training` guide covers input schemas, hyperparameters, output bundles,
+and release-style training without interrupting this prediction tutorial.
 
 
 ## Evaluating trained models
@@ -206,11 +136,11 @@ MHCflurry still distributes the allele-specific predictors described in the
 2018 paper. Download them and pass their model directory explicitly:
 
 ```shell
-$ mhcflurry-downloads fetch models_class1
-$ mhcflurry-predict \
+$ mhcflurry downloads fetch models_class1
+$ mhcflurry predict \
     --alleles HLA-A0201 HLA-A0301 \
     --peptides SIINFEKL SIINFEKD SIINFEKQ \
-    --models "$(mhcflurry-downloads path models_class1)/models" \
+    --models "$(mhcflurry downloads path models_class1)/models" \
     --out /tmp/predictions.csv
 ```
 

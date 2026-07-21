@@ -5,7 +5,7 @@ orphan: true
 # Orchestrator architecture
 
 > Internals doc — for contributors. End users running
-> `mhcflurry-class1-train-pan-allele-models` don't need to read this.
+> `mhcflurry class1-train-pan-allele-models` don't need to read this.
 
 ## The one-line summary
 

@@ -16,6 +16,8 @@ import subprocess
 
 import pytest
 
+from mhcflurry.version import __version__ as PACKAGE_VERSION
+
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 SCRIPT = REPO / "scripts" / "release" / "validate_release_provenance.py"
@@ -51,7 +53,7 @@ def write_model_info(run_dir, version, commit=None, workflow_id="run-123"):
 
 def test_collect_provenance_accepts_matching_release_candidate(tmp_path):
     module = load_module()
-    write_model_info(tmp_path, "2.3.0rc14")
+    write_model_info(tmp_path, PACKAGE_VERSION)
 
     result = module.collect_provenance(
         repo=REPO,
@@ -65,11 +67,11 @@ def test_collect_provenance_accepts_matching_release_candidate(tmp_path):
     )
 
     assert result["release_base_version"] == "2.3.0"
-    assert result["source"]["package_version"] == "2.3.0rc14"
+    assert result["source"]["package_version"] == PACKAGE_VERSION
     assert result["workflow_id"] == "run-123"
     assert {
         item["package_version"] for item in result["artifacts"].values()
-    } == {"2.3.0rc14"}
+    } == {PACKAGE_VERSION}
 
 
 def test_collect_provenance_rejects_mislabeled_model(tmp_path):
@@ -119,7 +121,7 @@ def test_artifact_paths_reject_invalid_processing_variants(
 
 def test_collect_provenance_rejects_model_from_another_commit(tmp_path):
     module = load_module()
-    write_model_info(tmp_path, "2.3.0rc14", commit="deadbeef")
+    write_model_info(tmp_path, PACKAGE_VERSION, commit="deadbeef")
 
     with pytest.raises(ValueError, match="does not match source commit"):
         module.collect_provenance(
@@ -136,7 +138,7 @@ def test_collect_provenance_rejects_model_from_another_commit(tmp_path):
 
 def test_collect_provenance_allows_later_evaluation_workflow(tmp_path):
     module = load_module()
-    write_model_info(tmp_path, "2.3.0rc14", workflow_id="training-run")
+    write_model_info(tmp_path, PACKAGE_VERSION, workflow_id="training-run")
 
     result = module.collect_provenance(
         repo=REPO,
@@ -156,7 +158,7 @@ def test_collect_artifact_provenance_without_git_checkout(tmp_path):
     module = load_module()
     write_model_info(
         tmp_path,
-        "2.3.0rc14",
+        PACKAGE_VERSION,
         commit="remote-commit",
         workflow_id="remote-run",
     )
@@ -175,7 +177,7 @@ def test_collect_artifact_provenance_without_git_checkout(tmp_path):
 
 def test_artifact_only_cli_requires_expected_identity(tmp_path):
     module = load_module()
-    write_model_info(tmp_path, "2.3.0rc14")
+    write_model_info(tmp_path, PACKAGE_VERSION)
 
     with pytest.raises(SystemExit, match="expected-artifact-git-commit"):
         module.main([

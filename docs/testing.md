@@ -95,5 +95,5 @@ that cannot be covered at a narrower level.
 `downloads`
 : Tests that require locally cached MHCflurry download bundles. These
   tests should not fetch from the network; missing bundles should fail
-  or skip with an instruction to run `mhcflurry-downloads fetch`
+  or skip with an instruction to run `mhcflurry downloads fetch`
   outside pytest.

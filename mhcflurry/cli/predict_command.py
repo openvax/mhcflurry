@@ -23,7 +23,7 @@ Examples:
 Write a CSV file containing the contents of INPUT.csv plus additional columns
 giving MHCflurry predictions:
 
-$ mhcflurry-predict INPUT.csv --out RESULT.csv
+$ mhcflurry predict INPUT.csv --out RESULT.csv
 
 The input CSV file is expected to contain columns "allele", "peptide", and,
 optionally, "n_flank", and "c_flank". An allele cell may contain one allele
@@ -36,20 +36,17 @@ You can also run on alleles and peptides specified on the commandline, in
 which case predictions are written for *all combinations* of alleles and
 peptides:
 
-$ mhcflurry-predict --alleles HLA-A0201 H-2Kb --peptides SIINFEKL DENDREKLLL
+$ mhcflurry predict --alleles HLA-A0201 H-2Kb --peptides SIINFEKL DENDREKLLL
 
 Instead of individual alleles (in a CSV or on the command line), you can also
-give a comma separated list of alleles giving a sample genotype. In this case,
+give a comma- or semicolon-separated sample genotype. In this case,
 the tightest binding affinity across the alleles for the sample will be
 returned. For example:
 
-$ mhcflurry-predict --peptides SIINFEKL DENDREKLLL \
-    --alleles \
-        HLA-A*02:01,HLA-A*03:01,HLA-B*57:01,HLA-B*45:01,HLA-C*02:01,HLA-C*07:02 \
-        HLA-A*01:01,HLA-A*02:06,HLA-B*44:02,HLA-B*07:02,HLA-C*01:01,HLA-C*03:01
+$ mhcflurry predict --peptides SIINFEKL --alleles 'HLA-A*02:01;HLA-A*03:01'
 
-will give the tightest predicted affinities across alleles for each of the two
-genotypes specified for each peptide.
+will report the tightest predicted affinity across the two alleles for each
+peptide.
 """
 import sys
 import argparse
@@ -119,7 +116,9 @@ input_args.add_argument(
     "--alleles",
     metavar="ALLELE",
     nargs="+",
-    help="Alleles to predict (exclusive with passing an input CSV)")
+    help="Allele or genotype queries (exclusive with an input CSV). "
+    "Separate arguments are independent queries; delimit alleles within one "
+    "argument with ';' or ',' to score them as one genotype.")
 input_args.add_argument(
     "--peptides",
     metavar="PEPTIDE",
@@ -131,7 +130,8 @@ input_mod_args.add_argument(
     "--allele-column",
     metavar="NAME",
     default="allele",
-    help="Input column name for alleles. Default: '%(default)s'")
+    help="Input column name for allele or delimited-genotype queries. "
+    "Default: '%(default)s'")
 input_mod_args.add_argument(
     "--peptide-column",
     metavar="NAME",
