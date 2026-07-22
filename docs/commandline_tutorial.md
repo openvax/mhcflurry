@@ -3,6 +3,7 @@
 # Command-line tutorial
 
 (downloading)=
+(downloading-models)=
 
 ## Download models
 

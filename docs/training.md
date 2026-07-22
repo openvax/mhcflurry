@@ -19,10 +19,15 @@ need the complete pipeline.
 
 ## Training data
 
-Affinity training tables use one row per measurement. The important columns
-are `allele`, `peptide`, `measurement_value`, and `measurement_inequality`.
-Alleles must be sequence-resolved MHC class I names supported by the supplied
-pseudosequence registry.
+Affinity training tables use one row per measurement. Allele-specific training
+requires `allele`, `peptide`, `measurement_value`, and `measurement_type`.
+Use `measurement_type` to identify quantitative or qualitative measurements.
+The optional `measurement_inequality` column records `=`, `<`, or `>`; if the
+column is omitted, all measurements are treated as equalities.
+
+Alleles must be sequence-resolved MHC class I names. Allele-specific training
+does not require a pseudosequence table unless the hyperparameters enable
+cross-allele pretraining with `pretrain_min_points`.
 
 The curated data used for released models is available as a download:
 
@@ -74,8 +79,10 @@ weights together; pass the directory to prediction commands with `--models`.
 ## Pan-allele and release training
 
 Pan-allele training additionally needs an allele pseudosequence table and a
-model-selection step. Start with the command help and the maintained training
-recipes rather than copying individual flags from an old run:
+model-selection step. Each training allele must resolve to a key in that table;
+rows for alleles without a matching pseudosequence are excluded. Start with
+the command help and the maintained training recipes rather than copying
+individual flags from an old run:
 
 ```shell
 mhcflurry class1-train-pan-allele-models --help
