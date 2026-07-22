@@ -19,14 +19,14 @@ for candidate epitopes, or train models on your own data.
 Install MHCflurry and download the pretrained presentation models:
 
 ```shell
-pip install mhcflurry
-mhcflurry-downloads fetch models_class1_presentation
+pip install --pre mhcflurry
+mhcflurry downloads fetch models_class1_presentation
 ```
 
 Predict a few peptides:
 
 ```shell
-mhcflurry-predict \
+mhcflurry predict \
     --alleles HLA-A0201 HLA-A0301 \
     --peptides SIINFEKL SIINFEKD SIINFEKQ \
     --out predictions.csv
@@ -35,7 +35,7 @@ mhcflurry-predict \
 Or scan a protein sequence for candidate ligands:
 
 ```shell
-mhcflurry-predict-scan \
+mhcflurry predict-scan \
     --sequences MFVFLVLLPLVSSQCVNLTTRTQLPPAYTNSFTRGVYYPDKVFRSSVLHS \
     --alleles 'HLA-A*02:01' \
     --out scan.csv
@@ -45,22 +45,19 @@ To try MHCflurry without installing anything, open the
 [Colab notebook](https://colab.research.google.com/github/openvax/mhcflurry/blob/master/notebooks/mhcflurry-colab.ipynb).
 
 > [!IMPORTANT]
-> The current source tree documents the 2.3.0 release candidate
-> (`2.3.0rc14`). Install it with `pip install --pre mhcflurry` or
-> `pip install mhcflurry==2.3.0rc14`. A normal `pip install mhcflurry` stays on
-> the latest stable 2.2.x release until 2.3.0 is final.
+> This source tree documents `2.3.0rc15`. Use
+> `pip install mhcflurry==2.3.0rc15` for that exact version. Omitting `--pre`
+> installs the latest stable 2.2.x release until 2.3.0 is final.
 
-In 2.3.0, the same commands are also available through one parent command, for
-example `mhcflurry predict` and `mhcflurry predict-scan`. The historical
-`mhcflurry-*` commands remain supported. See the
-[2.3.0 release notes](RELEASE_NOTES_2.3.0.md) for training, performance, and
-evaluation changes.
+The historical `mhcflurry-*` command names remain supported for existing
+scripts. See the [2.3.0 release notes](RELEASE_NOTES_2.3.0.md) for details.
 
 ## Documentation
 
 - [Introduction and installation](https://openvax.github.io/mhcflurry/intro.html)
 - [Command-line tutorial](https://openvax.github.io/mhcflurry/commandline_tutorial.html)
 - [Python tutorial](https://openvax.github.io/mhcflurry/python_tutorial.html)
+- [Training models](https://openvax.github.io/mhcflurry/training.html)
 - [Command reference](https://openvax.github.io/mhcflurry/commandline_tools.html)
 - [API reference](https://openvax.github.io/mhcflurry/api.html)
 

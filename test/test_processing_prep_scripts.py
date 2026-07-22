@@ -65,6 +65,28 @@ def test_generate_scripts_keep_packaged_proteome_peptide_artifacts():
     assert "proteome_peptides.$subset.csv.bz2" in predictions_generate
 
 
+def test_model_selection_decoys_do_not_require_unused_proteome_peptides():
+    module = load_script(
+        REPO_ROOT / "downloads-generation/analysis_predictor_info"
+        / "generate_model_selection_with_decoys.py"
+    )
+
+    args = module.parser.parse_args([
+        "model_selection.csv",
+        "--protein-data", "proteins.csv",
+        "--out", "with_decoys.csv",
+    ])
+    assert args.data == "model_selection.csv"
+    assert args.protein_data == "proteins.csv"
+    assert args.out == "with_decoys.csv"
+    assert not hasattr(args, "proteome_peptides")
+
+    generate = (
+        REPO_ROOT / "downloads-generation/analysis_predictor_info/GENERATE.sh"
+    ).read_text()
+    assert "--proteome-peptides" not in generate
+
+
 @pytest.mark.parametrize("relative_path", [
     "scripts/training/release_exact/make_train_data.processing.py",
     "downloads-generation/models_class1_processing/make_train_data.py",

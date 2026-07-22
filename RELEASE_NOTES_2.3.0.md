@@ -4,25 +4,28 @@ Release-candidate notes for 2.3.0. Held in this file (vs upstream into a
 single `CHANGELOG.md`) until after the validation training run completes
 and any last revisions land; will move to `CHANGELOG.md` at tag time.
 
-## Headline
+## rc15
 
-Pan-allele training pipeline modernization. ``fit()`` now defaults to
-**device-resident** tensors on CUDA — the inner training loop, random-
-negative pool, and validation forward pass all stay on-GPU, closing the
-GPU-starvation gap that the host-side batching path was working
-around. The post-training pipeline (select → calibrate → eval → plot)
-is unified into a single resumable script, and calibration runs on
-device end-to-end (`PercentRankTransform.fit_batch_torch`,
-`motif_summary.motif_summary_chunk_gpu`) for an additional per-worker speedup on
-top of the legacy `--gpu-batched` allele batching. Recipe tightening
-(``min_delta=1e-7``, ``max_epochs=500``) kills the patience-reset
-noise tail. Auto-resolvers pick workers/dataloader/compile settings
-from hardware so per-box tuning stops being manual.
+- Make the unified `mhcflurry` command primary throughout user documentation.
+- Clarify allele, genotype, and sample semantics in CLI help and tutorials;
+  `predict-scan` now accepts semicolon-delimited genotypes like `predict`.
+- Move detailed training configuration out of the beginner tutorial into a
+  dedicated training guide.
+- Remove the unused `--proteome-peptides` argument from model-selection decoy
+  generation.
 
-The orchestrator-as-locus-of-control architecture is documented in
-[docs/orchestrator.md](docs/orchestrator.md) — read that for the
-"who owns what" picture across parallelism, tensor residency, and env
-knobs.
+## Summary
+
+MHCflurry 2.3 modernizes pan-allele training and release evaluation:
+
+- affinity training keeps its working tensors on the active device;
+- one resumable workflow covers selection, calibration, evaluation, and plots;
+- automatic resource planning replaces machine-specific worker overrides; and
+- training defaults stop unproductive runs earlier.
+
+The sections below describe measured performance, behavioral changes, and
+compatibility. Maintainer-level parallelism and tensor-residency details are in
+[docs/orchestrator.md](docs/orchestrator.md).
 
 No changes to the prediction interface. **Saved 2.2.x model bundles remain
 compatible, and predictions for valid class-I alleles are unchanged.** Loading
@@ -60,7 +63,7 @@ validation run completes.
 
 | Hyperparameter | 2.2.x | 2.3.0 | Why |
 |---|---|---|---|
-| `max_epochs` | 5000 | 500 | Median observed was 67; max 174. The 5000 ceiling was theatrical and let pathological patience-reset tasks burn unbounded compute. 500 leaves comfortable headroom. |
+| `max_epochs` | 5000 | 500 | Observed runs had a median of 67 epochs and a maximum of 174; 500 retains headroom while bounding pathological runs. |
 | `min_delta` | 0.0 | 1e-7 | With `min_delta=0`, a 1e-9 RMSprop noise-floor improvement resets the 20-epoch patience counter, stretching some tasks to 174+ epochs at val_loss ~0.28 with no real signal. 1e-7 is two orders of magnitude above the observed noise rate; preserves real escape trajectories (typically ≥1e-3/epoch). |
 | `validation_interval` | 1 (always validated) | 5 | Skip the validation forward pass on 4 of 5 epochs; saves ~150 ms/epoch + a GPU sync barrier. The final epoch and any patience-trigger epoch are always measured (the saved model reflects an up-to-date val_loss). |
 | `dataloader_num_workers` (job-env default) | 0 | 1 | Applies to streaming pretraining batches only. Affinity fine-tuning no longer uses a per-fit DataLoader; it batches from device-resident tensors. One streaming worker per fit is the release wrapper default; tune upward only when CPU headroom and measurements justify it. |
@@ -111,7 +114,7 @@ validation run completes.
   passes `--gpu-batched` and uses larger chunk sizes. Bit-identical
   on CUDA per the existing flag's behavior (issue #272).
 
-## Behavioral changes worth knowing
+## Behavioral changes
 
 ### Training and calibration are reproducible by default (`--random-seed`)
 
@@ -137,8 +140,7 @@ matching `seed=` keyword (defaults to `None` = the prior stochastic behavior
 for direct API callers).
 
 **Reproducibility caveats.** "Bit-for-bit" is exact on CPU and for the default
-(Linear/RMSprop) affinity/processing architecture. Two scope conditions are
-worth knowing:
+(Linear/RMSprop) affinity/processing architecture. Two limits apply:
 
 - **Fixed effective minibatch size.** `fit()` may shrink the minibatch to fit
   available VRAM, and that shrink depends on free GPU memory and how many

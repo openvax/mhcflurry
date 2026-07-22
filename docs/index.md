@@ -8,14 +8,14 @@ prediction, then choose a task-oriented guide below.
 
 - {doc}`intro` explains the three prediction types and gets you to a first
   result.
-- {doc}`commandline_tutorial` covers peptide prediction, protein scanning, and
-  model training.
+- {doc}`commandline_tutorial` covers peptide prediction and protein scanning.
 - {doc}`python_tutorial` shows the same predictors through the Python API.
 
 ## Common next steps
 
 - {doc}`evaluation` compares trained models and builds diagnostic or
   publication-style figures.
+- {doc}`training` explains custom model fitting and release-style retraining.
 - {doc}`configuration` explains automatic hardware planning, runtime defaults,
   and reproducibility.
 - {doc}`commandline_tools` and {doc}`api` are the complete references.
@@ -38,6 +38,7 @@ python_tutorial
 :hidden:
 
 evaluation
+training
 ```
 
 ```{toctree}

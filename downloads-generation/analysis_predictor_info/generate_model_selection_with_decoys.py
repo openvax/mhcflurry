@@ -34,11 +34,6 @@ parser.add_argument(
     metavar="CSV",
     help="Model selection data")
 parser.add_argument(
-    "--proteome-peptides",
-    metavar="CSV",
-    required=True,
-    help="Proteome peptides")
-parser.add_argument(
     "--protein-data",
     metavar="CSV",
     default=get_path("data_references", "uniprot_proteins.csv.bz2", test_exists=False),

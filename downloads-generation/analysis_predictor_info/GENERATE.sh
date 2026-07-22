@@ -90,7 +90,6 @@ else
     cp $SCRIPT_DIR/generate_model_selection_with_decoys.py .
     time python generate_model_selection_with_decoys.py \
         "$(mhcflurry-downloads path models_class1_pan)/models.combined/model_selection_data.csv.bz2" \
-        --proteome-peptides "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \
         --out "$(pwd)/model_selection_with_decoys.csv"
     bzip2 -f model_selection_with_decoys.csv
 fi

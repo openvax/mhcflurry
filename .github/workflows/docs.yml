@@ -1,0 +1,98 @@
+name: Documentation
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+  workflow_dispatch:
+
+concurrency:
+  group: documentation-pages-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      MHCFLURRY_DATA_DIR: ${{ github.workspace }}/.mhcflurry-data
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            docs/requirements.txt
+            setup.py
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+
+      - name: Install package and documentation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install -r docs/requirements.txt
+
+      - name: Cache presentation models
+        uses: actions/cache@v4
+        with:
+          path: .mhcflurry-data
+          key: mhcflurry-docs-data-${{ runner.os }}-${{ hashFiles('mhcflurry/downloads.yml') }}
+          restore-keys: |
+            mhcflurry-docs-data-${{ runner.os }}-
+
+      - name: Download presentation models
+        run: mhcflurry downloads fetch models_class1_presentation
+
+      - name: Build documentation
+        run: |
+          make -C docs generate
+          make -C docs html SPHINXOPTS=-W
+          make -C docs doctest SPHINXOPTS=-W
+
+      - name: Save rendered documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-html
+          path: docs/_build/html
+
+  publish:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout archived documentation
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: archived-docs
+          sparse-checkout: previous-versions
+
+      - name: Download rendered documentation
+        uses: actions/download-artifact@v4
+        with:
+          name: documentation-html
+          path: documentation-html
+
+      - name: Preserve archived documentation
+        run: cp -R archived-docs/previous-versions documentation-html/
+
+      - name: Publish GitHub Pages branch
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: documentation-html
+          force_orphan: true

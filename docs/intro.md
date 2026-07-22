@@ -19,23 +19,19 @@ detected automatically.
 
 ## Install MHCflurry
 
-Install the latest stable release:
-
-```shell
-pip install mhcflurry
-```
-
-The current documentation also covers the 2.3.0 release candidate. To use its
-new unified command and training/evaluation features, install the prerelease:
+This documentation describes the 2.3.0 release candidate. Install it with:
 
 ```shell
 pip install --pre mhcflurry
 ```
 
+To stay on the latest stable 2.2.x release, omit `--pre`. The stable release
+continues to use the historical `mhcflurry-*` command names.
+
 Download the pretrained presentation models:
 
 ```shell
-mhcflurry-downloads fetch models_class1_presentation
+mhcflurry downloads fetch models_class1_presentation
 ```
 
 This bundle includes the binding-affinity and antigen-processing components
@@ -44,13 +40,13 @@ needed for presentation prediction.
 ## Make a first prediction
 
 ```shell
-mhcflurry-predict \
+mhcflurry predict \
     --alleles HLA-A0201 HLA-A0301 \
     --peptides SIINFEKL SIINFEKD SIINFEKQ \
     --out predictions.csv
 ```
 
-The output contains one row per peptide and allele/sample combination. The main
+The output contains one row per peptide and allele or genotype query. The main
 columns are:
 
 - `mhcflurry_affinity`: predicted binding affinity in nM; lower is stronger.
@@ -60,13 +56,16 @@ columns are:
 - `mhcflurry_presentation_score`: combined presentation score from 0–1; higher
   is stronger.
 
-With MHCflurry 2.3.0, the equivalent unified command is `mhcflurry predict`.
-The historical `mhcflurry-*` commands remain supported.
+Separate allele arguments request separate predictions. A delimited allele
+list represents one genotype and reports its strongest-binding allele. See
+{ref}`allele-input-semantics` for examples. Historical `mhcflurry-*` command
+names remain supported for existing scripts.
 
 ## Where to go next
 
-- {doc}`commandline_tutorial`: predict peptides, scan proteins, and train models.
+- {doc}`commandline_tutorial`: predict peptides and scan proteins.
 - {doc}`python_tutorial`: use predictors from Python.
+- {doc}`training`: fit and select custom models.
 - {doc}`evaluation`: compare trained models and generate evaluation figures.
 - {doc}`commandline_tools`: complete generated command reference.
 - {doc}`configuration`: runtime defaults, hardware autosizing, and
@@ -79,8 +78,8 @@ You can install into a conda environment and then use pip normally:
 ```shell
 conda create -q -n mhcflurry-env python=3.10
 conda activate mhcflurry-env
-pip install mhcflurry
-mhcflurry-downloads fetch models_class1_presentation
+pip install --pre mhcflurry
+mhcflurry downloads fetch models_class1_presentation
 ```
 
 MHCflurry supports Python 3.10+ on Linux and macOS. Windows may work but is not

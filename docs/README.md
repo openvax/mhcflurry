@@ -6,18 +6,19 @@ orphan: true
 
 To generate Sphinx documentation, from this directory run:
 
-```
-$ pip install -r requirements.txt  # for the first time you generate docs
-$ make generate html
+```shell
+pip install -r requirements.txt  # first build only
+make generate html
 ```
 
-Documentation is written to the _build/ directory. These files should not be
-checked into the repo.
+Documentation is written to `_build/html`. These files should not be checked
+into the source branch. Pull requests build and test the docs; merges to
+`master` publish them to the `gh-pages` branch.
 
 To test example code:
-```
-$ make doctest 
+
+```shell
+make doctest
 ```
 
-Then take a look at _build/doctest for detailed output.
-
+See `_build/doctest` for detailed output.
