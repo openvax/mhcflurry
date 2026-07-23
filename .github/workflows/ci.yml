@@ -21,10 +21,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -39,7 +39,7 @@ jobs:
           sudo apt-get install -y pandoc
 
       - name: Cache Conda packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         env:
           CACHE_NUMBER: 0
         with:
@@ -83,7 +83,7 @@ jobs:
       #    # flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
       - name: Cache MHCflurry downloads
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .mhcflurry-data
           key: mhcflurry-data-${{ runner.os }}-${{ hashFiles('mhcflurry/downloads.yml') }}

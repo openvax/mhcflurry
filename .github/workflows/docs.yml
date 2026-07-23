@@ -21,10 +21,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
@@ -44,7 +44,7 @@ jobs:
           python -m pip install -r docs/requirements.txt
 
       - name: Cache presentation models
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .mhcflurry-data
           key: mhcflurry-docs-data-${{ runner.os }}-${{ hashFiles('mhcflurry/downloads.yml') }}
@@ -61,7 +61,7 @@ jobs:
           make -C docs doctest SPHINXOPTS=-W
 
       - name: Save rendered documentation
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: documentation-html
           path: docs/_build/html
@@ -75,14 +75,14 @@ jobs:
 
     steps:
       - name: Checkout archived documentation
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: gh-pages
           path: archived-docs
           sparse-checkout: previous-versions
 
       - name: Download rendered documentation
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: documentation-html
           path: documentation-html
