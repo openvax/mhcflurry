@@ -4,6 +4,12 @@ Release-candidate notes for 2.3.0. Held in this file (vs upstream into a
 single `CHANGELOG.md`) until after the validation training run completes
 and any last revisions land; will move to `CHANGELOG.md` at tag time.
 
+## rc17
+
+- Move first-party GitHub Actions to their Node.js 24 releases, removing
+  deprecated Node.js 20 runtime warnings from CI, documentation, and package
+  publishing workflows.
+
 ## rc16
 
 - Credit all MHCflurry contributors in generated documentation metadata and
