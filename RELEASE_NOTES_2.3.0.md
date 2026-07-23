@@ -4,6 +4,11 @@ Release-candidate notes for 2.3.0. Held in this file (vs upstream into a
 single `CHANGELOG.md`) until after the validation training run completes
 and any last revisions land; will move to `CHANGELOG.md` at tag time.
 
+## rc16
+
+- Credit all MHCflurry contributors in generated documentation metadata and
+  the site footer.
+
 ## rc15
 
 - Make the unified `mhcflurry` command primary throughout user documentation.
