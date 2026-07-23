@@ -105,8 +105,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'MHCflurry'
-copyright = 'Timothy O\'Donnell'
-author = 'Timothy O\'Donnell'
+copyright = '2017–2026, MHCflurry contributors'
+author = 'MHCflurry contributors'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
