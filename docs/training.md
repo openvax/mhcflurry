@@ -17,30 +17,17 @@ The low-level commands fit candidate models. Production ensembles also require
 model selection and percentile calibration; use the release workflow when you
 need the complete pipeline.
 
-## Training data
-
-Affinity training tables use one row per measurement. Allele-specific training
-requires `allele`, `peptide`, `measurement_value`, and `measurement_type`.
-Use `measurement_type` to identify quantitative or qualitative measurements.
-The optional `measurement_inequality` column records `=`, `<`, or `>`; if the
-column is omitted, all measurements are treated as equalities.
-
-Alleles must be sequence-resolved MHC class I names. Allele-specific training
-does not require a pseudosequence table unless the hyperparameters enable
-cross-allele pretraining with `pretrain_min_points`.
-
-The curated data used for released models is available as a download:
-
-```shell
-mhcflurry downloads fetch data_curated
-mhcflurry downloads path data_curated
-```
-
 ## Small allele-specific example
 
 The training command accepts a YAML list of architectures. This single,
 four-member architecture is suitable for learning the workflow; it is not a
 replacement for the released ensemble search:
+
+Fetch the curated example data:
+
+```shell
+mhcflurry downloads fetch data_curated
+```
 
 ```yaml
 - activation: tanh
@@ -75,6 +62,22 @@ mhcflurry class1-train-allele-specific-models \
 
 The output directory is a complete predictor. Keep its manifest, metadata, and
 weights together; pass the directory to prediction commands with `--models`.
+
+## Prepare training data
+
+Affinity training tables use one row per measurement. Allele-specific training
+requires `allele`, `peptide`, `measurement_value`, and `measurement_type`.
+Use `measurement_type` to identify quantitative or qualitative measurements.
+The optional `measurement_inequality` column records `=`, `<`, or `>`; if the
+column is omitted, all measurements are treated as equalities.
+
+Alleles must be sequence-resolved MHC class I names. Allele-specific training
+does not require a pseudosequence table unless the hyperparameters enable
+cross-allele pretraining with `pretrain_min_points`.
+
+The curated data used in the example and for released models is the
+`data_curated` download bundle. Use `mhcflurry downloads path data_curated` to
+locate it.
 
 ## Pan-allele and release training
 

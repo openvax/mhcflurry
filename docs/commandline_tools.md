@@ -1,6 +1,8 @@
 # Command-line reference
 
-See also the {ref}`tutorial <commandline_tutorial>`.
+This page lists every command and option. If you are new to MHCflurry or are
+choosing a workflow, start with the {ref}`tutorial <commandline_tutorial>` and
+return here to look up specific arguments.
 
 MHCflurry 2.3.0 provides a unified `mhcflurry` command while retaining the
 historical `mhcflurry-*` names. Both forms use the same implementation. See
