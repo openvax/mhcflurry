@@ -1,21 +1,8 @@
 # Testing
 
-The default pytest command is a full test suite. It is not a fast
-unit-only loop.
-
-The suite intentionally covers several layers:
-
-* pure unit tests for encoding, losses, random-negative planning, and
-  argument resolution;
-* small neural-network training tests that verify numerical behavior;
-* command-level subprocess tests that train, select, and calibrate tiny
-  predictors end-to-end;
-* public-model smoke tests that require cached MHCflurry download bundles.
-
-That mix is useful before merging a release branch, but it makes a plain
-`python -m pytest test/` run take many minutes on a laptop. On macOS, prefer
-`python -m pytest` over the generated `pytest` console script so PyTorch can
-see MPS accelerators.
+Use focused tests while iterating and the full suite before merge or release.
+The default pytest command runs unit, training, command-level, and downloaded
+model checks; it is not a fast unit-only loop.
 
 ## Quick local feedback
 
@@ -63,10 +50,21 @@ If the run is unexpectedly slow, ask pytest for the slowest tests:
 $ python -m pytest -q test --durations=25 --durations-min=0.5
 ```
 
-## Current slow buckets
+On macOS, prefer `python -m pytest` over the generated `pytest` console script
+so PyTorch can see MPS accelerators.
 
-The slowest tests are usually not pure unit tests. They are small
-integration tests that do real model work:
+## What the full suite covers
+
+The full suite includes:
+
+* pure unit tests for encoding, losses, random-negative planning, and argument
+  resolution;
+* small neural-network training tests that verify numerical behavior;
+* command-level subprocess tests that train, select, and calibrate tiny
+  predictors end-to-end; and
+* public-model smoke tests that require cached MHCflurry download bundles.
+
+The slowest tests are usually small integration tests that do real model work:
 
 * `test/test_train_pan_allele_models_command.py` runs serial,
   parallel, and cluster-shaped pan-allele train/select command flows.

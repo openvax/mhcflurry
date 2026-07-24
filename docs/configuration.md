@@ -5,23 +5,6 @@ Most users should start without environment-variable overrides or fixed worker
 counts, then pin a value only when reproducing a benchmark or diagnosing a
 specific machine.
 
-## Runtime defaults
-
-`MHCFLURRY_DEFAULT_CLASS1_MODELS`
-: Path to the default model directory. If unset, MHCflurry uses the models from
-  the installed download bundle.
-
-`MHCFLURRY_OPTIMIZATION_LEVEL`
-: Controls pan-allele ensemble merging. The default, `1`, enables the faster
-  merged-network path. Set it to `0` when debugging or comparing the unmerged
-  implementation.
-
-`MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE`
-: Overrides the default prediction batch size. The normal value is `auto`,
-  which sizes batches from available device memory and can retry with a smaller
-  batch after an allocator out-of-memory error. A fixed integer disables that
-  resizing behavior and should be used only when you know the workload fits.
-
 ## Automatic hardware planning
 
 Prediction, training, calibration, selection, and evaluation commands share a
@@ -56,6 +39,26 @@ machine, but it also bypasses some automatic safeguards.
 
 See {doc}`orchestrator` for implementation details and expert environment
 overrides.
+
+## Environment overrides
+
+These variables are intended for custom model locations, debugging, and
+controlled benchmarks. Ordinary prediction and training do not require them.
+
+`MHCFLURRY_DEFAULT_CLASS1_MODELS`
+: Path to the default model directory. If unset, MHCflurry uses the models from
+  the installed download bundle.
+
+`MHCFLURRY_OPTIMIZATION_LEVEL`
+: Controls pan-allele ensemble merging. The default, `1`, enables the faster
+  merged-network path. Set it to `0` when debugging or comparing the unmerged
+  implementation.
+
+`MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE`
+: Overrides the default prediction batch size. The normal value is `auto`,
+  which sizes batches from available device memory and can retry with a smaller
+  batch after an allocator out-of-memory error. A fixed integer disables that
+  resizing behavior and should be used only when you know the workload fits.
 
 ## Reproducible training
 

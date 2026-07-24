@@ -2,7 +2,9 @@
 
 MHCflurry predicts MHC class I binding affinity, antigen processing, and peptide
 presentation. Start with the introduction for installation and a first
-prediction, then choose a task-oriented guide below.
+prediction, then choose either the command-line or Python tutorial. The
+reference pages are intentionally exhaustive and are best used to look up a
+specific option after you know which workflow you need.
 
 ## Start here
 
@@ -13,10 +15,10 @@ prediction, then choose a task-oriented guide below.
 
 ## Common next steps
 
+- {doc}`training` explains custom model fitting and release-style retraining.
 - {doc}`evaluation` compares trained models and builds diagnostic or
   publication-style figures.
-- {doc}`training` explains custom model fitting and release-style retraining.
-- {doc}`configuration` explains automatic hardware planning, runtime defaults,
+- {doc}`configuration` explains automatic hardware planning, expert overrides,
   and reproducibility.
 - {doc}`commandline_tools` and {doc}`api` are the complete references.
 
@@ -37,8 +39,8 @@ python_tutorial
 :caption: User guides
 :hidden:
 
-evaluation
 training
+evaluation
 ```
 
 ```{toctree}

@@ -2,6 +2,11 @@
 
 # Command-line tutorial
 
+This tutorial follows the common workflow: download the released models, score
+peptides, then scan proteins for candidate ligands. Most users can stop there;
+training, evaluation, configuration, and exhaustive flag descriptions are
+linked later.
+
 (downloading)=
 (downloading-models)=
 
@@ -25,11 +30,6 @@ directory. Use `info` to list available bundles and `path` to locate one:
 
 `mhcflurry predict` scores individual peptides with the downloaded models:
 
-Allele names are parsed as sequence-resolved MHC class I alleles. Invalid,
-ambiguous, class-II, pseudogene, null, or unsupported names produce a specific
-error. Add `--no-throw` when processing mixed-quality tables to keep those rows
-with `NaN` predictions instead.
-
 ```{command-output} mhcflurry predict --alleles HLA-A0201 HLA-A0301 --peptides SIINFEKL SIINFEKD SIINFEKQ --out /tmp/predictions.csv
 :nostderr:
 ```
@@ -47,6 +47,11 @@ with `NaN` predictions instead.
 Affinity thresholds of 500 nM or 2nd percentile are common screening choices.
 Presentation scores are useful for ranking candidates, but there is no
 universal presentation-score threshold.
+
+Allele names are parsed as sequence-resolved MHC class I alleles. Invalid,
+ambiguous, class-II, pseudogene, null, or unsupported names produce a specific
+error. Add `--no-throw` when processing mixed-quality tables to keep those rows
+with `NaN` predictions instead.
 
 (allele-input-semantics)=
 

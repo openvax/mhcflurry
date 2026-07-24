@@ -4,6 +4,12 @@ Use the Python API to add MHCflurry predictions to notebooks and analysis
 pipelines. This page covers the common presentation and affinity calls; the
 {ref}`API-documentation` contains the complete interfaces.
 
+For most applications, use
+{class}`~mhcflurry.Class1PresentationPredictor`: it returns binding, processing,
+and combined presentation predictions from one interface. Use the lower-level
+affinity or processing predictors only when you need those components by
+themselves.
+
 ## Loading a predictor
 
 {class}`~mhcflurry.Class1PresentationPredictor` provides binding, processing,

@@ -4,6 +4,12 @@ Release-candidate notes for 2.3.0. Held in this file (vs upstream into a
 single `CHANGELOG.md`) until after the validation training run completes
 and any last revisions land; will move to `CHANGELOG.md` at tag time.
 
+## rc19
+
+- Reorganize the user documentation around progressive disclosure: explain
+  prediction concepts and common workflows first, then introduce score
+  interpretation, schemas, performance overrides, and exhaustive references.
+
 ## rc18
 
 - Make README and installation-guide prerelease instructions independent of

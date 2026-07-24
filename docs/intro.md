@@ -1,13 +1,13 @@
 # Introduction and installation
 
 MHCflurry predicts which peptides are likely to be displayed by MHC class I
-molecules. It includes pretrained models and tools for three related tasks:
+molecules. Its pretrained models answer three related questions:
 
-| Prediction | What it answers | Output direction |
-|---|---|---|
-| Binding affinity | How strongly does this peptide bind this MHC allele? | Lower affinity in nM is stronger. |
-| Antigen processing | Does cellular processing favor this peptide? | Higher score is stronger. |
-| Presentation | Is this peptide likely to be presented, considering binding and processing? | Higher score is stronger. |
+- **Binding affinity:** can this peptide bind a particular MHC allele?
+- **Antigen processing:** is cellular processing likely to produce this
+  peptide?
+- **Presentation:** is the peptide likely to reach the cell surface, considering
+  both binding and processing?
 
 For most epitope-prioritization work, start with the **presentation** predictor.
 Use binding affinity when you specifically need peptide–MHC binding estimates,
@@ -46,15 +46,17 @@ mhcflurry predict \
     --out predictions.csv
 ```
 
-The output contains one row per peptide and allele or genotype query. The main
-columns are:
+## Understand the results
 
-- `mhcflurry_affinity`: predicted binding affinity in nM; lower is stronger.
-- `mhcflurry_affinity_percentile`: allele-specific rank from 0–100; lower is
-  stronger.
-- `mhcflurry_processing_score`: processing score from 0–1; higher is stronger.
-- `mhcflurry_presentation_score`: combined presentation score from 0–1; higher
-  is stronger.
+The output contains one row per peptide and allele or genotype query. These are
+the main prediction columns:
+
+| Column | Interpretation |
+|---|---|
+| `mhcflurry_presentation_score` | Combined binding and processing score from 0–1; higher is stronger. |
+| `mhcflurry_affinity` | Predicted binding affinity in nM; lower is stronger. |
+| `mhcflurry_affinity_percentile` | Allele-specific rank from 0–100; lower is stronger. |
+| `mhcflurry_processing_score` | Processing score from 0–1; higher is stronger. |
 
 Separate allele arguments request separate predictions. A delimited allele
 list represents one genotype and reports its strongest-binding allele. See
