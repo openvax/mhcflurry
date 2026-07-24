@@ -19,14 +19,14 @@ detected automatically.
 
 ## Install MHCflurry
 
-This documentation describes the 2.3.0 release candidate. Install it with:
+Install MHCflurry, including prereleases, with:
 
 ```shell
-pip install --pre mhcflurry
+pip install --upgrade --pre mhcflurry
 ```
 
-To stay on the latest stable 2.2.x release, omit `--pre`. The stable release
-continues to use the historical `mhcflurry-*` command names.
+Omit `--pre` to install the latest stable release. Older releases may use the
+historical `mhcflurry-*` command names shown in the command reference.
 
 Download the pretrained presentation models:
 

@@ -12,10 +12,23 @@
 
 """Packaging metadata tests."""
 
+import re
 import runpy
 from pathlib import Path
 
 import setuptools
+
+
+def test_install_guidance_is_not_pinned_to_a_release():
+    repo_dir = Path(__file__).resolve().parents[1]
+    prerelease = re.compile(r"\b\d+\.\d+\.\d+(?:a|b|rc)\d+\b")
+    stable_series = re.compile(r"\blatest stable \d+\.\d+(?:\.\w+)?\b", re.I)
+
+    for relative_path in ("README.md", "docs/intro.md"):
+        text = (repo_dir / relative_path).read_text()
+        assert "pip install --upgrade --pre mhcflurry" in text
+        assert not prerelease.search(text), relative_path
+        assert not stable_series.search(text), relative_path
 
 
 def test_setup_packages_cli_subpackage(monkeypatch):

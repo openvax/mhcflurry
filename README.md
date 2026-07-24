@@ -16,12 +16,15 @@ for candidate epitopes, or train models on your own data.
 
 ## Quick start
 
-Install MHCflurry and download the pretrained presentation models:
+Install MHCflurry, including prereleases, and download the pretrained
+presentation models:
 
 ```shell
-pip install --pre mhcflurry
+pip install --upgrade --pre mhcflurry
 mhcflurry downloads fetch models_class1_presentation
 ```
+
+Omit `--pre` to install the latest stable release.
 
 Predict a few peptides:
 
@@ -43,11 +46,6 @@ mhcflurry predict-scan \
 
 To try MHCflurry without installing anything, open the
 [Colab notebook](https://colab.research.google.com/github/openvax/mhcflurry/blob/master/notebooks/mhcflurry-colab.ipynb).
-
-> [!IMPORTANT]
-> This source tree documents `2.3.0rc15`. Use
-> `pip install mhcflurry==2.3.0rc15` for that exact version. Omitting `--pre`
-> installs the latest stable 2.2.x release until 2.3.0 is final.
 
 The historical `mhcflurry-*` command names remain supported for existing
 scripts. See the [2.3.0 release notes](RELEASE_NOTES_2.3.0.md) for details.
