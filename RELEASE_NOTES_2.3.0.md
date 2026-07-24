@@ -4,6 +4,12 @@ Release-candidate notes for 2.3.0. Held in this file (vs upstream into a
 single `CHANGELOG.md`) until after the validation training run completes
 and any last revisions land; will move to `CHANGELOG.md` at tag time.
 
+## rc18
+
+- Make README and installation-guide prerelease instructions independent of
+  the current release-candidate number so they cannot become stale on later
+  releases.
+
 ## rc17
 
 - Move first-party GitHub Actions to their Node.js 24 releases, removing
