@@ -1,0 +1,220 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Testing &mdash; MHCflurry 2.3.0rc19 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=0fe4ac82"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Development" href="development.html" />
+    <link rel="prev" title="API Documentation" href="api.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Testing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#quick-local-feedback">Quick local feedback</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#full-verification">Full verification</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#what-the-full-suite-covers">What the full suite covers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#markers">Markers</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Testing</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/testing.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="testing">
+<h1>Testing<a class="headerlink" href="#testing" title="Link to this heading"></a></h1>
+<p>Use focused tests while iterating and the full suite before merge or release.
+The default pytest command runs unit, training, command-level, and downloaded
+model checks; it is not a fast unit-only loop.</p>
+<section id="quick-local-feedback">
+<h2>Quick local feedback<a class="headerlink" href="#quick-local-feedback" title="Link to this heading"></a></h2>
+<p>From a checkout, first source the development environment:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nb">source</span><span class="w"> </span>develop.sh
+</pre></div>
+</div>
+<p>Run lint plus focused unit tests while iterating:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>./lint.sh
+$<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>-q<span class="w"> </span>test/test_amino_acid.py<span class="w"> </span>test/test_random_negative_peptides.py
+</pre></div>
+</div>
+<p>To run the broad fast tier, skip the tests marked as slow integration,
+cached-bundle, or benchmark checks:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>-q<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;not slow and not downloads&quot;</span>
+</pre></div>
+</div>
+<p>When working on training internals, add the directly affected files rather
+than jumping immediately to the full suite. Useful examples:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>-q<span class="w"> </span>test/test_class1_affinity_training_data.py
+$<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>-q<span class="w"> </span>test/test_pytorch_regressions.py
+$<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>-q<span class="w"> </span>test/test_train_pan_allele_models_command.py::test_pretrain_network_input_iterator_compact_torch_indices
+</pre></div>
+</div>
+</section>
+<section id="full-verification">
+<h2>Full verification<a class="headerlink" href="#full-verification" title="Link to this heading"></a></h2>
+<p>Before calling a release-branch change complete, run:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>./lint.sh
+$<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>test/
+</pre></div>
+</div>
+<p>If the run is unexpectedly slow, ask pytest for the slowest tests:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>-q<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--durations<span class="o">=</span><span class="m">25</span><span class="w"> </span>--durations-min<span class="o">=</span><span class="m">0</span>.5
+</pre></div>
+</div>
+<p>On macOS, prefer <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">pytest</span></code> over the generated <code class="docutils literal notranslate"><span class="pre">pytest</span></code> console script
+so PyTorch can see MPS accelerators.</p>
+</section>
+<section id="what-the-full-suite-covers">
+<h2>What the full suite covers<a class="headerlink" href="#what-the-full-suite-covers" title="Link to this heading"></a></h2>
+<p>The full suite includes:</p>
+<ul class="simple">
+<li><p>pure unit tests for encoding, losses, random-negative planning, and argument
+resolution;</p></li>
+<li><p>small neural-network training tests that verify numerical behavior;</p></li>
+<li><p>command-level subprocess tests that train, select, and calibrate tiny
+predictors end-to-end; and</p></li>
+<li><p>public-model smoke tests that require cached MHCflurry download bundles.</p></li>
+</ul>
+<p>The slowest tests are usually small integration tests that do real model work:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">test/test_train_pan_allele_models_command.py</span></code> runs serial,
+parallel, and cluster-shaped pan-allele train/select command flows.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">test/test_train_processing_models_command.py</span></code> trains and selects
+processing models.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">test/test_class1_neural_network.py</span></code> contains full training behavior
+checks such as inequality handling, early stopping, and learned motif
+recovery.</p></li>
+<li><p>public-model tests load cached MHCflurry download bundles and run
+prediction smoke checks.</p></li>
+</ul>
+<p>Mark new tests according to their cost. Keep small deterministic logic in
+unit tests, and reserve end-to-end command or training checks for behavior
+that cannot be covered at a narrower level.</p>
+</section>
+<section id="markers">
+<h2>Markers<a class="headerlink" href="#markers" title="Link to this heading"></a></h2>
+<dl class="simple myst">
+<dt><code class="docutils literal notranslate"><span class="pre">slow</span></code></dt><dd><p>Tests that are too expensive for the fast local loop. These are
+usually small training jobs or benchmark-style checks.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">integration</span></code></dt><dd><p>End-to-end command or training tests that exercise multiple modules
+through the public CLI/API.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">downloads</span></code></dt><dd><p>Tests that require locally cached MHCflurry download bundles. These
+tests should not fetch from the network; missing bundles should fail
+or skip with an instruction to run <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">downloads</span> <span class="pre">fetch</span></code>
+outside pytest.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="api.html" class="btn btn-neutral float-left" title="API Documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="development.html" class="btn btn-neutral float-right" title="Development" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Jul 24, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

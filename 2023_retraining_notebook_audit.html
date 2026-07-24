@@ -1,0 +1,274 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2023 retraining notebook audit &mdash; MHCflurry 2.3.0rc19 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=0fe4ac82"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">2023 retraining notebook audit</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/2023_retraining_notebook_audit.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="retraining-notebook-audit">
+<h1>2023 retraining notebook audit<a class="headerlink" href="#retraining-notebook-audit" title="Link to this heading"></a></h1>
+<blockquote>
+<div><p>Maintainer history, not a current user workflow. Use <a class="reference internal" href="evaluation.html"><span class="doc">Evaluating trained models</span></a> for
+current evaluation commands and the release-script README for current remote
+training and deployment behavior.</p>
+</div></blockquote>
+<p>This audits the copied notebook bundle in <code class="docutils literal notranslate"><span class="pre">notebooks/2023-retraining/</span></code> against
+the maintained release scripts and 2.3.x evaluation commands. The notebooks are
+valuable source material, but they include generated data, checkpoint notebooks,
+old imports, and local paths, so they should be ported into scripts rather than
+committed as the workflow.</p>
+<section id="what-the-notebooks-cover">
+<h2>What The Notebooks Cover<a class="headerlink" href="#what-the-notebooks-cover" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Benchmark assembly: joins <code class="docutils literal notranslate"><span class="pre">data_evaluation</span></code> sample shards into wide
+monoallelic and multiallelic benchmark tables with MHCflurry, NetMHCpan, and
+MixMHCpred columns.</p></li>
+<li><p>Accuracy scoring: per-sample and per-length AUC / PPV tables, percent-change
+columns against NetMHCpan BA, NetMHCpan EL, MixMHCpred, and older MHCflurry.</p></li>
+<li><p>Figure generation: paper-style scatter panels, score bars, processing motifs,
+processing-vs-affinity correlation plots, and presentation coefficient plots.</p></li>
+<li><p>Supplemental outputs: sample tables, benchmark data files, model-selection
+accuracy workbook, antigen-processing motif workbook, and supplementary data
+CSV/XLSX files.</p></li>
+<li><p>Exploratory analyses: novel-allele analysis, proteasome mass-spec analysis,
+and an immunogenicity experiment depending on external local files.</p></li>
+</ul>
+</section>
+<section id="differences-from-maintained-workflows">
+<h2>Differences From Maintained Workflows<a class="headerlink" href="#differences-from-maintained-workflows" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Data curation is split differently. Current maintained scripts use
+<code class="docutils literal notranslate"><span class="pre">downloads-generation/</span></code> to build raw downloads and <code class="docutils literal notranslate"><span class="pre">scripts/training/</span></code> to build
+release models. The notebooks start from already-generated downloads and create
+analysis artifacts under <code class="docutils literal notranslate"><span class="pre">notebooks/2023-retraining/artifacts/</span></code>.</p></li>
+<li><p>The current <code class="docutils literal notranslate"><span class="pre">data_evaluation</span></code> download generates train-excluded benchmark
+files and sample shards. The notebooks additionally join those shards into
+wide analysis tables and include an abandoned no-exclude-train path.</p></li>
+<li><p>The notebooks label recent multiallelic samples using PMIDs <code class="docutils literal notranslate"><span class="pre">31844290</span></code> and
+<code class="docutils literal notranslate"><span class="pre">31154438</span></code>. Current presentation training excludes <code class="docutils literal notranslate"><span class="pre">31844290</span></code>, <code class="docutils literal notranslate"><span class="pre">31495665</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">31154438</span></code>; this needs one named holdout policy before new public weights are
+trained and evaluated.</p></li>
+<li><p>The notebooks use old notebook-era dependencies and names (<code class="docutils literal notranslate"><span class="pre">keras</span></code>,
+<code class="docutils literal notranslate"><span class="pre">tensorflow</span></code>, <code class="docutils literal notranslate"><span class="pre">mhcnames</span></code> in places). Ports should use the current PyTorch code,
+<code class="docutils literal notranslate"><span class="pre">mhcgnomes</span></code> / existing allele normalization helpers, and maintained CLI
+commands.</p></li>
+<li><p>Current evaluation commands cover affinity, processing, and presentation
+metrics, diagnostic plots, reusable AUC/PPV score caches, and paper-style
+figures. The optional <code class="docutils literal notranslate"><span class="pre">external-predictors</span></code> adapter can invoke locally
+installed NetMHCpan/MixMHCpred runners through <code class="docutils literal notranslate"><span class="pre">mhctools</span></code>; binaries and
+licenses remain outside MHCflurry. Exact curated split tables, external
+supplemental sources, and hand-authored architecture artwork remain separate
+inputs.</p></li>
+<li><p>The processing-variant ambiguity has been resolved. The full release trains
+<code class="docutils literal notranslate"><span class="pre">with_flanks</span></code>, <code class="docutils literal notranslate"><span class="pre">no_flank</span></code>, and <code class="docutils literal notranslate"><span class="pre">short_flanks</span></code>, and presentation uses the true
+<code class="docutils literal notranslate"><span class="pre">with_flanks</span></code> predictor by default.</p></li>
+<li><p>Historical runplz files in <code class="docutils literal notranslate"><span class="pre">jobs/</span></code> patched scripts in place for one experiment
+and called deleted comparison scripts. Remote execution is now represented by
+maintained scripts instead of patching a remote copy.</p></li>
+</ul>
+</section>
+<section id="current-coverage-and-remaining-inputs">
+<h2>Current Coverage And Remaining Inputs<a class="headerlink" href="#current-coverage-and-remaining-inputs" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Predictor metadata / aesthetics: <code class="docutils literal notranslate"><span class="pre">paper-figures</span> <span class="pre">render</span></code> accepts
+<code class="docutils literal notranslate"><span class="pre">predictor_info.csv</span></code> and otherwise uses the maintained <code class="docutils literal notranslate"><span class="pre">figure_style.py</span></code>
+labels and palette for MHCflurry, NetMHCpan 4.0 / 4.2, and MixMHCpred.
+Saved-prediction scoring also uses <code class="docutils literal notranslate"><span class="pre">predictor_info.csv</span></code> for custom score
+orientation through a <code class="docutils literal notranslate"><span class="pre">higher_is_better</span></code> column.</p></li>
+<li><p>Wide benchmark tables: saved monoallelic and multiallelic prediction tables
+can be passed directly with <code class="docutils literal notranslate"><span class="pre">--monoallelic-predictions</span></code> and
+<code class="docutils literal notranslate"><span class="pre">--multiallelic-predictions</span></code>. The optional <code class="docutils literal notranslate"><span class="pre">external-predictors</span></code> adapter can
+populate canonical columns through a locally installed runner; tables
+produced by other workflows remain valid inputs.</p></li>
+<li><p>Accuracy score tables: <code class="docutils literal notranslate"><span class="pre">eval</span> <span class="pre">paper-figures</span> <span class="pre">score-predictions</span></code> derives the
+notebook-style AUC / PPV / percent-change tables from canonical saved
+prediction tables. <code class="docutils literal notranslate"><span class="pre">paper-figures</span> <span class="pre">render</span></code> can also derive them in-process when
+a cache table is absent.</p></li>
+<li><p>Monoallelic figures: current-vs-public scatter panels are generated from
+<code class="docutils literal notranslate"><span class="pre">compare-models</span></code>; external-predictor and novel-allele panels are generated
+when <code class="docutils literal notranslate"><span class="pre">accuracy_scores.monoallelic.csv</span></code> and
+<code class="docutils literal notranslate"><span class="pre">accuracy_scores.monoallelic.novel_alleles.csv</span></code> are supplied.</p></li>
+<li><p>Multiallelic figures: PPV/AUC scatter panels, percent-change bars, and
+presentation-vs-baseline panels are generated from saved multiallelic scores
+or prediction tables. Recent-vs-old sample grouping is enabled by
+<code class="docutils literal notranslate"><span class="pre">--sample-table</span></code>.</p></li>
+<li><p>Model-selection evidence: locus score bars are generated from
+<code class="docutils literal notranslate"><span class="pre">model_selection_accuracy.csv</span></code>, or a current comparison fallback is generated
+from <code class="docutils literal notranslate"><span class="pre">compare-models</span></code> when that workbook is absent.</p></li>
+<li><p>Processing evidence: cysteine-removed AP panels, AP motif/logo panels, and AP
+correlation panels are generated when their 2023 source tables exist; motif
+and correlation fallbacks are generated from current training / saved
+prediction artifacts where possible.</p></li>
+<li><p>Proteasome and model-info figures: proteasome plots are generated from
+<code class="docutils literal notranslate"><span class="pre">proteasome_mass_spec.csv</span></code>, <code class="docutils literal notranslate"><span class="pre">Additional</span> <span class="pre">File</span> <span class="pre">8.csv</span></code>, or a run’s
+<code class="docutils literal notranslate"><span class="pre">processing/hits_with_tpm.csv.bz2</span></code>. Architecture/model-info figures copy
+supplied artwork or generate a run-manifest fallback.</p></li>
+<li><p>Still deferred: the immunogenicity experiment and any exact supplemental
+source that depends on external files not present in this repository.</p></li>
+</ul>
+</section>
+<section id="decisions-and-remaining-work">
+<h2>Decisions and remaining work<a class="headerlink" href="#decisions-and-remaining-work" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>Notebooks remain references rather than the maintained workflow.</p></li>
+<li><p>Benchmark prediction tables use one canonical layout: one row per evaluated pMHC, a
+<code class="docutils literal notranslate"><span class="pre">hit</span></code> label, <code class="docutils literal notranslate"><span class="pre">sample_id</span></code> or allele columns, optional <code class="docutils literal notranslate"><span class="pre">sample_group</span></code>, and one
+numeric column per predictor. Allele parsing / normalization should use
+<code class="docutils literal notranslate"><span class="pre">mhcgnomes</span></code> or existing MHCflurry helpers, not ad hoc string matching.</p></li>
+<li><p>External predictor binaries remain outside MHCflurry’s core dependencies.
+The maintained adapter invokes an optional local runner and imports canonical
+saved columns.</p></li>
+<li><p>Decide the 2.3.0 holdout policy in one place: PMIDs, pMHC overlap removal,
+and whether evaluation data is filtered out of affinity / processing /
+presentation training. Move any useful logic from <code class="docutils literal notranslate"><span class="pre">jobs/filter_training...</span></code>
+into maintained scripts after that decision.</p></li>
+<li><p>Processing variant naming is resolved: the release trains a real
+<code class="docutils literal notranslate"><span class="pre">models.selected.with_flanks</span></code> artifact and uses it for presentation.</p></li>
+<li><p>Release retraining is available as one command:
+<code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">train</span> <span class="pre">pan-allele-release</span></code>. It trains, evaluates, plots, syncs
+remote artifacts, and leaves deployment opt-in through <code class="docutils literal notranslate"><span class="pre">--deploy-mode</span></code>.</p></li>
+</ol>
+</section>
+<section id="current-single-command-entry-point">
+<h2>Current Single-Command Entry Point<a class="headerlink" href="#current-single-command-entry-point" title="Link to this heading"></a></h2>
+<p>Local:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span>train<span class="w"> </span>pan-allele-release<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--run-dir<span class="w"> </span>/path/to/release-run<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--release<span class="w"> </span><span class="m">2</span>.3.0<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--backend<span class="w"> </span><span class="nb">local</span>
+</pre></div>
+</div>
+<p>Brev through existing runplz capacity:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span>train<span class="w"> </span>pan-allele-release<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--run-dir<span class="w"> </span>/path/to/release-run<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--release<span class="w"> </span><span class="m">2</span>.3.0<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--backend<span class="w"> </span>brev-existing
+</pre></div>
+</div>
+<p>Generic SSH machine:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span>train<span class="w"> </span>pan-allele-release<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--run-dir<span class="w"> </span>/path/to/local-copy<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--release<span class="w"> </span><span class="m">2</span>.3.0<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--backend<span class="w"> </span>ssh<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--remote<span class="w"> </span>user@host<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--remote-repo<span class="w"> </span>/path/to/mhcflurry<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--remote-run-dir<span class="w"> </span>/path/to/remote-release-run
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Jul 24, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

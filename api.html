@@ -1,0 +1,568 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Documentation &mdash; MHCflurry 2.3.0rc19 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=0fe4ac82"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Testing" href="testing.html" />
+    <link rel="prev" title="Configuration and performance" href="configuration.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#subpackages">Subpackages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-allele-encoding-module">mhcflurry.allele_encoding module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-amino-acid-module">mhcflurry.amino_acid module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-calibrate-percentile-ranks-command-module">mhcflurry.calibrate_percentile_ranks_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-class1-affinity-predictor-module">mhcflurry.class1_affinity_predictor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-class1-affinity-training-data-module">mhcflurry.class1_affinity_training_data module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-class1-encoding-module">mhcflurry.class1_encoding module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-class1-neural-network-module">mhcflurry.class1_neural_network module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-class1-presentation-predictor-module">mhcflurry.class1_presentation_predictor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-class1-processing-neural-network-module">mhcflurry.class1_processing_neural_network module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-class1-processing-predictor-module">mhcflurry.class1_processing_predictor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-class1-training-module">mhcflurry.class1_training module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-cluster-parallelism-module">mhcflurry.cluster_parallelism module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-cluster-worker-entry-point-module">mhcflurry.cluster_worker_entry_point module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-common-module">mhcflurry.common module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-custom-loss-module">mhcflurry.custom_loss module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-data-dependent-weights-initialization-module">mhcflurry.data_dependent_weights_initialization module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-device-footprint-module">mhcflurry.device_footprint module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-downloads-module">mhcflurry.downloads module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-downloads-command-module">mhcflurry.downloads_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-encodable-sequences-module">mhcflurry.encodable_sequences module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-ensemble-centrality-module">mhcflurry.ensemble_centrality module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-fasta-module">mhcflurry.fasta module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-flanking-encoding-module">mhcflurry.flanking_encoding module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-hyperparameters-module">mhcflurry.hyperparameters module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-local-parallelism-module">mhcflurry.local_parallelism module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-memory-budget-module">mhcflurry.memory_budget module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-model-provenance-module">mhcflurry.model_provenance module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-motif-summary-module">mhcflurry.motif_summary module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-peptide-reference-module">mhcflurry.peptide_reference module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-percent-rank-transform-module">mhcflurry.percent_rank_transform module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-predict-command-module">mhcflurry.predict_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-predict-scan-command-module">mhcflurry.predict_scan_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-proteome-decoys-module">mhcflurry.proteome_decoys module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-pseudosequences-module">mhcflurry.pseudosequences module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-pytorch-layers-module">mhcflurry.pytorch_layers module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-pytorch-losses-module">mhcflurry.pytorch_losses module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-pytorch-sizing-module">mhcflurry.pytorch_sizing module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-pytorch-training-module">mhcflurry.pytorch_training module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-random-negative-peptides-module">mhcflurry.random_negative_peptides module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-regression-target-module">mhcflurry.regression_target module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-scoring-module">mhcflurry.scoring module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-select-allele-specific-models-command-module">mhcflurry.select_allele_specific_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-select-pan-allele-models-command-module">mhcflurry.select_pan_allele_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-select-processing-models-command-module">mhcflurry.select_processing_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-testing-utils-module">mhcflurry.testing_utils module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-train-allele-specific-models-command-module">mhcflurry.train_allele_specific_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-train-pan-allele-models-command-module">mhcflurry.train_pan_allele_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-train-presentation-models-command-module">mhcflurry.train_presentation_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-train-processing-models-command-module">mhcflurry.train_processing_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-training-benchmark-module">mhcflurry.training_benchmark module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-version-module">mhcflurry.version module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mhcflurry-workload-planning-module">mhcflurry.workload_planning module</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">API Documentation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/api.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="api-documentation">
+<span id="id1"></span><h1>API Documentation<a class="headerlink" href="#api-documentation" title="Link to this heading"></a></h1>
+<p>This is the complete generated API reference. Start with the
+<a class="reference internal" href="python_tutorial.html"><span class="doc">Python library tutorial</span></a> for the common prediction workflow, then use this page to
+look up individual classes and methods.</p>
+<p>.. automodule:: mhcflurry
+:members:
+:show-inheritance:
+:undoc-members:</p>
+<section id="subpackages">
+<h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading"></a></h2>
+<p>.. toctree::
+:maxdepth: 4</p>
+<p>mhcflurry.affinity
+mhcflurry.cli
+mhcflurry.parallelism</p>
+</section>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+</section>
+<section id="mhcflurry-allele-encoding-module">
+<h2>mhcflurry.allele_encoding module<a class="headerlink" href="#mhcflurry-allele-encoding-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.allele_encoding
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-amino-acid-module">
+<h2>mhcflurry.amino_acid module<a class="headerlink" href="#mhcflurry-amino-acid-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.amino_acid
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-calibrate-percentile-ranks-command-module">
+<h2>mhcflurry.calibrate_percentile_ranks_command module<a class="headerlink" href="#mhcflurry-calibrate-percentile-ranks-command-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.calibrate_percentile_ranks_command
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-class1-affinity-predictor-module">
+<h2>mhcflurry.class1_affinity_predictor module<a class="headerlink" href="#mhcflurry-class1-affinity-predictor-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.class1_affinity_predictor
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-class1-affinity-training-data-module">
+<h2>mhcflurry.class1_affinity_training_data module<a class="headerlink" href="#mhcflurry-class1-affinity-training-data-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.class1_affinity_training_data
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-class1-encoding-module">
+<h2>mhcflurry.class1_encoding module<a class="headerlink" href="#mhcflurry-class1-encoding-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.class1_encoding
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-class1-neural-network-module">
+<h2>mhcflurry.class1_neural_network module<a class="headerlink" href="#mhcflurry-class1-neural-network-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.class1_neural_network
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-class1-presentation-predictor-module">
+<h2>mhcflurry.class1_presentation_predictor module<a class="headerlink" href="#mhcflurry-class1-presentation-predictor-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.class1_presentation_predictor
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-class1-processing-neural-network-module">
+<h2>mhcflurry.class1_processing_neural_network module<a class="headerlink" href="#mhcflurry-class1-processing-neural-network-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.class1_processing_neural_network
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-class1-processing-predictor-module">
+<h2>mhcflurry.class1_processing_predictor module<a class="headerlink" href="#mhcflurry-class1-processing-predictor-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.class1_processing_predictor
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-class1-training-module">
+<h2>mhcflurry.class1_training module<a class="headerlink" href="#mhcflurry-class1-training-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.class1_training
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-cluster-parallelism-module">
+<h2>mhcflurry.cluster_parallelism module<a class="headerlink" href="#mhcflurry-cluster-parallelism-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.cluster_parallelism
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-cluster-worker-entry-point-module">
+<h2>mhcflurry.cluster_worker_entry_point module<a class="headerlink" href="#mhcflurry-cluster-worker-entry-point-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.cluster_worker_entry_point
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-common-module">
+<h2>mhcflurry.common module<a class="headerlink" href="#mhcflurry-common-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.common
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-custom-loss-module">
+<h2>mhcflurry.custom_loss module<a class="headerlink" href="#mhcflurry-custom-loss-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.custom_loss
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-data-dependent-weights-initialization-module">
+<h2>mhcflurry.data_dependent_weights_initialization module<a class="headerlink" href="#mhcflurry-data-dependent-weights-initialization-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.data_dependent_weights_initialization
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-device-footprint-module">
+<h2>mhcflurry.device_footprint module<a class="headerlink" href="#mhcflurry-device-footprint-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.device_footprint
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-downloads-module">
+<h2>mhcflurry.downloads module<a class="headerlink" href="#mhcflurry-downloads-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.downloads
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-downloads-command-module">
+<h2>mhcflurry.downloads_command module<a class="headerlink" href="#mhcflurry-downloads-command-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.downloads_command
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-encodable-sequences-module">
+<h2>mhcflurry.encodable_sequences module<a class="headerlink" href="#mhcflurry-encodable-sequences-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.encodable_sequences
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-ensemble-centrality-module">
+<h2>mhcflurry.ensemble_centrality module<a class="headerlink" href="#mhcflurry-ensemble-centrality-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.ensemble_centrality
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-fasta-module">
+<h2>mhcflurry.fasta module<a class="headerlink" href="#mhcflurry-fasta-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.fasta
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-flanking-encoding-module">
+<h2>mhcflurry.flanking_encoding module<a class="headerlink" href="#mhcflurry-flanking-encoding-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.flanking_encoding
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-hyperparameters-module">
+<h2>mhcflurry.hyperparameters module<a class="headerlink" href="#mhcflurry-hyperparameters-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.hyperparameters
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-local-parallelism-module">
+<h2>mhcflurry.local_parallelism module<a class="headerlink" href="#mhcflurry-local-parallelism-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.local_parallelism
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-memory-budget-module">
+<h2>mhcflurry.memory_budget module<a class="headerlink" href="#mhcflurry-memory-budget-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.memory_budget
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-model-provenance-module">
+<h2>mhcflurry.model_provenance module<a class="headerlink" href="#mhcflurry-model-provenance-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.model_provenance
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-motif-summary-module">
+<h2>mhcflurry.motif_summary module<a class="headerlink" href="#mhcflurry-motif-summary-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.motif_summary
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-peptide-reference-module">
+<h2>mhcflurry.peptide_reference module<a class="headerlink" href="#mhcflurry-peptide-reference-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.peptide_reference
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-percent-rank-transform-module">
+<h2>mhcflurry.percent_rank_transform module<a class="headerlink" href="#mhcflurry-percent-rank-transform-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.percent_rank_transform
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-predict-command-module">
+<h2>mhcflurry.predict_command module<a class="headerlink" href="#mhcflurry-predict-command-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.predict_command
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-predict-scan-command-module">
+<h2>mhcflurry.predict_scan_command module<a class="headerlink" href="#mhcflurry-predict-scan-command-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.predict_scan_command
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-proteome-decoys-module">
+<h2>mhcflurry.proteome_decoys module<a class="headerlink" href="#mhcflurry-proteome-decoys-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.proteome_decoys
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-pseudosequences-module">
+<h2>mhcflurry.pseudosequences module<a class="headerlink" href="#mhcflurry-pseudosequences-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.pseudosequences
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-pytorch-layers-module">
+<h2>mhcflurry.pytorch_layers module<a class="headerlink" href="#mhcflurry-pytorch-layers-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.pytorch_layers
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-pytorch-losses-module">
+<h2>mhcflurry.pytorch_losses module<a class="headerlink" href="#mhcflurry-pytorch-losses-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.pytorch_losses
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-pytorch-sizing-module">
+<h2>mhcflurry.pytorch_sizing module<a class="headerlink" href="#mhcflurry-pytorch-sizing-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.pytorch_sizing
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-pytorch-training-module">
+<h2>mhcflurry.pytorch_training module<a class="headerlink" href="#mhcflurry-pytorch-training-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.pytorch_training
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-random-negative-peptides-module">
+<h2>mhcflurry.random_negative_peptides module<a class="headerlink" href="#mhcflurry-random-negative-peptides-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.random_negative_peptides
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-regression-target-module">
+<h2>mhcflurry.regression_target module<a class="headerlink" href="#mhcflurry-regression-target-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.regression_target
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-scoring-module">
+<h2>mhcflurry.scoring module<a class="headerlink" href="#mhcflurry-scoring-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.scoring
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-select-allele-specific-models-command-module">
+<h2>mhcflurry.select_allele_specific_models_command module<a class="headerlink" href="#mhcflurry-select-allele-specific-models-command-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.select_allele_specific_models_command
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-select-pan-allele-models-command-module">
+<h2>mhcflurry.select_pan_allele_models_command module<a class="headerlink" href="#mhcflurry-select-pan-allele-models-command-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.select_pan_allele_models_command
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-select-processing-models-command-module">
+<h2>mhcflurry.select_processing_models_command module<a class="headerlink" href="#mhcflurry-select-processing-models-command-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.select_processing_models_command
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-testing-utils-module">
+<h2>mhcflurry.testing_utils module<a class="headerlink" href="#mhcflurry-testing-utils-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.testing_utils
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-train-allele-specific-models-command-module">
+<h2>mhcflurry.train_allele_specific_models_command module<a class="headerlink" href="#mhcflurry-train-allele-specific-models-command-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.train_allele_specific_models_command
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-train-pan-allele-models-command-module">
+<h2>mhcflurry.train_pan_allele_models_command module<a class="headerlink" href="#mhcflurry-train-pan-allele-models-command-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.train_pan_allele_models_command
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-train-presentation-models-command-module">
+<h2>mhcflurry.train_presentation_models_command module<a class="headerlink" href="#mhcflurry-train-presentation-models-command-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.train_presentation_models_command
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-train-processing-models-command-module">
+<h2>mhcflurry.train_processing_models_command module<a class="headerlink" href="#mhcflurry-train-processing-models-command-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.train_processing_models_command
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-training-benchmark-module">
+<h2>mhcflurry.training_benchmark module<a class="headerlink" href="#mhcflurry-training-benchmark-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.training_benchmark
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-version-module">
+<h2>mhcflurry.version module<a class="headerlink" href="#mhcflurry-version-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.version
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+<section id="mhcflurry-workload-planning-module">
+<h2>mhcflurry.workload_planning module<a class="headerlink" href="#mhcflurry-workload-planning-module" title="Link to this heading"></a></h2>
+<p>.. automodule:: mhcflurry.workload_planning
+:members:
+:show-inheritance:
+:undoc-members:</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="configuration.html" class="btn btn-neutral float-left" title="Configuration and performance" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="testing.html" class="btn btn-neutral float-right" title="Testing" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Jul 24, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

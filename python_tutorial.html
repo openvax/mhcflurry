@@ -1,0 +1,305 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Python library tutorial &mdash; MHCflurry 2.3.0rc19 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=0fe4ac82"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Training models" href="training.html" />
+    <link rel="prev" title="Command-line tutorial" href="commandline_tutorial.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Python library tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#loading-a-predictor">Loading a predictor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#predicting-for-individual-peptides">Predicting for individual peptides</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#scanning-protein-sequences">Scanning protein sequences</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#lower-level-interfaces">Lower level interfaces</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Python library tutorial</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/python_tutorial.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="python-library-tutorial">
+<h1>Python library tutorial<a class="headerlink" href="#python-library-tutorial" title="Link to this heading"></a></h1>
+<p>Use the Python API to add MHCflurry predictions to notebooks and analysis
+pipelines. This page covers the common presentation and affinity calls; the
+<a class="reference internal" href="api.html#api-documentation"><span class="std std-ref">API Documentation</span></a> contains the complete interfaces.</p>
+<p>For most applications, use
+<code class="xref py py-class docutils literal notranslate"><span class="pre">Class1PresentationPredictor</span></code>: it returns binding, processing,
+and combined presentation predictions from one interface. Use the lower-level
+affinity or processing predictors only when you need those components by
+themselves.</p>
+<section id="loading-a-predictor">
+<h2>Loading a predictor<a class="headerlink" href="#loading-a-predictor" title="Link to this heading"></a></h2>
+<p><code class="xref py py-class docutils literal notranslate"><span class="pre">Class1PresentationPredictor</span></code> provides binding, processing,
+and combined presentation predictions. Calling <code class="docutils literal notranslate"><span class="pre">load()</span></code> without a path uses
+the downloaded release model (see <a class="reference internal" href="commandline_tutorial.html#downloading"><span class="std std-ref">Download models</span></a>); pass a model directory
+to load a custom predictor.</p>
+<div class="highlight-pycon notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">mhcflurry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Class1PresentationPredictor</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">predictor</span> <span class="o">=</span> <span class="n">Class1PresentationPredictor</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">predictor</span><span class="o">.</span><span class="n">supported_alleles</span><span class="p">[:</span><span class="mi">5</span><span class="p">]</span>
+<span class="go">[&#39;Atbe-B*01:01&#39;, &#39;Atbe-E*03:01&#39;, &#39;Atbe-G*03:01&#39;, &#39;Atbe-G*03:02&#39;, &#39;Atbe-G*06:01&#39;]</span>
+</pre></div>
+</div>
+</section>
+<section id="predicting-for-individual-peptides">
+<h2>Predicting for individual peptides<a class="headerlink" href="#predicting-for-individual-peptides" title="Link to this heading"></a></h2>
+<p>To generate predictions for individual peptides, we can use the
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">predict()</span></code> method of the <code class="xref py py-class docutils literal notranslate"><span class="pre">Class1PresentationPredictor</span></code>,
+loaded above. This method returns a <code class="xref py py-class docutils literal notranslate"><span class="pre">pandas.DataFrame</span></code> with binding affinity, processing, and presentation
+predictions:</p>
+<div class="highlight-pycon notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">predictions</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">peptides</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;SIINFEKL&quot;</span><span class="p">,</span> <span class="s2">&quot;NLVPMVATV&quot;</span><span class="p">],</span>
+<span class="gp">... </span>    <span class="n">alleles</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;HLA-A0201&quot;</span><span class="p">,</span> <span class="s2">&quot;HLA-A0301&quot;</span><span class="p">],</span>
+<span class="gp">... </span>    <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="p">[(</span><span class="n">row</span><span class="o">.</span><span class="n">peptide</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">best_allele</span><span class="p">))</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">predictions</span><span class="o">.</span><span class="n">itertuples</span><span class="p">()]</span>
+<span class="go">[(&#39;SIINFEKL&#39;, &#39;HLA-A0201&#39;), (&#39;NLVPMVATV&#39;, &#39;HLA-A0201&#39;)]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">predictions</span><span class="o">.</span><span class="n">presentation_score</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+<span class="go">[0.02, 0.97]</span>
+</pre></div>
+</div>
+<p>Here, the allele list is one MHC I genotype (up to six alleles), and the
+strongest binder across that genotype is reported for each peptide.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Python input</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">alleles=[&quot;A0201&quot;,</span> <span class="pre">&quot;A0301&quot;]</span></code></p></td>
+<td><p>One genotype; one result per peptide.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">alleles={&quot;sample1&quot;:</span> <span class="pre">[...],</span> <span class="pre">&quot;sample2&quot;:</span> <span class="pre">[...]}</span></code></p></td>
+<td><p>Multiple named genotypes; one result per sample and peptide.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Class1AffinityPredictor.predict_to_dataframe(allele=&quot;A0201&quot;,</span> <span class="pre">...)</span></code></p></td>
+<td><p>Score every peptide against one allele.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Class1AffinityPredictor.predict_to_dataframe(alleles=[...],</span> <span class="pre">...)</span></code></p></td>
+<td><p>Pair each peptide with the allele at the same position.</p></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>MHCflurry normalizes allele names using the <a class="reference external" href="https://github.com/pirl-unc/mhcgnomes">mhcgnomes</a>
+package. Names like <code class="docutils literal notranslate"><span class="pre">HLA-A0201</span></code> or <code class="docutils literal notranslate"><span class="pre">A*02:01</span></code> will be
+normalized to <code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code>, so most naming conventions can be used
+with methods such as <code class="xref py py-meth docutils literal notranslate"><span class="pre">predict()</span></code>.</p>
+</div>
+<p>Invalid, ambiguous, class-II, pseudogene, null, and unsupported allele names
+raise a descriptive <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> by default. For streaming or mixed-quality
+data, pass <code class="docutils literal notranslate"><span class="pre">throw=False</span></code>; affected prediction rows are retained with <code class="docutils literal notranslate"><span class="pre">NaN</span></code>
+scores (or ignored when another valid allele in the genotype supplies the
+sample’s best affinity) while valid inputs are still evaluated. The
+command-line equivalent is <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">predict</span> <span class="pre">--no-throw</span></code>.</p>
+<p>If you have multiple sample genotypes, you can pass a dict, where the
+keys are arbitrary sample names:</p>
+<div class="highlight-pycon notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">predictions</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">peptides</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;KSEYMTSWFY&quot;</span><span class="p">,</span> <span class="s2">&quot;NLVPMVATV&quot;</span><span class="p">],</span>
+<span class="gp">... </span>    <span class="n">alleles</span><span class="o">=</span><span class="p">{</span>
+<span class="gp">... </span>       <span class="s2">&quot;sample1&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;A0201&quot;</span><span class="p">,</span> <span class="s2">&quot;A0301&quot;</span><span class="p">,</span> <span class="s2">&quot;B0702&quot;</span><span class="p">,</span> <span class="s2">&quot;B4402&quot;</span><span class="p">,</span> <span class="s2">&quot;C0201&quot;</span><span class="p">,</span> <span class="s2">&quot;C0702&quot;</span><span class="p">],</span>
+<span class="gp">... </span>       <span class="s2">&quot;sample2&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;A0101&quot;</span><span class="p">,</span> <span class="s2">&quot;A0206&quot;</span><span class="p">,</span> <span class="s2">&quot;B5701&quot;</span><span class="p">,</span> <span class="s2">&quot;C0202&quot;</span><span class="p">],</span>
+<span class="gp">... </span>    <span class="p">},</span>
+<span class="gp">... </span>    <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="p">[(</span><span class="n">row</span><span class="o">.</span><span class="n">sample_name</span><span class="p">,</span> <span class="n">row</span><span class="o">.</span><span class="n">peptide</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">best_allele</span><span class="p">))</span>
+<span class="gp">... </span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">predictions</span><span class="o">.</span><span class="n">itertuples</span><span class="p">()]</span>
+<span class="go">[(&#39;sample1&#39;, &#39;KSEYMTSWFY&#39;, &#39;C0201&#39;), (&#39;sample1&#39;, &#39;NLVPMVATV&#39;, &#39;A0201&#39;), (&#39;sample2&#39;, &#39;KSEYMTSWFY&#39;, &#39;A0101&#39;), (&#39;sample2&#39;, &#39;NLVPMVATV&#39;, &#39;A0206&#39;)]</span>
+</pre></div>
+</div>
+<p>Here the strongest binder for each sample / peptide pair is returned.</p>
+<p>Processing and presentation predictions can use the upstream (N-flank) and
+downstream (C-flank) sequence from the source protein for better cleavage
+context. Pass those sequences with <code class="docutils literal notranslate"><span class="pre">n_flanks</span></code> and <code class="docutils literal notranslate"><span class="pre">c_flanks</span></code>:</p>
+<div class="highlight-pycon notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">predictions</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">peptides</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;KSEYMTSWFY&quot;</span><span class="p">,</span> <span class="s2">&quot;NLVPMVATV&quot;</span><span class="p">],</span>
+<span class="gp">... </span>    <span class="n">n_flanks</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;NNNNNNN&quot;</span><span class="p">,</span> <span class="s2">&quot;SSSSSSSS&quot;</span><span class="p">],</span>
+<span class="gp">... </span>    <span class="n">c_flanks</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;CCCCCCCC&quot;</span><span class="p">,</span> <span class="s2">&quot;YYYAAAA&quot;</span><span class="p">],</span>
+<span class="gp">... </span>    <span class="n">alleles</span><span class="o">=</span><span class="p">{</span>
+<span class="gp">... </span>       <span class="s2">&quot;sample1&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;A0201&quot;</span><span class="p">,</span> <span class="s2">&quot;A0301&quot;</span><span class="p">,</span> <span class="s2">&quot;B0702&quot;</span><span class="p">,</span> <span class="s2">&quot;B4402&quot;</span><span class="p">,</span> <span class="s2">&quot;C0201&quot;</span><span class="p">,</span> <span class="s2">&quot;C0702&quot;</span><span class="p">],</span>
+<span class="gp">... </span>       <span class="s2">&quot;sample2&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;A0101&quot;</span><span class="p">,</span> <span class="s2">&quot;A0206&quot;</span><span class="p">,</span> <span class="s2">&quot;B5701&quot;</span><span class="p">,</span> <span class="s2">&quot;C0202&quot;</span><span class="p">],</span>
+<span class="gp">... </span>    <span class="p">},</span>
+<span class="gp">... </span>    <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">predictions</span><span class="p">[[</span><span class="s2">&quot;n_flank&quot;</span><span class="p">,</span> <span class="s2">&quot;c_flank&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="s2">&quot;records&quot;</span><span class="p">)</span>
+<span class="go">[{&#39;n_flank&#39;: &#39;NNNNNNN&#39;, &#39;c_flank&#39;: &#39;CCCCCCCC&#39;}, {&#39;n_flank&#39;: &#39;SSSSSSSS&#39;, &#39;c_flank&#39;: &#39;YYYAAAA&#39;}]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">predictions</span><span class="o">.</span><span class="n">presentation_score</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+<span class="go">[0.1, 0.96, 0.9, 0.95]</span>
+</pre></div>
+</div>
+</section>
+<section id="scanning-protein-sequences">
+<h2>Scanning protein sequences<a class="headerlink" href="#scanning-protein-sequences" title="Link to this heading"></a></h2>
+<p>The <code class="xref py py-meth docutils literal notranslate"><span class="pre">predict_sequences()</span></code> method supports
+scanning protein sequences for MHC ligands. Here’s an example to identify all
+peptides with a predicted binding affinity of 500 nM or tighter to any allele
+across two sample genotypes and two short peptide sequences.</p>
+<div class="highlight-pycon notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">scan</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">predict_sequences</span><span class="p">(</span>
+<span class="gp">... </span>   <span class="n">sequences</span><span class="o">=</span><span class="p">{</span>
+<span class="gp">... </span>       <span class="s1">&#39;protein1&#39;</span><span class="p">:</span> <span class="s2">&quot;MDSKGSSQKGSRLLLLLVVSNLL&quot;</span><span class="p">,</span>
+<span class="gp">... </span>       <span class="s1">&#39;protein2&#39;</span><span class="p">:</span> <span class="s2">&quot;SSLPTPEDKEQAQQTHH&quot;</span><span class="p">,</span>
+<span class="gp">... </span>   <span class="p">},</span>
+<span class="gp">... </span>   <span class="n">alleles</span><span class="o">=</span><span class="p">{</span>
+<span class="gp">... </span>       <span class="s2">&quot;sample1&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;A0201&quot;</span><span class="p">,</span> <span class="s2">&quot;A0301&quot;</span><span class="p">,</span> <span class="s2">&quot;B0702&quot;</span><span class="p">],</span>
+<span class="gp">... </span>       <span class="s2">&quot;sample2&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;A0101&quot;</span><span class="p">,</span> <span class="s2">&quot;C0202&quot;</span><span class="p">],</span>
+<span class="gp">... </span>   <span class="p">},</span>
+<span class="gp">... </span>   <span class="n">result</span><span class="o">=</span><span class="s2">&quot;filtered&quot;</span><span class="p">,</span>
+<span class="gp">... </span>   <span class="n">comparison_quantity</span><span class="o">=</span><span class="s2">&quot;affinity&quot;</span><span class="p">,</span>
+<span class="gp">... </span>   <span class="n">filter_value</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
+<span class="gp">... </span>   <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">scan</span><span class="p">)</span>
+<span class="go">10</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">scan</span><span class="o">.</span><span class="n">affinity</span><span class="o">.</span><span class="n">le</span><span class="p">(</span><span class="mi">500</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">())</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">scan</span><span class="p">[[</span><span class="s2">&quot;sequence_name&quot;</span><span class="p">,</span> <span class="s2">&quot;peptide&quot;</span><span class="p">,</span> <span class="s2">&quot;best_allele&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="s2">&quot;records&quot;</span><span class="p">)</span>
+<span class="go">[{&#39;sequence_name&#39;: &#39;protein1&#39;, &#39;peptide&#39;: &#39;LLLVVSNLL&#39;, &#39;best_allele&#39;: &#39;A0201&#39;}, {&#39;sequence_name&#39;: &#39;protein1&#39;, &#39;peptide&#39;: &#39;LLLLVVSNL&#39;, &#39;best_allele&#39;: &#39;A0201&#39;}]</span>
+</pre></div>
+</div>
+<p>When using <code class="docutils literal notranslate"><span class="pre">predict_sequences</span></code>, the flanking sequences for each peptide are
+automatically included in the processing and presentation predictions.</p>
+<p>See the documentation for <code class="xref py py-class docutils literal notranslate"><span class="pre">Class1PresentationPredictor</span></code> for other
+useful methods.</p>
+</section>
+<section id="lower-level-interfaces">
+<h2>Lower level interfaces<a class="headerlink" href="#lower-level-interfaces" title="Link to this heading"></a></h2>
+<p>The <code class="xref py py-class docutils literal notranslate"><span class="pre">Class1PresentationPredictor</span></code> delegates to a
+<code class="xref py py-class docutils literal notranslate"><span class="pre">Class1AffinityPredictor</span></code> instance for binding affinity predictions.
+If all you need are binding affinities, you can use this instance directly.</p>
+<p>Here’s an example:</p>
+<div class="highlight-pycon notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">mhcflurry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Class1AffinityPredictor</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">predictor</span> <span class="o">=</span> <span class="n">Class1AffinityPredictor</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">affinities</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">predict_to_dataframe</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">allele</span><span class="o">=</span><span class="s2">&quot;HLA-A0201&quot;</span><span class="p">,</span> <span class="n">peptides</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;SIINFEKL&quot;</span><span class="p">,</span> <span class="s2">&quot;SIINFEQL&quot;</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">affinities</span><span class="p">[[</span><span class="s2">&quot;peptide&quot;</span><span class="p">,</span> <span class="s2">&quot;allele&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="s2">&quot;records&quot;</span><span class="p">)</span>
+<span class="go">[{&#39;peptide&#39;: &#39;SIINFEKL&#39;, &#39;allele&#39;: &#39;HLA-A*02:01&#39;}, {&#39;peptide&#39;: &#39;SIINFEQL&#39;, &#39;allele&#39;: &#39;HLA-A*02:01&#39;}]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(((</span><span class="n">affinities</span><span class="o">.</span><span class="n">prediction_low</span> <span class="o">&lt;</span> <span class="n">affinities</span><span class="o">.</span><span class="n">prediction</span><span class="p">)</span> <span class="o">&amp;</span>
+<span class="gp">... </span>      <span class="p">(</span><span class="n">affinities</span><span class="o">.</span><span class="n">prediction</span> <span class="o">&lt;</span> <span class="n">affinities</span><span class="o">.</span><span class="n">prediction_high</span><span class="p">))</span><span class="o">.</span><span class="n">all</span><span class="p">())</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">prediction_low</span></code> and <code class="docutils literal notranslate"><span class="pre">prediction_high</span></code> fields give the 5-95 percentile
+predictions across the models in the ensemble. This detailed information is not
+available through the higher-level <code class="xref py py-class docutils literal notranslate"><span class="pre">Class1PresentationPredictor</span></code>
+interface.</p>
+<p>Under the hood, <code class="docutils literal notranslate"><span class="pre">Class1AffinityPredictor</span></code> itself delegates to an ensemble of
+of <code class="xref py py-class docutils literal notranslate"><span class="pre">Class1NeuralNetwork</span></code> instances, which implement the neural network
+models used for prediction. To fit your own affinity prediction models, call
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">fit()</span></code>.</p>
+<p>You can similarly use <code class="xref py py-class docutils literal notranslate"><span class="pre">Class1ProcessingPredictor</span></code> directly for
+antigen processing prediction, and there is a low-level
+<code class="xref py py-class docutils literal notranslate"><span class="pre">Class1ProcessingNeuralNetwork</span></code> with a <code class="xref py py-meth docutils literal notranslate"><span class="pre">fit()</span></code> method.</p>
+<p>See the API documentation of these classes for details.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="commandline_tutorial.html" class="btn btn-neutral float-left" title="Command-line tutorial" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="training.html" class="btn btn-neutral float-right" title="Training models" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Jul 24, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

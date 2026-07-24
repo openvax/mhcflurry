@@ -1,0 +1,241 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Evaluating trained models &mdash; MHCflurry 2.3.0rc19 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=0fe4ac82"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Command-line reference" href="commandline_tools.html" />
+    <link rel="prev" title="Training models" href="training.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Evaluating trained models</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#quick-evaluation">Quick evaluation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#outputs">Outputs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#paper-style-figures">Paper-style figures</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#release-and-remote-runs">Release and remote runs</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Evaluating trained models</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/evaluation.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="evaluating-trained-models">
+<span id="evaluation"></span><h1>Evaluating trained models<a class="headerlink" href="#evaluating-trained-models" title="Link to this heading"></a></h1>
+<p>Use the evaluation commands after training a model to compare it with a public
+release or another run. The normal workflow separates reusable metrics from
+plot rendering, so you can change figures without rerunning predictions.</p>
+<section id="quick-evaluation">
+<h2>Quick evaluation<a class="headerlink" href="#quick-evaluation" title="Link to this heading"></a></h2>
+<p>Compare a candidate run with the installed public models:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>compare-models<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--a<span class="w"> </span>results/new_run<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--b<span class="w"> </span>public<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--out<span class="w"> </span>results/new_run/eval_comparison
+</pre></div>
+</div>
+<p>Render the diagnostic plots and combined PDF:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>plot-comparison<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--input<span class="w"> </span>results/new_run/eval_comparison<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--summary-pdf<span class="w"> </span>results/new_run/eval_comparison/plots/model_comparison_figures.pdf
+</pre></div>
+</div>
+<p>Use <code class="docutils literal notranslate"><span class="pre">public:&lt;release_name&gt;</span></code> instead of <code class="docutils literal notranslate"><span class="pre">public</span></code> when the baseline version must
+be fixed. Components are compared only when both sides contain the corresponding
+model artifacts; explicitly requested processing modes must exist on both sides.</p>
+</section>
+<section id="outputs">
+<h2>Outputs<a class="headerlink" href="#outputs" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Stage</p></th>
+<th class="head"><p>Command</p></th>
+<th class="head"><p>Main outputs</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Metrics</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">eval</span> <span class="pre">compare-models</span></code></p></td>
+<td><p>Component CSV/JSON files, <code class="docutils literal notranslate"><span class="pre">release_summary.csv</span></code>, and <code class="docutils literal notranslate"><span class="pre">release_summary.md</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Diagnostics</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">eval</span> <span class="pre">plot-comparison</span></code></p></td>
+<td><p>ROC, precision-recall, scatter, and delta plots plus an optional combined PDF</p></td>
+</tr>
+<tr class="row-even"><td><p>Paper figures</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">eval</span> <span class="pre">paper-figures</span> <span class="pre">render</span></code></p></td>
+<td><p>SVG/PDF/PNG panels, <code class="docutils literal notranslate"><span class="pre">paper_figures.pdf</span></code>, <code class="docutils literal notranslate"><span class="pre">manifest.csv</span></code>, and <code class="docutils literal notranslate"><span class="pre">missing_inputs.md</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>The metrics directory is the reusable contract between evaluation and plotting.
+Keep it when iterating on figure style or assembling a review packet.</p>
+<p>Keep paper figures in their own directory (the default is
+<code class="docutils literal notranslate"><span class="pre">&lt;out&gt;/plots/paper_figures</span></code>). The combined diagnostic <code class="docutils literal notranslate"><span class="pre">--summary-pdf</span></code> may be a
+top-level file under <code class="docutils literal notranslate"><span class="pre">&lt;out&gt;/plots</span></code> or live outside the plot tree, but it cannot
+be placed inside the paper-figure, affinity, processing, presentation, or
+diagnostic-paper subdirectories. Commands reject overlapping output paths
+before clearing or rendering anything.</p>
+</section>
+<section id="paper-style-figures">
+<h2>Paper-style figures<a class="headerlink" href="#paper-style-figures" title="Link to this heading"></a></h2>
+<p>For an already-trained local model, compose comparison, diagnostics, and any
+available paper panels with one command:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>paper-figures<span class="w"> </span>run<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--a<span class="w"> </span>results/new_run<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--b<span class="w"> </span>public<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--out<span class="w"> </span>results/new_run/eval_comparison
+</pre></div>
+</div>
+<p>Paper panels can also use cached benchmark predictions or score tables. A saved
+prediction table has one row per evaluated peptide–MHC example and contains:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">hit</span></code>;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sample_id</span></code> for multiallelic data, or <code class="docutils literal notranslate"><span class="pre">allele</span></code>/<code class="docutils literal notranslate"><span class="pre">hla</span></code> for monoallelic data;</p></li>
+<li><p>optional peptide and flank metadata; and</p></li>
+<li><p>canonical predictor score columns, or custom score columns declared in
+<code class="docutils literal notranslate"><span class="pre">predictor_info.csv</span></code>.</p></li>
+</ul>
+<p>Derive reusable AUC and PPV score tables with:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>paper-figures<span class="w"> </span>score-predictions<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--kind<span class="w"> </span>multiallelic<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--input<span class="w"> </span>benchmark.multiallelic.csv.bz2<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--out<span class="w"> </span>accuracy_scores.multiallelic.csv
+</pre></div>
+</div>
+<p>Score direction must be explicit. Common MHCflurry, NetMHCpan, and MixMHCpred
+column names have built-in orientation. Describe custom columns in
+<code class="docutils literal notranslate"><span class="pre">predictor_info.csv</span></code> using <code class="docutils literal notranslate"><span class="pre">predictor</span></code> and <code class="docutils literal notranslate"><span class="pre">higher_is_better</span></code>; those rows also
+select the custom columns. <code class="docutils literal notranslate"><span class="pre">--predictor-columns</span></code> can restrict scoring to an
+explicit subset, but custom names still need their direction in
+<code class="docutils literal notranslate"><span class="pre">predictor_info.csv</span></code>. Other numeric columns are treated as metadata rather than
+guessed to be predictor scores.</p>
+<p>Optional licensed predictors run outside the MHCflurry core package. The
+<code class="docutils literal notranslate"><span class="pre">paper-figures</span> <span class="pre">external-predictors</span></code> adapter can invoke a locally installed
+runner such as <code class="docutils literal notranslate"><span class="pre">mhctools</span></code> and join its output into the canonical benchmark
+table. Missing optional inputs are listed in <code class="docutils literal notranslate"><span class="pre">missing_inputs.md</span></code>; they are not
+silently replaced with synthetic panels.</p>
+</section>
+<section id="release-and-remote-runs">
+<h2>Release and remote runs<a class="headerlink" href="#release-and-remote-runs" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">train</span> <span class="pre">pan-allele-release</span></code> runs comparison and diagnostic plotting on
+the training machine before copying results home. Paper inputs that depend on
+locally licensed tools can remain on the control machine and be rendered after
+the remote artifacts arrive.</p>
+<p>Release maintainers should use the
+<a class="reference external" href="https://github.com/openvax/mhcflurry/tree/master/scripts/release">release workflow guide</a>
+for lifecycle, synchronization, and deployment options. The complete argument
+reference is in <a class="reference internal" href="commandline_tools.html"><span class="doc">Command-line reference</span></a> and <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">eval</span> <span class="pre">--help</span></code>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="training.html" class="btn btn-neutral float-left" title="Training models" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="commandline_tools.html" class="btn btn-neutral float-right" title="Command-line reference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Jul 24, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

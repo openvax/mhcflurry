@@ -1,0 +1,727 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orchestrator architecture &mdash; MHCflurry 2.3.0rc19 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=0fe4ac82"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Maintainer workflows" href="maintainers.html" />
+    <link rel="prev" title="Development" href="development.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Orchestrator architecture</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#the-one-line-summary">The one-line summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#locus-of-control">Locus of control</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tensor-residency-device-resident-affinity-fit">Tensor residency: device-resident affinity fit</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#random-negatives">Random negatives</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#parallelism-backends">Parallelism backends</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#coverage-matrix">Coverage matrix</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#auto-tuned-parallelism-knobs">Auto-tuned parallelism knobs</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#max-workers-per-gpu-auto-auto-max-workers-per-gpu"><code class="docutils literal notranslate"><span class="pre">--max-workers-per-gpu</span> <span class="pre">auto</span></code> → <code class="docutils literal notranslate"><span class="pre">auto_max_workers_per_gpu</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dataloader-num-workers-auto-auto-dataloader-num-workers"><code class="docutils literal notranslate"><span class="pre">--dataloader-num-workers</span> <span class="pre">auto</span></code> → <code class="docutils literal notranslate"><span class="pre">auto_dataloader_num_workers</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#num-jobs-auto-derives-from-mwpg-gpus"><code class="docutils literal notranslate"><span class="pre">--num-jobs</span></code> (auto-derives from MWPG × GPUs)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#cross-model-coverage">Cross-model coverage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#env-overrides">Env overrides</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#env-knobs-vs-cli-flags">Env knobs vs CLI flags</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#torch-compile-warmup">Torch Compile Warmup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#what-is-not-the-orchestrator-s-job">What is NOT the orchestrator’s job</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#recipes">Recipes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#adding-a-new-pre-fork-resource">Adding a new pre-fork resource</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#adding-a-new-env-knob">Adding a new env knob</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#adding-a-new-worker-side-filter">Adding a new worker-side filter</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#fit-time-data-flow">Fit-time data flow</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#peptide-amino-acid-vector-lookup">1. Peptide amino-acid vector lookup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pretrain-dataloader-process-parallelism">2. Pretrain DataLoader process parallelism</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#component-consistency">Component consistency</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#rsync-hygiene-laptop-remote-training-box">rsync hygiene (laptop ↔ remote training box)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pointers-to-code">Pointers to code</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#known-asymmetries-deliberate">Known asymmetries (deliberate)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#future-tightening-not-in-2-3-0">Future tightening (not in 2.3.0)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Orchestrator architecture</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/orchestrator.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="orchestrator-architecture">
+<h1>Orchestrator architecture<a class="headerlink" href="#orchestrator-architecture" title="Link to this heading"></a></h1>
+<blockquote>
+<div><p>Internals doc — for contributors. End users running
+<code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">class1-train-pan-allele-models</span></code> don’t need to read this.</p>
+</div></blockquote>
+<section id="the-one-line-summary">
+<h2>The one-line summary<a class="headerlink" href="#the-one-line-summary" title="Link to this heading"></a></h2>
+<p>The orchestrator owns the <strong>run-wide resources</strong> (parallel workers,
+env tuning); workers consume those and own their per-fit device state.
+Workers never build shared state and never set env knobs that affect
+other workers.</p>
+<p>If you find yourself adding orchestrator-shaped logic inside
+<code class="docutils literal notranslate"><span class="pre">fit()</span></code>, <code class="docutils literal notranslate"><span class="pre">train_model()</span></code>, or any worker function, stop and think
+whether it belongs in the orchestrator instead.</p>
+</section>
+<section id="locus-of-control">
+<h2>Locus of control<a class="headerlink" href="#locus-of-control" title="Link to this heading"></a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>orchestrator process               training worker process
+─────────────────────              ───────────────────────
+
+parse args                         (forked / spawned)
+load training data                  receive WORKER_CONTEXT once
+build WORKER_CONTEXT        ─┐
+                             │
+hoist env knobs              │
+  TORCHINDUCTOR_COMPILE_THREADS
+                             │
+start worker pool            ─┘
+                                    fit() builds device-resident
+                                      AffinityDeviceTrainingData
+                                      (peptide/allele/y/weights and
+                                      random-negative slice live on
+                                      the active torch device)
+collect results  ◀──────────────────  return predictor
+</pre></div>
+</div>
+<p>The orchestrator does the <strong>expensive, single-threaded preparation</strong>
+ONCE. Workers do the <strong>parallel, per-task</strong> work N times.</p>
+</section>
+<section id="tensor-residency-device-resident-affinity-fit">
+<h2>Tensor residency: device-resident affinity fit<a class="headerlink" href="#tensor-residency-device-resident-affinity-fit" title="Link to this heading"></a></h2>
+<p>Affinity <code class="docutils literal notranslate"><span class="pre">fit()</span></code> is <strong>device-resident</strong>. One container,
+<code class="docutils literal notranslate"><span class="pre">mhcflurry.class1_affinity_training_data.AffinityDeviceTrainingData</span></code>, holds
+the row space <code class="docutils literal notranslate"><span class="pre">[random</span> <span class="pre">negatives</span> <span class="pre">|</span> <span class="pre">real</span> <span class="pre">training</span> <span class="pre">rows]</span></code> as torch tensors on
+the active device for the lifetime of one <code class="docutils literal notranslate"><span class="pre">fit()</span></code> call. The inner loop
+forms batches via <code class="docutils literal notranslate"><span class="pre">index_select</span></code> against the combined buffer — no per-batch
+host-to-device copies, no DataLoader workers feeding the affinity loop.</p>
+<p>Random-negative peptides are refilled in-place once per epoch into the
+top slice of the combined buffer, so the real-data block is never
+recopied.</p>
+<p>The pretrain-streaming path (<code class="docutils literal notranslate"><span class="pre">fit_streaming_batches</span></code>) is a separate code
+path that <em>does</em> use a PyTorch DataLoader with optional prefetch workers.
+That’s controlled by <code class="docutils literal notranslate"><span class="pre">dataloader_num_workers</span></code>; 0 means in-process. It
+feeds the pretrain generator only and does not affect the affinity row
+layout above.</p>
+</section>
+<section id="random-negatives">
+<h2>Random negatives<a class="headerlink" href="#random-negatives" title="Link to this heading"></a></h2>
+<p>Random negatives are worker-local. <code class="docutils literal notranslate"><span class="pre">RandomNegativesPool</span></code> amortizes
+generation over <code class="docutils literal notranslate"><span class="pre">random_negative_pool_epochs</span></code>, but it does not try to
+share encoded pools between model fits. This preserves the historical
+behavior where independently trained workers sample independent negative
+peptides.</p>
+<p>For the default torch peptide-encoding path, the pool samples amino-acid
+indices directly on the worker’s active torch device and writes fixed-length
+int8 rows. The model’s embedding layer expands those indices to BLOSUM62 /
+PMBEC / physchem features during the forward pass. Legacy host-vector
+models fall back to the host encoder so their input shape remains unchanged.</p>
+</section>
+<section id="parallelism-backends">
+<h2>Parallelism backends<a class="headerlink" href="#parallelism-backends" title="Link to this heading"></a></h2>
+<p>Two backends, one CLI surface:</p>
+<ul class="simple">
+<li><p><strong>Local</strong> (<code class="docutils literal notranslate"><span class="pre">mhcflurry.parallelism</span></code>): <code class="docutils literal notranslate"><span class="pre">multiprocessing.Pool</span></code> of
+non-daemon workers. Workers can spawn DataLoader children for the
+pretrain streaming path. <code class="docutils literal notranslate"><span class="pre">resolve_local_parallelism_args</span></code> is the
+single pre-fork normalization point: it resolves
+<code class="docutils literal notranslate"><span class="pre">--max-workers-per-gpu=auto</span></code> and <code class="docutils literal notranslate"><span class="pre">--dataloader-num-workers=auto</span></code>
+without touching CUDA, caps local <code class="docutils literal notranslate"><span class="pre">--num-jobs</span></code> to GPU capacity when
+auto was requested, and hoists torch.compile’s thread cap before the
+Pool starts. Fork workers inherit <code class="docutils literal notranslate"><span class="pre">WORKER_CONTEXT</span></code> through copy-on-write;
+spawn workers receive it once in their initializer, never once per queued
+task. Before a spawn pool starts, the planner deep-sizes that loaded context
+and rechecks current host RAM, so worker copies are capped even when the
+source CSV was compressed or torch compilation is disabled. Explicit numeric
+<code class="docutils literal notranslate"><span class="pre">--max-workers-per-gpu</span></code> keeps the
+historical CPU-overflow behavior.</p></li>
+<li><p><strong>Cluster</strong> (<code class="docutils literal notranslate"><span class="pre">cluster_parallelism.py</span></code>): one job per work-item
+submitted via <code class="docutils literal notranslate"><span class="pre">bsub</span></code> / <code class="docutils literal notranslate"><span class="pre">sbatch</span></code> / <code class="docutils literal notranslate"><span class="pre">sh</span></code>. Workers serialize
+WORKER_CONTEXT to NFS and deserialize on the worker side.</p></li>
+</ul>
+<p>Worker-side code (<code class="docutils literal notranslate"><span class="pre">train_model()</span></code>, etc.) is identical between
+backends. Only the orchestrator branches on <code class="docutils literal notranslate"><span class="pre">args.cluster_parallelism</span></code>.</p>
+</section>
+<section id="coverage-matrix">
+<h2>Coverage matrix<a class="headerlink" href="#coverage-matrix" title="Link to this heading"></a></h2>
+<p>The 2.3.0 modernization concentrates on the pan-allele affinity
+training + percentile calibration paths. Other components inherit
+shared backend selection and worker orchestration, but their data
+paths remain intentionally smaller.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p></p></th>
+<th class="head"><p>pretrain</p></th>
+<th class="head"><p>finetune</p></th>
+<th class="head"><p>select</p></th>
+<th class="head"><p>calibrate</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>affinity (pan-allele)</strong></p></td>
+<td><p>streaming DataLoader + compact torch-index peptide batches</p></td>
+<td><p>device-resident tensors + worker-local RN pool</p></td>
+<td><p>filter ✓; pool/cache n/a (no fit)</p></td>
+<td><p>filter ✓; pool/cache n/a</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>affinity (allele-specific)</strong></p></td>
+<td><p>n/a</p></td>
+<td><p>device-resident tensors + worker-local RN pool</p></td>
+<td><p>filter ✓</p></td>
+<td><p>shares calibrate command</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>processing</strong></p></td>
+<td><p>n/a</p></td>
+<td><p>local+cluster worker pool</p></td>
+<td><p>local+cluster worker pool</p></td>
+<td><p>n/a (allele-independent)</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>presentation</strong></p></td>
+<td><p>n/a</p></td>
+<td><p>parallel auto-sized feature generation + deterministic fit</p></td>
+<td><p>n/a</p></td>
+<td><p>filter ✓ (shares calibrate command)</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="auto-tuned-parallelism-knobs">
+<h2>Auto-tuned parallelism knobs<a class="headerlink" href="#auto-tuned-parallelism-knobs" title="Link to this heading"></a></h2>
+<p>Three knobs auto-derive from the box’s hardware so the orchestrator
+keeps working when the recipe lands on a different tier. Every auto
+resolver lives in <code class="docutils literal notranslate"><span class="pre">mhcflurry.parallelism</span></code> and is exercised by
+the unit-test matrix in <code class="docutils literal notranslate"><span class="pre">test/test_orchestrator_helpers.py</span></code>. The
+production recipes pass <code class="docutils literal notranslate"><span class="pre">auto</span></code> for each; pin a literal int only when
+intentionally re-benchmarking.</p>
+<section id="max-workers-per-gpu-auto-auto-max-workers-per-gpu">
+<h3><code class="docutils literal notranslate"><span class="pre">--max-workers-per-gpu</span> <span class="pre">auto</span></code> → <code class="docutils literal notranslate"><span class="pre">auto_max_workers_per_gpu</span></code><a class="headerlink" href="#max-workers-per-gpu-auto-auto-max-workers-per-gpu" title="Link to this heading"></a></h3>
+<p>Picks per-GPU worker concurrency from the number of complete estimated worker
+working sets that fit in detected free VRAM after one shared reserve (10%, at
+least 1 GiB). There is no default worker hard cap. The working set is derived
+from model artifacts/parameters, gradients and optimizer state for training,
+resident encoded data, and the configured training minibatch where those facts
+are available; otherwise the workload profile supplies a conservative fallback.
+Free VRAM is read from <code class="docutils literal notranslate"><span class="pre">nvidia-smi</span></code> (no torch import — the parent process must
+not initialize CUDA before forking). The final job count is also bounded by
+available host RAM and vCPUs. In containers, host-memory sizing honors the
+current cgroup limit and usage rather than the physical host’s <code class="docutils literal notranslate"><span class="pre">/proc/meminfo</span></code>.
+Spawn pools then refine the host cap from the loaded per-worker context and
+current available RAM; fork pools retain copy-on-write sharing and skip that
+copy multiplier. If no additional spawn copy fits safely, automatic local
+execution falls back to serial work in the parent instead of forcing one child.</p>
+<p>When torch compilation is enabled, the existing one-worker compile warmup also
+records CUDA peak-reserved memory and process peak RSS. A measured peak can
+tighten an automatic plan before the production pool starts, but can never
+change explicit CLI values. Runtime validation and inference batches use the
+same shared reserve against live free memory, so they do not independently
+spend VRAM already assigned to workers.</p>
+<p>For the generic 4 GiB fallback, 80 GiB free fits 18 workers and 40 GiB fits 9;
+workload-specific estimates, host RAM, vCPUs, and the number of work items can
+reduce those capacities. CPU-only execution resolves to one device worker.</p>
+</section>
+<section id="dataloader-num-workers-auto-auto-dataloader-num-workers">
+<h3><code class="docutils literal notranslate"><span class="pre">--dataloader-num-workers</span> <span class="pre">auto</span></code> → <code class="docutils literal notranslate"><span class="pre">auto_dataloader_num_workers</span></code><a class="headerlink" href="#dataloader-num-workers-auto-auto-dataloader-num-workers" title="Link to this heading"></a></h3>
+<p>Picks the per-fit-worker DataLoader prefetch child count from box
+capacity. This applies to the pretrain streaming path
+(<code class="docutils literal notranslate"><span class="pre">fit_streaming_batches</span></code>); the affinity <code class="docutils literal notranslate"><span class="pre">fit()</span></code> path is device-resident
+and ignores it. Inputs: total vCPUs, total RAM in GB, the post-cap
+fit-worker count (<code class="docutils literal notranslate"><span class="pre">--num-jobs</span></code> resolved by
+<code class="docutils literal notranslate"><span class="pre">resolve_local_parallelism_args</span></code>), and a hard cap (default 4 — the
+empirical SM-scheduler-style wall, env-overridable via
+<code class="docutils literal notranslate"><span class="pre">MHCFLURRY_AUTO_DATALOADER_HARD_CAP</span></code>).</p>
+<p>Heuristic:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">cpu_per_fit</span> <span class="pre">=</span> <span class="pre">vcpus</span> <span class="pre">//</span> <span class="pre">num_fit_workers</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cpu_cap</span> <span class="pre">=</span> <span class="pre">cpu_per_fit</span> <span class="pre">//</span> <span class="pre">2</span></code> — each DL child needs ~2 effective
+cores (1 for the main loop, 1 for queue/collate/copy).</p></li>
+<li><p>RAM cap (when <code class="docutils literal notranslate"><span class="pre">ram_gb</span></code> is provided): assume ~2 GB baseline per
+fit-worker plus ~0.5 GB per DL child;
+<code class="docutils literal notranslate"><span class="pre">ram_cap</span> <span class="pre">=</span> <span class="pre">max(0,</span> <span class="pre">(ram_gb</span> <span class="pre">/</span> <span class="pre">num_fit_workers</span> <span class="pre">-</span> <span class="pre">2.0)</span> <span class="pre">/</span> <span class="pre">0.5)</span></code>.</p></li>
+<li><p>Result: <code class="docutils literal notranslate"><span class="pre">min(hard_cap,</span> <span class="pre">cpu_cap,</span> <span class="pre">ram_cap)</span></code> clamped to ≥1, except
+when any input cap is 0 (oversubscribed mains, RAM exhaustion, or
+user override <code class="docutils literal notranslate"><span class="pre">MHCFLURRY_AUTO_DATALOADER_HARD_CAP=0</span></code>) in which case
+the result is 0 — i.e. in-process batching, no children.</p></li>
+<li><p>Serial / no-fit-worker case: returns 0.</p></li>
+</ol>
+<p>Cross-checked configurations (see
+<code class="docutils literal notranslate"><span class="pre">test_auto_dataloader_num_workers_hardware_tiers</span></code>):</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Box</p></th>
+<th class="head"><p>vCPU</p></th>
+<th class="head"><p>RAM</p></th>
+<th class="head"><p>fit</p></th>
+<th class="head"><p>resolved</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>8×A100-80GB Verda</p></td>
+<td><p>176</p></td>
+<td><p>400 G</p></td>
+<td><p>16</p></td>
+<td><p><strong>4</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>8×A100-40GB</p></td>
+<td><p>176</p></td>
+<td><p>400 G</p></td>
+<td><p>8</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>8×L40S sweep box</p></td>
+<td><p>96</p></td>
+<td><p>200 G</p></td>
+<td><p>16</p></td>
+<td><p>3</p></td>
+</tr>
+<tr class="row-odd"><td><p>Single A100-80G Lambda</p></td>
+<td><p>30</p></td>
+<td><p>200 G</p></td>
+<td><p>2</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>Single A100-80G tight</p></td>
+<td><p>16</p></td>
+<td><p>64 G</p></td>
+<td><p>2</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>Single T4 / RTX</p></td>
+<td><p>8</p></td>
+<td><p>16 G</p></td>
+<td><p>1</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>Tight cluster node</p></td>
+<td><p>32</p></td>
+<td><p>64 G</p></td>
+<td><p>16</p></td>
+<td><p>1</p></td>
+</tr>
+<tr class="row-odd"><td><p>Very tight (8v / 8fit)</p></td>
+<td><p>8</p></td>
+<td><p>16 G</p></td>
+<td><p>8</p></td>
+<td><p><strong>0</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>RAM-starved (32G / 16fit)</p></td>
+<td><p>176</p></td>
+<td><p>32 G</p></td>
+<td><p>16</p></td>
+<td><p><strong>0</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>Serial / CPU</p></td>
+<td><p>—</p></td>
+<td><p>—</p></td>
+<td><p>0</p></td>
+<td><p><strong>0</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>The heuristic is hardware-only by design</strong> — <code class="docutils literal notranslate"><span class="pre">train_row_count</span></code> and
+<code class="docutils literal notranslate"><span class="pre">random_negative_rate</span></code> do not enter the formula. Per-batch CPU work is
+bounded by <code class="docutils literal notranslate"><span class="pre">minibatch_size</span></code>, not total dataset rows.</p>
+</section>
+<section id="num-jobs-auto-derives-from-mwpg-gpus">
+<h3><code class="docutils literal notranslate"><span class="pre">--num-jobs</span></code> (auto-derives from MWPG × GPUs)<a class="headerlink" href="#num-jobs-auto-derives-from-mwpg-gpus" title="Link to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">--num-jobs</span></code> defaults to <code class="docutils literal notranslate"><span class="pre">auto</span></code>, which resolves to <code class="docutils literal notranslate"><span class="pre">gpus</span> <span class="pre">×</span> <span class="pre">max_workers_per_gpu</span></code>
+via <code class="docutils literal notranslate"><span class="pre">mhcflurry.parallelism.auto_num_jobs(num_gpus,</span> <span class="pre">max_workers_per_gpu)</span></code>
+once <code class="docutils literal notranslate"><span class="pre">auto_max_workers_per_gpu</span></code> has resolved. Pass an integer to pin it.</p>
+</section>
+<section id="cross-model-coverage">
+<h3>Cross-model coverage<a class="headerlink" href="#cross-model-coverage" title="Link to this heading"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Model</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">--max-workers-per-gpu</span> <span class="pre">auto</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">--dataloader-num-workers</span> <span class="pre">auto</span></code></p></th>
+<th class="head"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Pan-allele affinity</p></td>
+<td><p>✓</p></td>
+<td><p>✓ (pretrain only)</p></td>
+<td><p>Default in release recipe; affinity <code class="docutils literal notranslate"><span class="pre">fit()</span></code> is device-resident</p></td>
+</tr>
+<tr class="row-odd"><td><p>Allele-specific affinity</p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+<td><p>Same <code class="docutils literal notranslate"><span class="pre">Class1NeuralNetwork</span></code> codebase; auto already wired</p></td>
+</tr>
+<tr class="row-even"><td><p>Processing</p></td>
+<td><p>✓</p></td>
+<td><p>n/a</p></td>
+<td><p>Parallel model fits; the processing network has no DataLoader pretraining path.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Presentation</p></td>
+<td><p>✓</p></td>
+<td><p>n/a</p></td>
+<td><p>Parallel feature generation followed by deterministic fitting.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="env-overrides">
+<h3>Env overrides<a class="headerlink" href="#env-overrides" title="Link to this heading"></a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Env var</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Effect</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB</span></code></p></td>
+<td><p>4.0 generic fallback</p></td>
+<td><p>Expert per-worker VRAM override; workload-specific estimates normally replace the fallback.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP</span></code></p></td>
+<td><p>unset</p></td>
+<td><p>Optional expert ceiling for workers per GPU.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB</span></code></p></td>
+<td><p>(auto-detect)</p></td>
+<td><p>Pin free VRAM (CSV per GPU); for tests / hidden-<code class="docutils literal notranslate"><span class="pre">nvidia-smi</span></code> launchers</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MHCFLURRY_AUTO_DATALOADER_HARD_CAP</span></code></p></td>
+<td><p>4</p></td>
+<td><p>DL child cap for <code class="docutils literal notranslate"><span class="pre">auto_dataloader_num_workers</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="env-knobs-vs-cli-flags">
+<h2>Env knobs vs CLI flags<a class="headerlink" href="#env-knobs-vs-cli-flags" title="Link to this heading"></a></h2>
+<p>A persistent question: when does a setting belong on <code class="docutils literal notranslate"><span class="pre">argparse</span></code> vs
+the environment?</p>
+<p><strong>Rule of thumb:</strong></p>
+<ul class="simple">
+<li><p><strong>CLI flag</strong> when the orchestrator owns it and propagates it.
+(Examples: <code class="docutils literal notranslate"><span class="pre">--max-workers-per-gpu</span></code>, <code class="docutils literal notranslate"><span class="pre">--random-negative-pool-epochs</span></code>,
+<code class="docutils literal notranslate"><span class="pre">--num-jobs</span></code>.)</p></li>
+<li><p><strong>Env var with optional CLI relay</strong> when the consumer is inside
+<code class="docutils literal notranslate"><span class="pre">fit()</span></code> or another worker-private code path, and the orchestrator
+only centralizes policy. (Examples: <code class="docutils literal notranslate"><span class="pre">MHCFLURRY_TORCH_COMPILE</span></code>,
+<code class="docutils literal notranslate"><span class="pre">MHCFLURRY_TORCH_COMPILE_LOSS</span></code>, <code class="docutils literal notranslate"><span class="pre">TORCHINDUCTOR_COMPILE_THREADS</span></code>.)</p></li>
+</ul>
+<p>The orchestrator may <strong>hoist</strong> env vars: read its own args, compute a
+sensible default, and put a concrete value in <code class="docutils literal notranslate"><span class="pre">os.environ</span></code> so workers
+inherit it. <code class="docutils literal notranslate"><span class="pre">resolve_local_parallelism_args</span></code> calls
+<code class="docutils literal notranslate"><span class="pre">hoist_torchinductor_compile_threads</span></code> for local runs — it sizes the
+inductor compile pool against the resolved <code class="docutils literal notranslate"><span class="pre">--num-jobs</span></code> so N workers
+don’t each spawn <code class="docutils literal notranslate"><span class="pre">cpu_count()</span></code> compile threads. If
+<code class="docutils literal notranslate"><span class="pre">TORCHINDUCTOR_COMPILE_THREADS=auto</span></code>, the orchestrator replaces it
+with a numeric value before any worker sees it.</p>
+</section>
+<section id="torch-compile-warmup">
+<h2>Torch Compile Warmup<a class="headerlink" href="#torch-compile-warmup" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> is worker-local: the Python wrapper, graph guards, and
+CUDA module handles cannot be shared across processes. What can be
+shared on one machine is the Inductor/Triton on-disk cache. For local
+Pool training, the orchestrator therefore runs one real work item
+first in a one-worker warmup pool with a larger compile-thread budget,
+saves that result, then restores production compile-thread sizing and
+launches the full worker pool.</p>
+<p>Cluster workers are different: they may land on different nodes, so
+mhcflurry does not try to share Inductor cache across a cluster. Each
+cluster worker process auto-sizes <code class="docutils literal notranslate"><span class="pre">TORCHINDUCTOR_COMPILE_THREADS</span></code>
+locally when the env is unset or <code class="docutils literal notranslate"><span class="pre">auto</span></code>. If a scheduler packs multiple
+mhcflurry work items onto one node, set
+<code class="docutils literal notranslate"><span class="pre">MHCFLURRY_CLUSTER_WORKERS_PER_NODE</span></code> so each process uses a fair share
+of cores.</p>
+<p>Compiled losses are enabled by default when <code class="docutils literal notranslate"><span class="pre">MHCFLURRY_TORCH_COMPILE=1</span></code>
+and can be disabled with <code class="docutils literal notranslate"><span class="pre">MHCFLURRY_TORCH_COMPILE_LOSS=0</span></code> or
+<code class="docutils literal notranslate"><span class="pre">--torch-compile-loss</span> <span class="pre">0</span></code>. CUDA workers run a one-op autograd warmup
+before compiling losses to avoid the PyTorch 2.4 / Triton
+<code class="docutils literal notranslate"><span class="pre">invalid</span> <span class="pre">device</span> <span class="pre">context</span></code> failure in the first compiled backward kernel.</p>
+</section>
+<section id="what-is-not-the-orchestrator-s-job">
+<h2>What is NOT the orchestrator’s job<a class="headerlink" href="#what-is-not-the-orchestrator-s-job" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Compiling models (<code class="docutils literal notranslate"><span class="pre">torch.compile</span></code>). Compilation is per-network and
+happens inside <code class="docutils literal notranslate"><span class="pre">fit()</span></code>. The orchestrator only sizes the compile
+worker pool via env.</p></li>
+<li><p>Calling <code class="docutils literal notranslate"><span class="pre">predict()</span></code> on individual alleles. The orchestrator
+builds work items; workers iterate.</p></li>
+<li><p>Validating data shape consistency between work items beyond what
+the worker-side fit/data constructors already check.</p></li>
+</ul>
+</section>
+<section id="recipes">
+<h2>Recipes<a class="headerlink" href="#recipes" title="Link to this heading"></a></h2>
+<section id="adding-a-new-pre-fork-resource">
+<h3>Adding a new pre-fork resource<a class="headerlink" href="#adding-a-new-pre-fork-resource" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Add a <code class="docutils literal notranslate"><span class="pre">_initialize_&lt;name&gt;(args,</span> <span class="pre">all_work_items)</span></code> helper near the
+existing ones in <code class="docutils literal notranslate"><span class="pre">train_pan_allele_models_command.py</span></code>.</p></li>
+<li><p>Stash the result in <code class="docutils literal notranslate"><span class="pre">WORKER_CONTEXT[&quot;&lt;name&gt;&quot;]</span></code>.</p></li>
+<li><p>Document the lookup key. Workers retrieve via
+<code class="docutils literal notranslate"><span class="pre">constant_data[&quot;&lt;name&gt;&quot;]</span></code> (forked workers inherit; spawned workers receive
+one initializer payload per process; cluster workers receive the serialized
+context through the shared filesystem).</p></li>
+<li><p>Add a <code class="docutils literal notranslate"><span class="pre">getattr(args,</span> <span class="pre">&quot;&lt;flag&gt;&quot;,</span> <span class="pre">None)</span></code> gate so the helper is opt-in
+on the CLI side.</p></li>
+</ol>
+</section>
+<section id="adding-a-new-env-knob">
+<h3>Adding a new env knob<a class="headerlink" href="#adding-a-new-env-knob" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Decide: orchestrator-set or worker-private?</p></li>
+<li><p>If orchestrator-set: add a <code class="docutils literal notranslate"><span class="pre">_hoist_&lt;knob&gt;(args)</span></code> helper that reads
+args + system info and <code class="docutils literal notranslate"><span class="pre">os.environ.setdefault(...)</span></code>s the value.
+Document the rule the orchestrator applies.</p></li>
+<li><p>If worker-private: just read it from <code class="docutils literal notranslate"><span class="pre">os.environ</span></code> inside <code class="docutils literal notranslate"><span class="pre">fit()</span></code>
+or wherever it’s consumed. Document it in
+<code class="docutils literal notranslate"><span class="pre">RELEASE_NOTES_&lt;version&gt;.md</span></code>.</p></li>
+</ol>
+</section>
+<section id="adding-a-new-worker-side-filter">
+<h3>Adding a new worker-side filter<a class="headerlink" href="#adding-a-new-worker-side-filter" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Drop into <code class="docutils literal notranslate"><span class="pre">mhcflurry/common.py</span></code> (e.g.,
+<code class="docutils literal notranslate"><span class="pre">filter_canonicalizable_alleles</span></code>).</p></li>
+<li><p>Apply at every iteration site that could trip on the bad input.
+The 2.3.0 application sites are calibrate (affinity + presentation
+paths) and select (pan-allele + allele-specific paths).</p></li>
+</ol>
+</section>
+</section>
+<section id="fit-time-data-flow">
+<h2>Fit-time data flow<a class="headerlink" href="#fit-time-data-flow" title="Link to this heading"></a></h2>
+<p>Affinity training has two configuration knobs that are deliberately
+configured separately. Do not collapse these into one.</p>
+<section id="peptide-amino-acid-vector-lookup">
+<h3>1. Peptide amino-acid vector lookup<a class="headerlink" href="#peptide-amino-acid-vector-lookup" title="Link to this heading"></a></h3>
+<p>Controlled by the model hyperparameter
+<code class="docutils literal notranslate"><span class="pre">peptide_amino_acid_encoding_torch</span></code>.</p>
+<p>When enabled (the default), peptide strings are encoded as <code class="docutils literal notranslate"><span class="pre">(N,</span> <span class="pre">L)</span></code>
+integer amino-acid indices. The model owns a frozen torch buffer for
+the configured vector encoding (<code class="docutils literal notranslate"><span class="pre">BLOSUM62</span></code>, <code class="docutils literal notranslate"><span class="pre">PMBEC</span></code>, <code class="docutils literal notranslate"><span class="pre">simons1999_contact</span></code>,
+or combinations), moves that buffer with <code class="docutils literal notranslate"><span class="pre">.to(device)</span></code>, and widens
+indices to <code class="docutils literal notranslate"><span class="pre">(N,</span> <span class="pre">L,</span> <span class="pre">V)</span></code> inside <code class="docutils literal notranslate"><span class="pre">forward()</span></code> using
+<code class="docutils literal notranslate"><span class="pre">torch.nn.functional.embedding</span></code>.</p>
+<p>This path is device agnostic: CUDA, MPS, and CPU all execute the same
+torch embedding operation on the active device. It is model semantics,
+not DataLoader behavior.</p>
+<p>Disable it only with <code class="docutils literal notranslate"><span class="pre">peptide_amino_acid_encoding_torch=False</span></code>, which
+restores the old path where numpy expands peptide strings into
+<code class="docutils literal notranslate"><span class="pre">(N,</span> <span class="pre">L,</span> <span class="pre">V)</span></code> vectors before they are moved to the device.</p>
+</section>
+<section id="pretrain-dataloader-process-parallelism">
+<h3>2. Pretrain DataLoader process parallelism<a class="headerlink" href="#pretrain-dataloader-process-parallelism" title="Link to this heading"></a></h3>
+<p>Controlled by the model hyperparameter <code class="docutils literal notranslate"><span class="pre">dataloader_num_workers</span></code>.</p>
+<p>This applies to the pretrain streaming path
+(<code class="docutils literal notranslate"><span class="pre">fit_streaming_batches</span></code>) only. It is pure process-count policy
+for the pretrain data pipeline:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>value</p></th>
+<th class="head"><p>meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">0</span></code></p></td>
+<td><p>build batches in the training worker process</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&gt;0</span></code></p></td>
+<td><p>spawn that many DataLoader child processes per training worker</p></td>
+</tr>
+</tbody>
+</table>
+<p>Release recipes set only this knob. On a local 8-GPU run with
+<code class="docutils literal notranslate"><span class="pre">NUM_JOBS=16</span></code>, <code class="docutils literal notranslate"><span class="pre">dataloader_num_workers=1</span></code> means up to 16 extra
+fit-local DataLoader children while pretrain epochs are active; <code class="docutils literal notranslate"><span class="pre">2</span></code>
+means up to 32. The thread-budget helper accounts for this when sizing
+<code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS</span></code>, <code class="docutils literal notranslate"><span class="pre">MKL_NUM_THREADS</span></code>, and <code class="docutils literal notranslate"><span class="pre">OPENBLAS_NUM_THREADS</span></code>.
+Caller-provided values remain authoritative and are not replaced by the
+planner’s uniform runtime limit. For serial (<code class="docutils literal notranslate"><span class="pre">num_jobs=0</span></code>) execution, an
+auto-owned budget is applied directly to the current native and PyTorch pools
+because there is no worker initializer.</p>
+<p>The affinity <code class="docutils literal notranslate"><span class="pre">fit()</span></code> path does not use a DataLoader and therefore
+ignores this hyperparameter.</p>
+</section>
+<section id="component-consistency">
+<h3>Component consistency<a class="headerlink" href="#component-consistency" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">Class1NeuralNetwork</span></code> affinity component model owns both
+hyperparameters above, so allele-specific affinity models, pan-allele
+affinity models, and affinity ensembles resolve the same internal rules
+after config load. Missing keys in old component configs are filled
+from defaults (<code class="docutils literal notranslate"><span class="pre">peptide_amino_acid_encoding_torch=True</span></code>,
+<code class="docutils literal notranslate"><span class="pre">dataloader_num_workers=0</span></code>).</p>
+<p>Processing models do not use the affinity <code class="docutils literal notranslate"><span class="pre">fit()</span></code> row layout and
+therefore have no <code class="docutils literal notranslate"><span class="pre">AffinityDeviceTrainingData</span></code>.</p>
+</section>
+</section>
+<section id="rsync-hygiene-laptop-remote-training-box">
+<h2>rsync hygiene (laptop ↔ remote training box)<a class="headerlink" href="#rsync-hygiene-laptop-remote-training-box" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">runplz</span></code> rsyncs the working tree up to the box on every launch, and
+the run’s <code class="docutils literal notranslate"><span class="pre">out/</span></code> directory back to the laptop on completion. Two
+asymmetries to know about:</p>
+<ul class="simple">
+<li><p><strong>Up direction:</strong> runplz’s hardcoded exclude list (<code class="docutils literal notranslate"><span class="pre">.git</span></code>, <code class="docutils literal notranslate"><span class="pre">.venv</span></code>,
+<code class="docutils literal notranslate"><span class="pre">__pycache__</span></code>, etc.) doesn’t anticipate per-project output dirs.
+In mhcflurry, <code class="docutils literal notranslate"><span class="pre">brev_runs/</span></code> accumulates 7-15 GB of past-run
+artifacts that ride along on every launch unless relocated. Run
+<code class="docutils literal notranslate"><span class="pre">bash</span> <span class="pre">scripts/dev/relocate_run_outputs.sh</span> <span class="pre">--apply</span></code> once to move
+<code class="docutils literal notranslate"><span class="pre">brev_runs/</span></code> and <code class="docutils literal notranslate"><span class="pre">results/</span></code> to <code class="docutils literal notranslate"><span class="pre">~/mhcflurry-brev-runs/</span></code> and
+<code class="docutils literal notranslate"><span class="pre">~/mhcflurry-results/</span></code>, with symlinks back into the repo. After
+that, rsync ships ~tiny symlinks instead of multi-GB directories.</p></li>
+<li><p><strong>Down direction:</strong> the post-run rsync has NO excludes — everything
+under <code class="docutils literal notranslate"><span class="pre">out/</span></code> returns. Keep large throwaway run artifacts outside
+<code class="docutils literal notranslate"><span class="pre">out/</span></code> unless they are meant to ship back.</p></li>
+</ul>
+</section>
+<section id="pointers-to-code">
+<h2>Pointers to code<a class="headerlink" href="#pointers-to-code" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Random-negative planning and pooling: <code class="docutils literal notranslate"><span class="pre">mhcflurry/random_negative_peptides.py</span></code></p></li>
+<li><p>Affinity device-resident row space:
+<code class="docutils literal notranslate"><span class="pre">mhcflurry/class1_affinity_training_data.py</span></code> (<code class="docutils literal notranslate"><span class="pre">AffinityDeviceTrainingData</span></code>)</p></li>
+<li><p>Pseudogene/null filter: <code class="docutils literal notranslate"><span class="pre">mhcflurry/common.py</span></code>
+(<code class="docutils literal notranslate"><span class="pre">filter_canonicalizable_alleles</span></code>)</p></li>
+<li><p>Worker pool sizing: <code class="docutils literal notranslate"><span class="pre">mhcflurry/parallelism</span></code>
+(<code class="docutils literal notranslate"><span class="pre">auto_max_workers_per_gpu</span></code>, <code class="docutils literal notranslate"><span class="pre">resolve_max_workers_per_gpu</span></code>)</p></li>
+<li><p>Compile-thread hoist:
+<code class="docutils literal notranslate"><span class="pre">mhcflurry.parallelism.hoist_torchinductor_compile_threads</span></code></p></li>
+<li><p>Cluster fork point:
+<code class="docutils literal notranslate"><span class="pre">mhcflurry/cluster_parallelism.cluster_results</span></code></p></li>
+</ul>
+</section>
+<section id="known-asymmetries-deliberate">
+<h2>Known asymmetries (deliberate)<a class="headerlink" href="#known-asymmetries-deliberate" title="Link to this heading"></a></h2>
+<p>These show up to readers as “why is this only done in pan-allele?”
+The answer in each case is “the other components don’t yet need it
+and adding it would be feature work, not a fix”:</p>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></strong> is off by default everywhere; opt-in via
+<code class="docutils literal notranslate"><span class="pre">MHCFLURRY_TORCH_COMPILE=1</span></code> or <code class="docutils literal notranslate"><span class="pre">--torch-compile</span> <span class="pre">1</span></code>. When enabled,
+the shared local-parallelism layer owns compile-thread sizing and
+local one-worker cache warmup for affinity and processing trainers.
+Presentation fitting is a separate model family and does not enter
+this central torch-training path.</p></li>
+</ul>
+</section>
+<section id="future-tightening-not-in-2-3-0">
+<h2>Future tightening (not in 2.3.0)<a class="headerlink" href="#future-tightening-not-in-2-3-0" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Presentation-training orchestration.</strong> Today
+<code class="docutils literal notranslate"><span class="pre">train_presentation_models_command</span></code> runs single-process; mirror the
+pan-allele orchestration shape if presentation retraining becomes
+GPU-bound.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="development.html" class="btn btn-neutral float-left" title="Development" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="maintainers.html" class="btn btn-neutral float-right" title="Maintainer workflows" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Jul 24, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

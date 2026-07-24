@@ -1,0 +1,315 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Command-line tutorial &mdash; MHCflurry 2.3.0rc19 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=0fe4ac82"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Python library tutorial" href="python_tutorial.html" />
+    <link rel="prev" title="Introduction and installation" href="intro.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Command-line tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#download-models">Download models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#predict-peptides">Predict peptides</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#alleles-genotypes-and-samples">Alleles, genotypes, and samples</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#scanning-protein-sequences-for-predicted-mhc-i-ligands">Scanning protein sequences for predicted MHC I ligands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#training-models">Training models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#evaluating-trained-models">Evaluating trained models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#using-older-allele-specific-models">Using older allele-specific models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#configuration-and-command-reference">Configuration and command reference</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Command-line tutorial</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/commandline_tutorial.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="command-line-tutorial">
+<span id="commandline-tutorial"></span><h1>Command-line tutorial<a class="headerlink" href="#command-line-tutorial" title="Link to this heading"></a></h1>
+<p>This tutorial follows the common workflow: download the released models, score
+peptides, then scan proteins for candidate ligands. Most users can stop there;
+training, evaluation, configuration, and exhaustive flag descriptions are
+linked later.</p>
+<section id="download-models">
+<span id="downloading-models"></span><span id="downloading"></span><h2>Download models<a class="headerlink" href="#download-models" title="Link to this heading"></a></h2>
+<p>Most users need only the presentation bundle. It includes the binding-affinity
+and antigen-processing components:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>mhcflurry<span class="w"> </span>downloads<span class="w"> </span>fetch<span class="w"> </span>models_class1_presentation
+</pre></div>
+</div>
+<p>Downloads are stored outside the Python package in a platform-specific data
+directory. Use <code class="docutils literal notranslate"><span class="pre">info</span></code> to list available bundles and <code class="docutils literal notranslate"><span class="pre">path</span></code> to locate one:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ mhcflurry downloads path models_class1_presentation
+/home/runner/work/mhcflurry/mhcflurry/.mhcflurry-data/2.2.0/models_class1_presentation/
+</pre></div>
+</div>
+</section>
+<section id="predict-peptides">
+<h2>Predict peptides<a class="headerlink" href="#predict-peptides" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">predict</span></code> scores individual peptides with the downloaded models:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ mhcflurry predict --alleles HLA-A0201 HLA-A0301 --peptides SIINFEKL SIINFEKD SIINFEKQ --out /tmp/predictions.csv
+Predicting processing.
+Predicting affinities.
+</pre></div>
+</div>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ cat /tmp/predictions.csv
+allele,peptide,mhcflurry_affinity,mhcflurry_affinity_percentile,mhcflurry_processing_score,mhcflurry_presentation_score,mhcflurry_presentation_percentile
+HLA-A0201,SIINFEKL,11927.164294664875,6.296000000000002,0.26470962166786194,0.020690202037635795,11.6303260869565
+HLA-A0201,SIINFEKD,30039.7732437649,41.398,0.024963298812508583,0.00367440114530976,99.28660326086957
+HLA-A0201,SIINFEKQ,28026.90603463826,30.226250000000004,0.0615493506193161,0.004470086908147677,62.74467391304348
+HLA-A0301,SIINFEKL,29871.588371336024,23.19225,0.26470959186553955,0.00858619019343956,27.61739130434782
+HLA-A0301,SIINFEKD,33158.80995716571,62.27625,0.024963300675153732,0.003339329916496058,99.28660326086957
+HLA-A0301,SIINFEKQ,29705.410284325066,21.8915,0.0615493506193161,0.004225575360616951,62.74467391304348
+</pre></div>
+</div>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Output</p></th>
+<th class="head"><p>Interpretation</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mhcflurry_affinity</span></code></p></td>
+<td><p>Predicted nM affinity; lower is stronger.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mhcflurry_affinity_percentile</span></code></p></td>
+<td><p>Allele-specific rank from 0–100; lower is stronger.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mhcflurry_processing_score</span></code></p></td>
+<td><p>Allele-independent processing score; higher is stronger.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mhcflurry_presentation_score</span></code></p></td>
+<td><p>Combined binding and processing score; higher is stronger.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Affinity thresholds of 500 nM or 2nd percentile are common screening choices.
+Presentation scores are useful for ranking candidates, but there is no
+universal presentation-score threshold.</p>
+<p>Allele names are parsed as sequence-resolved MHC class I alleles. Invalid,
+ambiguous, class-II, pseudogene, null, or unsupported names produce a specific
+error. Add <code class="docutils literal notranslate"><span class="pre">--no-throw</span></code> when processing mixed-quality tables to keep those rows
+with <code class="docutils literal notranslate"><span class="pre">NaN</span></code> predictions instead.</p>
+<section id="alleles-genotypes-and-samples">
+<span id="allele-input-semantics"></span><h3>Alleles, genotypes, and samples<a class="headerlink" href="#alleles-genotypes-and-samples" title="Link to this heading"></a></h3>
+<p>MHCflurry treats each allele argument or CSV cell as one query. Delimiters
+inside a query (<code class="docutils literal notranslate"><span class="pre">;</span></code>, <code class="docutils literal notranslate"><span class="pre">,</span></code>, or whitespace) combine alleles into one genotype;
+separate command-line arguments remain separate queries.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Input</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--alleles</span> <span class="pre">A0201</span> <span class="pre">A0301</span> <span class="pre">--peptides</span> <span class="pre">P1</span> <span class="pre">P2</span></code></p></td>
+<td><p>Four independent allele–peptide rows.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">--alleles</span> <span class="pre">'A0201;A0301'</span> <span class="pre">--peptides</span> <span class="pre">P1</span> <span class="pre">P2</span></code></p></td>
+<td><p>Two genotype–peptide rows; <code class="docutils literal notranslate"><span class="pre">best_allele</span></code> identifies the stronger allele.</p></td>
+</tr>
+<tr class="row-even"><td><p>CSV rows <code class="docutils literal notranslate"><span class="pre">P1,A0201</span></code> and <code class="docutils literal notranslate"><span class="pre">P1,A0301</span></code></p></td>
+<td><p>Two independent rows.</p></td>
+</tr>
+<tr class="row-odd"><td><p>CSV row <code class="docutils literal notranslate"><span class="pre">P1,A0201;A0301</span></code></p></td>
+<td><p>One genotype row with the strongest allele reported.</p></td>
+</tr>
+</tbody>
+</table>
+<p><code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">predict-scan</span></code> uses the same rule: each <code class="docutils literal notranslate"><span class="pre">--alleles</span></code> argument names
+one sample. A quoted comma-separated panel is scored as one group and reports
+the best allele across that group; separate arguments keep per-allele or
+per-genotype results. A large population panel is therefore not the same thing
+as one person’s genotype.</p>
+<p>For CSV prediction, optional <code class="docutils literal notranslate"><span class="pre">n_flank</span></code> and <code class="docutils literal notranslate"><span class="pre">c_flank</span></code> columns provide source
+protein context for cleavage prediction. See the
+<a class="reference internal" href="commandline_tools.html#ref-mhcflurry-predict"><span class="std std-ref">command reference</span></a> for the complete input schema.</p>
+</section>
+</section>
+<section id="scanning-protein-sequences-for-predicted-mhc-i-ligands">
+<h2>Scanning protein sequences for predicted MHC I ligands<a class="headerlink" href="#scanning-protein-sequences-for-predicted-mhc-i-ligands" title="Link to this heading"></a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">predict-scan</span></code> to score every supported peptide window in a
+protein sequence.</p>
+<p>We’ll generate predictions across <code class="docutils literal notranslate"><span class="pre">example.fasta</span></code>, a FASTA file with two short
+sequences:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span><span class="n">protein1</span>
+<span class="n">MSSSSTPVCPNGPGNCQV</span>
+<span class="o">&gt;</span><span class="n">protein2</span>
+<span class="n">MVENKRLLEGMEMIFGQVIPGA</span>
+</pre></div>
+</div>
+<p>This invocation keeps peptides predicted to bind at 100 nM or tighter:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>mhcflurry<span class="w"> </span>predict-scan<span class="w"> </span>example.fasta<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--alleles<span class="w"> </span>HLA-A*02:01<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--threshold-affinity<span class="w"> </span><span class="m">100</span>
+</pre></div>
+</div>
+<p>See the <a class="reference internal" href="commandline_tools.html#ref-mhcflurry-predict-scan"><span class="std std-ref">command reference</span></a> for FASTA/CSV
+input, presentation-score filtering, peptide lengths, and output options.</p>
+</section>
+<section id="training-models">
+<h2>Training models<a class="headerlink" href="#training-models" title="Link to this heading"></a></h2>
+<p>Training is an advanced workflow; most users should use the released models.
+If you have custom measurements, choose the smallest workflow that matches the
+data:</p>
+<ul class="simple">
+<li><p>allele-specific affinity models for one or a few well-covered alleles;</p></li>
+<li><p>pan-allele affinity models for measurements spanning many alleles; or</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">train</span> <span class="pre">pan-allele-release</span></code> for a complete retrain, selection,
+calibration, and evaluation run.</p></li>
+</ul>
+<p>The <a class="reference internal" href="training.html"><span class="doc">Training models</span></a> guide covers input schemas, hyperparameters, output bundles,
+and release-style training without interrupting this prediction tutorial.</p>
+</section>
+<section id="evaluating-trained-models">
+<h2>Evaluating trained models<a class="headerlink" href="#evaluating-trained-models" title="Link to this heading"></a></h2>
+<p>After fitting a model, compare it with a released predictor before using it as a
+default. A local comparison and diagnostic PDF take two commands:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>mhcflurry<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>compare-models<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--a<span class="w"> </span>results/new_run/<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--b<span class="w"> </span>public<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--out<span class="w"> </span>results/new_run/eval_comparison/
+
+$<span class="w"> </span>mhcflurry<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>plot-comparison<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--input<span class="w"> </span>results/new_run/eval_comparison/<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--summary-pdf<span class="w"> </span>results/new_run/eval_comparison/plots/model_comparison_figures.pdf
+</pre></div>
+</div>
+<p>The <a class="reference internal" href="evaluation.html"><span class="doc">Evaluating trained models</span></a> guide explains the output layers, saved-prediction schema,
+paper-style figures, and remote release behavior.</p>
+</section>
+<section id="using-older-allele-specific-models">
+<h2>Using older allele-specific models<a class="headerlink" href="#using-older-allele-specific-models" title="Link to this heading"></a></h2>
+<p>MHCflurry still distributes the allele-specific predictors described in the
+2018 paper. Download them and pass their model directory explicitly:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>mhcflurry<span class="w"> </span>downloads<span class="w"> </span>fetch<span class="w"> </span>models_class1
+$<span class="w"> </span>mhcflurry<span class="w"> </span>predict<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--alleles<span class="w"> </span>HLA-A0201<span class="w"> </span>HLA-A0301<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--peptides<span class="w"> </span>SIINFEKL<span class="w"> </span>SIINFEKD<span class="w"> </span>SIINFEKQ<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--models<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>mhcflurry<span class="w"> </span>downloads<span class="w"> </span>path<span class="w"> </span>models_class1<span class="k">)</span><span class="s2">/models&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--out<span class="w"> </span>/tmp/predictions.csv
+</pre></div>
+</div>
+<p>Use the current pan-allele presentation bundle unless you specifically need
+these historical models.</p>
+</section>
+<section id="configuration-and-command-reference">
+<h2>Configuration and command reference<a class="headerlink" href="#configuration-and-command-reference" title="Link to this heading"></a></h2>
+<p>See <a class="reference internal" href="configuration.html"><span class="doc">Configuration and performance</span></a> for prediction batches, hardware autosizing,
+reproducibility, and unified command aliases. The complete generated argument
+reference is in <a class="reference internal" href="commandline_tools.html"><span class="doc">Command-line reference</span></a>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="intro.html" class="btn btn-neutral float-left" title="Introduction and installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="python_tutorial.html" class="btn btn-neutral float-right" title="Python library tutorial" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Jul 24, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
