@@ -53,7 +53,7 @@ from .affinity import calibration_sizing, model_selection, persistence
 DEFAULT_CENTRALITY_MEASURE = "mean"
 
 # Any value > 0 will result in attempting to optimize models after loading.
-OPTIMIZATION_LEVEL = int(environ.get("MHCFLURRY_OPTIMIZATION_LEVEL", 1))
+OPTIMIZATION_LEVEL = int(environ.get("MHCFLURRY_OPTIMIZATION_LEVEL", "1"))
 
 
 class Class1AffinityPredictor(object):
@@ -1038,7 +1038,7 @@ class Class1AffinityPredictor(object):
             allele=None,
             throw=True,
             centrality_measure=DEFAULT_CENTRALITY_MEASURE,
-            model_kwargs={}):
+            model_kwargs=None):
         """
         Predict nM binding affinities.
 
@@ -1068,6 +1068,8 @@ class Class1AffinityPredictor(object):
         -------
         numpy.array of predictions
         """
+        if model_kwargs is None:
+            model_kwargs = {}
         df = self.predict_to_dataframe(
             peptides=peptides,
             alleles=alleles,
@@ -1332,7 +1334,7 @@ class Class1AffinityPredictor(object):
             include_percentile_ranks=True,
             include_confidence_intervals=True,
             centrality_measure=DEFAULT_CENTRALITY_MEASURE,
-            model_kwargs={}):
+            model_kwargs=None):
         """
         Predict nM binding affinities. Gives more detailed output than `predict`
         method, including 5-95% prediction intervals.
@@ -1371,6 +1373,8 @@ class Class1AffinityPredictor(object):
         -------
         `pandas.DataFrame` of predictions
         """
+        if model_kwargs is None:
+            model_kwargs = {}
         if isinstance(peptides, str):
             raise TypeError("peptides must be a list or array, not a string")
         if isinstance(alleles, str):
@@ -1640,9 +1644,9 @@ class Class1AffinityPredictor(object):
             alleles=None,
             bins=None,
             motif_summary=False,
-            summary_top_peptide_fractions=[0.001],
+            summary_top_peptide_fractions=None,
             verbose=False,
-            model_kwargs={}):
+            model_kwargs=None):
         """
         Compute the cumulative distribution of ic50 values for a set of alleles
         over a large universe of random peptides, to enable taking quantiles
@@ -1683,6 +1687,10 @@ class Class1AffinityPredictor(object):
         "length_distributions". Otherwise it will be empty.
 
         """
+        if summary_top_peptide_fractions is None:
+            summary_top_peptide_fractions = [0.001]
+        if model_kwargs is None:
+            model_kwargs = {}
         if bins is None:
             bins = to_ic50(numpy.linspace(1, 0, 1000))
 

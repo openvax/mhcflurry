@@ -861,9 +861,13 @@ def class1_affinity_calibrate_percentile_ranks(
         predictor,
         peptides=None,
         motif_summary=False,
-        summary_top_peptide_fractions=[0.001],
+        summary_top_peptide_fractions=None,
         verbose=False,
-        model_kwargs={}):
+        model_kwargs=None):
+    if summary_top_peptide_fractions is None:
+        summary_top_peptide_fractions = [0.001]
+    if model_kwargs is None:
+        model_kwargs = {}
     if verbose:
         print("Calibrating", allele)
     predictor.optimize()  # since we loaded with optimization_level=0

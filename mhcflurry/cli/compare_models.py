@@ -70,6 +70,7 @@ from ..parallelism import (
 )
 from ..pytorch_sizing import default_prediction_batch_is_auto
 from ..pseudosequences import LEGACY_ALLELE_SEQUENCES_FILENAME
+from ..release_holdout import load_excluded_samples
 from ..workload_planning import (
     WORKLOAD_AFFINITY_INFERENCE,
     WORKLOAD_PROCESSING_INFERENCE,
@@ -212,6 +213,14 @@ def register_subparser(parser):
         help=(
             "data_evaluation directory. Defaults to the currently-installed "
             "data_evaluation download."
+        ),
+    )
+    parser.add_argument(
+        "--release-holdout-dir",
+        help=(
+            "Release holdout manifest directory. When specified, affinity, "
+            "processing, and presentation benchmarks are restricted to their "
+            "frozen evaluation sample manifests."
         ),
     )
     parser.add_argument(
@@ -1050,6 +1059,29 @@ def _load_affinity_benchmark(data_dir, source, limit_files):
     return pandas.concat(dfs, ignore_index=True)
 
 
+def _filter_release_holdout_samples(frame, args, component):
+    """Restrict a benchmark to its frozen release-evaluation samples."""
+    if not args.release_holdout_dir:
+        return frame
+    filenames = {
+        "affinity": "affinity_samples.csv",
+        "processing": "processing_samples.csv",
+        "presentation": "presentation_samples.csv",
+    }
+    path = os.path.join(args.release_holdout_dir, filenames[component])
+    samples = load_excluded_samples(path)
+    sample_ids = frame.sample_id.astype(str)
+    result = frame.loc[sample_ids.isin(samples)].copy()
+    if result.empty:
+        raise ValueError(
+            "Release holdout selected no %s benchmark rows using %s" % (
+                component, path))
+    _stamp(
+        "  release holdout %s: %d rows, %d samples" % (
+            component, len(result), result.sample_id.nunique()))
+    return result
+
+
 def _run_affinity(side_a, side_b, args):
     component_dir = os.path.join(args.out, "affinity")
     os.makedirs(component_dir, exist_ok=True)
@@ -1058,6 +1090,7 @@ def _run_affinity(side_a, side_b, args):
     data_dir = args.data_dir or _default_data_evaluation_dir()
     test = _load_affinity_benchmark(
         data_dir, args.affinity_source, args.limit_files)
+    test = _filter_release_holdout_samples(test, args, "affinity")
     _require_complete_benchmark_rows(
         test, ("peptide", "hla", "hit"), "Affinity benchmark")
     try:
@@ -1341,6 +1374,8 @@ def _run_processing(side_a, side_b, args):
     processing_args = _parallelism_args_for_component(args, "processing")
     data_dir = args.data_dir or _default_data_evaluation_dir()
     benchmark = _load_presentation_benchmark(data_dir, args.limit_files)
+    benchmark = _filter_release_holdout_samples(
+        benchmark, args, "processing")
     summaries = {}
     summary_rows = []
     for mode in requested_modes:
@@ -1848,6 +1883,8 @@ def _run_presentation(side_a, side_b, args):
         args.presentation_modes, PRESENTATION_MODES, "--presentation-modes")
 
     benchmark = _load_presentation_benchmark(data_dir, args.limit_files)
+    benchmark = _filter_release_holdout_samples(
+        benchmark, args, "presentation")
     summaries = {}
     summary_rows = []
     presentation_args = _parallelism_args_for_component(args, "presentation")

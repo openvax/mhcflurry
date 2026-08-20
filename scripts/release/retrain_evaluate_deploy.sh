@@ -726,6 +726,8 @@ run_dir_matches_workflow() {
 run_dir_has_synced_brev_outputs() {
     run_dir_matches_workflow || return 1
     run_dir_has_model_artifacts || return 1
+    [ -f "$RUN_DIR/release_holdout/policy.json" ] || return 1
+    [ -f "$RUN_DIR/release_holdout/validation.json" ] || return 1
     if [ "${BREV_EXPECT_REMOTE_EVAL:-0}" = "1" ] && \
             [ ! -d "$RUN_DIR/eval_comparison" ]; then
         return 1
@@ -1248,6 +1250,7 @@ compare_args=(
     --b "${COMPARE_BASELINE:-public:2.0.0}" \
     --b-label "${COMPARE_BASELINE_LABEL:-MHCflurry 2.0}" \
     --data-dir "$data_dir" \
+    --release-holdout-dir "$run_dir/release_holdout" \
     --include "${COMPARE_INCLUDE:-affinity,processing,presentation}" \
     --processing-modes "${PROCESSING_MODES:-with_flanks,no_flank,short_flanks}" \
     --presentation-modes "${PRESENTATION_MODES:-with_flanks,without_flanks}" \
@@ -1509,6 +1512,8 @@ add_path affinity/select.log
 add_path affinity/train.log
 add_glob affinity/LOG-worker.*.txt
 
+add_path release_holdout
+
 add_glob processing/models.selected.*
 add_path processing/hits_with_tpm.csv.bz2
 add_path processing/gpu_occupancy.csv
@@ -1520,6 +1525,7 @@ add_glob processing/LOG-worker.*.txt
 add_path presentation/models
 add_path presentation/gpu_occupancy.csv
 add_path presentation/make_train_data.presentation.py
+add_path presentation/train_data.csv.bz2
 
 sort -u "$manifest" -o "$manifest"
 tar -cjf "$archive" -T "$manifest"
@@ -2569,6 +2575,7 @@ if [ "$SKIP_EVAL" != "1" ]; then
             --b "$COMPARE_BASELINE"
             --b-label "$COMPARE_BASELINE_LABEL"
             --data-dir "$DATA_DIR"
+            --release-holdout-dir "$RUN_DIR/release_holdout"
             --include "$COMPARE_INCLUDE"
             --processing-modes "$PROCESSING_MODES"
             --presentation-modes "$PRESENTATION_MODES"

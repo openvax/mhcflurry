@@ -47,6 +47,7 @@ from mhcflurry.proteome_decoys import (
     peptides_by_length_from_frame,
     sample_peptide_frame_for_accessions,
 )
+from mhcflurry.release_holdout import exclude_samples
 from mhcflurry.cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
@@ -148,6 +149,9 @@ parser.add_argument(
 parser.add_argument(
     "--exclude-contig",
     help="Exclude entries annotated to the given contig")
+parser.add_argument(
+    "--exclude-samples-file",
+    help="Generated release-holdout CSV of sample_id values to exclude")
 parser.add_argument(
     "--out",
     metavar="CSV",
@@ -309,6 +313,9 @@ def run():
     print("Loaded hits from %d samples" % hit_df.sample_id.nunique())
     hit_df = hit_df.loc[hit_df.format == "MONOALLELIC"].copy()
     print("Subselected to %d monoallelic samples" % hit_df.sample_id.nunique())
+    if args.exclude_samples_file:
+        hit_df = exclude_samples(
+            hit_df, args.exclude_samples_file, "processing")
     hit_df["allele"] = hit_df.hla.map(canonicalize_processing_allele)
     hit_df = hit_df.loc[~hit_df.allele.isnull()].copy()
     print(

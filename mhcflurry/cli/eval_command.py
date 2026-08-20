@@ -581,6 +581,10 @@ def _make_paper_figures_run_parser(prog):
         help="data_evaluation directory. Defaults to installed data_evaluation.",
     )
     parser.add_argument(
+        "--release-holdout-dir",
+        help="Frozen release-evaluation sample manifests for compare-models.",
+    )
+    parser.add_argument(
         "--include",
         default="auto",
         help="compare-models component subset. Default: %(default)s.",
@@ -677,6 +681,7 @@ def _run_paper_figures_pipeline(args):
             (args.a_label, "--a-label"),
             (args.b_label, "--b-label"),
             (args.data_dir, "--data-dir"),
+            (args.release_holdout_dir, "--release-holdout-dir"),
             (args.limit_files, "--limit-files")]:
         if source is not None:
             compare_argv.extend([flag, str(source)])

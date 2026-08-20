@@ -3479,7 +3479,13 @@ class Class1NeuralNetwork(object):
             n_train_epoch = int(train_indices_dev_full.shape[0])
             full_batch_count = (n_train_epoch // batch_size) * batch_size
 
-            def prepared_device_batches():
+            def prepared_device_batches(
+                    full_batch_count=full_batch_count,
+                    train_indices_dev_full=train_indices_dev_full,
+                    batch_size=batch_size,
+                    network=network,
+                    n_train_epoch=n_train_epoch,
+                    eager_network=eager_network):
                 # --- Device-resident inner loop ---
                 # No DataLoader, no per-batch H2D. Indices live on device;
                 # batches are built by index_select into the combined

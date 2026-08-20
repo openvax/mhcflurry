@@ -333,7 +333,7 @@ def run(argv=sys.argv[1:]):
             models = result['selected_models']
             summary_df = result['summary'].copy()
             summary_df.index = summary_df.index.map(
-                lambda idx: all_models_for_fold[idx])
+                lambda idx, models=all_models_for_fold: models[idx])
             summary_dfs.append(summary_df)
 
             print("Selected %d models for fold %d: %s" % (

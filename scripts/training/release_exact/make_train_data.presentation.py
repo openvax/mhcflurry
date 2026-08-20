@@ -34,6 +34,7 @@ from mhcflurry.proteome_decoys import (
     peptides_by_length_from_frame,
     sample_peptide_frame_for_accessions,
 )
+from mhcflurry.release_holdout import exclude_samples
 
 parser = argparse.ArgumentParser(usage=__doc__)
 
@@ -75,6 +76,9 @@ parser.add_argument(
     nargs="+",
     default=[],
     help="Remove hits and decoys included in the given training data")
+parser.add_argument(
+    "--exclude-samples-file",
+    help="Generated release-holdout CSV of sample_id values to exclude")
 parser.add_argument(
     "--only-format",
     choices=("MONOALLELIC", "MULTIALLELIC"),
@@ -124,6 +128,10 @@ def run():
         hit_df = hit_df.loc[hit_df.format == args.only_format].copy()
         print("Subselected to %d %s samples" % (
             hit_df.sample_id.nunique(), args.only_format))
+
+    if args.exclude_samples_file:
+        hit_df = exclude_samples(
+            hit_df, args.exclude_samples_file, "presentation")
 
     if args.only_pmid or args.exclude_pmid:
         assert not (args.only_pmid and args.exclude_pmid)

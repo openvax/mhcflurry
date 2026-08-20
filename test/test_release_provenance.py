@@ -11,6 +11,8 @@
 # limitations under the License.
 
 import importlib.util
+import hashlib
+import json
 import pathlib
 import subprocess
 
@@ -51,9 +53,44 @@ def write_model_info(run_dir, version, commit=None, workflow_id="run-123"):
         )
 
 
+def sha256(path):
+    digest = hashlib.sha256()
+    digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def write_holdout_proof(run_dir, overlap=0):
+    holdout_dir = run_dir / "release_holdout"
+    holdout_dir.mkdir(parents=True, exist_ok=True)
+    records = {}
+    for filename in (
+            "affinity_pmhcs.csv",
+            "affinity_samples.csv",
+            "processing_samples.csv",
+            "presentation_samples.csv"):
+        path = holdout_dir / filename
+        path.write_text("value\n")
+        records[filename] = {"rows": 0, "sha256": sha256(path)}
+    policy_path = holdout_dir / "policy.json"
+    policy_path.write_text(json.dumps({
+        "schema_version": 1,
+        "evaluation_hit_counts": {"monoallelic": 1, "multiallelic": 1},
+        "holdout_files": records,
+    }))
+    (holdout_dir / "validation.json").write_text(json.dumps({
+        "schema_version": 1,
+        "policy_sha256": sha256(policy_path),
+        "holdout_files": records,
+        "affinity_overlap_rows": overlap,
+        "processing_overlap_rows": 0,
+        "presentation_overlap_rows": 0,
+    }))
+
+
 def test_collect_provenance_accepts_matching_release_candidate(tmp_path):
     module = load_module()
     write_model_info(tmp_path, PACKAGE_VERSION)
+    write_holdout_proof(tmp_path)
 
     result = module.collect_provenance(
         repo=REPO,
@@ -77,6 +114,7 @@ def test_collect_provenance_accepts_matching_release_candidate(tmp_path):
 def test_collect_provenance_rejects_mislabeled_model(tmp_path):
     module = load_module()
     write_model_info(tmp_path, "2.3.1")
+    write_holdout_proof(tmp_path)
 
     with pytest.raises(ValueError, match="2.3.1, not release 2.3.0"):
         module.collect_provenance(
@@ -122,6 +160,7 @@ def test_artifact_paths_reject_invalid_processing_variants(
 def test_collect_provenance_rejects_model_from_another_commit(tmp_path):
     module = load_module()
     write_model_info(tmp_path, PACKAGE_VERSION, commit="deadbeef")
+    write_holdout_proof(tmp_path)
 
     with pytest.raises(ValueError, match="does not match source commit"):
         module.collect_provenance(
@@ -139,6 +178,7 @@ def test_collect_provenance_rejects_model_from_another_commit(tmp_path):
 def test_collect_provenance_allows_later_evaluation_workflow(tmp_path):
     module = load_module()
     write_model_info(tmp_path, PACKAGE_VERSION, workflow_id="training-run")
+    write_holdout_proof(tmp_path)
 
     result = module.collect_provenance(
         repo=REPO,
@@ -178,6 +218,7 @@ def test_collect_artifact_provenance_without_git_checkout(tmp_path):
 def test_artifact_only_cli_requires_expected_identity(tmp_path):
     module = load_module()
     write_model_info(tmp_path, PACKAGE_VERSION)
+    write_holdout_proof(tmp_path)
 
     with pytest.raises(SystemExit, match="expected-artifact-git-commit"):
         module.main([
@@ -186,3 +227,34 @@ def test_artifact_only_cli_requires_expected_identity(tmp_path):
             "--release", "2.3.0",
             "--require-artifacts",
         ])
+
+
+def test_collect_provenance_requires_holdout_proof(tmp_path):
+    module = load_module()
+    write_model_info(tmp_path, PACKAGE_VERSION)
+
+    with pytest.raises(ValueError, match="Missing required release holdout"):
+        module.collect_provenance(
+            repo=REPO,
+            run_dir=tmp_path,
+            release="2.3.0",
+            processing_variants=["with_flanks"],
+            require_artifacts=True,
+            allow_dirty_repo=True,
+        )
+
+
+def test_collect_provenance_rejects_holdout_overlap(tmp_path):
+    module = load_module()
+    write_model_info(tmp_path, PACKAGE_VERSION)
+    write_holdout_proof(tmp_path, overlap=1)
+
+    with pytest.raises(ValueError, match="contains overlap"):
+        module.collect_provenance(
+            repo=REPO,
+            run_dir=tmp_path,
+            release="2.3.0",
+            processing_variants=["with_flanks"],
+            require_artifacts=True,
+            allow_dirty_repo=True,
+        )

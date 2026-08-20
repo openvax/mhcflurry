@@ -98,7 +98,9 @@ def make_dataset(num=500):
     return (train_df, test_df)
 
 
-def run_and_check(n_jobs=0, additional_args=[], delete=False):
+def run_and_check(n_jobs=0, additional_args=None, delete=False):
+    if additional_args is None:
+        additional_args = []
     (train_df, test_df) = make_dataset()
 
     models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")

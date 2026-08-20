@@ -15,6 +15,7 @@
 
 import argparse
 import datetime
+import hashlib
 import json
 import pathlib
 import re
@@ -25,6 +26,12 @@ VERSION_RE = re.compile(r'^__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', re.MULTILI
 PACKAGE_RE = re.compile(r"^package\s+mhcflurry\s+(\S+)\s*$", re.MULTILINE)
 BASE_VERSION_RE = re.compile(r"^(\d+\.\d+\.\d+)")
 PROCESSING_VARIANTS = ("no_flank", "with_flanks", "short_flanks")
+HOLDOUT_MANIFESTS = (
+    "affinity_pmhcs.csv",
+    "affinity_samples.csv",
+    "processing_samples.csv",
+    "presentation_samples.csv",
+)
 
 
 def base_version(version):
@@ -60,6 +67,75 @@ def model_metadata(path):
         if len(fields) == 2:
             result[fields[0].strip()] = fields[1].strip()
     return result
+
+
+def sha256(path):
+    """Return the SHA256 digest of a file."""
+    digest = hashlib.sha256()
+    with open(path, "rb") as fd:
+        for block in iter(lambda: fd.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def collect_holdout_provenance(run_dir, require_artifacts=False):
+    """Validate and summarize the release holdout proof files."""
+    holdout_dir = pathlib.Path(run_dir) / "release_holdout"
+    policy_path = holdout_dir / "policy.json"
+    validation_path = holdout_dir / "validation.json"
+    if not policy_path.is_file() or not validation_path.is_file():
+        if require_artifacts:
+            raise ValueError(
+                "Missing required release holdout policy or validation: %s" %
+                holdout_dir)
+        return {}
+
+    policy = json.loads(policy_path.read_text())
+    validation = json.loads(validation_path.read_text())
+    if policy.get("schema_version") != 1:
+        raise ValueError("Unsupported release holdout policy schema")
+    if validation.get("schema_version") != 1:
+        raise ValueError("Unsupported release holdout validation schema")
+    if validation.get("policy_sha256") != sha256(policy_path):
+        raise ValueError(
+            "Release holdout validation does not match policy.json")
+
+    manifest_records = policy.get("holdout_files", {})
+    if set(manifest_records) != set(HOLDOUT_MANIFESTS):
+        raise ValueError(
+            "Release holdout policy has unexpected manifests: %s" %
+            sorted(manifest_records))
+    if validation.get("holdout_files") != manifest_records:
+        raise ValueError(
+            "Release holdout validation manifest records do not match policy")
+    for filename in HOLDOUT_MANIFESTS:
+        path = holdout_dir / filename
+        expected = manifest_records[filename]
+        if not path.is_file() or sha256(path) != expected.get("sha256"):
+            raise ValueError(
+                "Release holdout manifest checksum mismatch: %s" % path)
+
+    overlaps = {
+        key: validation.get(key)
+        for key in (
+            "affinity_overlap_rows",
+            "processing_overlap_rows",
+            "presentation_overlap_rows",
+        )
+    }
+    if any(value != 0 for value in overlaps.values()):
+        raise ValueError(
+            "Release holdout validation contains overlap: %s" % overlaps)
+    return {
+        "policy_sha256": sha256(policy_path),
+        "validation_sha256": sha256(validation_path),
+        "evaluation_row_counts": policy.get("evaluation_row_counts", {}),
+        "evaluation_hit_counts": policy.get("evaluation_hit_counts", {}),
+        "presentation_holdout_pmids": policy.get(
+            "presentation_holdout_pmids", []),
+        "holdout_files": manifest_records,
+        "overlap_rows": overlaps,
+    }
 
 
 def git_output(repo, *args):
@@ -185,6 +261,8 @@ def collect_provenance(
         expected_artifact_git_commit=(source_commit if require_artifacts else ""),
         expected_artifact_workflow_id=expected_artifact_workflow_id,
     )
+    holdout_provenance = collect_holdout_provenance(
+        run_dir, require_artifacts=require_artifacts)
 
     return {
         "schema_version": 2,
@@ -198,6 +276,7 @@ def collect_provenance(
         },
         "workflow_id": workflow_id,
         "artifacts": artifact_provenance,
+        "release_holdout": holdout_provenance,
     }
 
 
@@ -247,6 +326,8 @@ def main(argv=None):
                 expected_artifact_workflow_id=(
                     args.expected_artifact_workflow_id),
             )
+            holdout = collect_holdout_provenance(
+                args.run_dir, require_artifacts=True)
             provenance = {
                 "schema_version": 2,
                 "recorded_at": datetime.datetime.now(
@@ -259,6 +340,7 @@ def main(argv=None):
                 },
                 "workflow_id": args.workflow_id,
                 "artifacts": artifacts,
+                "release_holdout": holdout,
             }
         else:
             if not args.repo:

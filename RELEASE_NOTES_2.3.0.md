@@ -4,6 +4,23 @@ Release-candidate notes for 2.3.0. Held in this file (vs upstream into a
 single `CHANGELOG.md`) until after the validation training run completes
 and any last revisions land; will move to `CHANGELOG.md` at tag time.
 
+## rc20
+
+- Freeze a provenance-recorded final holdout before training. Affinity uses all
+  103 monoallelic benchmark samples plus the final multiallelic holdout and
+  removes every current-training pMHC found in those benchmark rows, including
+  decoys. Processing and presentation final metrics use the 10 multiallelic
+  samples from PMID 31154438; presentation excludes those complete samples
+  from training. Persist, checksum, and validate the generated manifests with
+  the release run.
+- Pin Ruff 0.16.0 in CI, commit an explicit correctness-focused lint rule set,
+  and run `./lint.sh` on every pull request. Mutable defaults, environment
+  defaults, and loop-closure findings uncovered during lint triage are fixed.
+- Interpret any processing-metric change alongside affinity-driven decoy
+  difficulty. The working hypothesis is that a stronger affinity predictor
+  selects higher-quality, harder processing negatives; final acceptance still
+  reports processing metrics on the strictly held-out evaluation set.
+
 ## rc19
 
 - Reorganize the user documentation around progressive disclosure: explain

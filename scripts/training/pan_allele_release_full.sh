@@ -64,6 +64,19 @@ export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
 BASE_OUT="$MHCFLURRY_OUT"
 mkdir -p "$BASE_OUT/affinity" "$BASE_OUT/processing" "$BASE_OUT/presentation"
 
+# Freeze the final evaluation boundary before any training work. The public
+# data_evaluation bundle is train-excluded relative to the old public models;
+# these generated manifests remove the candidate-training pMHC intersection
+# and select the independent multiallelic source-study holdout.
+mhcflurry-downloads fetch data_evaluation data_curated data_mass_spec_annotated
+RELEASE_HOLDOUT_DIR="$BASE_OUT/release_holdout"
+mhcflurry train release-holdout build \
+    --data-dir "$(mhcflurry-downloads path data_evaluation)" \
+    --training-data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
+    --mass-spec-data "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
+    --out-dir "$RELEASE_HOLDOUT_DIR"
+export RELEASE_HOLDOUT_DIR
+
 # Detect GPU count once; reuse for all stages.
 if command -v nvidia-smi >/dev/null 2>&1; then
     GPUS=$(nvidia-smi -L 2>/dev/null | wc -l | tr -d ' ')
@@ -290,6 +303,7 @@ python make_train_data.processing.py \
     --proteome-reference-csv "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \
     --ppv-multiplier 100 \
     --hit-multiplier-to-take 2 \
+    --exclude-samples-file "$RELEASE_HOLDOUT_DIR/processing_samples.csv" \
     --out "$(pwd)/train_data.csv" \
     "${COMMON_PARALLELISM_ARGS[@]}"
 compress_csv_bzip2 "$(pwd)/train_data.csv"
@@ -344,7 +358,7 @@ python make_train_data.presentation.py \
     --hits "$BASE_OUT/processing/hits_with_tpm.csv.bz2" \
     --proteome-reference-csv "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \
     --decoys-per-hit "$PRESENTATION_DECOYS_PER_HIT" \
-    --exclude-pmid 31844290 31495665 31154438 \
+    --exclude-samples-file "$RELEASE_HOLDOUT_DIR/presentation_samples.csv" \
     --only-format MULTIALLELIC \
     --out "$(pwd)/train_data.csv"
 compress_csv_bzip2 "$(pwd)/train_data.csv"
@@ -378,6 +392,13 @@ cp "$BASE_OUT/processing/models.selected.$PRESENTATION_PROCESSING_WITH_FLANKS_KI
     "$(pwd)/models/processing_predictor_with_flanks_train_data.csv.bz2"
 cp "$BASE_OUT/processing/models.selected.no_flank/train_data.csv.bz2" \
     "$(pwd)/models/processing_predictor_no_flank_train_data.csv.bz2"
+
+mhcflurry train release-holdout validate \
+    --holdout-dir "$RELEASE_HOLDOUT_DIR" \
+    --affinity-training-data "$AFFINITY_PREDICTOR/train_data.csv.bz2" \
+    --processing-training-data "$BASE_OUT/processing/train_data.csv.bz2" \
+    --presentation-training-data "$(pwd)/train_data.csv.bz2" \
+    --out "$RELEASE_HOLDOUT_DIR/validation.json"
 
 stop_gpu_telemetry
 echo "STAGE 3 duration: $(( $(date +%s) - STAGE3_START )) sec"

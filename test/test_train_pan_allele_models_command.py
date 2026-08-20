@@ -212,7 +212,9 @@ def test_pretrain_network_input_iterator_compact_torch_indices(tmp_path):
 
 
 
-def run_and_check(n_jobs=0, delete=True, additional_args=[]):
+def run_and_check(n_jobs=0, delete=True, additional_args=None):
+    if additional_args is None:
+        additional_args = []
     models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")
     hyperparameters_filename = os.path.join(
         models_dir, "hyperparameters.yaml")

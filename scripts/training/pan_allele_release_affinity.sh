@@ -307,9 +307,16 @@ CURRENT_PHASE="data_setup"
 log_release_event phase_info "starting data download and preprocessing"
 mhcflurry-downloads fetch data_curated allele_sequences random_peptide_predictions
 
+RELEASE_HOLDOUT_ARGS=()
+if [ -n "${RELEASE_HOLDOUT_DIR:-}" ]; then
+    RELEASE_HOLDOUT_ARGS=(
+        --exclude-pmhcs "$RELEASE_HOLDOUT_DIR/affinity_pmhcs.csv"
+    )
+fi
 mhcflurry class1-reassign-mass-spec-training-data \
     "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
     --set-measurement-value 100 \
+    "${RELEASE_HOLDOUT_ARGS[@]}" \
     --out-csv "$(pwd)/train_data.csv"
 bzip2 -f "$(pwd)/train_data.csv"
 TRAINING_DATA="$(pwd)/train_data.csv.bz2"

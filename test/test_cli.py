@@ -19,6 +19,7 @@ integration suites, not here.
 """
 
 import argparse
+import hashlib
 import importlib
 import json
 import os
@@ -200,6 +201,35 @@ def _write_minimal_deployable_run(run_dir):
         "model_name\nmodel\n")
     (run_dir / "presentation/models/percent_ranks.csv").write_text(
         "allele\nHLA-A*02:01\n")
+
+    holdout_dir = run_dir / "release_holdout"
+    holdout_dir.mkdir()
+    manifest_records = {}
+    for filename, header in (
+            ("affinity_pmhcs.csv", "allele,peptide\n"),
+            ("affinity_samples.csv", "sample_id\n"),
+            ("processing_samples.csv", "sample_id\n"),
+            ("presentation_samples.csv", "sample_id\n")):
+        path = holdout_dir / filename
+        path.write_text(header)
+        manifest_records[filename] = {
+            "rows": 0,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+    policy_path = holdout_dir / "policy.json"
+    policy_path.write_text(json.dumps({
+        "schema_version": 1,
+        "holdout_files": manifest_records,
+    }))
+    (holdout_dir / "validation.json").write_text(json.dumps({
+        "schema_version": 1,
+        "policy_sha256": hashlib.sha256(
+            policy_path.read_bytes()).hexdigest(),
+        "holdout_files": manifest_records,
+        "affinity_overlap_rows": 0,
+        "processing_overlap_rows": 0,
+        "presentation_overlap_rows": 0,
+    }))
 
 
 def test_deploy_packages_only_requested_processing_variants(tmp_path):

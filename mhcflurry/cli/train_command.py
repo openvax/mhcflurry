@@ -56,17 +56,24 @@ def make_parser(prog="mhcflurry train"):
         nargs=argparse.REMAINDER,
         help="Arguments forwarded to scripts/release/retrain_evaluate_deploy.sh.",
     )
+    holdout = sub.add_parser(
+        "release-holdout",
+        add_help=False,
+        help="Build or validate the frozen release evaluation holdout.",
+    )
+    holdout.add_argument("holdout_args", nargs=argparse.REMAINDER)
     return parser
 
 
 def _format_help(prog):
     return "\n".join([
-        "usage: %s {pan-allele-release} ..." % prog,
+        "usage: %s {pan-allele-release,release-holdout} ..." % prog,
         "",
         "Training workflows.",
         "",
         "Subcommands:",
         "  pan-allele-release  Train/evaluate/plot release weights from one entry point.",
+        "  release-holdout     Build/validate frozen evaluation exclusions.",
         "",
         "Examples:",
         "  %s pan-allele-release --run-dir runs/2.3.0 --release 2.3.0 --backend local" % prog,
@@ -120,6 +127,10 @@ def run_argv(argv, prog="mhcflurry train"):
     if argv[0] == "pan-allele-release":
         return _run_pan_allele_release(
             argv[1:], "%s pan-allele-release" % prog)
+    if argv[0] == "release-holdout":
+        from mhcflurry import release_holdout
+        return release_holdout.run_argv(
+            argv[1:], prog="%s release-holdout" % prog)
     make_parser(prog).parse_args(argv)
     return 2
 
