@@ -64,6 +64,7 @@ from ..device_footprint import (
 from ..pytorch_sizing import (
     begin_peak_memory_measurement,
     end_peak_memory_measurement,
+    release_unused_torch_memory,
 )
 from ..cluster_parallelism import (
     add_cluster_parallelism_args,
@@ -940,22 +941,30 @@ def _run_compile_warmup(hyperparameters, fold_num, constant_data):
     )
     started = time.time()
     memory_token = begin_peak_memory_measurement()
-    model = Class1NeuralNetwork(**hp)
-    model.fit(
-        peptides=train_peptides,
-        affinities=train_subset.measurement_value.values,
-        allele_encoding=train_alleles,
-        inequalities=(
-            train_subset.measurement_inequality.values
-            if "measurement_inequality" in train_subset.columns else None
-        ),
-        verbose=0,
-    )
-    report = end_peak_memory_measurement(memory_token)
-    report["elapsed_seconds"] = time.time() - started
-    print("compile_warmup_only: completed in %.1f sec" % (
-        report["elapsed_seconds"]))
-    return report
+    model = None
+    try:
+        model = Class1NeuralNetwork(**hp)
+        model.fit(
+            peptides=train_peptides,
+            affinities=train_subset.measurement_value.values,
+            allele_encoding=train_alleles,
+            inequalities=(
+                train_subset.measurement_inequality.values
+                if "measurement_inequality" in train_subset.columns else None
+            ),
+            verbose=0,
+        )
+        report = end_peak_memory_measurement(memory_token)
+        report["elapsed_seconds"] = time.time() - started
+        print("compile_warmup_only: completed in %.1f sec" % (
+            report["elapsed_seconds"]))
+        return report
+    finally:
+        if model is not None:
+            model.clear_allele_representations()
+            model._network = None
+        model = None
+        release_unused_torch_memory()
 
 
 def _run_resource_probe(hyperparameters, fold_num, constant_data):
@@ -997,23 +1006,31 @@ def _run_resource_probe(hyperparameters, fold_num, constant_data):
         train_data.allele.values, borrow_from=allele_encoding)
     started = time.time()
     memory_token = begin_peak_memory_measurement()
-    model = Class1NeuralNetwork(**hp)
-    model.fit(
-        peptides=train_peptides,
-        affinities=train_data.measurement_value.values,
-        allele_encoding=train_alleles,
-        inequalities=(
-            train_data.measurement_inequality.values
-            if "measurement_inequality" in train_data.columns else None
-        ),
-        seed=0,
-        verbose=0,
-    )
-    report = end_peak_memory_measurement(memory_token)
-    report["elapsed_seconds"] = time.time() - started
-    print("resource_probe_only: completed in %.1f sec: %s" % (
-        report["elapsed_seconds"], report))
-    return report
+    model = None
+    try:
+        model = Class1NeuralNetwork(**hp)
+        model.fit(
+            peptides=train_peptides,
+            affinities=train_data.measurement_value.values,
+            allele_encoding=train_alleles,
+            inequalities=(
+                train_data.measurement_inequality.values
+                if "measurement_inequality" in train_data.columns else None
+            ),
+            seed=0,
+            verbose=0,
+        )
+        report = end_peak_memory_measurement(memory_token)
+        report["elapsed_seconds"] = time.time() - started
+        print("resource_probe_only: completed in %.1f sec: %s" % (
+            report["elapsed_seconds"], report))
+        return report
+    finally:
+        if model is not None:
+            model.clear_allele_representations()
+            model._network = None
+        model = None
+        release_unused_torch_memory()
 
 
 def train_model(

@@ -12,6 +12,7 @@
 
 """Prediction and training batch-size helpers."""
 
+import gc
 import logging
 import math
 import os
@@ -252,6 +253,39 @@ def release_device_memory_after_oom(device):
         elif device.type == "mps" and hasattr(torch.mps, "empty_cache"):
             torch.mps.empty_cache()
     except Exception:
+        pass
+
+
+def release_unused_torch_memory():
+    """Collect dead tensors and return unused accelerator cache memory.
+
+    Resource probes deliberately reuse one worker for several architectures.
+    Python reference cycles can otherwise keep the previous fit's tensors
+    alive until a later, unrelated collection, while allocator cache blocks
+    continue to hide global device headroom. Collect cycles before emptying
+    the backend cache so the next probe observes only its own residency.
+    """
+    gc.collect()
+    try:
+        import torch
+    except ImportError:
+        return
+
+    try:
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            return
+    except RuntimeError:
+        pass
+
+    try:
+        if (
+                hasattr(torch.backends, "mps")
+                and torch.backends.mps.is_available()
+                and hasattr(torch, "mps")
+                and hasattr(torch.mps, "empty_cache")):
+            torch.mps.empty_cache()
+    except RuntimeError:
         pass
 
 
