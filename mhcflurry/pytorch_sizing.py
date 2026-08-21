@@ -15,9 +15,16 @@
 import logging
 import math
 import os
+import subprocess
 import sys
+from dataclasses import dataclass
 
-from .memory_budget import per_worker_memory_budget_bytes
+from .memory_budget import (
+    DEVICE_MIN_RESERVE_BYTES,
+    MEMORY_RESERVE_FRACTION,
+    memory_reserve_bytes,
+    usable_memory_bytes,
+)
 
 DEFAULT_PREDICT_BATCH_SIZE = "auto"
 AUTO_BATCH_MAX_ROWS = sys.maxsize
@@ -25,6 +32,9 @@ AUTO_BATCH_MIN_ROWS = 1024  # floor: avoid pathologically tiny batches
 AUTO_BATCH_CPU_FALLBACK = 32_768  # CPU: large batches thrash L3; stay modest
 AUTO_BATCH_FREE_FRACTION = None
 _MPS_PSUTIL_WARNED = False  # one-shot warning if psutil is missing on MPS
+CUDA_FREE_BEFORE_CONTEXT_ENV = (
+    "MHCFLURRY_CUDA_FREE_BEFORE_CONTEXT_BYTES"
+)
 if os.environ.get("MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"):
     raw_default_batch_size = os.environ["MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"]
     try:
@@ -64,6 +74,115 @@ def begin_peak_memory_measurement():
     return token
 
 
+def _process_namespace_pids():
+    """Return host/container PID aliases reported for this process."""
+    result = {os.getpid()}
+    try:
+        with open("/proc/self/status") as status_fd:
+            for line in status_fd:
+                if not line.startswith("NSpid:"):
+                    continue
+                for value in line.split()[1:]:
+                    result.add(int(value))
+                break
+    except (OSError, ValueError):
+        pass
+    return result
+
+
+def cuda_process_memory_bytes(pid=None):
+    """Return this process's CUDA memory from ``nvidia-smi``, if available.
+
+    PyTorch allocator counters omit the CUDA context and other non-PyTorch
+    allocations. Those bytes matter when many worker processes share a GPU.
+    Querying the driver gives resource probes a complete steady-state working
+    set without initializing CUDA in the parent process.
+    """
+    pids = _process_namespace_pids() if pid is None else {int(pid)}
+    try:
+        output = subprocess.check_output(
+            [
+                "nvidia-smi",
+                "--query-compute-apps=pid,used_memory",
+                "--format=csv,noheader,nounits",
+            ],
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        )
+    except (
+            OSError,
+            subprocess.CalledProcessError,
+            subprocess.TimeoutExpired):
+        return None
+    total_mib = 0.0
+    found = False
+    for line in output.decode("utf-8", errors="ignore").splitlines():
+        fields = [field.strip() for field in line.split(",")]
+        if len(fields) < 2:
+            continue
+        try:
+            row_pid = int(fields[0])
+            used_mib = float(fields[1].split()[0])
+        except ValueError:
+            continue
+        if row_pid in pids:
+            total_mib += used_mib
+            found = True
+    return int(total_mib * (1 << 20)) if found else None
+
+
+def cuda_free_memory_before_context_bytes(device_id):
+    """Query one physical CUDA device's free memory without importing torch."""
+    try:
+        output = subprocess.check_output(
+            [
+                "nvidia-smi",
+                "--id=%s" % device_id,
+                "--query-gpu=memory.free",
+                "--format=csv,noheader,nounits",
+            ],
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        )
+        value = float(output.decode("utf-8", errors="ignore").splitlines()[0])
+    except (
+            IndexError,
+            OSError,
+            subprocess.CalledProcessError,
+            subprocess.TimeoutExpired,
+            ValueError):
+        return None
+    return int(value * (1 << 20))
+
+
+def _nonnegative_env_bytes(name):
+    """Read an optional non-negative byte count from the environment."""
+    raw = os.environ.get(name)
+    if raw in (None, ""):
+        return None
+    try:
+        value = int(raw)
+    except ValueError:
+        raise ValueError(
+            "%s must be a non-negative integer; got %r" % (name, raw)
+        ) from None
+    if value < 0:
+        raise ValueError(
+            "%s must be a non-negative integer; got %r" % (name, raw)
+        )
+    return value
+
+
+def _cuda_process_bytes_with_baseline(
+        free_bytes, measured_process_bytes, *, allow_baseline=True):
+    """Include context usage when driver PIDs differ across namespaces."""
+    candidates = [max(int(measured_process_bytes or 0), 0)]
+    baseline_free = _nonnegative_env_bytes(CUDA_FREE_BEFORE_CONTEXT_ENV)
+    if allow_baseline and baseline_free is not None:
+        candidates.append(max(baseline_free - max(int(free_bytes), 0), 0))
+    return max(candidates)
+
+
 def _process_peak_rss_bytes():
     """Best-effort process peak RSS in bytes on Linux and macOS."""
     try:
@@ -89,6 +208,27 @@ def end_peak_memory_measurement(token):
                 "cuda_peak_reserved_bytes": int(
                     torch.cuda.max_memory_reserved(device)),
             })
+            current_reserved = int(torch.cuda.memory_reserved(device))
+            current_free, _ = torch.cuda.mem_get_info(device)
+            measured_process_bytes = cuda_process_memory_bytes()
+            process_bytes = _cuda_process_bytes_with_baseline(
+                current_free,
+                measured_process_bytes,
+            )
+            if measured_process_bytes is not None or os.environ.get(
+                    CUDA_FREE_BEFORE_CONTEXT_ENV) not in (None, ""):
+                # nvidia-smi is a current whole-process measurement; PyTorch's
+                # peak is an allocator high-water mark. A before-context free
+                # memory baseline covers PID-namespaced containers where the
+                # nvidia-smi process PID cannot match os.getpid(). Preserve the
+                # observed non-PyTorch component and add allocator growth that
+                # was released before the probe ended.
+                non_torch_bytes = max(process_bytes - current_reserved, 0)
+                result["cuda_process_memory_bytes"] = process_bytes
+                result["cuda_process_peak_estimate_bytes"] = (
+                    non_torch_bytes
+                    + result["cuda_peak_reserved_bytes"]
+                )
         except Exception as exc:
             result["cuda_error"] = str(exc)
     return result
@@ -282,6 +422,117 @@ def free_device_memory_bytes(device):
     return 2 * (1 << 30)
 
 
+@dataclass(frozen=True)
+class DeviceMemoryBudget:
+    """Stable per-worker device-memory entitlement and remaining headroom."""
+
+    free_bytes: int
+    total_bytes: int
+    reserve_bytes: int
+    worker_entitlement_bytes: int
+    process_bytes: int
+    available_bytes: int
+
+
+def device_memory_budget(
+        device,
+        num_workers_per_gpu=1,
+        free_memory_fraction=None,
+        reserve_fraction=MEMORY_RESERVE_FRACTION,
+        reserve_min_bytes=DEVICE_MIN_RESERVE_BYTES):
+    """Return a race-free memory budget for one co-resident worker.
+
+    The old calculation divided *live free memory* by the declared worker
+    count. Live free memory already reflects allocations made by workers that
+    initialized earlier, so that calculation double-discounted memory and made
+    the resulting batch size depend on startup order. Here every worker gets a
+    fixed entitlement captured from launch-time free capacity (falling back to
+    total device capacity for direct API calls), subtracts its own resident
+    working set, and finally caps the result by live global headroom. Managed
+    workers therefore cannot collectively claim more than the shared launch
+    budget.
+    """
+    workers = int(num_workers_per_gpu)
+    if workers < 1:
+        raise ValueError("num_workers_per_gpu must be at least 1")
+    if free_memory_fraction is not None:
+        free_memory_fraction = float(free_memory_fraction)
+        if (
+                not math.isfinite(free_memory_fraction)
+                or not 0 < free_memory_fraction <= 1):
+            raise ValueError("free_memory_fraction must be in (0, 1]")
+
+    free = int(free_device_memory_bytes(device))
+    total = free
+    process_bytes = 0
+    if device.type == "cuda":
+        try:
+            import torch
+            free, total = (
+                int(value) for value in torch.cuda.mem_get_info(device)
+            )
+            process_bytes = cuda_process_memory_bytes()
+            if process_bytes is None:
+                process_bytes = int(torch.cuda.memory_reserved(device))
+            process_bytes = _cuda_process_bytes_with_baseline(
+                free,
+                process_bytes,
+                # A launch baseline is isolated only when this is the sole
+                # resident worker. With peers it can include allocations made
+                # by workers that initialized after this process.
+                allow_baseline=(workers == 1),
+            )
+        except Exception:
+            try:
+                import torch
+                total = int(torch.cuda.get_device_properties(device).total_memory)
+                process_bytes = int(torch.cuda.memory_reserved(device))
+            except Exception:
+                total = free
+                process_bytes = 0
+    elif device.type == "mps":
+        try:
+            import torch
+            total = int(torch.mps.recommended_max_memory())
+            process_bytes = int(torch.mps.driver_allocated_memory())
+        except Exception:
+            total = free
+            process_bytes = 0
+
+    reserve = memory_reserve_bytes(
+        total,
+        min_reserve_bytes=reserve_min_bytes,
+        reserve_fraction=reserve_fraction,
+    )
+    spendable = usable_memory_bytes(
+        total,
+        min_reserve_bytes=reserve_min_bytes,
+        reserve_fraction=reserve_fraction,
+    )
+    if free_memory_fraction is not None:
+        spendable = min(
+            spendable,
+            int(total * free_memory_fraction),
+        )
+    entitlement = spendable // workers
+    launch_budget = _nonnegative_env_bytes(
+        "MHCFLURRY_DEVICE_MEMORY_BUDGET_BYTES")
+    if launch_budget is not None:
+        entitlement = min(entitlement, launch_budget)
+    available = min(
+        max(free, 0),
+        max(entitlement - max(process_bytes, 0), 0),
+    )
+    return DeviceMemoryBudget(
+        free_bytes=max(free, 0),
+        total_bytes=max(total, 0),
+        reserve_bytes=max(reserve, 0),
+        worker_entitlement_bytes=max(entitlement, 0),
+        process_bytes=max(process_bytes, 0),
+        available_bytes=max(available, 0),
+    )
+
+
 def compute_prediction_batch_size(
         device,
         model=None,
@@ -293,9 +544,10 @@ def compute_prediction_batch_size(
         total_rows=None):
     """Auto-size a prediction batch for ``device`` and ``model``.
 
-    Divides live free VRAM (after one shared reserve) by co-resident workers
-    and the model's per-row peak activation estimate. ``max_rows`` is only an
-    optional caller limit; the default auto path has no hardwired batch cap.
+    Uses the worker's remaining fixed device-memory entitlement and the model's
+    per-row peak activation estimate, capped by current global headroom.
+    ``max_rows`` is only an optional caller limit; the default auto path has no
+    hardwired batch cap.
 
     CPU: returns ``cpu_fallback`` — large batches on CPU thrash L3
     cache and rarely help for the small networks mhcflurry trains.
@@ -322,13 +574,13 @@ def compute_prediction_batch_size(
             if total_rows is not None else rows
         )
     peak_bytes = estimate_peak_bytes_per_row(model)
-    free = free_device_memory_bytes(device)
-    if free_memory_fraction is None:
-        budget = per_worker_memory_budget_bytes(free, workers)
-    else:
-        # Backward-compatible expert API: an explicit fraction replaces the
-        # default shared reserve calculation.
-        budget = int(free * free_memory_fraction / workers)
+    memory = device_memory_budget(
+        device,
+        num_workers_per_gpu=workers,
+        free_memory_fraction=free_memory_fraction,
+    )
+    free = memory.free_bytes
+    budget = memory.available_bytes
     rows = max(1, budget // peak_bytes)
     if rows < min_rows:
         logging.warning(
@@ -434,11 +686,13 @@ def check_training_batch_fits(
                 or not 0 < free_memory_fraction <= 1):
             raise ValueError("free_memory_fraction must be in (0, 1]")
     peak_bytes = estimate_peak_bytes_per_row(model) * TRAINING_PEAK_MULTIPLIER
-    free = free_device_memory_bytes(device)
-    if free_memory_fraction is None:
-        budget = per_worker_memory_budget_bytes(free, workers)
-    else:
-        budget = int(free * free_memory_fraction / workers)
+    memory = device_memory_budget(
+        device,
+        num_workers_per_gpu=workers,
+        free_memory_fraction=free_memory_fraction,
+    )
+    free = memory.free_bytes
+    budget = memory.available_bytes
     max_rows = max(budget // peak_bytes, 1)
     if requested_batch_size <= max_rows:
         return requested_batch_size, False
@@ -476,4 +730,10 @@ def check_training_batch_fits(
     # Also scream to stderr so it's loud in the job log regardless of
     # which logger config the caller uses.
     print("\n" + message + "\n", file=sys.stderr, flush=True)
+    if os.environ.get("MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK") == "1":
+        raise RuntimeError(
+            message
+            + " Automatic shrink is forbidden by "
+            "MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK=1."
+        )
     return int(shrunk), True

@@ -61,5 +61,6 @@ api
 testing
 development
 orchestrator
+auto_sizing_audit
 maintainers
 ```

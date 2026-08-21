@@ -888,6 +888,8 @@ def test_release_workflow_forwards_presentation_recipe_controls(tmp_path):
 def test_release_workflow_sync_is_workflow_id_scoped():
     script = pathlib.Path(
         "scripts/release/retrain_evaluate_deploy.sh").read_text()
+    assert 'RUNPLZ_REQUIRED_VERSION="3.15.3"' in script
+    assert "require_clean_runplz_3153" in script
     assert "run_dir_matches_workflow || return 1" in script
     assert "remote_workflow_id" in script
     assert "Refusing to sync Brev output for workflow" in script
@@ -1776,6 +1778,8 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     fake_runplz = types.ModuleType("runplz")
     fake_config = types.ModuleType("runplz.config")
 
+    pip_packages = []
+
     class FakeImage:
         @classmethod
         def from_registry(cls, *_args, **_kwargs):
@@ -1784,7 +1788,8 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
         def apt_install(self, *_args, **_kwargs):
             return self
 
-        def pip_install(self, *_args, **_kwargs):
+        def pip_install(self, *args, **_kwargs):
+            pip_packages.extend(args)
             return self
 
         def pip_install_local_dir(self, *_args, **_kwargs):
@@ -1811,6 +1816,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
         "scripts/training/launch_pan_allele_training_remote.py",
     )
     module = _load_script_module(path, "remote_launcher_under_test")
+    assert "runplz==3.15.3" in pip_packages
     env = module.remote_training_env({"TRAINING_MINIBATCH_SIZE": "2048"})
     assert env["TRAINING_MINIBATCH_SIZE"] == "2048"
     assert env["COMPARE_BASELINE"] == "public:2.0.0"

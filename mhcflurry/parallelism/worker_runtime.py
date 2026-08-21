@@ -25,6 +25,10 @@ import numpy
 from threadpoolctl import threadpool_limits
 
 from ..common import configure_pytorch
+from ..pytorch_sizing import (
+    CUDA_FREE_BEFORE_CONTEXT_ENV,
+    cuda_free_memory_before_context_bytes,
+)
 from .planning import resolved_int
 
 
@@ -115,7 +119,8 @@ def worker_init(
         worker_log_dir=None, max_workers_per_gpu=None,
         cpu_threads_per_worker=None,
         cpu_threads_per_worker_was_auto=True,
-        worker_context_module=None, worker_context_data=None):
+        worker_context_module=None, worker_context_data=None,
+        device_memory_budget_bytes=None):
     del keras_backend  # legacy argument retained for API compatibility
     if worker_log_dir:
         os.makedirs(worker_log_dir, exist_ok=True)
@@ -130,6 +135,13 @@ def worker_init(
             worker_log_dir,
             "LOG-worker.%d.%d.txt" % (os.getpid(), int(time.time()))),
             "w", buffering=1)
+
+    if backend == "gpu" and gpu_device_nums and len(gpu_device_nums) == 1:
+        free_before_context = cuda_free_memory_before_context_bytes(
+            gpu_device_nums[0])
+        if free_before_context is not None:
+            os.environ[CUDA_FREE_BEFORE_CONTEXT_ENV] = str(
+                free_before_context)
 
     # Each worker needs distinct random numbers
     numpy.random.seed()
@@ -167,6 +179,12 @@ def worker_init(
     if max_workers_per_gpu is not None:
         os.environ["MHCFLURRY_MAX_WORKERS_PER_GPU"] = str(
             resolved_int(max_workers_per_gpu, "max_workers_per_gpu"))
+    if device_memory_budget_bytes is not None and backend == "gpu":
+        device_memory_budget_bytes = int(device_memory_budget_bytes)
+        if device_memory_budget_bytes < 0:
+            raise ValueError("device_memory_budget_bytes must be non-negative")
+        os.environ["MHCFLURRY_DEVICE_MEMORY_BUDGET_BYTES"] = str(
+            device_memory_budget_bytes)
 
 
 # Solution suggested in https://bugs.python.org/issue13831

@@ -248,6 +248,8 @@ def worker_pool_with_gpu_assignments_from_args(
         num_gpus=args.gpus,
         backend=args.backend,
         max_workers_per_gpu=args.max_workers_per_gpu,
+        device_memory_budget_bytes=getattr(
+            args, "device_memory_budget_bytes", None),
         max_tasks_per_worker=args.max_tasks_per_worker,
         worker_log_dir=args.worker_log_dir,
         cpu_threads_per_worker=getattr(
@@ -388,7 +390,8 @@ def worker_pool_with_gpu_assignments(
         cpu_threads_per_worker_was_auto=True,
         start_method=None,
         worker_context_module=None,
-        worker_context_data=None):
+        worker_context_data=None,
+        device_memory_budget_bytes=None):
     """
     Create a multiprocessing.Pool where each worker uses its own GPU.
 
@@ -416,6 +419,10 @@ def worker_pool_with_gpu_assignments(
         Constant data to install once per process during initialization. This
         avoids serializing the same large payload with every queued task on
         spawn-based platforms.
+    device_memory_budget_bytes : int, optional
+        Fixed launch-time device-memory entitlement propagated to each GPU
+        worker for elastic batch sizing. Kept last in the signature so adding
+        the planner-owned value does not change existing positional calls.
 
     Returns
     -------
@@ -446,6 +453,7 @@ def worker_pool_with_gpu_assignments(
         num_gpus=num_gpus,
         backend=backend,
         max_workers_per_gpu=max_workers_per_gpu,
+        device_memory_budget_bytes=device_memory_budget_bytes,
         cpu_threads_per_worker=cpu_threads_per_worker,
         cpu_threads_per_worker_was_auto=(
             cpu_threads_per_worker_was_auto
@@ -518,7 +526,8 @@ def worker_init_kwargs_for_scheduler(
         backend="auto",
         max_workers_per_gpu=1,
         cpu_threads_per_worker=None,
-        cpu_threads_per_worker_was_auto=True):
+        cpu_threads_per_worker_was_auto=True,
+        device_memory_budget_bytes=None):
     """
     Build per-worker init kwargs from the local scheduling configuration.
 
@@ -583,6 +592,11 @@ def worker_init_kwargs_for_scheduler(
             kwargs["cpu_threads_per_worker_was_auto"] = (
                 cpu_threads_per_worker_was_auto
             )
+    if device_memory_budget_bytes is not None:
+        for kwargs in worker_kwargs:
+            if kwargs["backend"] == "gpu":
+                kwargs["device_memory_budget_bytes"] = int(
+                    device_memory_budget_bytes)
     return worker_kwargs
 
 

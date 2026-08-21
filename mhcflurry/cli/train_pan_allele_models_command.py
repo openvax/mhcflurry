@@ -51,7 +51,7 @@ from ..parallelism import (
     call_wrapped_kwargs,
     refine_local_parallelism_from_worker_context,
     resolve_local_parallelism_args,
-    run_single_worker_torch_compile_warmup,
+    run_single_worker_resource_probe,
     worker_pool_with_gpu_assignments_from_args,
 )
 from ..workload_planning import (
@@ -815,7 +815,7 @@ def train_models(args):
             constant_data=WORKER_CONTEXT,
             result_serialization_method="save_predictor")
     else:
-        run_single_worker_torch_compile_warmup(
+        run_single_worker_resource_probe(
             args,
             work_items,
             train_model,
@@ -958,6 +958,64 @@ def _run_compile_warmup(hyperparameters, fold_num, constant_data):
     return report
 
 
+def _run_resource_probe(hyperparameters, fold_num, constant_data):
+    """Measure a bounded finetune pass with production-shaped residency.
+
+    Unlike the legacy compile warmup, this uses the complete training fold and
+    keeps validation enabled. One epoch is enough to exercise device-resident
+    inputs, the configured minibatch, optimizer state, and the actual batched
+    validation path that determines peak VRAM.
+    """
+    df = constant_data["train_data"]
+    folds_df = constant_data["folds_df"]
+    allele_encoding = constant_data["allele_encoding"]
+    fold_mask = folds_df["fold_%d" % fold_num]
+    train_data = df.loc[fold_mask]
+    if len(train_data) == 0:
+        train_data = df
+
+    hp = Class1NeuralNetwork.hyperparameter_defaults.subselect(
+        dict(hyperparameters))
+    hp["max_epochs"] = 1
+    hp["early_stopping"] = False
+    train_data_overrides = dict(hp.get("train_data") or {})
+    train_data_overrides["pretrain"] = False
+    hp["train_data"] = train_data_overrides
+
+    print(
+        "resource_probe_only: layer_sizes=%s topology=%s minibatch=%d "
+        "rows=%d validation_split=%s" % (
+            hp.get("layer_sizes"),
+            hp.get("topology"),
+            int(hp.get("minibatch_size", 128) or 128),
+            len(train_data),
+            hp.get("validation_split"),
+        )
+    )
+    train_peptides = _build_train_peptides(train_data.peptide.values)
+    train_alleles = AlleleEncoding(
+        train_data.allele.values, borrow_from=allele_encoding)
+    started = time.time()
+    memory_token = begin_peak_memory_measurement()
+    model = Class1NeuralNetwork(**hp)
+    model.fit(
+        peptides=train_peptides,
+        affinities=train_data.measurement_value.values,
+        allele_encoding=train_alleles,
+        inequalities=(
+            train_data.measurement_inequality.values
+            if "measurement_inequality" in train_data.columns else None
+        ),
+        seed=0,
+        verbose=0,
+    )
+    report = end_peak_memory_measurement(memory_token)
+    report["elapsed_seconds"] = time.time() - started
+    print("resource_probe_only: completed in %.1f sec: %s" % (
+        report["elapsed_seconds"], report))
+    return report
+
+
 def train_model(
         work_item_name,
         work_item_num,
@@ -975,8 +1033,11 @@ def train_model(
         predictor,
         save_to,
         compile_warmup_only=False,
-        constant_data=WORKER_CONTEXT):
+        constant_data=WORKER_CONTEXT,
+        resource_probe_only=False):
 
+    if resource_probe_only:
+        return _run_resource_probe(hyperparameters, fold_num, constant_data)
     if compile_warmup_only:
         return _run_compile_warmup(hyperparameters, fold_num, constant_data)
 

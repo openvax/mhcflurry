@@ -60,6 +60,9 @@ export PYTHONUNBUFFERED=1
 # Same default as the affinity stage; the orchestrator's CLI flag
 # (--torch-compile auto) reads this when set.
 export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
+# Preserve the configured optimization problem for release weights. Affinity
+# training must fail rather than silently shrink its effective minibatch.
+export MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK="${MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK:-1}"
 
 BASE_OUT="$MHCFLURRY_OUT"
 mkdir -p "$BASE_OUT/affinity" "$BASE_OUT/processing" "$BASE_OUT/presentation"

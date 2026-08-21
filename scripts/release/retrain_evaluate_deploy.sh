@@ -176,6 +176,43 @@ require_command() {
     command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"
 }
 
+require_clean_runplz_3153() {
+    python3 - "$RUNPLZ_REQUIRED_VERSION" <<'PY' || \
+        die "runplz $RUNPLZ_REQUIRED_VERSION from PyPI or a clean checkout is required"
+import importlib.metadata
+import pathlib
+import subprocess
+import sys
+
+required = sys.argv[1]
+actual = importlib.metadata.version("runplz")
+if actual != required:
+    raise SystemExit(
+        "runplz version mismatch: required %s, found %s" % (required, actual)
+    )
+
+import runplz
+module_path = pathlib.Path(runplz.__file__).resolve()
+identity = "version=%s module=%s" % (actual, module_path)
+for parent in module_path.parents:
+    if not (parent / ".git").exists():
+        continue
+    commit = subprocess.check_output(
+        ["git", "-C", str(parent), "rev-parse", "HEAD"], text=True
+    ).strip()
+    dirty = subprocess.check_output(
+        ["git", "-C", str(parent), "status", "--porcelain"], text=True
+    ).strip()
+    if dirty:
+        raise SystemExit(
+            "editable runplz checkout is dirty: %s" % parent
+        )
+    identity += " git_commit=%s" % commit
+    break
+print("runplz provenance: %s" % identity, file=sys.stderr)
+PY
+}
+
 validate_release_provenance() {
     local step="$1"
     local require_artifacts="$2"
@@ -1625,6 +1662,7 @@ run_brev_training() {
     local auto_create=$1
     if [ "$DRY_RUN" != "1" ]; then
         require_command runplz
+        require_clean_runplz_3153
     fi
     run_cmd mkdir -p "$RUN_DIR"
     local runplz_on_finish=leave
@@ -1820,6 +1858,7 @@ BREV_INSTANCE_TYPE="${RUNPLZ_BREV_INSTANCE_TYPE:-${BREV_INSTANCE_TYPE:-}}"
 DEFAULT_BREV_PROVISION_INSTANCE_TYPE="${DEFAULT_BREV_PROVISION_INSTANCE_TYPE:-}"
 BREV_CONTAINER_IMAGE="${BREV_CONTAINER_IMAGE:-pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime}"
 BREV_MAX_RUNTIME_SECONDS="${RUNPLZ_BREV_MAX_RUNTIME_SECONDS:-${BREV_MAX_RUNTIME_SECONDS:-}}"
+RUNPLZ_REQUIRED_VERSION="3.15.3"
 BREV_INSTANCE_TYPE_FALLBACK_COUNT="${RUNPLZ_BREV_INSTANCE_TYPE_FALLBACK_COUNT:-3}"
 BREV_EXCLUDE_PROVIDERS="${RUNPLZ_BREV_EXCLUDE_PROVIDERS:-oci}"
 BREV_STOP_FAILURE_ACTION_EXPLICIT=0

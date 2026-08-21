@@ -28,6 +28,9 @@ export PYTHONUNBUFFERED=1
 # avoid long-lived-worker death modes on multi-day runs while still
 # amortizing compile / CUDA init across several networks.
 export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
+# The resource probe should make the configured release minibatch safe. If it
+# does not, changing optimization dynamics is a provenance failure.
+export MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK="${MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK:-1}"
 # Inductor defaults to a large compile helper pool per training process.
 # With 8-16 concurrent mhcflurry workers that multiplies into thousands of
 # short-lived subprocesses and can stall the box. Leave the env unset by

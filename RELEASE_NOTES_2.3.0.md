@@ -284,6 +284,8 @@ negatives are refilled into the top slice of that row space each epoch.
 `matplotlib` is now an installed package dependency, so the documented
 evaluation and paper-figure commands work in a clean MHCflurry installation;
 remote launchers no longer install it as an undeclared workaround.
+Percent-change paper figures now use finite axis limits for degenerate
+all-equal metrics, restoring compatibility with Matplotlib 3.11.
 Paper and diagnostic output paths are validated before comparison, cleanup, or
 rendering, preventing a custom summary path or paper directory from deleting or
 overwriting command-owned PDFs.
@@ -297,10 +299,11 @@ When to use which:
   candidates against each other.
 - **`plot_loss_curves.py`** — diagnostic. Doesn't need a baseline.
 
-Dev-workstation helper: `scripts/dev/relocate_run_outputs.sh` moves
-`brev_runs/` and `results/` outside the repo (with symlinks) so runplz's
-rsync_up doesn't ship 15+ GB of stale prior-run artifacts to the box on every
-launch. Run with `--apply` once per workstation.
+Remote release launches require runplz 3.15.3. Its Git-aware staging excludes
+ignored output directories such as `brev_runs/` and `results/`, so the former
+workstation-specific relocation and symlink workaround is no longer needed.
+The wrapper records the runplz module path and, for an editable checkout, its
+clean Git commit before launching.
 
 ## Pipeline orchestration
 
@@ -354,12 +357,13 @@ required and is used for device-resident training and optional
        `epoch // pool_epochs` boundary. Set `random_negative_pool_epochs=1`
        to recover the pre-2.3.0 "fresh negatives every epoch" semantics
        (at the ~17 s/epoch encode cost).
-    2. The 1-batch-per-architecture warmup primes torch.compile's
-       on-disk cache with one synthetic forward+backward; the
-       compiled-graph cache it writes does not affect weights, but
-       running it does advance the global RNG before training proper
-       starts. Pin a per-arch seed if you need bit-equivalence across
-       runs.
+    2. A single-worker resource probe runs one bounded, full-residency training
+       epoch with validation for each resource-distinct architecture before the
+       production pool starts. It tightens automatic concurrency from measured
+       process-level CUDA and host peaks; when compilation is enabled, the same
+       pass primes torch.compile's on-disk cache. The probe runs in a separate
+       process with a fixed probe seed and does not contribute weights or advance
+       any production worker's RNG stream.
     3. Device-resident random-negative sampling
        (`encode_random_negatives_on_device`) draws negative peptides as
        amino-acid indices via `torch.multinomial` rather than the host

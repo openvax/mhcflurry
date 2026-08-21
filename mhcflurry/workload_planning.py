@@ -164,6 +164,10 @@ class LocalParallelismPlan:
     warmup_host_peak_gb: Optional[float] = None
     cpu_threads_per_worker: Optional[int] = None
     cpu_threads_per_worker_was_auto: bool = True
+    # Append new fields to preserve positional compatibility for callers that
+    # construct this public diagnostic dataclass directly.
+    device_memory_available_gb: Optional[float] = None
+    device_memory_budget_gb: Optional[float] = None
 
     def __str__(self):
         device_worker = (
@@ -176,10 +180,15 @@ class LocalParallelismPlan:
             if self.host_memory_available_gb is not None
             else "unknown"
         )
+        device_budget = (
+            "%.1f GB" % self.device_memory_budget_gb
+            if self.device_memory_budget_gb is not None
+            else "unknown"
+        )
         return (
             "LocalParallelismPlan("
             "workload=%s, backend=%s, jobs=%d, gpus=%d, workers/gpu=%d, "
-            "dataloader_workers=%d, device_worker_gb=%s, "
+            "dataloader_workers=%d, device_worker_gb=%s, device_budget=%s, "
             "host_worker_gb=%.1f, host_available=%s from %s, "
             "warmup_device_peak_gb=%s, warmup_host_peak_gb=%s, "
             "cpu_threads_per_worker=%s [%s])"
@@ -191,6 +200,7 @@ class LocalParallelismPlan:
                 self.max_workers_per_gpu,
                 self.dataloader_num_workers,
                 device_worker,
+                device_budget,
                 self.host_worker_gb,
                 host_available,
                 self.host_memory_source,

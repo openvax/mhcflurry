@@ -99,6 +99,58 @@ def test_worker_init_kwargs_honors_cuda_visible_devices(monkeypatch):
     ]
 
 
+def test_worker_init_kwargs_propagates_budget_only_to_gpu_workers():
+    assert worker_init_kwargs_for_scheduler(
+        num_jobs=3,
+        num_gpus=1,
+        backend="auto",
+        max_workers_per_gpu=2,
+        device_memory_budget_bytes=1234,
+    ) == [
+        {
+            "backend": "gpu",
+            "gpu_device_nums": [0],
+            "max_workers_per_gpu": 2,
+            "device_memory_budget_bytes": 1234,
+        },
+        {
+            "backend": "gpu",
+            "gpu_device_nums": [0],
+            "max_workers_per_gpu": 2,
+            "device_memory_budget_bytes": 1234,
+        },
+        {"backend": "cpu", "gpu_device_nums": [], "max_workers_per_gpu": 2},
+    ]
+
+
+def test_worker_init_exports_fixed_device_budget(monkeypatch):
+    # Register the key with monkeypatch before worker_init mutates os.environ
+    # directly, so the process-level value cannot leak into later sizing tests.
+    monkeypatch.setenv("MHCFLURRY_DEVICE_MEMORY_BUDGET_BYTES", "")
+    monkeypatch.setenv(
+        "MHCFLURRY_CUDA_FREE_BEFORE_CONTEXT_BYTES", "")
+    monkeypatch.setattr(
+        worker_runtime_module, "configure_pytorch", lambda **kwargs: None)
+    monkeypatch.setattr(
+        worker_runtime_module,
+        "cuda_free_memory_before_context_bytes",
+        lambda device_id: 8 * (1 << 30),
+    )
+
+    worker_runtime_module.worker_init(
+        backend="gpu",
+        gpu_device_nums=[0],
+        max_workers_per_gpu=2,
+        device_memory_budget_bytes=1234,
+    )
+
+    assert os.environ["MHCFLURRY_DEVICE_MEMORY_BUDGET_BYTES"] == "1234"
+    assert (
+        os.environ["MHCFLURRY_CUDA_FREE_BEFORE_CONTEXT_BYTES"]
+        == str(8 * (1 << 30))
+    )
+
+
 def test_worker_init_kwargs_without_gpu_scheduling_uses_backend():
     assert worker_init_kwargs_for_scheduler(
         num_jobs=3,
@@ -530,12 +582,19 @@ def test_warmup_measurement_can_only_tighten_an_auto_plan(monkeypatch):
     )
     resolve_local_parallelism_args(args)
     initial_workers = args.max_workers_per_gpu
+    initial_budget = args.device_memory_budget_bytes
+    # Refinement must use the launch snapshot, not a later live-free reading
+    # that may temporarily include allocations from the probe or peers.
+    monkeypatch.setenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "10")
     refine_local_parallelism_from_warmup(args, [{
         "cuda_peak_reserved_bytes": 20 * (1 << 30),
         "host_peak_rss_bytes": 4 * (1 << 30),
     }])
     assert args.max_workers_per_gpu < initial_workers
     assert args.max_workers_per_gpu == 3
+    assert args.device_memory_budget_bytes > initial_budget
+    assert args.workload_plan.device_memory_budget_gb == pytest.approx(24.0)
     assert args.workload_plan.warmup_device_peak_gb == 20.0
     assert args.workload_plan.warmup_host_peak_gb == 4.0
 

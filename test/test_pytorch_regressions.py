@@ -147,6 +147,107 @@ def test_prediction_batch_sizing_rejects_unsafe_inputs(
             torch.device("cpu"), **kwargs)
 
 
+def test_cuda_worker_budget_uses_total_entitlement_not_free_divided_twice(
+        monkeypatch):
+    gib = 1 << 30
+    monkeypatch.delenv(
+        "MHCFLURRY_DEVICE_MEMORY_BUDGET_BYTES", raising=False)
+    monkeypatch.delenv(
+        pytorch_sizing.CUDA_FREE_BEFORE_CONTEXT_ENV, raising=False)
+    live_free = {"bytes": 28 * gib}
+    monkeypatch.setattr(
+        pytorch_sizing,
+        "free_device_memory_bytes",
+        lambda device: live_free["bytes"],
+    )
+    monkeypatch.setattr(
+        torch.cuda,
+        "mem_get_info",
+        lambda device: (live_free["bytes"], 40 * gib),
+    )
+    monkeypatch.setattr(
+        pytorch_sizing,
+        "cuda_process_memory_bytes",
+        lambda pid=None: 3 * gib,
+    )
+
+    first = pytorch_sizing.device_memory_budget(
+        torch.device("cuda"), num_workers_per_gpu=4)
+    assert first.worker_entitlement_bytes == 9 * gib
+    assert first.available_bytes == 6 * gib
+
+    # Allocations made by earlier-starting peer workers reduce global free
+    # memory, but do not divide this worker's fixed entitlement a second time.
+    live_free["bytes"] = 10 * gib
+    later = pytorch_sizing.device_memory_budget(
+        torch.device("cuda"), num_workers_per_gpu=4)
+    assert later.worker_entitlement_bytes == first.worker_entitlement_bytes
+    assert later.available_bytes == first.available_bytes
+
+    monkeypatch.setenv(
+        "MHCFLURRY_DEVICE_MEMORY_BUDGET_BYTES", str(5 * gib))
+    occupied_at_launch = pytorch_sizing.device_memory_budget(
+        torch.device("cuda"), num_workers_per_gpu=4)
+    assert occupied_at_launch.worker_entitlement_bytes == 5 * gib
+    assert occupied_at_launch.available_bytes == 2 * gib
+
+    monkeypatch.delenv(
+        "MHCFLURRY_DEVICE_MEMORY_BUDGET_BYTES", raising=False)
+    monkeypatch.setenv(
+        pytorch_sizing.CUDA_FREE_BEFORE_CONTEXT_ENV, str(32 * gib))
+    monkeypatch.setattr(
+        pytorch_sizing, "cuda_process_memory_bytes", lambda pid=None: None)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 0)
+    co_resident = pytorch_sizing.device_memory_budget(
+        torch.device("cuda"), num_workers_per_gpu=4)
+    assert co_resident.process_bytes == 0
+    assert co_resident.available_bytes == 9 * gib
+
+    baseline_fallback = pytorch_sizing.device_memory_budget(
+        torch.device("cuda"), num_workers_per_gpu=1)
+    assert baseline_fallback.process_bytes == 22 * gib
+    assert baseline_fallback.available_bytes == 10 * gib
+
+
+def test_cuda_process_memory_includes_all_rows_for_pid(monkeypatch):
+    monkeypatch.setattr(
+        pytorch_sizing.subprocess,
+        "check_output",
+        lambda *args, **kwargs: b"10, 512\n11, 2048\n10, 256\n",
+    )
+
+    assert pytorch_sizing.cuda_process_memory_bytes(10) == 768 * (1 << 20)
+
+
+def test_cuda_process_memory_matches_pid_namespace_alias(monkeypatch):
+    monkeypatch.setattr(
+        pytorch_sizing, "_process_namespace_pids", lambda: {10, 10010})
+    monkeypatch.setattr(
+        pytorch_sizing.subprocess,
+        "check_output",
+        lambda *args, **kwargs: b"10010, 640\n11, 2048\n",
+    )
+
+    assert pytorch_sizing.cuda_process_memory_bytes() == 640 * (1 << 20)
+
+
+def test_cuda_free_memory_before_context_uses_physical_device(monkeypatch):
+    calls = []
+
+    def fake_check_output(command, **kwargs):
+        calls.append(command)
+        return b"32768\n"
+
+    monkeypatch.setattr(
+        pytorch_sizing.subprocess, "check_output", fake_check_output)
+
+    assert (
+        pytorch_sizing.cuda_free_memory_before_context_bytes("GPU-abc")
+        == 32 * (1 << 30)
+    )
+    assert "--id=GPU-abc" in calls[0]
+
+
 def test_maybe_compile_loss_defaults_on_with_network_compile_cuda(monkeypatch):
     from mhcflurry import pytorch_training as training
 

@@ -33,6 +33,7 @@ from .planning import (
     auto_random_negative_pool_epochs,
     detect_free_vram_per_gpu_gb,
     num_workers_per_gpu_from_args,
+    refresh_device_memory_budget,
     refine_local_parallelism_from_spawn_context,
     refine_local_parallelism_from_warmup,
     resolve_cpu_threads_per_worker,
@@ -44,6 +45,7 @@ from .torch_compile import (
     configure_cluster_worker_torch_compile_threads,
     hoist_torchinductor_compile_threads,
     resolve_torchinductor_compile_threads_env,
+    run_single_worker_resource_probe,
     run_single_worker_torch_compile_warmup,
 )
 from .worker_pool import (
@@ -101,6 +103,7 @@ __all__ = [
     "non_daemon_context",
     "num_workers_per_gpu_from_args",
     "planning",
+    "refresh_device_memory_budget",
     "refine_local_parallelism_from_spawn_context",
     "refine_local_parallelism_from_worker_context",
     "refine_local_parallelism_from_warmup",
@@ -109,6 +112,7 @@ __all__ = [
     "resolve_local_parallelism_args",
     "resolve_max_workers_per_gpu",
     "resolve_torchinductor_compile_threads_env",
+    "run_single_worker_resource_probe",
     "run_single_worker_torch_compile_warmup",
     "torch_compile",
     "validate_worker_pool_args",

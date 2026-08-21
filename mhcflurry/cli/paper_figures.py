@@ -1383,15 +1383,10 @@ def _plot_percent_change_by_length(
             "No percent-change columns found for external baselines.")
         return
 
-    n_cols = len(baselines)
-    fig, axes = plt.subplots(
-        1, n_cols, figsize=(max(2.4, 2.35 * n_cols), 2.1),
-        sharey=True, squeeze=False)
-    color = _predictor_color(predictor_info, predictor)
-    for ax, (baseline, suffix) in zip(axes[0], baselines):
+    plot_specs = []
+    for baseline, suffix in baselines:
         column = "percent_change_%s_%s" % (metric, suffix)
         if column not in sub.columns:
-            ax.set_visible(False)
             continue
         plot_df = (
             sub[["length_label", column]]
@@ -1404,6 +1399,31 @@ def _plot_percent_change_by_length(
             .reindex(LENGTH_LABEL_ORDER)
             .dropna()
         )
+        if not values.empty:
+            plot_specs.append((baseline, values))
+    if not plot_specs:
+        writer.skip(
+            "multiallelic", name,
+            [
+                "percent_change_%s_%s" % (metric, suffix)
+                for _baseline, suffix in baselines
+            ],
+            "No finite per-length percent-change values were available.",
+        )
+        return
+
+    n_cols = len(plot_specs)
+    fig, axes = plt.subplots(
+        1, n_cols, figsize=(max(2.4, 2.35 * n_cols), 2.1),
+        sharey=True, squeeze=False)
+    color = _predictor_color(predictor_info, predictor)
+    finite_values = numpy.concatenate([
+        values.to_numpy(dtype=float) for _baseline, values in plot_specs
+    ])
+    y_min = float(finite_values.min())
+    y_max = float(finite_values.max())
+    y_pad = max((y_max - y_min) * 0.05, abs(y_max) * 0.05, 1.0)
+    for ax, (baseline, values) in zip(axes[0], plot_specs):
         x = numpy.arange(len(values))
         ax.bar(x, values.values, color=color, edgecolor="white", linewidth=0.6)
         ax.axhline(0, color="0.35", linewidth=0.8)
@@ -1411,6 +1431,7 @@ def _plot_percent_change_by_length(
         ax.set_xticklabels(values.index, rotation=30, ha="right")
         ax.set_title("vs %s" % _short_label(predictor_info, baseline))
         ax.set_ylabel("%% change in %s" % metric_label)
+        ax.set_ylim(y_min - y_pad, y_max + y_pad)
         _despine(ax)
     fig.tight_layout(w_pad=1.0)
     writer.save(fig, name, "multiallelic")

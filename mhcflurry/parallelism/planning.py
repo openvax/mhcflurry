@@ -22,8 +22,10 @@ from dataclasses import replace
 
 from ..common import configure_pytorch, normalize_pytorch_backend
 from ..memory_budget import (
+    GIB,
     HOST_MIN_RESERVE_BYTES,
     memory_worker_capacity,
+    per_worker_memory_budget_bytes,
     usable_memory_bytes,
 )
 from ..workload_planning import (
@@ -769,6 +771,40 @@ def num_workers_per_gpu_from_args(args):
     return resolved_int(value, "max_workers_per_gpu")
 
 
+def refresh_device_memory_budget(args):
+    """Snapshot and propagate one fixed launch-time entitlement per worker."""
+    plan = getattr(args, "workload_plan", None)
+    if (
+            plan is None
+            or plan.backend not in ("auto", "gpu")
+            or int(plan.gpus) < 1):
+        args.device_memory_budget_bytes = None
+        return None
+
+    available_bytes = getattr(
+        args, "_device_memory_available_bytes_at_launch", None)
+    if available_bytes is None:
+        per_gpu = detect_free_vram_per_gpu_gb(plan.gpus)
+        if per_gpu:
+            available_bytes = int(min(float(value) for value in per_gpu) * GIB)
+            args._device_memory_available_bytes_at_launch = available_bytes
+    if available_bytes is None:
+        args.device_memory_budget_bytes = None
+        return None
+
+    budget_bytes = per_worker_memory_budget_bytes(
+        available_bytes,
+        max(int(plan.max_workers_per_gpu), 1),
+    )
+    args.device_memory_budget_bytes = int(budget_bytes)
+    args.workload_plan = replace(
+        plan,
+        device_memory_available_gb=available_bytes / GIB,
+        device_memory_budget_gb=budget_bytes / GIB,
+    )
+    return int(budget_bytes)
+
+
 def resolve_local_parallelism_args(
         args,
         cap_auto_num_jobs=True,
@@ -820,6 +856,8 @@ def resolve_local_parallelism_args(
         cpu_threads_per_worker_was_auto
     )
     args.workload_plan = plan
+    refresh_device_memory_budget(args)
+    plan = args.workload_plan
 
     if (
             plan.num_jobs == 0
@@ -943,6 +981,7 @@ def refine_local_parallelism_from_warmup(args, reports):
     gib = float(1 << 30)
     device_values = [
         max(
+            int(report.get("cuda_process_peak_estimate_bytes") or 0),
             int(report.get("cuda_peak_allocated_bytes") or 0),
             int(report.get("cuda_peak_reserved_bytes") or 0),
         ) / gib
@@ -950,6 +989,7 @@ def refine_local_parallelism_from_warmup(args, reports):
         if (
             report.get("cuda_peak_allocated_bytes") is not None
             or report.get("cuda_peak_reserved_bytes") is not None
+            or report.get("cuda_process_peak_estimate_bytes") is not None
         )
     ]
     host_values = [
@@ -995,12 +1035,20 @@ def refine_local_parallelism_from_warmup(args, reports):
             plan.max_workers_per_gpu_was_auto
             and plan.gpus > 0
             and device_worker_gb is not None):
-        measured_mwpg = auto_max_workers_per_gpu(
-            num_jobs="auto",
-            num_gpus=plan.gpus,
-            backend=plan.backend,
-            per_worker_gb=device_worker_gb,
-        )
+        launch_available_bytes = getattr(
+            args, "_device_memory_available_bytes_at_launch", None)
+        if launch_available_bytes is not None:
+            measured_mwpg = memory_worker_capacity(
+                launch_available_bytes / GIB,
+                device_worker_gb,
+            )
+        else:
+            measured_mwpg = auto_max_workers_per_gpu(
+                num_jobs="auto",
+                num_gpus=plan.gpus,
+                backend=plan.backend,
+                per_worker_gb=device_worker_gb,
+            )
         new_mwpg = min(new_mwpg, int(measured_mwpg))
 
     new_num_jobs = int(plan.num_jobs)
@@ -1060,6 +1108,8 @@ def refine_local_parallelism_from_warmup(args, reports):
     args.cpu_threads_per_worker_was_auto = (
         cpu_threads_per_worker_was_auto
     )
+    refresh_device_memory_budget(args)
+    refined = args.workload_plan
     if changed:
         print(
             "Warmup memory calibration tightened local parallelism: %s" % (
@@ -1189,6 +1239,8 @@ def refine_local_parallelism_from_spawn_context(
     args.num_jobs = new_num_jobs
     args.cpu_threads_per_worker = cpu_threads_per_worker
     args.cpu_threads_per_worker_was_auto = cpu_threads_per_worker_was_auto
+    refresh_device_memory_budget(args)
+    refined = args.workload_plan
     if new_num_jobs == 0 and int(plan.num_jobs) > 0:
         # Commands decide between their serial and parallel branches
         # immediately after this late, context-aware refinement. Apply the

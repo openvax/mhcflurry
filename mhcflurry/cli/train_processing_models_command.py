@@ -53,7 +53,7 @@ from ..parallelism import (
     add_local_parallelism_args,
     refine_local_parallelism_from_worker_context,
     resolve_local_parallelism_args,
-    run_single_worker_torch_compile_warmup,
+    run_single_worker_resource_probe,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
 from ..workload_planning import (
@@ -543,7 +543,7 @@ def train_models(args):
             constant_data=WORKER_CONTEXT,
             result_serialization_method="pickle")
     else:
-        run_single_worker_torch_compile_warmup(
+        run_single_worker_resource_probe(
             args,
             work_items,
             train_model,
@@ -666,6 +666,50 @@ def _run_compile_warmup(hyperparameters, fold_num, constant_data):
     return report
 
 
+def _run_resource_probe(hyperparameters, fold_num, constant_data):
+    """Measure one full-residency processing fit epoch with validation."""
+    from mhcflurry.flanking_encoding import FlankingEncoding
+
+    df = constant_data["train_data"]
+    folds_df = constant_data["folds_df"]
+    fold_mask = folds_df["fold_%d" % fold_num]
+    train_data = df.loc[fold_mask]
+    if len(train_data) == 0:
+        train_data = df
+
+    hp = Class1ProcessingNeuralNetwork.hyperparameter_defaults.subselect(
+        dict(hyperparameters))
+    hp["max_epochs"] = 1
+    hp["early_stopping"] = False
+    print(
+        "resource_probe_only (processing): convolutional_filters=%s "
+        "post_dense=%s minibatch=%d rows=%d validation_split=%s" % (
+            hp.get("convolutional_filters"),
+            hp.get("post_convolutional_dense_layer_sizes"),
+            int(hp.get("minibatch_size", 128) or 128),
+            len(train_data),
+            hp.get("validation_split"),
+        )
+    )
+    started = time.time()
+    memory_token = begin_peak_memory_measurement()
+    model = Class1ProcessingNeuralNetwork(**hp)
+    model.fit(
+        sequences=FlankingEncoding(
+            peptides=train_data.peptide.values,
+            n_flanks=train_data.n_flank.values,
+            c_flanks=train_data.c_flank.values),
+        targets=train_data.hit.values,
+        seed=0,
+        verbose=0,
+    )
+    report = end_peak_memory_measurement(memory_token)
+    report["elapsed_seconds"] = time.time() - started
+    print("resource_probe_only (processing): completed in %.1f sec: %s" % (
+        report["elapsed_seconds"], report))
+    return report
+
+
 def train_model(
         work_item_name,
         work_item_num,
@@ -682,11 +726,14 @@ def train_model(
         predictor,
         save_to,
         compile_warmup_only=False,
-        constant_data=WORKER_CONTEXT):
+        constant_data=WORKER_CONTEXT,
+        resource_probe_only=False):
 
     from sklearn.metrics import roc_auc_score
     from mhcflurry.flanking_encoding import FlankingEncoding
 
+    if resource_probe_only:
+        return _run_resource_probe(hyperparameters, fold_num, constant_data)
     if compile_warmup_only:
         return _run_compile_warmup(hyperparameters, fold_num, constant_data)
 
