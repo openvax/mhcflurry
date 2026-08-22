@@ -53,6 +53,19 @@ HARDWARE_CASES = (
     ),
     pytest.param(
         {
+            "backend": "cpu",
+            "gpus": 4,
+            "free_vram_gb": 80.0,
+            "cpus": 8,
+            "total_ram_gb": 16.0,
+            "available_ram_gb": 12.0,
+            "initial": (0, 1, 0, 6),
+            "final": None,
+        },
+        id="cpu-selected-with-4-gpus-visible",
+    ),
+    pytest.param(
+        {
             "gpus": 1,
             "free_vram_gb": 32.0,
             "cpus": 32,
@@ -181,7 +194,7 @@ def _resolve_case(monkeypatch, case):
         lambda num_threads, auto_owned=True: num_threads,
     )
     args = Namespace(
-        backend="auto",
+        backend=case.get("backend", "auto"),
         gpus=case["gpus"],
         max_workers_per_gpu="auto",
         num_jobs="auto",
@@ -233,7 +246,7 @@ def test_affinity_autosizer_hardware_matrix(monkeypatch, case):
         assert initial.num_jobs <= initial.host_memory_num_jobs_cap
 
     if case["final"] is None:
-        assert initial.gpus == 0
+        assert initial.backend == "cpu" or initial.gpus == 0
         assert args.device_memory_budget_bytes is None
         return
 

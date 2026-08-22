@@ -942,7 +942,10 @@ def plan_local_parallelism(
             capacity = int(num_jobs)
 
     dataloader_fit_workers = max(0, int(num_jobs))
-    if int(num_jobs) <= 0 and gpus > 0:
+    if (
+            int(num_jobs) <= 0
+            and gpus > 0
+            and backend in ("auto", "gpu")):
         # An explicit serial run can still execute one fit on an accelerator.
         dataloader_fit_workers = 1
     effective_fit_workers = max(1, int(num_jobs))

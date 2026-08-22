@@ -1117,9 +1117,9 @@ def refine_local_parallelism_from_warmup(args, reports):
             > refined.device_memory_budget_gb):
         warning = (
             "observed device peak (%.1f GB) exceeds the %.1f GB "
-            "automatic per-worker entitlement on the smallest GPU; one "
-            "worker per GPU is already the minimum attempt, so elastic batch "
-            "sizing must shrink the workload or it will OOM."
+            "per-worker entitlement on the smallest GPU; the resolved "
+            "concurrency cannot accommodate the measured workload without "
+            "elastic batch shrink or OOM."
             % (
                 refined.warmup_device_peak_gb,
                 refined.device_memory_budget_gb,
