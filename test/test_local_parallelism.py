@@ -25,11 +25,13 @@ from mhcflurry.parallelism import (
     auto_max_workers_per_gpu,
     chunk_ranges_for_local_parallelism,
     estimate_worker_context_bytes,
+    free_vram_per_gpu_from_nvidia_smi_gb,
     non_daemon_context,
     num_workers_per_gpu_from_args,
     refine_local_parallelism_from_spawn_context,
     resolve_local_parallelism_args,
     refine_local_parallelism_from_warmup,
+    resolve_cpu_thread_budget,
     resolve_cpu_threads_per_worker,
     resolve_max_workers_per_gpu,
     validate_worker_pool_args,
@@ -818,7 +820,7 @@ def test_stale_auto_thread_marker_does_not_override_new_explicit_value(
     # Simulate a caller overriding one inherited setting between commands
     # without knowing about MHCflurry's private ownership marker.
     monkeypatch.setenv("OMP_NUM_THREADS", "7")
-    threads, auto_owned = planning._resolve_cpu_thread_budget(
+    threads, auto_owned = resolve_cpu_thread_budget(
         plan, cpu_count=6)
 
     assert threads == 2
@@ -1545,6 +1547,7 @@ def test_detect_free_vram_per_gpu_preserves_heterogeneity(monkeypatch):
     monkeypatch.setattr(
         planning.subprocess, "check_output",
         lambda args, **kw: b"8192\n71680\n")  # 8 GB, 70 GB
+    assert free_vram_per_gpu_from_nvidia_smi_gb(2) == [8.0, 70.0]
     assert planning.detect_free_vram_per_gpu_gb(2) == [8.0, 70.0]
     assert planning.free_vram_from_nvidia_smi_gb(2) == 8.0
 

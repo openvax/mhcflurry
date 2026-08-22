@@ -186,7 +186,7 @@ def detect_num_cuda_devices_no_torch():
     return n
 
 
-def _free_vram_per_gpu_from_nvidia_smi_gb(num_gpus):
+def free_vram_per_gpu_from_nvidia_smi_gb(num_gpus):
     """Return a list of free VRAM (GB) per visible GPU using ``nvidia-smi``.
 
     Returns ``None`` if ``nvidia-smi`` is unavailable or returns nothing. The
@@ -240,7 +240,7 @@ def _free_vram_per_gpu_from_nvidia_smi_gb(num_gpus):
 
 def free_vram_from_nvidia_smi_gb(num_gpus):
     """Minimum free VRAM (GB) across visible GPUs, or ``None``."""
-    vals = _free_vram_per_gpu_from_nvidia_smi_gb(num_gpus)
+    vals = free_vram_per_gpu_from_nvidia_smi_gb(num_gpus)
     return min(vals) if vals else None
 
 
@@ -255,7 +255,7 @@ def detect_free_vram_per_gpu_gb(num_gpus):
     override = free_vram_per_gpu_override_gb(num_gpus)
     if override is not None:
         return override
-    return _free_vram_per_gpu_from_nvidia_smi_gb(num_gpus)
+    return free_vram_per_gpu_from_nvidia_smi_gb(num_gpus)
 
 
 def auto_max_workers_per_gpu(
@@ -845,7 +845,7 @@ def resolve_local_parallelism_args(
     (
         cpu_threads_per_worker,
         cpu_threads_per_worker_was_auto,
-    ) = _resolve_cpu_thread_budget(plan)
+    ) = resolve_cpu_thread_budget(plan)
     plan = replace(
         plan,
         cpu_threads_per_worker=cpu_threads_per_worker,
@@ -914,12 +914,12 @@ def resolve_local_parallelism_args(
 
 def resolve_cpu_threads_per_worker(plan, cpu_count=None):
     """Set unset BLAS/OpenMP thread env vars from the final worker plan."""
-    threads, _was_auto = _resolve_cpu_thread_budget(plan, cpu_count=cpu_count)
+    threads, _was_auto = resolve_cpu_thread_budget(plan, cpu_count=cpu_count)
     return threads
 
 
-def _resolve_cpu_thread_budget(plan, cpu_count=None):
-    """Return the numeric thread budget and whether mhcflurry owns it.
+def resolve_cpu_thread_budget(plan, cpu_count=None):
+    """Resolve native threads per fit worker and environment ownership.
 
     A uniform runtime resize is safe only when all supported environment
     variables are unset or were written by an earlier mhcflurry auto pass.
@@ -1095,7 +1095,7 @@ def refine_local_parallelism_from_warmup(args, reports):
     (
         cpu_threads_per_worker,
         cpu_threads_per_worker_was_auto,
-    ) = _resolve_cpu_thread_budget(refined)
+    ) = resolve_cpu_thread_budget(refined)
     refined = replace(
         refined,
         cpu_threads_per_worker=cpu_threads_per_worker,
@@ -1110,6 +1110,28 @@ def refine_local_parallelism_from_warmup(args, reports):
     )
     refresh_device_memory_budget(args)
     refined = args.workload_plan
+    if (
+            refined.warmup_device_peak_gb is not None
+            and refined.device_memory_budget_gb is not None
+            and refined.warmup_device_peak_gb
+            > refined.device_memory_budget_gb):
+        warning = (
+            "observed device peak (%.1f GB) exceeds the %.1f GB "
+            "automatic per-worker entitlement on the smallest GPU; one "
+            "worker per GPU is already the minimum attempt, so elastic batch "
+            "sizing must shrink the workload or it will OOM."
+            % (
+                refined.warmup_device_peak_gb,
+                refined.device_memory_budget_gb,
+            )
+        )
+        if warning not in refined.warnings:
+            refined = replace(
+                refined,
+                warnings=refined.warnings + (warning,),
+            )
+            args.workload_plan = refined
+            print("Local parallelism:", warning, file=sys.stderr)
     if changed:
         print(
             "Warmup memory calibration tightened local parallelism: %s" % (
@@ -1228,7 +1250,7 @@ def refine_local_parallelism_from_spawn_context(
     (
         cpu_threads_per_worker,
         cpu_threads_per_worker_was_auto,
-    ) = _resolve_cpu_thread_budget(refined)
+    ) = resolve_cpu_thread_budget(refined)
     refined = replace(
         refined,
         cpu_threads_per_worker=cpu_threads_per_worker,

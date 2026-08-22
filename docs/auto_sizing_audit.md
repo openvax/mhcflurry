@@ -58,9 +58,79 @@ refinement, persist the final plan as JSON, and add measured probes for the
 remaining calibration/inference workloads. Track that follow-up in
 [issue #363](https://github.com/openvax/mhcflurry/issues/363).
 
+## Helper API audit
+
+Private-helper status follows responsibility rather than function size:
+
+| Decision | Helpers | Rationale |
+|---|---|---|
+| Public API | ``normalize_workload_hints``, ``is_auto_value`` | Both define planner input semantics, are reused throughout resolution, and have direct contract tests. |
+| Public API | ``free_vram_per_gpu_from_nvidia_smi_gb`` | Per-device discovery is a reusable hardware boundary. The existing minimum and override-aware APIs build on it. |
+| Public API | ``resolve_cpu_thread_budget`` | The numeric budget and whether MHCflurry owns the thread environment are both required by orchestration callers; returning only the number hid half of that contract. |
+| Folded | Workload-specific environment-variable name construction | It had one caller and no independent policy, so keeping a named private function obscured the estimate path. |
+| Remains private | OS/cgroup parsers, PID-namespace discovery, environment byte parsing, and CUDA-baseline combination | These are platform-specific implementation details behind public memory-discovery and peak-measurement APIs. Their direct tests protect edge cases without making them compatibility promises. |
+| Remains private | Host-memory clipping and finite-hint parsing | These are cohesive validation/planning steps whose intermediate forms are not useful to callers; they are covered through the public planner. |
+
+The audit also found a behavioral bug rather than an API-shape problem: the
+planner changed a CPU-only serial run from zero fit workers to one before
+DataLoader sizing. That contradicted ``auto_dataloader_num_workers`` and
+started four loader children. CPU-only serial plans now retain zero for that
+decision while still budgeting one main process for resident host memory.
+
 ## Release gate
 
 The next A100-40GB run must show that the resource probe tightens the original
 analytic plan, completes affinity training with no automatic minibatch shrink or
 OOM, and records a stable per-worker device entitlement. The end-to-end release
 run remains the empirical validation for prediction-affecting training changes.
+
+## Hardware validation matrix
+
+The autosizer tests machine *characteristics*, not accelerator names. A label
+such as ``4xH100`` makes a test case readable, but the planner receives only
+GPU count and free memory per GPU, available host RAM, available CPU units, and
+the workload envelope. This keeps a new card or cloud shape from requiring a
+model-name lookup table.
+
+Each matrix row validates two plans:
+
+1. The provisional launch plan packs the analytic worker estimate into the
+   shared-reserve GPU budget, then clamps total jobs by host RAM, CPU count,
+   and available work items. DataLoader children are resolved from the
+   resulting CPU/RAM share and host capacity is checked again.
+2. The measured plan replaces optimistic worker estimates with the maximum
+   full-residency probe peaks plus safety margins. It may only tighten an
+   automatic plan. Explicit concurrency is never mutated.
+
+The representative matrix covers CPU-only hosts, a 32 GB RTX 5090 workstation,
+single- and four-GPU A100-40GB hosts, four H100-80GB GPUs, eight H200-141GB
+GPUs, and deliberately CPU- and RAM-constrained variants. Nominal memory sizes
+come from NVIDIA's published [RTX 5090](https://www.nvidia.com/en-us/geforce/graphics-cards/50-series/rtx-5090/),
+[A100/H100 support table](https://docs.nvidia.com/datacenter/tesla/mig-user-guide/supported-gpus.html),
+and [H200 specifications](https://www.nvidia.com/en-us/data-center/h200/).
+Tests pass an explicit free-memory value, since real capacity must use current
+free memory rather than nominal card memory.
+
+Only the four-A100 row below is an empirical result. The 5090, H100, and H200
+rows are unit tests of capacity arithmetic: they map the observed affinity
+workload envelope onto explicit published hardware characteristics, but do not
+claim that an unmeasured accelerator generation has the identical runtime
+peak.
+
+The empirical golden row is the GCP ``a2-highgpu-4g`` release host: four
+A100-40GB GPUs, 48 vCPUs, and 340 GB system memory (the published shape is
+documented by [Google Cloud](https://docs.cloud.google.com/compute/docs/accelerator-optimized-machines)).
+Run ``20260821T234311Z-rc14-gcp-provision-train-release-full-db33e184`` on
+commit ``fdf746158`` observed 39.49 GiB free per GPU and 329.3 GiB available
+host RAM. Its affinity plan changed as follows:
+
+| Phase | Jobs | Workers/GPU | Device worker | Host worker | Device entitlement | CPU threads/worker |
+|---|---:|---:|---:|---:|---:|---:|
+| Analytic launch | 48 | 12 | 2.5 GiB | 3.0 GiB | 3.0 GiB | 1 |
+| Full-residency probe | 4 | 1 | 40.7 GiB | 12.3 GiB | 35.5 GiB | 11 |
+
+The seven probe architectures completed at minibatch 1024 with a maximum
+35.4 GiB CUDA process peak and 11.2 GiB host RSS peak. After explicit
+task-boundary cleanup, later architectures began near 2.7 GiB instead of
+inheriting the preceding 32--40 GiB allocator state. The production pool then
+started exactly four workers, one per GPU, without a training-batch shrink.

@@ -325,25 +325,31 @@ def test_macos_memory_info_preserves_zero_available_pages(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# _normalize_hints
+# normalize_workload_hints
 # ---------------------------------------------------------------------------
 
 
 def test_normalize_hints_empty():
-    assert wp._normalize_hints() == {}
+    assert wp.normalize_workload_hints() == {}
 
 
 def test_normalize_hints_dict_only():
-    assert wp._normalize_hints({"foo": 1, "bar": 2}) == {"foo": 1, "bar": 2}
+    assert wp.normalize_workload_hints(
+        {"foo": 1, "bar": 2},
+    ) == {"foo": 1, "bar": 2}
 
 
 def test_normalize_hints_kwargs_drop_none():
-    result = wp._normalize_hints({"foo": 1}, per_worker_gb=4.0, missing=None)
+    result = wp.normalize_workload_hints(
+        {"foo": 1},
+        per_worker_gb=4.0,
+        missing=None,
+    )
     assert result == {"foo": 1, "per_worker_gb": 4.0}
 
 
 def test_normalize_hints_kwargs_override_dict():
-    result = wp._normalize_hints({"foo": 1}, foo=99)
+    result = wp.normalize_workload_hints({"foo": 1}, foo=99)
     assert result == {"foo": 99}
 
 
@@ -529,28 +535,28 @@ def test_host_memory_num_jobs_cap_rejects_bad_safety_env(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# _is_auto
+# is_auto_value
 # ---------------------------------------------------------------------------
 
 
 def test_is_auto_none():
-    assert wp._is_auto(None)
+    assert wp.is_auto_value(None)
 
 
 def test_is_auto_string():
-    assert wp._is_auto("auto")
-    assert wp._is_auto("AUTO")
-    assert wp._is_auto("Auto")
+    assert wp.is_auto_value("auto")
+    assert wp.is_auto_value("AUTO")
+    assert wp.is_auto_value("Auto")
 
 
 def test_is_auto_int_is_not_auto():
-    assert not wp._is_auto(0)
-    assert not wp._is_auto(8)
+    assert not wp.is_auto_value(0)
+    assert not wp.is_auto_value(8)
 
 
 def test_is_auto_other_string_not_auto():
-    assert not wp._is_auto("manual")
-    assert not wp._is_auto("")
+    assert not wp.is_auto_value("manual")
+    assert not wp.is_auto_value("")
 
 
 # ---------------------------------------------------------------------------
