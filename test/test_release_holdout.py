@@ -10,7 +10,10 @@ import pytest
 from mhcflurry.cli.reassign_mass_spec_training_data import (
     reassign_mass_spec_training_data,
 )
-from mhcflurry.cli.compare_models import _filter_release_holdout_samples
+from mhcflurry.cli.compare_models import (
+    _filter_release_holdout_samples,
+    _load_presentation_benchmark_for_component,
+)
 from mhcflurry.release_holdout import (
     AFFINITY_PMHCS_FILE,
     AFFINITY_SAMPLES_FILE,
@@ -201,10 +204,52 @@ def test_build_apply_and_validate_release_holdout(tmp_path):
         "sample_id": ["mono-test", "multi-test", "multi-train"],
         "peptide": ["SIINFEKL", "GILGFVFTL", "KLGGALQAK"],
     })
-    args = SimpleNamespace(release_holdout_dir=str(holdout_dir))
+    args = SimpleNamespace(
+        release_holdout_dir=str(holdout_dir),
+        limit_files=None,
+    )
     affinity_eval = _filter_release_holdout_samples(
         benchmark, args, "affinity")
     processing_eval = _filter_release_holdout_samples(
         benchmark, args, "processing")
     assert affinity_eval.sample_id.tolist() == ["mono-test"]
     assert processing_eval.sample_id.tolist() == ["multi-test"]
+
+
+def test_release_holdout_file_limit_applies_after_sample_selection(tmp_path):
+    holdout_dir = tmp_path / "holdout"
+    holdout_dir.mkdir()
+    pandas.DataFrame({
+        "sample_id": ["held-out"],
+    }).to_csv(holdout_dir / PROCESSING_SAMPLES_FILE, index=False)
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    for filename, sample_id, peptides in (
+            ("a", "training", ["AAAAAAAA", "AAAAAAAK"]),
+            ("z", "held-out", ["BBBBBBBB", "BBBBBBBK"])):
+        pandas.DataFrame({
+            "sample_id": [sample_id, sample_id],
+            "peptide": peptides,
+            "hla": ["HLA-A*02:01", "HLA-A*02:01"],
+            "hit": [1, 0],
+        }).to_csv(
+            data_dir / (
+                "benchmark.multiallelic.train_excluded.%s.csv.bz2" % filename
+            ),
+            index=False,
+        )
+    args = SimpleNamespace(
+        release_holdout_dir=str(holdout_dir),
+        limit_files=1,
+    )
+
+    result = _load_presentation_benchmark_for_component(
+        str(data_dir),
+        args,
+        "processing",
+    )
+
+    assert result.sample_id.tolist() == ["held-out", "held-out"]
+    assert result.source_file.unique().tolist() == [
+        "benchmark.multiallelic.train_excluded.z.csv.bz2",
+    ]

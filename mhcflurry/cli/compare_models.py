@@ -1079,7 +1079,26 @@ def _filter_release_holdout_samples(frame, args, component):
     _stamp(
         "  release holdout %s: %d rows, %d samples" % (
             component, len(result), result.sample_id.nunique()))
+    if getattr(args, "limit_files", None):
+        selected_files = result.source_file.drop_duplicates().iloc[
+            :args.limit_files
+        ]
+        result = result.loc[result.source_file.isin(selected_files)].copy()
+        _stamp(
+            "  release holdout %s file limit: %d files, %d rows" % (
+                component,
+                len(selected_files),
+                len(result),
+            )
+        )
     return result
+
+
+def _load_presentation_benchmark_for_component(data_dir, args, component):
+    """Load, holdout-filter, then file-limit a presentation benchmark."""
+    initial_file_limit = None if args.release_holdout_dir else args.limit_files
+    benchmark = _load_presentation_benchmark(data_dir, initial_file_limit)
+    return _filter_release_holdout_samples(benchmark, args, component)
 
 
 def _run_affinity(side_a, side_b, args):
@@ -1088,8 +1107,9 @@ def _run_affinity(side_a, side_b, args):
     affinity_args = _parallelism_args_for_component(args, "affinity")
 
     data_dir = args.data_dir or _default_data_evaluation_dir()
+    initial_file_limit = None if args.release_holdout_dir else args.limit_files
     test = _load_affinity_benchmark(
-        data_dir, args.affinity_source, args.limit_files)
+        data_dir, args.affinity_source, initial_file_limit)
     test = _filter_release_holdout_samples(test, args, "affinity")
     _require_complete_benchmark_rows(
         test, ("peptide", "hla", "hit"), "Affinity benchmark")
@@ -1373,9 +1393,8 @@ def _run_processing(side_a, side_b, args):
     os.makedirs(component_dir, exist_ok=True)
     processing_args = _parallelism_args_for_component(args, "processing")
     data_dir = args.data_dir or _default_data_evaluation_dir()
-    benchmark = _load_presentation_benchmark(data_dir, args.limit_files)
-    benchmark = _filter_release_holdout_samples(
-        benchmark, args, "processing")
+    benchmark = _load_presentation_benchmark_for_component(
+        data_dir, args, "processing")
     summaries = {}
     summary_rows = []
     for mode in requested_modes:
@@ -1882,9 +1901,8 @@ def _run_presentation(side_a, side_b, args):
     requested_modes = _requested_modes(
         args.presentation_modes, PRESENTATION_MODES, "--presentation-modes")
 
-    benchmark = _load_presentation_benchmark(data_dir, args.limit_files)
-    benchmark = _filter_release_holdout_samples(
-        benchmark, args, "presentation")
+    benchmark = _load_presentation_benchmark_for_component(
+        data_dir, args, "presentation")
     summaries = {}
     summary_rows = []
     presentation_args = _parallelism_args_for_component(args, "presentation")

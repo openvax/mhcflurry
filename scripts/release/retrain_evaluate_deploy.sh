@@ -177,40 +177,25 @@ require_command() {
 }
 
 require_clean_runplz_3153() {
-    python3 - "$RUNPLZ_REQUIRED_VERSION" <<'PY' || \
+    local runplz_executable
+    local runplz_shebang
+    local -a runplz_python
+    runplz_executable="$(command -v runplz)" || \
+        die "Required command not found: runplz"
+    IFS= read -r runplz_shebang < "$runplz_executable" || \
+        die "Could not read runplz executable: $runplz_executable"
+    case "$runplz_shebang" in
+        '#!'*) ;;
+        *) die "runplz executable has no interpreter shebang: $runplz_executable" ;;
+    esac
+    read -r -a runplz_python <<< "${runplz_shebang#\#!}"
+    [ "${#runplz_python[@]}" -gt 0 ] || \
+        die "Could not resolve the runplz interpreter: $runplz_executable"
+    "${runplz_python[@]}" \
+        "$SCRIPT_DIR/validate_runplz_provenance.py" \
+        --executable "$runplz_executable" \
+        --required-version "$RUNPLZ_REQUIRED_VERSION" || \
         die "runplz $RUNPLZ_REQUIRED_VERSION from PyPI or a clean checkout is required"
-import importlib.metadata
-import pathlib
-import subprocess
-import sys
-
-required = sys.argv[1]
-actual = importlib.metadata.version("runplz")
-if actual != required:
-    raise SystemExit(
-        "runplz version mismatch: required %s, found %s" % (required, actual)
-    )
-
-import runplz
-module_path = pathlib.Path(runplz.__file__).resolve()
-identity = "version=%s module=%s" % (actual, module_path)
-for parent in module_path.parents:
-    if not (parent / ".git").exists():
-        continue
-    commit = subprocess.check_output(
-        ["git", "-C", str(parent), "rev-parse", "HEAD"], text=True
-    ).strip()
-    dirty = subprocess.check_output(
-        ["git", "-C", str(parent), "status", "--porcelain"], text=True
-    ).strip()
-    if dirty:
-        raise SystemExit(
-            "editable runplz checkout is dirty: %s" % parent
-        )
-    identity += " git_commit=%s" % commit
-    break
-print("runplz provenance: %s" % identity, file=sys.stderr)
-PY
 }
 
 validate_release_provenance() {
@@ -910,20 +895,21 @@ build_brev_postprocess_archives() {
     local remote_data_dir="$3"
     local repo_archive="$staging/repo.tar.bz2"
     local models_archive="$staging/model_artifacts.tar.bz2"
-    local model_paths=(
+    local artifact_paths=(
         affinity/models.combined
         presentation/models
+        release_holdout
     )
     local kind
     for kind in $PROCESSING_VARIANTS; do
-        model_paths+=("processing/models.selected.$kind")
+        artifact_paths+=("processing/models.selected.$kind")
     done
 
     run_cmd mkdir -p "$staging"
     run_logged_step postprocess_package_repo \
         write_git_repo_archive "$repo_archive"
     run_logged_step postprocess_package_models \
-        tar -C "$RUN_DIR" -cjf "$models_archive" "${model_paths[@]}"
+        tar -C "$RUN_DIR" -cjf "$models_archive" "${artifact_paths[@]}"
     build_brev_paper_input_archive "$staging" "$remote_paper_inputs_root"
     build_brev_data_dir_archive "$staging" "$remote_data_dir"
 }

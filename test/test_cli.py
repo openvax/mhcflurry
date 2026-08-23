@@ -26,6 +26,7 @@ import os
 import pathlib
 import subprocess
 import sys
+import tarfile
 import types
 
 import numpy
@@ -895,6 +896,118 @@ def test_release_workflow_sync_is_workflow_id_scoped():
     assert "Refusing to sync Brev output for workflow" in script
     assert "add_path .runplz/mhcflurry_release_workflow_id" in script
     assert "add_path .runplz/mhcflurry_release_workflow_exit_code" in script
+
+
+def test_release_workflow_validates_selected_runplz_interpreter(tmp_path):
+    fake_checkout = tmp_path / "mhcflurry-checkout"
+    selected_environment = fake_checkout / ".venv"
+    subprocess.run(
+        [sys.executable, "-m", "venv", str(selected_environment)],
+        check=True,
+    )
+    selected_python = selected_environment / "bin" / "python"
+    site_packages = (
+        selected_environment
+        / "lib"
+        / ("python%d.%d" % sys.version_info[:2])
+        / "site-packages"
+    )
+    package_dir = site_packages / "runplz"
+    distribution_dir = site_packages / "runplz-3.15.3.dist-info"
+    package_dir.mkdir(parents=True)
+    distribution_dir.mkdir()
+    (fake_checkout / ".git").mkdir()
+    (package_dir / "__init__.py").write_text("")
+    (distribution_dir / "METADATA").write_text(
+        "Metadata-Version: 2.1\nName: runplz\nVersion: 3.15.3\n"
+    )
+
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    runplz = fake_bin / "runplz"
+    runplz.write_text(
+        "#!%s\nimport sys\nsys.exit(23)\n" % selected_python
+    )
+    runplz.chmod(0o755)
+    brev = fake_bin / "brev"
+    brev.write_text(
+        "#!/bin/sh\n"
+        "if [ \"$1\" = ls ]; then printf '[]\\n'; fi\n"
+    )
+    brev.chmod(0o755)
+    env = dict(os.environ)
+    env["PATH"] = "%s:%s" % (fake_bin, env["PATH"])
+
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "brev-existing",
+            "--brev-instance", "missing-test-instance",
+            "--no-sync-remote-output",
+            "--skip-eval",
+            "--skip-plots",
+            "--allow-dirty-repo",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    output = result.stdout + result.stderr
+    assert result.returncode == 23, output
+    assert "runplz provenance:" in output
+    assert "executable=%s" % runplz in output
+    assert "module=%s" % (package_dir / "__init__.py") in output
+    assert "from PyPI or a clean checkout is required" not in output
+
+
+def test_brev_postprocess_archive_includes_release_holdout(tmp_path):
+    run_dir = tmp_path / "release-run"
+    _write_minimal_deployable_run(run_dir)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    brev = fake_bin / "brev"
+    brev.write_text(
+        "#!/bin/sh\n"
+        "if [ \"$1\" = ls ]; then printf '[]\\n'; fi\n"
+    )
+    brev.chmod(0o755)
+    env = dict(os.environ)
+    env["PATH"] = "%s:%s" % (fake_bin, env["PATH"])
+
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(run_dir),
+            "--release", "2.3.0",
+            "--backend", "brev-existing",
+            "--brev-instance", "missing-test-instance",
+            "--skip-train",
+            "--skip-plots",
+            "--allow-dirty-repo",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode != 0
+    archive = run_dir / ".brev-postprocess" / "model_artifacts.tar.bz2"
+    assert archive.is_file()
+    with tarfile.open(archive, "r:bz2") as tar:
+        archived_paths = set(tar.getnames())
+    assert {
+        "release_holdout/policy.json",
+        "release_holdout/validation.json",
+        "release_holdout/affinity_pmhcs.csv",
+        "release_holdout/affinity_samples.csv",
+        "release_holdout/processing_samples.csv",
+        "release_holdout/presentation_samples.csv",
+    }.issubset(archived_paths)
 
 
 def test_release_sync_archive_preserves_comparison_predictions(tmp_path):
