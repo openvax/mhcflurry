@@ -29,7 +29,7 @@ def _write_benchmark(path, rows):
     pandas.DataFrame(rows).to_csv(path, index=False)
 
 
-def test_build_apply_and_validate_release_holdout(tmp_path):
+def test_build_apply_and_validate_release_holdout(tmp_path, monkeypatch):
     data_dir = tmp_path / "data_evaluation"
     data_dir.mkdir()
     _write_benchmark(
@@ -160,6 +160,8 @@ def test_build_apply_and_validate_release_holdout(tmp_path):
     presentation = pandas.DataFrame([
         {"sample_id": "multi-test", "peptide": "GILGFVFTL", "hit": 1},
         {"sample_id": "multi-train", "peptide": "KLGGALQAK", "hit": 1},
+        # Production presentation data mixes numeric-looking and textual IDs.
+        {"sample_id": "24616531", "peptide": "AAAAAAAAA", "hit": 0},
     ])
     presentation = exclude_samples(
         presentation,
@@ -169,6 +171,18 @@ def test_build_apply_and_validate_release_holdout(tmp_path):
     presentation_path = tmp_path / "presentation.csv"
     presentation.to_csv(presentation_path, index=False)
 
+    sample_read_options = []
+    read_csv = pandas.read_csv
+
+    def read_csv_spy(path, *args, **kwargs):
+        if (
+                path in (processing_path, presentation_path)
+                and kwargs.get("usecols") == ["sample_id"]):
+            sample_read_options.append(kwargs.copy())
+        return read_csv(path, *args, **kwargs)
+
+    monkeypatch.setattr(pandas, "read_csv", read_csv_spy)
+
     validation_path = tmp_path / "validation.json"
     result = validate_release_holdout(
         holdout_dir,
@@ -177,6 +191,12 @@ def test_build_apply_and_validate_release_holdout(tmp_path):
         presentation_path,
         out=validation_path,
     )
+    assert len(sample_read_options) == 2
+    assert all(
+        options["dtype"] == {"sample_id": str}
+        for options in sample_read_options
+    )
+    assert all(options["chunksize"] for options in sample_read_options)
     assert result["schema_version"] == 1
     assert result["affinity_overlap_rows"] == 0
     assert result["processing_overlap_rows"] == 0

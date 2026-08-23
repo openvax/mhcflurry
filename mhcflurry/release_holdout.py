@@ -325,17 +325,21 @@ def validate_release_holdout(
         affinity[["allele", "peptide"]]).isin(
             pandas.MultiIndex.from_frame(affinity_exclusions)).sum()
 
-    processing = pandas.read_csv(
-        processing_training_data, usecols=["sample_id"])
-    processing_overlap = processing.sample_id.astype(str).isin(
-        load_excluded_samples(
-            holdout_dir / PROCESSING_SAMPLES_FILE)).sum()
+    def count_sample_overlaps(training_data, manifest):
+        excluded = load_excluded_samples(holdout_dir / manifest)
+        overlap_rows = 0
+        for chunk in pandas.read_csv(
+                training_data,
+                usecols=["sample_id"],
+                dtype={"sample_id": str},
+                chunksize=500_000):
+            overlap_rows += chunk.sample_id.isin(excluded).sum()
+        return int(overlap_rows)
 
-    presentation = pandas.read_csv(
-        presentation_training_data, usecols=["sample_id"])
-    presentation_overlap = presentation.sample_id.astype(str).isin(
-        load_excluded_samples(
-            holdout_dir / PRESENTATION_SAMPLES_FILE)).sum()
+    processing_overlap = count_sample_overlaps(
+        processing_training_data, PROCESSING_SAMPLES_FILE)
+    presentation_overlap = count_sample_overlaps(
+        presentation_training_data, PRESENTATION_SAMPLES_FILE)
 
     result = {
         "schema_version": 1,
