@@ -71,8 +71,9 @@ paper figures, saved-prediction tables, and external predictors.
   paths; explicit values are for controlled comparisons.
 - **`plot_minibatch_sweep.py`** renders throughput and loss plots from
   `sweep_summary.csv`.
-- **`plot_loss_curves.py`** renders per-architecture loss curves from a trained
-  ensemble.
+- **`mhcflurry train plot-loss-curves`** renders per-architecture loss curves
+  from a trained ensemble. The historical `plot_loss_curves.py` path remains a
+  compatibility shim.
 - **`benchmark_training_profile.py`** reports data-load, encoding, fit, and save
   timings for one architecture.
 

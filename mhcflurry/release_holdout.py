@@ -45,7 +45,8 @@ def _benchmark_rows(path, chunksize):
         yield chunk
 
 
-def _canonical_allele_mapping(values):
+def canonical_allele_mapping(values):
+    """Map raw class-I allele names to sequence-resolved canonical names."""
     result = {}
     for raw in pandas.Series(values).dropna().astype(str).unique():
         try:
@@ -83,7 +84,7 @@ def build_release_holdout(
 
     training = pandas.read_csv(
         training_data, usecols=["allele", "peptide"])
-    training_allele_map = _canonical_allele_mapping(training.allele)
+    training_allele_map = canonical_allele_mapping(training.allele)
     training["canonical_allele"] = training.allele.astype(str).map(
         training_allele_map)
     training = training.loc[training.canonical_allele.notna()]
@@ -262,7 +263,7 @@ def exclude_affinity_pmhcs(frame, manifest):
             f"got {list(exclusions.columns)}")
     exclusion_index = pandas.MultiIndex.from_frame(exclusions[required])
     canonical = frame[required].copy()
-    allele_map = _canonical_allele_mapping(canonical.allele)
+    allele_map = canonical_allele_mapping(canonical.allele)
     canonical["allele"] = canonical.allele.astype(str).map(allele_map)
     row_index = pandas.MultiIndex.from_frame(canonical)
     mask = row_index.isin(exclusion_index)
@@ -316,7 +317,7 @@ def validate_release_holdout(
     policy = validate_holdout_manifests(holdout_dir)
     affinity = pandas.read_csv(
         affinity_training_data, usecols=["allele", "peptide"])
-    affinity_map = _canonical_allele_mapping(affinity.allele)
+    affinity_map = canonical_allele_mapping(affinity.allele)
     affinity["allele"] = affinity.allele.astype(str).map(affinity_map)
     affinity = affinity.loc[affinity.allele.notna()]
     affinity_exclusions = pandas.read_csv(

@@ -70,7 +70,7 @@ from ..parallelism import (
 )
 from ..pytorch_sizing import default_prediction_batch_is_auto
 from ..pseudosequences import LEGACY_ALLELE_SEQUENCES_FILENAME
-from ..release_holdout import load_excluded_samples
+from ..release_holdout import canonical_allele_mapping, load_excluded_samples
 from ..workload_planning import (
     WORKLOAD_AFFINITY_INFERENCE,
     WORKLOAD_PROCESSING_INFERENCE,
@@ -228,9 +228,14 @@ def register_subparser(parser):
         help="Smoke-test: only read first N benchmark files.",
     )
     parser.add_argument(
-        "--affinity-source", choices=["mixmhcpred", "netmhcpan4", "both"],
+        "--affinity-source",
+        choices=["mixmhcpred", "netmhcpan4", "no_additional_ms", "both"],
         default="mixmhcpred",
-        help="Which monoallelic benchmark source to use for affinity eval.",
+        help=(
+            "Which monoallelic benchmark source to use for affinity eval. "
+            "The no_additional_ms source is train-excluded for the matching "
+            "models_class1_pan_variants/models.no_additional_ms predictor."
+        ),
     )
     parser.add_argument(
         "--processing-modes",
@@ -1059,6 +1064,74 @@ def _load_affinity_benchmark(data_dir, source, limit_files):
     return pandas.concat(dfs, ignore_index=True)
 
 
+def _affinity_training_data_path(predictor_dir):
+    """Return recorded training rows for an affinity predictor, if present."""
+    for filename in ("train_data.csv.bz2", "train_data.csv"):
+        path = os.path.join(predictor_dir, filename)
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def _exclude_affinity_training_overlap(test, side_a, side_b):
+    """Drop the union of side A/B training pMHCs from a release benchmark."""
+    benchmark_index = pandas.MultiIndex.from_frame(test[["hla", "peptide"]])
+    union_mask = numpy.zeros(len(test), dtype=bool)
+    report = {
+        "policy": "drop union of side A and side B affinity training pMHCs",
+        "rows_before": int(len(test)),
+        "hits_before": int(test.hit.sum()),
+        "sides": {},
+    }
+    for side in (side_a, side_b):
+        predictor_dir = side["paths"]["affinity"]
+        training_path = _affinity_training_data_path(predictor_dir)
+        if training_path is None:
+            raise ValueError(
+                "Release affinity comparison cannot audit training overlap "
+                "for %s: missing train_data.csv[.bz2] in %s" % (
+                    side["label"], predictor_dir)
+            )
+        training = pandas.read_csv(
+            training_path, usecols=["allele", "peptide"])
+        allele_map = canonical_allele_mapping(training.allele)
+        training["allele"] = training.allele.astype(str).map(allele_map)
+        training = training.loc[training.allele.notna()]
+        training_index = pandas.MultiIndex.from_frame(
+            training[["allele", "peptide"]]).unique()
+        overlap_mask = benchmark_index.isin(training_index)
+        union_mask |= overlap_mask
+        report["sides"][side["letter"]] = {
+            "label": side["label"],
+            "predictor_dir": predictor_dir,
+            "training_data": training_path,
+            "training_rows": int(len(training)),
+            "training_unique_pmhcs": int(len(training_index)),
+            "overlap_rows": int(overlap_mask.sum()),
+            "overlap_hits": int(test.hit.loc[overlap_mask].sum()),
+            "overlap_unique_pmhcs": int(
+                benchmark_index[overlap_mask].nunique()),
+        }
+    report.update({
+        "union_overlap_rows": int(union_mask.sum()),
+        "union_overlap_hits": int(test.hit.loc[union_mask].sum()),
+        "union_overlap_unique_pmhcs": int(
+            benchmark_index[union_mask].nunique()),
+        "rows_after": int((~union_mask).sum()),
+        "hits_after": int(test.hit.loc[~union_mask].sum()),
+    })
+    _stamp(
+        "  release training-overlap exclusion: %d rows / %d hits dropped; "
+        "%d rows / %d hits remain" % (
+            report["union_overlap_rows"],
+            report["union_overlap_hits"],
+            report["rows_after"],
+            report["hits_after"],
+        )
+    )
+    return test.loc[~union_mask].copy(), report
+
+
 def _filter_release_holdout_samples(frame, args, component):
     """Restrict a benchmark to its frozen release-evaluation samples."""
     if not args.release_holdout_dir:
@@ -1150,6 +1223,16 @@ def _run_affinity(side_a, side_b, args):
     test = test[(test.peptide_len >= 8) & (test.peptide_len <= 15)].copy()
     test["hit"] = pandas.to_numeric(test["hit"], errors="coerce")
     _require_binary_comparison_rows(test, "Affinity benchmark")
+    training_overlap = None
+    if args.release_holdout_dir:
+        test, training_overlap = _exclude_affinity_training_overlap(
+            test, side_a, side_b)
+        _require_binary_comparison_rows(
+            test, "Train-excluded release affinity benchmark")
+        with open(
+                os.path.join(component_dir, "training_overlap.json"),
+                "w") as fd:
+            json.dump(training_overlap, fd, indent=2, sort_keys=True)
     _stamp("  evaluable rows: %d" % len(test))
 
     comparison_model_bytes = max(
@@ -1197,6 +1280,8 @@ def _run_affinity(side_a, side_b, args):
         )
 
     summary = _affinity_summary(test, per_allele, per_length)
+    if training_overlap is not None:
+        summary["training_overlap"] = training_overlap
     with open(os.path.join(component_dir, "summary.json"), "w") as fd:
         json.dump(summary, fd, indent=2, sort_keys=True)
     _stamp("  wrote summary.json")
@@ -2180,6 +2265,17 @@ def _write_summary_markdown(headline, side_a, side_b, out_dir, components):
                 s["allele_count"]["b_better_roc_auc"],
             )
         )
+        overlap = s.get("training_overlap")
+        if overlap:
+            lines.append(
+                "- training-overlap exclusion: %d rows / %d hits dropped; "
+                "%d rows / %d hits remain" % (
+                    overlap["union_overlap_rows"],
+                    overlap["union_overlap_hits"],
+                    overlap["rows_after"],
+                    overlap["hits_after"],
+                )
+            )
         lines.append("- Details: `affinity/per_allele.csv`, `affinity/summary.json`")
         lines.append("")
 

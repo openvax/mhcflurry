@@ -44,13 +44,23 @@ def test_model_artifact_size_uses_uncompressed_npz_members(tmp_path):
     assert wp.model_artifact_size_bytes(tmp_path) > os.path.getsize(weights)
 
 
-def test_elastic_inference_uses_model_artifacts_not_static_profile():
+def test_elastic_inference_keeps_resident_workload_floor():
     estimate = wp.estimate_workload_memory(
         wp.WORKLOAD_PRESENTATION_INFERENCE,
         {"model_bytes": 10 * wp.GIB, "elastic_batch": True},
     )
-    assert estimate["device_worker_gb"] == pytest.approx(13.5)
-    assert "uncompressed model artifacts" in estimate["notes"]
+    assert estimate["device_worker_gb"] == 16.0
+    assert "profile default" in estimate["notes"]
+    assert "elastic batches retain resident workload floor" in estimate["notes"]
+
+
+def test_elastic_inference_raises_floor_for_larger_model_artifacts():
+    estimate = wp.estimate_workload_memory(
+        wp.WORKLOAD_PRESENTATION_INFERENCE,
+        {"model_bytes": 20 * wp.GIB, "elastic_batch": True},
+    )
+    assert estimate["device_worker_gb"] == pytest.approx(25.5)
+    assert "uncompressed model artifact floor" in estimate["notes"]
 
 
 def test_elastic_inference_preserves_explicit_worker_memory(monkeypatch):

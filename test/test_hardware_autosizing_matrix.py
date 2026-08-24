@@ -23,7 +23,12 @@ from mhcflurry.parallelism import (
 )
 from mhcflurry.parallelism import planning
 from mhcflurry.parallelism import worker_runtime
-from mhcflurry.workload_planning import WORKLOAD_AFFINITY_TRAINING
+from mhcflurry.workload_planning import (
+    WORKLOAD_AFFINITY_INFERENCE,
+    WORKLOAD_AFFINITY_TRAINING,
+    WORKLOAD_PRESENTATION_INFERENCE,
+    WORKLOAD_PROCESSING_INFERENCE,
+)
 
 
 # Maximums observed by the seven-architecture full-residency affinity probe on
@@ -286,3 +291,79 @@ def test_affinity_autosizer_hardware_matrix(monkeypatch, case):
         assert final.warmup_host_peak_gb == pytest.approx(11.1962, abs=1e-4)
         assert final.host_worker_gb == pytest.approx(12.3158, abs=1e-4)
         assert final.device_memory_budget_gb == pytest.approx(35.5447, abs=1e-4)
+
+
+INFERENCE_HARDWARE_CASES = (
+    pytest.param(1, 32.0, 64, 512.0, (7, 3, 1), id="rtx-5090-32gb"),
+    pytest.param(
+        1, 40_442 / 1024.0, 64, 512.0, (8, 4, 2), id="a100-40gb"),
+    pytest.param(
+        4, 40_442 / 1024.0, 48, 340.0, (32, 16, 8), id="4x-a100-40gb"),
+    pytest.param(4, 80.0, 96, 640.0, (72, 36, 16), id="4x-h100-80gb"),
+    pytest.param(8, 141.0, 112, 2048.0, (112, 112, 56), id="8x-h200-141gb"),
+)
+
+
+@pytest.mark.parametrize(
+    ("gpus", "free_vram_gb", "cpus", "ram_gb", "expected_jobs"),
+    INFERENCE_HARDWARE_CASES,
+)
+def test_inference_autosizer_hardware_matrix(
+        monkeypatch, gpus, free_vram_gb, cpus, ram_gb, expected_jobs):
+    """Elastic batches never erase complete resident-workload capacity."""
+    monkeypatch.setenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB",
+        str(free_vram_gb),
+    )
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_RAM_GB", str(ram_gb))
+    monkeypatch.setenv("MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB", str(ram_gb))
+    monkeypatch.setattr(planning.os, "cpu_count", lambda: cpus)
+    monkeypatch.setattr(planning, "configure_pytorch", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        worker_runtime,
+        "configure_worker_cpu_threads",
+        lambda num_threads, auto_owned=True: num_threads,
+    )
+    for name in (
+            "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP",
+            "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB",
+            "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_VRAM_FRACTION",
+            "MHCFLURRY_AUTO_HOST_MEMORY_SAFETY_FRACTION"):
+        monkeypatch.delenv(name, raising=False)
+
+    workloads = (
+        WORKLOAD_AFFINITY_INFERENCE,
+        WORKLOAD_PROCESSING_INFERENCE,
+        WORKLOAD_PRESENTATION_INFERENCE,
+    )
+    for workload, expected in zip(workloads, expected_jobs):
+        args = Namespace(
+            backend="auto",
+            gpus=gpus,
+            max_workers_per_gpu="auto",
+            num_jobs="auto",
+            dataloader_num_workers="auto",
+            random_negative_pool_epochs="auto",
+            torch_compile="auto",
+            torch_compile_loss="auto",
+            matmul_precision="none",
+            enable_timing=False,
+            cluster_parallelism=False,
+        )
+        resolve_local_parallelism_args(
+            args,
+            workload_name=workload,
+            workload_hints={
+                # Matches the order of magnitude of the 2.3 release archives;
+                # it must not replace the complete resident-workload floor.
+                "model_bytes": 200 * (1 << 20),
+                "elastic_batch": True,
+                "prediction_rows": 2_054_263,
+            },
+        )
+        assert args.num_jobs == expected
+        assert args.workload_plan.device_worker_gb == {
+            WORKLOAD_AFFINITY_INFERENCE: 4.0,
+            WORKLOAD_PROCESSING_INFERENCE: 8.0,
+            WORKLOAD_PRESENTATION_INFERENCE: 16.0,
+        }[workload]

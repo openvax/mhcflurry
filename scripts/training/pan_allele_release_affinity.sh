@@ -487,17 +487,12 @@ SKIP_PLOTS="${SKIP_PLOTS:-0}"
 if [ "$SKIP_PLOTS" = "1" ]; then
     log_release_event phase_skipped "SKIP_PLOTS=1"
 else
-    PLOT_SCRIPT="$SCRIPT_DIR/plot_loss_curves.py"
     PLOT_OUT="$MHCFLURRY_OUT/loss_plots"
-    if [ ! -f "$PLOT_SCRIPT" ]; then
-        log_release_event plot_skipped "missing plot_loss_curves.py"
-    else
-        run_logged_step "plot_loss_curves" "$PLOT_LOG" \
-            python3 "$PLOT_SCRIPT" \
-            --selected-dir "$MHCFLURRY_OUT/models.combined" \
-            --unselected-dir "$MHCFLURRY_OUT/models.unselected.combined" \
-            --out "$PLOT_OUT"
-    fi
+    run_logged_step "plot_loss_curves" "$PLOT_LOG" \
+        mhcflurry train plot-loss-curves \
+        --selected-dir "$MHCFLURRY_OUT/models.combined" \
+        --unselected-dir "$MHCFLURRY_OUT/models.unselected.combined" \
+        --out "$PLOT_OUT"
 fi
 
 CURRENT_PHASE="complete"

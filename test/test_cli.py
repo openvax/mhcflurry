@@ -119,7 +119,52 @@ def test_train_help_runs(capsys):
     assert cli_main.main(["train", "--help"]) == 0
     captured = capsys.readouterr().out
     assert "pan-allele-release" in captured
+    assert "plot-loss-curves" in captured
     assert "Deployment is opt-in" in captured
+
+
+def test_compare_models_accepts_train_excluded_affinity_source():
+    parser = compare_models.make_parser()
+    args = parser.parse_args([
+        "--a", "candidate",
+        "--b", "baseline",
+        "--out", "comparison",
+        "--affinity-source", "no_additional_ms",
+    ])
+    assert args.affinity_source == "no_additional_ms"
+
+
+def test_release_affinity_excludes_union_of_both_sides_training(tmp_path):
+    dirs = [tmp_path / "a", tmp_path / "b"]
+    for directory, rows in zip(dirs, [
+            [("HLA-A0201", "SIINFEKL")],
+            [("HLA-A*03:01", "KLGGALQAK")],
+    ]):
+        directory.mkdir()
+        pandas.DataFrame(rows, columns=["allele", "peptide"]).to_csv(
+            directory / "train_data.csv", index=False)
+    side_a = {
+        "letter": "a", "label": "candidate",
+        "paths": {"affinity": str(dirs[0])},
+    }
+    side_b = {
+        "letter": "b", "label": "baseline",
+        "paths": {"affinity": str(dirs[1])},
+    }
+    benchmark = pandas.DataFrame({
+        "hla": ["HLA-A*02:01", "HLA-A*03:01", "HLA-B*07:02"],
+        "peptide": ["SIINFEKL", "KLGGALQAK", "RPHERNGFTV"],
+        "hit": [1, 1, 0],
+    })
+
+    filtered, report = compare_models._exclude_affinity_training_overlap(
+        benchmark, side_a, side_b)
+
+    assert filtered.peptide.tolist() == ["RPHERNGFTV"]
+    assert report["union_overlap_rows"] == 2
+    assert report["union_overlap_hits"] == 2
+    assert report["sides"]["a"]["overlap_unique_pmhcs"] == 1
+    assert report["sides"]["b"]["overlap_unique_pmhcs"] == 1
 
 
 def test_train_pan_allele_release_delegates(monkeypatch, tmp_path):
@@ -508,6 +553,8 @@ def test_release_workflow_eval_max_benchmark_files_is_forwarded(tmp_path):
     output = result.stdout + result.stderr
     assert "mhcflurry eval compare-models" in output
     assert "--include affinity" in output
+    assert "--affinity-source no_additional_ms" in output
+    assert "eval_comparison_train_excluded_affinity" in output
     assert "--limit-files 1" in output
 
 
@@ -1021,6 +1068,10 @@ def test_release_sync_archive_preserves_comparison_predictions(tmp_path):
         "eval_comparison/affinity/predictions.csv.bz2",
         "eval_comparison/processing/predictions_with_flanks.csv.bz2",
         "eval_comparison/presentation/predictions_without_flanks.csv.bz2",
+        (
+            "eval_comparison_train_excluded_affinity/affinity/"
+            "predictions.csv.bz2"
+        ),
     ]
     for relative in expected:
         path = out_dir / relative

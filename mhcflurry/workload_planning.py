@@ -594,18 +594,14 @@ def estimate_workload_memory(workload_name=WORKLOAD_GENERIC, hints=None):
     data_bytes = _finite_nonnegative_hint(hints, "data_bytes") or 0.0
     model_bytes = _finite_nonnegative_hint(hints, "model_bytes")
     data_gb = data_bytes / GIB
-    explicit_device_worker_gb = False
-
     workload_env = "MHCFLURRY_WORKLOAD_%s_PER_WORKER_GB" % (
         profile.name.upper().replace("-", "_"),
     )
     if os.environ.get(workload_env) not in (None, ""):
         device_worker_gb = env_float(workload_env, 0.0, bounds=(0.0, None))
-        explicit_device_worker_gb = True
         notes.append("env override")
     elif hints.get("per_worker_gb") is not None:
         device_worker_gb = _finite_nonnegative_hint(hints, "per_worker_gb")
-        explicit_device_worker_gb = True
         notes.append("command estimate")
     else:
         device_worker_gb = profile.device_worker_gb
@@ -617,14 +613,17 @@ def estimate_workload_memory(workload_name=WORKLOAD_GENERIC, hints=None):
             DEVICE_RUNTIME_BASE_GB
             + float(model_bytes) / GIB * MODEL_TENSOR_SAFETY_FACTOR
         )
-        if hints.get("elastic_batch") and not explicit_device_worker_gb:
-            # Activations are sized later from live memory. For inference the
-            # launcher only needs parameters plus the CUDA/runtime base.
-            device_worker_gb = artifact_worker_gb
-            notes.append("uncompressed model artifacts")
-        elif device_worker_gb is None or artifact_worker_gb > device_worker_gb:
+        if device_worker_gb is None or artifact_worker_gb > device_worker_gb:
+            # Artifact size is a resident-memory floor, not a replacement for
+            # the workload profile. An elastic batch can shrink transient
+            # activations, but it cannot shrink CUDA contexts, model state, or
+            # the other predictors held by a composite workload. Analytic
+            # command estimates and expert env overrides remain authoritative;
+            # unlike raw artifact size, they describe a complete worker.
             device_worker_gb = artifact_worker_gb
             notes.append("uncompressed model artifact floor")
+        elif hints.get("elastic_batch"):
+            notes.append("elastic batches retain resident workload floor")
 
     data_pressure_gb = 0.0
     if data_bytes and device_worker_gb is not None:

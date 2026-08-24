@@ -114,6 +114,11 @@ Evaluation:
   closest older public release available in downloads.yml, public:2.0.0; pass
   --compare-baseline public to compare against the currently configured public
   release, or pass a model-run directory / public:<release_name>.
+  When affinity is included, the workflow also writes
+  RUN_DIR/eval_comparison_train_excluded_affinity using the official
+  models.no_additional_ms predictor and its matching train-excluded benchmark.
+  This is the generalization gate; a production-release comparison may overlap
+  historical training data and is retained only for descriptive continuity.
   --eval-max-benchmark-files limits each evaluation benchmark family to the
   first N benchmark input CSV files. It is intended only for smoke proofs that
   the end-to-end command wiring works.
@@ -1269,6 +1274,9 @@ else
         models_class1_processing models_class1_presentation
     data_dir="$(mhcflurry downloads path data_evaluation)"
 fi
+case ",${COMPARE_INCLUDE:-affinity,processing,presentation}," in
+    *,affinity,*) mhcflurry downloads fetch models_class1_pan_variants ;;
+esac
 baseline_release="${COMPARE_BASELINE#public:}"
 if [ "$baseline_release" != "$COMPARE_BASELINE" ]; then
     MHCFLURRY_DOWNLOADS_CURRENT_RELEASE="$baseline_release" \
@@ -1311,6 +1319,43 @@ case "$(printf '%s' "$COMPARE_GPUS" | tr '[:upper:]' '[:lower:]')" in
 esac
 "${compare_args[@]}"
 
+case ",${COMPARE_INCLUDE:-affinity,processing,presentation}," in
+    *,affinity,*)
+        train_excluded_affinity_dir="$(
+            mhcflurry downloads path models_class1_pan_variants
+        )/models.no_additional_ms"
+        fair_affinity_args=(
+            mhcflurry eval compare-models
+            --a "$run_dir"
+            --a-label "${RUN_LABEL:-new}"
+            --b "$train_excluded_affinity_dir"
+            --b-affinity-dir "$train_excluded_affinity_dir"
+            --b-label "MHCflurry no-additional-MS (train-excluded)"
+            --data-dir "$data_dir"
+            --release-holdout-dir "$run_dir/release_holdout"
+            --include affinity
+            --affinity-source no_additional_ms
+            --out "$run_dir/eval_comparison_train_excluded_affinity"
+            --backend "$COMPARE_BACKEND"
+            --num-jobs "$COMPARE_NUM_JOBS"
+            --max-workers-per-gpu "$COMPARE_MAX_WORKERS_PER_GPU"
+            --max-tasks-per-worker "$COMPARE_MAX_TASKS_PER_WORKER"
+            --worker-log-dir \
+                "$run_dir/eval_comparison_train_excluded_affinity/worker_logs"
+            --torch-compile "$COMPARE_TORCH_COMPILE"
+            --matmul-precision "$COMPARE_MATMUL_PRECISION"
+        )
+        if [ -n "${EVAL_MAX_BENCHMARK_FILES:-}" ]; then
+            fair_affinity_args+=(--limit-files "$EVAL_MAX_BENCHMARK_FILES")
+        fi
+        case "$(printf '%s' "$COMPARE_GPUS" | tr '[:upper:]' '[:lower:]')" in
+            auto) ;;
+            *) fair_affinity_args+=(--gpus "$COMPARE_GPUS") ;;
+        esac
+        "${fair_affinity_args[@]}"
+        ;;
+esac
+
 if [ "${RUN_RELEASE_PLOTS:-1}" = "1" ]; then
     plot_args=(
         mhcflurry eval plot-comparison
@@ -1344,8 +1389,17 @@ if [ "${RUN_RELEASE_PLOTS:-1}" = "1" ]; then
         plot_args+=(--paper-figures-presentation-panel-baselines "$PAPER_FIGURES_PRESENTATION_PANEL_BASELINES")
     fi
     "${plot_args[@]}"
-    python scripts/training/plot_loss_curves.py \
+    if [ -d "$run_dir/eval_comparison_train_excluded_affinity" ]; then
+        mhcflurry eval plot-comparison \
+            --input "$run_dir/eval_comparison_train_excluded_affinity" \
+            --a-label "${RUN_LABEL:-new}" \
+            --b-label "MHCflurry no-additional-MS (train-excluded)" \
+            --summary-pdf \
+                "$run_dir/eval_comparison_train_excluded_affinity/plots/model_comparison_figures.pdf"
+    fi
+    mhcflurry train plot-loss-curves \
         --selected-dir "$run_dir/affinity/models.combined" \
+        --unselected-dir "$run_dir/affinity/models.unselected.combined" \
         --out "$run_dir/affinity/loss_plots"
 fi
 EOF
@@ -1390,9 +1444,21 @@ add_path eval_comparison/side_b.json
 add_path eval_comparison/plots
 add_path affinity/loss_plots
 add_glob eval_comparison/*/summary.json
+add_glob eval_comparison/*/training_overlap.json
 add_glob eval_comparison/*/summary_table.csv
 add_glob eval_comparison/*/per_*.csv
 add_glob eval_comparison/*/predictions*.csv.bz2
+
+add_path eval_comparison_train_excluded_affinity/release_summary.csv
+add_path eval_comparison_train_excluded_affinity/release_summary.md
+add_path eval_comparison_train_excluded_affinity/summary.md
+add_path eval_comparison_train_excluded_affinity/side_a.json
+add_path eval_comparison_train_excluded_affinity/side_b.json
+add_path eval_comparison_train_excluded_affinity/plots
+add_glob eval_comparison_train_excluded_affinity/*/summary.json
+add_glob eval_comparison_train_excluded_affinity/*/training_overlap.json
+add_glob eval_comparison_train_excluded_affinity/*/per_*.csv
+add_glob eval_comparison_train_excluded_affinity/*/predictions*.csv.bz2
 
 sort -u "$manifest" -o "$manifest"
 tar -cjf "$archive" -T "$manifest"
@@ -1526,9 +1592,21 @@ add_path eval_comparison/side_a.json
 add_path eval_comparison/side_b.json
 add_path eval_comparison/plots
 add_glob eval_comparison/*/summary.json
+add_glob eval_comparison/*/training_overlap.json
 add_glob eval_comparison/*/summary_table.csv
 add_glob eval_comparison/*/per_*.csv
 add_glob eval_comparison/*/predictions*.csv.bz2
+
+add_path eval_comparison_train_excluded_affinity/release_summary.csv
+add_path eval_comparison_train_excluded_affinity/release_summary.md
+add_path eval_comparison_train_excluded_affinity/summary.md
+add_path eval_comparison_train_excluded_affinity/side_a.json
+add_path eval_comparison_train_excluded_affinity/side_b.json
+add_path eval_comparison_train_excluded_affinity/plots
+add_glob eval_comparison_train_excluded_affinity/*/summary.json
+add_glob eval_comparison_train_excluded_affinity/*/training_overlap.json
+add_glob eval_comparison_train_excluded_affinity/*/per_*.csv
+add_glob eval_comparison_train_excluded_affinity/*/predictions*.csv.bz2
 
 add_path affinity/models.combined
 add_path affinity/eval_comparison
@@ -2601,6 +2679,12 @@ if [ "$SKIP_EVAL" != "1" ]; then
                 DATA_DIR="$(mhcflurry-downloads path data_evaluation)"
             fi
         fi
+        case ",$COMPARE_INCLUDE," in
+            *,affinity,*)
+                run_logged_step fetch_train_excluded_affinity_baseline \
+                    mhcflurry-downloads fetch models_class1_pan_variants
+                ;;
+        esac
         run_logged_step fetch_compare_baseline_downloads \
             fetch_pinned_public_baseline_downloads
         compare_args=(
@@ -2634,6 +2718,46 @@ if [ "$SKIP_EVAL" != "1" ]; then
             *) compare_args+=(--gpus "$COMPARE_GPUS") ;;
         esac
         run_logged_step compare_models "${compare_args[@]}"
+        case ",$COMPARE_INCLUDE," in
+            *,affinity,*)
+                if [ "$DRY_RUN" = "1" ]; then
+                    TRAIN_EXCLUDED_AFFINITY_DIR='<mhcflurry-downloads path models_class1_pan_variants>/models.no_additional_ms'
+                else
+                    TRAIN_EXCLUDED_AFFINITY_DIR="$(
+                        mhcflurry-downloads path models_class1_pan_variants
+                    )/models.no_additional_ms"
+                fi
+                fair_affinity_args=(
+                    mhcflurry eval compare-models
+                    --a "$RUN_DIR"
+                    --a-label "$RUN_LABEL"
+                    --b "$TRAIN_EXCLUDED_AFFINITY_DIR"
+                    --b-affinity-dir "$TRAIN_EXCLUDED_AFFINITY_DIR"
+                    --b-label "MHCflurry no-additional-MS (train-excluded)"
+                    --data-dir "$DATA_DIR"
+                    --release-holdout-dir "$RUN_DIR/release_holdout"
+                    --include affinity
+                    --affinity-source no_additional_ms
+                    --backend "$COMPARE_BACKEND"
+                    --num-jobs "$COMPARE_NUM_JOBS"
+                    --max-workers-per-gpu "$COMPARE_MAX_WORKERS_PER_GPU"
+                    --max-tasks-per-worker "$COMPARE_MAX_TASKS_PER_WORKER"
+                    --torch-compile "$COMPARE_TORCH_COMPILE"
+                    --matmul-precision "$COMPARE_MATMUL_PRECISION"
+                    --out "$RUN_DIR/eval_comparison_train_excluded_affinity"
+                )
+                if [ -n "$EVAL_MAX_BENCHMARK_FILES" ]; then
+                    fair_affinity_args+=(
+                        --limit-files "$EVAL_MAX_BENCHMARK_FILES")
+                fi
+                case "$(lowercase "$COMPARE_GPUS")" in
+                    auto) ;;
+                    *) fair_affinity_args+=(--gpus "$COMPARE_GPUS") ;;
+                esac
+                run_logged_step compare_models_train_excluded_affinity \
+                    "${fair_affinity_args[@]}"
+                ;;
+        esac
     fi
 else
     note "Skipping evaluation."
@@ -2677,6 +2801,15 @@ if [ "$SKIP_PLOTS" != "1" ]; then
         fi
         run_logged_step plot_model_comparison \
             "${plot_args[@]}"
+        if [ -d "$RUN_DIR/eval_comparison_train_excluded_affinity" ]; then
+            run_logged_step plot_train_excluded_affinity_comparison \
+                mhcflurry eval plot-comparison \
+                --input "$RUN_DIR/eval_comparison_train_excluded_affinity" \
+                --a-label "$RUN_LABEL" \
+                --b-label "MHCflurry no-additional-MS (train-excluded)" \
+                --summary-pdf \
+                    "$RUN_DIR/eval_comparison_train_excluded_affinity/plots/model_comparison_figures.pdf"
+        fi
     fi
 else
     note "Skipping plots."
