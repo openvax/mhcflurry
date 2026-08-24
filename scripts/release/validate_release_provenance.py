@@ -229,13 +229,43 @@ def collect_artifact_provenance(
         raise ValueError(
             "Missing required model provenance file(s): %s" %
             ", ".join(missing))
+    if require_artifacts:
+        missing_commits = sorted(
+            role for role, item in artifact_provenance.items()
+            if not item["git_commit"])
+        if missing_commits:
+            raise ValueError(
+                "Model artifact provenance is missing git commit for: %s" %
+                ", ".join(missing_commits))
+        commits = {
+            item["git_commit"] for item in artifact_provenance.values()
+        }
+        if len(commits) > 1:
+            raise ValueError(
+                "Model artifacts do not agree on git commit: %s" %
+                ", ".join(sorted(commits)))
+        missing_workflows = sorted(
+            role for role, item in artifact_provenance.items()
+            if not item["workflow_id"])
+        if missing_workflows:
+            raise ValueError(
+                "Model artifact provenance is missing workflow id for: %s" %
+                ", ".join(missing_workflows))
+        workflow_ids = {
+            item["workflow_id"] for item in artifact_provenance.values()
+        }
+        if len(workflow_ids) > 1:
+            raise ValueError(
+                "Model artifacts do not agree on workflow id: %s" %
+                ", ".join(sorted(workflow_ids)))
     return artifact_provenance
 
 
 def collect_provenance(
         repo, run_dir, release, workflow_id="", processing_variants=(),
         require_artifacts=False, allow_dirty_repo=False,
-        expected_artifact_workflow_id=""):
+        expected_artifact_workflow_id="",
+        allow_artifact_source_mismatch=False):
     """Validate release identity and return serializable provenance."""
     repo = pathlib.Path(repo).resolve()
     run_dir = pathlib.Path(run_dir).resolve()
@@ -258,9 +288,27 @@ def collect_provenance(
         release=release,
         processing_variants=processing_variants,
         require_artifacts=require_artifacts,
-        expected_artifact_git_commit=(source_commit if require_artifacts else ""),
+        expected_artifact_git_commit=(
+            source_commit
+            if require_artifacts and not allow_artifact_source_mismatch
+            else ""),
         expected_artifact_workflow_id=expected_artifact_workflow_id,
     )
+    artifact_commits = {
+        item["git_commit"] for item in artifact_provenance.values()
+        if item["git_commit"]
+    }
+    artifact_workflow_ids = {
+        item["workflow_id"] for item in artifact_provenance.values()
+        if item["workflow_id"]
+    }
+    artifact_training = {}
+    if artifact_commits:
+        artifact_training = {
+            "git_commit": next(iter(artifact_commits)),
+            "workflow_id": next(iter(artifact_workflow_ids), ""),
+            "matches_evaluation_source": artifact_commits == {source_commit},
+        }
     holdout_provenance = collect_holdout_provenance(
         run_dir, require_artifacts=require_artifacts)
 
@@ -275,6 +323,7 @@ def collect_provenance(
             "tracked_worktree_dirty": dirty,
         },
         "workflow_id": workflow_id,
+        "artifact_training": artifact_training,
         "artifacts": artifact_provenance,
         "release_holdout": holdout_provenance,
     }
@@ -295,6 +344,15 @@ def make_parser():
     )
     parser.add_argument("--require-artifacts", action="store_true")
     parser.add_argument("--allow-dirty-repo", action="store_true")
+    parser.add_argument(
+        "--allow-artifact-source-mismatch",
+        action="store_true",
+        help=(
+            "Permit a postprocess/deploy checkout newer than the model-training "
+            "commit while still requiring all model artifacts to agree on "
+            "their recorded commit and workflow."
+        ),
+    )
     parser.add_argument("--out")
     return parser
 
@@ -355,6 +413,8 @@ def main(argv=None):
                 allow_dirty_repo=args.allow_dirty_repo,
                 expected_artifact_workflow_id=(
                     args.expected_artifact_workflow_id),
+                allow_artifact_source_mismatch=(
+                    args.allow_artifact_source_mismatch),
             )
     except (OSError, RuntimeError, ValueError) as error:
         raise SystemExit("ERROR: %s" % error) from error

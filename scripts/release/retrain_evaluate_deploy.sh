@@ -224,6 +224,9 @@ validate_release_provenance() {
     if [ "$ALLOW_DIRTY_REPO" = "1" ]; then
         args+=(--allow-dirty-repo)
     fi
+    if [ "$require_artifacts" = "1" ] && [ "$SKIP_TRAIN" = "1" ]; then
+        args+=(--allow-artifact-source-mismatch)
+    fi
     run_logged_step "$step" "${args[@]}"
 }
 
@@ -2827,6 +2830,9 @@ if [ "$DEPLOY_MODE" != "none" ]; then
     )
     if [ "$ALLOW_DIRTY_REPO" = "1" ]; then
         deploy_args+=(--allow-dirty-repo)
+    fi
+    if [ "$SKIP_TRAIN" = "1" ]; then
+        deploy_args+=(--allow-artifact-source-mismatch)
     fi
     run_logged_step deploy_trained_models \
         "${deploy_args[@]}"

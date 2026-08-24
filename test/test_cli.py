@@ -231,7 +231,9 @@ def _write_minimal_deployable_run(run_dir):
         ["git", "rev-parse", "HEAD"], text=True).strip()
     info = (
         "package\tmhcflurry %s\n"
-        "git commit\t%s\n" % (__version__, source_commit)
+        "git commit\t%s\n"
+        "workflow id\ttest-training-workflow\n" % (
+            __version__, source_commit)
     )
     for relative in model_directories:
         (run_dir / relative / "info.txt").write_text(info)
@@ -368,6 +370,7 @@ def test_release_workflow_forwards_processing_variants_to_deploy(tmp_path):
     output = result.stdout + result.stderr
     assert "deploy_trained_models.sh" in output
     assert "--processing-variants with_flanks\\ no_flank" in output
+    assert "--allow-artifact-source-mismatch" in output
     assert (
         "variants=with_flanks no_flank; eval_modes=with_flanks,no_flank"
     ) in output

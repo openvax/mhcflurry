@@ -175,6 +175,91 @@ def test_collect_provenance_rejects_model_from_another_commit(tmp_path):
         )
 
 
+def test_collect_provenance_records_separate_postprocess_source(tmp_path):
+    module = load_module()
+    write_model_info(
+        tmp_path,
+        PACKAGE_VERSION,
+        commit="training-commit",
+        workflow_id="training-run",
+    )
+    write_holdout_proof(tmp_path)
+
+    result = module.collect_provenance(
+        repo=REPO,
+        run_dir=tmp_path,
+        release="2.3.0",
+        workflow_id="evaluation-run",
+        processing_variants=["with_flanks"],
+        require_artifacts=True,
+        allow_dirty_repo=True,
+        allow_artifact_source_mismatch=True,
+    )
+
+    assert result["artifact_training"] == {
+        "git_commit": "training-commit",
+        "workflow_id": "training-run",
+        "matches_evaluation_source": False,
+    }
+    assert result["source"]["git_commit"] != "training-commit"
+
+
+def test_cli_records_separate_postprocess_source(tmp_path, capsys):
+    module = load_module()
+    write_model_info(
+        tmp_path,
+        PACKAGE_VERSION,
+        commit="training-commit",
+        workflow_id="training-run",
+    )
+    write_holdout_proof(tmp_path)
+
+    assert module.main([
+        "--repo", str(REPO),
+        "--run-dir", str(tmp_path),
+        "--release", "2.3.0",
+        "--workflow-id", "evaluation-run",
+        "--processing-variants", "with_flanks",
+        "--require-artifacts",
+        "--allow-dirty-repo",
+        "--allow-artifact-source-mismatch",
+    ]) == 0
+
+    result = json.loads(capsys.readouterr().out)
+    assert result["artifact_training"]["git_commit"] == "training-commit"
+    assert result["artifact_training"]["matches_evaluation_source"] is False
+
+
+def test_collect_provenance_rejects_inconsistent_artifact_commits(tmp_path):
+    module = load_module()
+    write_model_info(
+        tmp_path,
+        PACKAGE_VERSION,
+        commit="training-commit",
+        workflow_id="training-run",
+    )
+    affinity_info = tmp_path / "affinity" / "models.combined" / "info.txt"
+    affinity_info.write_text(
+        affinity_info.read_text().replace(
+            "git commit\ttraining-commit",
+            "git commit\tanother-commit",
+        )
+    )
+    write_holdout_proof(tmp_path)
+
+    with pytest.raises(ValueError, match="do not agree on git commit"):
+        module.collect_provenance(
+            repo=REPO,
+            run_dir=tmp_path,
+            release="2.3.0",
+            workflow_id="evaluation-run",
+            processing_variants=["with_flanks"],
+            require_artifacts=True,
+            allow_dirty_repo=True,
+            allow_artifact_source_mismatch=True,
+        )
+
+
 def test_collect_provenance_allows_later_evaluation_workflow(tmp_path):
     module = load_module()
     write_model_info(tmp_path, PACKAGE_VERSION, workflow_id="training-run")
