@@ -1097,8 +1097,18 @@ def _filter_release_holdout_samples(frame, args, component):
 def _load_presentation_benchmark_for_component(data_dir, args, component):
     """Load, holdout-filter, then file-limit a presentation benchmark."""
     initial_file_limit = None if args.release_holdout_dir else args.limit_files
-    benchmark = _load_presentation_benchmark(data_dir, initial_file_limit)
-    return _filter_release_holdout_samples(benchmark, args, component)
+    row_filter = None
+    if args.release_holdout_dir:
+        row_filter = partial(
+            _filter_release_holdout_samples,
+            args=args,
+            component=component,
+        )
+    return _load_presentation_benchmark(
+        data_dir,
+        initial_file_limit,
+        row_filter=row_filter,
+    )
 
 
 def _run_affinity(side_a, side_b, args):
@@ -1567,7 +1577,7 @@ def _parallel_presentation_predict(
     )
 
 
-def _load_presentation_benchmark(data_dir, limit_files):
+def _load_presentation_benchmark(data_dir, limit_files, row_filter=None):
     files = sorted(glob.glob(os.path.join(
         data_dir,
         "benchmark.multiallelic.train_excluded.*.csv.bz2",
@@ -1599,6 +1609,11 @@ def _load_presentation_benchmark(data_dir, limit_files):
     result = result.copy()
     result["hit"] = pandas.to_numeric(result["hit"], errors="coerce")
     _require_binary_comparison_rows(result, "Presentation benchmark")
+    if row_filter is not None:
+        # Genotype normalization dominates runtime for the full benchmark.
+        # Release evaluation only needs its frozen samples, so select those
+        # rows after whole-input integrity checks but before parsing genotypes.
+        result = row_filter(result)
     result["hla"] = result["hla"].map(_normalize_benchmark_genotype)
     genotype_counts = result.groupby("sample_id", dropna=False).hla.nunique()
     inconsistent_samples = genotype_counts[genotype_counts > 1]

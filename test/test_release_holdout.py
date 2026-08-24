@@ -236,7 +236,8 @@ def test_build_apply_and_validate_release_holdout(tmp_path, monkeypatch):
     assert processing_eval.sample_id.tolist() == ["multi-test"]
 
 
-def test_release_holdout_file_limit_applies_after_sample_selection(tmp_path):
+def test_release_holdout_file_limit_applies_before_genotype_normalization(
+        tmp_path, monkeypatch):
     holdout_dir = tmp_path / "holdout"
     holdout_dir.mkdir()
     pandas.DataFrame({
@@ -244,13 +245,23 @@ def test_release_holdout_file_limit_applies_after_sample_selection(tmp_path):
     }).to_csv(holdout_dir / PROCESSING_SAMPLES_FILE, index=False)
     data_dir = tmp_path / "data"
     data_dir.mkdir()
-    for filename, sample_id, peptides in (
-            ("a", "training", ["AAAAAAAA", "AAAAAAAK"]),
-            ("z", "held-out", ["BBBBBBBB", "BBBBBBBK"])):
+    for filename, sample_id, peptides, genotype in (
+            (
+                "a",
+                "training",
+                ["AAAAAAAA", "AAAAAAAK"],
+                "excluded genotype must not be normalized",
+            ),
+            (
+                "z",
+                "held-out",
+                ["BBBBBBBB", "BBBBBBBK"],
+                "HLA-A*02:01",
+            )):
         pandas.DataFrame({
             "sample_id": [sample_id, sample_id],
             "peptide": peptides,
-            "hla": ["HLA-A*02:01", "HLA-A*02:01"],
+            "hla": [genotype, genotype],
             "hit": [1, 0],
         }).to_csv(
             data_dir / (
@@ -261,6 +272,18 @@ def test_release_holdout_file_limit_applies_after_sample_selection(tmp_path):
     args = SimpleNamespace(
         release_holdout_dir=str(holdout_dir),
         limit_files=1,
+    )
+    normalized = []
+
+    def normalize_selected_genotype(value):
+        normalized.append(value)
+        if value != "HLA-A*02:01":
+            raise AssertionError("normalized a non-holdout genotype")
+        return value
+
+    monkeypatch.setattr(
+        "mhcflurry.cli.compare_models._normalize_benchmark_genotype",
+        normalize_selected_genotype,
     )
 
     result = _load_presentation_benchmark_for_component(
@@ -273,3 +296,4 @@ def test_release_holdout_file_limit_applies_after_sample_selection(tmp_path):
     assert result.source_file.unique().tolist() == [
         "benchmark.multiallelic.train_excluded.z.csv.bz2",
     ]
+    assert normalized == ["HLA-A*02:01", "HLA-A*02:01"]

@@ -1074,6 +1074,21 @@ def test_release_workflow_brev_prepare_uses_remote_postprocess(tmp_path):
     assert "Using plots produced on the Brev instance" in output
 
 
+def test_brev_postprocess_reuses_training_python_without_compile_fanout():
+    workflow = pathlib.Path(
+        "scripts/release/retrain_evaluate_deploy.sh").read_text()
+
+    assert "if [ -x /opt/conda/bin/python ]; then" in workflow
+    assert 'export PATH="/opt/conda/bin:$PATH"' in workflow
+    assert (
+        'export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-0}"'
+        in workflow
+    )
+    assert (
+        'export COMPARE_TORCH_COMPILE=%q\\n' in workflow
+    )
+
+
 def test_release_workflow_brev_provider_aliases(tmp_path):
     result = subprocess.run(
         [

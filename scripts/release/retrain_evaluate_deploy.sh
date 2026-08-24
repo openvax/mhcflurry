@@ -1218,8 +1218,18 @@ remote_root=/root/mhcflurry-postprocess
 repo_dir="$remote_root/repo"
 run_dir="$remote_root/run"
 
+# Reuse the PyTorch environment that produced the models when the Brev
+# training image exposes it. Falling back to the host interpreter here can
+# silently install a newer Torch/CUDA stack for evaluation than for training.
+if [ -x /opt/conda/bin/python ]; then
+    export PATH="/opt/conda/bin:$PATH"
+fi
+
 export MKL_THREADING_LAYER="${MKL_THREADING_LAYER:-GNU}"
-export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
+# Compiling every model in every short-lived comparison worker multiplies
+# Inductor compiler pools by the worker count. Eager inference is the safe
+# default; COMPARE_TORCH_COMPILE still carries any explicit caller override.
+export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-0}"
 export MHCFLURRY_MATMUL_PRECISION="${MHCFLURRY_MATMUL_PRECISION:-high}"
 export MHCFLURRY_ENABLE_TIMING="${MHCFLURRY_ENABLE_TIMING:-1}"
 
