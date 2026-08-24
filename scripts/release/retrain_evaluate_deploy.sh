@@ -1298,6 +1298,7 @@ compare_args=(
     --b-label "${COMPARE_BASELINE_LABEL:-MHCflurry 2.0}" \
     --data-dir "$data_dir" \
     --release-holdout-dir "$run_dir/release_holdout" \
+    --affinity-training-overlap-policy audit \
     --include "${COMPARE_INCLUDE:-affinity,processing,presentation}" \
     --processing-modes "${PROCESSING_MODES:-with_flanks,no_flank,short_flanks}" \
     --presentation-modes "${PRESENTATION_MODES:-with_flanks,without_flanks}" \
@@ -1339,6 +1340,7 @@ case ",${COMPARE_INCLUDE:-affinity,processing,presentation}," in
             --b-label "MHCflurry no-additional-MS (train-excluded)"
             --data-dir "$data_dir"
             --release-holdout-dir "$run_dir/release_holdout"
+            --affinity-training-overlap-policy exclude
             --include affinity
             --affinity-source no_additional_ms
             --out "$run_dir/eval_comparison_train_excluded_affinity"
@@ -2701,6 +2703,7 @@ if [ "$SKIP_EVAL" != "1" ]; then
             --b-label "$COMPARE_BASELINE_LABEL"
             --data-dir "$DATA_DIR"
             --release-holdout-dir "$RUN_DIR/release_holdout"
+            --affinity-training-overlap-policy audit
             --include "$COMPARE_INCLUDE"
             --processing-modes "$PROCESSING_MODES"
             --presentation-modes "$PRESENTATION_MODES"
@@ -2742,6 +2745,7 @@ if [ "$SKIP_EVAL" != "1" ]; then
                     --b-label "MHCflurry no-additional-MS (train-excluded)"
                     --data-dir "$DATA_DIR"
                     --release-holdout-dir "$RUN_DIR/release_holdout"
+                    --affinity-training-overlap-policy exclude
                     --include affinity
                     --affinity-source no_additional_ms
                     --backend "$COMPARE_BACKEND"

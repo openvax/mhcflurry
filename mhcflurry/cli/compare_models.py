@@ -238,6 +238,16 @@ def register_subparser(parser):
         ),
     )
     parser.add_argument(
+        "--affinity-training-overlap-policy",
+        choices=["exclude", "audit"],
+        default="exclude",
+        help=(
+            "For frozen release affinity evaluation, either exclude the union "
+            "of both predictors' recorded training pMHCs or audit/report that "
+            "overlap without changing the score set."
+        ),
+    )
+    parser.add_argument(
         "--processing-modes",
         default=",".join(PROCESSING_MODES),
         help=(
@@ -1073,12 +1083,20 @@ def _affinity_training_data_path(predictor_dir):
     return None
 
 
-def _exclude_affinity_training_overlap(test, side_a, side_b):
-    """Drop the union of side A/B training pMHCs from a release benchmark."""
+def _exclude_affinity_training_overlap(
+        test, side_a, side_b, policy="exclude"):
+    """Audit, and optionally drop, side A/B training pMHC overlap."""
+    if policy not in ("exclude", "audit"):
+        raise ValueError("Unknown affinity training-overlap policy: %s" % policy)
     benchmark_index = pandas.MultiIndex.from_frame(test[["hla", "peptide"]])
     union_mask = numpy.zeros(len(test), dtype=bool)
     report = {
-        "policy": "drop union of side A and side B affinity training pMHCs",
+        "policy": policy,
+        "policy_description": (
+            "drop union of side A and side B affinity training pMHCs"
+            if policy == "exclude"
+            else "audit side A and side B affinity training pMHCs only"
+        ),
         "rows_before": int(len(test)),
         "hits_before": int(test.hit.sum()),
         "sides": {},
@@ -1112,24 +1130,28 @@ def _exclude_affinity_training_overlap(test, side_a, side_b):
             "overlap_unique_pmhcs": int(
                 benchmark_index[overlap_mask].nunique()),
         }
+    retained_mask = ~union_mask if policy == "exclude" else numpy.ones(
+        len(test), dtype=bool)
     report.update({
+        "exclusion_applied": policy == "exclude",
         "union_overlap_rows": int(union_mask.sum()),
         "union_overlap_hits": int(test.hit.loc[union_mask].sum()),
         "union_overlap_unique_pmhcs": int(
             benchmark_index[union_mask].nunique()),
-        "rows_after": int((~union_mask).sum()),
-        "hits_after": int(test.hit.loc[~union_mask].sum()),
+        "rows_after": int(retained_mask.sum()),
+        "hits_after": int(test.hit.loc[retained_mask].sum()),
     })
     _stamp(
-        "  release training-overlap exclusion: %d rows / %d hits dropped; "
-        "%d rows / %d hits remain" % (
+        "  release training-overlap %s: %d rows / %d hits overlap; "
+        "%d rows / %d hits scored" % (
+            policy,
             report["union_overlap_rows"],
             report["union_overlap_hits"],
             report["rows_after"],
             report["hits_after"],
         )
     )
-    return test.loc[~union_mask].copy(), report
+    return test.loc[retained_mask].copy(), report
 
 
 def _filter_release_holdout_samples(frame, args, component):
@@ -1226,7 +1248,11 @@ def _run_affinity(side_a, side_b, args):
     training_overlap = None
     if args.release_holdout_dir:
         test, training_overlap = _exclude_affinity_training_overlap(
-            test, side_a, side_b)
+            test,
+            side_a,
+            side_b,
+            policy=args.affinity_training_overlap_policy,
+        )
         _require_binary_comparison_rows(
             test, "Train-excluded release affinity benchmark")
         with open(
@@ -2268,8 +2294,9 @@ def _write_summary_markdown(headline, side_a, side_b, out_dir, components):
         overlap = s.get("training_overlap")
         if overlap:
             lines.append(
-                "- training-overlap exclusion: %d rows / %d hits dropped; "
-                "%d rows / %d hits remain" % (
+                "- training-overlap policy `%s`: %d rows / %d hits overlap; "
+                "%d rows / %d hits scored" % (
+                    overlap["policy"],
                     overlap["union_overlap_rows"],
                     overlap["union_overlap_hits"],
                     overlap["rows_after"],
