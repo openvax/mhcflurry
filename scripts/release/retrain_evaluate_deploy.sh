@@ -908,6 +908,9 @@ build_brev_postprocess_archives() {
         presentation/models
         release_holdout
     )
+    if [ "$SKIP_PLOTS" != "1" ]; then
+        artifact_paths+=(affinity/models.unselected.combined)
+    fi
     local kind
     for kind in $PROCESSING_VARIANTS; do
         artifact_paths+=("processing/models.selected.$kind")

@@ -1017,6 +1017,9 @@ def test_release_workflow_validates_selected_runplz_interpreter(tmp_path):
 def test_brev_postprocess_archive_includes_release_holdout(tmp_path):
     run_dir = tmp_path / "release-run"
     _write_minimal_deployable_run(run_dir)
+    unselected = run_dir / "affinity/models.unselected.combined"
+    unselected.mkdir()
+    (unselected / "manifest.csv").write_text("model_name\nmodel\n")
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
     brev = fake_bin / "brev"
@@ -1037,7 +1040,6 @@ def test_brev_postprocess_archive_includes_release_holdout(tmp_path):
             "--backend", "brev-existing",
             "--brev-instance", "missing-test-instance",
             "--skip-train",
-            "--skip-plots",
             "--allow-dirty-repo",
         ],
         capture_output=True,
@@ -1057,6 +1059,7 @@ def test_brev_postprocess_archive_includes_release_holdout(tmp_path):
         "release_holdout/affinity_samples.csv",
         "release_holdout/processing_samples.csv",
         "release_holdout/presentation_samples.csv",
+        "affinity/models.unselected.combined/manifest.csv",
     }.issubset(archived_paths)
 
 
