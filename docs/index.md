@@ -62,5 +62,6 @@ testing
 development
 orchestrator
 auto_sizing_audit
+release_training_recipe
 maintainers
 ```

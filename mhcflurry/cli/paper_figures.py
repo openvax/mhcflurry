@@ -1709,6 +1709,7 @@ def _generate_model_selection_figures(inputs, writer):
         return
 
     import matplotlib.pyplot as plt
+    from matplotlib.ticker import NullFormatter
 
     df = df.copy()
     df["locus"] = df[allele_col].map(_allele_locus)
@@ -1732,13 +1733,20 @@ def _generate_model_selection_figures(inputs, writer):
                 [path],
                 "No rows for locus %s." % locus)
             continue
+        has_baseline = bool(baseline_col and baseline_col in sub.columns)
+        figure_height = max(
+            2.1 if has_baseline else 1.7,
+            0.18 * len(sub) + (1.0 if has_baseline else 0.6),
+        )
         fig, axes = plt.subplots(
             1, 1 + len(optional_panels),
-            figsize=(7.1, max(1.7, 0.18 * len(sub) + 0.6)),
+            figsize=(7.1, figure_height),
             squeeze=False)
         ax = axes[0, 0]
         y = numpy.arange(len(sub))
-        if baseline_col and baseline_col in sub.columns:
+        legend_handles = None
+        legend_labels = None
+        if has_baseline:
             height = 0.36
             ax.barh(
                 y - height / 2,
@@ -1755,7 +1763,7 @@ def _generate_model_selection_figures(inputs, writer):
                 color=(0.55, 0.55, 0.55),
                 label=baseline_label,
             )
-            ax.legend(frameon=False, loc="lower right")
+            legend_handles, legend_labels = ax.get_legend_handles_labels()
         else:
             ax.barh(y, sub[score_col], color=(0.34, 0.46, 0.75))
         ax.set_yticks(y)
@@ -1771,9 +1779,22 @@ def _generate_model_selection_figures(inputs, writer):
             ax.set_yticklabels([])
             if log_scale:
                 ax.set_xscale("log")
+                ax.xaxis.set_minor_formatter(NullFormatter())
             ax.set_xlabel(xlabel)
             _despine(ax)
-        fig.tight_layout(w_pad=1.0)
+        bottom_margin = 0.0
+        if legend_handles:
+            bottom_margin = min(0.18, 0.4 / figure_height)
+            fig.legend(
+                legend_handles,
+                legend_labels,
+                frameon=False,
+                loc="lower center",
+                bbox_to_anchor=(0.5, 0.01),
+                ncol=2,
+                fontsize=7,
+            )
+        fig.tight_layout(rect=(0, bottom_margin, 1, 1), w_pad=1.0)
         writer.save(
             fig,
             "fig.1_model_selection_predictor_accuracy.scores.%s" % label,

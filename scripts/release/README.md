@@ -93,8 +93,8 @@ needs every candidate model and training intermediate table.
 ## Release profiles and performance
 
 `--release-profile full` is the default. It trains the complete processing set:
-`with_flanks`, `no_flank`, and `short_flanks`. Presentation uses the true
-`with_flanks` predictor by default.
+`with_flanks`, `no_flank`, and `short_flanks`. Presentation uses the published
+`short_flanks` predictor (5 aa on each side) by default.
 
 Optional profiles are:
 
@@ -103,9 +103,9 @@ Optional profiles are:
 - `minimal-processing`: omits `short_flanks` from both training and evaluation.
 - `fast-minimal`: combines those two choices.
 
-The shared training minibatch defaults to 1024. Use
-`--affinity-minibatch-size` or `--processing-minibatch-size` only when a model
-family needs a different value.
+Affinity minibatch defaults to the held-out-validated value 1024. Processing
+retains the published minibatch 512. Use `--affinity-minibatch-size` or
+`--processing-minibatch-size` only for a deliberate experiment.
 
 Affinity worker packing defaults to `--affinity-max-workers-per-gpu auto`. The
 training command estimates the complete per-worker working set from the model,

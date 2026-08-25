@@ -20,7 +20,10 @@ import yaml
 from ..common import positive_int_arg
 
 
-DEFAULT_MINIBATCH_SIZE = 1024
+AFFINITY_DEFAULT_MINIBATCH_SIZE = 1024
+PROCESSING_DEFAULT_MINIBATCH_SIZE = 512
+# Compatibility name used by the historical affinity generator wrapper.
+DEFAULT_MINIBATCH_SIZE = AFFINITY_DEFAULT_MINIBATCH_SIZE
 PROCESSING_VARIANT_CHOICES = (
     "with_flanks",
     "no_n_flank",
@@ -44,22 +47,15 @@ AFFINITY_BASE_HYPERPARAMETERS = {
     "locally_connected_layers": [],
     "topology": "feedfoward",
     "loss": "custom:mse_with_inequalities",
-    # Hard cap for runaway patience-reset tails. Recent full release
-    # cohorts had median task lengths under 100 epochs; 500 leaves broad
-    # headroom while preventing accidental multi-thousand-epoch tasks.
-    "max_epochs": 500,
-    "minibatch_size": DEFAULT_MINIBATCH_SIZE,
+    # Preserve the published 2.1.x/2.2.x scientific recipe. Early stopping
+    # normally terminates well before this safety ceiling.
+    "max_epochs": 5000,
+    "minibatch_size": AFFINITY_DEFAULT_MINIBATCH_SIZE,
     "optimizer": "rmsprop",
     "output_activation": "sigmoid",
     "patience": 20,
-    # Keep min_delta above the observed RMSprop noise floor so tiny
-    # numerical improvements do not reset patience indefinitely, while
-    # still preserving genuine late-escape trajectories.
-    "min_delta": 1e-7,
-    # Validation is a GPU-sync barrier. Checking every 5 epochs keeps
-    # early stopping responsive relative to patience=20 while cutting
-    # repeated validation overhead.
-    "validation_interval": 5,
+    "min_delta": 0.0,
+    "validation_interval": 1,
     "peptide_encoding": {
         "vector_encoding_name": "BLOSUM62",
         "alignment_method": "left_pad_centered_right_pad",
@@ -105,7 +101,7 @@ PROCESSING_BASE_HYPERPARAMETERS = {
     "n_flank_length": 15,
     "c_flank_length": 15,
     "post_convolutional_dense_layer_sizes": [],
-    "minibatch_size": DEFAULT_MINIBATCH_SIZE,
+    "minibatch_size": PROCESSING_DEFAULT_MINIBATCH_SIZE,
     "dropout_rate": 0.5,
     "convolutional_activation": "relu",
     "patience": 20,
@@ -122,7 +118,7 @@ def unique_hyperparameters(items):
     return result
 
 
-def build_affinity_grid(minibatch_size=DEFAULT_MINIBATCH_SIZE):
+def build_affinity_grid(minibatch_size=AFFINITY_DEFAULT_MINIBATCH_SIZE):
     """Return the 35-architecture Class I pan-allele affinity grid."""
     grid = []
     base = deepcopy(AFFINITY_BASE_HYPERPARAMETERS)
@@ -149,7 +145,7 @@ def build_affinity_grid(minibatch_size=DEFAULT_MINIBATCH_SIZE):
     return grid
 
 
-def processing_base_grid_iter(minibatch_size=DEFAULT_MINIBATCH_SIZE):
+def processing_base_grid_iter(minibatch_size=PROCESSING_DEFAULT_MINIBATCH_SIZE):
     """Yield the base processing architecture grid before flank variants."""
     base = deepcopy(PROCESSING_BASE_HYPERPARAMETERS)
     base["minibatch_size"] = minibatch_size
@@ -179,7 +175,7 @@ def processing_base_grid_iter(minibatch_size=DEFAULT_MINIBATCH_SIZE):
                                     yield new
 
 
-def build_processing_base_grid(minibatch_size=DEFAULT_MINIBATCH_SIZE):
+def build_processing_base_grid(minibatch_size=PROCESSING_DEFAULT_MINIBATCH_SIZE):
     """Return the processing architecture grid before flank variants."""
     return unique_hyperparameters(
         processing_base_grid_iter(minibatch_size=minibatch_size))
@@ -231,12 +227,12 @@ def dump_hyperparameters(hyperparameters, stream=None):
     yaml.safe_dump(hyperparameters, stream or sys.stdout)
 
 
-def add_minibatch_argument(parser):
+def add_minibatch_argument(parser, default=DEFAULT_MINIBATCH_SIZE):
     """Add the common training-minibatch-size argument to ``parser``."""
     parser.add_argument(
         "--minibatch-size",
         type=positive_int_arg,
-        default=DEFAULT_MINIBATCH_SIZE,
+        default=default,
         help=(
             "Training minibatch size to write into every architecture. "
             "Default: %(default)s"
@@ -252,12 +248,12 @@ def make_parser(prog=None):
     affinity = subparsers.add_parser(
         "affinity",
         help="Generate the Class I pan-allele affinity grid.")
-    add_minibatch_argument(affinity)
+    add_minibatch_argument(affinity, AFFINITY_DEFAULT_MINIBATCH_SIZE)
 
     processing_base = subparsers.add_parser(
         "processing-base",
         help="Generate the base Class I processing grid.")
-    add_minibatch_argument(processing_base)
+    add_minibatch_argument(processing_base, PROCESSING_DEFAULT_MINIBATCH_SIZE)
 
     processing_variant = subparsers.add_parser(
         "processing-variant",

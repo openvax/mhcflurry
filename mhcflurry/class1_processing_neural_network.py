@@ -149,6 +149,14 @@ class Class1ProcessingModel(nn.Module):
             num_final_inputs += 1
 
         self.output_layer = nn.Linear(num_final_inputs, 1)
+        # Keras Conv1D and Dense default to GlorotUniform with zero biases.
+        # PyTorch Conv1d/Linear default to KaimingUniform, so leaving the
+        # framework defaults in place changes the published training recipe.
+        for module in self.modules():
+            if isinstance(module, (nn.Conv1d, nn.Linear)):
+                nn.init.xavier_uniform_(module.weight)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
         # Initialize output weights to ones (like Keras initializers.Ones())
         nn.init.ones_(self.output_layer.weight)
         nn.init.zeros_(self.output_layer.bias)

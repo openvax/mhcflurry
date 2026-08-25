@@ -59,7 +59,7 @@ parser.add_argument(
     "--decoys-per-hit",
     type=positive_float_arg,
     metavar="N",
-    default=99,
+    default=2,
     help="Decoys per hit")
 parser.add_argument(
     "--exclude-pmid",

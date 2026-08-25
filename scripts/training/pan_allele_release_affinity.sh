@@ -23,11 +23,12 @@ set -x
 : "${MHCFLURRY_OUT:?MHCFLURRY_OUT must be set}"
 
 export PYTHONUNBUFFERED=1
-# torch.compile is on by default. Compile cost (~30-60s codegen) is paid
-# once per worker; we recycle workers after a moderate number of tasks to
-# avoid long-lived-worker death modes on multi-day runs while still
-# amortizing compile / CUDA init across several networks.
-export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
+# Release weights use eager, full-FP32 matrix multiplication unless a caller
+# deliberately overrides these controls. Neither compilation nor TF32 has
+# isolated held-out evidence establishing identical training trajectories.
+export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-0}"
+export MHCFLURRY_TORCH_COMPILE_LOSS="${MHCFLURRY_TORCH_COMPILE_LOSS:-0}"
+export MHCFLURRY_MATMUL_PRECISION="${MHCFLURRY_MATMUL_PRECISION:-highest}"
 # The resource probe should make the configured release minibatch safe. If it
 # does not, changing optimization dynamics is a provenance failure.
 export MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK="${MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK:-1}"
@@ -281,12 +282,12 @@ PARALLELISM_ARGS=(
     # to env (MHCFLURRY_TORCH_COMPILE / MHCFLURRY_MATMUL_PRECISION /
     # MHCFLURRY_ENABLE_TIMING) inside resolve_local_parallelism_args, so
     # the existing maybe_compile_network / configure_matmul_precision /
-    # _timing_enabled call sites continue to read env unchanged. Defaults
-    # to 'auto' for --torch-compile so an env preset (e.g.
-    # MHCFLURRY_TORCH_COMPILE=1 set by the runplz container) still wins
-    # when the shell is invoked outside the runplz path.
-    --torch-compile "${TORCH_COMPILE_CLI:-auto}"
-    --matmul-precision "${MATMUL_PRECISION_CLI:-none}"
+    # _timing_enabled call sites continue to read env unchanged. The release
+    # recipe pins eager/full-FP32 defaults; callers can still override them for
+    # non-release throughput experiments.
+    --random-negative-pool-epochs 1
+    --torch-compile "${TORCH_COMPILE_CLI:-0}"
+    --matmul-precision "${MATMUL_PRECISION_CLI:-highest}"
 )
 if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
     PARALLELISM_ARGS+=(--enable-timing)
@@ -391,8 +392,7 @@ do
     cp "$UNSELECTED_DIR/train_data.csv.bz2" "$SELECTED_DIR/train_data.csv.bz2"
 
     # ---- percentile rank calibration (matches release) ---------------
-    # Three speedups vs the legacy invocation, individually safe and
-    # stacking to ~10-20x on CUDA on the pan-allele universe:
+    # Two throughput-only speedups vs the legacy invocation:
     #
     #   --gpu-batched: batches many alleles into one forward pass via
     #     the GPU-hoisted fast path. Bit-identical on CUDA; ~5-30x
@@ -400,12 +400,9 @@ do
     #   --alleles-per-work-chunk 30 (was 10): better amortization of
     #     per-chunk fixed costs (pool dispatch, model load, aggregate).
     #     ~3x fewer chunks. Override with CALIBRATE_ALLELES_PER_CHUNK.
-    #   --num-peptides-per-length 50000 (was 100000): linear in
-    #     calibration wall time. Quality trade-off matters only for
-    #     the deep tail of the percent-rank distribution; for
-    #     ranks > 0.5% the noise from halving is negligible.
-    #     Override with CALIBRATE_PEPTIDES_PER_LENGTH.
-    CALIBRATE_PEPTIDES_PER_LENGTH="${CALIBRATE_PEPTIDES_PER_LENGTH:-50000}"
+    # The statistical calibration sample remains the published 100000
+    # peptides per length; only execution batching is changed.
+    CALIBRATE_PEPTIDES_PER_LENGTH="${CALIBRATE_PEPTIDES_PER_LENGTH:-100000}"
     CALIBRATE_ALLELES_PER_CHUNK="${CALIBRATE_ALLELES_PER_CHUNK:-30}"
     # Calibrate's peak VRAM per worker is dominated by the merged
     # ensemble's peptide-stage cache (~8x stage_dim × n_peptides × 4
@@ -428,8 +425,8 @@ do
         --gpus "$GPUS"
         --max-workers-per-gpu "$CALIBRATE_MAX_WORKERS_PER_GPU"
         --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
-        --torch-compile "${TORCH_COMPILE_CLI:-auto}"
-        --matmul-precision "${MATMUL_PRECISION_CLI:-none}"
+        --torch-compile "${TORCH_COMPILE_CLI:-0}"
+        --matmul-precision "${MATMUL_PRECISION_CLI:-highest}"
     )
     if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
         CALIBRATE_PARALLELISM_ARGS+=(--enable-timing)

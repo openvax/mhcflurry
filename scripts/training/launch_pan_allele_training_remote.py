@@ -93,7 +93,7 @@ def compare_torch_compile_value(environ):
 def compare_matmul_precision_value(environ):
     value = environ.get(
         "COMPARE_MATMUL_PRECISION",
-        environ.get("MHCFLURRY_MATMUL_PRECISION", "high"),
+        environ.get("MHCFLURRY_MATMUL_PRECISION", "highest"),
     )
     normalized = value.strip().lower()
     if normalized not in {"none", "highest", "high", "medium"}:
@@ -163,7 +163,7 @@ def remote_training_env(environ=os.environ):
         "COMPARE_GPUS": environ.get("COMPARE_GPUS", "auto"),
         "COMPARE_MATMUL_PRECISION": environ.get(
             "COMPARE_MATMUL_PRECISION",
-            environ.get("MHCFLURRY_MATMUL_PRECISION", "high"),
+            environ.get("MHCFLURRY_MATMUL_PRECISION", "highest"),
         ),
         "COMPARE_MAX_TASKS_PER_WORKER": environ.get(
             "COMPARE_MAX_TASKS_PER_WORKER",
@@ -187,7 +187,7 @@ def remote_training_env(environ=os.environ):
         ),
         "COMPARE_TORCH_COMPILE": environ.get(
             "COMPARE_TORCH_COMPILE",
-            environ.get("MHCFLURRY_TORCH_COMPILE", "auto"),
+            environ.get("MHCFLURRY_TORCH_COMPILE", "0"),
         ),
         # This must be a path visible inside the remote runplz job. Do not
         # inherit DATA_DIR from the local shell; in the release wrapper that is
@@ -211,12 +211,12 @@ def remote_training_env(environ=os.environ):
         "MHCFLURRY_GPU_TELEMETRY_SECONDS": environ.get(
             "MHCFLURRY_GPU_TELEMETRY_SECONDS", "30"
         ),
-        "MHCFLURRY_TORCH_COMPILE": environ.get("MHCFLURRY_TORCH_COMPILE", "1"),
+        "MHCFLURRY_TORCH_COMPILE": environ.get("MHCFLURRY_TORCH_COMPILE", "0"),
         "MHCFLURRY_TORCH_COMPILE_LOSS": environ.get(
-            "MHCFLURRY_TORCH_COMPILE_LOSS", "1"
+            "MHCFLURRY_TORCH_COMPILE_LOSS", "0"
         ),
         "MHCFLURRY_MATMUL_PRECISION": environ.get(
-            "MHCFLURRY_MATMUL_PRECISION", "high"
+            "MHCFLURRY_MATMUL_PRECISION", "highest"
         ),
         "MHCFLURRY_RELEASE_WORKFLOW_ID": environ.get(
             "MHCFLURRY_RELEASE_WORKFLOW_ID", ""
@@ -227,14 +227,19 @@ def remote_training_env(environ=os.environ):
         "MHCFLURRY_RELEASE_VERSION": environ.get(
             "MHCFLURRY_RELEASE_VERSION", ""
         ),
-        "MATMUL_PRECISION": environ.get("MATMUL_PRECISION", "high"),
-        "MATMUL_PRECISION_CLI": environ.get("MATMUL_PRECISION_CLI", "high"),
+        "MATMUL_PRECISION": environ.get("MATMUL_PRECISION", "highest"),
+        "MATMUL_PRECISION_CLI": environ.get(
+            "MATMUL_PRECISION_CLI", "highest"
+        ),
         "NUM_JOBS": environ.get("NUM_JOBS", "auto"),
         "PRESENTATION_PROCESSING_WITH_FLANKS_KIND": environ.get(
-            "PRESENTATION_PROCESSING_WITH_FLANKS_KIND", "with_flanks"
+            "PRESENTATION_PROCESSING_WITH_FLANKS_KIND", "short_flanks"
         ),
         "PRESENTATION_DECOYS_PER_HIT": environ.get(
-            "PRESENTATION_DECOYS_PER_HIT", "99"
+            "PRESENTATION_DECOYS_PER_HIT", "2"
+        ),
+        "PRESENTATION_SAMPLE_FRACTION": environ.get(
+            "PRESENTATION_SAMPLE_FRACTION", "0.1"
         ),
         "PRESENTATION_FEATURE_CHUNK_SIZE": environ.get(
             "PRESENTATION_FEATURE_CHUNK_SIZE", "250000"
@@ -290,7 +295,7 @@ def remote_training_env(environ=os.environ):
             "PROCESSING_VARIANTS", "with_flanks no_flank short_flanks"
         ),
         "PROCESSING_HELD_OUT_SAMPLES": environ.get(
-            "PROCESSING_HELD_OUT_SAMPLES", "50"
+            "PROCESSING_HELD_OUT_SAMPLES", "10"
         ),
         "PROCESSING_NUM_JOBS": environ.get("PROCESSING_NUM_JOBS", "auto"),
         "PROCESSING_MAX_WORKERS_PER_GPU": environ.get(

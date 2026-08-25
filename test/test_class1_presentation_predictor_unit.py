@@ -184,6 +184,12 @@ def test_fit_from_scores_trains_expected_variants():
     }
 
 
+def test_new_presentation_models_use_published_logistic_recipe():
+    model = Class1PresentationPredictor().get_model()
+    assert model.solver == "lbfgs"
+    assert model.max_iter == 100
+
+
 def test_percentile_calibration_preserves_compressed_score_ranking():
     """Low presentation scores must not collapse into one percentile bin."""
     rng = numpy.random.default_rng(42)

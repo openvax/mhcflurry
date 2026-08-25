@@ -32,7 +32,9 @@ GPU_TELEMETRY_PID=""
 trap stop_gpu_telemetry EXIT
 
 export PYTHONUNBUFFERED=1
-export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
+export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-0}"
+export MHCFLURRY_TORCH_COMPILE_LOSS="${MHCFLURRY_TORCH_COMPILE_LOSS:-0}"
+export MHCFLURRY_MATMUL_PRECISION="${MHCFLURRY_MATMUL_PRECISION:-highest}"
 
 mkdir -p "$BASE_OUT/processing" "$BASE_OUT/presentation"
 
@@ -43,13 +45,14 @@ else
 fi
 MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-auto}"
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-auto}"
-PROCESSING_HELD_OUT_SAMPLES="${PROCESSING_HELD_OUT_SAMPLES:-50}"
-PRESENTATION_DECOYS_PER_HIT="${PRESENTATION_DECOYS_PER_HIT:-99}"
+PROCESSING_HELD_OUT_SAMPLES="${PROCESSING_HELD_OUT_SAMPLES:-10}"
+PRESENTATION_DECOYS_PER_HIT="${PRESENTATION_DECOYS_PER_HIT:-2}"
+PRESENTATION_SAMPLE_FRACTION="${PRESENTATION_SAMPLE_FRACTION:-0.1}"
 PRESENTATION_FEATURE_CHUNK_SIZE="${PRESENTATION_FEATURE_CHUNK_SIZE:-250000}"
 TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-1024}"
-PROCESSING_MINIBATCH_SIZE="${PROCESSING_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
+PROCESSING_MINIBATCH_SIZE="${PROCESSING_MINIBATCH_SIZE:-512}"
 PROCESSING_VARIANTS="${PROCESSING_VARIANTS:-with_flanks no_flank short_flanks}"
-PRESENTATION_PROCESSING_WITH_FLANKS_KIND="${PRESENTATION_PROCESSING_WITH_FLANKS_KIND:-with_flanks}"
+PRESENTATION_PROCESSING_WITH_FLANKS_KIND="${PRESENTATION_PROCESSING_WITH_FLANKS_KIND:-short_flanks}"
 
 processing_variant_enabled() {
     case " $PROCESSING_VARIANTS " in
@@ -119,8 +122,8 @@ COMMON_PARALLELISM_ARGS=(
     --gpus "$GPUS"
     --max-workers-per-gpu "$MAX_WORKERS_PER_GPU"
     --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
-    --torch-compile auto
-    --matmul-precision "${MATMUL_PRECISION:-none}"
+    --torch-compile "${TORCH_COMPILE_CLI:-0}"
+    --matmul-precision "${MATMUL_PRECISION:-highest}"
 )
 [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ] && COMMON_PARALLELISM_ARGS+=(--enable-timing)
 
@@ -132,8 +135,8 @@ PROCESSING_PARALLELISM_ARGS=(
     --gpus "$GPUS"
     --max-workers-per-gpu "$PROCESSING_MAX_WORKERS_PER_GPU"
     --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
-    --torch-compile auto
-    --matmul-precision "${MATMUL_PRECISION:-none}"
+    --torch-compile "${TORCH_COMPILE_CLI:-0}"
+    --matmul-precision "${MATMUL_PRECISION:-highest}"
 )
 [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ] && PROCESSING_PARALLELISM_ARGS+=(--enable-timing)
 
@@ -145,8 +148,8 @@ PRESENTATION_PARALLELISM_ARGS=(
     --gpus "$GPUS"
     --max-workers-per-gpu "$PRESENTATION_MAX_WORKERS_PER_GPU"
     --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
-    --torch-compile auto
-    --matmul-precision "${MATMUL_PRECISION:-none}"
+    --torch-compile "${TORCH_COMPILE_CLI:-0}"
+    --matmul-precision "${MATMUL_PRECISION:-highest}"
 )
 [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ] && PRESENTATION_PARALLELISM_ARGS+=(--enable-timing)
 
@@ -159,8 +162,8 @@ PRESENTATION_CALIBRATION_PARALLELISM_ARGS=(
     --gpus "$GPUS"
     --max-workers-per-gpu "$PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU"
     --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
-    --torch-compile auto
-    --matmul-precision "${MATMUL_PRECISION:-none}"
+    --torch-compile "${TORCH_COMPILE_CLI:-0}"
+    --matmul-precision "${MATMUL_PRECISION:-highest}"
 )
 [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ] && PRESENTATION_CALIBRATION_PARALLELISM_ARGS+=(--enable-timing)
 
@@ -251,6 +254,7 @@ python make_train_data.presentation.py \
     --decoys-per-hit "$PRESENTATION_DECOYS_PER_HIT" \
     --exclude-pmid 31844290 31495665 31154438 \
     --only-format MULTIALLELIC \
+    --sample-fraction "$PRESENTATION_SAMPLE_FRACTION" \
     --out "$(pwd)/train_data.csv"
 compress_csv_bzip2 "$(pwd)/train_data.csv"
 
@@ -268,7 +272,7 @@ mhcflurry-calibrate-percentile-ranks \
     --match-amino-acid-distribution-data "$AFFINITY_PREDICTOR/train_data.csv.bz2" \
     --alleles-file "$AFFINITY_PREDICTOR/train_data.csv.bz2" \
     --predictor-kind class1_presentation \
-    --num-peptides-per-length 100000 \
+    --num-peptides-per-length 10000 \
     --alleles-per-genotype 1 \
     --num-genotypes 50 \
     --prediction-batch-size "$PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE" \

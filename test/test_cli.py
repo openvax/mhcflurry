@@ -356,6 +356,50 @@ def test_deploy_packages_only_requested_processing_variants(tmp_path):
     assert "models.selected.short_flanks" in all_tar
 
 
+def test_deploy_creates_draft_noninteractively_with_release_notes(tmp_path):
+    run_dir = tmp_path / "release-run"
+    assets_dir = tmp_path / "assets"
+    _write_minimal_deployable_run(run_dir)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    gh_log = tmp_path / "gh.log"
+    fake_gh = fake_bin / "gh"
+    fake_gh.write_text(
+        "#!/usr/bin/env bash\n"
+        "printf '%s\\n' \"$*\" >> \"$GH_LOG\"\n"
+        "if [ \"$1 $2\" = \"release view\" ]; then exit 1; fi\n"
+    )
+    fake_gh.chmod(0o755)
+    env = os.environ.copy()
+    env["PATH"] = "%s:%s" % (fake_bin, env["PATH"])
+    env["GH_LOG"] = str(gh_log)
+
+    subprocess.run(
+        [
+            "bash", "scripts/release/deploy_trained_models.sh",
+            "--run-dir", str(run_dir),
+            "--release", "2.3.0",
+            "--github-release", "2.3.0",
+            "--repo", ".",
+            "--assets-dir", str(assets_dir),
+            "--date", "20260825",
+            "--allow-dirty-repo",
+            "--draft",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
+
+    calls = gh_log.read_text().splitlines()
+    create = next(line for line in calls if line.startswith("release create "))
+    assert "--notes-file " in create
+    assert "RELEASE_NOTES_2.3.0.md" in create
+    assert create.startswith("release create 2.3.0 --draft --title ")
+    assert any(line.startswith("release upload 2.3.0 ") for line in calls)
+
+
 def test_deploy_rejects_artifacts_from_a_different_commit(tmp_path):
     run_dir = tmp_path / "release-run"
     _write_minimal_deployable_run(run_dir)
@@ -947,6 +991,7 @@ def test_release_workflow_forwards_presentation_recipe_controls(tmp_path):
             "--skip-plots",
             "--processing-held-out-samples", "17",
             "--presentation-decoys-per-hit", "7",
+            "--presentation-sample-fraction", "0.25",
             "--presentation-feature-chunk-size", "12345",
             "--presentation-num-jobs", "8",
             "--presentation-max-workers-per-gpu", "2",
@@ -964,6 +1009,7 @@ def test_release_workflow_forwards_presentation_recipe_controls(tmp_path):
     for expected in (
             "PROCESSING_HELD_OUT_SAMPLES=17",
             "PRESENTATION_DECOYS_PER_HIT=7",
+            "PRESENTATION_SAMPLE_FRACTION=0.25",
             "PRESENTATION_FEATURE_CHUNK_SIZE=12345",
             "PRESENTATION_NUM_JOBS=8",
             "PRESENTATION_MAX_WORKERS_PER_GPU=2",
@@ -971,6 +1017,48 @@ def test_release_workflow_forwards_presentation_recipe_controls(tmp_path):
             "PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU=4",
             "PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE=4096"):
         assert expected in output
+
+
+def test_release_workflow_defaults_to_validated_published_recipe(tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "local",
+            "--skip-eval",
+            "--skip-plots",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    output = result.stdout + result.stderr
+    for expected in (
+            "AFFINITY_MINIBATCH_SIZE=1024",
+            "PROCESSING_MINIBATCH_SIZE=512",
+            "PROCESSING_HELD_OUT_SAMPLES=10",
+            "PRESENTATION_PROCESSING_WITH_FLANKS_KIND=short_flanks",
+            "PRESENTATION_DECOYS_PER_HIT=2",
+            "PRESENTATION_SAMPLE_FRACTION=0.1",
+            "MHCFLURRY_TORCH_COMPILE=0",
+            "MHCFLURRY_TORCH_COMPILE_LOSS=0",
+            "MHCFLURRY_MATMUL_PRECISION=highest"):
+        assert expected in output
+
+    affinity_workflow = pathlib.Path(
+        "scripts/training/pan_allele_release_affinity.sh").read_text()
+    assert "--random-negative-pool-epochs 1" in affinity_workflow
+    assert 'CALIBRATE_PEPTIDES_PER_LENGTH:-100000' in affinity_workflow
+
+    full_workflow = pathlib.Path(
+        "scripts/training/pan_allele_release_full.sh").read_text()
+    assert '--exclude-pmid 31844290 31495665' in full_workflow
+    assert '--sample-fraction "$PRESENTATION_SAMPLE_FRACTION"' in full_workflow
+    assert "--num-peptides-per-length 10000" in full_workflow
 
 
 def test_release_workflow_sync_is_workflow_id_scoped():
@@ -1974,6 +2062,14 @@ def test_affinity_hyperparameter_generator_is_importable():
     grid = module.build_grid(minibatch_size=2048)
     assert len(grid) == 35
     assert {item["minibatch_size"] for item in grid} == {2048}
+    published_recipe_grid = module.build_grid()
+    assert {item["minibatch_size"] for item in published_recipe_grid} == {1024}
+    assert {item["max_epochs"] for item in published_recipe_grid} == {5000}
+    assert {item["min_delta"] for item in published_recipe_grid} == {0.0}
+    assert {item["validation_interval"] for item in published_recipe_grid} == {1}
+    assert {
+        item["random_negative_pool_epochs"] for item in published_recipe_grid
+    } == {1}
 
 
 def test_processing_hyperparameter_generator_is_importable():
@@ -1985,6 +2081,7 @@ def test_processing_hyperparameter_generator_is_importable():
     grid = module.build_grid(minibatch_size=2048)
     assert len(grid) == 128
     assert {item["minibatch_size"] for item in grid} == {2048}
+    assert {item["minibatch_size"] for item in module.build_grid()} == {512}
 
 
 def test_training_hyperparameter_cli_generates_processing_variant(tmp_path, capsys):
@@ -2097,8 +2194,8 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert env["COMPARE_BACKEND"] == "auto"
     assert env["EVAL_MAX_BENCHMARK_FILES"] == ""
     assert env["COMPARE_GPUS"] == "auto"
-    assert env["COMPARE_TORCH_COMPILE"] == "auto"
-    assert env["COMPARE_MATMUL_PRECISION"] == "high"
+    assert env["COMPARE_TORCH_COMPILE"] == "0"
+    assert env["COMPARE_MATMUL_PRECISION"] == "highest"
     assert env["MHCFLURRY_RELEASE_WORKFLOW_ID"] == ""
     assert env["MHCFLURRY_RELEASE_GIT_COMMIT"] == ""
     assert env["MHCFLURRY_RELEASE_VERSION"] == ""
@@ -2115,8 +2212,13 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert "PROCESSING_MINIBATCH_SIZE" not in env
     assert env["PROCESSING_NUM_JOBS"] == "auto"
     assert env["PROCESSING_MAX_WORKERS_PER_GPU"] == "auto"
-    assert env["PROCESSING_HELD_OUT_SAMPLES"] == "50"
-    assert env["PRESENTATION_DECOYS_PER_HIT"] == "99"
+    assert env["PROCESSING_HELD_OUT_SAMPLES"] == "10"
+    assert env["PRESENTATION_DECOYS_PER_HIT"] == "2"
+    assert env["PRESENTATION_SAMPLE_FRACTION"] == "0.1"
+    assert env["PRESENTATION_PROCESSING_WITH_FLANKS_KIND"] == "short_flanks"
+    assert env["MHCFLURRY_TORCH_COMPILE"] == "0"
+    assert env["MHCFLURRY_TORCH_COMPILE_LOSS"] == "0"
+    assert env["MHCFLURRY_MATMUL_PRECISION"] == "highest"
     assert env["PRESENTATION_FEATURE_CHUNK_SIZE"] == "250000"
     assert env["PRESENTATION_NUM_JOBS"] == "auto"
     assert env["PRESENTATION_MAX_WORKERS_PER_GPU"] == "auto"
@@ -2132,6 +2234,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
         "PROCESSING_MAX_WORKERS_PER_GPU": "1",
         "PROCESSING_HELD_OUT_SAMPLES": "17",
         "PRESENTATION_DECOYS_PER_HIT": "7",
+        "PRESENTATION_SAMPLE_FRACTION": "0.25",
         "PRESENTATION_FEATURE_CHUNK_SIZE": "12345",
         "PRESENTATION_NUM_JOBS": "8",
         "PRESENTATION_MAX_WORKERS_PER_GPU": "2",
@@ -2159,6 +2262,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert env["PROCESSING_MAX_WORKERS_PER_GPU"] == "1"
     assert env["PROCESSING_HELD_OUT_SAMPLES"] == "17"
     assert env["PRESENTATION_DECOYS_PER_HIT"] == "7"
+    assert env["PRESENTATION_SAMPLE_FRACTION"] == "0.25"
     assert env["PRESENTATION_FEATURE_CHUNK_SIZE"] == "12345"
     assert env["PRESENTATION_NUM_JOBS"] == "8"
     assert env["PRESENTATION_MAX_WORKERS_PER_GPU"] == "2"
@@ -3509,6 +3613,69 @@ def test_comparison_curves_use_shared_finite_rows():
     assert b_score.tolist() == [0.7, 0.3]
 
 
+def test_comparison_curves_move_long_legends_below_axes():
+    figsize, kwargs = plot_model_comparison._curve_legend_layout(
+        "MHCflurry 2.3.0",
+        "MHCflurry no-additional-MS (train-excluded)",
+    )
+
+    assert figsize == (4.2, 3.6)
+    assert kwargs["loc"] == "upper center"
+    assert kwargs["bbox_to_anchor"][1] < 0
+
+
+def test_comparison_curves_keep_short_legends_inside_axes():
+    figsize, kwargs = plot_model_comparison._curve_legend_layout(
+        "MHCflurry 2.3.0", "MHCflurry 2.2.0")
+
+    assert figsize == (3.2, 3.0)
+    assert kwargs == {}
+
+
+def test_release_summary_keeps_long_labels_clear_of_panels(
+        tmp_path, monkeypatch):
+    matplotlib = pytest.importorskip("matplotlib")
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    pandas.DataFrame([
+        {
+            "component": "affinity",
+            "eval": "affinity",
+            "metric": metric,
+            "average": "Macro",
+            "side_a": 0.8,
+            "side_b": 0.7,
+            "diff": 0.1,
+        }
+        for metric in ("AUROC", "AUPRC", "PPV@N")
+    ]).to_csv(tmp_path / "release_summary.csv", index=False)
+    saved = []
+    monkeypatch.setattr(
+        plot_model_comparison,
+        "_save_figure",
+        lambda fig, path: saved.append((path, fig)),
+    )
+    labels = {
+        "a": "MHCflurry 2.3.0",
+        "b": "MHCflurry no-additional-MS (train-excluded)",
+    }
+
+    plot_model_comparison._plot_release_summary(
+        str(tmp_path), str(tmp_path / "paper"), labels)
+
+    assert len(saved) == 2
+    accuracy_fig = saved[0][1]
+    assert len(accuracy_fig.legends) == 1
+    assert all(ax.get_legend() is None for ax in accuracy_fig.axes)
+    delta_fig = saved[1][1]
+    assert [ax.get_ylabel() for ax in delta_fig.axes] == [
+        "Macro difference", "", ""]
+    assert any(labels["b"] in text.get_text() for text in delta_fig.texts)
+    for _, fig in saved:
+        plt.close(fig)
+
+
 def test_plot_model_comparison_writes_paper_plots_from_summaries(tmp_path):
     pytest.importorskip("matplotlib")
 
@@ -4350,9 +4517,19 @@ def test_current_comparison_labels_counts_as_evaluation_peptides(
     class CaptureWriter:
         def __init__(self):
             self.xlabels = {}
+            self.figure_legend_counts = {}
+            self.axes_legend_counts = {}
+            self.minor_formatter_names = {}
 
         def save(self, fig, name, _family, note=""):
             self.xlabels[name] = [ax.get_xlabel() for ax in fig.axes]
+            self.figure_legend_counts[name] = len(fig.legends)
+            self.axes_legend_counts[name] = sum(
+                ax.get_legend() is not None for ax in fig.axes)
+            self.minor_formatter_names[name] = [
+                type(ax.xaxis.get_minor_formatter()).__name__
+                for ax in fig.axes
+            ]
             plt.close(fig)
 
         def skip(self, *_args, **_kwargs):
@@ -4372,6 +4549,10 @@ def test_current_comparison_labels_counts_as_evaluation_peptides(
         "fig.1_model_selection_predictor_accuracy.scores.hla_a"]
     assert "Evaluation peptides" in xlabels
     assert "Training peptides" not in xlabels
+    figure_name = "fig.1_model_selection_predictor_accuracy.scores.hla_a"
+    assert writer.figure_legend_counts[figure_name] == 1
+    assert writer.axes_legend_counts[figure_name] == 0
+    assert "NullFormatter" in writer.minor_formatter_names[figure_name]
 
 
 def test_current_model_information_uses_only_final_manifests(tmp_path):

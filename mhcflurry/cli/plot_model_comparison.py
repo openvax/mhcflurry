@@ -780,7 +780,7 @@ def _plot_release_summary(input_dir, paper_dir, labels):
 
     fig, axes = plt.subplots(
         1, len(METRIC_NAMES),
-        figsize=(3.2 * len(METRIC_NAMES), 3.0),
+        figsize=(3.2 * len(METRIC_NAMES), 3.6),
         squeeze=False,
     )
     for ax, metric in zip(axes[0], METRIC_NAMES):
@@ -806,15 +806,23 @@ def _plot_release_summary(input_dir, paper_dir, labels):
         ax.set_ylim(_metric_ylim(metric, rows[["side_a", "side_b"]].values))
         ax.grid(axis="y")
     axes[0][0].set_ylabel("Macro mean")
-    axes[0][-1].legend(frameon=False)
-    fig.suptitle("Model comparison: macro accuracy by component")
-    fig.tight_layout()
+    handles, legend_labels = axes[0][-1].get_legend_handles_labels()
+    fig.suptitle("Model comparison: macro accuracy by component", y=0.98)
+    fig.legend(
+        handles,
+        legend_labels,
+        frameon=False,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.91),
+        ncol=2,
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.80))
     _save_figure(fig, os.path.join(paper_dir, "release_summary_macro.png"))
     plt.close(fig)
 
     fig, axes = plt.subplots(
         1, len(METRIC_NAMES),
-        figsize=(3.2 * len(METRIC_NAMES), 3.0),
+        figsize=(3.2 * len(METRIC_NAMES), 3.6),
         squeeze=False,
     )
     for ax, metric in zip(axes[0], METRIC_NAMES):
@@ -834,10 +842,17 @@ def _plot_release_summary(input_dir, paper_dir, labels):
         ax.set_title(METRIC_DISPLAY_NAMES[metric])
         ax.set_xticks(numpy.arange(len(rows)))
         ax.set_xticklabels(rows.index, rotation=35, ha="right")
-        ax.set_ylabel("%s - %s" % (labels["a"], labels["b"]))
         ax.grid(axis="y")
-    fig.suptitle("Model comparison: macro deltas by component")
-    fig.tight_layout()
+    axes[0][0].set_ylabel("Macro difference")
+    fig.suptitle("Model comparison: macro deltas by component", y=0.98)
+    fig.text(
+        0.5,
+        0.90,
+        "%s − %s" % (labels["a"], labels["b"]),
+        ha="center",
+        va="top",
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.80))
     _save_figure(fig, os.path.join(paper_dir, "release_summary_macro_delta.png"))
     plt.close(fig)
 
@@ -1381,7 +1396,8 @@ def _save_macro_bars(plt, summary, sub_dir, label_a, label_b, title_prefix):
 
 def _save_roc(plt, roc_curve_fn, roc_auc_fn,
               y, a_score, b_score, label_a, label_b, out_path, title):
-    fig, ax = plt.subplots(figsize=(3.2, 3.0))
+    figsize, legend_kwargs = _curve_legend_layout(label_a, label_b)
+    fig, ax = plt.subplots(figsize=figsize)
     y, a_score, b_score = _shared_finite_curve_values(y, a_score, b_score)
     for label, values, color in (
             (label_a, a_score, SIDE_A_COLOR),
@@ -1398,7 +1414,7 @@ def _save_roc(plt, roc_curve_fn, roc_auc_fn,
     ax.set_ylabel("True positive rate")
     ax.set_title(title)
     if ax.get_legend_handles_labels()[0]:
-        ax.legend(frameon=False)
+        ax.legend(frameon=False, **legend_kwargs)
     ax.grid(False)
     fig.tight_layout()
     _save_figure(fig, out_path)
@@ -1407,7 +1423,8 @@ def _save_roc(plt, roc_curve_fn, roc_auc_fn,
 
 def _save_pr(plt, pr_curve_fn, ap_fn,
              y, a_score, b_score, label_a, label_b, out_path, title):
-    fig, ax = plt.subplots(figsize=(3.2, 3.0))
+    figsize, legend_kwargs = _curve_legend_layout(label_a, label_b)
+    fig, ax = plt.subplots(figsize=figsize)
     y, a_score, b_score = _shared_finite_curve_values(y, a_score, b_score)
     for label, values, color in (
             (label_a, a_score, SIDE_A_COLOR),
@@ -1423,11 +1440,23 @@ def _save_pr(plt, pr_curve_fn, ap_fn,
     ax.set_ylabel("Precision")
     ax.set_title(title)
     if ax.get_legend_handles_labels()[0]:
-        ax.legend(frameon=False)
+        ax.legend(frameon=False, **legend_kwargs)
     ax.grid(False)
     fig.tight_layout()
     _save_figure(fig, out_path)
     plt.close(fig)
+
+
+def _curve_legend_layout(*labels):
+    """Keep long comparison labels clear of curve axes and tick labels."""
+    if max((len(str(label)) for label in labels), default=0) <= 32:
+        return (3.2, 3.0), {}
+    return (4.2, 3.6), {
+        "bbox_to_anchor": (0.5, -0.20),
+        "handlelength": 1.5,
+        "loc": "upper center",
+        "fontsize": 8,
+    }
 
 
 def _shared_finite_curve_values(y, a_score, b_score):

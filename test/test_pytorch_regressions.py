@@ -1699,6 +1699,42 @@ def test_optimizer_defaults_match_keras():
     assert processing_optimizer.defaults["eps"] == pytest.approx(1e-07, abs=1e-12)
 
 
+def test_processing_initializers_match_keras(monkeypatch):
+    initialized_shapes = []
+
+    def record_xavier(tensor):
+        initialized_shapes.append(tuple(tensor.shape))
+        return torch.nn.init.constant_(tensor, 0.125)
+
+    monkeypatch.setattr(torch.nn.init, "xavier_uniform_", record_xavier)
+    model = Class1ProcessingModel(
+        sequence_dims=(41, 21),
+        peptide_max_length=15,
+        n_flank_length=15,
+        c_flank_length=15,
+        flanking_averages=True,
+        convolutional_filters=8,
+        convolutional_kernel_size=11,
+        convolutional_activation="tanh",
+        convolutional_kernel_l1_l2=(0.0, 0.0),
+        dropout_rate=0.3,
+        post_convolutional_dense_layer_sizes=[4],
+    )
+
+    trainable_layers = [
+        module for module in model.modules()
+        if isinstance(module, (torch.nn.Conv1d, torch.nn.Linear))
+    ]
+    assert len(initialized_shapes) == len(trainable_layers)
+    assert all(torch.count_nonzero(layer.bias) == 0 for layer in trainable_layers)
+    assert torch.all(model.output_layer.weight == 1)
+    assert all(
+        torch.all(layer.weight == 0.125)
+        for layer in trainable_layers
+        if layer is not model.output_layer
+    )
+
+
 def test_weight_and_embedding_updates_preserve_device():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
