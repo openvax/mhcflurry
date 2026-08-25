@@ -296,4 +296,4 @@ def test_release_holdout_file_limit_applies_before_genotype_normalization(
     assert result.source_file.unique().tolist() == [
         "benchmark.multiallelic.train_excluded.z.csv.bz2",
     ]
-    assert normalized == ["HLA-A*02:01", "HLA-A*02:01"]
+    assert normalized == ["HLA-A*02:01"]

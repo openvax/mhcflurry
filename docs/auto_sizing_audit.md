@@ -13,6 +13,7 @@ then reached 2.7–4.1 GiB per process and one validation forward failed with on
 |---|---|---|---|
 | GPU workers per device | Workload constants plus analytic model/data formulas | A formula for steady training tensors was treated as the peak for every phase. Historical constants were repeatedly retuned to individual release runs. | Keep formulas only as launch fallbacks; tighten from a real peak-phase probe before training pools start. |
 | Validation and prediction batch | Live free VRAM divided by declared co-resident workers | Live free VRAM already contains allocations from earlier-starting peers. Dividing it again creates startup-order-dependent batches and does not prevent simultaneous claims. | Snapshot launch-time free capacity, allocate a fixed per-worker share, subtract the current process working set, then cap by live headroom. |
+| Processing prediction batch | Analytic sequence-span and filter-width estimate | It did not observe CUDA's kernel-dependent convolution workspace or masking/pooling temporaries. Thirteen release-evaluation forwards recovered by halving otherwise valid auto batches. | Keep the analytic estimate as a portable floor, then let a safe real-input CUDA forward probe only tighten automatic batches. CPU and MPS retain the analytic path and elastic retry. |
 | Compile warmup | One minibatch, validation disabled | It tested compilation, not the production resource envelope, yet its allocator peak was used to validate concurrency. It also disappeared when compilation was disabled. | Replace it with a compilation-independent full-residency resource probe; compilation cache warming is an optional side effect. |
 | Calibration batch | A second cache/scratch formula over live free VRAM | It duplicated the global memory partition and inherited the same live-free race. | Route it through the shared per-worker entitlement, retaining only calibration-specific future cache and cartesian-forward terms. |
 | Host worker count | Static workload RSS plus loaded spawn-context size | The spawn-context refinement is useful, but dependent DataLoader and random-negative decisions are made before late refinements and are only safe because refinements can tighten. | Retain for 2.3.0; recompute dependent auto knobs to a fixed point in the follow-up planner cleanup. |
@@ -43,6 +44,10 @@ new collection of workload constants.
    process IDs differ.
 6. Resource decisions are visible in the run log, and release workflows turn
    any training-affecting shrink into a hard provenance failure.
+7. Automatic CUDA processing batches are calibrated after the real model and
+   encoded inputs are resident. The measured peak may only shrink the analytic
+   batch; explicit batches are unchanged, and elastic halving remains the final
+   allocator-specific safety net.
 
 ## Rewrite boundary
 

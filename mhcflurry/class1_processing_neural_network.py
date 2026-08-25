@@ -1108,6 +1108,7 @@ class Class1ProcessingNeuralNetwork(object):
         numpy for the public API.
         """
         from .pytorch_sizing import (
+            calibrate_prediction_batch_size,
             env_workers_per_gpu,
             is_device_out_of_memory_error,
             release_device_memory_after_oom,
@@ -1130,16 +1131,30 @@ class Class1ProcessingNeuralNetwork(object):
         network.eval()
 
         n_samples = len(x_dict["sequence"])
+        workers_per_gpu = env_workers_per_gpu(1)
         batch_size = resolve_prediction_batch_size(
             batch_size,
             device,
             model=network,
-            num_workers_per_gpu=env_workers_per_gpu(1),
+            num_workers_per_gpu=workers_per_gpu,
             total_rows=n_samples,
         )
 
         if n_samples == 0:
             return torch.empty((0,), dtype=torch.float32, device=device)
+
+        if auto_batch_size:
+            batch_size = calibrate_prediction_batch_size(
+                batch_size,
+                device,
+                network,
+                {
+                    "sequence": x_dict["sequence"],
+                    "peptide_length": x_dict["peptide_length"],
+                },
+                num_workers_per_gpu=workers_per_gpu,
+                total_rows=n_samples,
+            )
 
         predictions = torch.empty(
             (n_samples,), dtype=torch.float32, device=device)

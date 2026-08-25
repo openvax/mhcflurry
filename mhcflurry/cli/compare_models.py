@@ -1725,7 +1725,14 @@ def _load_presentation_benchmark(data_dir, limit_files, row_filter=None):
         # Release evaluation only needs its frozen samples, so select those
         # rows after whole-input integrity checks but before parsing genotypes.
         result = row_filter(result)
-    result["hla"] = result["hla"].map(_normalize_benchmark_genotype)
+    # A release benchmark has millions of peptide rows but only a handful of
+    # distinct sample genotypes. Parse each distinct genotype once, then map
+    # the canonical value back without changing row order or validation.
+    normalized_genotypes = {
+        value: _normalize_benchmark_genotype(value)
+        for value in pandas.unique(result["hla"])
+    }
+    result["hla"] = result["hla"].map(normalized_genotypes)
     genotype_counts = result.groupby("sample_id", dropna=False).hla.nunique()
     inconsistent_samples = genotype_counts[genotype_counts > 1]
     if not inconsistent_samples.empty:

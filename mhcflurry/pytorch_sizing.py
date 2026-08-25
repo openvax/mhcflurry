@@ -32,6 +32,8 @@ AUTO_BATCH_MAX_ROWS = sys.maxsize
 AUTO_BATCH_MIN_ROWS = 1024  # floor: avoid pathologically tiny batches
 AUTO_BATCH_CPU_FALLBACK = 32_768  # CPU: large batches thrash L3; stay modest
 AUTO_BATCH_FREE_FRACTION = None
+AUTO_BATCH_CALIBRATION_PROBE_ROWS = 4096
+AUTO_BATCH_CALIBRATION_SAFETY_MULTIPLIER = 2.0
 _MPS_PSUTIL_WARNED = False  # one-shot warning if psutil is missing on MPS
 CUDA_FREE_BEFORE_CONTEXT_ENV = (
     "MHCFLURRY_CUDA_FREE_BEFORE_CONTEXT_BYTES"
@@ -667,6 +669,179 @@ def resolve_prediction_batch_size(
     if result < 1:
         raise ValueError("prediction batch size must be at least 1")
     return result
+
+
+def calibrate_prediction_batch_size(
+        batch_size,
+        device,
+        model,
+        inputs,
+        num_workers_per_gpu=1,
+        total_rows=None,
+        probe_rows=AUTO_BATCH_CALIBRATION_PROBE_ROWS,
+        safety_multiplier=AUTO_BATCH_CALIBRATION_SAFETY_MULTIPLIER):
+    """Tighten an automatic CUDA prediction batch from a real forward probe.
+
+    The analytic estimator cannot know the exact allocator and convolution
+    workspace chosen for every model shape and CUDA runtime. This function
+    measures the incremental peak of the loaded model with its real resident
+    input tensors, then recomputes the batch from the worker's remaining fixed
+    device-memory entitlement. The result never exceeds ``batch_size``.
+
+    CPU and MPS return ``batch_size`` unchanged. MPS does not expose an
+    equivalent resettable peak allocator counter, so it retains the analytic
+    estimate and the caller's elastic OOM retry. Explicit batches should not be
+    passed to this function; callers retain authority over pinned values.
+
+    Parameters
+    ----------
+    batch_size : int
+        Analytically selected automatic batch size.
+    device : torch.device
+        Device on which ``model`` and ``inputs`` reside.
+    model : callable
+        Eval-mode model accepting the sliced ``inputs`` mapping.
+    inputs : mapping
+        Tensor inputs with a shared leading row dimension.
+    num_workers_per_gpu : int
+        Co-resident workers sharing the device entitlement.
+    total_rows : int, optional
+        Number of available rows. Inferred from ``inputs`` when omitted.
+    probe_rows : int
+        Maximum rows in the measurement forward. The actual probe is also
+        capped at one eighth of the analytic entitlement so measurement cannot
+        consume the batch it is meant to protect.
+    safety_multiplier : float
+        Extrapolation margin for larger batches and peer peak collisions.
+
+    Returns
+    -------
+    int
+        A calibrated batch no larger than ``batch_size``.
+    """
+    batch_size = int(batch_size)
+    if batch_size < 1:
+        raise ValueError("batch_size must be at least 1")
+    workers = int(num_workers_per_gpu)
+    if workers < 1:
+        raise ValueError("num_workers_per_gpu must be at least 1")
+    probe_rows = int(probe_rows)
+    if probe_rows < 1:
+        raise ValueError("probe_rows must be at least 1")
+    safety_multiplier = float(safety_multiplier)
+    if (
+            not math.isfinite(safety_multiplier)
+            or safety_multiplier < 1):
+        raise ValueError("safety_multiplier must be finite and at least 1")
+    if device.type != "cuda" or batch_size == 1:
+        return batch_size
+    if not inputs:
+        raise ValueError("inputs must contain at least one tensor")
+    if total_rows is None:
+        total_rows = len(next(iter(inputs.values())))
+    total_rows = int(total_rows)
+    if total_rows < 0:
+        raise ValueError("total_rows must be non-negative")
+    if total_rows <= 1:
+        return min(batch_size, max(total_rows, 1))
+
+    analytic_bytes_per_row = max(estimate_peak_bytes_per_row(model), 1)
+    memory_before = device_memory_budget(
+        device,
+        num_workers_per_gpu=workers,
+    )
+    # Keep the probe safely inside the analytic entitlement. A one-eighth
+    # slice is large enough to exercise release processing convolutions while
+    # leaving room for co-resident workers probing at the same time.
+    entitlement_probe_rows = max(
+        memory_before.available_bytes // (analytic_bytes_per_row * 8),
+        1,
+    )
+    actual_probe_rows = min(
+        batch_size,
+        total_rows,
+        probe_rows,
+        entitlement_probe_rows,
+    )
+
+    try:
+        import torch
+
+        def run_probe(rows):
+            probe_inputs = {
+                name: value[:rows]
+                for name, value in inputs.items()
+            }
+            with torch.no_grad():
+                return model(probe_inputs)
+
+        # Trigger lazy CUDA context, kernel, and optional compile setup before
+        # resetting counters. The measured pass then represents repeatable
+        # inference allocation rather than one-time initialization.
+        warmup_output = run_probe(1)
+        torch.cuda.synchronize(device)
+        del warmup_output
+
+        allocated_before = int(torch.cuda.memory_allocated(device))
+        reserved_before = int(torch.cuda.memory_reserved(device))
+        torch.cuda.reset_peak_memory_stats(device)
+        probe_output = run_probe(actual_probe_rows)
+        torch.cuda.synchronize(device)
+        del probe_output
+        peak_allocated = max(
+            int(torch.cuda.max_memory_allocated(device)) - allocated_before,
+            0,
+        )
+        peak_reserved = max(
+            int(torch.cuda.max_memory_reserved(device)) - reserved_before,
+            0,
+        )
+    except Exception as exc:
+        logging.warning(
+            "CUDA prediction batch calibration unavailable; retaining "
+            "analytic batch %d: %s",
+            batch_size,
+            exc,
+        )
+        return batch_size
+
+    measured_peak_bytes = max(peak_allocated, peak_reserved)
+    if measured_peak_bytes <= 0:
+        logging.warning(
+            "CUDA prediction batch calibration observed no incremental peak; "
+            "retaining analytic batch %d.",
+            batch_size,
+        )
+        return batch_size
+    measured_bytes_per_row = int(math.ceil(
+        measured_peak_bytes / float(actual_probe_rows)
+    ))
+    effective_bytes_per_row = max(
+        analytic_bytes_per_row,
+        int(math.ceil(measured_bytes_per_row * safety_multiplier)),
+    )
+    memory_after = device_memory_budget(
+        device,
+        num_workers_per_gpu=workers,
+    )
+    calibrated = max(
+        memory_after.available_bytes // effective_bytes_per_row,
+        1,
+    )
+    calibrated = min(calibrated, batch_size, total_rows)
+    logging.info(
+        "Calibrated CUDA prediction batch: %d -> %d rows "
+        "(probe=%d, analytic=%.1f KB/row, measured=%.1f KB/row, "
+        "effective=%.1f KB/row, remaining entitlement=%.2f GB).",
+        batch_size,
+        calibrated,
+        actual_probe_rows,
+        analytic_bytes_per_row / 1024.0,
+        measured_bytes_per_row / 1024.0,
+        effective_bytes_per_row / 1024.0,
+        memory_after.available_bytes / float(1 << 30),
+    )
+    return int(calibrated)
 
 
 # Inference keeps only activations of the current layer alive (input +

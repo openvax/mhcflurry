@@ -409,11 +409,31 @@ def test_processing_predict_auto_batch_uses_worker_env(monkeypatch):
     monkeypatch.setenv("MHCFLURRY_MAX_WORKERS_PER_GPU", "4")
     monkeypatch.setattr(pytorch_sizing, "resolve_prediction_batch_size", fake_resolve)
 
+    def fake_calibrate(
+            batch_size, device, network, inputs, num_workers_per_gpu=1,
+            total_rows=None, **_kwargs):
+        captured.update({
+            "calibration_batch_size": batch_size,
+            "calibration_device": device.type,
+            "calibration_workers_per_gpu": num_workers_per_gpu,
+            "calibration_total_rows": total_rows,
+            "calibration_sequence_shape": tuple(inputs["sequence"].shape),
+            "calibration_kernel_size": tuple(network.conv1.kernel_size),
+        })
+        return batch_size
+
+    monkeypatch.setattr(
+        pytorch_sizing,
+        "calibrate_prediction_batch_size",
+        fake_calibrate,
+    )
+
     model = Class1ProcessingNeuralNetwork(
         peptide_max_length=12,
         n_flank_length=2,
         c_flank_length=2,
         convolutional_filters=8,
+        convolutional_kernel_size=5,
     )
     model._network = model.make_network(
         **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
@@ -428,6 +448,12 @@ def test_processing_predict_auto_batch_uses_worker_env(monkeypatch):
 
     assert len(predictions) == len(peptides)
     assert captured["num_workers_per_gpu"] == 4
+    assert captured["calibration_batch_size"] == 2
+    assert captured["calibration_device"] == "cpu"
+    assert captured["calibration_workers_per_gpu"] == 4
+    assert captured["calibration_total_rows"] == 3
+    assert captured["calibration_sequence_shape"] == (3, 16)
+    assert captured["calibration_kernel_size"] == (5,)
 
 
 def test_processing_predict_auto_batch_retries_device_oom(monkeypatch):

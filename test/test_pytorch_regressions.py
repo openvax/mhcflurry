@@ -127,6 +127,66 @@ def test_explicit_batch_size_helpers_reject_nonpositive_values():
         pytorch_sizing.check_training_batch_fits(0, device, model=None)
 
 
+@pytest.mark.parametrize("device_type", ["cpu", "mps"])
+def test_prediction_batch_calibration_uses_analytic_fallback_off_cuda(
+        device_type):
+    """CPU/MPS have no CUDA peak probe and keep the analytic batch."""
+    class MustNotRun:
+        def __call__(self, inputs):
+            raise AssertionError("non-CUDA calibration ran a forward probe")
+
+    result = pytorch_sizing.calibrate_prediction_batch_size(
+        123,
+        torch.device(device_type),
+        MustNotRun(),
+        {"sequence": torch.zeros((10, 5))},
+        total_rows=10,
+    )
+
+    assert result == 123
+
+
+def test_prediction_batch_calibration_measures_real_cuda_forward(monkeypatch):
+    """A measured peak can only tighten the analytic CUDA batch."""
+    from types import SimpleNamespace
+
+    calls = []
+
+    class RecordingModel:
+        def __call__(self, inputs):
+            calls.append(tuple(inputs["sequence"].shape))
+            return inputs["sequence"].sum(dim=1)
+
+    budget = SimpleNamespace(available_bytes=10_000)
+    monkeypatch.setattr(
+        pytorch_sizing, "estimate_peak_bytes_per_row", lambda model: 10)
+    monkeypatch.setattr(
+        pytorch_sizing, "device_memory_budget", lambda *args, **kwargs: budget)
+    monkeypatch.setattr(torch.cuda, "synchronize", lambda device: None)
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: 100)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 200)
+    monkeypatch.setattr(
+        torch.cuda, "reset_peak_memory_stats", lambda device: None)
+    monkeypatch.setattr(
+        torch.cuda, "max_memory_allocated", lambda device: 20_100)
+    monkeypatch.setattr(
+        torch.cuda, "max_memory_reserved", lambda device: 10_200)
+
+    result = pytorch_sizing.calibrate_prediction_batch_size(
+        1000,
+        torch.device("cuda"),
+        RecordingModel(),
+        {"sequence": torch.ones((1000, 7))},
+        total_rows=1000,
+        probe_rows=100,
+    )
+
+    # 20,000-byte incremental peak / 100 rows * 2x extrapolation safety;
+    # 10,000-byte remaining entitlement therefore fits 25 rows.
+    assert result == 25
+    assert calls == [(1, 7), (100, 7)]
+
+
 @pytest.mark.parametrize(
     ("keyword", "value", "message"),
     [
