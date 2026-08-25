@@ -1229,6 +1229,61 @@ remote_root=/root/mhcflurry-postprocess
 repo_dir="$remote_root/repo"
 run_dir="$remote_root/run"
 
+# BEGIN BREV POSTPROCESS REPLAY GUARD
+# Some Brev CLI versions replay the complete remote command after an SSH
+# transport failure. Coalesce that retry with the original invocation so setup
+# and evaluation are never executed twice. The outer workflow recreates
+# remote_root for every intentional run, so this state cannot block a later
+# user-requested rerun.
+postprocess_state_dir="$remote_root/postprocess_state"
+postprocess_status_file="$postprocess_state_dir/exit_status"
+postprocess_owner_file="$postprocess_state_dir/owner_pid"
+if ! mkdir "$postprocess_state_dir" 2>/dev/null; then
+    echo "Detected replay of Brev postprocess command; waiting for original invocation." >&2
+    while [ ! -f "$postprocess_status_file" ]; do
+        postprocess_owner_pid="$(cat "$postprocess_owner_file" 2>/dev/null || true)"
+        postprocess_owner_state=""
+        if [ -n "$postprocess_owner_pid" ]; then
+            postprocess_owner_state="$(
+                awk '{print $3}' "/proc/$postprocess_owner_pid/stat" \
+                    2>/dev/null || true
+            )"
+        fi
+        if [ -n "$postprocess_owner_pid" ] && {
+                [ -z "$postprocess_owner_state" ] || \
+                [ "$postprocess_owner_state" = "Z" ];
+        }; then
+            # The owner may have exited between its final command and the EXIT
+            # trap's atomic marker rename. Give that narrow race one interval
+            # to publish the real status before declaring the run abandoned.
+            sleep 1
+            [ -f "$postprocess_status_file" ] && continue
+            printf '70\n' > "$postprocess_status_file.tmp.$$"
+            mv "$postprocess_status_file.tmp.$$" "$postprocess_status_file"
+            echo "Original Brev postprocess owner exited without a status marker." >&2
+            break
+        fi
+        sleep 1
+    done
+    postprocess_original_status="$(cat "$postprocess_status_file")"
+    echo "Brev postprocess replay returning original status $postprocess_original_status." >&2
+    exit "$postprocess_original_status"
+fi
+printf '%s\n' "$$" > "$postprocess_owner_file"
+
+record_postprocess_status() {
+    local status="$?"
+    trap - EXIT
+    printf '%s\n' "$status" > "$postprocess_status_file.tmp.$$"
+    mv "$postprocess_status_file.tmp.$$" "$postprocess_status_file"
+    exit "$status"
+}
+trap record_postprocess_status EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+# END BREV POSTPROCESS REPLAY GUARD
+
 # Reuse the PyTorch environment that produced the models when the Brev
 # training image exposes it. Falling back to the host interpreter here can
 # silently install a newer Torch/CUDA stack for evaluation than for training.

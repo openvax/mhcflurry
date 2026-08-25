@@ -27,6 +27,7 @@ import pathlib
 import subprocess
 import sys
 import tarfile
+import time
 import types
 
 import numpy
@@ -1180,6 +1181,57 @@ def test_brev_postprocess_reuses_training_python_without_compile_fanout():
     assert (
         'export COMPARE_TORCH_COMPILE=%q\\n' in workflow
     )
+
+
+@pytest.mark.parametrize("body_status", [0, 23])
+def test_brev_postprocess_replay_guard_runs_body_once(tmp_path, body_status):
+    """A replay waits for and returns the original invocation's status."""
+    workflow = pathlib.Path(
+        "scripts/release/retrain_evaluate_deploy.sh").read_text()
+    guard = workflow.split(
+        "# BEGIN BREV POSTPROCESS REPLAY GUARD\n", 1)[1].split(
+            "# END BREV POSTPROCESS REPLAY GUARD\n", 1)[0]
+    remote_root = tmp_path / "remote"
+    remote_root.mkdir()
+    script = tmp_path / "remote-postprocess.sh"
+    script.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        f"remote_root={str(remote_root)!r}\n"
+        f"{guard}\n"
+        'printf "run\\n" >> "$remote_root/body_runs"\n'
+        "sleep 0.5\n"
+        f"exit {body_status}\n"
+    )
+    script.chmod(0o755)
+
+    original = subprocess.Popen(
+        ["bash", str(script)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    for _ in range(100):
+        if (remote_root / "postprocess_state").is_dir():
+            break
+        time.sleep(0.01)
+    else:
+        original.kill()
+        pytest.fail("original invocation did not claim replay guard")
+
+    replay = subprocess.run(
+        ["bash", str(script)],
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+    original_stdout, original_stderr = original.communicate(timeout=5)
+
+    assert original.returncode == body_status, (original_stdout, original_stderr)
+    assert replay.returncode == body_status, (replay.stdout, replay.stderr)
+    assert (remote_root / "body_runs").read_text() == "run\n"
+    assert "Detected replay" in replay.stderr
+    assert f"returning original status {body_status}" in replay.stderr
 
 
 def test_release_workflow_brev_provider_aliases(tmp_path):

@@ -38,6 +38,9 @@ the real resident fold and validation path and measures whole-process CUDA usage
 it is a resource-safety step even when `torch.compile` is disabled. Runtime auto
 batches use a fixed per-worker share of launch-time free device capacity, so
 their size does not depend on which co-resident worker initialized first.
+Automatic CUDA processing batches are additionally capped by a successful
+real-model forward probe; the planner does not extrapolate across unobserved
+convolution workspace shapes.
 
 If a workload still runs out of memory, first keep the batch and worker settings
 on `auto`. If you need to intervene, reduce `--max-workers-per-gpu` or use a

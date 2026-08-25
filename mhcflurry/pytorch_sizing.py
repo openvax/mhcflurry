@@ -686,7 +686,10 @@ def calibrate_prediction_batch_size(
     workspace chosen for every model shape and CUDA runtime. This function
     measures the incremental peak of the loaded model with its real resident
     input tensors, then recomputes the batch from the worker's remaining fixed
-    device-memory entitlement. The result never exceeds ``batch_size``.
+    device-memory entitlement. The result never exceeds either ``batch_size``
+    or the largest batch exercised successfully by the probe. CUDA convolution
+    workspaces are not reliably linear in batch size, especially while peer
+    workers initialize, so extrapolating above a measured batch is unsafe.
 
     CPU and MPS return ``batch_size`` unchanged. MPS does not expose an
     equivalent resettable peak allocator counter, so it retains the analytic
@@ -712,12 +715,14 @@ def calibrate_prediction_batch_size(
         capped at one eighth of the analytic entitlement so measurement cannot
         consume the batch it is meant to protect.
     safety_multiplier : float
-        Extrapolation margin for larger batches and peer peak collisions.
+        Margin applied to the measured per-row peak when deciding whether the
+        verified probe batch must be tightened further.
 
     Returns
     -------
     int
-        A calibrated batch no larger than ``batch_size``.
+        A calibrated batch no larger than ``batch_size`` or the successfully
+        exercised probe batch.
     """
     batch_size = int(batch_size)
     if batch_size < 1:
@@ -766,28 +771,88 @@ def calibrate_prediction_batch_size(
 
     try:
         import torch
+    except Exception as exc:
+        logging.warning(
+            "CUDA prediction batch calibration unavailable before any "
+            "successful probe; forcing batch 1: %s",
+            exc,
+        )
+        return 1
 
-        def run_probe(rows):
-            probe_inputs = {
-                name: value[:rows]
-                for name, value in inputs.items()
-            }
-            with torch.no_grad():
-                return model(probe_inputs)
+    def run_probe(rows):
+        probe_inputs = {
+            name: value[:rows]
+            for name, value in inputs.items()
+        }
+        with torch.no_grad():
+            return model(probe_inputs)
 
-        # Trigger lazy CUDA context, kernel, and optional compile setup before
-        # resetting counters. The measured pass then represents repeatable
-        # inference allocation rather than one-time initialization.
+    # Trigger lazy CUDA context, kernel, and optional compile setup before
+    # resetting counters. The measured pass then represents repeatable
+    # inference allocation rather than one-time initialization.
+    warmup_output = None
+    try:
         warmup_output = run_probe(1)
         torch.cuda.synchronize(device)
+    except Exception as exc:
+        if is_device_out_of_memory_error(exc):
+            release_device_memory_after_oom(device)
+        logging.warning(
+            "CUDA prediction batch calibration failed before any successful "
+            "probe; forcing batch 1: %s",
+            exc,
+        )
+        return 1
+    finally:
         del warmup_output
 
-        allocated_before = int(torch.cuda.memory_allocated(device))
-        reserved_before = int(torch.cuda.memory_reserved(device))
-        torch.cuda.reset_peak_memory_stats(device)
-        probe_output = run_probe(actual_probe_rows)
-        torch.cuda.synchronize(device)
-        del probe_output
+    measurement_error = None
+    while True:
+        try:
+            allocated_before = int(torch.cuda.memory_allocated(device))
+            reserved_before = int(torch.cuda.memory_reserved(device))
+            torch.cuda.reset_peak_memory_stats(device)
+        except Exception as exc:
+            measurement_error = exc
+
+        probe_output = None
+        try:
+            probe_output = run_probe(actual_probe_rows)
+            torch.cuda.synchronize(device)
+        except Exception as exc:
+            if is_device_out_of_memory_error(exc) and actual_probe_rows > 1:
+                previous_probe_rows = actual_probe_rows
+                actual_probe_rows = max(1, actual_probe_rows // 2)
+                release_device_memory_after_oom(device)
+                logging.warning(
+                    "CUDA prediction batch probe OOM at %d rows; retrying "
+                    "calibration at %d.",
+                    previous_probe_rows,
+                    actual_probe_rows,
+                )
+                continue
+            if is_device_out_of_memory_error(exc):
+                release_device_memory_after_oom(device)
+            logging.warning(
+                "CUDA prediction batch calibration failed above the verified "
+                "one-row warmup; forcing batch 1: %s",
+                exc,
+            )
+            return 1
+        finally:
+            del probe_output
+        break
+
+    if measurement_error is not None:
+        logging.warning(
+            "CUDA prediction batch counters unavailable; using verified "
+            "probe batch %d: %s",
+            actual_probe_rows,
+            measurement_error,
+        )
+        return min(batch_size, actual_probe_rows, total_rows)
+
+    try:
         peak_allocated = max(
             int(torch.cuda.max_memory_allocated(device)) - allocated_before,
             0,
@@ -798,21 +863,21 @@ def calibrate_prediction_batch_size(
         )
     except Exception as exc:
         logging.warning(
-            "CUDA prediction batch calibration unavailable; retaining "
-            "analytic batch %d: %s",
-            batch_size,
+            "CUDA prediction batch peak counters unavailable; using verified "
+            "probe batch %d: %s",
+            actual_probe_rows,
             exc,
         )
-        return batch_size
+        return min(batch_size, actual_probe_rows, total_rows)
 
     measured_peak_bytes = max(peak_allocated, peak_reserved)
     if measured_peak_bytes <= 0:
         logging.warning(
             "CUDA prediction batch calibration observed no incremental peak; "
-            "retaining analytic batch %d.",
-            batch_size,
+            "using verified probe batch %d.",
+            actual_probe_rows,
         )
-        return batch_size
+        return min(batch_size, actual_probe_rows, total_rows)
     measured_bytes_per_row = int(math.ceil(
         measured_peak_bytes / float(actual_probe_rows)
     ))
@@ -828,11 +893,22 @@ def calibrate_prediction_batch_size(
         memory_after.available_bytes // effective_bytes_per_row,
         1,
     )
-    calibrated = min(calibrated, batch_size, total_rows)
+    # A real forward proves that ``actual_probe_rows`` fits this architecture;
+    # it does not prove that a larger convolution uses the same CUDA algorithm
+    # or workspace. In particular, co-resident workers can cross those
+    # allocator thresholds at slightly different times. Never extrapolate an
+    # automatic batch above the largest shape that actually ran successfully.
+    calibrated = min(
+        calibrated,
+        actual_probe_rows,
+        batch_size,
+        total_rows,
+    )
     logging.info(
         "Calibrated CUDA prediction batch: %d -> %d rows "
         "(probe=%d, analytic=%.1f KB/row, measured=%.1f KB/row, "
-        "effective=%.1f KB/row, remaining entitlement=%.2f GB).",
+        "effective=%.1f KB/row, remaining entitlement=%.2f GB, "
+        "verified ceiling=%d).",
         batch_size,
         calibrated,
         actual_probe_rows,
@@ -840,6 +916,7 @@ def calibrate_prediction_batch_size(
         measured_bytes_per_row / 1024.0,
         effective_bytes_per_row / 1024.0,
         memory_after.available_bytes / float(1 << 30),
+        actual_probe_rows,
     )
     return int(calibrated)
 

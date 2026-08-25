@@ -187,6 +187,128 @@ def test_prediction_batch_calibration_measures_real_cuda_forward(monkeypatch):
     assert calls == [(1, 7), (100, 7)]
 
 
+def test_prediction_batch_calibration_does_not_extrapolate_past_probe(
+        monkeypatch):
+    """A successful small CUDA forward is not proof that a larger one fits."""
+    from types import SimpleNamespace
+
+    calls = []
+
+    class RecordingModel:
+        def __call__(self, inputs):
+            calls.append(tuple(inputs["sequence"].shape))
+            return inputs["sequence"].sum(dim=1)
+
+    budget = SimpleNamespace(available_bytes=100_000)
+    monkeypatch.setattr(
+        pytorch_sizing, "estimate_peak_bytes_per_row", lambda model: 10)
+    monkeypatch.setattr(
+        pytorch_sizing, "device_memory_budget", lambda *args, **kwargs: budget)
+    monkeypatch.setattr(torch.cuda, "synchronize", lambda device: None)
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: 100)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 200)
+    monkeypatch.setattr(
+        torch.cuda, "reset_peak_memory_stats", lambda device: None)
+    monkeypatch.setattr(
+        torch.cuda, "max_memory_allocated", lambda device: 20_100)
+    monkeypatch.setattr(
+        torch.cuda, "max_memory_reserved", lambda device: 10_200)
+
+    result = pytorch_sizing.calibrate_prediction_batch_size(
+        1000,
+        torch.device("cuda"),
+        RecordingModel(),
+        {"sequence": torch.ones((1000, 7))},
+        total_rows=1000,
+        probe_rows=100,
+    )
+
+    # The measured arithmetic would allow 250 rows, but only 100 actually ran.
+    assert result == 100
+    assert calls == [(1, 7), (100, 7)]
+
+
+def test_prediction_batch_calibration_halves_an_oom_probe(monkeypatch):
+    """A failed probe must find a verified smaller batch, not guess upward."""
+    from types import SimpleNamespace
+
+    calls = []
+
+    class ThresholdModel:
+        def __call__(self, inputs):
+            rows = len(inputs["sequence"])
+            calls.append(rows)
+            if rows > 50:
+                raise RuntimeError("CUDA out of memory")
+            return inputs["sequence"].sum(dim=1)
+
+    budget = SimpleNamespace(available_bytes=100_000)
+    monkeypatch.setattr(
+        pytorch_sizing, "estimate_peak_bytes_per_row", lambda model: 10)
+    monkeypatch.setattr(
+        pytorch_sizing, "device_memory_budget", lambda *args, **kwargs: budget)
+    monkeypatch.setattr(
+        pytorch_sizing, "release_device_memory_after_oom", lambda device: None)
+    monkeypatch.setattr(torch.cuda, "synchronize", lambda device: None)
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: 100)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 200)
+    monkeypatch.setattr(
+        torch.cuda, "reset_peak_memory_stats", lambda device: None)
+    monkeypatch.setattr(
+        torch.cuda, "max_memory_allocated", lambda device: 20_100)
+    monkeypatch.setattr(
+        torch.cuda, "max_memory_reserved", lambda device: 10_200)
+
+    result = pytorch_sizing.calibrate_prediction_batch_size(
+        1000,
+        torch.device("cuda"),
+        ThresholdModel(),
+        {"sequence": torch.ones((1000, 7))},
+        total_rows=1000,
+        probe_rows=100,
+    )
+
+    assert result == 50
+    assert calls == [1, 100, 50]
+
+
+def test_prediction_batch_calibration_uses_probe_when_counters_fail(
+        monkeypatch):
+    """Missing allocator telemetry cannot restore an unverified large batch."""
+    from types import SimpleNamespace
+
+    calls = []
+
+    class RecordingModel:
+        def __call__(self, inputs):
+            calls.append(len(inputs["sequence"]))
+            return inputs["sequence"].sum(dim=1)
+
+    budget = SimpleNamespace(available_bytes=100_000)
+    monkeypatch.setattr(
+        pytorch_sizing, "estimate_peak_bytes_per_row", lambda model: 10)
+    monkeypatch.setattr(
+        pytorch_sizing, "device_memory_budget", lambda *args, **kwargs: budget)
+    monkeypatch.setattr(torch.cuda, "synchronize", lambda device: None)
+    monkeypatch.setattr(
+        torch.cuda,
+        "memory_allocated",
+        lambda device: (_ for _ in ()).throw(RuntimeError("no counter")),
+    )
+
+    result = pytorch_sizing.calibrate_prediction_batch_size(
+        1000,
+        torch.device("cuda"),
+        RecordingModel(),
+        {"sequence": torch.ones((1000, 7))},
+        total_rows=1000,
+        probe_rows=100,
+    )
+
+    assert result == 100
+    assert calls == [1, 100]
+
+
 @pytest.mark.parametrize(
     ("keyword", "value", "message"),
     [
