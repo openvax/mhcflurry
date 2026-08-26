@@ -781,7 +781,8 @@ class Class1AffinityPredictor(object):
             models_dir_for_save=None,
             verbose=1,
             progress_preamble="",
-            progress_print_interval=5.0):
+            progress_print_interval=5.0,
+            seed=None):
         """
         Fit one or more pan-allele predictors using a single neural network
         architecture.
@@ -820,6 +821,12 @@ class Class1AffinityPredictor(object):
         progress_print_interval : float
             How often (in seconds) to print progress. Set to None to disable.
 
+        seed : int, optional
+            Base seed for these fits. When given, each ensemble member gets a
+            distinct sub-seed derived from it, so members are decorrelated but
+            the whole call is reproducible. When None, each
+            `Class1NeuralNetwork.fit` is left entropy-seeded as before.
+
         Returns
         -------
         list of `Class1NeuralNetwork`
@@ -835,12 +842,14 @@ class Class1AffinityPredictor(object):
         for i in range(n_models):
             logging.info("Training model %d / %d", i + 1, n_models)
             model = Class1NeuralNetwork(**architecture_hyperparameters)
+            fit_seed = None if seed is None else derive_seed(seed, i)
             model.fit(
                 encodable_peptides,
                 affinities,
                 inequalities=inequalities,
                 allele_encoding=allele_encoding,
                 verbose=verbose,
+                seed=fit_seed,
                 progress_preamble=progress_preamble,
                 progress_print_interval=progress_print_interval)
 
