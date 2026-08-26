@@ -761,7 +761,7 @@ def make_indexing_dataset_factory(first, last):
 
 
 def train_basic_network(
-        num, do_assertions=True, is_hit=None, dataset_factory=None,
+        num, do_assertions=True, is_hit=None, dataset_factory=None, seed=1,
         **hyperparameters):
     """Train a processing network and check performance."""
     use_hyperparameters = {
@@ -826,6 +826,7 @@ def train_basic_network(
             n_flanks=train_df.n_flank.values,
             c_flanks=train_df.c_flank.values),
         targets=train_df.hit.values,
+        seed=seed,
         verbose=0)
 
     print(network.network())
