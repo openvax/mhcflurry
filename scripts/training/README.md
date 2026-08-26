@@ -21,6 +21,9 @@ the ignored `jobs/` directory, not here.
   calibrates presentation models.
 - **`pan_allele_release_full.sh`** runs both stages in order for a complete
   local training pass.
+- **`run_release_affinity_ablations.sh`** and
+  **`run_release_processing_ablations.sh`** run the small, paired parity panels
+  described in the neural hyperparameter audit before a full release retrain.
 - **`launch_pan_allele_training_remote.py`** transports the same stages through
   runplz. Use it directly only when debugging transport; normal remote releases
   should use `mhcflurry train pan-allele-release`.

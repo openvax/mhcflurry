@@ -36,6 +36,7 @@ possible.
 | Early stopping | patience 20, `min_delta=0`, ceiling 5000 epochs | Restored |
 | Pretraining | 64 peptides/chunk, 256 steps/epoch, min 5/max 50 epochs, patience 2, `min_delta=1e-4`, maximum accepted validation loss 0.10 | Exact match |
 | Random negatives | Per-allele nonbinder equalization, rate 1, constant 1, 30,000–50,000 nM, binder threshold 500 nM, fresh pool each epoch | Exact distribution and pool lifetime; seeded identities differ |
+| Randomness | Historically entropy-derived | One explicit release master seed (42), recorded and threaded through folds, fits, random negatives, and calibration |
 | Selection | 4 folds, minimum 2 / maximum 8 models per fold | Exact match |
 
 ### Processing
@@ -52,6 +53,7 @@ possible.
 | Validation / early stop | Tail 10%, patience 20, `min_delta=0`, ceiling 500 epochs | Exact match, including Keras split rounding |
 | Holdout / selection | 10 samples per fold; minimum 1 / maximum 2 models per fold | Restored |
 | Decoys | Proteome-derived; PPV multiplier 100; retain 2 candidates per hit | Exact recipe |
+| Randomness | Historically entropy-derived | One explicit release master seed (42), with stable per-sample decoy streams and deterministic output order |
 
 ### Presentation combiner
 
@@ -60,6 +62,8 @@ part of the end-to-end result. The compatibility recipe is two proteome decoys
 per hit, sample fraction 0.1, the three study exclusions, `short_flanks` (5 aa
 on each side), and L-BFGS with 100 iterations. L-BFGS itself is supported; an
 upstream SciPy warning concerns deprecated display options, not the optimizer.
+Presentation decoy selection and the 0.1 subsample now derive from the same
+explicit release seed (42), rather than ambient process state.
 
 ## Framework-semantic discrepancies found
 
@@ -137,6 +141,11 @@ relu/512/kernel-17/dense-16/dropout-0.5/L1-`1e-6` network. Cross:
 Run the 15/15 and no-flank variants first; add 5/5 only if the direction differs
 by variant. Primary metrics on the frozen 10 samples are AUPRC and PPV, with
 AUROC, calibration, early-stop epoch, stability, and peak memory secondary.
+The reproducible runner is
+`scripts/training/run_release_processing_ablations.sh`; it holds the public
+affinity predictor fixed while generating one shared processing-training table,
+then compares each alternative directly with Glorot + Keras Adam on identical
+folds and frozen rows.
 
 ### Decision before the full retrain
 

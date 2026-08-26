@@ -23,6 +23,7 @@ Usage:
       --release 2.3.0 \
       [--backend local|brev-existing|brev-provision|ssh] \
       [--release-profile full|fast-8xa100|minimal-processing|fast-minimal] \
+      [--random-seed 42] \
       [--minibatch-size 1024] \
       [--affinity-minibatch-size 1024] \
       [--affinity-max-workers-per-gpu auto] \
@@ -1850,6 +1851,7 @@ run_brev_training() {
     local runplz_env=(
         "MHCFLURRY_OUT=$RUN_DIR"
         "REPO=$REPO"
+        "RELEASE_RANDOM_SEED=$RELEASE_RANDOM_SEED"
         "TRAINING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE"
         "AFFINITY_MINIBATCH_SIZE=$AFFINITY_MINIBATCH_SIZE"
         "AFFINITY_MAX_WORKERS_PER_GPU=$AFFINITY_MAX_WORKERS_PER_GPU"
@@ -2078,6 +2080,7 @@ PAPER_FIGURES_PRESENTATION_PANEL_BASELINES="${PAPER_FIGURES_PRESENTATION_PANEL_B
 RUN_LABEL="${RUN_LABEL:-}"
 DRY_RUN=0
 ALLOW_DIRTY_REPO="${ALLOW_DIRTY_REPO:-0}"
+RELEASE_RANDOM_SEED="${RELEASE_RANDOM_SEED:-42}"
 TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-1024}"
 AFFINITY_MINIBATCH_SIZE=
 AFFINITY_MAX_WORKERS_PER_GPU_EXPLICIT=0
@@ -2331,6 +2334,10 @@ while [ $# -gt 0 ]; do
             TRAINING_MINIBATCH_SIZE=$2
             shift 2
             ;;
+        --random-seed)
+            RELEASE_RANDOM_SEED=$2
+            shift 2
+            ;;
         --affinity-minibatch-size)
             AFFINITY_MINIBATCH_SIZE=$2
             shift 2
@@ -2439,6 +2446,7 @@ if [ -z "$PROCESSING_MINIBATCH_SIZE" ]; then
 fi
 apply_release_profile
 validate_processing_configuration
+validate_nonnegative_integer "--random-seed" "$RELEASE_RANDOM_SEED"
 validate_positive_integer "--affinity-minibatch-size" "$AFFINITY_MINIBATCH_SIZE"
 validate_positive_integer "--processing-minibatch-size" "$PROCESSING_MINIBATCH_SIZE"
 validate_positive_integer "--processing-held-out-samples" "$PROCESSING_HELD_OUT_SAMPLES"
@@ -2629,6 +2637,7 @@ note "Run directory: $RUN_DIR"
 note "Release:       $RELEASE"
 note "Backend:       $BACKEND"
 note "Profile:       $RELEASE_PROFILE"
+note "Random seed:   $RELEASE_RANDOM_SEED"
 note "Batch sizes:   affinity=$AFFINITY_MINIBATCH_SIZE processing=$PROCESSING_MINIBATCH_SIZE"
 note "Compare:       $RUN_LABEL vs $COMPARE_BASELINE_LABEL ($COMPARE_BASELINE)"
 note "Affinity MWPG: $AFFINITY_MAX_WORKERS_PER_GPU"
@@ -2672,6 +2681,7 @@ if [ "$SKIP_TRAIN" != "1" ]; then
                 "REPO=$REPO" \
                 "MHCFLURRY_RELEASE_WORKFLOW_ID=$WORKFLOW_RUN_ID" \
                 "MHCFLURRY_RELEASE_GIT_COMMIT=$RELEASE_GIT_COMMIT" \
+                "RELEASE_RANDOM_SEED=$RELEASE_RANDOM_SEED" \
                 "TRAINING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE" \
                 "AFFINITY_MINIBATCH_SIZE=$AFFINITY_MINIBATCH_SIZE" \
                 "AFFINITY_MAX_WORKERS_PER_GPU=$AFFINITY_MAX_WORKERS_PER_GPU" \
@@ -2715,6 +2725,7 @@ if [ "$SKIP_TRAIN" != "1" ]; then
             REMOTE_COMMAND="$REMOTE_COMMAND REPO=$(shell_quote "$REMOTE_REPO")"
             REMOTE_COMMAND="$REMOTE_COMMAND MHCFLURRY_RELEASE_WORKFLOW_ID=$(shell_quote "$WORKFLOW_RUN_ID")"
             REMOTE_COMMAND="$REMOTE_COMMAND MHCFLURRY_RELEASE_GIT_COMMIT=\$(git -C $REMOTE_REPO_QUOTED rev-parse HEAD)"
+            REMOTE_COMMAND="$REMOTE_COMMAND RELEASE_RANDOM_SEED=$(shell_quote "$RELEASE_RANDOM_SEED")"
             REMOTE_COMMAND="$REMOTE_COMMAND TRAINING_MINIBATCH_SIZE=$(shell_quote "$TRAINING_MINIBATCH_SIZE")"
             REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_MINIBATCH_SIZE=$(shell_quote "$AFFINITY_MINIBATCH_SIZE")"
             REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_MAX_WORKERS_PER_GPU=$(shell_quote "$AFFINITY_MAX_WORKERS_PER_GPU")"

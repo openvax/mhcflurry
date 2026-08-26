@@ -23,6 +23,9 @@ import tqdm
 
 import mhcflurry
 from mhcflurry.common import (
+    add_random_seed_arg,
+    configure_random_seed,
+    derive_seed,
     fraction_arg,
     normalize_class1_genotype,
     normalize_sequence_resolved_allele_name,
@@ -93,6 +96,8 @@ parser.add_argument(
     required=True,
     help="File to write")
 
+add_random_seed_arg(parser)
+
 
 def canonicalize_training_allele(raw_name):
     """Return a sequence-resolved class-I allele or fail immediately."""
@@ -106,6 +111,8 @@ def split_hla_genotype(value):
 
 def run():
     args = parser.parse_args(sys.argv[1:])
+    master_seed = configure_random_seed(
+        args.random_seed, name="make-presentation-train-data")
     hit_df = pandas.read_csv(args.hits)
     hit_df["pmid"] = hit_df["pmid"].astype(str)
     original_samples_pmids = hit_df.pmid.unique()
@@ -224,6 +231,10 @@ def run():
 
     for sample_id, sub_df in tqdm.tqdm(
             hit_df.groupby("sample_id"), total=hit_df.sample_id.nunique()):
+        # Make each sample independent of group iteration order while keeping
+        # every decoy draw rooted in the one recorded release seed.
+        numpy.random.seed(
+            derive_seed(master_seed, "sample", sample_id) % (2 ** 32))
         result_df.append(
             sub_df[[
                 "protein_accession",
@@ -292,7 +303,12 @@ def run():
 
     if args.sample_fraction:
         print("Subsampling to ", args.sample_fraction)
-        result_df = result_df.sample(frac=args.sample_fraction)
+        result_df = result_df.sample(
+            frac=args.sample_fraction,
+            random_state=(
+                derive_seed(master_seed, "sample_fraction") % (2 ** 32)
+            ),
+        )
         print("Subsampled:")
         print(result_df)
         print("Hit rates:")

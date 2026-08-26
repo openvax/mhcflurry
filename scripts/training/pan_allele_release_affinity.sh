@@ -20,6 +20,8 @@
 #   AFFINITY_HYPERPARAMETERS_FILE
 #                              optional pre-generated YAML for controlled
 #                              experiments; release runs leave this unset
+#   RELEASE_RANDOM_SEED        master seed for folds, fits, random negatives,
+#                              and calibration (default 42)
 #   SKIP_CALIBRATE=1           skip percentile calibration for experiments
 #                              that compare raw affinity predictions
 set -euo pipefail
@@ -34,6 +36,7 @@ export PYTHONUNBUFFERED=1
 export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-0}"
 export MHCFLURRY_TORCH_COMPILE_LOSS="${MHCFLURRY_TORCH_COMPILE_LOSS:-0}"
 export MHCFLURRY_MATMUL_PRECISION="${MHCFLURRY_MATMUL_PRECISION:-highest}"
+RELEASE_RANDOM_SEED="${RELEASE_RANDOM_SEED:-42}"
 # The resource probe should make the configured release minibatch safe. If it
 # does not, changing optimization dynamics is a provenance failure.
 export MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK="${MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK:-1}"
@@ -195,7 +198,7 @@ trap 'on_signal TERM' TERM
 trap cleanup_release_logging EXIT
 
 log_release_event script_start \
-    "pid=$$ out_dir=$MHCFLURRY_OUT pythonunbuffered=$PYTHONUNBUFFERED torch_compile=$MHCFLURRY_TORCH_COMPILE inductor_threads=${TORCHINDUCTOR_COMPILE_THREADS:-auto}"
+    "pid=$$ out_dir=$MHCFLURRY_OUT pythonunbuffered=$PYTHONUNBUFFERED torch_compile=$MHCFLURRY_TORCH_COMPILE inductor_threads=${TORCHINDUCTOR_COMPILE_THREADS:-auto} random_seed=$RELEASE_RANDOM_SEED"
 write_snapshot startup
 start_heartbeat
 
@@ -380,6 +383,7 @@ do
         --pretrain-data "$PRETRAIN_DATA" \
         --held-out-measurements-per-allele-fraction-and-max 0.25 100 \
         --num-folds 4 \
+        --random-seed "$RELEASE_RANDOM_SEED" \
         --hyperparameters hyperparameters.yaml \
         --out-models-dir "$(pwd)/$UNSELECTED_DIR" \
         --worker-log-dir "$MHCFLURRY_OUT" \
@@ -457,6 +461,7 @@ do
         --num-peptides-per-length "$CALIBRATE_PEPTIDES_PER_LENGTH" \
         --alleles-per-work-chunk "$CALIBRATE_ALLELES_PER_CHUNK" \
         --gpu-batched \
+        --random-seed "$RELEASE_RANDOM_SEED" \
         --verbosity 1 \
         "${CALIBRATE_PARALLELISM_ARGS[@]}"
 done

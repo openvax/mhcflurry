@@ -42,6 +42,8 @@
 #   PRESENTATION_PROCESSING_WITH_FLANKS_KIND
 #                              processing variant used as presentation's
 #                              with-flanks predictor (default short_flanks)
+#   RELEASE_RANDOM_SEED        master seed for data generation, folds, fits,
+#                              random negatives, and calibration (default 42)
 #   MHCFLURRY_GPU_TELEMETRY    0 disables processing/presentation GPU CSVs
 #   MHCFLURRY_GPU_TELEMETRY_SECONDS
 #                              telemetry sampling interval (default 30)
@@ -104,6 +106,7 @@ AFFINITY_MAX_WORKERS_PER_GPU="${AFFINITY_MAX_WORKERS_PER_GPU:-auto}"
 PROCESSING_MINIBATCH_SIZE="${PROCESSING_MINIBATCH_SIZE:-512}"
 PROCESSING_VARIANTS="${PROCESSING_VARIANTS:-with_flanks no_flank short_flanks}"
 PRESENTATION_PROCESSING_WITH_FLANKS_KIND="${PRESENTATION_PROCESSING_WITH_FLANKS_KIND:-short_flanks}"
+RELEASE_RANDOM_SEED="${RELEASE_RANDOM_SEED:-42}"
 
 processing_variant_enabled() {
     case " $PROCESSING_VARIANTS " in
@@ -308,6 +311,7 @@ python make_train_data.processing.py \
     --ppv-multiplier 100 \
     --hit-multiplier-to-take 2 \
     --exclude-samples-file "$RELEASE_HOLDOUT_DIR/processing_samples.csv" \
+    --random-seed "$RELEASE_RANDOM_SEED" \
     --out "$(pwd)/train_data.csv" \
     "${COMMON_PARALLELISM_ARGS[@]}"
 compress_csv_bzip2 "$(pwd)/train_data.csv"
@@ -328,6 +332,7 @@ for kind in $PROCESSING_VARIANTS; do
         --data "$(pwd)/train_data.csv.bz2" \
         --held-out-samples "$PROCESSING_HELD_OUT_SAMPLES" \
         --num-folds 4 \
+        --random-seed "$RELEASE_RANDOM_SEED" \
         --hyperparameters "hyperparameters.$kind.yaml" \
         --out-models-dir "$(pwd)/models.unselected.$kind" \
         --worker-log-dir "$BASE_OUT/processing" \
@@ -362,10 +367,11 @@ python make_train_data.presentation.py \
     --hits "$BASE_OUT/processing/hits_with_tpm.csv.bz2" \
     --proteome-reference-csv "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \
     --decoys-per-hit "$PRESENTATION_DECOYS_PER_HIT" \
-    --exclude-pmid 31844290 31495665 \
+    --exclude-pmid 31844290 31495665 31154438 \
     --exclude-samples-file "$RELEASE_HOLDOUT_DIR/presentation_samples.csv" \
     --only-format MULTIALLELIC \
     --sample-fraction "$PRESENTATION_SAMPLE_FRACTION" \
+    --random-seed "$RELEASE_RANDOM_SEED" \
     --out "$(pwd)/train_data.csv"
 compress_csv_bzip2 "$(pwd)/train_data.csv"
 
@@ -375,6 +381,7 @@ mhcflurry-class1-train-presentation-models \
     --processing-predictor-with-flanks "$BASE_OUT/processing/models.selected.$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" \
     --processing-predictor-without-flanks "$BASE_OUT/processing/models.selected.no_flank" \
     --out-models-dir "$(pwd)/models" \
+    --random-seed "$RELEASE_RANDOM_SEED" \
     --feature-chunk-size "$PRESENTATION_FEATURE_CHUNK_SIZE" \
     "${PRESENTATION_PARALLELISM_ARGS[@]}"
 
@@ -387,6 +394,7 @@ mhcflurry-calibrate-percentile-ranks \
     --alleles-per-genotype 1 \
     --num-genotypes 50 \
     --prediction-batch-size "$PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE" \
+    --random-seed "$RELEASE_RANDOM_SEED" \
     --verbosity 1 \
     "${PRESENTATION_CALIBRATION_PARALLELISM_ARGS[@]}"
 

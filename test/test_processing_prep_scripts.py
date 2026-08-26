@@ -368,15 +368,15 @@ def write_presentation_like_inputs(tmp_path):
     return hits_csv, reference_csv
 
 
-def run_reference_decoy_script(script_path, tmp_path):
+def run_reference_decoy_script(script_path, tmp_path, random_seed=None):
+    tmp_path.mkdir(parents=True, exist_ok=True)
     hits_csv, reference_csv = write_presentation_like_inputs(tmp_path)
     out_csv = tmp_path / "train_data.csv"
     env = os.environ.copy()
     env["PYTHONPATH"] = os.pathsep.join(
         [str(REPO_ROOT)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else [])
     )
-    subprocess.run(
-        [
+    command = [
             sys.executable,
             str(script_path),
             "--hits",
@@ -389,7 +389,11 @@ def run_reference_decoy_script(script_path, tmp_path):
             "MULTIALLELIC",
             "--out",
             str(out_csv),
-        ],
+        ]
+    if random_seed is not None:
+        command.extend(["--random-seed", str(random_seed)])
+    subprocess.run(
+        command,
         env=env,
         check=True,
     )
@@ -410,6 +414,17 @@ def test_release_presentation_train_data_uses_reference_csv_decoys(tmp_path):
         tmp_path,
     )
     assert_reference_decoy_output(result)
+
+
+def test_release_presentation_decoys_are_reproducible_from_seed(tmp_path):
+    script = (
+        REPO_ROOT / "scripts/training/release_exact"
+        / "make_train_data.presentation.py"
+    )
+    first = run_reference_decoy_script(script, tmp_path / "first", 271)
+    second = run_reference_decoy_script(script, tmp_path / "second", 271)
+
+    pandas.testing.assert_frame_equal(first, second)
 
 
 def test_download_presentation_train_data_uses_reference_csv_decoys(tmp_path):

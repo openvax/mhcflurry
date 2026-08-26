@@ -550,6 +550,10 @@ def test_release_workflow_rejects_invalid_processing_configuration_before_train(
     ("extra_args", "expected_error"),
     [
         (
+            ["--random-seed", "-1"],
+            "--random-seed must be a non-negative integer",
+        ),
+        (
             ["--processing-minibatch-size", "0"],
             "--processing-minibatch-size must be a positive integer",
         ),
@@ -989,6 +993,7 @@ def test_release_workflow_forwards_presentation_recipe_controls(tmp_path):
             "--backend", "local",
             "--skip-eval",
             "--skip-plots",
+            "--random-seed", "271",
             "--processing-held-out-samples", "17",
             "--presentation-decoys-per-hit", "7",
             "--presentation-sample-fraction", "0.25",
@@ -1007,6 +1012,7 @@ def test_release_workflow_forwards_presentation_recipe_controls(tmp_path):
 
     output = result.stdout + result.stderr
     for expected in (
+            "RELEASE_RANDOM_SEED=271",
             "PROCESSING_HELD_OUT_SAMPLES=17",
             "PRESENTATION_DECOYS_PER_HIT=7",
             "PRESENTATION_SAMPLE_FRACTION=0.25",
@@ -1038,6 +1044,7 @@ def test_release_workflow_defaults_to_validated_published_recipe(tmp_path):
 
     output = result.stdout + result.stderr
     for expected in (
+            "RELEASE_RANDOM_SEED=42",
             "AFFINITY_MINIBATCH_SIZE=1024",
             "PROCESSING_MINIBATCH_SIZE=512",
             "PROCESSING_HELD_OUT_SAMPLES=10",
@@ -1056,7 +1063,7 @@ def test_release_workflow_defaults_to_validated_published_recipe(tmp_path):
 
     full_workflow = pathlib.Path(
         "scripts/training/pan_allele_release_full.sh").read_text()
-    assert '--exclude-pmid 31844290 31495665' in full_workflow
+    assert '--exclude-pmid 31844290 31495665 31154438' in full_workflow
     assert '--sample-fraction "$PRESENTATION_SAMPLE_FRACTION"' in full_workflow
     assert "--num-peptides-per-length 10000" in full_workflow
 
@@ -2207,6 +2214,24 @@ def test_affinity_release_script_accepts_tracked_ablation_yaml():
     assert "published_parity/models.combined" in runner
     assert "SKIP_CALIBRATE=1" in runner
     assert "SKIP_EVAL=1" in runner
+
+
+def test_processing_release_script_runs_paired_seeded_ablations():
+    runner = pathlib.Path(
+        "scripts/training/run_release_processing_ablations.sh"
+    ).read_text()
+    for condition in (
+        "glorot_keras_adam",
+        "kaiming_keras_adam",
+        "glorot_pytorch_adam",
+        "kaiming_pytorch_adam",
+    ):
+        assert condition in runner
+    assert "--random-seed \"$RANDOM_SEED\"" in runner
+    assert "--exclude-samples-file \"$HOLDOUT_DIR/processing_samples.csv\"" in runner
+    assert "--processing-modes with_flanks,no_flank" in runner
+    assert "vs-glorot_keras_adam" in runner
+    assert "glorot_keras_adam-vs-public" in runner
 
 
 def test_reassign_mass_spec_training_data_cli(tmp_path):
