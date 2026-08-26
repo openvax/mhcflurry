@@ -41,6 +41,11 @@ RUNPLZ_BREV_AUTO_CREATE=0 runplz brev \
     scripts/training/launch_pan_allele_training_remote.py
 ```
 
+Set `MHCFLURRY_REMOTE_WORKFLOW=affinity-ablations` or
+`MHCFLURRY_REMOTE_WORKFLOW=processing-ablations` to run the corresponding
+committed parity panel through the same image and transport. The default is
+`full`.
+
 ## Training data and hyperparameters
 
 - **`mhcflurry class1-generate-training-hyperparameters`** generates the

@@ -2227,7 +2227,7 @@ def test_processing_release_script_runs_paired_seeded_ablations():
         "kaiming_pytorch_adam",
     ):
         assert condition in runner
-    assert "--random-seed \"$RANDOM_SEED\"" in runner
+    assert "--random-seed \"$RELEASE_RANDOM_SEED\"" in runner
     assert "--exclude-samples-file \"$HOLDOUT_DIR/processing_samples.csv\"" in runner
     assert "--processing-modes with_flanks,no_flank" in runner
     assert "vs-glorot_keras_adam" in runner
@@ -2311,6 +2311,8 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert env["MHCFLURRY_RELEASE_WORKFLOW_ID"] == ""
     assert env["MHCFLURRY_RELEASE_GIT_COMMIT"] == ""
     assert env["MHCFLURRY_RELEASE_VERSION"] == ""
+    assert env["MHCFLURRY_REMOTE_WORKFLOW"] == "full"
+    assert env["RELEASE_RANDOM_SEED"] == "42"
     assert env["MHCFLURRY_GPU_TELEMETRY"] == "1"
     assert env["MHCFLURRY_GPU_TELEMETRY_SECONDS"] == "30"
     assert env["NUM_JOBS"] == "auto"
@@ -2363,6 +2365,8 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
         "MHCFLURRY_RELEASE_WORKFLOW_ID": "run-123",
         "MHCFLURRY_RELEASE_GIT_COMMIT": "abc123",
         "MHCFLURRY_RELEASE_VERSION": "2.3.0",
+        "MHCFLURRY_REMOTE_WORKFLOW": "processing-ablations",
+        "RELEASE_RANDOM_SEED": "271",
         "MHCFLURRY_GPU_TELEMETRY": "0",
         "MHCFLURRY_GPU_TELEMETRY_SECONDS": "5",
         "NUM_JOBS": "6",
@@ -2391,10 +2395,25 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert env["MHCFLURRY_RELEASE_WORKFLOW_ID"] == "run-123"
     assert env["MHCFLURRY_RELEASE_GIT_COMMIT"] == "abc123"
     assert env["MHCFLURRY_RELEASE_VERSION"] == "2.3.0"
+    assert env["MHCFLURRY_REMOTE_WORKFLOW"] == "processing-ablations"
+    assert env["RELEASE_RANDOM_SEED"] == "271"
     assert env["MHCFLURRY_GPU_TELEMETRY"] == "0"
     assert env["MHCFLURRY_GPU_TELEMETRY_SECONDS"] == "5"
     assert env["NUM_JOBS"] == "6"
     assert env["MKL_THREADING_LAYER"] == "TBB"
+
+    assert module.remote_workflow_script({}) == (
+        "full", "scripts/training/pan_allele_release_full.sh")
+    assert module.remote_workflow_script({
+        "MHCFLURRY_REMOTE_WORKFLOW": "affinity-ablations",
+    }) == (
+        "affinity-ablations",
+        "scripts/training/run_release_affinity_ablations.sh",
+    )
+    with pytest.raises(ValueError, match="MHCFLURRY_REMOTE_WORKFLOW"):
+        module.remote_workflow_script({
+            "MHCFLURRY_REMOTE_WORKFLOW": "typo",
+        })
 
     brev_config = module.brev_config_from_env({
         "RUNPLZ_BREV_AUTO_CREATE": "1",

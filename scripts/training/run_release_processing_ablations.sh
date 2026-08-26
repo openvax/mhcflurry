@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run the paired processing initializer/optimizer panel on the frozen holdout.
-# RANDOM_SEED controls shared decoys, folds, and every fit (default 42).
+# RELEASE_RANDOM_SEED controls shared decoys, folds, and every fit (default 42).
 set -euo pipefail
 
 : "${MHCFLURRY_OUT:?MHCFLURRY_OUT must be set}"
@@ -47,7 +47,7 @@ else
     MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-auto}"
 fi
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-auto}"
-RANDOM_SEED="${RANDOM_SEED:-42}"
+RELEASE_RANDOM_SEED="${RELEASE_RANDOM_SEED:-42}"
 
 PARALLELISM_ARGS=(
     --num-jobs "$NUM_JOBS"
@@ -88,7 +88,7 @@ if [ ! -f "$SHARED_DIR/train_data.csv.bz2" ]; then
         --ppv-multiplier 100 \
         --hit-multiplier-to-take 2 \
         --exclude-samples-file "$HOLDOUT_DIR/processing_samples.csv" \
-        --random-seed "$RANDOM_SEED" \
+        --random-seed "$RELEASE_RANDOM_SEED" \
         --out "$SHARED_DIR/train_data.csv" \
         "${PARALLELISM_ARGS[@]}"
     compress_csv_bzip2 "$SHARED_DIR/train_data.csv"
@@ -122,7 +122,7 @@ for condition in "${conditions[@]}"; do
                 --data "$SHARED_DIR/train_data.csv.bz2" \
                 --held-out-samples 10 \
                 --num-folds 4 \
-                --random-seed "$RANDOM_SEED" \
+                --random-seed "$RELEASE_RANDOM_SEED" \
                 --hyperparameters "$hyperparameters" \
                 --out-models-dir "$unselected" \
                 --worker-log-dir "$processing_root" \

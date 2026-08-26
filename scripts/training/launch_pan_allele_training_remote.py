@@ -14,11 +14,11 @@
 """
 Launch pan-allele training on remote GPU machines.
 
-This is the maintained runplz wrapper for pan_allele_release_full.sh. The
-release workflow chooses whether Brev should use an existing instance or
-intentionally provision one by setting RUNPLZ_BREV_* environment variables
-before invoking ``runplz brev``. Local runs should call the shell script
-directly.
+This is the maintained runplz wrapper for the full release workflow and its
+paired pre-release ablation panels. The release workflow chooses whether Brev
+should use an existing instance or intentionally provision one by setting
+RUNPLZ_BREV_* environment variables before invoking ``runplz brev``. Local
+runs should call the shell scripts directly.
 """
 
 from __future__ import annotations
@@ -51,6 +51,15 @@ DEFAULT_OUT = os.environ.get(
 
 TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
 FALSE_ENV_VALUES = {"0", "false", "no", "off"}
+REMOTE_WORKFLOW_SCRIPTS = {
+    "full": "scripts/training/pan_allele_release_full.sh",
+    "affinity-ablations": (
+        "scripts/training/run_release_affinity_ablations.sh"
+    ),
+    "processing-ablations": (
+        "scripts/training/run_release_processing_ablations.sh"
+    ),
+}
 
 
 def env_bool(environ, name, default=False):
@@ -118,6 +127,20 @@ def env_csv_tuple(environ, name, default):
     if not value.strip():
         return ()
     return tuple(item.strip() for item in value.split(",") if item.strip())
+
+
+def remote_workflow_script(environ=os.environ):
+    """Return the committed shell entrypoint selected for this remote run."""
+    workflow = environ.get("MHCFLURRY_REMOTE_WORKFLOW", "full")
+    try:
+        return workflow, REMOTE_WORKFLOW_SCRIPTS[workflow]
+    except KeyError as error:
+        raise ValueError(
+            "MHCFLURRY_REMOTE_WORKFLOW must be one of %s; got %r" % (
+                ", ".join(sorted(REMOTE_WORKFLOW_SCRIPTS)),
+                workflow,
+            )
+        ) from error
 
 
 def brev_config_from_env(environ=os.environ):
@@ -227,6 +250,9 @@ def remote_training_env(environ=os.environ):
         "MHCFLURRY_RELEASE_VERSION": environ.get(
             "MHCFLURRY_RELEASE_VERSION", ""
         ),
+        "MHCFLURRY_REMOTE_WORKFLOW": environ.get(
+            "MHCFLURRY_REMOTE_WORKFLOW", "full"
+        ),
         "MATMUL_PRECISION": environ.get("MATMUL_PRECISION", "highest"),
         "MATMUL_PRECISION_CLI": environ.get(
             "MATMUL_PRECISION_CLI", "highest"
@@ -307,6 +333,7 @@ def remote_training_env(environ=os.environ):
         "RUN_LABEL": environ.get("RUN_LABEL", "new"),
         "RUN_RELEASE_EVAL": environ.get("RUN_RELEASE_EVAL", "0"),
         "RUN_RELEASE_PLOTS": environ.get("RUN_RELEASE_PLOTS", "0"),
+        "RELEASE_RANDOM_SEED": environ.get("RELEASE_RANDOM_SEED", "42"),
         "TORCHINDUCTOR_COMPILE_THREADS": environ.get(
             "TORCHINDUCTOR_COMPILE_THREADS", "auto"
         ),
@@ -364,7 +391,7 @@ app = App(
     env=remote_training_env(),
 )
 def train_release_full():
-    """Run the maintained full release training script."""
+    """Run the selected maintained release or ablation workflow."""
     repo = Path.cwd()
     out = Path(
         os.environ.get("RUNPLZ_OUT")
@@ -373,6 +400,13 @@ def train_release_full():
     ).resolve()
     env = os.environ.copy()
     env.update({"MHCFLURRY_OUT": str(out), "REPO": str(repo)})
+    workflow, workflow_script = remote_workflow_script(env)
+    if workflow != "full" and (
+            env_bool(env, "RUN_RELEASE_EVAL", default=False) or
+            env_bool(env, "RUN_RELEASE_PLOTS", default=False)):
+        raise ValueError(
+            "Remote evaluation/plotting is only valid for the full workflow"
+        )
     workflow_id = env.get("MHCFLURRY_RELEASE_WORKFLOW_ID", "").strip()
     exit_path = None
     if workflow_id:
@@ -384,18 +418,22 @@ def train_release_full():
             exit_path.unlink()
         except FileNotFoundError:
             pass
+    marker_dir = out / ".runplz"
+    marker_dir.mkdir(parents=True, exist_ok=True)
+    (marker_dir / "mhcflurry_remote_workflow").write_text(workflow)
     try:
         subprocess.run(
-            ["bash", "scripts/training/pan_allele_release_full.sh"],
+            ["bash", workflow_script],
             check=True,
             cwd=repo,
             env=env,
         )
-        validate_remote_release_artifacts(repo, out, env)
-        if env_bool(env, "RUN_RELEASE_EVAL", default=False):
-            run_release_evaluation(repo, out, env)
-        if env_bool(env, "RUN_RELEASE_PLOTS", default=False):
-            run_release_plots(repo, out, env)
+        if workflow == "full":
+            validate_remote_release_artifacts(repo, out, env)
+            if env_bool(env, "RUN_RELEASE_EVAL", default=False):
+                run_release_evaluation(repo, out, env)
+            if env_bool(env, "RUN_RELEASE_PLOTS", default=False):
+                run_release_plots(repo, out, env)
     except subprocess.CalledProcessError as e:
         if exit_path is not None:
             exit_path.write_text(str(e.returncode))
