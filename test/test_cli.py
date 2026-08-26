@@ -1064,8 +1064,8 @@ def test_release_workflow_defaults_to_validated_published_recipe(tmp_path):
 def test_release_workflow_sync_is_workflow_id_scoped():
     script = pathlib.Path(
         "scripts/release/retrain_evaluate_deploy.sh").read_text()
-    assert 'RUNPLZ_REQUIRED_VERSION="3.15.3"' in script
-    assert "require_clean_runplz_3153" in script
+    assert 'RUNPLZ_REQUIRED_VERSION="3.16.0"' in script
+    assert "require_clean_runplz_3160" in script
     assert "run_dir_matches_workflow || return 1" in script
     assert "remote_workflow_id" in script
     assert "Refusing to sync Brev output for workflow" in script
@@ -1088,13 +1088,13 @@ def test_release_workflow_validates_selected_runplz_interpreter(tmp_path):
         / "site-packages"
     )
     package_dir = site_packages / "runplz"
-    distribution_dir = site_packages / "runplz-3.15.3.dist-info"
+    distribution_dir = site_packages / "runplz-3.16.0.dist-info"
     package_dir.mkdir(parents=True)
     distribution_dir.mkdir()
     (fake_checkout / ".git").mkdir()
     (package_dir / "__init__.py").write_text("")
     (distribution_dir / "METADATA").write_text(
-        "Metadata-Version: 2.1\nName: runplz\nVersion: 3.15.3\n"
+        "Metadata-Version: 2.1\nName: runplz\nVersion: 3.16.0\n"
     )
 
     fake_bin = tmp_path / "bin"
@@ -2068,6 +2068,9 @@ def test_affinity_hyperparameter_generator_is_importable():
     assert {item["min_delta"] for item in published_recipe_grid} == {0.0}
     assert {item["validation_interval"] for item in published_recipe_grid} == {1}
     assert {
+        item["optimizer_implementation"] for item in published_recipe_grid
+    } == {"keras"}
+    assert {
         item["random_negative_pool_epochs"] for item in published_recipe_grid
     } == {1}
 
@@ -2082,6 +2085,9 @@ def test_processing_hyperparameter_generator_is_importable():
     assert len(grid) == 128
     assert {item["minibatch_size"] for item in grid} == {2048}
     assert {item["minibatch_size"] for item in module.build_grid()} == {512}
+    assert {
+        item["optimizer_implementation"] for item in module.build_grid()
+    } == {"keras"}
 
 
 def test_training_hyperparameter_cli_generates_processing_variant(tmp_path, capsys):
@@ -2095,6 +2101,7 @@ def test_training_hyperparameter_cli_generates_processing_variant(tmp_path, caps
     base = yaml.safe_load(base_text)
     assert len(base) == 128
     assert {item["minibatch_size"] for item in base} == {2048}
+    assert {item["optimizer_implementation"] for item in base} == {"keras"}
 
     base_path = tmp_path / "hyperparameters.base.yaml"
     base_path.write_text(base_text)
@@ -2120,6 +2127,86 @@ def test_training_hyperparameter_helpers_reject_invalid_configuration():
         generator.make_parser().parse_args([
             "affinity", "--minibatch-size", "0",
         ])
+
+
+def test_training_hyperparameter_generator_tracks_ablation_switches():
+    from mhcflurry.cli import generate_training_hyperparameters as generator
+
+    affinity = generator.build_affinity_grid(
+        optimizer_implementation="pytorch",
+        data_dependent_initialization_target="pre_activation",
+    )
+    assert {item["optimizer_implementation"] for item in affinity} == {"pytorch"}
+    assert {
+        item["data_dependent_initialization_target"] for item in affinity
+    } == {"pre_activation"}
+
+    processing = generator.build_processing_base_grid(
+        optimizer_implementation="pytorch",
+        init="kaiming_uniform_fan_in",
+    )
+    assert {item["optimizer_implementation"] for item in processing} == {"pytorch"}
+    assert {item["init"] for item in processing} == {"kaiming_uniform_fan_in"}
+
+
+def test_release_hyperparameter_ablation_panels_are_paired():
+    from mhcflurry.cli import generate_training_hyperparameters as generator
+
+    affinity = generator.build_affinity_ablation_panels()
+    assert set(affinity) == {
+        "published_parity",
+        "proposed_release",
+        "pre_activation_lsuv",
+        "no_lsuv",
+        "pytorch_rmsprop",
+    }
+    assert {len(values) for values in affinity.values()} == {2}
+    affinity_architectures = {
+        condition: [
+            (item["topology"], item["layer_sizes"], item["dense_layer_l1_regularization"])
+            for item in values
+        ]
+        for condition, values in affinity.items()
+    }
+    assert len({repr(value) for value in affinity_architectures.values()}) == 1
+    assert {
+        item["data_dependent_initialization_method"]
+        for item in affinity["no_lsuv"]
+    } == {None}
+
+    processing = generator.build_processing_ablation_panels()
+    assert set(processing) == {
+        "glorot_keras_adam",
+        "kaiming_keras_adam",
+        "glorot_pytorch_adam",
+        "kaiming_pytorch_adam",
+    }
+    assert {len(values) for values in processing.values()} == {2}
+
+
+def test_affinity_release_script_accepts_tracked_ablation_yaml():
+    affinity_script = pathlib.Path(
+        "scripts/training/pan_allele_release_affinity.sh"
+    ).read_text()
+    runner = pathlib.Path(
+        "scripts/training/run_release_affinity_ablations.sh"
+    ).read_text()
+    assert "AFFINITY_HYPERPARAMETERS_FILE" in affinity_script
+    assert "SKIP_CALIBRATE" in affinity_script
+    for condition in (
+        "published_parity",
+        "proposed_release",
+        "pre_activation_lsuv",
+        "no_lsuv",
+        "pytorch_rmsprop",
+    ):
+        assert condition in runner
+    assert "release-holdout build" in runner
+    assert "--release-holdout-dir" in runner
+    assert "--affinity-training-overlap-policy audit" in runner
+    assert "published_parity/models.combined" in runner
+    assert "SKIP_CALIBRATE=1" in runner
+    assert "SKIP_EVAL=1" in runner
 
 
 def test_reassign_mass_spec_training_data_cli(tmp_path):
@@ -2186,7 +2273,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
         "scripts/training/launch_pan_allele_training_remote.py",
     )
     module = _load_script_module(path, "remote_launcher_under_test")
-    assert "runplz==3.15.3" in pip_packages
+    assert "runplz==3.16.0" in pip_packages
     env = module.remote_training_env({"TRAINING_MINIBATCH_SIZE": "2048"})
     assert env["TRAINING_MINIBATCH_SIZE"] == "2048"
     assert env["COMPARE_BASELINE"] == "public:2.0.0"

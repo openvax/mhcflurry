@@ -13,6 +13,8 @@
 """
 PyTorch custom layers for mhcflurry.
 """
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -43,6 +45,41 @@ def get_activation(name):
         return F.relu
     else:
         raise ValueError(f"Unknown activation: {name}")
+
+
+class KerasBatchNorm1d(nn.BatchNorm1d):
+    """BatchNorm1d with Keras-compatible running-statistics updates.
+
+    PyTorch normalizes with the biased batch variance but updates
+    ``running_var`` with an unbiased estimate. Keras uses the biased population
+    variance for both. ``momentum`` retains PyTorch's new-batch-coefficient
+    convention so ``0.01`` corresponds to Keras ``momentum=0.99``.
+    """
+
+    def forward(self, inputs):
+        self._check_input_dim(inputs)
+        if inputs.dim() != 2:
+            raise ValueError(
+                "KerasBatchNorm1d supports the 2D Dense-layer outputs used by "
+                "MHCflurry; got shape %s" % (tuple(inputs.shape),)
+            )
+
+        if self.training or not self.track_running_stats:
+            mean = inputs.mean(dim=0)
+            variance = inputs.var(dim=0, unbiased=False)
+            if self.training and self.track_running_stats:
+                with torch.no_grad():
+                    self.num_batches_tracked.add_(1)
+                    self.running_mean.lerp_(mean.detach(), self.momentum)
+                    self.running_var.lerp_(variance.detach(), self.momentum)
+        else:
+            mean = self.running_mean
+            variance = self.running_var
+
+        result = (inputs - mean) * torch.rsqrt(variance + self.eps)
+        if self.affine:
+            result = result * self.weight + self.bias
+        return result
 
 
 class LocallyConnected1D(nn.Module):
@@ -88,8 +125,15 @@ class LocallyConnected1D(nn.Module):
 
         self._activation = get_activation(activation)
 
-        # Initialize weights
-        nn.init.xavier_uniform_(self.weight)
+        # Match Keras LocallyConnected1D GlorotUniform. Keras computes fan-in
+        # and fan-out on its (output_length, flattened_input, filters) kernel;
+        # applying torch's generic 3D fan calculation to our transposed storage
+        # would use different fan values.
+        flattened_input = in_channels * kernel_size
+        fan_in = self.output_length * flattened_input
+        fan_out = self.output_length * out_channels
+        bound = math.sqrt(6.0 / (fan_in + fan_out))
+        nn.init.uniform_(self.weight, -bound, bound)
 
     def forward(self, x):
         """

@@ -36,6 +36,7 @@ base_hyperparameters = {
     # Held-out validation supports this increase over the published 128.
     'minibatch_size': 1024,
     'optimizer': 'rmsprop',
+    'optimizer_implementation': 'keras',
     'output_activation': 'sigmoid',
     "patience": 20,
     "min_delta": 0.0,
@@ -78,6 +79,7 @@ base_hyperparameters = {
     },
     'validation_split': 0.1,
     'data_dependent_initialization_method': "lsuv",
+    'data_dependent_initialization_target': "post_activation",
 }
 
 grid = []

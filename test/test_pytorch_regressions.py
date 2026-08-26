@@ -33,6 +33,10 @@ from mhcflurry.class1_neural_network import (
 )
 from mhcflurry.class1_training import (
     _batched_validation_loss,
+    validation_split_counts,
+)
+from mhcflurry.data_dependent_weights_initialization import (
+    get_activations_pytorch,
 )
 from mhcflurry.class1_processing_neural_network import (
     Class1ProcessingModel,
@@ -40,11 +44,13 @@ from mhcflurry.class1_processing_neural_network import (
 )
 from mhcflurry.common import load_weights
 from mhcflurry.flanking_encoding import FlankingEncoding
+from mhcflurry.keras_optimizers import KerasAdam, KerasRMSprop
 from mhcflurry.pytorch_losses import (
     MSEWithInequalities,
     MultiallelicMassSpecLoss,
     get_pytorch_loss,
 )
+from mhcflurry.pytorch_layers import KerasBatchNorm1d, LocallyConnected1D
 from mhcflurry.pytorch_training import (
     effective_validation_batch_size,
     maybe_compile_loss,
@@ -98,6 +104,48 @@ def _seed_all(seed=1):
 def _plain_or_shared_tensor(value):
     """Convenience: produce a plain tensor (legacy SHM path is gone)."""
     return torch.from_numpy(np.ascontiguousarray(value)).clone()
+
+
+def test_validation_split_counts_match_keras_rounding():
+    assert validation_split_counts(11, 0.1) == (9, 2)
+    assert validation_split_counts(10, 0.1) == (9, 1)
+    assert validation_split_counts(11, 0.0) == (11, 0)
+    with pytest.raises(ValueError, match="leaves 0 training rows"):
+        validation_split_counts(1, 0.1)
+
+
+def test_affinity_lsuv_observes_post_activation_dense_output():
+    model = Class1NeuralNetworkModel(
+        peptide_encoding_shape=(2, 2),
+        layer_sizes=[3],
+        activation="tanh",
+        output_activation="sigmoid",
+        peptide_input_is_indices=False,
+    )
+    peptide = np.array(
+        [
+            [[2.0, -1.0], [0.5, 3.0]],
+            [[-2.0, 1.0], [1.5, -3.0]],
+        ],
+        dtype=np.float32,
+    )
+    inputs = {"peptide": peptide}
+    with torch.no_grad():
+        flattened = torch.from_numpy(peptide).reshape(2, -1)
+        raw = model.dense_layers[0](flattened)
+        expected = torch.tanh(raw).numpy()
+
+    observed = get_activations_pytorch(model, "dense_layers.0", inputs)
+    pre_activation = get_activations_pytorch(
+        model,
+        "dense_layers.0",
+        inputs,
+        target="pre_activation",
+    )
+
+    np.testing.assert_allclose(observed, expected, rtol=0, atol=0)
+    assert not np.array_equal(observed, raw.numpy())
+    np.testing.assert_allclose(pre_activation, raw.numpy(), rtol=0, atol=0)
 
 
 def test_mps_free_memory_preserves_zero_headroom(monkeypatch):
@@ -689,6 +737,44 @@ def test_batch_norm_uses_keras_defaults():
     assert model.batch_norms[0] is not None
     assert model.batch_norms[0].eps == pytest.approx(1e-3, abs=1e-12)
     assert model.batch_norms[0].momentum == pytest.approx(0.01, abs=1e-12)
+
+
+def test_batch_norm_updates_keras_population_variance():
+    layer = KerasBatchNorm1d(1, eps=1e-3, momentum=0.01)
+    inputs = torch.tensor([[0.0], [2.0]])
+
+    observed = layer(inputs)
+
+    np.testing.assert_allclose(
+        observed.detach().numpy(),
+        np.array([[-1.0], [1.0]]) / np.sqrt(1.001),
+        rtol=1e-6,
+    )
+    # Population variance is 1.0, so the Keras 0.99/0.01 moving update
+    # leaves the initial running variance of 1.0 unchanged. PyTorch's native
+    # BatchNorm would use unbiased variance=2.0 and update it to 1.01.
+    assert layer.running_var.item() == pytest.approx(1.0)
+
+
+def test_locally_connected_initializer_uses_keras_fans(monkeypatch):
+    calls = []
+
+    def record_uniform(tensor, lower, upper):
+        calls.append((tuple(tensor.shape), lower, upper))
+        return tensor
+
+    monkeypatch.setattr(torch.nn.init, "uniform_", record_uniform)
+    LocallyConnected1D(
+        in_channels=21,
+        out_channels=8,
+        input_length=15,
+        kernel_size=3,
+    )
+
+    expected_bound = np.sqrt(6.0 / (13 * 63 + 13 * 8))
+    assert calls == [
+        ((13, 8, 63), -expected_bound, expected_bound),
+    ]
 
 
 def test_network_forward_requires_allele_key_to_match_model_type():
@@ -1673,7 +1759,7 @@ def test_validation_forward_network_uses_eager_by_default(monkeypatch):
 
 
 def test_optimizer_defaults_match_keras():
-    affinity_model = _make_simple_affinity_model(optimizer="adam")
+    affinity_model = _make_simple_affinity_model(optimizer="rmsprop")
     affinity_model._network = affinity_model.make_network(
         allele_representations=None,
         **affinity_model.network_hyperparameter_defaults.subselect(
@@ -1681,10 +1767,12 @@ def test_optimizer_defaults_match_keras():
         )
     )
     affinity_optimizer = affinity_model._create_optimizer(affinity_model.network())
-    assert affinity_optimizer.defaults["eps"] == pytest.approx(1e-07, abs=1e-12)
+    assert isinstance(affinity_optimizer, KerasRMSprop)
+    assert affinity_optimizer.defaults["rho"] == pytest.approx(0.9)
+    assert affinity_optimizer.defaults["epsilon"] == pytest.approx(1e-7)
 
     processing_model = Class1ProcessingNeuralNetwork(
-        optimizer="rmsprop",
+        optimizer="adam",
         learning_rate=0.001,
     )
     processing_model._network = processing_model.make_network(
@@ -1695,8 +1783,61 @@ def test_optimizer_defaults_match_keras():
     processing_optimizer = processing_model._create_optimizer(
         processing_model.network()
     )
-    assert processing_optimizer.defaults["alpha"] == pytest.approx(0.9, abs=1e-12)
-    assert processing_optimizer.defaults["eps"] == pytest.approx(1e-07, abs=1e-12)
+    assert isinstance(processing_optimizer, KerasAdam)
+    assert processing_optimizer.defaults["beta_1"] == pytest.approx(0.9)
+    assert processing_optimizer.defaults["beta_2"] == pytest.approx(0.999)
+    assert processing_optimizer.defaults["epsilon"] == pytest.approx(1e-7)
+
+    native_affinity = _make_simple_affinity_model(
+        optimizer="rmsprop",
+        optimizer_implementation="pytorch",
+    )
+    native_affinity._network = native_affinity.make_network(
+        allele_representations=None,
+        **native_affinity.network_hyperparameter_defaults.subselect(
+            native_affinity.hyperparameters
+        ),
+    )
+    native_optimizer = native_affinity._create_optimizer(native_affinity.network())
+    assert isinstance(native_optimizer, torch.optim.RMSprop)
+
+
+def test_keras_rmsprop_matches_historical_update_equation():
+    parameter = torch.nn.Parameter(torch.tensor([1.0, -2.0], dtype=torch.float64))
+    optimizer = KerasRMSprop([parameter], lr=0.001, rho=0.9, epsilon=1e-7)
+    velocity = np.zeros(2)
+    expected = parameter.detach().numpy().copy()
+    for gradient in (np.array([0.25, -0.5]), np.array([-0.1, 0.2])):
+        velocity = 0.9 * velocity + 0.1 * gradient ** 2
+        expected -= 0.001 * gradient / np.sqrt(velocity + 1e-7)
+        parameter.grad = torch.from_numpy(gradient)
+        optimizer.step()
+    np.testing.assert_allclose(parameter.detach().numpy(), expected, rtol=0, atol=1e-15)
+
+
+def test_keras_adam_matches_historical_update_equation():
+    parameter = torch.nn.Parameter(torch.tensor([1.0, -2.0], dtype=torch.float64))
+    optimizer = KerasAdam(
+        [parameter],
+        lr=0.001,
+        beta_1=0.9,
+        beta_2=0.999,
+        epsilon=1e-7,
+    )
+    momentum = np.zeros(2)
+    velocity = np.zeros(2)
+    expected = parameter.detach().numpy().copy()
+    for step, gradient in enumerate(
+        (np.array([0.25, -0.5]), np.array([-0.1, 0.2])),
+        start=1,
+    ):
+        momentum = 0.9 * momentum + 0.1 * gradient
+        velocity = 0.999 * velocity + 0.001 * gradient ** 2
+        alpha = 0.001 * np.sqrt(1.0 - 0.999 ** step) / (1.0 - 0.9 ** step)
+        expected -= alpha * momentum / (np.sqrt(velocity) + 1e-7)
+        parameter.grad = torch.from_numpy(gradient)
+        optimizer.step()
+    np.testing.assert_allclose(parameter.detach().numpy(), expected, rtol=0, atol=1e-15)
 
 
 def test_processing_initializers_match_keras(monkeypatch):

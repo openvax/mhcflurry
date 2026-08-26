@@ -698,9 +698,23 @@ class Class1PresentationPredictor(object):
                     )
                 )
 
-            model.fit(
-                X=df[self.model_inputs].values,
-                y=df.target.astype(float))
+            with warnings.catch_warnings():
+                # scikit-learn <=1.5 passes deprecated ``disp`` / ``iprint``
+                # options to SciPy's L-BFGS-B implementation even when its
+                # own verbose setting is zero. Preserve the published lbfgs
+                # recipe while suppressing only that upstream compatibility
+                # warning; fitting inputs and results are unchanged.
+                warnings.filterwarnings(
+                    "ignore",
+                    message=(
+                        r"scipy\.optimize: The `disp` and `iprint` options of "
+                        r"the L-BFGS-B solver are deprecated.*"
+                    ),
+                    category=DeprecationWarning,
+                )
+                model.fit(
+                    X=df[self.model_inputs].values,
+                    y=df.target.astype(float))
 
             (intercept,) = model.intercept_.flatten()
             self.weights_dataframe.loc[model_name, "intercept"] = intercept

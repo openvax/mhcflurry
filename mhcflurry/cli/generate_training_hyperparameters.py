@@ -22,6 +22,10 @@ from ..common import positive_int_arg
 
 AFFINITY_DEFAULT_MINIBATCH_SIZE = 1024
 PROCESSING_DEFAULT_MINIBATCH_SIZE = 512
+DEFAULT_OPTIMIZER_IMPLEMENTATION = "keras"
+OPTIMIZER_IMPLEMENTATION_CHOICES = ("keras", "pytorch")
+LSUV_TARGET_CHOICES = ("post_activation", "pre_activation")
+PROCESSING_INIT_CHOICES = ("glorot_uniform", "kaiming_uniform_fan_in")
 # Compatibility name used by the historical affinity generator wrapper.
 DEFAULT_MINIBATCH_SIZE = AFFINITY_DEFAULT_MINIBATCH_SIZE
 PROCESSING_VARIANT_CHOICES = (
@@ -52,6 +56,7 @@ AFFINITY_BASE_HYPERPARAMETERS = {
     "max_epochs": 5000,
     "minibatch_size": AFFINITY_DEFAULT_MINIBATCH_SIZE,
     "optimizer": "rmsprop",
+    "optimizer_implementation": DEFAULT_OPTIMIZER_IMPLEMENTATION,
     "output_activation": "sigmoid",
     "patience": 20,
     "min_delta": 0.0,
@@ -90,6 +95,7 @@ AFFINITY_BASE_HYPERPARAMETERS = {
     },
     "validation_split": 0.1,
     "data_dependent_initialization_method": "lsuv",
+    "data_dependent_initialization_target": "post_activation",
 }
 
 
@@ -106,6 +112,8 @@ PROCESSING_BASE_HYPERPARAMETERS = {
     "convolutional_activation": "relu",
     "patience": 20,
     "learning_rate": 0.001,
+    "optimizer_implementation": DEFAULT_OPTIMIZER_IMPLEMENTATION,
+    "init": "glorot_uniform",
 }
 
 
@@ -118,11 +126,19 @@ def unique_hyperparameters(items):
     return result
 
 
-def build_affinity_grid(minibatch_size=AFFINITY_DEFAULT_MINIBATCH_SIZE):
+def build_affinity_grid(
+    minibatch_size=AFFINITY_DEFAULT_MINIBATCH_SIZE,
+    optimizer_implementation=DEFAULT_OPTIMIZER_IMPLEMENTATION,
+    data_dependent_initialization_target="post_activation",
+):
     """Return the 35-architecture Class I pan-allele affinity grid."""
     grid = []
     base = deepcopy(AFFINITY_BASE_HYPERPARAMETERS)
     base["minibatch_size"] = minibatch_size
+    base["optimizer_implementation"] = optimizer_implementation
+    base["data_dependent_initialization_target"] = (
+        data_dependent_initialization_target
+    )
     for layer_sizes in [[512, 256], [512, 512], [1024, 512], [1024, 1024]]:
         l1_base = 0.0000001
         for l1 in [l1_base, l1_base / 10, l1_base / 100, l1_base / 1000, 0.0]:
@@ -145,10 +161,16 @@ def build_affinity_grid(minibatch_size=AFFINITY_DEFAULT_MINIBATCH_SIZE):
     return grid
 
 
-def processing_base_grid_iter(minibatch_size=PROCESSING_DEFAULT_MINIBATCH_SIZE):
+def processing_base_grid_iter(
+    minibatch_size=PROCESSING_DEFAULT_MINIBATCH_SIZE,
+    optimizer_implementation=DEFAULT_OPTIMIZER_IMPLEMENTATION,
+    init="glorot_uniform",
+):
     """Yield the base processing architecture grid before flank variants."""
     base = deepcopy(PROCESSING_BASE_HYPERPARAMETERS)
     base["minibatch_size"] = minibatch_size
+    base["optimizer_implementation"] = optimizer_implementation
+    base["init"] = init
     for learning_rate in [0.001]:
         for convolutional_activation in ["tanh", "relu"]:
             for convolutional_filters in [256, 512]:
@@ -175,10 +197,18 @@ def processing_base_grid_iter(minibatch_size=PROCESSING_DEFAULT_MINIBATCH_SIZE):
                                     yield new
 
 
-def build_processing_base_grid(minibatch_size=PROCESSING_DEFAULT_MINIBATCH_SIZE):
+def build_processing_base_grid(
+    minibatch_size=PROCESSING_DEFAULT_MINIBATCH_SIZE,
+    optimizer_implementation=DEFAULT_OPTIMIZER_IMPLEMENTATION,
+    init="glorot_uniform",
+):
     """Return the processing architecture grid before flank variants."""
     return unique_hyperparameters(
-        processing_base_grid_iter(minibatch_size=minibatch_size))
+        processing_base_grid_iter(
+            minibatch_size=minibatch_size,
+            optimizer_implementation=optimizer_implementation,
+            init=init,
+        ))
 
 
 def transform_processing_hyperparameters(kind, hyperparameters):
@@ -207,6 +237,100 @@ def build_processing_variant_grid(production_hyperparameters, kind):
         transform_processing_hyperparameters(kind, item)
         for item in production_hyperparameters
     )
+
+
+def build_affinity_ablation_panels():
+    """Return the paired, representative affinity audit panels."""
+    architecture_keys = (
+        ("feedforward", (512, 512), 1e-8),
+        ("with-skip-connections", (256, 512, 512), 1e-8),
+    )
+    conditions = {
+        "published_parity": dict(
+            minibatch_size=128,
+            optimizer_implementation="keras",
+            data_dependent_initialization_target="post_activation",
+        ),
+        "proposed_release": dict(
+            minibatch_size=1024,
+            optimizer_implementation="keras",
+            data_dependent_initialization_target="post_activation",
+        ),
+        "pre_activation_lsuv": dict(
+            minibatch_size=1024,
+            optimizer_implementation="keras",
+            data_dependent_initialization_target="pre_activation",
+        ),
+        "no_lsuv": dict(
+            minibatch_size=1024,
+            optimizer_implementation="keras",
+            data_dependent_initialization_target="post_activation",
+        ),
+        "pytorch_rmsprop": dict(
+            minibatch_size=1024,
+            optimizer_implementation="pytorch",
+            data_dependent_initialization_target="post_activation",
+        ),
+    }
+    result = {}
+    for condition, options in conditions.items():
+        grid = build_affinity_grid(**options)
+        selected = [
+            item for item in grid
+            if (
+                item["topology"],
+                tuple(item["layer_sizes"]),
+                item["dense_layer_l1_regularization"],
+            ) in architecture_keys
+        ]
+        if len(selected) != len(architecture_keys):
+            raise RuntimeError(
+                "Affinity ablation architecture selection returned %d rows"
+                % len(selected)
+            )
+        if condition == "no_lsuv":
+            for item in selected:
+                item["data_dependent_initialization_method"] = None
+        result[condition] = selected
+    return result
+
+
+def build_processing_ablation_panels():
+    """Return the paired, representative processing audit panels."""
+    architecture_keys = (
+        ("tanh", 256, 11, (0.0, 0.0), (8,), 0.3),
+        ("relu", 512, 17, (1e-6, 0.0), (16,), 0.5),
+    )
+    conditions = {
+        "glorot_keras_adam": ("glorot_uniform", "keras"),
+        "kaiming_keras_adam": ("kaiming_uniform_fan_in", "keras"),
+        "glorot_pytorch_adam": ("glorot_uniform", "pytorch"),
+        "kaiming_pytorch_adam": ("kaiming_uniform_fan_in", "pytorch"),
+    }
+    result = {}
+    for condition, (init, optimizer_implementation) in conditions.items():
+        grid = build_processing_base_grid(
+            init=init,
+            optimizer_implementation=optimizer_implementation,
+        )
+        selected = [
+            item for item in grid
+            if (
+                item["convolutional_activation"],
+                item["convolutional_filters"],
+                item["convolutional_kernel_size"],
+                tuple(item["convolutional_kernel_l1_l2"]),
+                tuple(item["post_convolutional_dense_layer_sizes"]),
+                item["dropout_rate"],
+            ) in architecture_keys
+        ]
+        if len(selected) != len(architecture_keys):
+            raise RuntimeError(
+                "Processing ablation architecture selection returned %d rows"
+                % len(selected)
+            )
+        result[condition] = selected
+    return result
 
 
 def read_hyperparameters_yaml(path):
@@ -240,6 +364,19 @@ def add_minibatch_argument(parser, default=DEFAULT_MINIBATCH_SIZE):
     )
 
 
+def add_optimizer_implementation_argument(parser):
+    """Add the optimizer-equation implementation argument."""
+    parser.add_argument(
+        "--optimizer-implementation",
+        choices=OPTIMIZER_IMPLEMENTATION_CHOICES,
+        default=DEFAULT_OPTIMIZER_IMPLEMENTATION,
+        help=(
+            "Optimizer update equations to write into every architecture. "
+            "Default: %(default)s (published 2.1.x parity)"
+        ),
+    )
+
+
 def make_parser(prog=None):
     """Build the argparse parser for the unified generator command."""
     parser = argparse.ArgumentParser(description=__doc__, prog=prog)
@@ -249,11 +386,25 @@ def make_parser(prog=None):
         "affinity",
         help="Generate the Class I pan-allele affinity grid.")
     add_minibatch_argument(affinity, AFFINITY_DEFAULT_MINIBATCH_SIZE)
+    add_optimizer_implementation_argument(affinity)
+    affinity.add_argument(
+        "--data-dependent-initialization-target",
+        choices=LSUV_TARGET_CHOICES,
+        default="post_activation",
+        help="LSUV activation boundary. Default: %(default)s (2.1.x parity)",
+    )
 
     processing_base = subparsers.add_parser(
         "processing-base",
         help="Generate the base Class I processing grid.")
     add_minibatch_argument(processing_base, PROCESSING_DEFAULT_MINIBATCH_SIZE)
+    add_optimizer_implementation_argument(processing_base)
+    processing_base.add_argument(
+        "--init",
+        choices=PROCESSING_INIT_CHOICES,
+        default="glorot_uniform",
+        help="Processing-layer initializer. Default: %(default)s (2.1.x parity)",
+    )
 
     processing_variant = subparsers.add_parser(
         "processing-variant",
@@ -274,9 +425,19 @@ def run_argv(argv=None, prog=None):
     """Run the unified generator command."""
     args = make_parser(prog=prog).parse_args(argv)
     if args.recipe == "affinity":
-        grid = build_affinity_grid(minibatch_size=args.minibatch_size)
+        grid = build_affinity_grid(
+            minibatch_size=args.minibatch_size,
+            optimizer_implementation=args.optimizer_implementation,
+            data_dependent_initialization_target=(
+                args.data_dependent_initialization_target
+            ),
+        )
     elif args.recipe == "processing-base":
-        grid = build_processing_base_grid(minibatch_size=args.minibatch_size)
+        grid = build_processing_base_grid(
+            minibatch_size=args.minibatch_size,
+            optimizer_implementation=args.optimizer_implementation,
+            init=args.init,
+        )
     elif args.recipe == "processing-variant":
         grid = build_processing_variant_grid(
             read_hyperparameters_yaml(args.production_hyperparameters),

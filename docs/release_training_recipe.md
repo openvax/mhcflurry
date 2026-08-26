@@ -10,6 +10,10 @@ held-out evidence is the Class I pan-allele affinity minibatch increase from
 generalization; it is therefore retained. Other prediction-affecting recipe
 changes are reverted unless and until they have isolated held-out evidence.
 
+The layer-by-layer comparison, framework-equation audit, discrepancy register,
+and controlled experiment plan are in
+{doc}`release_neural_hyperparameter_audit`.
+
 ## Exact release settings
 
 | Stage | Setting | Published 2.1.x | 2.3 release recipe | Status |
@@ -19,9 +23,13 @@ changes are reverted unless and until they have isolated held-out evidence.
 | Affinity | early-stop `min_delta` | 0 | 0 | Restored |
 | Affinity | validation interval | every epoch | every epoch | Restored |
 | Affinity | random-negative pool | fresh each epoch | fresh each epoch | Explicitly pinned to 1 |
+| Affinity | LSUV variance target | post-activation Dense output | post-activation Dense output | Restored and explicit |
+| Affinity | RMSprop equations | Keras | Keras | Restored and explicit; PyTorch selectable for ablation |
 | Affinity calibration | peptides per length | 100,000 | 100,000 | Restored |
 | Processing | minibatch | 512 | 512 | Restored |
 | Processing | held-out samples per fold | 10 | 10 | Restored |
+| Processing | initializer | Glorot uniform, zero bias | Glorot uniform, zero bias | Restored and explicit; former Kaiming behavior selectable for ablation |
+| Processing | Adam equations | Keras | Keras | Restored and explicit; PyTorch selectable for ablation |
 | Processing | decoy candidates retained | 2 per hit | 2 per hit | Unchanged |
 | Presentation | decoys per hit | 2 | 2 | Restored |
 | Presentation | training-row sample fraction | 0.1 | 0.1 | Restored |
@@ -42,9 +50,18 @@ ways that do not intentionally change the scientific objective:
 
 - PyTorch replaces TensorFlow/Keras, and fixed BLOSUM62 expansion is performed
   by a frozen on-device embedding rather than host numpy code.
-- PyTorch optimizer epsilon/decay parameters and processing-network Glorot
-  initializers are explicitly pinned to the Keras defaults; framework defaults
-  are not allowed to redefine the recipe.
+- Keras-compatible RMSprop and Adam update equations, including epsilon
+  placement, are explicit and equation-tested. The native PyTorch equations
+  remain selectable through ``optimizer_implementation`` for controlled
+  experiments, but are not the compatibility default.
+- Affinity LSUV measures post-activation variance as the historical Keras
+  implementation did. ``data_dependent_initialization_target`` records this
+  choice and permits a pre-activation ablation.
+- Processing Glorot initializers and zero biases are explicit. The rejected
+  port's Kaiming/fan-in behavior remains selectable as
+  ``kaiming_uniform_fan_in`` for an ablation.
+- Validation splits use Keras' exact boundary calculation: training rows are
+  ``floor(N * (1 - validation_split))`` and the tail is validation.
 - A fixed master seed and derived per-fit seeds replace entropy-derived random
   state. Exact peptide identities and trained weights consequently need not
   reproduce historical TensorFlow runs even when distributions match.

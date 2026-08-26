@@ -63,5 +63,6 @@ development
 orchestrator
 auto_sizing_audit
 release_training_recipe
+release_neural_hyperparameter_audit
 maintainers
 ```

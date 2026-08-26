@@ -18,6 +18,7 @@ import time
 import collections
 import json
 import logging
+import math
 import numpy
 import torch
 import torch.nn as nn
@@ -25,7 +26,8 @@ import torch.nn.functional as F
 
 from . import amino_acid
 from .hyperparameters import HyperparameterDefaults
-from .class1_training import torch_from_numpy
+from .class1_training import torch_from_numpy, validation_split_counts
+from .keras_optimizers import KerasAdam, KerasRMSprop
 from .pytorch_sizing import DEFAULT_PREDICT_BATCH_SIZE, env_workers_per_gpu
 from .flanking_encoding import FlankingEncoding
 from .common import get_pytorch_device
@@ -58,7 +60,8 @@ class Class1ProcessingModel(nn.Module):
             dropout_rate,
             post_convolutional_dense_layer_sizes,
             sequence_input_is_indices=False,
-            sequence_input_vector_encoding_name=None):
+            sequence_input_vector_encoding_name=None,
+            init="glorot_uniform"):
         super(Class1ProcessingModel, self).__init__()
 
         self.n_flank_length = n_flank_length
@@ -150,13 +153,24 @@ class Class1ProcessingModel(nn.Module):
 
         self.output_layer = nn.Linear(num_final_inputs, 1)
         # Keras Conv1D and Dense default to GlorotUniform with zero biases.
-        # PyTorch Conv1d/Linear default to KaimingUniform, so leaving the
-        # framework defaults in place changes the published training recipe.
+        # Keep the rejected port's former Kaiming behavior selectable for
+        # controlled ablations, but never implicit.
         for module in self.modules():
-            if isinstance(module, (nn.Conv1d, nn.Linear)):
+            if not isinstance(module, (nn.Conv1d, nn.Linear)):
+                continue
+            if init == "glorot_uniform":
                 nn.init.xavier_uniform_(module.weight)
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
+            elif init == "kaiming_uniform_fan_in":
+                nn.init.kaiming_uniform_(module.weight, a=math.sqrt(5))
+                if module.bias is not None:
+                    fan_in, _ = nn.init._calculate_fan_in_and_fan_out(
+                        module.weight)
+                    bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
+                    nn.init.uniform_(module.bias, -bound, bound)
+            else:
+                raise ValueError("Unsupported processing initializer: %s" % init)
         # Initialize output weights to ones (like Keras initializers.Ones())
         nn.init.ones_(self.output_layer.weight)
         nn.init.zeros_(self.output_layer.bias)
@@ -561,6 +575,7 @@ class Class1ProcessingNeuralNetwork(object):
         convolutional_kernel_l1_l2=[0.0001, 0.0001],
         dropout_rate=0.5,
         post_convolutional_dense_layer_sizes=[],
+        init="glorot_uniform",
     )
     """
     Hyperparameters (and their default values) that affect the neural network
@@ -588,6 +603,7 @@ class Class1ProcessingNeuralNetwork(object):
 
     compile_hyperparameter_defaults = HyperparameterDefaults(
         optimizer="adam",
+        optimizer_implementation="keras",
         learning_rate=None,
     )
     """
@@ -815,8 +831,7 @@ class Class1ProcessingNeuralNetwork(object):
         # Validation split
         val_split = self.hyperparameters["validation_split"]
         n_total = len(targets)
-        n_val = int(n_total * val_split)
-        n_train = n_total - n_val
+        n_train, n_val = validation_split_counts(n_total, val_split)
 
         # Hoist all per-batch H2D copies to a single up-front device
         # transfer. The processing dataset is small (peptide flanks for
@@ -1018,24 +1033,61 @@ class Class1ProcessingNeuralNetwork(object):
             print("Output weights", self.network().output_layer.weight.data.cpu().numpy())
 
     def _create_optimizer(self, network):
-        """Create an optimizer for the network."""
+        """Create an optimizer with the historical Keras update equations."""
         optimizer_name = self.hyperparameters["optimizer"].lower()
-        lr = (
-            self.hyperparameters["learning_rate"]
-            if self.hyperparameters["learning_rate"] is not None
-            else 0.001
-        )
+        implementation = self.hyperparameters["optimizer_implementation"].lower()
+        if implementation not in ("keras", "pytorch"):
+            raise ValueError(
+                "optimizer_implementation must be 'keras' or 'pytorch'; got %r"
+                % implementation
+            )
+        configured_lr = self.hyperparameters["learning_rate"]
 
         if optimizer_name == "adam":
-            # Match Keras default epsilon=1e-07.
-            return torch.optim.Adam(network.parameters(), lr=lr, eps=1e-07)
+            lr = 0.001 if configured_lr is None else configured_lr
+            if implementation == "keras":
+                return KerasAdam(
+                    network.parameters(),
+                    lr=lr,
+                    beta_1=0.9,
+                    beta_2=0.999,
+                    epsilon=1e-7,
+                )
+            return torch.optim.Adam(
+                network.parameters(),
+                lr=lr,
+                betas=(0.9, 0.999),
+                eps=1e-7,
+                weight_decay=0.0,
+                amsgrad=False,
+            )
         elif optimizer_name == "rmsprop":
-            # Match Keras defaults: rho=0.9, epsilon=1e-07.
-            return torch.optim.RMSprop(network.parameters(), lr=lr, alpha=0.9, eps=1e-07)
+            lr = 0.001 if configured_lr is None else configured_lr
+            if implementation == "keras":
+                return KerasRMSprop(
+                    network.parameters(),
+                    lr=lr,
+                    rho=0.9,
+                    epsilon=1e-7,
+                )
+            return torch.optim.RMSprop(
+                network.parameters(),
+                lr=lr,
+                alpha=0.9,
+                eps=1e-7,
+                weight_decay=0.0,
+                momentum=0.0,
+                centered=False,
+            )
         elif optimizer_name == "sgd":
-            return torch.optim.SGD(network.parameters(), lr=lr)
-        else:
-            return torch.optim.Adam(network.parameters(), lr=lr, eps=1e-07)
+            return torch.optim.SGD(
+                network.parameters(),
+                lr=0.01 if configured_lr is None else configured_lr,
+                momentum=0.0,
+                weight_decay=0.0,
+                nesterov=False,
+            )
+        raise ValueError("Unsupported optimizer: %s" % optimizer_name)
 
     def predict(
         self,
@@ -1276,6 +1328,7 @@ class Class1ProcessingNeuralNetwork(object):
         convolutional_kernel_l1_l2,
         dropout_rate,
         post_convolutional_dense_layer_sizes,
+        init,
     ):
         """
         Helper function to make a PyTorch network given hyperparameters.
@@ -1303,6 +1356,7 @@ class Class1ProcessingNeuralNetwork(object):
             # arg is retained for signature/config compatibility but ignored.
             sequence_input_is_indices=True,
             sequence_input_vector_encoding_name=amino_acid_encoding,
+            init=init,
         )
 
     def __getstate__(self):

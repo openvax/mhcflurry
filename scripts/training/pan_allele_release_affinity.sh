@@ -17,6 +17,11 @@
 #   TRAINING_MINIBATCH_SIZE    shared release-training minibatch default
 #                              (default 1024)
 #   AFFINITY_MINIBATCH_SIZE    affinity-specific override
+#   AFFINITY_HYPERPARAMETERS_FILE
+#                              optional pre-generated YAML for controlled
+#                              experiments; release runs leave this unset
+#   SKIP_CALIBRATE=1           skip percentile calibration for experiments
+#                              that compare raw affinity predictions
 set -euo pipefail
 set -x
 
@@ -329,9 +334,17 @@ TRAINING_DATA="$(pwd)/train_data.csv.bz2"
 CURRENT_PHASE="hyperparameters"
 TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-1024}"
 AFFINITY_MINIBATCH_SIZE="${AFFINITY_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
-mhcflurry class1-generate-training-hyperparameters affinity \
-    --minibatch-size "$AFFINITY_MINIBATCH_SIZE" \
-    > hyperparameters.yaml
+if [ -n "${AFFINITY_HYPERPARAMETERS_FILE:-}" ]; then
+    [ -f "$AFFINITY_HYPERPARAMETERS_FILE" ] || {
+        echo "AFFINITY_HYPERPARAMETERS_FILE not found: $AFFINITY_HYPERPARAMETERS_FILE" >&2
+        exit 2
+    }
+    cp "$AFFINITY_HYPERPARAMETERS_FILE" hyperparameters.yaml
+else
+    mhcflurry class1-generate-training-hyperparameters affinity \
+        --minibatch-size "$AFFINITY_MINIBATCH_SIZE" \
+        > hyperparameters.yaml
+fi
 # ``dataloader_num_workers`` is no longer injected here. The orchestrator
 # overrides each work item's hyperparameters via the
 # ``--dataloader-num-workers`` CLI flag at planning time (see
@@ -402,6 +415,11 @@ do
     #     ~3x fewer chunks. Override with CALIBRATE_ALLELES_PER_CHUNK.
     # The statistical calibration sample remains the published 100000
     # peptides per length; only execution batching is changed.
+    SKIP_CALIBRATE="${SKIP_CALIBRATE:-0}"
+    if [ "$SKIP_CALIBRATE" = "1" ]; then
+        log_release_event phase_skipped "SKIP_CALIBRATE=1"
+        continue
+    fi
     CALIBRATE_PEPTIDES_PER_LENGTH="${CALIBRATE_PEPTIDES_PER_LENGTH:-100000}"
     CALIBRATE_ALLELES_PER_CHUNK="${CALIBRATE_ALLELES_PER_CHUNK:-30}"
     # Calibrate's peak VRAM per worker is dominated by the merged
@@ -465,12 +483,20 @@ else
     DATA_EVAL_DIR="$(mhcflurry-downloads path data_evaluation)"
     EVAL_OUT="$MHCFLURRY_OUT/eval_comparison"
     mkdir -p "$EVAL_OUT"
+    COMPARE_HOLDOUT_ARGS=()
+    if [ -n "${RELEASE_HOLDOUT_DIR:-}" ]; then
+        COMPARE_HOLDOUT_ARGS=(
+            --release-holdout-dir "$RELEASE_HOLDOUT_DIR"
+            --affinity-training-overlap-policy audit
+        )
+    fi
     run_logged_step "eval_compare_new_vs_public" "$EVAL_LOG" \
         mhcflurry eval compare-models \
             --a "$MHCFLURRY_OUT/models.combined" \
             --a-label new \
             --b public \
             --data-dir "$DATA_EVAL_DIR" \
+            "${COMPARE_HOLDOUT_ARGS[@]}" \
             --include affinity \
             --out "$EVAL_OUT"
 fi

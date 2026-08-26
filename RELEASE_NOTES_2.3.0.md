@@ -5,6 +5,14 @@ model-validation record stays distinct from the package changelog.
 
 ## rc20
 
+- Restore framework-level 2.1.x training semantics that numeric
+  hyperparameters alone did not capture: post-activation affinity LSUV,
+  Keras-equation RMSprop/Adam, Keras validation-split rounding, processing
+  Glorot/zero-bias initialization, and Keras BatchNorm moving variance.
+  Optimizer equation, LSUV boundary, and processing initializer are serialized
+  switches with paired frozen-holdout ablations before the full retrain.
+- Require runplz 3.16.0 for remote release provenance and use its updated
+  staging/bootstrap behavior.
 - Restore the published 2.1.x/2.2.x scientific recipe after auditing the first
   full candidate. Retain affinity minibatch 1024 because its held-out sweep was
   better, but restore affinity early stopping/calibration, processing batch and

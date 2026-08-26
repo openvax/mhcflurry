@@ -22,6 +22,34 @@ import torch
 from .regression_target import from_ic50
 
 
+def validation_split_counts(total_rows, validation_split):
+    """Return train/validation row counts using Keras split semantics.
+
+    Keras assigns the last rows to validation and computes the boundary as
+    ``floor(total_rows * (1 - validation_split))``. Computing validation rows
+    first is not equivalent for row counts that are not exact multiples of the
+    split denominator.
+    """
+    total_rows = int(total_rows)
+    validation_split = float(validation_split)
+    if total_rows < 0:
+        raise ValueError("total_rows must be non-negative")
+    if not 0.0 <= validation_split < 1.0:
+        raise ValueError("validation_split must be in [0, 1)")
+    if validation_split == 0.0:
+        return total_rows, 0
+
+    train_rows = int(numpy.floor(total_rows * (1.0 - validation_split)))
+    validation_rows = total_rows - train_rows
+    if train_rows == 0 or validation_rows == 0:
+        raise ValueError(
+            "validation_split=%s leaves %d training rows and %d validation "
+            "rows from %d total rows"
+            % (validation_split, train_rows, validation_rows, total_rows)
+        )
+    return train_rows, validation_rows
+
+
 def _identity_collate(sample):
     """Return a pre-batched sample unchanged."""
     return sample

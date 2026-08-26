@@ -34,8 +34,9 @@ from .encodable_sequences import EncodableSequences, EncodingError
 from .allele_encoding import AlleleEncoding
 from .regression_target import to_ic50, from_ic50
 from .common import get_pytorch_device
-from .pytorch_layers import LocallyConnected1D, get_activation
+from .pytorch_layers import KerasBatchNorm1d, LocallyConnected1D, get_activation
 from .pytorch_losses import get_pytorch_loss
+from .keras_optimizers import KerasAdam, KerasRMSprop
 from .data_dependent_weights_initialization import lsuv_init
 from .random_negative_peptides import (
     RandomNegativePeptides,
@@ -66,6 +67,7 @@ from .class1_training import (
     torch_from_numpy,
     _update_min_validation_loss,
     _validation_interval_from_hyperparameters,
+    validation_split_counts,
 )
 from .pytorch_training import (
     configure_matmul_precision,
@@ -275,7 +277,7 @@ class Class1NeuralNetworkModel(nn.Module):
         # Batch normalization after peptide processing (early)
         self.batch_norm_early = None
         if batch_normalization:
-            self.batch_norm_early = nn.BatchNorm1d(
+            self.batch_norm_early = KerasBatchNorm1d(
                 peptide_layer_input,
                 eps=KERAS_BATCH_NORM_EPSILON,
                 momentum=KERAS_BATCH_NORM_MOMENTUM,
@@ -349,7 +351,7 @@ class Class1NeuralNetworkModel(nn.Module):
             self.dense_layers.append(layer)
 
             if batch_normalization:
-                self.batch_norms.append(nn.BatchNorm1d(
+                self.batch_norms.append(KerasBatchNorm1d(
                     size,
                     eps=KERAS_BATCH_NORM_EPSILON,
                     momentum=KERAS_BATCH_NORM_MOMENTUM,
@@ -382,6 +384,29 @@ class Class1NeuralNetworkModel(nn.Module):
 
         # Initialize weights
         self._initialize_weights(init)
+
+    def activation_output_for_layer(self, layer, output):
+        """Apply the activation belonging to a trainable affine layer.
+
+        This exposes the same layer-output boundary that Keras reports for a
+        ``Dense`` layer. Data-dependent initialization uses it to measure
+        post-activation variance even though PyTorch represents the linear
+        transform and activation as separate operations.
+        """
+        hidden_layers = (
+            list(self.peptide_dense_layers)
+            + list(self.allele_dense_layers)
+            + list(self.dense_layers)
+        )
+        if any(layer is hidden_layer for hidden_layer in hidden_layers):
+            return self.activation(output) if self.activation is not None else output
+        if layer is self.output_layer:
+            return (
+                self.output_activation(output)
+                if self.output_activation is not None
+                else output
+            )
+        return output
 
     def _initialize_weights(self, init):
         """Initialize layer weights."""
@@ -1299,6 +1324,7 @@ class Class1NeuralNetwork(object):
     compile_hyperparameter_defaults = HyperparameterDefaults(
         loss="custom:mse_with_inequalities",
         optimizer="rmsprop",
+        optimizer_implementation="keras",
         learning_rate=None,
     )
     """
@@ -1311,6 +1337,7 @@ class Class1NeuralNetwork(object):
         early_stopping=True,
         minibatch_size=512,
         data_dependent_initialization_method=None,
+        data_dependent_initialization_target="post_activation",
         random_negative_affinity_min=20000.0,
         random_negative_affinity_max=50000.0,
         random_negative_output_indices=None,
@@ -2343,7 +2370,13 @@ class Class1NeuralNetwork(object):
         )
 
     @staticmethod
-    def data_dependent_weights_initialization(network, x_dict=None, method="lsuv", verbose=1):
+    def data_dependent_weights_initialization(
+        network,
+        x_dict=None,
+        method="lsuv",
+        target="post_activation",
+        verbose=1,
+    ):
         """
         Data dependent weights initialization.
 
@@ -2354,6 +2387,8 @@ class Class1NeuralNetwork(object):
             Training data
         method : string
             Initialization method. Currently only "lsuv" is supported.
+        target : {"post_activation", "pre_activation"}
+            Affine-layer output whose variance LSUV normalizes.
         verbose : int
             Status updates printed to stdout if verbose > 0
         """
@@ -2361,7 +2396,7 @@ class Class1NeuralNetwork(object):
             print("Performing data-dependent init: ", method)
         if method == "lsuv":
             assert x_dict is not None, "Data required for LSUV init"
-            lsuv_init(network, x_dict, verbose=verbose > 0)
+            lsuv_init(network, x_dict, verbose=verbose > 0, target=target)
         else:
             raise RuntimeError("Unsupported init method: ", method)
 
@@ -2606,6 +2641,9 @@ class Class1NeuralNetwork(object):
                 network,
                 first_inputs,
                 method=data_dependent_init,
+                target=self.hyperparameters[
+                    "data_dependent_initialization_target"
+                ],
                 verbose=verbose,
             )
             iterator = itertools.chain([first_chunk], iterator)
@@ -2941,25 +2979,61 @@ class Class1NeuralNetwork(object):
         )
 
     def _create_optimizer(self, network):
-        """Create an optimizer for the network."""
+        """Create an optimizer with the historical Keras update equations."""
         optimizer_name = self.hyperparameters["optimizer"].lower()
-        lr = (
-            self.hyperparameters["learning_rate"]
-            if self.hyperparameters["learning_rate"] is not None
-            else 0.001
-        )
+        implementation = self.hyperparameters["optimizer_implementation"].lower()
+        if implementation not in ("keras", "pytorch"):
+            raise ValueError(
+                "optimizer_implementation must be 'keras' or 'pytorch'; got %r"
+                % implementation
+            )
+        configured_lr = self.hyperparameters["learning_rate"]
 
         if optimizer_name == "rmsprop":
-            # Match Keras defaults: rho=0.9, epsilon=1e-07
+            lr = 0.001 if configured_lr is None else configured_lr
+            if implementation == "keras":
+                return KerasRMSprop(
+                    network.parameters(),
+                    lr=lr,
+                    rho=0.9,
+                    epsilon=1e-7,
+                )
             return torch.optim.RMSprop(
-                network.parameters(), lr=lr, alpha=0.9, eps=1e-07)
+                network.parameters(),
+                lr=lr,
+                alpha=0.9,
+                eps=1e-7,
+                weight_decay=0.0,
+                momentum=0.0,
+                centered=False,
+            )
         elif optimizer_name == "adam":
-            # Match Keras default epsilon=1e-07.
-            return torch.optim.Adam(network.parameters(), lr=lr, eps=1e-07)
+            lr = 0.001 if configured_lr is None else configured_lr
+            if implementation == "keras":
+                return KerasAdam(
+                    network.parameters(),
+                    lr=lr,
+                    beta_1=0.9,
+                    beta_2=0.999,
+                    epsilon=1e-7,
+                )
+            return torch.optim.Adam(
+                network.parameters(),
+                lr=lr,
+                betas=(0.9, 0.999),
+                eps=1e-7,
+                weight_decay=0.0,
+                amsgrad=False,
+            )
         elif optimizer_name == "sgd":
-            return torch.optim.SGD(network.parameters(), lr=lr)
-        else:
-            return torch.optim.Adam(network.parameters(), lr=lr, eps=1e-07)
+            return torch.optim.SGD(
+                network.parameters(),
+                lr=0.01 if configured_lr is None else configured_lr,
+                momentum=0.0,
+                weight_decay=0.0,
+                nesterov=False,
+            )
+        raise ValueError("Unsupported optimizer: %s" % optimizer_name)
 
     def fit(
             self,
@@ -3295,8 +3369,7 @@ class Class1NeuralNetwork(object):
         # Validation split (fixed across epochs; only training data is reshuffled)
         val_split = self.hyperparameters["validation_split"]
         n_total = len(y_encoded)
-        n_val = int(n_total * val_split)
-        n_train = n_total - n_val
+        n_train, n_val = validation_split_counts(n_total, val_split)
         indices = numpy.arange(n_total)
         if n_val > 0:
             train_indices_base = indices[:n_train]
@@ -3443,6 +3516,9 @@ class Class1NeuralNetwork(object):
                     network,
                     init_batch,
                     method=self.hyperparameters["data_dependent_initialization_method"],
+                    target=self.hyperparameters[
+                        "data_dependent_initialization_target"
+                    ],
                     verbose=verbose,
                 )
                 initialization_time += _timing_stop(
