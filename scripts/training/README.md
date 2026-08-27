@@ -49,8 +49,9 @@ committed parity panel through the same image and transport. The default is
 ## Training data and hyperparameters
 
 - **`mhcflurry class1-generate-training-hyperparameters`** generates the
-  maintained affinity and processing grids. The base minibatch defaults to 1024
-  and can be changed with `--minibatch-size`.
+  maintained affinity and processing grids. The affinity minibatch defaults to
+  the published value 128; processing defaults to 512. Both can be changed with
+  `--minibatch-size`.
 - **`release_exact/generate_hyperparameters*.py`** are compatibility shims for
   historical direct-script workflows.
 - **`release_exact/make_train_data.processing.py`** and

@@ -20,7 +20,7 @@ import yaml
 from ..common import positive_int_arg
 
 
-AFFINITY_DEFAULT_MINIBATCH_SIZE = 1024
+AFFINITY_DEFAULT_MINIBATCH_SIZE = 128
 PROCESSING_DEFAULT_MINIBATCH_SIZE = 512
 DEFAULT_OPTIMIZER_IMPLEMENTATION = "keras"
 OPTIMIZER_IMPLEMENTATION_CHOICES = ("keras", "pytorch")
@@ -268,6 +268,11 @@ def build_affinity_ablation_panels():
         ),
         "pytorch_rmsprop": dict(
             minibatch_size=1024,
+            optimizer_implementation="pytorch",
+            data_dependent_initialization_target="post_activation",
+        ),
+        "pytorch_rmsprop_batch128": dict(
+            minibatch_size=128,
             optimizer_implementation="pytorch",
             data_dependent_initialization_target="post_activation",
         ),

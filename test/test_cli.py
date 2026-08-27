@@ -1046,7 +1046,7 @@ def test_release_workflow_defaults_to_validated_published_recipe(tmp_path):
     output = result.stdout + result.stderr
     for expected in (
             "RELEASE_RANDOM_SEED=42",
-            "AFFINITY_MINIBATCH_SIZE=1024",
+            "AFFINITY_MINIBATCH_SIZE=128",
             "PROCESSING_MINIBATCH_SIZE=512",
             "PROCESSING_HELD_OUT_SAMPLES=10",
             "PRESENTATION_PROCESSING_WITH_FLANKS_KIND=short_flanks",
@@ -2074,7 +2074,7 @@ def test_affinity_hyperparameter_generator_is_importable():
     assert len(grid) == 35
     assert {item["minibatch_size"] for item in grid} == {2048}
     published_recipe_grid = module.build_grid()
-    assert {item["minibatch_size"] for item in published_recipe_grid} == {1024}
+    assert {item["minibatch_size"] for item in published_recipe_grid} == {128}
     assert {item["max_epochs"] for item in published_recipe_grid} == {5000}
     assert {item["min_delta"] for item in published_recipe_grid} == {0.0}
     assert {item["validation_interval"] for item in published_recipe_grid} == {1}
@@ -2170,6 +2170,7 @@ def test_release_hyperparameter_ablation_panels_are_paired():
         "pre_activation_lsuv",
         "no_lsuv",
         "pytorch_rmsprop",
+        "pytorch_rmsprop_batch128",
     }
     assert {len(values) for values in affinity.values()} == {2}
     affinity_architectures = {
@@ -2184,6 +2185,14 @@ def test_release_hyperparameter_ablation_panels_are_paired():
         item["data_dependent_initialization_method"]
         for item in affinity["no_lsuv"]
     } == {None}
+    assert {
+        item["minibatch_size"]
+        for item in affinity["pytorch_rmsprop_batch128"]
+    } == {128}
+    assert {
+        item["optimizer_implementation"]
+        for item in affinity["pytorch_rmsprop_batch128"]
+    } == {"pytorch"}
 
     processing = generator.build_processing_ablation_panels()
     assert set(processing) == {
@@ -2210,12 +2219,15 @@ def test_affinity_release_script_accepts_tracked_ablation_yaml():
         "pre_activation_lsuv",
         "no_lsuv",
         "pytorch_rmsprop",
+        "pytorch_rmsprop_batch128",
     ):
         assert condition in runner
     assert "release-holdout build" in runner
     assert "--release-holdout-dir" in runner
     assert "--affinity-training-overlap-policy audit" in runner
     assert "published_parity/models.combined" in runner
+    assert "AFFINITY_ABLATION_CONDITIONS" in runner
+    assert "AFFINITY_ABLATION_BASELINE_DIR" in runner
     assert "SKIP_CALIBRATE=1" in runner
     assert "SKIP_EVAL=1" in runner
 
@@ -2304,6 +2316,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     )
     module = _load_script_module(path, "remote_launcher_under_test")
     assert "runplz==3.17.0" in pip_packages
+    assert module.remote_training_env({})["TRAINING_MINIBATCH_SIZE"] == "128"
     env = module.remote_training_env({"TRAINING_MINIBATCH_SIZE": "2048"})
     assert env["TRAINING_MINIBATCH_SIZE"] == "2048"
     assert env["COMPARE_BASELINE"] == "public:2.0.0"
@@ -2321,6 +2334,8 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     assert env["MHCFLURRY_GPU_TELEMETRY"] == "1"
     assert env["MHCFLURRY_GPU_TELEMETRY_SECONDS"] == "30"
     assert env["NUM_JOBS"] == "auto"
+    assert env["AFFINITY_ABLATION_CONDITIONS"] == ""
+    assert env["AFFINITY_ABLATION_BASELINE_DIR"] == ""
     assert env["MKL_THREADING_LAYER"] == "GNU"
     assert env["COMPARE_PRESENTATION_NUM_JOBS"] == "auto"
     assert env["COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU"] == "auto"
@@ -2375,6 +2390,8 @@ def test_remote_launcher_preserves_shared_minibatch_override(
         "MHCFLURRY_GPU_TELEMETRY": "0",
         "MHCFLURRY_GPU_TELEMETRY_SECONDS": "5",
         "NUM_JOBS": "6",
+        "AFFINITY_ABLATION_CONDITIONS": "pytorch_rmsprop_batch128",
+        "AFFINITY_ABLATION_BASELINE_DIR": "/remote/baseline",
         "MKL_THREADING_LAYER": "TBB",
     })
     assert env["AFFINITY_MINIBATCH_SIZE"] == "512"
@@ -2405,6 +2422,8 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     assert env["MHCFLURRY_GPU_TELEMETRY"] == "0"
     assert env["MHCFLURRY_GPU_TELEMETRY_SECONDS"] == "5"
     assert env["NUM_JOBS"] == "6"
+    assert env["AFFINITY_ABLATION_CONDITIONS"] == "pytorch_rmsprop_batch128"
+    assert env["AFFINITY_ABLATION_BASELINE_DIR"] == "/remote/baseline"
     assert env["MKL_THREADING_LAYER"] == "TBB"
 
     assert module.remote_workflow_script({}) == (

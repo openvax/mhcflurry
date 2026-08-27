@@ -14,8 +14,9 @@ model-validation record stays distinct from the package changelog.
 - Require runplz 3.16.0 for remote release provenance and use its updated
   staging/bootstrap behavior.
 - Restore the published 2.1.x/2.2.x scientific recipe after auditing the first
-  full candidate. Retain affinity minibatch 1024 because its held-out sweep was
-  better, but restore affinity early stopping/calibration, processing batch and
+  full candidate. Restore affinity minibatch 128 after a paired frozen-holdout
+  comparison rejected 1024, and restore affinity early stopping/calibration,
+  processing batch and
   fold holdout, and presentation decoy/sampling/flank/solver/calibration
   settings. Pin fresh affinity negatives each epoch, eager execution, and full
   float32 matmul precision for release provenance. Processing layers now pin
@@ -108,9 +109,8 @@ class-II, or non-MHC records; these rows were never valid prediction targets.
 
 ## Release recipe
 
-The release recipe matches the published 2.1.x/2.2.x scientific settings
-except for affinity minibatch 1024, which improved held-out affinity metrics in
-the controlled batch sweep. Affinity `max_epochs=5000`, `min_delta=0`,
+The release recipe matches the published 2.1.x/2.2.x scientific settings,
+including affinity minibatch 128. Affinity `max_epochs=5000`, `min_delta=0`,
 validation every epoch, and fresh negatives every epoch remain unchanged.
 Processing uses minibatch 512 and 10 held-out samples. Presentation uses 2
 proteome decoys per hit, a 0.1 sample fraction, `short_flanks` (5 aa per side),

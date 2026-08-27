@@ -20,13 +20,10 @@ mhcflurry train release-holdout build \
     --mass-spec-data "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
     --out-dir "$HOLDOUT_DIR"
 
-for condition in \
-    published_parity \
-    proposed_release \
-    pre_activation_lsuv \
-    no_lsuv \
-    pytorch_rmsprop
-do
+DEFAULT_CONDITIONS="published_parity proposed_release pre_activation_lsuv no_lsuv pytorch_rmsprop pytorch_rmsprop_batch128"
+read -r -a CONDITIONS <<< "${AFFINITY_ABLATION_CONDITIONS:-$DEFAULT_CONDITIONS}"
+
+for condition in "${CONDITIONS[@]}"; do
     condition_out="$MHCFLURRY_OUT/affinity.$condition"
     env \
         MHCFLURRY_OUT="$condition_out" \
@@ -42,16 +39,15 @@ done
 DATA_EVAL_DIR="$(mhcflurry-downloads path data_evaluation)"
 PAIRWISE_DIR="$MHCFLURRY_OUT/paired_comparisons"
 mkdir -p "$PAIRWISE_DIR"
-for condition in \
-    proposed_release \
-    pre_activation_lsuv \
-    no_lsuv \
-    pytorch_rmsprop
-do
+BASELINE_DIR="${AFFINITY_ABLATION_BASELINE_DIR:-$MHCFLURRY_OUT}"
+for condition in "${CONDITIONS[@]}"; do
+    if [ "$condition" = "published_parity" ]; then
+        continue
+    fi
     mhcflurry eval compare-models \
         --a "$MHCFLURRY_OUT/affinity.$condition/models.combined" \
         --a-label "$condition" \
-        --b "$MHCFLURRY_OUT/affinity.published_parity/models.combined" \
+        --b "$BASELINE_DIR/affinity.published_parity/models.combined" \
         --b-label published_parity \
         --data-dir "$DATA_EVAL_DIR" \
         --release-holdout-dir "$HOLDOUT_DIR" \

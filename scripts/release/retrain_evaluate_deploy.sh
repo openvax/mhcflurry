@@ -24,8 +24,8 @@ Usage:
       [--backend local|brev-existing|brev-provision|ssh] \
       [--release-profile full|fast-8xa100|minimal-processing|fast-minimal] \
       [--random-seed 42] \
-      [--minibatch-size 1024] \
-      [--affinity-minibatch-size 1024] \
+      [--minibatch-size 128] \
+      [--affinity-minibatch-size 128] \
       [--affinity-max-workers-per-gpu auto] \
       [--processing-minibatch-size 512] \
       [--processing-num-jobs auto] \
@@ -2082,7 +2082,7 @@ RUN_LABEL="${RUN_LABEL:-}"
 DRY_RUN=0
 ALLOW_DIRTY_REPO="${ALLOW_DIRTY_REPO:-0}"
 RELEASE_RANDOM_SEED="${RELEASE_RANDOM_SEED:-42}"
-TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-1024}"
+TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-128}"
 AFFINITY_MINIBATCH_SIZE=
 AFFINITY_MAX_WORKERS_PER_GPU_EXPLICIT=0
 if [ -n "${AFFINITY_MAX_WORKERS_PER_GPU:-}" ]; then

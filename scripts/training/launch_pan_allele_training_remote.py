@@ -221,6 +221,12 @@ def remote_training_env(environ=os.environ):
         "AFFINITY_DATALOADER_NUM_WORKERS": environ.get(
             "AFFINITY_DATALOADER_NUM_WORKERS", ""
         ),
+        "AFFINITY_ABLATION_CONDITIONS": environ.get(
+            "AFFINITY_ABLATION_CONDITIONS", ""
+        ),
+        "AFFINITY_ABLATION_BASELINE_DIR": environ.get(
+            "AFFINITY_ABLATION_BASELINE_DIR", ""
+        ),
         "MAX_TASKS_PER_WORKER": environ.get("MAX_TASKS_PER_WORKER", "12"),
         "MAX_WORKERS_PER_GPU": environ.get("MAX_WORKERS_PER_GPU", "auto"),
         # PyTorch/Inductor workers load GNU OpenMP (libgomp). The PyTorch
@@ -337,7 +343,7 @@ def remote_training_env(environ=os.environ):
         "TORCHINDUCTOR_COMPILE_THREADS": environ.get(
             "TORCHINDUCTOR_COMPILE_THREADS", "auto"
         ),
-        "TRAINING_MINIBATCH_SIZE": environ.get("TRAINING_MINIBATCH_SIZE", "1024"),
+        "TRAINING_MINIBATCH_SIZE": environ.get("TRAINING_MINIBATCH_SIZE", "128"),
     }
     for name in (
         "AFFINITY_MINIBATCH_SIZE",

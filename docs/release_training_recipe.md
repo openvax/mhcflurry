@@ -4,11 +4,12 @@ The MHCflurry 2.3 release recipe uses the published 2.1.x/2.2.x scientific
 configuration as its baseline. The 2.1.x and 2.2.x public model downloads use
 the same affinity, processing, and presentation generation recipes.
 
-The only training-hyperparameter exception currently supported by direct
-held-out evidence is the Class I pan-allele affinity minibatch increase from
-128 to 1024. A release-candidate sweep found that 1024 improved affinity
-generalization; it is therefore retained. Other prediction-affecting recipe
-changes are reverted unless and until they have isolated held-out evidence.
+No training-hyperparameter exception is currently supported by direct held-out
+evidence. A release-candidate sweep initially appeared to favor a Class I
+pan-allele affinity minibatch increase from 128 to 1024, but the result did not
+reproduce with restored Keras optimizer equations on the frozen release
+holdout. Prediction-affecting recipe changes are reverted unless and until they
+have isolated held-out evidence.
 
 The layer-by-layer comparison, framework-equation audit, discrepancy register,
 and controlled experiment plan are in
@@ -18,7 +19,7 @@ and controlled experiment plan are in
 
 | Stage | Setting | Published 2.1.x | 2.3 release recipe | Status |
 |---|---|---:|---:|---|
-| Affinity | minibatch | 128 | 1024 | Retained: held-out improvement |
+| Affinity | minibatch | 128 | 128 | Restored after paired frozen-holdout comparison |
 | Affinity | maximum epochs | 5000 | 5000 | Restored |
 | Affinity | early-stop `min_delta` | 0 | 0 | Restored |
 | Affinity | validation interval | every epoch | every epoch | Restored |

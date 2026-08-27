@@ -14,9 +14,9 @@
 #   NUM_JOBS=N                 parallelism (default: $GPUS). Controls
 #                              how many networks train concurrently;
 #                              mhcflurry pairs jobs 1:1 with GPUs.
-#   TRAINING_MINIBATCH_SIZE    shared release-training minibatch default
-#                              (default 1024)
+#   TRAINING_MINIBATCH_SIZE    shared release minibatch default (128)
 #   AFFINITY_MINIBATCH_SIZE    affinity-specific override
+#                              (default 128, matching 2.1.x/2.2.x)
 #   AFFINITY_HYPERPARAMETERS_FILE
 #                              optional pre-generated YAML for controlled
 #                              experiments; release runs leave this unset
@@ -335,7 +335,7 @@ TRAINING_DATA="$(pwd)/train_data.csv.bz2"
 
 # ---- hyperparameters -------------------------------------------------
 CURRENT_PHASE="hyperparameters"
-TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-1024}"
+TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-128}"
 AFFINITY_MINIBATCH_SIZE="${AFFINITY_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
 if [ -n "${AFFINITY_HYPERPARAMETERS_FILE:-}" ]; then
     [ -f "$AFFINITY_HYPERPARAMETERS_FILE" ] || {

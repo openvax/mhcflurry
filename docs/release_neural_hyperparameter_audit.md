@@ -11,10 +11,11 @@ conflate:
 3. execution controls that should not alter the scientific recipe.
 
 The compatibility rule is: restore 2.1.x behavior unless a held-out comparison
-supports a change. The only supported training change so far is affinity
-minibatch 128 to 1024. The ablations below recheck that result after restoring
-the Keras optimizer equations, because optimizer/minibatch interactions are
-possible.
+supports a change. A previous sweep appeared to support affinity minibatch
+1024, but that result did not reproduce after restoring the Keras optimizer
+equations and using the frozen release holdout. Batch 128 therefore remains the
+release baseline. The ablations below test optimizer/minibatch interactions
+explicitly rather than coupling them.
 
 ## Release-grid audit
 
@@ -31,7 +32,7 @@ possible.
 | Data-dependent initializer | LSUV, measuring the post-activation Keras Dense output | Restored; `data_dependent_initialization_target=post_activation` is explicit |
 | Loss | Inequality-aware mean squared error | Exact objective and reduction |
 | Optimizer | Keras RMSprop: pretrain LR `0.001`, fine-tune LR `0.0001`, rho `0.9`, momentum `0`, centered false, epsilon `1e-7` inside `sqrt(v + epsilon)` | Restored with public `KerasRMSprop`; `optimizer_implementation=keras` is explicit |
-| Minibatch | 128 | 1024 retained from held-out improvement; recheck in restored-optimizer ablation |
+| Minibatch | 128 | Restored. Under Keras RMSprop, 1024 reduced frozen-holdout macro AUROC 0.40%, AUPRC 5.20%, and PPV@N 4.31% relative to the paired batch-128 control. |
 | Validation | Tail 10%; every epoch | Restored, including Keras split rounding |
 | Early stopping | patience 20, `min_delta=0`, ceiling 5000 epochs | Restored |
 | Pretraining | 64 peptides/chunk, 256 steps/epoch, min 5/max 50 epochs, patience 2, `min_delta=1e-4`, maximum accepted validation loss 0.10 | Exact match |
@@ -92,11 +93,9 @@ variants of the algorithm in the
 [Kingma and Ba paper](https://arxiv.org/abs/1412.6980); compatibility, not a
 claim of universal optimizer superiority, determines the 2.3.0 default.
 
-The public class defaults also changed independently of the release YAML:
-affinity defaults from minibatch 128 to 512, while the release explicitly uses
-1024; processing defaults from 256 to 512, while both published and current
-release generators explicitly use 512. These default changes cannot silently
-alter the release because the generated YAML records the actual values.
+The public predictor class defaults are independent of the release YAML.
+Current release generators explicitly use affinity minibatch 128 and processing
+minibatch 512, and the generated YAML records the actual values.
 
 ## Controlled experiment matrix
 
@@ -119,6 +118,7 @@ four folds. This is 8 networks per condition rather than the full 140.
 | C: rejected LSUV port | 1024 | pre-activation | Keras RMSprop | Isolate LSUV boundary |
 | D: no LSUV | 1024 | disabled | Keras RMSprop | Test whether LSUV itself helps |
 | E: native optimizer | 1024 | post-activation | PyTorch RMSprop | Isolate optimizer equation |
+| F: native optimizer at parity batch | 128 | post-activation | PyTorch RMSprop | Isolate optimizer equation without the batch-size confounder |
 
 Primary metrics are frozen-holdout affinity AUROC, AUPRC, and PPV@N. Secondary
 diagnostics are pretrain failure rate, inequality-aware validation loss,
