@@ -672,6 +672,7 @@ def test_release_workflow_plots_include_paper_figures_by_default(tmp_path):
     assert "--paper-figures-scores-dir %s" % (
         run_dir / "eval_comparison"
     ) in output
+    assert "--include-paper-figures-in-summary-pdf" in output
 
 
 def test_release_workflow_honors_repo_env_override(tmp_path):
@@ -1276,6 +1277,9 @@ def test_brev_postprocess_reuses_training_python_without_compile_fanout():
     assert (
         'export COMPARE_TORCH_COMPILE=%q\\n' in workflow
     )
+    assert workflow.count(
+        "--include-paper-figures-in-summary-pdf"
+    ) == 2
 
 
 @pytest.mark.parametrize("body_status", [0, 23])
@@ -2255,7 +2259,8 @@ def test_reassign_mass_spec_training_data_cli(tmp_path):
     assert result.measurement_value.tolist() == [100.0, 456.0]
 
 
-def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
+def test_remote_launcher_preserves_shared_minibatch_override(
+        monkeypatch, tmp_path):
     """Family-specific minibatch env vars should only be set when provided."""
     fake_runplz = types.ModuleType("runplz")
     fake_config = types.ModuleType("runplz.config")
@@ -2442,6 +2447,16 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     }) == "high"
     with pytest.raises(ValueError):
         module.compare_torch_compile_value({"COMPARE_TORCH_COMPILE": "maybe"})
+
+    plot_commands = []
+
+    def capture_plot_command(command, **_kwargs):
+        plot_commands.append(command)
+
+    monkeypatch.setattr(module.subprocess, "run", capture_plot_command)
+    module.run_release_plots(tmp_path, tmp_path / "release-run", env)
+    assert len(plot_commands) == 1
+    assert "--include-paper-figures-in-summary-pdf" in plot_commands[0]
     with pytest.raises(ValueError):
         module.compare_matmul_precision_value({
             "COMPARE_MATMUL_PRECISION": "fast",

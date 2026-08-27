@@ -1444,6 +1444,7 @@ if [ "${RUN_RELEASE_PLOTS:-1}" = "1" ]; then
         --paper-figures-out "$run_dir/eval_comparison/plots/paper_figures"
         --paper-figures-formats "${PAPER_FIGURES_FORMATS:-svg,pdf,png}"
         --paper-figures-scores-dir "${PAPER_FIGURES_SCORES_DIR:-$run_dir/eval_comparison}"
+        --include-paper-figures-in-summary-pdf
     )
     if [ -n "${PAPER_FIGURES_MULTIALLELIC_PREDICTIONS:-}" ]; then
         plot_args+=(--paper-figures-multiallelic-predictions "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS")
@@ -2901,6 +2902,7 @@ if [ "$SKIP_PLOTS" != "1" ]; then
             --paper-figures-out "$RUN_DIR/eval_comparison/plots/paper_figures"
             --paper-figures-formats "$PAPER_FIGURES_FORMATS"
             --paper-figures-scores-dir "${PAPER_FIGURES_SCORES_DIR:-$RUN_DIR/eval_comparison}"
+            --include-paper-figures-in-summary-pdf
         )
         if [ -n "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS" ]; then
             plot_args+=(--paper-figures-multiallelic-predictions "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS")

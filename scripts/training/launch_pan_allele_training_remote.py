@@ -607,6 +607,7 @@ def run_release_plots(repo, out, env):
         str(out / "eval_comparison" / "plots" / "paper_figures"),
         "--paper-figures-formats",
         env.get("PAPER_FIGURES_FORMATS", "svg,pdf,png"),
+        "--include-paper-figures-in-summary-pdf",
     ]
     scores_dir = (
         env.get("PAPER_FIGURES_SCORES_DIR", "").strip()
