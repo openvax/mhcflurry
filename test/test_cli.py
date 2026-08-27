@@ -1071,8 +1071,8 @@ def test_release_workflow_defaults_to_validated_published_recipe(tmp_path):
 def test_release_workflow_sync_is_workflow_id_scoped():
     script = pathlib.Path(
         "scripts/release/retrain_evaluate_deploy.sh").read_text()
-    assert 'RUNPLZ_REQUIRED_VERSION="3.16.0"' in script
-    assert "require_clean_runplz_3160" in script
+    assert 'RUNPLZ_REQUIRED_VERSION="3.17.0"' in script
+    assert "require_clean_runplz" in script
     assert "run_dir_matches_workflow || return 1" in script
     assert "remote_workflow_id" in script
     assert "Refusing to sync Brev output for workflow" in script
@@ -1095,13 +1095,13 @@ def test_release_workflow_validates_selected_runplz_interpreter(tmp_path):
         / "site-packages"
     )
     package_dir = site_packages / "runplz"
-    distribution_dir = site_packages / "runplz-3.16.0.dist-info"
+    distribution_dir = site_packages / "runplz-3.17.0.dist-info"
     package_dir.mkdir(parents=True)
     distribution_dir.mkdir()
     (fake_checkout / ".git").mkdir()
     (package_dir / "__init__.py").write_text("")
     (distribution_dir / "METADATA").write_text(
-        "Metadata-Version: 2.1\nName: runplz\nVersion: 3.16.0\n"
+        "Metadata-Version: 2.1\nName: runplz\nVersion: 3.17.0\n"
     )
 
     fake_bin = tmp_path / "bin"
@@ -2298,7 +2298,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
         "scripts/training/launch_pan_allele_training_remote.py",
     )
     module = _load_script_module(path, "remote_launcher_under_test")
-    assert "runplz==3.16.0" in pip_packages
+    assert "runplz==3.17.0" in pip_packages
     env = module.remote_training_env({"TRAINING_MINIBATCH_SIZE": "2048"})
     assert env["TRAINING_MINIBATCH_SIZE"] == "2048"
     assert env["COMPARE_BASELINE"] == "public:2.0.0"

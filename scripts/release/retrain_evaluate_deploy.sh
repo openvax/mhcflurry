@@ -184,7 +184,7 @@ require_command() {
     command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"
 }
 
-require_clean_runplz_3160() {
+require_clean_runplz() {
     local runplz_executable
     local runplz_shebang
     local -a runplz_python
@@ -1814,7 +1814,7 @@ run_brev_training() {
     local auto_create=$1
     if [ "$DRY_RUN" != "1" ]; then
         require_command runplz
-        require_clean_runplz_3160
+        require_clean_runplz
     fi
     run_cmd mkdir -p "$RUN_DIR"
     local runplz_on_finish=leave
@@ -2017,7 +2017,7 @@ BREV_INSTANCE_TYPE="${RUNPLZ_BREV_INSTANCE_TYPE:-${BREV_INSTANCE_TYPE:-}}"
 DEFAULT_BREV_PROVISION_INSTANCE_TYPE="${DEFAULT_BREV_PROVISION_INSTANCE_TYPE:-}"
 BREV_CONTAINER_IMAGE="${BREV_CONTAINER_IMAGE:-pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime}"
 BREV_MAX_RUNTIME_SECONDS="${RUNPLZ_BREV_MAX_RUNTIME_SECONDS:-${BREV_MAX_RUNTIME_SECONDS:-}}"
-RUNPLZ_REQUIRED_VERSION="3.16.0"
+RUNPLZ_REQUIRED_VERSION="3.17.0"
 BREV_INSTANCE_TYPE_FALLBACK_COUNT="${RUNPLZ_BREV_INSTANCE_TYPE_FALLBACK_COUNT:-3}"
 BREV_EXCLUDE_PROVIDERS="${RUNPLZ_BREV_EXCLUDE_PROVIDERS:-oci}"
 BREV_STOP_FAILURE_ACTION_EXPLICIT=0
