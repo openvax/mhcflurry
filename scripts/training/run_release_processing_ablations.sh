@@ -49,14 +49,17 @@ fi
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-auto}"
 RELEASE_RANDOM_SEED="${RELEASE_RANDOM_SEED:-42}"
 
-PARALLELISM_ARGS=(
+COMMON_PARALLELISM_ARGS=(
     --num-jobs "$NUM_JOBS"
     --max-tasks-per-worker 1000
     --gpus "$GPUS"
     --max-workers-per-gpu "$MAX_WORKERS_PER_GPU"
-    --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
     --torch-compile 0
     --matmul-precision highest
+)
+TRAINING_PARALLELISM_ARGS=(
+    "${COMMON_PARALLELISM_ARGS[@]}"
+    --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
 )
 
 compress_csv_bzip2() {
@@ -90,7 +93,7 @@ if [ ! -f "$SHARED_DIR/train_data.csv.bz2" ]; then
         --exclude-samples-file "$HOLDOUT_DIR/processing_samples.csv" \
         --random-seed "$RELEASE_RANDOM_SEED" \
         --out "$SHARED_DIR/train_data.csv" \
-        "${PARALLELISM_ARGS[@]}"
+        "${TRAINING_PARALLELISM_ARGS[@]}"
     compress_csv_bzip2 "$SHARED_DIR/train_data.csv"
 fi
 
@@ -100,7 +103,28 @@ conditions=(
     glorot_pytorch_adam
     kaiming_pytorch_adam
 )
-variants=(with_flanks no_flank)
+read -r -a variants <<< \
+    "${PROCESSING_ABLATION_VARIANTS:-with_flanks no_flank}"
+if [ "${#variants[@]}" -eq 0 ]; then
+    echo "PROCESSING_ABLATION_VARIANTS must name at least one variant" >&2
+    exit 2
+fi
+for variant in "${variants[@]}"; do
+    case "$variant" in
+        with_flanks|no_flank|short_flanks) ;;
+        *)
+            echo "Unknown processing ablation variant: $variant" >&2
+            exit 2
+            ;;
+    esac
+done
+PROCESSING_ABLATION_COMPARE_MODES="${PROCESSING_ABLATION_COMPARE_MODES:-}"
+if [ -z "$PROCESSING_ABLATION_COMPARE_MODES" ]; then
+    PROCESSING_ABLATION_COMPARE_MODES="${variants[0]}"
+    for variant in "${variants[@]:1}"; do
+        PROCESSING_ABLATION_COMPARE_MODES+=",$variant"
+    done
+fi
 
 for condition in "${conditions[@]}"; do
     condition_root="$MHCFLURRY_OUT/processing.$condition"
@@ -116,7 +140,7 @@ for condition in "${conditions[@]}"; do
             mhcflurry-class1-train-processing-models \
                 --out-models-dir "$unselected" \
                 --continue-incomplete \
-                "${PARALLELISM_ARGS[@]}"
+                "${TRAINING_PARALLELISM_ARGS[@]}"
         else
             mhcflurry-class1-train-processing-models \
                 --data "$SHARED_DIR/train_data.csv.bz2" \
@@ -126,7 +150,7 @@ for condition in "${conditions[@]}"; do
                 --hyperparameters "$hyperparameters" \
                 --out-models-dir "$unselected" \
                 --worker-log-dir "$processing_root" \
-                "${PARALLELISM_ARGS[@]}"
+                "${TRAINING_PARALLELISM_ARGS[@]}"
         fi
 
         if [ ! -f "$selected/train_data.csv.bz2" ]; then
@@ -136,7 +160,7 @@ for condition in "${conditions[@]}"; do
                 --out-models-dir "$selected" \
                 --min-models-per-fold 1 \
                 --max-models-per-fold 2 \
-                "${PARALLELISM_ARGS[@]}"
+                "${TRAINING_PARALLELISM_ARGS[@]}"
             cp "$unselected/train_data.csv.bz2" \
                 "$selected/train_data.csv.bz2"
         fi
@@ -159,9 +183,9 @@ do
         --data-dir "$DATA_EVAL_DIR" \
         --release-holdout-dir "$HOLDOUT_DIR" \
         --include processing \
-        --processing-modes with_flanks,no_flank \
+        --processing-modes "$PROCESSING_ABLATION_COMPARE_MODES" \
         --out "$PAIRWISE_DIR/$condition-vs-glorot_keras_adam" \
-        "${PARALLELISM_ARGS[@]}"
+        "${COMMON_PARALLELISM_ARGS[@]}"
 done
 
 # Keep one external anchor: the retrained historical-parity condition versus
@@ -174,6 +198,6 @@ mhcflurry eval compare-models \
     --data-dir "$DATA_EVAL_DIR" \
     --release-holdout-dir "$HOLDOUT_DIR" \
     --include processing \
-    --processing-modes with_flanks,no_flank \
+    --processing-modes "$PROCESSING_ABLATION_COMPARE_MODES" \
     --out "$PAIRWISE_DIR/glorot_keras_adam-vs-public" \
-    "${PARALLELISM_ARGS[@]}"
+    "${COMMON_PARALLELISM_ARGS[@]}"

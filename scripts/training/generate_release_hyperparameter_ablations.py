@@ -47,7 +47,7 @@ def write_panels(out_dir):
         write_yaml("affinity.%s.yaml" % condition, values)
 
     for condition, base_values in build_processing_ablation_panels().items():
-        for variant in ("with_flanks", "no_flank"):
+        for variant in ("with_flanks", "no_flank", "short_flanks"):
             write_yaml(
                 "processing.%s.%s.yaml" % (condition, variant),
                 build_processing_variant_grid(base_values, variant),

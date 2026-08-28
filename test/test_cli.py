@@ -2204,6 +2204,29 @@ def test_release_hyperparameter_ablation_panels_are_paired():
     assert {len(values) for values in processing.values()} == {2}
 
 
+def test_release_ablation_generator_writes_all_processing_flank_variants(
+        tmp_path):
+    path = pathlib.Path(
+        "scripts/training/generate_release_hyperparameter_ablations.py"
+    )
+    generator = _load_script_module(path, "release_ablations_under_test")
+    manifest = generator.write_panels(tmp_path)
+    processing_paths = {
+        record["path"]
+        for record in manifest["records"]
+        if record["path"].startswith("processing.")
+    }
+    assert len(processing_paths) == 12
+    for condition in (
+            "glorot_keras_adam",
+            "kaiming_keras_adam",
+            "glorot_pytorch_adam",
+            "kaiming_pytorch_adam"):
+        for variant in ("with_flanks", "no_flank", "short_flanks"):
+            assert "processing.%s.%s.yaml" % (
+                condition, variant) in processing_paths
+
+
 def test_affinity_release_script_accepts_tracked_ablation_yaml():
     affinity_script = pathlib.Path(
         "scripts/training/pan_allele_release_affinity.sh"
@@ -2245,9 +2268,16 @@ def test_processing_release_script_runs_paired_seeded_ablations():
         assert condition in runner
     assert "--random-seed \"$RELEASE_RANDOM_SEED\"" in runner
     assert "--exclude-samples-file \"$HOLDOUT_DIR/processing_samples.csv\"" in runner
-    assert "--processing-modes with_flanks,no_flank" in runner
+    assert "PROCESSING_ABLATION_VARIANTS" in runner
+    assert "PROCESSING_ABLATION_COMPARE_MODES" in runner
+    assert "with_flanks|no_flank|short_flanks" in runner
     assert "vs-glorot_keras_adam" in runner
     assert "glorot_keras_adam-vs-public" in runner
+    assert runner.count('"${TRAINING_PARALLELISM_ARGS[@]}"') == 4
+    assert runner.count('"${COMMON_PARALLELISM_ARGS[@]}"') == 3
+    comparison_block = runner[runner.index("DATA_EVAL_DIR="):]
+    assert "--dataloader-num-workers" not in comparison_block
+    assert '"${COMMON_PARALLELISM_ARGS[@]}"' in comparison_block
 
 
 def test_reassign_mass_spec_training_data_cli(tmp_path):
