@@ -2,31 +2,210 @@
 # Train and evaluate the controlled affinity recipe sweep.
 set -euo pipefail
 
-: "${MHCFLURRY_OUT:?MHCFLURRY_OUT must be set}"
-: "${TRAIN_DATA:?TRAIN_DATA must be set}"
-: "${ALLELE_SEQUENCES:?ALLELE_SEQUENCES must be set}"
-: "${PRETRAIN_DATA:?PRETRAIN_DATA must be set}"
-: "${DATA_EVAL_DIR:?DATA_EVAL_DIR must be set}"
-: "${RELEASE_HOLDOUT_DIR:?RELEASE_HOLDOUT_DIR must be set}"
+usage() {
+    cat <<'EOF'
+Usage: run_affinity_factorial.sh [OPTIONS]
+
+Required:
+  --out PATH                         Experiment output directory
+  --train-data PATH                  Affinity training measurements
+  --allele-sequences PATH            Allele pseudosequences CSV
+  --pretrain-data PATH               Affinity pretraining predictions
+  --data-eval-dir PATH               Evaluation data directory
+  --release-holdout-dir PATH         Frozen release-holdout manifests
+  --source-commit COMMIT             Exact source commit being evaluated
+
+Experiment controls:
+  --mode MODE                        representative (default) or full
+  --condition NAME                   Run one generated condition; repeatable
+  --random-seed INTEGER              Release random seed (default: 42)
+
+Execution controls:
+  --gpus INTEGER|auto                GPU count (default: auto)
+  --max-workers-per-gpu INTEGER|auto Worker density (default: auto)
+  --dataloader-num-workers N|auto    Workers per training dataloader (default: 1)
+  --max-tasks-per-worker INTEGER     Worker recycling interval (default: 12)
+  --torch-compile VALUE              auto, 0, or 1 (default: 0)
+  --torch-compile-loss VALUE         auto, 0, or 1 (default: 0)
+  --matmul-precision VALUE           none, highest, high, or medium
+                                      (default: highest)
+  -h, --help                         Show this help
+EOF
+}
+
+require_value() {
+    if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+        printf 'Missing value for %s\n' "$1" >&2
+        usage >&2
+        exit 2
+    fi
+}
+
+MHCFLURRY_OUT=""
+TRAIN_DATA=""
+ALLELE_SEQUENCES=""
+PRETRAIN_DATA=""
+DATA_EVAL_DIR=""
+RELEASE_HOLDOUT_DIR=""
+SOURCE_COMMIT=""
+FACTORIAL_MODE="representative"
+RELEASE_RANDOM_SEED=42
+MAX_TASKS_PER_WORKER=12
+MAX_WORKERS_PER_GPU="auto"
+DATALOADER_NUM_WORKERS=1
+GPUS="auto"
+TORCH_COMPILE=0
+TORCH_COMPILE_LOSS=0
+MATMUL_PRECISION="highest"
+FACTORIAL_CONDITIONS=()
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --out)
+            require_value "$@"; MHCFLURRY_OUT="$2"; shift 2 ;;
+        --train-data)
+            require_value "$@"; TRAIN_DATA="$2"; shift 2 ;;
+        --allele-sequences)
+            require_value "$@"; ALLELE_SEQUENCES="$2"; shift 2 ;;
+        --pretrain-data)
+            require_value "$@"; PRETRAIN_DATA="$2"; shift 2 ;;
+        --data-eval-dir)
+            require_value "$@"; DATA_EVAL_DIR="$2"; shift 2 ;;
+        --release-holdout-dir)
+            require_value "$@"; RELEASE_HOLDOUT_DIR="$2"; shift 2 ;;
+        --source-commit)
+            require_value "$@"; SOURCE_COMMIT="$2"; shift 2 ;;
+        --mode)
+            require_value "$@"; FACTORIAL_MODE="$2"; shift 2 ;;
+        --condition)
+            require_value "$@"; FACTORIAL_CONDITIONS+=("$2"); shift 2 ;;
+        --random-seed)
+            require_value "$@"; RELEASE_RANDOM_SEED="$2"; shift 2 ;;
+        --gpus)
+            require_value "$@"; GPUS="$2"; shift 2 ;;
+        --max-workers-per-gpu)
+            require_value "$@"; MAX_WORKERS_PER_GPU="$2"; shift 2 ;;
+        --dataloader-num-workers)
+            require_value "$@"; DATALOADER_NUM_WORKERS="$2"; shift 2 ;;
+        --max-tasks-per-worker)
+            require_value "$@"; MAX_TASKS_PER_WORKER="$2"; shift 2 ;;
+        --torch-compile)
+            require_value "$@"; TORCH_COMPILE="$2"; shift 2 ;;
+        --torch-compile-loss)
+            require_value "$@"; TORCH_COMPILE_LOSS="$2"; shift 2 ;;
+        --matmul-precision)
+            require_value "$@"; MATMUL_PRECISION="$2"; shift 2 ;;
+        -h|--help)
+            usage; exit 0 ;;
+        *)
+            printf 'Unknown argument: %s\n' "$1" >&2
+            usage >&2
+            exit 2 ;;
+    esac
+done
+
+for required in \
+        MHCFLURRY_OUT TRAIN_DATA ALLELE_SEQUENCES PRETRAIN_DATA \
+        DATA_EVAL_DIR RELEASE_HOLDOUT_DIR SOURCE_COMMIT; do
+    if [ -z "${!required}" ]; then
+        printf 'Missing required argument for %s\n' "$required" >&2
+        usage >&2
+        exit 2
+    fi
+done
+
+case "$FACTORIAL_MODE" in
+    representative|full) ;;
+    *) printf 'Invalid --mode: %s\n' "$FACTORIAL_MODE" >&2; exit 2 ;;
+esac
+case "$MATMUL_PRECISION" in
+    none|highest|high|medium) ;;
+    *) printf 'Invalid --matmul-precision: %s\n' "$MATMUL_PRECISION" >&2; exit 2 ;;
+esac
+case "$TORCH_COMPILE" in
+    auto|0|1) ;;
+    *) printf 'Invalid --torch-compile: %s\n' "$TORCH_COMPILE" >&2; exit 2 ;;
+esac
+case "$TORCH_COMPILE_LOSS" in
+    auto|0|1) ;;
+    *) printf 'Invalid --torch-compile-loss: %s\n' "$TORCH_COMPILE_LOSS" >&2; exit 2 ;;
+esac
+for value_and_name in \
+        "$RELEASE_RANDOM_SEED:--random-seed" \
+        "$MAX_TASKS_PER_WORKER:--max-tasks-per-worker"; do
+    value="${value_and_name%%:*}"
+    name="${value_and_name#*:}"
+    if ! [[ "$value" =~ ^[0-9]+$ ]]; then
+        printf '%s must be a nonnegative integer: %s\n' "$name" "$value" >&2
+        exit 2
+    fi
+done
+if [ "$DATALOADER_NUM_WORKERS" != "auto" ] && \
+        ! [[ "$DATALOADER_NUM_WORKERS" =~ ^[0-9]+$ ]]; then
+    printf '%s must be auto or a nonnegative integer: %s\n' \
+        '--dataloader-num-workers' "$DATALOADER_NUM_WORKERS" >&2
+    exit 2
+fi
+if [ "$MAX_TASKS_PER_WORKER" -eq 0 ]; then
+    printf '%s must be positive\n' '--max-tasks-per-worker' >&2
+    exit 2
+fi
+if [ "$MAX_WORKERS_PER_GPU" != "auto" ] && \
+        ! [[ "$MAX_WORKERS_PER_GPU" =~ ^[1-9][0-9]*$ ]]; then
+    printf '%s must be auto or a positive integer: %s\n' \
+        '--max-workers-per-gpu' "$MAX_WORKERS_PER_GPU" >&2
+    exit 2
+fi
+if [ "$GPUS" != "auto" ] && ! [[ "$GPUS" =~ ^[0-9]+$ ]]; then
+    printf '%s must be auto or a nonnegative integer: %s\n' \
+        '--gpus' "$GPUS" >&2
+    exit 2
+fi
+
+for path_and_name in \
+        "$TRAIN_DATA:--train-data" \
+        "$ALLELE_SEQUENCES:--allele-sequences" \
+        "$PRETRAIN_DATA:--pretrain-data"; do
+    path="${path_and_name%%:*}"
+    name="${path_and_name#*:}"
+    if [ ! -f "$path" ]; then
+        printf '%s is not a file: %s\n' "$name" "$path" >&2
+        exit 2
+    fi
+done
+for path_and_name in \
+        "$DATA_EVAL_DIR:--data-eval-dir" \
+        "$RELEASE_HOLDOUT_DIR:--release-holdout-dir"; do
+    path="${path_and_name%%:*}"
+    name="${path_and_name#*:}"
+    if [ ! -d "$path" ]; then
+        printf '%s is not a directory: %s\n' "$name" "$path" >&2
+        exit 2
+    fi
+done
+for holdout_file in \
+        policy.json affinity_samples.csv affinity_pmhcs.csv; do
+    if [ ! -f "$RELEASE_HOLDOUT_DIR/$holdout_file" ]; then
+        printf '%s is missing required file: %s\n' \
+            '--release-holdout-dir' "$holdout_file" >&2
+        exit 2
+    fi
+done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FACTORIAL_MODE="${FACTORIAL_MODE:-representative}"
-RELEASE_RANDOM_SEED="${RELEASE_RANDOM_SEED:-42}"
-MAX_TASKS_PER_WORKER="${MAX_TASKS_PER_WORKER:-12}"
-MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-auto}"
-DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-1}"
-FACTORIAL_CONDITIONS="${FACTORIAL_CONDITIONS:-}"
 
 export PYTHONUNBUFFERED=1
-export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-0}"
-export MHCFLURRY_TORCH_COMPILE_LOSS="${MHCFLURRY_TORCH_COMPILE_LOSS:-0}"
-export MHCFLURRY_MATMUL_PRECISION="${MHCFLURRY_MATMUL_PRECISION:-highest}"
+# Training-batch shrinkage would confound this experiment. The library guard
+# currently has no CLI equivalent, so keep this one invariant in the runtime
+# environment and verify the effective minibatch in every saved model.
 export MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK=1
 
-if command -v nvidia-smi >/dev/null 2>&1; then
-    GPUS="${GPUS:-$(nvidia-smi -L | wc -l | tr -d ' ')}"
-else
-    GPUS="${GPUS:-0}"
+if [ "$GPUS" = "auto" ]; then
+    if command -v nvidia-smi >/dev/null 2>&1; then
+        GPUS="$(nvidia-smi -L | wc -l | tr -d ' ')"
+    else
+        GPUS=0
+    fi
 fi
 
 mkdir -p "$MHCFLURRY_OUT"
@@ -39,17 +218,36 @@ BASELINE_CONDITION="$(python -c \
     'import json,sys; print(json.load(open(sys.argv[1]))["baseline_condition"])' \
     "$MHCFLURRY_OUT/manifest.json")"
 
+for selected in "${FACTORIAL_CONDITIONS[@]}"; do
+    if ! tail -n +2 "$MHCFLURRY_OUT/manifest.csv" | cut -d, -f1 | \
+            grep -Fqx -- "$selected"; then
+        printf 'Unknown --condition: %s\n' "$selected" >&2
+        exit 2
+    fi
+done
+
 condition_selected() {
     local condition="$1"
-    if [ -z "$FACTORIAL_CONDITIONS" ] || \
+    if [ "${#FACTORIAL_CONDITIONS[@]}" -eq 0 ] || \
             [ "$condition" = "$BASELINE_CONDITION" ]; then
         return 0
     fi
-    case " $FACTORIAL_CONDITIONS " in
-        *" $condition "*) return 0 ;;
-        *) return 1 ;;
-    esac
+    local selected
+    for selected in "${FACTORIAL_CONDITIONS[@]}"; do
+        if [ "$selected" = "$condition" ]; then
+            return 0
+        fi
+    done
+    return 1
 }
+
+if [ "${#FACTORIAL_CONDITIONS[@]}" -eq 0 ]; then
+    FACTORIAL_CONDITIONS_PROVENANCE=all
+else
+    FACTORIAL_CONDITIONS_PROVENANCE="$(
+        IFS=,; printf '%s' "${FACTORIAL_CONDITIONS[*]}"
+    )"
+fi
 
 AFFINITY_PREDICTION_ARTIFACT_ARGS=()
 if [ "$FACTORIAL_MODE" = "representative" ]; then
@@ -59,14 +257,17 @@ fi
 {
     printf '%s\n' \
         "schema_version=1" \
-        "source_commit=${SOURCE_COMMIT:-unknown}" \
+        "source_commit=$SOURCE_COMMIT" \
         "factorial_mode=$FACTORIAL_MODE" \
-        "factorial_conditions=${FACTORIAL_CONDITIONS:-all}" \
+        "factorial_conditions=$FACTORIAL_CONDITIONS_PROVENANCE" \
         "random_seed=$RELEASE_RANDOM_SEED" \
         "gpus=$GPUS" \
         "max_workers_per_gpu=$MAX_WORKERS_PER_GPU" \
-        "torch_compile=$MHCFLURRY_TORCH_COMPILE" \
-        "matmul_precision=$MHCFLURRY_MATMUL_PRECISION" \
+        "dataloader_num_workers=$DATALOADER_NUM_WORKERS" \
+        "max_tasks_per_worker=$MAX_TASKS_PER_WORKER" \
+        "torch_compile=$TORCH_COMPILE" \
+        "torch_compile_loss=$TORCH_COMPILE_LOSS" \
+        "matmul_precision=$MATMUL_PRECISION" \
         "baseline_condition=$BASELINE_CONDITION"
     sha256sum \
         "$TRAIN_DATA" \
@@ -121,8 +322,9 @@ while IFS= read -r condition; do
         --max-workers-per-gpu "$MAX_WORKERS_PER_GPU" \
         --dataloader-num-workers "$DATALOADER_NUM_WORKERS" \
         --random-negative-pool-epochs 1 \
-        --torch-compile 0 \
-        --matmul-precision highest \
+        --torch-compile "$TORCH_COMPILE" \
+        --torch-compile-loss "$TORCH_COMPILE_LOSS" \
+        --matmul-precision "$MATMUL_PRECISION" \
         --enable-timing \
         "${continue_args[@]}" \
         2>&1 | tee "$condition_out/train.log"
@@ -155,8 +357,9 @@ while IFS= read -r condition; do
                 --gpus "$GPUS" \
                 --max-workers-per-gpu "$MAX_WORKERS_PER_GPU" \
                 --dataloader-num-workers "$DATALOADER_NUM_WORKERS" \
-                --torch-compile 0 \
-                --matmul-precision highest \
+                --torch-compile "$TORCH_COMPILE" \
+                --torch-compile-loss "$TORCH_COMPILE_LOSS" \
+                --matmul-precision "$MATMUL_PRECISION" \
                 --enable-timing \
                 2>&1 | tee "$condition_out/select.log"
             cp "$unselected/train_data.csv.bz2" "$predictor/train_data.csv.bz2"
@@ -187,8 +390,8 @@ if [ ! -f "$baseline_eval/.done" ]; then
         --gpus "$GPUS" \
         --max-workers-per-gpu "$MAX_WORKERS_PER_GPU" \
         --max-tasks-per-worker "$MAX_TASKS_PER_WORKER" \
-        --torch-compile 0 \
-        --matmul-precision highest \
+        --torch-compile "$TORCH_COMPILE" \
+        --matmul-precision "$MATMUL_PRECISION" \
         2>&1 | tee "$baseline_eval/eval.log"
     date -u +%Y-%m-%dT%H:%M:%SZ > "$baseline_eval/.done"
 fi
@@ -221,8 +424,8 @@ while IFS= read -r condition; do
             --gpus "$GPUS" \
             --max-workers-per-gpu "$MAX_WORKERS_PER_GPU" \
             --max-tasks-per-worker "$MAX_TASKS_PER_WORKER" \
-            --torch-compile 0 \
-            --matmul-precision highest \
+            --torch-compile "$TORCH_COMPILE" \
+            --matmul-precision "$MATMUL_PRECISION" \
             2>&1 | tee "$comparison/eval.log"
         date -u +%Y-%m-%dT%H:%M:%SZ > "$comparison/.done"
     fi
@@ -243,8 +446,8 @@ while IFS= read -r condition; do
                 --gpus "$GPUS" \
                 --max-workers-per-gpu "$MAX_WORKERS_PER_GPU" \
                 --max-tasks-per-worker "$MAX_TASKS_PER_WORKER" \
-                --torch-compile 0 \
-                --matmul-precision highest \
+                --torch-compile "$TORCH_COMPILE" \
+                --matmul-precision "$MATMUL_PRECISION" \
                 2>&1 | tee "$public_comparison/eval.log"
             date -u +%Y-%m-%dT%H:%M:%SZ > "$public_comparison/.done"
         fi

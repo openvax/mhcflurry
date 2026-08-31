@@ -1,9 +1,10 @@
 """Tests for the controlled affinity recipe sweep."""
 
-import importlib.util
 import csv
+import importlib.util
 import json
 from pathlib import Path
+import subprocess
 
 import numpy
 import pytest
@@ -13,6 +14,7 @@ from mhcflurry.class1_neural_network import Class1NeuralNetworkModel
 
 
 REPO = Path(__file__).resolve().parents[1]
+RUNNER = REPO / "scripts" / "training" / "run_affinity_factorial.sh"
 
 
 def load_script(name):
@@ -22,6 +24,76 @@ def load_script(name):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def test_affinity_factorial_runner_exposes_explicit_cli():
+    result = subprocess.run(
+        ["bash", str(RUNNER), "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    for flag in (
+            "--out",
+            "--train-data",
+            "--allele-sequences",
+            "--pretrain-data",
+            "--data-eval-dir",
+            "--release-holdout-dir",
+            "--source-commit",
+            "--mode",
+            "--condition",
+            "--random-seed",
+            "--gpus",
+            "--max-workers-per-gpu",
+            "--dataloader-num-workers",
+            "--max-tasks-per-worker",
+            "--torch-compile",
+            "--torch-compile-loss",
+            "--matmul-precision"):
+        assert flag in result.stdout
+
+
+def test_affinity_factorial_runner_does_not_accept_env_only_configuration(
+        monkeypatch,
+):
+    for name in (
+            "MHCFLURRY_OUT",
+            "TRAIN_DATA",
+            "ALLELE_SEQUENCES",
+            "PRETRAIN_DATA",
+            "DATA_EVAL_DIR",
+            "RELEASE_HOLDOUT_DIR",
+            "SOURCE_COMMIT",
+            "GPUS"):
+        monkeypatch.setenv(name, "/ignored")
+    result = subprocess.run(
+        ["bash", str(RUNNER)],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    assert "Missing required argument for MHCFLURRY_OUT" in result.stderr
+
+
+def test_affinity_factorial_runner_validates_cli_values():
+    result = subprocess.run(
+        [
+            "bash", str(RUNNER),
+            "--out", "/unused",
+            "--train-data", "/unused",
+            "--allele-sequences", "/unused",
+            "--pretrain-data", "/unused",
+            "--data-eval-dir", "/unused",
+            "--release-holdout-dir", "/unused",
+            "--source-commit", "deadbeef",
+            "--mode", "invalid",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    assert "Invalid --mode: invalid" in result.stderr
 
 
 def test_orthogonal_affinity_initializer():
