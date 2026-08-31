@@ -265,10 +265,16 @@ def test_prediction_batch_calibration_measures_streamed_input_transfer(
             return inputs["sequence"].sum(dim=1)
 
     budget = SimpleNamespace(available_bytes=100_000)
+    released = []
     monkeypatch.setattr(
         pytorch_sizing, "estimate_peak_bytes_per_row", lambda model: 10)
     monkeypatch.setattr(
         pytorch_sizing, "device_memory_budget", lambda *args, **kwargs: budget)
+    monkeypatch.setattr(
+        pytorch_sizing,
+        "release_cached_device_memory",
+        lambda device: released.append(device.type),
+    )
     monkeypatch.setattr(torch.cuda, "synchronize", lambda device: None)
     monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: 100)
     monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 200)
@@ -292,6 +298,7 @@ def test_prediction_batch_calibration_measures_streamed_input_transfer(
     assert result == 100
     assert transfers == [(1, "cuda"), (100, "cuda")]
     assert calls == [(1, 7), (100, 7)]
+    assert released == ["cuda"]
 
 
 def test_prediction_batch_calibration_does_not_extrapolate_past_probe(

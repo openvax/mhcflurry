@@ -246,8 +246,8 @@ def is_device_out_of_memory_error(exc):
     )
 
 
-def release_device_memory_after_oom(device):
-    """Release cached allocator blocks before retrying a smaller auto batch."""
+def release_cached_device_memory(device):
+    """Return unused accelerator allocator blocks to the shared device."""
     try:
         import torch
         if device.type == "cuda":
@@ -256,6 +256,11 @@ def release_device_memory_after_oom(device):
             torch.mps.empty_cache()
     except Exception:
         pass
+
+
+def release_device_memory_after_oom(device):
+    """Release cached allocator blocks before retrying a smaller auto batch."""
+    release_cached_device_memory(device)
 
 
 def synchronize_device(device):
@@ -802,6 +807,14 @@ def calibrate_prediction_batch_size(
         )
         return 1
 
+    def finish(result):
+        # cuDNN may reserve a workspace far larger than the final calibrated
+        # batch needs. The probe output and sliced inputs are dead at each
+        # return below, so give those unused blocks back before peer workers
+        # make their own probes or transfers.
+        release_cached_device_memory(device)
+        return int(result)
+
     def run_probe(rows):
         probe_inputs = {
             name: (
@@ -828,7 +841,7 @@ def calibrate_prediction_batch_size(
             "probe; forcing batch 1: %s",
             exc,
         )
-        return 1
+        return finish(1)
     finally:
         del warmup_output
 
@@ -864,7 +877,7 @@ def calibrate_prediction_batch_size(
                 "one-row warmup; forcing batch 1: %s",
                 exc,
             )
-            return 1
+            return finish(1)
         finally:
             del probe_output
         break
@@ -876,7 +889,7 @@ def calibrate_prediction_batch_size(
             actual_probe_rows,
             measurement_error,
         )
-        return min(batch_size, actual_probe_rows, total_rows)
+        return finish(min(batch_size, actual_probe_rows, total_rows))
 
     try:
         peak_allocated = max(
@@ -894,7 +907,7 @@ def calibrate_prediction_batch_size(
             actual_probe_rows,
             exc,
         )
-        return min(batch_size, actual_probe_rows, total_rows)
+        return finish(min(batch_size, actual_probe_rows, total_rows))
 
     measured_peak_bytes = max(peak_allocated, peak_reserved)
     if measured_peak_bytes <= 0:
@@ -903,7 +916,7 @@ def calibrate_prediction_batch_size(
             "using verified probe batch %d.",
             actual_probe_rows,
         )
-        return min(batch_size, actual_probe_rows, total_rows)
+        return finish(min(batch_size, actual_probe_rows, total_rows))
     measured_bytes_per_row = int(math.ceil(
         measured_peak_bytes / float(actual_probe_rows)
     ))
@@ -944,7 +957,7 @@ def calibrate_prediction_batch_size(
         memory_after.available_bytes / float(1 << 30),
         actual_probe_rows,
     )
-    return int(calibrated)
+    return finish(calibrated)
 
 
 # Inference keeps only activations of the current layer alive (input +
