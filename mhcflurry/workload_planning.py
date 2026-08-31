@@ -287,13 +287,18 @@ WORKLOAD_PROFILES = {
     ),
     WORKLOAD_PROCESSING_INFERENCE: WorkloadProfile(
         name=WORKLOAD_PROCESSING_INFERENCE,
-        device_worker_gb=8.0,
+        # Four 8 GB workers fit arithmetically on an A100-40GB after the
+        # shared reserve, but the release processing ensemble can cross that
+        # envelope when four convolution workspaces peak concurrently.  The
+        # 10 GB resident-workload floor was established from the release
+        # holdout failure at the 5-aa condition after ten prior comparisons.
+        device_worker_gb=10.0,
         data_pressure_start_gb=2.0,
         data_pressure_factor=0.03,
         data_pressure_cap_gb=4.0,
         host_worker_gb=4.0,
         host_data_multiplier=0.03,
-        description="Processing predictor inference.",
+        description="Processing predictor inference with convolution peaks.",
     ),
     WORKLOAD_PROCESSING_SELECTION: WorkloadProfile(
         name=WORKLOAD_PROCESSING_SELECTION,

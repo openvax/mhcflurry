@@ -498,6 +498,45 @@ def test_processing_predict_auto_batch_retries_device_oom(monkeypatch):
     assert model._network.raised
 
 
+def test_processing_predict_auto_batch_retries_deferred_device_oom(monkeypatch):
+    """A deferred accelerator OOM is synchronized inside the retry loop."""
+    from mhcflurry import pytorch_sizing
+
+    synchronize_calls = []
+
+    def oom_once(_device):
+        synchronize_calls.append(True)
+        if len(synchronize_calls) == 1:
+            raise RuntimeError("CUDA out of memory in deferred test kernel")
+
+    monkeypatch.setattr(
+        pytorch_sizing,
+        "resolve_prediction_batch_size",
+        lambda *args, **kwargs: 2,
+    )
+    monkeypatch.setattr(pytorch_sizing, "synchronize_device", oom_once)
+
+    model = Class1ProcessingNeuralNetwork(
+        peptide_max_length=12,
+        n_flank_length=2,
+        c_flank_length=2,
+        convolutional_filters=8,
+    )
+    model._network = model.make_network(
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
+    )
+    peptides = ["SIINFEKL", "GILGFVFTL", "NLVPMVATV"]
+    predictions = model.predict(
+        peptides=peptides,
+        n_flanks=["AA"] * len(peptides),
+        c_flanks=["GG"] * len(peptides),
+        batch_size="auto",
+    )
+
+    assert len(predictions) == len(peptides)
+    assert len(synchronize_calls) == 2
+
+
 def test_processing_validation_is_batched(monkeypatch):
     """An explicit validation cap still prevents a whole-fold forward."""
     monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "0")

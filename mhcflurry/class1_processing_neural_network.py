@@ -1173,6 +1173,7 @@ class Class1ProcessingNeuralNetwork(object):
             is_device_out_of_memory_error,
             release_device_memory_after_oom,
             resolve_prediction_batch_size,
+            synchronize_device,
         )
 
         auto_batch_size = batch_size in (None, "auto")
@@ -1183,8 +1184,17 @@ class Class1ProcessingNeuralNetwork(object):
             device = torch.device(device)
         configure_matmul_precision(device)
 
+        # Automatic accelerator inference streams encoded inputs one batch at
+        # a time. Previously the complete worker chunk was copied before the
+        # elastic retry loop, so a transfer peak could not be recovered by
+        # shrinking the batch. Explicit batches retain the cached resident
+        # tensor path for callers that intentionally choose it.
+        stream_inputs = (
+            auto_batch_size and device.type in ("cuda", "mps")
+        )
+        input_device = torch.device("cpu") if stream_inputs else device
         x_dict = self.network_input_tensors(
-            sequences=sequences, device=device, throw=throw)
+            sequences=sequences, device=input_device, throw=throw)
         network = self.network()
         network.to(device)
         network = maybe_compile_network(network, device)
@@ -1214,6 +1224,7 @@ class Class1ProcessingNeuralNetwork(object):
                 },
                 num_workers_per_gpu=workers_per_gpu,
                 total_rows=n_samples,
+                transfer_inputs_to_device=stream_inputs,
             )
 
         predictions = torch.empty(
@@ -1228,6 +1239,9 @@ class Class1ProcessingNeuralNetwork(object):
                         seq_batch = x_dict["sequence"][batch_start:batch_end]
                         length_batch = x_dict[
                             "peptide_length"][batch_start:batch_end]
+                        if stream_inputs:
+                            seq_batch = seq_batch.to(device)
+                            length_batch = length_batch.to(device)
 
                         inputs = {
                             "sequence": seq_batch,
@@ -1235,6 +1249,11 @@ class Class1ProcessingNeuralNetwork(object):
                         }
                         batch_predictions = network(inputs)
                         predictions[batch_start:batch_end] = batch_predictions
+                    # Surface asynchronous CUDA/MPS errors while they are
+                    # still inside the elastic retry boundary. Otherwise the
+                    # next ensemble member's input transfer can receive a
+                    # misleading deferred OOM.
+                    synchronize_device(device)
                 break
             except RuntimeError as exc:
                 if (

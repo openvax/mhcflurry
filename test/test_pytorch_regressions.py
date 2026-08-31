@@ -235,6 +235,65 @@ def test_prediction_batch_calibration_measures_real_cuda_forward(monkeypatch):
     assert calls == [(1, 7), (100, 7)]
 
 
+def test_prediction_batch_calibration_measures_streamed_input_transfer(
+        monkeypatch):
+    """Host-resident probe slices move inside the protected CUDA attempt."""
+    from types import SimpleNamespace
+
+    transfers = []
+    calls = []
+
+    class HostInput:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def __len__(self):
+            return self.rows
+
+        def __getitem__(self, item):
+            start, stop, step = item.indices(self.rows)
+            assert step == 1
+            return HostInput(max(stop - start, 0))
+
+        def to(self, device):
+            transfers.append((self.rows, device.type))
+            return torch.ones((self.rows, 7))
+
+    class RecordingModel:
+        def __call__(self, inputs):
+            calls.append(tuple(inputs["sequence"].shape))
+            return inputs["sequence"].sum(dim=1)
+
+    budget = SimpleNamespace(available_bytes=100_000)
+    monkeypatch.setattr(
+        pytorch_sizing, "estimate_peak_bytes_per_row", lambda model: 10)
+    monkeypatch.setattr(
+        pytorch_sizing, "device_memory_budget", lambda *args, **kwargs: budget)
+    monkeypatch.setattr(torch.cuda, "synchronize", lambda device: None)
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: 100)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 200)
+    monkeypatch.setattr(
+        torch.cuda, "reset_peak_memory_stats", lambda device: None)
+    monkeypatch.setattr(
+        torch.cuda, "max_memory_allocated", lambda device: 20_100)
+    monkeypatch.setattr(
+        torch.cuda, "max_memory_reserved", lambda device: 10_200)
+
+    result = pytorch_sizing.calibrate_prediction_batch_size(
+        1000,
+        torch.device("cuda"),
+        RecordingModel(),
+        {"sequence": HostInput(1000)},
+        total_rows=1000,
+        probe_rows=100,
+        transfer_inputs_to_device=True,
+    )
+
+    assert result == 100
+    assert transfers == [(1, "cuda"), (100, "cuda")]
+    assert calls == [(1, 7), (100, 7)]
+
+
 def test_prediction_batch_calibration_does_not_extrapolate_past_probe(
         monkeypatch):
     """A successful small CUDA forward is not proof that a larger one fits."""

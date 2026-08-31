@@ -258,6 +258,24 @@ def release_device_memory_after_oom(device):
         pass
 
 
+def synchronize_device(device):
+    """Wait for accelerator work so deferred errors surface at their source.
+
+    CUDA and MPS kernels are asynchronous. Without an explicit synchronization
+    at the end of an elastic prediction attempt, an OOM from a network forward
+    can be reported by an unrelated later tensor transfer, outside the retry
+    loop that can safely reduce the batch size.
+    """
+    try:
+        import torch
+    except ImportError:
+        return
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+    elif device.type == "mps" and hasattr(torch.mps, "synchronize"):
+        torch.mps.synchronize()
+
+
 def release_unused_torch_memory():
     """Collect dead tensors and return unused accelerator cache memory.
 
@@ -679,7 +697,8 @@ def calibrate_prediction_batch_size(
         num_workers_per_gpu=1,
         total_rows=None,
         probe_rows=AUTO_BATCH_CALIBRATION_PROBE_ROWS,
-        safety_multiplier=AUTO_BATCH_CALIBRATION_SAFETY_MULTIPLIER):
+        safety_multiplier=AUTO_BATCH_CALIBRATION_SAFETY_MULTIPLIER,
+        transfer_inputs_to_device=False):
     """Tighten an automatic CUDA prediction batch from a real forward probe.
 
     The analytic estimator cannot know the exact allocator and convolution
@@ -705,7 +724,8 @@ def calibrate_prediction_batch_size(
     model : callable
         Eval-mode model accepting the sliced ``inputs`` mapping.
     inputs : mapping
-        Tensor inputs with a shared leading row dimension.
+        Tensor inputs with a shared leading row dimension. They may remain on
+        the host when ``transfer_inputs_to_device`` is true.
     num_workers_per_gpu : int
         Co-resident workers sharing the device entitlement.
     total_rows : int, optional
@@ -717,6 +737,9 @@ def calibrate_prediction_batch_size(
     safety_multiplier : float
         Margin applied to the measured per-row peak when deciding whether the
         verified probe batch must be tightened further.
+    transfer_inputs_to_device : bool
+        Move each probe slice to ``device`` inside the protected measurement.
+        This models streaming inference and makes transfer OOMs recoverable.
 
     Returns
     -------
@@ -781,7 +804,10 @@ def calibrate_prediction_batch_size(
 
     def run_probe(rows):
         probe_inputs = {
-            name: value[:rows]
+            name: (
+                value[:rows].to(device)
+                if transfer_inputs_to_device else value[:rows]
+            )
             for name, value in inputs.items()
         }
         with torch.no_grad():

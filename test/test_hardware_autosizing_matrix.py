@@ -294,13 +294,13 @@ def test_affinity_autosizer_hardware_matrix(monkeypatch, case):
 
 
 INFERENCE_HARDWARE_CASES = (
-    pytest.param(1, 32.0, 64, 512.0, (7, 3, 1), id="rtx-5090-32gb"),
+    pytest.param(1, 32.0, 64, 512.0, (7, 2, 1), id="rtx-5090-32gb"),
     pytest.param(
-        1, 40_442 / 1024.0, 64, 512.0, (8, 4, 2), id="a100-40gb"),
+        1, 40_442 / 1024.0, 64, 512.0, (8, 3, 2), id="a100-40gb"),
     pytest.param(
-        4, 40_442 / 1024.0, 48, 340.0, (32, 16, 8), id="4x-a100-40gb"),
-    pytest.param(4, 80.0, 96, 640.0, (72, 36, 16), id="4x-h100-80gb"),
-    pytest.param(8, 141.0, 112, 2048.0, (112, 112, 56), id="8x-h200-141gb"),
+        4, 40_442 / 1024.0, 48, 340.0, (32, 12, 8), id="4x-a100-40gb"),
+    pytest.param(4, 80.0, 96, 640.0, (72, 28, 16), id="4x-h100-80gb"),
+    pytest.param(8, 141.0, 112, 2048.0, (112, 96, 56), id="8x-h200-141gb"),
 )
 
 
@@ -364,6 +364,6 @@ def test_inference_autosizer_hardware_matrix(
         assert args.num_jobs == expected
         assert args.workload_plan.device_worker_gb == {
             WORKLOAD_AFFINITY_INFERENCE: 4.0,
-            WORKLOAD_PROCESSING_INFERENCE: 8.0,
+            WORKLOAD_PROCESSING_INFERENCE: 10.0,
             WORKLOAD_PRESENTATION_INFERENCE: 16.0,
         }[workload]
