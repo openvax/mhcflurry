@@ -25,6 +25,13 @@ PROCESSING_DEFAULT_MINIBATCH_SIZE = 512
 DEFAULT_OPTIMIZER_IMPLEMENTATION = "keras"
 OPTIMIZER_IMPLEMENTATION_CHOICES = ("keras", "pytorch")
 LSUV_TARGET_CHOICES = ("post_activation", "pre_activation")
+AFFINITY_INIT_CHOICES = (
+    "glorot_uniform",
+    "glorot_normal",
+    "he_uniform",
+    "he_normal",
+    "orthogonal",
+)
 PROCESSING_INIT_CHOICES = ("glorot_uniform", "kaiming_uniform_fan_in")
 # Compatibility name used by the historical affinity generator wrapper.
 DEFAULT_MINIBATCH_SIZE = AFFINITY_DEFAULT_MINIBATCH_SIZE
@@ -130,12 +137,21 @@ def build_affinity_grid(
     minibatch_size=AFFINITY_DEFAULT_MINIBATCH_SIZE,
     optimizer_implementation=DEFAULT_OPTIMIZER_IMPLEMENTATION,
     data_dependent_initialization_target="post_activation",
+    init="glorot_uniform",
 ):
     """Return the 35-architecture Class I pan-allele affinity grid."""
+    if init not in AFFINITY_INIT_CHOICES:
+        raise ValueError(
+            "Unknown affinity initializer %r; expected one of: %s" % (
+                init,
+                ", ".join(AFFINITY_INIT_CHOICES),
+            )
+        )
     grid = []
     base = deepcopy(AFFINITY_BASE_HYPERPARAMETERS)
     base["minibatch_size"] = minibatch_size
     base["optimizer_implementation"] = optimizer_implementation
+    base["init"] = init
     base["data_dependent_initialization_target"] = (
         data_dependent_initialization_target
     )
@@ -398,6 +414,12 @@ def make_parser(prog=None):
         default="post_activation",
         help="LSUV activation boundary. Default: %(default)s (2.1.x parity)",
     )
+    affinity.add_argument(
+        "--init",
+        choices=AFFINITY_INIT_CHOICES,
+        default="glorot_uniform",
+        help="Affinity-layer initializer. Default: %(default)s (2.1.x parity)",
+    )
 
     processing_base = subparsers.add_parser(
         "processing-base",
@@ -436,6 +458,7 @@ def run_argv(argv=None, prog=None):
             data_dependent_initialization_target=(
                 args.data_dependent_initialization_target
             ),
+            init=args.init,
         )
     elif args.recipe == "processing-base":
         grid = build_processing_base_grid(

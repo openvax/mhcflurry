@@ -2146,11 +2146,16 @@ def test_training_hyperparameter_generator_tracks_ablation_switches():
     affinity = generator.build_affinity_grid(
         optimizer_implementation="pytorch",
         data_dependent_initialization_target="pre_activation",
+        init="he_uniform",
     )
     assert {item["optimizer_implementation"] for item in affinity} == {"pytorch"}
     assert {
         item["data_dependent_initialization_target"] for item in affinity
     } == {"pre_activation"}
+    assert {item["init"] for item in affinity} == {"he_uniform"}
+
+    with pytest.raises(ValueError, match="Unknown affinity initializer"):
+        generator.build_affinity_grid(init="typo")
 
     processing = generator.build_processing_base_grid(
         optimizer_implementation="pytorch",

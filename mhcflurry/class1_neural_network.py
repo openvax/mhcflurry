@@ -420,6 +420,8 @@ class Class1NeuralNetworkModel(nn.Module):
                     nn.init.kaiming_uniform_(module.weight)
                 elif init == "he_normal":
                     nn.init.kaiming_normal_(module.weight)
+                elif init == "orthogonal":
+                    nn.init.orthogonal_(module.weight)
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
 
