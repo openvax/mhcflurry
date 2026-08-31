@@ -15,6 +15,12 @@ from mhcflurry.class1_neural_network import Class1NeuralNetworkModel
 
 REPO = Path(__file__).resolve().parents[1]
 RUNNER = REPO / "scripts" / "training" / "run_affinity_factorial.sh"
+ARCHITECTURE_RUNNER = (
+    REPO
+    / "scripts"
+    / "training"
+    / "run_affinity_factorial_architecture_evaluation.sh"
+)
 
 
 def load_script(name):
@@ -50,6 +56,27 @@ def test_affinity_factorial_runner_exposes_explicit_cli():
             "--max-tasks-per-worker",
             "--torch-compile",
             "--torch-compile-loss",
+            "--matmul-precision"):
+        assert flag in result.stdout
+
+
+def test_affinity_architecture_runner_exposes_explicit_cli():
+    result = subprocess.run(
+        ["bash", str(ARCHITECTURE_RUNNER), "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    for flag in (
+            "--factorial-dir",
+            "--data-eval-dir",
+            "--release-holdout-dir",
+            "--training-source-commit",
+            "--analysis-source-commit",
+            "--gpus",
+            "--max-workers-per-gpu",
+            "--max-tasks-per-worker",
+            "--torch-compile",
             "--matmul-precision"):
         assert flag in result.stdout
 
@@ -231,6 +258,68 @@ def test_affinity_factorial_summary_keeps_comparison_sides_separate(tmp_path):
     assert (tmp_path / "summary.csv").exists()
 
 
+def test_affinity_architecture_summary_classifies_strict_dominance(tmp_path):
+    module = load_script("summarize_affinity_factorial_architectures")
+    baseline = "baseline"
+    candidate = "candidate"
+    manifest = {
+        "baseline_condition": baseline,
+        "records": [
+            {"condition": baseline, "minibatch_size": 128},
+            {"condition": candidate, "minibatch_size": 256},
+        ],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest))
+    architecture_dir = tmp_path / "architecture_evaluation"
+    provenance = {
+        "architecture_num": 0,
+        "architecture": {
+            "topology": "feedforward",
+            "layer_sizes": [512, 512],
+            "dense_layer_l1_regularization": 1e-8,
+        },
+    }
+    for condition in (baseline, candidate):
+        subset = (
+            architecture_dir
+            / "subsets"
+            / condition
+            / "architecture_0"
+        )
+        subset.mkdir(parents=True)
+        (subset / "subset_provenance.json").write_text(json.dumps(provenance))
+    baseline_summary = (
+        architecture_dir
+        / "baseline-vs-public"
+        / "architecture_0"
+        / "affinity"
+    )
+    baseline_summary.mkdir(parents=True)
+    (baseline_summary / "summary.json").write_text(
+        json.dumps(metric_summary((0.9, 0.6, 0.5), (0.8, 0.4, 0.3)))
+    )
+    candidate_summary = (
+        architecture_dir
+        / "comparisons"
+        / candidate
+        / "architecture_0-vs-baseline"
+        / "affinity"
+    )
+    candidate_summary.mkdir(parents=True)
+    (candidate_summary / "summary.json").write_text(
+        json.dumps(metric_summary((0.91, 0.63, 0.52), (0.9, 0.6, 0.5)))
+    )
+
+    records = module.summarize(tmp_path)
+    by_condition = {record["condition"]: record for record in records}
+    assert by_condition[baseline]["metric_dominance"] == "reference"
+    assert by_condition[candidate]["metric_dominance"] == (
+        "strictly_dominates_baseline"
+    )
+    assert by_condition[candidate]["macro_pr_auc_delta"] == pytest.approx(0.03)
+    assert (architecture_dir / "summary.csv").exists()
+
+
 def test_affinity_factorial_model_verifier_checks_folds_and_batch(tmp_path):
     generator = load_script("generate_affinity_factorial")
     verifier = load_script("verify_affinity_factorial_models")
@@ -292,3 +381,58 @@ def test_affinity_factorial_model_verifier_checks_folds_and_batch(tmp_path):
         writer.writerows(rows)
     with pytest.raises(ValueError, match="Training minibatch shrank"):
         verifier.verify(models_dir, hyperparameters_path)
+
+
+def test_split_affinity_architectures_writes_fold_complete_subsets(tmp_path):
+    module = load_script("split_affinity_architectures")
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    rows = []
+    for architecture_num, topology in enumerate((
+            "feedforward", "with-skip-connections")):
+        for fold_num in range(4):
+            name = "model-%d-%d" % (architecture_num, fold_num)
+            numpy.savez(models_dir / ("weights_%s.npz" % name), value=[1])
+            rows.append({
+                "model_name": name,
+                "allele": "pan-class1",
+                "config_json": json.dumps({
+                    "hyperparameters": {
+                        "topology": topology,
+                        "layer_sizes": [512, 512],
+                        "dense_layer_l1_regularization": 1e-8,
+                    },
+                    "fit_info": [{
+                        "training_info": {
+                            "architecture_num": architecture_num,
+                            "fold_num": fold_num,
+                        },
+                    }],
+                }),
+            })
+    pandas = pytest.importorskip("pandas")
+    pandas.DataFrame(rows).to_csv(models_dir / "manifest.csv", index=False)
+    (models_dir / "train_data.csv.bz2").write_bytes(b"training")
+    (models_dir / "allele_sequences.csv").write_text(
+        "allele,sequence\nHLA-A*02:01," + "A" * 39 + "\n"
+    )
+
+    result = module.split_models(models_dir, tmp_path / "subsets")
+    assert len(result) == 2
+    for architecture_num in range(2):
+        target = tmp_path / "subsets" / ("architecture_%d" % architecture_num)
+        subset = pandas.read_csv(target / "manifest.csv")
+        assert len(subset) == 4
+        assert set(subset.model_name) == {
+            "model-%d-%d" % (architecture_num, fold) for fold in range(4)
+        }
+        assert (target / "train_data.csv.bz2").read_bytes() == b"training"
+        provenance = json.loads((target / "subset_provenance.json").read_text())
+        assert provenance["folds"] == [0, 1, 2, 3]
+        assert provenance["architecture_num"] == architecture_num
+
+    repeated = module.split_models(models_dir, tmp_path / "subsets")
+    assert [item["models_dir"] for item in repeated] == [
+        str(tmp_path / "subsets" / "architecture_0"),
+        str(tmp_path / "subsets" / "architecture_1"),
+    ]

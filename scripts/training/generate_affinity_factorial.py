@@ -178,7 +178,6 @@ def write_conditions(out_dir, mode="representative", **factorial_axes):
             "learning_rate": 0.001,
             "optimizer": "rmsprop",
             "random_seed": 42,
-            "data_dependent_initialization_method": "lsuv",
             "lsuv_replaces_eligible_weights_with_orthogonal": True,
         },
         "records": records,
