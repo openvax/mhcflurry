@@ -248,6 +248,15 @@ def register_subparser(parser):
         ),
     )
     parser.add_argument(
+        "--skip-affinity-predictions",
+        action="store_true",
+        help=(
+            "Do not persist the row-level affinity/predictions.csv.bz2 "
+            "artifact. Aggregate metrics, overlap audits, and per-allele/"
+            "per-length tables are unchanged."
+        ),
+    )
+    parser.add_argument(
         "--processing-modes",
         default=",".join(PROCESSING_MODES),
         help=(
@@ -1287,9 +1296,15 @@ def _run_affinity(side_a, side_b, args):
         ))
     test["a_score"] = -numpy.log10(numpy.clip(test.a_pred, 1e-3, 1e8))
     test["b_score"] = -numpy.log10(numpy.clip(test.b_pred, 1e-3, 1e8))
-    test.to_csv(
-        os.path.join(component_dir, "predictions.csv.bz2"), index=False)
-    _stamp("  wrote predictions.csv.bz2 (%d rows)" % len(test))
+    if args.skip_affinity_predictions:
+        _stamp(
+            "  skipped predictions.csv.bz2 (%d rows; "
+            "--skip-affinity-predictions)" % len(test)
+        )
+    else:
+        test.to_csv(
+            os.path.join(component_dir, "predictions.csv.bz2"), index=False)
+        _stamp("  wrote predictions.csv.bz2 (%d rows)" % len(test))
 
     per_allele = _affinity_per_allele(test)
     per_allele.to_csv(

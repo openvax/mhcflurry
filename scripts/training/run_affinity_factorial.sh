@@ -51,6 +51,11 @@ condition_selected() {
     esac
 }
 
+AFFINITY_PREDICTION_ARTIFACT_ARGS=()
+if [ "$FACTORIAL_MODE" = "representative" ]; then
+    AFFINITY_PREDICTION_ARTIFACT_ARGS=(--skip-affinity-predictions)
+fi
+
 {
     printf '%s\n' \
         "schema_version=1" \
@@ -175,6 +180,7 @@ if [ ! -f "$baseline_eval/.done" ]; then
         --data-dir "$DATA_EVAL_DIR" \
         --release-holdout-dir "$RELEASE_HOLDOUT_DIR" \
         --affinity-training-overlap-policy audit \
+        "${AFFINITY_PREDICTION_ARTIFACT_ARGS[@]}" \
         --include affinity \
         --out "$baseline_eval" \
         --num-jobs auto \
@@ -208,6 +214,7 @@ while IFS= read -r condition; do
             --data-dir "$DATA_EVAL_DIR" \
             --release-holdout-dir "$RELEASE_HOLDOUT_DIR" \
             --affinity-training-overlap-policy audit \
+            "${AFFINITY_PREDICTION_ARTIFACT_ARGS[@]}" \
             --include affinity \
             --out "$comparison" \
             --num-jobs auto \

@@ -1924,10 +1924,70 @@ def test_compare_models_help_runs(capsys):
     for flag in ["--a", "--b", "--include", "--out", "--data-dir",
                  "--num-jobs", "--gpus", "--max-workers-per-gpu",
                  "--processing-modes", "--presentation-modes",
+                 "--skip-affinity-predictions",
                  "--presentation-num-jobs",
                  "--presentation-max-workers-per-gpu",
                  "--presentation-torch-compile"]:
         assert flag in captured, "missing flag in help: %s" % flag
+
+
+def test_compare_models_can_skip_large_affinity_prediction_artifact(
+        tmp_path, monkeypatch):
+    rows = []
+    for index in range(40):
+        rows.append({
+            "peptide": "AAAAAAAAA" if index % 2 else "CCCCCCCCC",
+            "hla": "HLA-A*02:01",
+            "hit": index % 2,
+            "sample_id": "sample",
+            "source_file": "benchmark.csv",
+        })
+    benchmark = pandas.DataFrame(rows)
+    prediction_calls = []
+
+    monkeypatch.setattr(
+        compare_models,
+        "_load_affinity_benchmark",
+        lambda *args, **kwargs: benchmark.copy(),
+    )
+    monkeypatch.setattr(
+        compare_models,
+        "_read_supported_alleles",
+        lambda path: {"HLA-A*02:01"},
+    )
+    monkeypatch.setattr(
+        compare_models,
+        "_parallelism_args_for_component",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        compare_models,
+        "model_artifact_size_bytes",
+        lambda path: 1,
+    )
+
+    def predict(*args, **kwargs):
+        prediction_calls.append(args)
+        return numpy.where(benchmark.hit.values, 50.0, 5000.0)
+
+    monkeypatch.setattr(compare_models, "_parallel_affinity_predict", predict)
+    out = tmp_path / "comparison"
+    args = compare_models.make_parser().parse_args([
+        "--a", "a",
+        "--b", "b",
+        "--out", str(out),
+        "--skip-affinity-predictions",
+    ])
+    side_a = {"label": "a", "paths": {"affinity": "a"}}
+    side_b = {"label": "b", "paths": {"affinity": "b"}}
+
+    summary = compare_models._run_affinity(side_a, side_b, args)
+
+    assert len(prediction_calls) == 2
+    assert summary["n_rows"] == 40
+    assert not (out / "affinity" / "predictions.csv.bz2").exists()
+    assert (out / "affinity" / "summary.json").exists()
+    assert (out / "affinity" / "per_allele.csv").exists()
 
 
 def test_compare_models_presentation_parallelism_overrides():
