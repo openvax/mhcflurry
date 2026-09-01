@@ -33,6 +33,7 @@ AFFINITY_INIT_CHOICES = (
     "orthogonal",
 )
 PROCESSING_INIT_CHOICES = ("glorot_uniform", "kaiming_uniform_fan_in")
+PROCESSING_BATCH_SWEEP_SIZES = (128, 256, 512, 1024)
 # Compatibility name used by the historical affinity generator wrapper.
 DEFAULT_MINIBATCH_SIZE = AFFINITY_DEFAULT_MINIBATCH_SIZE
 PROCESSING_VARIANT_CHOICES = (
@@ -351,6 +352,84 @@ def build_processing_ablation_panels():
                 % len(selected)
             )
         result[condition] = selected
+    return result
+
+
+def build_processing_batch_sweep_panels(
+        minibatch_sizes=PROCESSING_BATCH_SWEEP_SIZES):
+    """Return focused 5-aa and no-flank processing batch-sweep panels.
+
+    This is a screening grid, not the production architecture grid. It keeps
+    the two representative architectures used by the initializer/optimizer
+    audit and prunes recipe combinations that were dominated on the primary
+    held-out metrics. The same candidate recipes are emitted at every batch
+    size so minibatch size is the only between-panel change.
+    """
+    minibatch_sizes = tuple(minibatch_sizes)
+    if not minibatch_sizes:
+        raise ValueError("minibatch_sizes must not be empty")
+    if any(
+            isinstance(value, bool) or not isinstance(value, int) or value <= 0
+            for value in minibatch_sizes):
+        raise ValueError("minibatch_sizes must contain positive integers")
+    if len(set(minibatch_sizes)) != len(minibatch_sizes):
+        raise ValueError("minibatch_sizes must not contain duplicates")
+
+    architecture_keys = {
+        "small": ("tanh", 256, 11, (0.0, 0.0), (8,), 0.3),
+        "large": ("relu", 512, 17, (1e-6, 0.0), (16,), 0.5),
+    }
+    candidate_recipes = {
+        "short_flanks": (
+            ("small", "glorot_uniform", "keras"),
+            ("large", "glorot_uniform", "keras"),
+            ("large", "glorot_uniform", "pytorch"),
+            ("large", "kaiming_uniform_fan_in", "pytorch"),
+        ),
+        "no_flank": (
+            ("small", "glorot_uniform", "keras"),
+            ("small", "kaiming_uniform_fan_in", "keras"),
+            ("large", "glorot_uniform", "keras"),
+        ),
+    }
+
+    result = {}
+    for minibatch_size in minibatch_sizes:
+        recipe_grids = {}
+        for recipes in candidate_recipes.values():
+            for _, init, optimizer_implementation in recipes:
+                recipe_key = (init, optimizer_implementation)
+                if recipe_key not in recipe_grids:
+                    recipe_grids[recipe_key] = build_processing_base_grid(
+                        minibatch_size=minibatch_size,
+                        init=init,
+                        optimizer_implementation=optimizer_implementation,
+                    )
+        for variant, recipes in candidate_recipes.items():
+            selected = []
+            for architecture, init, optimizer_implementation in recipes:
+                architecture_key = architecture_keys[architecture]
+                matches = [
+                    item for item in recipe_grids[
+                        (init, optimizer_implementation)]
+                    if (
+                        item["convolutional_activation"],
+                        item["convolutional_filters"],
+                        item["convolutional_kernel_size"],
+                        tuple(item["convolutional_kernel_l1_l2"]),
+                        tuple(item["post_convolutional_dense_layer_sizes"]),
+                        item["dropout_rate"],
+                    ) == architecture_key
+                ]
+                if len(matches) != 1:
+                    raise RuntimeError(
+                        "Processing batch-sweep architecture selection "
+                        "returned %d rows for %s/%s/%s" % (
+                            len(matches), variant, architecture, recipe_key))
+                selected.append(transform_processing_hyperparameters(
+                    variant, matches[0]))
+            result["batch%d.%s" % (minibatch_size, variant)] = (
+                unique_hyperparameters(selected))
     return result
 
 

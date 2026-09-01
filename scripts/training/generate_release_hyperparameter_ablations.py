@@ -23,6 +23,7 @@ import yaml
 from mhcflurry.cli.generate_training_hyperparameters import (
     build_affinity_ablation_panels,
     build_processing_ablation_panels,
+    build_processing_batch_sweep_panels,
     build_processing_variant_grid,
 )
 
@@ -53,10 +54,18 @@ def write_panels(out_dir):
                 build_processing_variant_grid(base_values, variant),
             )
 
+    for condition, values in build_processing_batch_sweep_panels().items():
+        write_yaml("processing_batch_sweep.%s.yaml" % condition, values)
+
     manifest = {
         "schema_version": 1,
         "affinity_folds": 4,
         "processing_folds": 4,
+        "processing_batch_sweep": {
+            "minibatch_sizes": [128, 256, 512, 1024],
+            "priority": ["short_flanks", "no_flank"],
+            "with_flanks_policy": "excluded_except_targeted_8mer_diagnostic",
+        },
         "records": records,
     }
     manifest_path = out_dir / "manifest.json"

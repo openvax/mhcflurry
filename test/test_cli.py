@@ -2269,6 +2269,61 @@ def test_release_hyperparameter_ablation_panels_are_paired():
     assert {len(values) for values in processing.values()} == {2}
 
 
+def test_processing_batch_sweep_panels_are_focused_and_paired():
+    from mhcflurry.cli import generate_training_hyperparameters as generator
+
+    panels = generator.build_processing_batch_sweep_panels()
+    assert set(panels) == {
+        "batch%d.%s" % (batch, variant)
+        for batch in (128, 256, 512, 1024)
+        for variant in ("short_flanks", "no_flank")
+    }
+    for batch in (128, 256, 512, 1024):
+        short = panels["batch%d.short_flanks" % batch]
+        no_flank = panels["batch%d.no_flank" % batch]
+        assert len(short) == 4
+        assert len(no_flank) == 3
+        assert {item["minibatch_size"] for item in short + no_flank} == {
+            batch
+        }
+        assert {
+            (item["n_flank_length"], item["c_flank_length"])
+            for item in short
+        } == {(5, 5)}
+        assert {
+            (item["n_flank_length"], item["c_flank_length"])
+            for item in no_flank
+        } == {(0, 0)}
+        short_small = [
+            item for item in short
+            if item["convolutional_activation"] == "tanh"
+        ]
+        assert {
+            (item["init"], item["optimizer_implementation"])
+            for item in short_small
+        } == {("glorot_uniform", "keras")}
+        short_large = [
+            item for item in short
+            if item["convolutional_activation"] == "relu"
+        ]
+        assert {
+            (item["init"], item["optimizer_implementation"])
+            for item in short_large
+        } == {
+            ("glorot_uniform", "keras"),
+            ("glorot_uniform", "pytorch"),
+            ("kaiming_uniform_fan_in", "pytorch"),
+        }
+
+
+@pytest.mark.parametrize("sizes", [(), (0,), (128, 128), (True,)])
+def test_processing_batch_sweep_rejects_invalid_sizes(sizes):
+    from mhcflurry.cli import generate_training_hyperparameters as generator
+
+    with pytest.raises(ValueError):
+        generator.build_processing_batch_sweep_panels(sizes)
+
+
 def test_release_ablation_generator_writes_all_processing_flank_variants(
         tmp_path):
     path = pathlib.Path(
@@ -2290,6 +2345,47 @@ def test_release_ablation_generator_writes_all_processing_flank_variants(
         for variant in ("with_flanks", "no_flank", "short_flanks"):
             assert "processing.%s.%s.yaml" % (
                 condition, variant) in processing_paths
+    batch_paths = {
+        record["path"]
+        for record in manifest["records"]
+        if record["path"].startswith("processing_batch_sweep.")
+    }
+    assert batch_paths == {
+        "processing_batch_sweep.batch%d.%s.yaml" % (batch, variant)
+        for batch in (128, 256, 512, 1024)
+        for variant in ("short_flanks", "no_flank")
+    }
+    assert manifest["processing_batch_sweep"]["priority"] == [
+        "short_flanks", "no_flank"
+    ]
+
+
+def test_processing_ablation_runner_includes_focused_batch_sweep():
+    runner = pathlib.Path(
+        "scripts/training/run_release_processing_ablations.sh"
+    ).read_text()
+    assert "batch_sweep_variants=(short_flanks no_flank)" in runner
+    assert "for minibatch_size in 128 256 512 1024" in runner
+    assert "processing_batch_sweep.batch$minibatch_size.$variant.yaml" in runner
+    assert "--processing-modes short_flanks,no_flank" in runner
+
+    focused_runner = pathlib.Path(
+        "scripts/training/run_processing_batch_sweep.sh"
+    ).read_text()
+    for option in (
+        "--out",
+        "--train-data",
+        "--data-eval-dir",
+        "--release-holdout-dir",
+        "--source-commit",
+        "--gpus",
+        "--max-workers-per-gpu",
+        "--dataloader-num-workers",
+    ):
+        assert option in focused_runner
+    assert "MHCFLURRY_OUT" not in focused_runner
+    assert "train_panel \"$minibatch_size\" short_flanks" in focused_runner
+    assert "train_panel \"$minibatch_size\" no_flank" in focused_runner
 
 
 def test_affinity_release_script_accepts_tracked_ablation_yaml():
@@ -2339,7 +2435,7 @@ def test_processing_release_script_runs_paired_seeded_ablations():
     assert "vs-glorot_keras_adam" in runner
     assert "glorot_keras_adam-vs-public" in runner
     assert runner.count('"${TRAINING_PARALLELISM_ARGS[@]}"') == 4
-    assert runner.count('"${COMMON_PARALLELISM_ARGS[@]}"') == 3
+    assert runner.count('"${COMMON_PARALLELISM_ARGS[@]}"') == 5
     comparison_block = runner[runner.index("DATA_EVAL_DIR="):]
     assert "--dataloader-num-workers" not in comparison_block
     assert '"${COMMON_PARALLELISM_ARGS[@]}"' in comparison_block

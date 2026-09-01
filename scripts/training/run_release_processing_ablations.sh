@@ -126,44 +126,68 @@ if [ -z "$PROCESSING_ABLATION_COMPARE_MODES" ]; then
     done
 fi
 
+train_processing_panel() {
+    local condition_root="$1"
+    local variant="$2"
+    local hyperparameters="$3"
+    local processing_root="$condition_root/processing"
+    local unselected="$processing_root/models.unselected.$variant"
+    local selected="$processing_root/models.selected.$variant"
+
+    mkdir -p "$processing_root"
+    if [ -f "$unselected/manifest.csv" ]; then
+        mhcflurry-class1-train-processing-models \
+            --out-models-dir "$unselected" \
+            --continue-incomplete \
+            "${TRAINING_PARALLELISM_ARGS[@]}"
+    else
+        mhcflurry-class1-train-processing-models \
+            --data "$SHARED_DIR/train_data.csv.bz2" \
+            --held-out-samples 10 \
+            --num-folds 4 \
+            --random-seed "$RELEASE_RANDOM_SEED" \
+            --hyperparameters "$hyperparameters" \
+            --out-models-dir "$unselected" \
+            --worker-log-dir "$processing_root" \
+            "${TRAINING_PARALLELISM_ARGS[@]}"
+    fi
+
+    if [ ! -f "$selected/train_data.csv.bz2" ]; then
+        mhcflurry-class1-select-processing-models \
+            --data "$unselected/train_data.csv.bz2" \
+            --models-dir "$unselected" \
+            --out-models-dir "$selected" \
+            --min-models-per-fold 1 \
+            --max-models-per-fold 2 \
+            "${TRAINING_PARALLELISM_ARGS[@]}"
+        cp "$unselected/train_data.csv.bz2" \
+            "$selected/train_data.csv.bz2"
+    fi
+}
+
 for condition in "${conditions[@]}"; do
     condition_root="$MHCFLURRY_OUT/processing.$condition"
     processing_root="$condition_root/processing"
     mkdir -p "$processing_root"
     start_gpu_telemetry "$processing_root/gpu_occupancy.csv"
     for variant in "${variants[@]}"; do
-        unselected="$processing_root/models.unselected.$variant"
-        selected="$processing_root/models.selected.$variant"
         hyperparameters="$PANEL_DIR/processing.$condition.$variant.yaml"
+        train_processing_panel \
+            "$condition_root" "$variant" "$hyperparameters"
+    done
+    stop_gpu_telemetry
+done
 
-        if [ -f "$unselected/manifest.csv" ]; then
-            mhcflurry-class1-train-processing-models \
-                --out-models-dir "$unselected" \
-                --continue-incomplete \
-                "${TRAINING_PARALLELISM_ARGS[@]}"
-        else
-            mhcflurry-class1-train-processing-models \
-                --data "$SHARED_DIR/train_data.csv.bz2" \
-                --held-out-samples 10 \
-                --num-folds 4 \
-                --random-seed "$RELEASE_RANDOM_SEED" \
-                --hyperparameters "$hyperparameters" \
-                --out-models-dir "$unselected" \
-                --worker-log-dir "$processing_root" \
-                "${TRAINING_PARALLELISM_ARGS[@]}"
-        fi
-
-        if [ ! -f "$selected/train_data.csv.bz2" ]; then
-            mhcflurry-class1-select-processing-models \
-                --data "$unselected/train_data.csv.bz2" \
-                --models-dir "$unselected" \
-                --out-models-dir "$selected" \
-                --min-models-per-fold 1 \
-                --max-models-per-fold 2 \
-                "${TRAINING_PARALLELISM_ARGS[@]}"
-            cp "$unselected/train_data.csv.bz2" \
-                "$selected/train_data.csv.bz2"
-        fi
+batch_sweep_variants=(short_flanks no_flank)
+for minibatch_size in 128 256 512 1024; do
+    condition_root="$MHCFLURRY_OUT/processing_batch_sweep.batch$minibatch_size"
+    processing_root="$condition_root/processing"
+    mkdir -p "$processing_root"
+    start_gpu_telemetry "$processing_root/gpu_occupancy.csv"
+    for variant in "${batch_sweep_variants[@]}"; do
+        hyperparameters="$PANEL_DIR/processing_batch_sweep.batch$minibatch_size.$variant.yaml"
+        train_processing_panel \
+            "$condition_root" "$variant" "$hyperparameters"
     done
     stop_gpu_telemetry
 done
@@ -200,4 +224,31 @@ mhcflurry eval compare-models \
     --include processing \
     --processing-modes "$PROCESSING_ABLATION_COMPARE_MODES" \
     --out "$PAIRWISE_DIR/glorot_keras_adam-vs-public" \
+    "${COMMON_PARALLELISM_ARGS[@]}"
+
+batch_sweep_baseline="$MHCFLURRY_OUT/processing_batch_sweep.batch512"
+for minibatch_size in 128 256 1024; do
+    mhcflurry eval compare-models \
+        --a "$MHCFLURRY_OUT/processing_batch_sweep.batch$minibatch_size" \
+        --a-label "processing_batch_$minibatch_size" \
+        --b "$batch_sweep_baseline" \
+        --b-label processing_batch_512 \
+        --data-dir "$DATA_EVAL_DIR" \
+        --release-holdout-dir "$HOLDOUT_DIR" \
+        --include processing \
+        --processing-modes short_flanks,no_flank \
+        --out "$PAIRWISE_DIR/processing_batch_$minibatch_size-vs-512" \
+        "${COMMON_PARALLELISM_ARGS[@]}"
+done
+
+mhcflurry eval compare-models \
+    --a "$batch_sweep_baseline" \
+    --a-label processing_batch_512 \
+    --b public \
+    --b-label public \
+    --data-dir "$DATA_EVAL_DIR" \
+    --release-holdout-dir "$HOLDOUT_DIR" \
+    --include processing \
+    --processing-modes short_flanks,no_flank \
+    --out "$PAIRWISE_DIR/processing_batch_512-vs-public" \
     "${COMMON_PARALLELISM_ARGS[@]}"
