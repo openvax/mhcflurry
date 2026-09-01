@@ -68,12 +68,24 @@ def verify(models_dir, hyperparameters_path, num_folds=4):
             raise ValueError("Unexpected architecture: %r" % (signature,))
         expected_hyperparameters = expected_by_arch[signature]
         for key in CONTROL_KEYS:
-            if actual.get(key) != expected_hyperparameters.get(key):
+            expected_value = expected_hyperparameters.get(key)
+            # The published pan-allele recipe intentionally fine-tunes at one
+            # tenth of the pretraining learning rate. Training serializes that
+            # effective value in the fitted model while the input YAML retains
+            # the pretraining value. This behavior is present in v2.1.x and is
+            # not a recipe mismatch.
+            if (
+                    key == "learning_rate"
+                    and expected_hyperparameters.get(
+                        "train_data", {}).get("pretrain", False)
+                    and expected_value is not None):
+                expected_value /= 10
+            if actual.get(key) != expected_value:
                 raise ValueError(
                     "%s mismatch for %r: expected %r; found %r" % (
                         key,
                         signature,
-                        expected_hyperparameters.get(key),
+                        expected_value,
                         actual.get(key),
                     )
                 )

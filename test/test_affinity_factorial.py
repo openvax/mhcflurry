@@ -1,6 +1,7 @@
 """Tests for the controlled affinity recipe sweep."""
 
 import csv
+from copy import deepcopy
 import importlib.util
 import json
 from pathlib import Path
@@ -338,11 +339,13 @@ def test_affinity_factorial_model_verifier_checks_folds_and_batch(tmp_path):
         for fold in range(4):
             model_name = "model-%d-%d" % (architecture_num, fold)
             numpy.savez(models_dir / ("weights_%s.npz" % model_name), value=[1])
+            fitted_hyperparameters = deepcopy(hyperparameters)
+            fitted_hyperparameters["learning_rate"] /= 10
             rows.append({
                 "model_name": model_name,
                 "allele": "pan-class1",
                 "config_json": json.dumps({
-                    "hyperparameters": hyperparameters,
+                    "hyperparameters": fitted_hyperparameters,
                     "fit_info": [{
                         "effective_minibatch_size": 128,
                         "training_info": {
@@ -362,8 +365,22 @@ def test_affinity_factorial_model_verifier_checks_folds_and_batch(tmp_path):
 
     report = verifier.verify(models_dir, hyperparameters_path)
     assert report["model_count"] == 8
+    wrong_learning_rate = json.loads(rows[0]["config_json"])
+    wrong_learning_rate["hyperparameters"]["learning_rate"] = 0.001
+    rows[0]["config_json"] = json.dumps(wrong_learning_rate)
+    with (models_dir / "manifest.csv").open("w", newline="") as fd:
+        writer = csv.DictWriter(
+            fd, fieldnames=("model_name", "allele", "config_json")
+        )
+        writer.writeheader()
+        writer.writerows(rows)
+    with pytest.raises(ValueError, match="learning_rate mismatch"):
+        verifier.verify(models_dir, hyperparameters_path)
+
+    fitted_hyperparameters = deepcopy(grid[0])
+    fitted_hyperparameters["learning_rate"] /= 10
     rows[0]["config_json"] = json.dumps({
-        "hyperparameters": grid[0],
+        "hyperparameters": fitted_hyperparameters,
         "fit_info": [{
             "effective_minibatch_size": 64,
             "training_info": {
