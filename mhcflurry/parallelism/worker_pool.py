@@ -615,10 +615,15 @@ def make_worker_pool(
     this feature is to support allocating each worker to a (different) GPU.
 
     IMPLEMENTATION NOTE:
-        The per-worker initializer arguments are implemented using a Queue. Each
-        worker reads its arguments from this queue when it starts. When it
-        terminates, it adds its initializer arguments back to the queue, so a
-        future process can initialize itself using these arguments.
+        The per-worker initializer arguments are implemented using a
+        ``SimpleQueue``. Each worker reads its arguments from this queue when it
+        starts. When it terminates, it adds its initializer arguments back to
+        the queue, so a future process can initialize itself using these
+        arguments. ``SimpleQueue`` is important here: ``Queue.put`` uses a
+        feeder thread, so workers can observe a transiently empty queue during
+        startup and duplicate GPU assignments. A worker that puts its arguments
+        back can also hang forever joining that feeder thread during process
+        finalization.
 
         There is one issue with this approach, however. If a worker crashes, it
         never repopulates the queue of initializer arguments. This will prevent
@@ -713,8 +718,13 @@ def make_worker_pool(
     if initializer:
         if initializer_kwargs_per_process:
             queue_context = pool_context or multiprocessing.get_context()
-            kwargs_queue = queue_context.Queue()
-            kwargs_queue_backup = queue_context.Queue()
+            # Queue.put() is asynchronous and starts a feeder thread. Forking
+            # the pool immediately after filling such a queue can make workers
+            # see it as transiently empty, while worker-side puts can deadlock
+            # process shutdown in the queue feeder finalizer. SimpleQueue puts
+            # synchronously and has no feeder thread.
+            kwargs_queue = queue_context.SimpleQueue()
+            kwargs_queue_backup = queue_context.SimpleQueue()
             for kwargs in initializer_kwargs_per_process:
                 kwargs_queue.put(kwargs)
                 kwargs_queue_backup.put(kwargs)

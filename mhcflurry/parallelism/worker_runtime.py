@@ -14,7 +14,6 @@
 
 import importlib
 import os
-import queue
 import random
 import sys
 import time
@@ -82,14 +81,14 @@ def worker_init_entry_point(
         shared_kwargs=None):
     kwargs = {}
     if arg_queue:
-        try:
-            kwargs = arg_queue.get(block=False)
-        except queue.Empty:
+        if arg_queue.empty():
             print(
                 "Argument queue empty. Using round robin arg queue.",
                 file=sys.stderr)
-            kwargs = backup_arg_queue.get(block=True)
+            kwargs = backup_arg_queue.get()
             backup_arg_queue.put(kwargs)
+        else:
+            kwargs = arg_queue.get()
 
         # On exit we add the init args back to the queue so restarted workers
         # (e.g. when when running with maxtasksperchild) will pickup init

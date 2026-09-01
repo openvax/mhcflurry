@@ -65,6 +65,10 @@ def _read_shared_initializer_state(_):
     return _SHARED_INITIALIZER_STATE
 
 
+def _record_initializer_slot(seen_slots, slot):
+    seen_slots.put(slot)
+
+
 @pytest.fixture(autouse=True)
 def clear_cuda_visible_devices(monkeypatch):
     monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
@@ -1364,8 +1368,12 @@ def test_worker_initializer_restart_queue_excludes_shared_context(monkeypatch):
     finalized = []
 
     class FakeQueue:
-        def __init__(self, value):
+        def __init__(self, value, empty=False):
             self.value = value
+            self.is_empty = empty
+
+        def empty(self):
+            return self.is_empty
 
         def get(self, **kwargs):
             del kwargs
@@ -1389,6 +1397,101 @@ def test_worker_initializer_restart_queue_excludes_shared_context(monkeypatch):
 
     assert finalized == [{"per_process": 1}]
     assert set(received) == {"per_process", "worker_context_data"}
+
+
+def test_worker_initializer_uses_backup_only_when_primary_is_empty(monkeypatch):
+    finalized = []
+
+    class FakeQueue:
+        def __init__(self, value, empty=False):
+            self.value = value
+            self.is_empty = empty
+            self.put_values = []
+
+        def empty(self):
+            return self.is_empty
+
+        def get(self):
+            return self.value
+
+        def put(self, value):
+            self.put_values.append(value)
+
+    primary = FakeQueue({"primary": 1}, empty=True)
+    backup = FakeQueue({"backup": 1})
+    monkeypatch.setattr(
+        worker_runtime_module,
+        "Finalize",
+        lambda _obj, _callback, args, **kwargs: finalized.append(args[0]),
+    )
+    received = {}
+
+    worker_runtime_module.worker_init_entry_point(
+        lambda **kwargs: received.update(kwargs),
+        arg_queue=primary,
+        backup_arg_queue=backup,
+    )
+
+    assert received == {"backup": 1}
+    assert backup.put_values == [{"backup": 1}]
+    assert finalized == [{"backup": 1}]
+
+
+@pytest.mark.skipif(
+    "fork" not in multiprocessing.get_all_start_methods(),
+    reason="fork start method unavailable",
+)
+def test_fork_pool_assigns_every_initializer_slot_once_and_joins():
+    num_workers = 16
+    seen_slots = multiprocessing.get_context("fork").SimpleQueue()
+    pool = worker_pool_module.make_worker_pool(
+        processes=num_workers,
+        initializer=_record_initializer_slot,
+        initializer_kwargs_per_process=[
+            {"slot": slot} for slot in range(num_workers)
+        ],
+        initializer_shared_kwargs={"seen_slots": seen_slots},
+        start_method="fork",
+    )
+    try:
+        pool.close()
+        pool.join()
+    except BaseException:
+        pool.terminate()
+        pool.join()
+        raise
+
+    assert sorted(seen_slots.get() for _ in range(num_workers)) == list(
+        range(num_workers))
+
+
+@pytest.mark.skipif(
+    "fork" not in multiprocessing.get_all_start_methods(),
+    reason="fork start method unavailable",
+)
+def test_fork_pool_reuses_initializer_slots_after_worker_restart():
+    pool = worker_pool_module.make_worker_pool(
+        processes=2,
+        initializer=_set_shared_initializer_state,
+        initializer_kwargs_per_process=[
+            {"per_process_value": "worker-0"},
+            {"per_process_value": "worker-1"},
+        ],
+        initializer_shared_kwargs={"shared_value": "shared"},
+        max_tasks_per_worker=1,
+        start_method="fork",
+    )
+    try:
+        results = pool.map(_read_shared_initializer_state, range(6), chunksize=1)
+        pool.close()
+        pool.join()
+    except BaseException:
+        pool.terminate()
+        pool.join()
+        raise
+
+    assert {result[0] for result in results} == {"shared"}
+    assert {result[1] for result in results} == {"worker-0", "worker-1"}
 
 
 def test_spawn_pool_installs_shared_initializer_data_once_per_worker():
