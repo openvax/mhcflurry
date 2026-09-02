@@ -80,6 +80,16 @@ paper figures, saved-prediction tables, and external predictors.
   paths; explicit values are for controlled comparisons.
 - **`plot_minibatch_sweep.py`** renders throughput and loss plots from
   `sweep_summary.csv`.
+- **`run_affinity_factorial.sh`** trains controlled affinity-recipe conditions,
+  saves per-epoch histories and held-out predictions, and compares every
+  condition directly to an explicitly supplied public
+  `models.no_additional_ms` predictor. The direct comparisons exclude union
+  training overlap, assert one common cohort identity, and render one review
+  PDF per condition. **`evaluate_affinity_factorial_public.sh`** applies the
+  same evaluation/figure gate to an already-trained factorial directory.
+- **`mhcflurry eval affinity-candidate-figures`** combines shortlisted
+  conditions, public 2.2, and any available canonical NetMHCpan/MixMHCpred
+  columns into one reusable held-out prediction table and paper-figure suite.
 - **`mhcflurry train plot-loss-curves`** renders per-architecture loss curves
   from a trained ensemble. The historical `plot_loss_curves.py` path remains a
   compatibility shim.

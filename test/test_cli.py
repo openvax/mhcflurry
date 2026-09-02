@@ -1524,7 +1524,16 @@ def test_eval_help_runs(capsys):
     assert "paper-figures score-predictions" in captured
     assert "paper-figures external-predictors" in captured
     assert "paper-figures run" in captured
+    assert "affinity-candidate-figures" in captured
     assert "Compatibility:" in captured
+
+
+def test_eval_affinity_candidate_figures_help_runs(capsys):
+    with pytest.raises(SystemExit):
+        cli_main.main(["eval", "affinity-candidate-figures", "--help"])
+    captured = capsys.readouterr().out
+    assert "usage: mhcflurry eval affinity-candidate-figures" in captured
+    assert "--condition" in captured
 
 
 def test_eval_compare_models_help_runs(capsys):
@@ -1986,9 +1995,84 @@ def test_compare_models_can_skip_large_affinity_prediction_artifact(
 
     assert len(prediction_calls) == 2
     assert summary["n_rows"] == 40
+    identity = summary["benchmark_identity"]
+    assert identity["row_count"] == 40
+    assert identity["columns"] == ["source_file", "hla", "peptide", "hit"]
+    assert len(identity["sha256"]) == 64
+    assert compare_models._affinity_benchmark_identity(
+        benchmark.copy()) == identity
+    assert compare_models._affinity_benchmark_identity(
+        benchmark.iloc[::-1].copy())["sha256"] != identity["sha256"]
     assert not (out / "affinity" / "predictions.csv.bz2").exists()
     assert (out / "affinity" / "summary.json").exists()
     assert (out / "affinity" / "per_allele.csv").exists()
+
+
+def test_compare_models_reuses_only_row_identical_affinity_predictions(
+        tmp_path, monkeypatch):
+    benchmark = pandas.DataFrame({
+        "source_file": "benchmark.csv",
+        "peptide": ["AAAAAAAAA", "CCCCCCCCC"] * 20,
+        "hla": "HLA-A*02:01",
+        "hit": [1, 0] * 20,
+    })
+    saved = benchmark.copy()
+    saved["b_pred"] = numpy.where(saved.hit, 50.0, 5000.0)
+    saved_path = tmp_path / "public-predictions.csv.bz2"
+    saved.to_csv(saved_path, index=False)
+    prediction_calls = []
+
+    monkeypatch.setattr(
+        compare_models, "_load_affinity_benchmark",
+        lambda *args, **kwargs: benchmark.copy())
+    monkeypatch.setattr(
+        compare_models, "_read_supported_alleles",
+        lambda path: {"HLA-A*02:01"})
+    monkeypatch.setattr(
+        compare_models, "_parallelism_args_for_component",
+        lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        compare_models, "model_artifact_size_bytes", lambda path: 1)
+
+    def predict(*args, **kwargs):
+        prediction_calls.append(args)
+        return numpy.where(benchmark.hit.values, 40.0, 6000.0)
+
+    monkeypatch.setattr(compare_models, "_parallel_affinity_predict", predict)
+    args = compare_models.make_parser().parse_args([
+        "--a", "a",
+        "--b", "b",
+        "--out", str(tmp_path / "comparison"),
+        "--b-affinity-predictions", str(saved_path),
+        "--skip-affinity-predictions",
+    ])
+    summary = compare_models._run_affinity(
+        {"label": "a", "paths": {"affinity": "a"}},
+        {"label": "b", "paths": {"affinity": "b"}},
+        args,
+    )
+
+    assert len(prediction_calls) == 1
+    assert summary["prediction_sources"]["a"]["mode"] == "computed"
+    assert summary["prediction_sources"]["b"]["mode"] == "reused"
+    assert summary["prediction_sources"]["b"]["sha256"] == (
+        compare_models._sha256_file(saved_path))
+
+    mismatched = saved.iloc[::-1]
+    mismatch_path = tmp_path / "mismatch.csv.bz2"
+    mismatched.to_csv(mismatch_path, index=False)
+    mismatch_args = compare_models.make_parser().parse_args([
+        "--a", "a",
+        "--b", "b",
+        "--out", str(tmp_path / "mismatch-comparison"),
+        "--b-affinity-predictions", str(mismatch_path),
+    ])
+    with pytest.raises(ValueError, match="different benchmark rows"):
+        compare_models._run_affinity(
+            {"label": "a", "paths": {"affinity": "a"}},
+            {"label": "b", "paths": {"affinity": "b"}},
+            mismatch_args,
+        )
 
 
 def test_compare_models_presentation_parallelism_overrides():

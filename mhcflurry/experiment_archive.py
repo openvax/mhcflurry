@@ -209,6 +209,10 @@ def _artifact_role(relative_path):
         return "model_manifest"
     if name == "gpu_occupancy.csv":
         return "telemetry"
+    if name.endswith(("predictions.csv", "predictions.csv.bz2")):
+        return "prediction"
+    if path.suffix.lower() in (".pdf", ".png", ".svg"):
+        return "figure"
     if name.endswith((".log", ".txt")) and (
             "log" in name.lower() or name.startswith("LOG-worker")):
         return "log"
@@ -231,8 +235,12 @@ def _artifact_role(relative_path):
 def _copy_role(role):
     return role in {
         "model_manifest", "telemetry", "log", "configuration",
-        "provenance", "metric",
+        "provenance", "metric", "prediction", "figure",
     }
+
+
+def _copy_regardless_of_size(role):
+    return role == "prediction"
 
 
 def _environment_record():
@@ -366,7 +374,8 @@ def snapshot_experiment(
         relative_path = source_path.relative_to(source_dir)
         role = _artifact_role(relative_path.as_posix())
         size = source_path.stat().st_size
-        copied = _copy_role(role) and size <= max_copy_bytes
+        copied = _copy_role(role) and (
+            size <= max_copy_bytes or _copy_regardless_of_size(role))
         if copied:
             target = artifacts_dir / relative_path
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -457,7 +466,9 @@ def snapshot_experiment(
             "rebuild learning-curve plots. `data/models.csv`, `data/fits.csv`, "
             "and `data/model_configs.jsonl` preserve model and fit metadata. "
             "Comparison tables, telemetry, configs, manifests, and logs are "
-            "under `artifacts/`.",
+            "under `artifacts/`. Held-out prediction tables and generated "
+            "figures are copied there even when prediction files exceed the "
+            "ordinary artifact-size threshold.",
             "",
             "`source_files.csv` inventories every original artifact by SHA256. "
             "Large weights and training tables are checksummed but intentionally "

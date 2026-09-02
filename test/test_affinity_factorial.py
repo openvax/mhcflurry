@@ -22,6 +22,12 @@ ARCHITECTURE_RUNNER = (
     / "training"
     / "run_affinity_factorial_architecture_evaluation.sh"
 )
+PUBLIC_EVALUATOR = (
+    REPO
+    / "scripts"
+    / "training"
+    / "evaluate_affinity_factorial_public.sh"
+)
 
 
 def load_script(name):
@@ -47,6 +53,7 @@ def test_affinity_factorial_runner_exposes_explicit_cli():
             "--pretrain-data",
             "--data-eval-dir",
             "--release-holdout-dir",
+            "--public-affinity-dir",
             "--source-commit",
             "--mode",
             "--condition",
@@ -59,6 +66,32 @@ def test_affinity_factorial_runner_exposes_explicit_cli():
             "--torch-compile-loss",
             "--matmul-precision"):
         assert flag in result.stdout
+
+
+def test_affinity_public_evaluator_exposes_explicit_cli():
+    result = subprocess.run(
+        ["bash", str(PUBLIC_EVALUATOR), "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    for flag in (
+            "--factorial-dir",
+            "--public-affinity-dir",
+            "--data-eval-dir",
+            "--release-holdout-dir",
+            "--analysis-source-commit",
+            "--public-label",
+            "--gpus",
+            "--max-workers-per-gpu"):
+        assert flag in result.stdout
+    script = PUBLIC_EVALUATOR.read_text()
+    assert "--affinity-source no_additional_ms" in script
+    assert "--affinity-training-overlap-policy exclude" in script
+    assert "--skip-affinity-predictions" not in script
+    assert "mhcflurry train plot-loss-curves" in script
+    assert "mhcflurry plot-model-comparison" in script
+    assert "mhcflurry eval affinity-candidate-figures" in script
 
 
 def test_affinity_architecture_runner_exposes_explicit_cli():
@@ -114,6 +147,7 @@ def test_affinity_factorial_runner_validates_cli_values():
             "--pretrain-data", "/unused",
             "--data-eval-dir", "/unused",
             "--release-holdout-dir", "/unused",
+            "--public-affinity-dir", "/unused",
             "--source-commit", "deadbeef",
             "--mode", "invalid",
         ],
@@ -236,11 +270,19 @@ def test_affinity_factorial_summary_keeps_comparison_sides_separate(tmp_path):
         ],
     }
     (tmp_path / "manifest.json").write_text(json.dumps(manifest))
-    baseline_dir = tmp_path / "baseline-vs-public" / "affinity"
-    baseline_dir.mkdir(parents=True)
-    (baseline_dir / "summary.json").write_text(
-        json.dumps(metric_summary((0.9, 0.6, 0.5), (0.8, 0.4, 0.3)))
+    baseline_dir = (
+        tmp_path / "baseline-vs-public-no-additional-ms" / "affinity"
     )
+    baseline_dir.mkdir(parents=True)
+    baseline_public = metric_summary((0.9, 0.6, 0.5), (0.8, 0.4, 0.3))
+    baseline_public["benchmark_identity"] = {
+        "algorithm": "test",
+        "columns": ["source_file", "hla", "peptide", "hit"],
+        "ordered_rows": True,
+        "row_count": 10,
+        "sha256": "a" * 64,
+    }
+    (baseline_dir / "summary.json").write_text(json.dumps(baseline_public))
     candidate_dir = (
         tmp_path / candidate / "comparison-vs-baseline" / "affinity"
     )
@@ -248,6 +290,17 @@ def test_affinity_factorial_summary_keeps_comparison_sides_separate(tmp_path):
     (candidate_dir / "summary.json").write_text(
         json.dumps(metric_summary((0.91, 0.63, 0.52), (0.9, 0.6, 0.5)))
     )
+    candidate_public_dir = (
+        tmp_path / candidate / "comparison-vs-public-no-additional-ms" /
+        "affinity"
+    )
+    candidate_public_dir.mkdir(parents=True)
+    candidate_public = metric_summary(
+        (0.905, 0.625, 0.515), (0.8, 0.4, 0.3))
+    candidate_public["benchmark_identity"] = baseline_public[
+        "benchmark_identity"]
+    (candidate_public_dir / "summary.json").write_text(
+        json.dumps(candidate_public))
 
     records = module.summarize(tmp_path)
     by_condition = {record["condition"]: record for record in records}
@@ -255,8 +308,21 @@ def test_affinity_factorial_summary_keeps_comparison_sides_separate(tmp_path):
     assert by_condition[candidate]["macro_pr_auc_baseline"] == 0.6
     assert by_condition[candidate]["macro_pr_auc_delta"] == pytest.approx(0.03)
     assert by_condition[baseline]["macro_pr_auc_public"] == 0.4
-    assert by_condition[candidate]["macro_pr_auc_public"] is None
+    assert by_condition[candidate]["macro_pr_auc_public"] == 0.4
+    assert by_condition[candidate][
+        "macro_pr_auc_vs_public_candidate"] == 0.625
+    assert by_condition[candidate]["macro_pr_auc_vs_public_delta"] == (
+        pytest.approx(0.225))
+    assert by_condition[candidate][
+        "public_benchmark_identity_sha256"] == "a" * 64
     assert (tmp_path / "summary.csv").exists()
+
+    candidate_public["benchmark_identity"] = {
+        **baseline_public["benchmark_identity"], "sha256": "b" * 64}
+    (candidate_public_dir / "summary.json").write_text(
+        json.dumps(candidate_public))
+    with pytest.raises(ValueError, match="different benchmark rows"):
+        module.summarize(tmp_path)
 
 
 def test_affinity_architecture_summary_classifies_strict_dominance(tmp_path):

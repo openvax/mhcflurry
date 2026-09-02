@@ -40,6 +40,25 @@ model artifacts; explicitly requested processing modes must exist on both sides.
 The metrics directory is the reusable contract between evaluation and plotting.
 Keep it when iterating on figure style or assembling a review packet.
 
+Affinity comparison summaries include a `benchmark_identity` hash calculated
+after holdout selection, allele intersection, peptide-length filtering, and
+training-overlap exclusion. A saved prediction column can be reused without
+rerunning a baseline only when that identity matches exactly:
+
+```shell
+mhcflurry eval compare-models \
+    --a results/candidate/models.combined \
+    --b public \
+    --b-affinity-predictions results/public-comparison/affinity/predictions.csv.bz2 \
+    --b-affinity-prediction-column b_pred \
+    --out results/candidate/comparison-vs-public
+```
+
+For affinity-factorial finalists, `mhcflurry eval affinity-candidate-figures`
+combines the direct, row-identical candidate/public prediction tables into one
+monoallelic score table and figure suite. Canonical NetMHCpan BA/EL and
+MixMHCpred columns are retained when present.
+
 Keep paper figures in their own directory (the default is
 `<out>/plots/paper_figures`). The combined diagnostic `--summary-pdf` may be a
 top-level file under `<out>/plots` or live outside the plot tree, but it cannot

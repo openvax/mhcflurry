@@ -69,6 +69,12 @@ def test_snapshot_experiment_exports_reconstructable_tables(tmp_path):
         "a_roc_auc": 0.9,
         "b_roc_auc": 0.8,
     }]).to_csv(comparison / "per_allele.csv", index=False)
+    predictions = comparison / "predictions.csv.bz2"
+    predictions.write_bytes(
+        b"held-out predictions larger than test limit" * 10)
+    figure = comparison / "plots" / "model_comparison_figures.pdf"
+    figure.parent.mkdir()
+    figure.write_bytes(b"pdf")
     (conditions / "condition-a.yaml").write_text("minibatch_size: 256\n")
     (source / "gpu_occupancy.csv").write_text("timestamp,gpu_util\n1,99\n")
     command = source / "command.sh"
@@ -89,6 +95,7 @@ def test_snapshot_experiment_exports_reconstructable_tables(tmp_path):
         source_archive=source_archive,
         command_files=[command],
         input_files=[input_data],
+        max_copy_bytes=64,
         captured_at=datetime(2026, 9, 2, 12, 34, 56, tzinfo=timezone.utc),
     )
 
@@ -133,6 +140,15 @@ def test_snapshot_experiment_exports_reconstructable_tables(tmp_path):
     assert (
         destination / "artifacts" / "condition-a" /
         "comparison-vs-baseline" / "affinity" / "per_allele.csv"
+    ).exists()
+    assert (
+        destination / "artifacts" / "condition-a" /
+        "comparison-vs-baseline" / "affinity" / "predictions.csv.bz2"
+    ).read_bytes() == predictions.read_bytes()
+    assert (
+        destination / "artifacts" / "condition-a" /
+        "comparison-vs-baseline" / "affinity" / "plots" /
+        "model_comparison_figures.pdf"
     ).exists()
     assert (destination / "source" / source_archive.name).exists()
     assert (destination / "supplemental" / "command" / command.name).exists()

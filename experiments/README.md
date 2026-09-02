@@ -27,12 +27,14 @@ Each snapshot contains:
 - `data/training_history.csv`: one plot-friendly row per model/fit/epoch;
 - `data/models.csv`, `data/fits.csv`, and `data/model_configs.jsonl`;
 - `artifacts/`: copied hyperparameters, manifests, metrics, telemetry, and logs;
+- held-out `predictions.csv[.bz2]` tables and generated PDF/PNG/SVG figures;
 - optional source archive and exact command files.
 
-Weights and training tables are hashed but are not duplicated by default. Files
-larger than `--max-copy-mb` also remain inventory-only. Preserve the original
-run until the snapshot and any required model archives have been copied to
-durable storage.
+Held-out prediction tables are copied even when they exceed `--max-copy-mb`, so
+performance figures can be regenerated without rerunning inference. Weights and
+training tables are hashed but are not duplicated by default. Other files larger
+than `--max-copy-mb` remain inventory-only. Preserve the original run until the
+snapshot and any required model archives have been copied to durable storage.
 
 Generated snapshot directories are ignored by Git; this README is tracked.
 
@@ -54,6 +56,27 @@ mhcflurry plot-model-comparison \
     --input experiments/<snapshot>/artifacts/<condition>/comparison-vs-baseline \
     --summary-pdf experiments/<snapshot>/plots/<condition>-comparison.pdf
 ```
+
+Affinity-factorial runs create one direct, overlap-excluded comparison and one
+review PDF per candidate against the pinned public `models.no_additional_ms`
+predictor. `benchmark_identity.sha256` in each `affinity/summary.json` proves
+that the candidate/public comparisons used identical ordered holdout rows.
+
+For a shortlist, build one shared prediction/score table and a paper-figure
+suite containing every finalist plus public 2.2:
+
+```bash
+mhcflurry eval affinity-candidate-figures \
+    --factorial-dir experiments/<snapshot>/artifacts \
+    --condition <candidate-a> \
+    --condition <candidate-b> \
+    --out experiments/<snapshot>/finalist_figures
+```
+
+Canonical external columns already present in the held-out predictions, such as
+`netmhcpan4.ba`, `netmhcpan4.el`, and `mixmhcpred`, are retained automatically.
+Absent external predictors remain absent rather than being fabricated; they can
+first be added with `mhcflurry eval paper-figures external-predictors`.
 
 `artifacts/summary.csv` is the stable optimizer × LSUV × minibatch table for
 factorial heatmaps. `data/training_history.csv` is the corresponding tidy

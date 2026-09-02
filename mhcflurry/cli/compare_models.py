@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import ast
 import glob
+import hashlib
 import json
 import os
 import shutil
@@ -195,6 +196,23 @@ def register_subparser(parser):
                     % (role, letter.upper())
                 ),
             )
+        parser.add_argument(
+            "--%s-affinity-predictions" % letter,
+            help=(
+                "Reuse a saved, row-identical affinity prediction table for "
+                "side %s instead of rerunning that predictor. The table's "
+                "cohort identity is verified before scores are accepted."
+                % letter.upper()
+            ),
+        )
+        parser.add_argument(
+            "--%s-affinity-prediction-column" % letter,
+            default="%s_pred" % letter,
+            help=(
+                "Prediction column in --%s-affinity-predictions. "
+                "Default: %%(default)s" % letter
+            ),
+        )
     parser.add_argument(
         "--out", required=True,
         help="Output directory. Subdirs per component are created here.",
@@ -353,6 +371,11 @@ def _validate_comparison_output_location(args):
             value = getattr(args, "%s_%s_dir" % (letter, role))
             if value:
                 inputs.append(("--%s-%s-dir" % (letter, role), value))
+        predictions = getattr(
+            args, "%s_affinity_predictions" % letter, None)
+        if predictions:
+            inputs.append((
+                "--%s-affinity-predictions" % letter, predictions))
     for option, value in inputs:
         path = os.path.realpath(value)
         try:
@@ -684,6 +707,14 @@ def _processing_model_dirs(side_a, side_b, requested_modes):
 
 def _validate_component_configuration(args, components, side_a, side_b):
     """Validate component-specific options before output cleanup begins."""
+    if "affinity" in components:
+        for letter in ("a", "b"):
+            path = getattr(
+                args, "%s_affinity_predictions" % letter, None)
+            if path and not os.path.isfile(path):
+                raise ValueError(
+                    "--%s-affinity-predictions is not a file: %s" %
+                    (letter, path))
     if "processing" in components:
         modes = _requested_modes(
             args.processing_modes, PROCESSING_MODES, "--processing-modes")
@@ -1215,6 +1246,45 @@ def _load_presentation_benchmark_for_component(data_dir, args, component):
     )
 
 
+def _sha256_file(path, chunk_size=1024 * 1024):
+    digest = hashlib.sha256()
+    with open(path, "rb") as fd:
+        for chunk in iter(lambda: fd.read(chunk_size), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _load_reused_affinity_predictions(
+        path, prediction_column, expected_identity, label):
+    """Load saved predictions after proving their cohort is identical."""
+    path = os.path.abspath(path)
+    if not os.path.isfile(path):
+        raise ValueError(
+            "Saved affinity predictions for %s do not exist: %s" %
+            (label, path))
+    required = ["source_file", "hla", "peptide", "hit", prediction_column]
+    try:
+        saved = pandas.read_csv(path, usecols=required)
+    except ValueError as error:
+        raise ValueError(
+            "Saved affinity predictions for %s lack a required column: %s" %
+            (label, error)) from error
+    identity = _affinity_benchmark_identity(saved)
+    if identity != expected_identity:
+        raise ValueError(
+            "Saved affinity predictions for %s use different benchmark rows: "
+            "%s versus %s" % (label, identity, expected_identity))
+    values = pandas.to_numeric(
+        saved[prediction_column], errors="coerce").to_numpy()
+    return values, {
+        "mode": "reused",
+        "path": path,
+        "prediction_column": prediction_column,
+        "sha256": _sha256_file(path),
+        "benchmark_identity": identity,
+    }
+
+
 def _run_affinity(side_a, side_b, args):
     component_dir = os.path.join(args.out, "affinity")
     os.makedirs(component_dir, exist_ok=True)
@@ -1268,24 +1338,43 @@ def _run_affinity(side_a, side_b, args):
                 os.path.join(component_dir, "training_overlap.json"),
                 "w") as fd:
             json.dump(training_overlap, fd, indent=2, sort_keys=True)
+    benchmark_identity = _affinity_benchmark_identity(test)
     _stamp("  evaluable rows: %d" % len(test))
 
     comparison_model_bytes = max(
         model_artifact_size_bytes(side_a["paths"]["affinity"]) or 0,
         model_artifact_size_bytes(side_b["paths"]["affinity"]) or 0,
     ) or None
-    _stamp("predicting side A affinity...")
-    test["a_pred"] = _parallel_affinity_predict(
-        affinity_args, side_a["paths"]["affinity"],
-        test.peptide.values, test.hla.values,
-        model_bytes=comparison_model_bytes,
-    )
-    _stamp("predicting side B affinity...")
-    test["b_pred"] = _parallel_affinity_predict(
-        affinity_args, side_b["paths"]["affinity"],
-        test.peptide.values, test.hla.values,
-        model_bytes=comparison_model_bytes,
-    )
+    prediction_sources = {}
+    for letter, side in (("a", side_a), ("b", side_b)):
+        saved_path = getattr(
+            args, "%s_affinity_predictions" % letter, None)
+        if saved_path:
+            _stamp("reusing side %s affinity predictions..." % letter.upper())
+            predictions, source = _load_reused_affinity_predictions(
+                saved_path,
+                getattr(
+                    args,
+                    "%s_affinity_prediction_column" % letter,
+                    "%s_pred" % letter,
+                ),
+                benchmark_identity,
+                side["label"],
+            )
+        else:
+            _stamp("predicting side %s affinity..." % letter.upper())
+            predictions = _parallel_affinity_predict(
+                affinity_args, side["paths"]["affinity"],
+                test.peptide.values, test.hla.values,
+                model_bytes=comparison_model_bytes,
+            )
+            source = {
+                "mode": "computed",
+                "predictor_dir": side["paths"]["affinity"],
+                "benchmark_identity": benchmark_identity,
+            }
+        test["%s_pred" % letter] = predictions
+        prediction_sources[letter] = source
     _require_valid_affinity_predictions(
         test,
         labels=(side_a["label"], side_b["label"]),
@@ -1321,12 +1410,48 @@ def _run_affinity(side_a, side_b, args):
         )
 
     summary = _affinity_summary(test, per_allele, per_length)
+    summary["benchmark_identity"] = benchmark_identity
+    summary["prediction_sources"] = prediction_sources
     if training_overlap is not None:
         summary["training_overlap"] = training_overlap
     with open(os.path.join(component_dir, "summary.json"), "w") as fd:
         json.dump(summary, fd, indent=2, sort_keys=True)
     _stamp("  wrote summary.json")
     return summary
+
+
+def _affinity_benchmark_identity(test):
+    """Return a stable within-version identity for scored affinity rows.
+
+    This is intentionally calculated after allele intersection, peptide-length
+    filtering, frozen-holdout selection, and training-overlap exclusion. It
+    lets a factorial evaluator prove that every candidate/public comparison
+    used the same rows instead of inferring comparability from row counts.
+    """
+    columns = [
+        column
+        for column in ("source_file", "hla", "peptide", "hit")
+        if column in test
+    ]
+    if columns != ["source_file", "hla", "peptide", "hit"]:
+        raise ValueError(
+            "Affinity benchmark identity requires columns: "
+            "source_file, hla, peptide, hit")
+    row_hashes = pandas.util.hash_pandas_object(
+        test[columns], index=False, categorize=True,
+    ).to_numpy(dtype="<u8", copy=False)
+    digest = hashlib.sha256()
+    digest.update(b"mhcflurry-affinity-benchmark-identity-v1\0")
+    digest.update("\0".join(columns).encode("utf-8"))
+    digest.update(b"\0")
+    digest.update(row_hashes.tobytes())
+    return {
+        "algorithm": "pandas-row-hash-sha256-v1",
+        "columns": columns,
+        "ordered_rows": True,
+        "row_count": int(len(test)),
+        "sha256": digest.hexdigest(),
+    }
 
 
 def _affinity_per_allele(test):

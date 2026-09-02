@@ -13,6 +13,7 @@ Required:
   --pretrain-data PATH               Affinity pretraining predictions
   --data-eval-dir PATH               Evaluation data directory
   --release-holdout-dir PATH         Frozen release-holdout manifests
+  --public-affinity-dir PATH         Official models.no_additional_ms predictor
   --source-commit COMMIT             Exact source commit being evaluated
 
 Experiment controls:
@@ -52,6 +53,7 @@ ALLELE_SEQUENCES=""
 PRETRAIN_DATA=""
 DATA_EVAL_DIR=""
 RELEASE_HOLDOUT_DIR=""
+PUBLIC_AFFINITY_DIR=""
 SOURCE_COMMIT=""
 FACTORIAL_MODE="representative"
 RELEASE_RANDOM_SEED=42
@@ -82,6 +84,8 @@ while [ "$#" -gt 0 ]; do
             require_value "$@"; DATA_EVAL_DIR="$2"; shift 2 ;;
         --release-holdout-dir)
             require_value "$@"; RELEASE_HOLDOUT_DIR="$2"; shift 2 ;;
+        --public-affinity-dir)
+            require_value "$@"; PUBLIC_AFFINITY_DIR="$2"; shift 2 ;;
         --source-commit)
             require_value "$@"; SOURCE_COMMIT="$2"; shift 2 ;;
         --mode)
@@ -125,7 +129,7 @@ fi
 
 for required in \
         MHCFLURRY_OUT TRAIN_DATA ALLELE_SEQUENCES PRETRAIN_DATA \
-        DATA_EVAL_DIR RELEASE_HOLDOUT_DIR SOURCE_COMMIT; do
+        DATA_EVAL_DIR RELEASE_HOLDOUT_DIR PUBLIC_AFFINITY_DIR SOURCE_COMMIT; do
     if [ -z "${!required}" ]; then
         printf 'Missing required argument for %s\n' "$required" >&2
         usage >&2
@@ -194,7 +198,8 @@ for path_and_name in \
 done
 for path_and_name in \
         "$DATA_EVAL_DIR:--data-eval-dir" \
-        "$RELEASE_HOLDOUT_DIR:--release-holdout-dir"; do
+        "$RELEASE_HOLDOUT_DIR:--release-holdout-dir" \
+        "$PUBLIC_AFFINITY_DIR:--public-affinity-dir"; do
     path="${path_and_name%%:*}"
     name="${path_and_name#*:}"
     if [ ! -d "$path" ]; then
@@ -207,6 +212,13 @@ for holdout_file in \
     if [ ! -f "$RELEASE_HOLDOUT_DIR/$holdout_file" ]; then
         printf '%s is missing required file: %s\n' \
             '--release-holdout-dir' "$holdout_file" >&2
+        exit 2
+    fi
+done
+for public_file in manifest.csv train_data.csv.bz2; do
+    if [ ! -f "$PUBLIC_AFFINITY_DIR/$public_file" ]; then
+        printf '%s is missing required file: %s\n' \
+            '--public-affinity-dir' "$public_file" >&2
         exit 2
     fi
 done
@@ -274,11 +286,6 @@ else
     )"
 fi
 
-AFFINITY_PREDICTION_ARTIFACT_ARGS=()
-if [ "$FACTORIAL_MODE" = "representative" ]; then
-    AFFINITY_PREDICTION_ARTIFACT_ARGS=(--skip-affinity-predictions)
-fi
-
 {
     printf '%s\n' \
         "schema_version=1" \
@@ -296,6 +303,7 @@ fi
         "experiments_dir=$EXPERIMENTS_DIR" \
         "experiment_name=$EXPERIMENT_NAME" \
         "source_archive=$SOURCE_ARCHIVE" \
+        "public_affinity_dir=$PUBLIC_AFFINITY_DIR" \
         "baseline_condition=$BASELINE_CONDITION"
     sha256sum \
         "$TRAIN_DATA" \
@@ -305,6 +313,9 @@ fi
         "$RELEASE_HOLDOUT_DIR/affinity_samples.csv" \
         "$RELEASE_HOLDOUT_DIR/affinity_pmhcs.csv" \
         "$MHCFLURRY_OUT/manifest.json"
+    while IFS= read -r public_file; do
+        sha256sum "$public_file"
+    done < <(find "$PUBLIC_AFFINITY_DIR" -maxdepth 1 -type f | sort)
 } > "$MHCFLURRY_OUT/provenance.txt"
 
 # shellcheck disable=SC1091
@@ -397,32 +408,22 @@ while IFS= read -r condition; do
         predictor="$unselected"
     fi
     printf '%s\n' "$predictor" > "$condition_out/predictor_path.txt"
+    if [ ! -f "$condition_out/.loss-plots.done" ]; then
+        loss_plot_args=(
+            --selected-dir "$predictor"
+            --out "$condition_out/loss_plots"
+        )
+        if [ "$predictor" != "$unselected" ]; then
+            loss_plot_args+=(--unselected-dir "$unselected")
+        fi
+        mhcflurry train plot-loss-curves "${loss_plot_args[@]}"
+        date -u +%Y-%m-%dT%H:%M:%SZ \
+            > "$condition_out/.loss-plots.done"
+    fi
 done
 
 baseline_predictor="$(cat \
     "$MHCFLURRY_OUT/$BASELINE_CONDITION/predictor_path.txt")"
-baseline_eval="$MHCFLURRY_OUT/baseline-vs-public"
-if [ ! -f "$baseline_eval/.done" ]; then
-    mkdir -p "$baseline_eval"
-    mhcflurry eval compare-models \
-        --a "$baseline_predictor" \
-        --a-label "$BASELINE_CONDITION" \
-        --b public \
-        --data-dir "$DATA_EVAL_DIR" \
-        --release-holdout-dir "$RELEASE_HOLDOUT_DIR" \
-        --affinity-training-overlap-policy audit \
-        "${AFFINITY_PREDICTION_ARTIFACT_ARGS[@]}" \
-        --include affinity \
-        --out "$baseline_eval" \
-        --num-jobs auto \
-        --gpus "$GPUS" \
-        --max-workers-per-gpu "$MAX_WORKERS_PER_GPU" \
-        --max-tasks-per-worker "$MAX_TASKS_PER_WORKER" \
-        --torch-compile "$TORCH_COMPILE" \
-        --matmul-precision "$MATMUL_PRECISION" \
-        2>&1 | tee "$baseline_eval/eval.log"
-    date -u +%Y-%m-%dT%H:%M:%SZ > "$baseline_eval/.done"
-fi
 
 tail -n +2 "$MHCFLURRY_OUT/manifest.csv" | cut -d, -f1 | \
 while IFS= read -r condition; do
@@ -444,8 +445,8 @@ while IFS= read -r condition; do
             --b-label "$BASELINE_CONDITION" \
             --data-dir "$DATA_EVAL_DIR" \
             --release-holdout-dir "$RELEASE_HOLDOUT_DIR" \
-            --affinity-training-overlap-policy audit \
-            "${AFFINITY_PREDICTION_ARTIFACT_ARGS[@]}" \
+            --affinity-source no_additional_ms \
+            --affinity-training-overlap-policy exclude \
             --include affinity \
             --out "$comparison" \
             --num-jobs auto \
@@ -457,35 +458,27 @@ while IFS= read -r condition; do
             2>&1 | tee "$comparison/eval.log"
         date -u +%Y-%m-%dT%H:%M:%SZ > "$comparison/.done"
     fi
-    if [ "$FACTORIAL_MODE" = "full" ]; then
-        public_comparison="$condition_out/comparison-vs-public"
-        if [ ! -f "$public_comparison/.done" ]; then
-            mkdir -p "$public_comparison"
-            mhcflurry eval compare-models \
-                --a "$predictor" \
-                --a-label "$condition" \
-                --b public \
-                --data-dir "$DATA_EVAL_DIR" \
-                --release-holdout-dir "$RELEASE_HOLDOUT_DIR" \
-                --affinity-training-overlap-policy audit \
-                --include affinity \
-                --out "$public_comparison" \
-                --num-jobs auto \
-                --gpus "$GPUS" \
-                --max-workers-per-gpu "$MAX_WORKERS_PER_GPU" \
-                --max-tasks-per-worker "$MAX_TASKS_PER_WORKER" \
-                --torch-compile "$TORCH_COMPILE" \
-                --matmul-precision "$MATMUL_PRECISION" \
-                2>&1 | tee "$public_comparison/eval.log"
-            date -u +%Y-%m-%dT%H:%M:%SZ > "$public_comparison/.done"
-        fi
+    if [ ! -f "$comparison/.plots.done" ]; then
+        mhcflurry plot-model-comparison \
+            --input "$comparison" \
+            --components affinity \
+            --summary-pdf "$comparison/plots/model_comparison_figures.pdf"
+        date -u +%Y-%m-%dT%H:%M:%SZ > "$comparison/.plots.done"
     fi
-    python "$SCRIPT_DIR/summarize_affinity_factorial.py" \
-        "$MHCFLURRY_OUT" > "$MHCFLURRY_OUT/summary.stdout.json"
 done
 
-python "$SCRIPT_DIR/summarize_affinity_factorial.py" \
-    "$MHCFLURRY_OUT" > "$MHCFLURRY_OUT/summary.stdout.json"
+bash "$SCRIPT_DIR/evaluate_affinity_factorial_public.sh" \
+    --factorial-dir "$MHCFLURRY_OUT" \
+    --public-affinity-dir "$PUBLIC_AFFINITY_DIR" \
+    --public-label public-2.2-no-additional-ms \
+    --data-eval-dir "$DATA_EVAL_DIR" \
+    --release-holdout-dir "$RELEASE_HOLDOUT_DIR" \
+    --analysis-source-commit "$SOURCE_COMMIT" \
+    --gpus "$GPUS" \
+    --max-workers-per-gpu "$MAX_WORKERS_PER_GPU" \
+    --max-tasks-per-worker "$MAX_TASKS_PER_WORKER" \
+    --torch-compile "$TORCH_COMPILE" \
+    --matmul-precision "$MATMUL_PRECISION"
 
 date -u +%Y-%m-%dT%H:%M:%SZ > "$MHCFLURRY_OUT/completed_at_utc.txt"
 stop_gpu_telemetry
@@ -501,6 +494,8 @@ if [ -n "$EXPERIMENTS_DIR" ]; then
         --input-file "$TRAIN_DATA"
         --input-file "$ALLELE_SEQUENCES"
         --input-file "$PRETRAIN_DATA"
+        --input-file "$PUBLIC_AFFINITY_DIR/manifest.csv"
+        --input-file "$PUBLIC_AFFINITY_DIR/train_data.csv.bz2"
         --input-file "$RELEASE_HOLDOUT_DIR/policy.json"
         --input-file "$RELEASE_HOLDOUT_DIR/affinity_samples.csv"
         --input-file "$RELEASE_HOLDOUT_DIR/affinity_pmhcs.csv"

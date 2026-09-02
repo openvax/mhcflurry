@@ -29,6 +29,8 @@ available:
   saved benchmark prediction table.
 * ``mhcflurry eval paper-figures run`` runs compare-models, paper-figures, and
   plot-model-comparison as one local evaluation/figure pipeline.
+* ``mhcflurry eval affinity-candidate-figures`` builds a common held-out
+  prediction table and paper-figure suite for shortlisted affinity candidates.
 
 Future benchmark-prediction and external-predictor registration commands should
 be added under this namespace rather than as new top-level commands.
@@ -70,6 +72,11 @@ def make_parser(prog="mhcflurry eval"):
     sub.add_parser(
         "plot-model-comparison",
         help="Compatibility alias for plot-comparison.",
+        add_help=False,
+    )
+    sub.add_parser(
+        "affinity-candidate-figures",
+        help="Compare shortlisted affinity candidates on one saved cohort.",
         add_help=False,
     )
     paper = sub.add_parser(
@@ -121,6 +128,10 @@ def run_argv(argv, prog="mhcflurry eval"):
         from . import plot_model_comparison
         return _run_existing_command(
             plot_model_comparison, rest, "%s %s" % (prog, subcommand))
+    if subcommand == "affinity-candidate-figures":
+        from . import affinity_candidate_figures
+        return affinity_candidate_figures.run_argv(
+            rest, prog="%s affinity-candidate-figures" % prog)
     if subcommand == "paper-figures":
         return _run_paper_figures(rest, "%s paper-figures" % prog)
 
@@ -138,6 +149,8 @@ def format_help(prog="mhcflurry eval"):
         "Subcommands:",
         "  compare-models          Compare two model ensembles.",
         "  plot-comparison         Render diagnostic plots from compare output.",
+        "  affinity-candidate-figures",
+        "                          Plot finalists and public on one saved cohort.",
         "  paper-figures render    Render paper figures from saved inputs.",
         "  paper-figures score-predictions",
         "                          Derive score tables from saved predictions.",
