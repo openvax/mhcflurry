@@ -31,10 +31,14 @@ Each snapshot contains:
 - optional source archive and exact command files.
 
 Held-out prediction tables are copied even when they exceed `--max-copy-mb`, so
-performance figures can be regenerated without rerunning inference. Weights and
-training tables are hashed but are not duplicated by default. Other files larger
-than `--max-copy-mb` remain inventory-only. Preserve the original run until the
-snapshot and any required model archives have been copied to durable storage.
+performance figures can be regenerated without rerunning inference. On the same
+filesystem they are hard-linked into the immutable snapshot to avoid duplicating
+multi-gigabyte tables; `source_files.csv` records `storage=hardlink` or `copy`.
+Cross-filesystem snapshots fall back to normal copies. Weights and training
+tables are hashed but are not duplicated by default. Other files larger than
+`--max-copy-mb` remain inventory-only. Do not modify hard-linked source outputs;
+preserve the original run until the snapshot and required model archives have
+been copied to durable storage.
 
 Generated snapshot directories are ignored by Git; this README is tracked.
 

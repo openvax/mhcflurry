@@ -134,6 +134,7 @@ def test_snapshot_experiment_exports_reconstructable_tables(tmp_path):
         inventory.relative_path.str.endswith(weight.name)].iloc[0]
     assert weight_row.sha256 == sha256_file(weight)
     assert not bool(weight_row.copied)
+    assert weight_row.storage == "inventory_only"
     metric_row = inventory.loc[
         inventory.relative_path.str.endswith("per_allele.csv")].iloc[0]
     assert bool(metric_row.copied)
@@ -145,6 +146,13 @@ def test_snapshot_experiment_exports_reconstructable_tables(tmp_path):
         destination / "artifacts" / "condition-a" /
         "comparison-vs-baseline" / "affinity" / "predictions.csv.bz2"
     ).read_bytes() == predictions.read_bytes()
+    prediction_row = inventory.loc[
+        inventory.relative_path.str.endswith("predictions.csv.bz2")].iloc[0]
+    assert prediction_row.storage == "hardlink"
+    assert (
+        destination / "artifacts" / "condition-a" /
+        "comparison-vs-baseline" / "affinity" / "predictions.csv.bz2"
+    ).stat().st_ino == predictions.stat().st_ino
     assert (
         destination / "artifacts" / "condition-a" /
         "comparison-vs-baseline" / "affinity" / "plots" /

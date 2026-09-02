@@ -243,6 +243,18 @@ def _copy_regardless_of_size(role):
     return role == "prediction"
 
 
+def _copy_artifact(source, target, prefer_hardlink=False):
+    """Copy an artifact, or hard-link immutable large data when possible."""
+    if prefer_hardlink:
+        try:
+            os.link(source, target)
+            return "hardlink"
+        except OSError:
+            pass
+    shutil.copy2(source, target)
+    return "copy"
+
+
 def _environment_record():
     distributions = {}
     for distribution in metadata.distributions():
@@ -376,23 +388,32 @@ def snapshot_experiment(
         size = source_path.stat().st_size
         copied = _copy_role(role) and (
             size <= max_copy_bytes or _copy_regardless_of_size(role))
+        storage = "inventory_only"
         if copied:
             target = artifacts_dir / relative_path
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source_path, target)
+            storage = _copy_artifact(
+                source_path,
+                target,
+                prefer_hardlink=role == "prediction",
+            )
         inventory.append({
             "relative_path": relative_path.as_posix(),
             "role": role,
             "size_bytes": size,
             "sha256": sha256_file(source_path),
             "copied": copied,
+            "storage": storage,
         })
 
     training_tables = export_training_tables(source_dir, data_dir)
     _write_csv(
         temporary / "source_files.csv",
         inventory,
-        ("relative_path", "role", "size_bytes", "sha256", "copied"),
+        (
+            "relative_path", "role", "size_bytes", "sha256", "copied",
+            "storage",
+        ),
     )
     _write_csv(
         temporary / "external_inputs.csv",
@@ -468,7 +489,9 @@ def snapshot_experiment(
             "Comparison tables, telemetry, configs, manifests, and logs are "
             "under `artifacts/`. Held-out prediction tables and generated "
             "figures are copied there even when prediction files exceed the "
-            "ordinary artifact-size threshold.",
+            "ordinary artifact-size threshold. Same-filesystem prediction "
+            "tables use hard links to avoid duplicate storage; their storage "
+            "mode is recorded in `source_files.csv`.",
             "",
             "`source_files.csv` inventories every original artifact by SHA256. "
             "Large weights and training tables are checksummed but intentionally "
