@@ -14,6 +14,8 @@ Required:
   --analysis-source-commit COMMIT    Exact comparison-code commit
 
 Optional:
+  --external-predictions FILE        Benchmark-aligned NetMHCpan/MixMHCpred
+                                      table for combined candidate figures
   --public-label LABEL               Report label (default: public-no-additional-ms)
   --gpus INTEGER|auto                GPU count (default: auto)
   --max-workers-per-gpu INTEGER|auto Worker density (default: auto)
@@ -38,6 +40,7 @@ PUBLIC_AFFINITY_DIR=""
 DATA_EVAL_DIR=""
 RELEASE_HOLDOUT_DIR=""
 ANALYSIS_SOURCE_COMMIT=""
+EXTERNAL_PREDICTIONS=""
 PUBLIC_LABEL="public-no-additional-ms"
 GPUS="auto"
 MAX_WORKERS_PER_GPU="auto"
@@ -57,6 +60,8 @@ while [ "$#" -gt 0 ]; do
             require_value "$@"; RELEASE_HOLDOUT_DIR="$2"; shift 2 ;;
         --analysis-source-commit)
             require_value "$@"; ANALYSIS_SOURCE_COMMIT="$2"; shift 2 ;;
+        --external-predictions)
+            require_value "$@"; EXTERNAL_PREDICTIONS="$2"; shift 2 ;;
         --public-label)
             require_value "$@"; PUBLIC_LABEL="$2"; shift 2 ;;
         --gpus)
@@ -77,6 +82,11 @@ while [ "$#" -gt 0 ]; do
             exit 2 ;;
     esac
 done
+if [ -n "$EXTERNAL_PREDICTIONS" ] && [ ! -f "$EXTERNAL_PREDICTIONS" ]; then
+    printf 'External predictions file does not exist: %s\n' \
+        "$EXTERNAL_PREDICTIONS" >&2
+    exit 2
+fi
 
 for required in \
         FACTORIAL_DIR PUBLIC_AFFINITY_DIR DATA_EVAL_DIR \
@@ -145,6 +155,12 @@ PROVENANCE="$FACTORIAL_DIR/public_comparison_provenance.txt"
     while IFS= read -r public_file; do
         sha256sum "$public_file"
     done < <(find "$PUBLIC_AFFINITY_DIR" -maxdepth 1 -type f | sort)
+    if [ -n "$EXTERNAL_PREDICTIONS" ]; then
+        sha256sum "$EXTERNAL_PREDICTIONS"
+        if [ -f "$EXTERNAL_PREDICTIONS.provenance.json" ]; then
+            sha256sum "$EXTERNAL_PREDICTIONS.provenance.json"
+        fi
+    fi
 } > "$PROVENANCE"
 
 conditions=("$BASELINE_CONDITION")
@@ -252,6 +268,11 @@ if [ ! -f "$candidate_figure_out/.done" ]; then
     if [ "${#candidate_figure_args[@]}" -eq 0 ]; then
         printf 'No trained predictor paths were available for figures.\n' >&2
         exit 2
+    fi
+    if [ -n "$EXTERNAL_PREDICTIONS" ]; then
+        candidate_figure_args+=(
+            --external-predictions "$EXTERNAL_PREDICTIONS"
+        )
     fi
     mhcflurry eval affinity-candidate-figures \
         --factorial-dir "$FACTORIAL_DIR" \

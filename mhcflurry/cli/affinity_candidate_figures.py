@@ -21,6 +21,27 @@ from mhcflurry.experiment_archive import sha256_file
 BASELINE_PUBLIC_COMPARISON = "baseline-vs-public-no-additional-ms"
 PUBLIC_COMPARISON = "comparison-vs-public-no-additional-ms"
 IDENTITY_COLUMNS = ("source_file", "hla", "peptide", "hit")
+BENCHMARK_METADATA_COLUMNS = (
+    "source_file",
+    "protein_accession",
+    "sample_id",
+    "hla",
+    "peptide",
+    "peptide_len",
+    "n_flank",
+    "c_flank",
+    "hit",
+    "allele",
+)
+EXTERNAL_JOIN_COLUMNS = (
+    "protein_accession",
+    "sample_id",
+    "hla",
+    "peptide",
+    "n_flank",
+    "c_flank",
+    "hit",
+)
 
 
 def make_parser(prog="mhcflurry eval affinity-candidate-figures"):
@@ -38,6 +59,17 @@ def make_parser(prog="mhcflurry eval affinity-candidate-figures"):
         "--public-predictor-name",
         default="mhcflurry_public_2_2",
         help="Column/legend name for the pinned public predictor.",
+    )
+    parser.add_argument(
+        "--external-predictions",
+        action="append",
+        default=[],
+        metavar="CSV[.bz2]",
+        help=(
+            "Benchmark-aligned table containing NetMHCpan/MixMHCpred "
+            "columns. Repeat to merge multiple tables. Every candidate row "
+            "must match exactly one external row."
+        ),
     )
     parser.add_argument(
         "--formats", default="svg,pdf,png",
@@ -88,8 +120,97 @@ def _predictor_info_row(name, description, primary=False, color=None):
     }
 
 
+def _merge_external_predictions(combined, paths, canonical_columns):
+    """Join canonical external scores with strict row-coverage validation."""
+    records = []
+    for path_value in paths:
+        path = Path(path_value).expanduser().resolve()
+        if not path.is_file():
+            raise ValueError("Missing external prediction table: %s" % path)
+        external = pandas.read_csv(path)
+        missing_keys = [
+            column for column in EXTERNAL_JOIN_COLUMNS
+            if column not in combined or column not in external
+        ]
+        if missing_keys:
+            raise ValueError(
+                "External prediction join lacks stable key column(s) in %s: "
+                "%s" % (path, ", ".join(missing_keys)))
+        score_columns = [
+            column for column in external.columns
+            if column in canonical_columns
+        ]
+        if not score_columns:
+            raise ValueError(
+                "External prediction table has no supported predictor "
+                "columns: %s" % path)
+        duplicate_columns = [
+            column for column in score_columns if column in combined
+        ]
+        if duplicate_columns:
+            raise ValueError(
+                "External predictor column already exists before joining %s: "
+                "%s" % (path, ", ".join(duplicate_columns)))
+        if combined.duplicated(list(EXTERNAL_JOIN_COLUMNS)).any():
+            raise ValueError(
+                "Candidate benchmark rows are not unique on external join "
+                "columns")
+        if external.duplicated(list(EXTERNAL_JOIN_COLUMNS)).any():
+            raise ValueError(
+                "External prediction rows are not unique on join columns: %s" %
+                path)
+
+        original_rows = len(combined)
+        combined["_candidate_row_order"] = numpy.arange(original_rows)
+        combined = combined.merge(
+            external[list(EXTERNAL_JOIN_COLUMNS) + score_columns],
+            on=list(EXTERNAL_JOIN_COLUMNS),
+            how="left",
+            sort=False,
+            validate="one_to_one",
+            indicator="_external_merge",
+        )
+        unmatched = int((combined["_external_merge"] != "both").sum())
+        if unmatched:
+            raise ValueError(
+                "External prediction table failed to cover %d of %d candidate "
+                "rows: %s" % (unmatched, original_rows, path))
+        combined = combined.sort_values("_candidate_row_order")
+        combined = combined.drop(
+            columns=["_candidate_row_order", "_external_merge"])
+        combined.index = pandas.RangeIndex(len(combined))
+        if len(combined) != original_rows:
+            raise ValueError(
+                "External prediction join changed candidate row count: %s" %
+                path)
+        companion = Path("%s.provenance.json" % path)
+        records.append({
+            "path": str(path),
+            "sha256": sha256_file(path),
+            "source_rows": len(external),
+            "matched_candidate_rows": original_rows,
+            "join_columns": list(EXTERNAL_JOIN_COLUMNS),
+            "predictor_columns": score_columns,
+            "finite_prediction_rows": {
+                column: int(numpy.isfinite(
+                    pandas.to_numeric(combined[column], errors="coerce")
+                ).sum())
+                for column in score_columns
+            },
+            "companion_provenance": (
+                {
+                    "path": str(companion),
+                    "sha256": sha256_file(companion),
+                }
+                if companion.is_file() else None
+            ),
+        })
+    return combined, records
+
+
 def build_candidate_figure_inputs(
-        factorial_dir, out_dir, conditions, public_predictor_name):
+        factorial_dir, out_dir, conditions, public_predictor_name,
+        external_predictions=()):
     """Write and return common-cohort predictions and score metadata."""
     from . import paper_figures
 
@@ -145,10 +266,10 @@ def build_candidate_figure_inputs(
                 "Prediction table for %s lacks: %s" % (
                     condition, ", ".join(missing)))
         if combined is None:
-            metadata_columns = list(IDENTITY_COLUMNS)
-            for optional in ("peptide_len", "sample_id", "allele"):
-                if optional in predictions and optional not in metadata_columns:
-                    metadata_columns.append(optional)
+            metadata_columns = [
+                column for column in BENCHMARK_METADATA_COLUMNS
+                if column in predictions
+            ]
             external_columns = [
                 column for column in predictions.columns
                 if column in canonical_external_columns
@@ -206,6 +327,12 @@ def build_candidate_figure_inputs(
             "benchmark_identity_sha256": identity["sha256"],
         })
 
+    combined, external_prediction_sources = _merge_external_predictions(
+        combined,
+        external_predictions,
+        canonical_external_columns,
+    )
+
     external_columns = [
         column for column in combined.columns
         if column in canonical_external_columns
@@ -250,6 +377,7 @@ def build_candidate_figure_inputs(
         "public_predictor_name": public_predictor_name,
         "public_prediction_max_abs_diff": public_prediction_max_abs_diff,
         "external_predictors_included": external_columns,
+        "external_prediction_sources": external_prediction_sources,
         "source_comparisons": records,
         "outputs": {
             "predictions": str(predictions_out),
@@ -271,6 +399,7 @@ def run(args):
         args.out,
         args.condition,
         args.public_predictor_name,
+        args.external_predictions,
     )
     if not args.skip_render:
         external = [args.public_predictor_name]

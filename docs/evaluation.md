@@ -59,6 +59,12 @@ combines the direct, row-identical candidate/public prediction tables into one
 monoallelic score table and figure suite. Canonical NetMHCpan BA/EL and
 MixMHCpred columns are retained when present.
 
+Use `--external-predictions` to add a benchmark-aligned table containing
+NetMHCpan BA/EL or MixMHCpred scores. The table can be built from official
+per-sample `data_evaluation` groups with `mhcflurry eval
+merge-external-predictions`; both commands validate stable row identity and
+record input hashes and coverage in figure provenance.
+
 Keep paper figures in their own directory (the default is
 `<out>/plots/paper_figures`). The combined diagnostic `--summary-pdf` may be a
 top-level file under `<out>/plots` or live outside the plot tree, but it cannot

@@ -74,13 +74,27 @@ mhcflurry eval affinity-candidate-figures \
     --factorial-dir experiments/<snapshot>/artifacts \
     --condition <candidate-a> \
     --condition <candidate-b> \
+    --external-predictions external_predictions.csv.bz2 \
     --out experiments/<snapshot>/finalist_figures
 ```
 
-Canonical external columns already present in the held-out predictions, such as
-`netmhcpan4.ba`, `netmhcpan4.el`, and `mixmhcpred`, are retained automatically.
-Absent external predictors remain absent rather than being fabricated; they can
-first be added with `mhcflurry eval paper-figures external-predictors`.
+Canonical external columns already present in the held-out predictions are
+retained automatically. Official per-sample `data_evaluation` groups can be
+consolidated reproducibly before rendering:
+
+```bash
+mhcflurry eval merge-external-predictions \
+    --group netmhcpan4.ba=group.monoallelic.netmhcpan4.ba.train_excluded.csv \
+    --group netmhcpan4.el=group.monoallelic.netmhcpan4.el.train_excluded.csv \
+    --group mixmhcpred=group.monoallelic.mixmhcpred.train_excluded.csv \
+    --out external_predictions.csv.bz2
+```
+
+The merge validates row identity across tools and writes a hashed provenance
+sidecar. The figure command requires every candidate row to match exactly one
+external row and records predictor coverage. Absent predictors remain absent
+rather than being fabricated; new predictions can first be added with
+`mhcflurry eval paper-figures external-predictors`.
 
 `artifacts/summary.csv` is the stable optimizer × LSUV × minibatch table for
 factorial heatmaps. `data/training_history.csv` is the corresponding tidy

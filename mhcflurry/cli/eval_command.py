@@ -31,6 +31,8 @@ available:
   plot-model-comparison as one local evaluation/figure pipeline.
 * ``mhcflurry eval affinity-candidate-figures`` builds a common held-out
   prediction table and paper-figure suite for shortlisted affinity candidates.
+* ``mhcflurry eval merge-external-predictions`` consolidates aligned
+  per-sample external-predictor benchmark groups for those figures.
 
 Future benchmark-prediction and external-predictor registration commands should
 be added under this namespace rather than as new top-level commands.
@@ -77,6 +79,11 @@ def make_parser(prog="mhcflurry eval"):
     sub.add_parser(
         "affinity-candidate-figures",
         help="Compare shortlisted affinity candidates on one saved cohort.",
+        add_help=False,
+    )
+    sub.add_parser(
+        "merge-external-predictions",
+        help="Consolidate precomputed external benchmark predictions.",
         add_help=False,
     )
     paper = sub.add_parser(
@@ -132,6 +139,10 @@ def run_argv(argv, prog="mhcflurry eval"):
         from . import affinity_candidate_figures
         return affinity_candidate_figures.run_argv(
             rest, prog="%s affinity-candidate-figures" % prog)
+    if subcommand == "merge-external-predictions":
+        from . import merge_external_predictions
+        return merge_external_predictions.run_argv(
+            rest, prog="%s merge-external-predictions" % prog)
     if subcommand == "paper-figures":
         return _run_paper_figures(rest, "%s paper-figures" % prog)
 
@@ -151,6 +162,8 @@ def format_help(prog="mhcflurry eval"):
         "  plot-comparison         Render diagnostic plots from compare output.",
         "  affinity-candidate-figures",
         "                          Plot finalists and public on one saved cohort.",
+        "  merge-external-predictions",
+        "                          Consolidate precomputed external predictions.",
         "  paper-figures render    Render paper figures from saved inputs.",
         "  paper-figures score-predictions",
         "                          Derive score tables from saved predictions.",

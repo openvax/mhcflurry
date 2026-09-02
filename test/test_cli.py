@@ -1534,6 +1534,15 @@ def test_eval_affinity_candidate_figures_help_runs(capsys):
     captured = capsys.readouterr().out
     assert "usage: mhcflurry eval affinity-candidate-figures" in captured
     assert "--condition" in captured
+    assert "--external-predictions" in captured
+
+
+def test_eval_merge_external_predictions_help_runs(capsys):
+    with pytest.raises(SystemExit):
+        cli_main.main(["eval", "merge-external-predictions", "--help"])
+    captured = capsys.readouterr().out
+    assert "usage: mhcflurry eval merge-external-predictions" in captured
+    assert "--group" in captured
 
 
 def test_eval_compare_models_help_runs(capsys):
