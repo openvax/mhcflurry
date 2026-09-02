@@ -121,6 +121,7 @@ def test_train_help_runs(capsys):
     captured = capsys.readouterr().out
     assert "pan-allele-release" in captured
     assert "plot-loss-curves" in captured
+    assert "snapshot-experiment" in captured
     assert "Deployment is opt-in" in captured
 
 

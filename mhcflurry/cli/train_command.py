@@ -68,6 +68,12 @@ def make_parser(prog="mhcflurry train"):
         help="Plot training loss curves and highlight selected models.",
     )
     loss_curves.add_argument("plot_args", nargs=argparse.REMAINDER)
+    snapshot = sub.add_parser(
+        "snapshot-experiment",
+        add_help=False,
+        help="Archive reproducible experiment metadata and plotting tables.",
+    )
+    snapshot.add_argument("snapshot_args", nargs=argparse.REMAINDER)
     return parser
 
 
@@ -75,7 +81,7 @@ def _format_help(prog):
     return "\n".join([
         (
             "usage: %s {pan-allele-release,release-holdout,"
-            "plot-loss-curves} ..." % prog
+            "plot-loss-curves,snapshot-experiment} ..." % prog
         ),
         "",
         "Training workflows.",
@@ -84,11 +90,13 @@ def _format_help(prog):
         "  pan-allele-release  Train/evaluate/plot release weights from one entry point.",
         "  release-holdout     Build/validate frozen evaluation exclusions.",
         "  plot-loss-curves    Plot candidate losses and selected models.",
+        "  snapshot-experiment Archive hashes, provenance, metrics, and epoch tables.",
         "",
         "Examples:",
         "  %s pan-allele-release --run-dir runs/2.3.0 --release 2.3.0 --backend local" % prog,
         "  %s pan-allele-release --run-dir runs/2.3.0 --release 2.3.0 --backend brev-provision" % prog,
         "  %s plot-loss-curves --selected-dir models.combined --out plots" % prog,
+        "  %s snapshot-experiment --source-dir results/run --name batch-sweep" % prog,
         "",
         "Deployment is opt-in. Pass --deploy-mode dry-run, draft, or publish "
         "to run the model-artifact deployment step.",
@@ -146,6 +154,10 @@ def run_argv(argv, prog="mhcflurry train"):
         from . import plot_loss_curves
         return plot_loss_curves.run_argv(
             argv[1:], prog="%s plot-loss-curves" % prog)
+    if argv[0] == "snapshot-experiment":
+        from . import experiment_snapshot
+        return experiment_snapshot.run_argv(
+            argv[1:], prog="%s snapshot-experiment" % prog)
     make_parser(prog).parse_args(argv)
     return 2
 

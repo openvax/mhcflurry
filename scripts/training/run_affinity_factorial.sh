@@ -20,6 +20,11 @@ Experiment controls:
   --condition NAME                   Run one generated condition; repeatable
   --random-seed INTEGER              Release random seed (default: 42)
 
+Experiment archiving:
+  --experiments-dir PATH             Write a timestamped snapshot after success
+  --experiment-name NAME             Snapshot label (default: affinity-factorial)
+  --source-archive PATH              Preserve the exact source archive in snapshot
+
 Execution controls:
   --gpus INTEGER|auto                GPU count (default: auto)
   --max-workers-per-gpu INTEGER|auto Worker density (default: auto)
@@ -58,6 +63,10 @@ TORCH_COMPILE=0
 TORCH_COMPILE_LOSS=0
 MATMUL_PRECISION="highest"
 FACTORIAL_CONDITIONS=()
+EXPERIMENTS_DIR=""
+EXPERIMENT_NAME="affinity-factorial"
+SOURCE_ARCHIVE=""
+ORIGINAL_ARGS=("$@")
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -81,6 +90,12 @@ while [ "$#" -gt 0 ]; do
             require_value "$@"; FACTORIAL_CONDITIONS+=("$2"); shift 2 ;;
         --random-seed)
             require_value "$@"; RELEASE_RANDOM_SEED="$2"; shift 2 ;;
+        --experiments-dir)
+            require_value "$@"; EXPERIMENTS_DIR="$2"; shift 2 ;;
+        --experiment-name)
+            require_value "$@"; EXPERIMENT_NAME="$2"; shift 2 ;;
+        --source-archive)
+            require_value "$@"; SOURCE_ARCHIVE="$2"; shift 2 ;;
         --gpus)
             require_value "$@"; GPUS="$2"; shift 2 ;;
         --max-workers-per-gpu)
@@ -103,6 +118,10 @@ while [ "$#" -gt 0 ]; do
             exit 2 ;;
     esac
 done
+if [ -n "$SOURCE_ARCHIVE" ] && [ ! -f "$SOURCE_ARCHIVE" ]; then
+    printf '%s is not a file: %s\n' '--source-archive' "$SOURCE_ARCHIVE" >&2
+    exit 2
+fi
 
 for required in \
         MHCFLURRY_OUT TRAIN_DATA ALLELE_SEQUENCES PRETRAIN_DATA \
@@ -209,6 +228,12 @@ if [ "$GPUS" = "auto" ]; then
 fi
 
 mkdir -p "$MHCFLURRY_OUT"
+date -u +%Y-%m-%dT%H:%M:%SZ > "$MHCFLURRY_OUT/started_at_utc.txt"
+{
+    printf 'bash %q' "$0"
+    printf ' %q' "${ORIGINAL_ARGS[@]}"
+    printf '\n'
+} > "$MHCFLURRY_OUT/command.sh"
 python "$SCRIPT_DIR/generate_affinity_factorial.py" \
     "$MHCFLURRY_OUT" \
     --mode "$FACTORIAL_MODE" \
@@ -268,6 +293,9 @@ fi
         "torch_compile=$TORCH_COMPILE" \
         "torch_compile_loss=$TORCH_COMPILE_LOSS" \
         "matmul_precision=$MATMUL_PRECISION" \
+        "experiments_dir=$EXPERIMENTS_DIR" \
+        "experiment_name=$EXPERIMENT_NAME" \
+        "source_archive=$SOURCE_ARCHIVE" \
         "baseline_condition=$BASELINE_CONDITION"
     sha256sum \
         "$TRAIN_DATA" \
@@ -458,3 +486,28 @@ done
 
 python "$SCRIPT_DIR/summarize_affinity_factorial.py" \
     "$MHCFLURRY_OUT" > "$MHCFLURRY_OUT/summary.stdout.json"
+
+date -u +%Y-%m-%dT%H:%M:%SZ > "$MHCFLURRY_OUT/completed_at_utc.txt"
+stop_gpu_telemetry
+GPU_TELEMETRY_PID=""
+
+if [ -n "$EXPERIMENTS_DIR" ]; then
+    snapshot_args=(
+        --source-dir "$MHCFLURRY_OUT"
+        --experiments-dir "$EXPERIMENTS_DIR"
+        --name "$EXPERIMENT_NAME"
+        --source-commit "$SOURCE_COMMIT"
+        --command-file "$MHCFLURRY_OUT/command.sh"
+        --input-file "$TRAIN_DATA"
+        --input-file "$ALLELE_SEQUENCES"
+        --input-file "$PRETRAIN_DATA"
+        --input-file "$RELEASE_HOLDOUT_DIR/policy.json"
+        --input-file "$RELEASE_HOLDOUT_DIR/affinity_samples.csv"
+        --input-file "$RELEASE_HOLDOUT_DIR/affinity_pmhcs.csv"
+    )
+    if [ -n "$SOURCE_ARCHIVE" ]; then
+        snapshot_args+=(--source-archive "$SOURCE_ARCHIVE")
+    fi
+    snapshot_path="$(mhcflurry train snapshot-experiment "${snapshot_args[@]}")"
+    printf '%s\n' "$snapshot_path" | tee "$MHCFLURRY_OUT/snapshot_path.txt"
+fi
