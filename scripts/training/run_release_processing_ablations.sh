@@ -178,6 +178,10 @@ for condition in "${conditions[@]}"; do
     stop_gpu_telemetry
 done
 
+# The initializer/optimizer panel above deliberately holds the published
+# processing batch of 512 fixed. This focused release gate isolates processing
+# minibatch size and prioritizes 5-aa, then no-flank. The 15-aa variant is not
+# expanded into a broad batch sweep based on a sparse 8-mer PPV signal.
 batch_sweep_variants=(short_flanks no_flank)
 for minibatch_size in 128 256 512 1024; do
     condition_root="$MHCFLURRY_OUT/processing_batch_sweep.batch$minibatch_size"

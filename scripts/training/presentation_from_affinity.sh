@@ -210,11 +210,24 @@ compress_csv_bzip2 "$(pwd)/train_data.csv"
 
 mhcflurry class1-generate-training-hyperparameters processing-base \
     --minibatch-size "$PROCESSING_MINIBATCH_SIZE" \
+    --optimizer-implementation keras \
+    --init glorot_uniform \
     > hyperparameters.base.yaml
 
 for kind in $PROCESSING_VARIANTS; do
+    PROCESSING_VARIANT_HYPERPARAMETER_ARGS=(
+        --optimizer-implementation keras
+        --init glorot_uniform
+    )
+    if [[ "$kind" == "with_flanks" ]]; then
+        PROCESSING_VARIANT_HYPERPARAMETER_ARGS=(
+            --optimizer-implementation pytorch
+            --init kaiming_uniform_fan_in
+        )
+    fi
     mhcflurry class1-generate-training-hyperparameters processing-variant \
         hyperparameters.base.yaml "$kind" \
+        "${PROCESSING_VARIANT_HYPERPARAMETER_ARGS[@]}" \
         > "hyperparameters.$kind.yaml"
 
     mhcflurry-class1-train-processing-models \

@@ -398,12 +398,14 @@ therefore have no `AffinityDeviceTrainingData`.
 `out/` directory returns to the laptop on completion. Two asymmetries to know
 about:
 
-- **Up direction:** runplz 3.17.0 uses Git-aware staging and HUP-safe detached
-  bootstraps. Tracked files and
+- **Up direction:** runplz 3.24.31 uses Git-aware staging, HUP-safe detached
+  bootstraps, shared backend retries, and retryable idempotent SSH preparation.
+  Tracked files and
   intentional untracked inputs are staged, while ignored directories such as
   `brev_runs/`, `results/`, `.venv/`, and `out/` are excluded without a
   workstation-specific relocation or symlink workaround. The release wrapper
-  requires exactly 3.17.0 and rejects a dirty editable runplz checkout.
+  requires exactly 3.24.31 and rejects a dirty editable runplz checkout or a
+  source/distribution version mismatch.
 - **Down direction:** the post-run rsync has NO excludes — everything
   under `out/` returns. Keep large throwaway run artifacts outside
   `out/` unless they are meant to ship back.

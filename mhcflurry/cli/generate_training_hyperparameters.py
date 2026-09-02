@@ -228,8 +228,14 @@ def build_processing_base_grid(
         ))
 
 
-def transform_processing_hyperparameters(kind, hyperparameters):
-    """Return one processing flank variant for a hyperparameter dict."""
+def transform_processing_hyperparameters(
+        kind, hyperparameters, optimizer_implementation=None, init=None):
+    """Return one processing flank variant for a hyperparameter dict.
+
+    ``optimizer_implementation`` and ``init`` are optional explicit overrides.
+    When omitted, the values already serialized in ``hyperparameters`` are
+    retained.
+    """
     if kind not in PROCESSING_VARIANT_CHOICES:
         raise ValueError(
             "Unknown processing variant %r; expected one of: %s" % (
@@ -245,13 +251,39 @@ def transform_processing_hyperparameters(kind, hyperparameters):
     if kind == "short_flanks":
         new_hyperparameters["c_flank_length"] = 5
         new_hyperparameters["n_flank_length"] = 5
+    if optimizer_implementation is not None:
+        if optimizer_implementation not in OPTIMIZER_IMPLEMENTATION_CHOICES:
+            raise ValueError(
+                "Unknown optimizer implementation %r; expected one of: %s" % (
+                    optimizer_implementation,
+                    ", ".join(OPTIMIZER_IMPLEMENTATION_CHOICES),
+                )
+            )
+        new_hyperparameters["optimizer_implementation"] = (
+            optimizer_implementation)
+    if init is not None:
+        if init not in PROCESSING_INIT_CHOICES:
+            raise ValueError(
+                "Unknown processing initializer %r; expected one of: %s" % (
+                    init,
+                    ", ".join(PROCESSING_INIT_CHOICES),
+                )
+            )
+        new_hyperparameters["init"] = init
     return new_hyperparameters
 
 
-def build_processing_variant_grid(production_hyperparameters, kind):
+def build_processing_variant_grid(
+        production_hyperparameters, kind, optimizer_implementation=None,
+        init=None):
     """Return a flank-mode variant of a processing hyperparameter grid."""
     return unique_hyperparameters(
-        transform_processing_hyperparameters(kind, item)
+        transform_processing_hyperparameters(
+            kind,
+            item,
+            optimizer_implementation=optimizer_implementation,
+            init=init,
+        )
         for item in production_hyperparameters
     )
 
@@ -379,6 +411,10 @@ def build_processing_batch_sweep_panels(
         "small": ("tanh", 256, 11, (0.0, 0.0), (8,), 0.3),
         "large": ("relu", 512, 17, (1e-6, 0.0), (16,), 0.5),
     }
+    # Primary 5-aa candidates: alternatives hurt the small/tanh model. For
+    # large/ReLU, Kaiming+Keras was dominated by the two retained alternatives.
+    # Secondary no-flank candidates: Kaiming+Keras improved all three primary
+    # small/tanh metrics; every alternative hurt large/ReLU.
     candidate_recipes = {
         "short_flanks": (
             ("small", "glorot_uniform", "keras"),
@@ -523,6 +559,24 @@ def make_parser(prog=None):
         "kind",
         choices=PROCESSING_VARIANT_CHOICES,
         help="Processing flank variant to output.")
+    processing_variant.add_argument(
+        "--optimizer-implementation",
+        choices=OPTIMIZER_IMPLEMENTATION_CHOICES,
+        default=None,
+        help=(
+            "Override the optimizer equations in every architecture. "
+            "If omitted, retain the value from the base YAML."
+        ),
+    )
+    processing_variant.add_argument(
+        "--init",
+        choices=PROCESSING_INIT_CHOICES,
+        default=None,
+        help=(
+            "Override the initializer in every architecture. If omitted, "
+            "retain the value from the base YAML."
+        ),
+    )
 
     return parser
 
@@ -548,7 +602,10 @@ def run_argv(argv=None, prog=None):
     elif args.recipe == "processing-variant":
         grid = build_processing_variant_grid(
             read_hyperparameters_yaml(args.production_hyperparameters),
-            args.kind)
+            args.kind,
+            optimizer_implementation=args.optimizer_implementation,
+            init=args.init,
+        )
     else:
         raise ValueError("Unsupported recipe: %s" % args.recipe)
     print("Hyperparameters grid size: %d" % len(grid), file=sys.stderr)

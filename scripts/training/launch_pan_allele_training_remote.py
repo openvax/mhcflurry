@@ -375,7 +375,7 @@ image = (
         "procps",
     )
     .pip_install("pypdf")
-    .pip_install("runplz==3.17.0")
+    .pip_install("runplz==3.24.31")
     .pip_install_local_dir(".", editable=True)
 )
 

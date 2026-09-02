@@ -64,6 +64,22 @@ def validate_runplz_provenance(executable, required_version):
 
     import runplz
 
+    source_version = getattr(runplz, "__version__", None)
+    if source_version is None:
+        raise ValueError(
+            "imported runplz source does not expose __version__: %s" % (
+                runplz.__file__,
+            )
+        )
+    if source_version != actual_version:
+        raise ValueError(
+            "runplz source/distribution version mismatch: "
+            "imported source reports %s, package metadata reports %s" % (
+                source_version,
+                actual_version,
+            )
+        )
+
     executable = pathlib.Path(executable).resolve()
     module_path = pathlib.Path(runplz.__file__).resolve()
     identity = "executable=%s interpreter=%s version=%s module=%s" % (

@@ -1073,7 +1073,7 @@ def test_release_workflow_defaults_to_validated_published_recipe(tmp_path):
 def test_release_workflow_sync_is_workflow_id_scoped():
     script = pathlib.Path(
         "scripts/release/retrain_evaluate_deploy.sh").read_text()
-    assert 'RUNPLZ_REQUIRED_VERSION="3.17.0"' in script
+    assert 'RUNPLZ_REQUIRED_VERSION="3.24.31"' in script
     assert "require_clean_runplz" in script
     assert "run_dir_matches_workflow || return 1" in script
     assert "remote_workflow_id" in script
@@ -1097,13 +1097,15 @@ def test_release_workflow_validates_selected_runplz_interpreter(tmp_path):
         / "site-packages"
     )
     package_dir = site_packages / "runplz"
-    distribution_dir = site_packages / "runplz-3.17.0.dist-info"
+    distribution_dir = site_packages / "runplz-3.24.31.dist-info"
     package_dir.mkdir(parents=True)
     distribution_dir.mkdir()
     (fake_checkout / ".git").mkdir()
-    (package_dir / "__init__.py").write_text("")
+    (package_dir / "__init__.py").write_text(
+        '__version__ = "3.24.31"\n'
+    )
     (distribution_dir / "METADATA").write_text(
-        "Metadata-Version: 2.1\nName: runplz\nVersion: 3.17.0\n"
+        "Metadata-Version: 2.1\nName: runplz\nVersion: 3.24.31\n"
     )
 
     fake_bin = tmp_path / "bin"
@@ -1146,6 +1148,48 @@ def test_release_workflow_validates_selected_runplz_interpreter(tmp_path):
     assert "executable=%s" % runplz in output
     assert "module=%s" % (package_dir / "__init__.py") in output
     assert "from PyPI or a clean checkout is required" not in output
+
+
+def test_runplz_provenance_rejects_stale_distribution_version(tmp_path):
+    selected_environment = tmp_path / ".venv"
+    subprocess.run(
+        [sys.executable, "-m", "venv", str(selected_environment)],
+        check=True,
+    )
+    selected_python = selected_environment / "bin" / "python"
+    site_packages = (
+        selected_environment
+        / "lib"
+        / ("python%d.%d" % sys.version_info[:2])
+        / "site-packages"
+    )
+    package_dir = site_packages / "runplz"
+    distribution_dir = site_packages / "runplz-3.17.0.dist-info"
+    package_dir.mkdir(parents=True)
+    distribution_dir.mkdir()
+    (package_dir / "__init__.py").write_text(
+        '__version__ = "3.20.0"\n'
+    )
+    (distribution_dir / "METADATA").write_text(
+        "Metadata-Version: 2.1\nName: runplz\nVersion: 3.17.0\n"
+    )
+
+    result = subprocess.run(
+        [
+            str(selected_python),
+            "scripts/release/validate_runplz_provenance.py",
+            "--executable", str(selected_environment / "bin" / "runplz"),
+            "--required-version", "3.17.0",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert result.returncode == 2, output
+    assert "source/distribution version mismatch" in output
+    assert "source reports 3.20.0" in output
+    assert "metadata reports 3.17.0" in output
 
 
 def test_brev_postprocess_archive_includes_release_holdout(tmp_path):
@@ -2280,6 +2324,29 @@ def test_training_hyperparameter_cli_generates_processing_variant(tmp_path, caps
     assert len(variant) == 128
     assert {item["n_flank_length"] for item in variant} == {5}
     assert {item["c_flank_length"] for item in variant} == {5}
+    assert {item["optimizer_implementation"] for item in variant} == {"keras"}
+    assert {item["init"] for item in variant} == {"glorot_uniform"}
+
+    cli_main.main([
+        "class1-generate-training-hyperparameters",
+        "processing-variant",
+        str(base_path),
+        "with_flanks",
+        "--optimizer-implementation",
+        "pytorch",
+        "--init",
+        "kaiming_uniform_fan_in",
+    ])
+    with_flanks = yaml.safe_load(capsys.readouterr().out)
+    assert len(with_flanks) == 128
+    assert {item["n_flank_length"] for item in with_flanks} == {15}
+    assert {item["c_flank_length"] for item in with_flanks} == {15}
+    assert {
+        item["optimizer_implementation"] for item in with_flanks
+    } == {"pytorch"}
+    assert {item["init"] for item in with_flanks} == {
+        "kaiming_uniform_fan_in"
+    }
 
 
 def test_training_hyperparameter_helpers_reject_invalid_configuration():
@@ -2292,6 +2359,18 @@ def test_training_hyperparameter_helpers_reject_invalid_configuration():
         generator.make_parser().parse_args([
             "affinity", "--minibatch-size", "0",
         ])
+    with pytest.raises(ValueError, match="Unknown optimizer implementation"):
+        generator.transform_processing_hyperparameters(
+            "with_flanks",
+            {"n_flank_length": 15, "c_flank_length": 15},
+            optimizer_implementation="typo",
+        )
+    with pytest.raises(ValueError, match="Unknown processing initializer"):
+        generator.transform_processing_hyperparameters(
+            "with_flanks",
+            {"n_flank_length": 15, "c_flank_length": 15},
+            init="typo",
+        )
 
 
 def test_training_hyperparameter_generator_tracks_ablation_switches():
@@ -2392,6 +2471,7 @@ def test_processing_batch_sweep_panels_are_focused_and_paired():
             item for item in short
             if item["convolutional_activation"] == "tanh"
         ]
+        assert len(short_small) == 1
         assert {
             (item["init"], item["optimizer_implementation"])
             for item in short_small
@@ -2408,6 +2488,15 @@ def test_processing_batch_sweep_panels_are_focused_and_paired():
             ("glorot_uniform", "pytorch"),
             ("kaiming_uniform_fan_in", "pytorch"),
         }
+        no_flank_large = [
+            item for item in no_flank
+            if item["convolutional_activation"] == "relu"
+        ]
+        assert len(no_flank_large) == 1
+        assert (
+            no_flank_large[0]["init"],
+            no_flank_large[0]["optimizer_implementation"],
+        ) == ("glorot_uniform", "keras")
 
 
 @pytest.mark.parametrize("sizes", [(), (0,), (128, 128), (True,)])
@@ -2449,9 +2538,11 @@ def test_release_ablation_generator_writes_all_processing_flank_variants(
         for batch in (128, 256, 512, 1024)
         for variant in ("short_flanks", "no_flank")
     }
-    assert manifest["processing_batch_sweep"]["priority"] == [
-        "short_flanks", "no_flank"
-    ]
+    assert manifest["processing_batch_sweep"] == {
+        "minibatch_sizes": [128, 256, 512, 1024],
+        "priority": ["short_flanks", "no_flank"],
+        "with_flanks_policy": "excluded_except_targeted_8mer_diagnostic",
+    }
 
 
 def test_processing_ablation_runner_includes_focused_batch_sweep():
@@ -2600,7 +2691,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(
         "scripts/training/launch_pan_allele_training_remote.py",
     )
     module = _load_script_module(path, "remote_launcher_under_test")
-    assert "runplz==3.17.0" in pip_packages
+    assert "runplz==3.24.31" in pip_packages
     assert module.remote_training_env({})["TRAINING_MINIBATCH_SIZE"] == "128"
     env = module.remote_training_env({"TRAINING_MINIBATCH_SIZE": "2048"})
     assert env["TRAINING_MINIBATCH_SIZE"] == "2048"

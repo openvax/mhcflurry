@@ -5,11 +5,20 @@ configuration as its baseline. The 2.1.x and 2.2.x public model downloads use
 the same affinity, processing, and presentation generation recipes.
 
 No training-hyperparameter exception is currently supported by direct held-out
-evidence. A release-candidate sweep initially appeared to favor a Class I
-pan-allele affinity minibatch increase from 128 to 1024, but the result did not
-reproduce with restored Keras optimizer equations on the frozen release
-holdout. Prediction-affecting recipe changes are reverted unless and until they
-have isolated held-out evidence.
+evidence. A rejected full candidate trained with a Class I pan-allele affinity
+minibatch of 1024 outperformed an older public ensemble, but that comparison
+changed many settings and could not attribute the improvement to batch size. A
+direct latest-code comparison with restored Keras optimizer equations on the
+frozen release holdout instead favored 128. Prediction-affecting recipe changes
+are reverted unless and until they have isolated held-out evidence.
+
+The processing initializer/optimizer panel reached the same compatibility
+decision. Kaiming initialization, native PyTorch Adam, and their coupled use
+showed flank-dependent gains at 0 or 15 aa, but all three alternatives reduced
+AUPRC and PPV@N for the 5-aa processing input used by presentation. The release
+therefore retains Glorot initialization with zero biases and Keras-compatible
+Adam. The complete crossed table is in
+{doc}`release_neural_hyperparameter_audit`.
 
 The layer-by-layer comparison, framework-equation audit, discrepancy register,
 and controlled experiment plan are in
