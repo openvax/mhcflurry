@@ -4514,6 +4514,8 @@ def test_paper_figures_score_predictions_uses_explicit_orientation(tmp_path):
     assert all_scores.set_index("predictor").loc[
         "netmhcpan4.2.el", "auc"] == 1.0
     assert "percent_change_auc_ba" in scores.columns
+    assert "pr_auc" in scores.columns
+    assert "percent_change_pr_auc_ba" in scores.columns
 
 
 def test_paper_figures_score_predictions_uses_schema_not_numeric_dtype(tmp_path):
@@ -4689,6 +4691,7 @@ def test_paper_figures_mean_ppv_small_uses_with_flanks_and_weighted_external():
             ("netmhcpan4.el", "el"),
         ),
         preferred_predictors=(),
+        monoallelic_panel_predictors=(),
         presentation_panel_predictors=(),
         presentation_panel_baselines=(),
     )
@@ -5220,7 +5223,7 @@ def test_paper_figures_monoallelic_scatter_uses_all_length_rows(monkeypatch):
         captured["pivot"] = pivot
 
     monkeypatch.setattr(
-        paper_figures, "_plot_scatter_triptych_from_pivot", fake_scatter)
+        paper_figures, "_plot_scatter_grid_from_pivot", fake_scatter)
 
     scores = pandas.DataFrame([
         {
@@ -5256,6 +5259,7 @@ def test_paper_figures_monoallelic_scatter_uses_all_length_rows(monkeypatch):
         candidate="candidate",
         external_baselines=(("baseline", "baseline"),),
         preferred_predictors=("candidate", "baseline"),
+        monoallelic_panel_predictors=(),
         presentation_panel_predictors=("candidate",),
         presentation_panel_baselines=("baseline",),
     )
@@ -5279,6 +5283,45 @@ def test_paper_figures_monoallelic_scatter_uses_all_length_rows(monkeypatch):
     assert pivot.loc["HLA-A*02:01", "candidate"] == 0.90
     assert pivot.loc["HLA-A*02:01", "baseline"] == 0.80
     assert len(pivot) == 1
+
+
+def test_paper_figures_monoallelic_scatter_paginates_all_candidates(
+        monkeypatch):
+    captured = []
+
+    def fake_scatter(
+            _pivot, _predictor_info, candidates, _metric_label, _max_points,
+            name, _family, _writer, _predictors, baselines=None):
+        captured.append((tuple(candidates), name, baselines))
+
+    monkeypatch.setattr(
+        paper_figures, "_plot_scatter_grid_from_pivot", fake_scatter)
+    candidates = tuple("candidate_%d" % index for index in range(5))
+    rows = []
+    for predictor in candidates + ("public",):
+        rows.append({
+            "allele": "HLA-A*02:01",
+            "length": numpy.nan,
+            "length_label": "All",
+            "predictor": predictor,
+            "auc": 0.8,
+        })
+    predictors = paper_figures.PredictorConfig(
+        candidate=candidates[0],
+        external_baselines=(("public", "public"),),
+        preferred_predictors=candidates + ("public",),
+        monoallelic_panel_predictors=candidates,
+        presentation_panel_predictors=(),
+        presentation_panel_baselines=(),
+    )
+
+    paper_figures._plot_monoallelic_scatter(
+        pandas.DataFrame(rows), pandas.DataFrame(), "auc", "AUC", 100,
+        "mono", object(), predictors)
+
+    assert [item[0] for item in captured] == [candidates[:4], candidates[4:]]
+    assert [item[1] for item in captured] == [
+        "mono.page_01", "mono.page_02"]
 
 
 def test_paper_figures_prediction_scoring_drops_invalid_hit_rows():
@@ -5439,6 +5482,7 @@ def test_paper_figures_external_baseline_geometry_is_configurable(tmp_path):
         ),
         preferred_predictors=(
             "candidate", "baseline_a", "baseline_b", "baseline_c"),
+        monoallelic_panel_predictors=(),
         presentation_panel_predictors=("candidate",),
         presentation_panel_baselines=("baseline_a", "baseline_b", "baseline_c"),
     )
@@ -5564,6 +5608,7 @@ def test_paper_figures_predictor_config_parser():
         "--candidate-predictor", "candidate",
         "--external-baselines", "baseline_a:ba,baseline_b",
         "--preferred-predictors", "candidate,baseline_a",
+        "--monoallelic-panel-predictors", "candidate,candidate_b",
         "--presentation-panel-predictors", "candidate_ps",
         "--presentation-panel-baselines", "baseline_a,baseline_b",
     ])
@@ -5574,5 +5619,7 @@ def test_paper_figures_predictor_config_parser():
         ("baseline_b", "baseline_b"),
     )
     assert config.preferred_predictors == ("candidate", "baseline_a")
+    assert config.monoallelic_panel_predictors == (
+        "candidate", "candidate_b")
     assert config.presentation_panel_predictors == ("candidate_ps",)
     assert config.presentation_panel_baselines == ("baseline_a", "baseline_b")

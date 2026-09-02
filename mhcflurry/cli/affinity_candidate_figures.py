@@ -108,16 +108,37 @@ def _load_comparison(factorial_dir, condition, baseline):
     return comparison, summary_path, predictions_path, identity
 
 
-def _predictor_info_row(name, description, primary=False, color=None):
+def _predictor_info_row(
+        name, description, primary=False, color=None, short=None):
     return {
         "predictor": name,
         "description": description,
         "primary": bool(primary),
         "color": color,
-        "short": name,
+        "short": short or name,
         "detail": description,
         "higher_is_better": True,
     }
+
+
+def _condition_short_label(condition):
+    """Return a compact, unambiguous label for an affinity factorial arm."""
+    replacements = {
+        "rmsprop_keras": "Keras",
+        "rmsprop_pytorch": "PyTorch",
+        "lsuv_post_activation": "post-LSUV",
+        "lsuv_pre_activation": "pre-LSUV",
+        "lsuv_none": "no LSUV",
+        "init_glorot_uniform": "Glorot",
+        "init_he_uniform": "He",
+    }
+    labels = []
+    for component in condition.split("__"):
+        if component.startswith("mb_"):
+            labels.append("mb%s" % component.removeprefix("mb_"))
+        else:
+            labels.append(replacements.get(component, component))
+    return " | ".join(labels)
 
 
 def _merge_external_predictions(combined, paths, canonical_columns):
@@ -286,6 +307,7 @@ def build_candidate_figure_inputs(
                 public_predictor_name,
                 "Pinned public 2.2 models.no_additional_ms affinity ensemble",
                 color="#4c78a8",
+                short="Public 2.2",
             ))
         else:
             if len(predictions) != len(combined):
@@ -316,6 +338,7 @@ def build_candidate_figure_inputs(
             candidate_column,
             "MHCflurry affinity-factorial candidate %s" % condition,
             primary=index == 0,
+            short=_condition_short_label(condition),
         ))
         records.append({
             "condition": condition,
@@ -337,10 +360,16 @@ def build_candidate_figure_inputs(
         column for column in combined.columns
         if column in canonical_external_columns
     ]
+    external_short_labels = {
+        "netmhcpan4.ba": "NetMHCpan 4.0 BA",
+        "netmhcpan4.el": "NetMHCpan 4.0 EL",
+        "mixmhcpred": "MixMHCpred",
+    }
     for column in external_columns:
         predictor_info_rows.append({
             **_predictor_info_row(
-                column, "External benchmark predictor %s" % column),
+                column, "External benchmark predictor %s" % column,
+                short=external_short_labels.get(column, column)),
             "higher_is_better": paper_figures.DEFAULT_PREDICTOR_HIGHER_IS_BETTER[
                 column],
         })
@@ -412,6 +441,7 @@ def run(args):
             "--out", str(Path(args.out).resolve() / "paper_figures"),
             "--formats", args.formats,
             "--candidate-predictor", args.condition[0],
+            "--monoallelic-panel-predictors", ",".join(args.condition),
             "--external-baselines", ",".join(external),
             "--preferred-predictors", ",".join(preferred),
         ])

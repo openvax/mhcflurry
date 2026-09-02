@@ -108,6 +108,7 @@ PREFERRED_PREDICTORS = (
 
 LENGTH_LABEL_ORDER = ("All", "8-mer", "9-mer", "10-mer", "11-mer")
 DEFAULT_FORMATS = ("svg", "pdf", "png")
+MONOALLELIC_PANEL_ROWS_PER_PAGE = 4
 
 
 @dataclass(frozen=True)
@@ -115,6 +116,7 @@ class PredictorConfig:
     candidate: str
     external_baselines: tuple
     preferred_predictors: tuple
+    monoallelic_panel_predictors: tuple
     presentation_panel_predictors: tuple
     presentation_panel_baselines: tuple
 
@@ -260,6 +262,15 @@ missing_inputs.md instead of being silently fabricated.
         help=(
             "Comma-separated predictors for summary bar panels. Default: "
             "%(default)s."
+        ),
+    )
+    parser.add_argument(
+        "--monoallelic-panel-predictors",
+        default="",
+        help=(
+            "Comma-separated candidate predictors to show as rows in the "
+            "monoallelic AUROC/AUPRC/PPV comparison grids. Default: only "
+            "--candidate-predictor."
         ),
     )
     parser.add_argument(
@@ -496,6 +507,8 @@ def _parse_predictor_config(args):
         candidate=candidate,
         external_baselines=_parse_external_baselines(args.external_baselines),
         preferred_predictors=_parse_predictor_list(args.preferred_predictors),
+        monoallelic_panel_predictors=_parse_predictor_list(
+            args.monoallelic_panel_predictors),
         presentation_panel_predictors=presentation_panel_predictors,
         presentation_panel_baselines=presentation_panel_baselines,
     )
@@ -1117,7 +1130,7 @@ def _prediction_score_columns(
 def _scores_for_prediction_group(
         group, index_column, group_value, length, length_label,
         predictor_columns, predictor_orientations=None):
-    from sklearn.metrics import roc_auc_score
+    from sklearn.metrics import average_precision_score, roc_auc_score
 
     labels = pandas.to_numeric(group["hit"], errors="coerce")
     valid_labels = labels.isin([0, 1])
@@ -1143,9 +1156,11 @@ def _scores_for_prediction_group(
         s = oriented_scores[predictor][shared_mask]
         if len(y) == 0 or y.sum() == 0 or y.sum() == len(y):
             auc = numpy.nan
+            pr_auc = numpy.nan
             ppv = numpy.nan
         else:
             auc = float(roc_auc_score(y, s))
+            pr_auc = float(average_precision_score(y, s))
             ppv = _ppv_at_n(y, s, int(y.sum()), tie_breaker=ties)
         rows.append({
             index_column: group_value,
@@ -1157,6 +1172,7 @@ def _scores_for_prediction_group(
             "n_pos": int(y.sum()),
             "ppv": ppv,
             "auc": auc,
+            "pr_auc": pr_auc,
         })
     return rows
 
@@ -1204,7 +1220,9 @@ def _ppv_at_n(y_true, y_score, n, tie_breaker=None):
 
 def _add_percent_change_columns(scores, external_baselines=EXTERNAL_BASELINES):
     result = scores.copy()
-    for metric in ("auc", "ppv"):
+    for metric in ("auc", "pr_auc", "ppv"):
+        if metric not in result:
+            continue
         pivot = result.pivot_table(
             index=["sample_id", "length_label"],
             columns="predictor",
@@ -1811,9 +1829,17 @@ def _generate_monoallelic_figures(
         predictor_info,
     )
     if scores is not None:
+        _plot_monoallelic_metric_overview(
+            scores, predictor_info,
+            "fig.3_scores_plots_monoallelic.summary.all_predictors",
+            writer, predictors)
         _plot_monoallelic_scatter(
             scores, predictor_info, "auc", "AUC", max_scatter_points,
             "fig.3_scores_plots_monoallelic.scatter.auc.monoallelic.ba",
+            writer, predictors)
+        _plot_monoallelic_scatter(
+            scores, predictor_info, "pr_auc", "AUPRC", max_scatter_points,
+            "fig.3_scores_plots_monoallelic.scatter.pr_auc.monoallelic.ba",
             writer, predictors)
         _plot_monoallelic_scatter(
             scores, predictor_info, "ppv", "PPV", max_scatter_points,
@@ -1910,14 +1936,24 @@ def _plot_monoallelic_scatter(
             "monoallelic", name, ["All-length monoallelic scores"],
             "Monoallelic scores have no All-length rows.")
         return
-    candidate = (
-        preferred_candidate if preferred_candidate in set(scores["predictor"])
-        else predictors.candidate
-    )
-    if candidate not in set(scores["predictor"]):
+    available = set(scores["predictor"])
+    if predictors.monoallelic_panel_predictors:
+        candidates = list(predictors.monoallelic_panel_predictors)
+        missing_candidates = [
+            predictor for predictor in candidates if predictor not in available
+        ]
+    else:
+        candidates = [
+            preferred_candidate
+            if preferred_candidate in available else predictors.candidate
+        ]
+        missing_candidates = [
+            candidate for candidate in candidates if candidate not in available
+        ]
+    if not candidates or missing_candidates:
         writer.skip(
-            "monoallelic", name, [candidate],
-            "MHCflurry candidate predictor absent.")
+            "monoallelic", name, missing_candidates or candidates,
+            "Configured MHCflurry candidate predictors are absent.")
         return
     pivot = scores.pivot_table(
         index=_monoallelic_index_columns(scores),
@@ -1932,9 +1968,90 @@ def _plot_monoallelic_scatter(
             [predictor for predictor, _ in predictors.external_baselines],
             "No external baseline predictors found in monoallelic scores.")
         return
-    _plot_scatter_triptych_from_pivot(
-        pivot, predictor_info, candidate, metric_label, max_points, name,
-        "monoallelic", writer, predictors, baselines=baselines)
+    pages = [
+        candidates[index:index + MONOALLELIC_PANEL_ROWS_PER_PAGE]
+        for index in range(0, len(candidates), MONOALLELIC_PANEL_ROWS_PER_PAGE)
+    ]
+    for page_index, page_candidates in enumerate(pages, start=1):
+        page_name = (
+            name if len(pages) == 1 else
+            "%s.page_%02d" % (name, page_index)
+        )
+        _plot_scatter_grid_from_pivot(
+            pivot, predictor_info, page_candidates, metric_label, max_points,
+            page_name, "monoallelic", writer, predictors,
+            baselines=baselines)
+
+
+def _plot_monoallelic_metric_overview(
+        scores, predictor_info, name, writer, predictors):
+    """Plot macro allele-level metrics for all requested candidates/baselines."""
+    import matplotlib.pyplot as plt
+
+    rows = _all_length_rows(scores)
+    candidates = list(predictors.monoallelic_panel_predictors)
+    if not candidates:
+        candidates = [predictors.candidate]
+    baselines = [
+        predictor for predictor, _suffix in predictors.external_baselines
+    ]
+    selected = list(dict.fromkeys(candidates + baselines))
+    selected = [
+        predictor for predictor in selected
+        if predictor in set(rows["predictor"])
+    ]
+    metrics = [
+        ("auc", "Macro AUROC"),
+        ("pr_auc", "Macro AUPRC"),
+        ("ppv", "Macro PPV@N"),
+    ]
+    metrics = [(column, label) for column, label in metrics if column in rows]
+    if not selected or not metrics:
+        writer.skip(
+            "monoallelic", name, selected,
+            "No configured predictors or monoallelic metrics were available.")
+        return
+
+    means = (
+        rows.loc[rows["predictor"].isin(selected)]
+        .groupby("predictor")[[column for column, _label in metrics]]
+        .mean()
+        .reindex(selected)
+    )
+    labels = [_short_label(predictor_info, predictor) for predictor in selected]
+    colors = [_predictor_color(predictor_info, predictor) for predictor in selected]
+    height = max(3.2, 0.28 * len(selected) + 1.0)
+    fig, axes = plt.subplots(
+        1, len(metrics), figsize=(3.0 * len(metrics), height),
+        sharey=True, squeeze=False)
+    y = numpy.arange(len(selected))
+    for metric_index, (column, label) in enumerate(metrics):
+        ax = axes[0, metric_index]
+        values = means[column]
+        ax.barh(y, values, color=colors, edgecolor="white", linewidth=0.5)
+        ax.set_yticks(y)
+        if metric_index == 0:
+            ax.set_yticklabels(labels)
+        else:
+            ax.tick_params(axis="y", labelleft=False)
+        ax.set_xlim(0.0, 1.0)
+        ax.set_xlabel(label)
+        for row_index, value in enumerate(values):
+            if numpy.isfinite(value):
+                inside = float(value) > 0.85
+                ax.text(
+                    float(value) - 0.008 if inside else float(value) + 0.008,
+                    row_index,
+                    "%.4f" % value,
+                    ha="right" if inside else "left",
+                    va="center",
+                    color="white" if inside else "black",
+                    fontsize=6,
+                )
+        _despine(ax)
+    axes[0, 0].invert_yaxis()
+    fig.tight_layout(w_pad=1.0)
+    writer.save(fig, name, "monoallelic")
 
 
 def _generate_processing_notebook_figures(
@@ -2779,6 +2896,14 @@ def _manifest_component_label(path, run_dir):
 def _plot_scatter_triptych_from_pivot(
         pivot, predictor_info, candidate, metric_label, max_points, name, family,
         writer, predictors, baselines=None):
+    _plot_scatter_grid_from_pivot(
+        pivot, predictor_info, [candidate], metric_label, max_points, name,
+        family, writer, predictors, baselines=baselines)
+
+
+def _plot_scatter_grid_from_pivot(
+        pivot, predictor_info, candidates, metric_label, max_points, name,
+        family, writer, predictors, baselines=None):
     import matplotlib.pyplot as plt
 
     if baselines is None:
@@ -2791,26 +2916,59 @@ def _plot_scatter_triptych_from_pivot(
             "No external baseline predictors found.")
         return
 
+    n_rows = len(candidates)
     n_cols = len(baselines)
     fig, axes = plt.subplots(
-        1, n_cols, figsize=(max(2.4, 2.35 * n_cols), 2.2),
+        n_rows, n_cols,
+        figsize=(max(2.4, 2.35 * n_cols), max(2.2, 2.2 * n_rows)),
         squeeze=False)
-    for ax, (baseline, _suffix) in zip(axes[0], baselines):
-        sub = pivot[[baseline, candidate]].replace(
-            [numpy.inf, -numpy.inf], numpy.nan).dropna()
-        _scatter_with_winner_colors(
-            ax, sub[baseline].values, sub[candidate].values,
-            baseline, candidate, predictor_info, max_points)
-        _finish_metric_scatter(
-            ax,
-            _short_label(predictor_info, baseline),
-            _short_label(predictor_info, candidate),
-            "%s vs %s" % (
-                _short_label(predictor_info, candidate),
-                _short_label(predictor_info, baseline)),
-            metric_label)
+    for row_index, candidate in enumerate(candidates):
+        for column_index, (baseline, _suffix) in enumerate(baselines):
+            ax = axes[row_index, column_index]
+            sub = pivot[[baseline, candidate]].replace(
+                [numpy.inf, -numpy.inf], numpy.nan).dropna()
+            _scatter_with_winner_colors(
+                ax, sub[baseline].values, sub[candidate].values,
+                baseline, candidate, predictor_info, max_points)
+            candidate_label = _short_label(predictor_info, candidate)
+            baseline_label = _short_label(predictor_info, baseline)
+            if n_rows == 1:
+                _finish_metric_scatter(
+                    ax,
+                    baseline_label,
+                    candidate_label,
+                    "%s vs %s" % (candidate_label, baseline_label),
+                    metric_label)
+            else:
+                ax.set_title(baseline_label if row_index == 0 else "")
+                ax.set_xlabel(
+                    "%s %s" % (baseline_label, metric_label)
+                    if row_index == n_rows - 1 else "")
+                ax.set_ylabel(
+                    _grid_row_label(candidate_label)
+                    if column_index == 0 else "",
+                    rotation=0,
+                    ha="right",
+                    va="center",
+                    labelpad=42,
+                    fontsize=7,
+                )
+                _set_unit_limits(ax)
+                _despine(ax)
     fig.tight_layout(w_pad=1.0)
     writer.save(fig, name, family)
+
+
+def _grid_row_label(label):
+    """Wrap compact factorial labels into readable scatter-grid row labels."""
+    parts = str(label).split(" | ")
+    if len(parts) < 3:
+        return str(label)
+    midpoint = (len(parts) + 1) // 2
+    return "%s\n%s" % (
+        " | ".join(parts[:midpoint]),
+        " | ".join(parts[midpoint:]),
+    )
 
 
 def _pivot_all_lengths(scores, metric):

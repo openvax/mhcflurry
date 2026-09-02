@@ -56,8 +56,10 @@ mhcflurry eval compare-models \
 
 For affinity-factorial finalists, `mhcflurry eval affinity-candidate-figures`
 combines the direct, row-identical candidate/public prediction tables into one
-monoallelic score table and figure suite. Canonical NetMHCpan BA/EL and
-MixMHCpred columns are retained when present.
+monoallelic score table and figure suite. Its paginated AUROC, AUPRC, and PPV
+grids show every requested candidate against every available baseline, and its
+overview ranks all predictors by macro allele-level metrics. Canonical
+NetMHCpan BA/EL and MixMHCpred columns are retained when present.
 
 Use `--external-predictions` to add a benchmark-aligned table containing
 NetMHCpan BA/EL or MixMHCpred scores. The table can be built from official

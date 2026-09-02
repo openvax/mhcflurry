@@ -8,6 +8,7 @@ import pytest
 
 from mhcflurry.cli import affinity_candidate_figures
 from mhcflurry.cli import merge_external_predictions
+from mhcflurry.cli import paper_figures
 
 
 def _write_comparison(root, condition, baseline, identity, offset):
@@ -151,6 +152,39 @@ def test_candidate_figure_inputs_join_external_prediction_table(tmp_path):
             "public_2_2",
             [external],
         )
+
+
+def test_candidate_figure_render_includes_every_candidate_row(
+        tmp_path, monkeypatch):
+    conditions = ["keras_128", "native_1024"]
+    captured = {}
+    monkeypatch.setattr(
+        affinity_candidate_figures,
+        "build_candidate_figure_inputs",
+        lambda *_args, **_kwargs: {
+            "outputs": {"predictions": str(tmp_path / "predictions.csv")},
+            "external_predictors_included": ["netmhcpan4.ba"],
+        },
+    )
+
+    def fake_render(args):
+        captured["args"] = args
+        return 0
+
+    monkeypatch.setattr(paper_figures, "run", fake_render)
+    args = affinity_candidate_figures.make_parser().parse_args([
+        "--factorial-dir", str(tmp_path / "factorial"),
+        "--out", str(tmp_path / "figures"),
+        "--condition", conditions[0],
+        "--condition", conditions[1],
+    ])
+
+    assert affinity_candidate_figures.run(args) == 0
+    rendered = captured["args"]
+    assert rendered.candidate_predictor == conditions[0]
+    assert rendered.monoallelic_panel_predictors == ",".join(conditions)
+    assert rendered.external_baselines == (
+        "mhcflurry_public_2_2,netmhcpan4.ba")
 
 
 def test_merge_external_prediction_groups(tmp_path):
