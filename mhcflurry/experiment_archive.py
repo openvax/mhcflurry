@@ -228,6 +228,8 @@ def _artifact_role(relative_path):
         return "telemetry"
     if name.endswith(("predictions.csv", "predictions.csv.bz2")):
         return "prediction"
+    if name.startswith("benchmark.") and name.endswith((".csv", ".csv.bz2")):
+        return "prediction"
     if path.suffix.lower() in (".pdf", ".png", ".svg"):
         return "figure"
     if name.endswith((".log", ".txt")) and (
@@ -245,6 +247,8 @@ def _artifact_role(relative_path):
             "release_summary.csv", "release_summary.md", "per_allele.csv",
             "per_length.csv", "per_length_per_allele.csv",
             "training_overlap.json", "model_selection_summary.csv.bz2"}:
+        return "metric"
+    if name == "predictor_info.csv" or name.startswith("accuracy_scores."):
         return "metric"
     return "other"
 

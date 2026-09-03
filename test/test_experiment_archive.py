@@ -77,6 +77,14 @@ def test_snapshot_experiment_exports_reconstructable_tables(tmp_path):
     predictions = comparison / "predictions.csv.bz2"
     predictions.write_bytes(
         b"held-out predictions larger than test limit" * 10)
+    combined_predictions = source / "candidate_figures" / (
+        "benchmark.monoallelic.csv.bz2")
+    combined_predictions.parent.mkdir()
+    combined_predictions.write_bytes(b"combined predictions" * 10)
+    (combined_predictions.parent / "predictor_info.csv").write_text(
+        "predictor,description\ncandidate,test\n")
+    (combined_predictions.parent / "accuracy_scores.monoallelic.csv").write_text(
+        "predictor,metric,value\ncandidate,pr_auc,0.9\n")
     figure = comparison / "plots" / "model_comparison_figures.pdf"
     figure.parent.mkdir()
     figure.write_bytes(b"pdf")
@@ -160,6 +168,14 @@ def test_snapshot_experiment_exports_reconstructable_tables(tmp_path):
         destination / "artifacts" / "condition-a" /
         "comparison-vs-baseline" / "affinity" / "predictions.csv.bz2"
     ).read_bytes() == predictions.read_bytes()
+    assert (
+        destination / "artifacts" / "candidate_figures" /
+        combined_predictions.name
+    ).read_bytes() == combined_predictions.read_bytes()
+    assert (
+        destination / "artifacts" / "candidate_figures" /
+        "accuracy_scores.monoallelic.csv"
+    ).is_file()
     prediction_row = inventory.loc[
         inventory.relative_path.str.endswith("predictions.csv.bz2")].iloc[0]
     assert prediction_row.storage == "hardlink"
