@@ -172,23 +172,33 @@ def _merge_external_predictions(combined, paths, canonical_columns):
             raise ValueError(
                 "External predictor column already exists before joining %s: "
                 "%s" % (path, ", ".join(duplicate_columns)))
-        if combined.duplicated(list(EXTERNAL_JOIN_COLUMNS)).any():
-            raise ValueError(
-                "Candidate benchmark rows are not unique on external join "
-                "columns")
-        if external.duplicated(list(EXTERNAL_JOIN_COLUMNS)).any():
-            raise ValueError(
-                "External prediction rows are not unique on join columns: %s" %
-                path)
+        join_columns = list(EXTERNAL_JOIN_COLUMNS)
+        candidate_duplicate_mask = combined.duplicated(
+            join_columns, keep=False)
+        external_duplicate_mask = external.duplicated(
+            join_columns, keep=False)
+        external_duplicate_rows = external.loc[
+            external_duplicate_mask, join_columns + score_columns]
+        if not external_duplicate_rows.empty:
+            score_counts = external_duplicate_rows.groupby(
+                join_columns, dropna=False, sort=False,
+            )[score_columns].nunique(dropna=False)
+            inconsistent = score_counts.gt(1).any(axis=1)
+            if inconsistent.any():
+                raise ValueError(
+                    "External prediction rows repeat a join identity with "
+                    "different scores in %s (%d inconsistent key(s))" % (
+                        path, int(inconsistent.sum())))
+        external_unique = external.drop_duplicates(join_columns, keep="first")
 
         original_rows = len(combined)
         combined["_candidate_row_order"] = numpy.arange(original_rows)
         combined = combined.merge(
-            external[list(EXTERNAL_JOIN_COLUMNS) + score_columns],
-            on=list(EXTERNAL_JOIN_COLUMNS),
+            external_unique[join_columns + score_columns],
+            on=join_columns,
             how="left",
             sort=False,
-            validate="one_to_one",
+            validate="many_to_one",
             indicator="_external_merge",
         )
         unmatched = int((combined["_external_merge"] != "both").sum())
@@ -209,8 +219,19 @@ def _merge_external_predictions(combined, paths, canonical_columns):
             "path": str(path),
             "sha256": sha256_file(path),
             "source_rows": len(external),
+            "unique_join_rows": len(external_unique),
+            "duplicate_source_rows": int(external_duplicate_mask.sum()),
+            "duplicate_source_keys": int(
+                external.loc[external_duplicate_mask, join_columns]
+                .drop_duplicates()
+                .shape[0]),
             "matched_candidate_rows": original_rows,
-            "join_columns": list(EXTERNAL_JOIN_COLUMNS),
+            "duplicate_candidate_rows": int(candidate_duplicate_mask.sum()),
+            "duplicate_candidate_keys": int(
+                combined.loc[candidate_duplicate_mask, join_columns]
+                .drop_duplicates()
+                .shape[0]),
+            "join_columns": join_columns,
             "predictor_columns": score_columns,
             "finite_prediction_rows": {
                 column: int(numpy.isfinite(

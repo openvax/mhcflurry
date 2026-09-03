@@ -117,6 +117,17 @@ def export_training_tables(source_dir, out_dir):
                     hyperparameters.get("layer_sizes", []),
                     separators=(",", ":"),
                 ),
+                "activation": hyperparameters.get("activation"),
+                "convolutional_activation": hyperparameters.get(
+                    "convolutional_activation"),
+                "normalization": hyperparameters.get("normalization", "none"),
+                "dropout_keep_probability": hyperparameters.get(
+                    "dropout_probability"),
+                "dropout_rate": hyperparameters.get("dropout_rate"),
+                "restore_best_weights": hyperparameters.get(
+                    "restore_best_weights", False),
+                "patience": hyperparameters.get("patience"),
+                "learning_rate": hyperparameters.get("learning_rate"),
                 "minibatch_size": hyperparameters.get("minibatch_size"),
                 "optimizer": hyperparameters.get("optimizer"),
                 "optimizer_implementation": hyperparameters.get(
@@ -126,6 +137,12 @@ def export_training_tables(source_dir, out_dir):
                     "data_dependent_initialization_method"),
                 "data_dependent_initialization_target": hyperparameters.get(
                     "data_dependent_initialization_target"),
+                "convolutional_filters": hyperparameters.get(
+                    "convolutional_filters"),
+                "convolutional_kernel_size": hyperparameters.get(
+                    "convolutional_kernel_size"),
+                "n_flank_length": hyperparameters.get("n_flank_length"),
+                "c_flank_length": hyperparameters.get("c_flank_length"),
                 "hyperparameters_json": json.dumps(
                     hyperparameters, sort_keys=True, separators=(",", ":")),
             })
@@ -234,8 +251,8 @@ def _artifact_role(relative_path):
 
 def _copy_role(role):
     return role in {
-        "model_manifest", "telemetry", "log", "configuration",
-        "provenance", "metric", "prediction", "figure",
+        "weight", "training_data", "model_manifest", "telemetry", "log",
+        "configuration", "provenance", "metric", "prediction", "figure",
     }
 
 
@@ -494,9 +511,10 @@ def snapshot_experiment(
             "mode is recorded in `source_files.csv`.",
             "",
             "`source_files.csv` inventories every original artifact by SHA256. "
-            "Large weights and training tables are checksummed but intentionally "
-            "not duplicated. `external_inputs.csv` preserves hashes recorded by "
-            "the runner. `environment.json` records the capture environment.",
+            "Weights and per-model training tables below the configured copy-size "
+            "limit are retained; larger files remain checksummed in the inventory. "
+            "`external_inputs.csv` preserves hashes recorded by the runner. "
+            "`environment.json` records the capture environment.",
             "",
             "To reconstruct, check out the training source commit, verify input "
             "and weight hashes against the inventories, then use a preserved "

@@ -154,6 +154,41 @@ def test_candidate_figure_inputs_join_external_prediction_table(tmp_path):
         )
 
 
+def test_candidate_figure_inputs_join_repeated_external_identities(tmp_path):
+    combined = pandas.DataFrame({
+        "protein_accession": ["P1", "P1", "P2"],
+        "sample_id": ["sample-1"] * 3,
+        "hla": ["HLA-A*02:01"] * 3,
+        "peptide": ["AAAAAAAA", "AAAAAAAA", "BBBBBBBB"],
+        "n_flank": ["NNNNN"] * 3,
+        "c_flank": ["CCCCC"] * 3,
+        "hit": [0, 0, 1],
+    })
+    external = tmp_path / "external.csv.bz2"
+    pandas.concat([
+        combined.assign(mixmhcpred=[0.1, 0.1, 0.9]),
+        combined.iloc[[0]].assign(mixmhcpred=0.1),
+    ], ignore_index=True).to_csv(external, index=False)
+
+    merged, records = affinity_candidate_figures._merge_external_predictions(
+        combined.copy(), [external], {"mixmhcpred"})
+
+    assert len(merged) == len(combined)
+    numpy.testing.assert_allclose(merged.mixmhcpred, [0.1, 0.1, 0.9])
+    assert records[0]["duplicate_candidate_rows"] == 2
+    assert records[0]["duplicate_candidate_keys"] == 1
+    assert records[0]["duplicate_source_rows"] == 3
+    assert records[0]["duplicate_source_keys"] == 1
+    assert records[0]["unique_join_rows"] == 2
+
+    inconsistent = pandas.read_csv(external)
+    inconsistent.loc[3, "mixmhcpred"] = 0.2
+    inconsistent.to_csv(external, index=False)
+    with pytest.raises(ValueError, match="different scores"):
+        affinity_candidate_figures._merge_external_predictions(
+            combined.copy(), [external], {"mixmhcpred"})
+
+
 def test_candidate_figure_render_includes_every_candidate_row(
         tmp_path, monkeypatch):
     conditions = ["keras_128", "native_1024"]

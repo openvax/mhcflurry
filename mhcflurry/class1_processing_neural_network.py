@@ -22,16 +22,17 @@ import math
 import numpy
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from . import amino_acid
 from .hyperparameters import HyperparameterDefaults
 from .class1_training import torch_from_numpy, validation_split_counts
 from .keras_optimizers import KerasAdam, KerasRMSprop
 from .pytorch_sizing import DEFAULT_PREDICT_BATCH_SIZE, env_workers_per_gpu
+from .pytorch_layers import KerasBatchNorm1d, get_activation
 from .flanking_encoding import FlankingEncoding
 from .common import get_pytorch_device
 from .pytorch_training import (
+    copy_module_state_dict_to_cpu,
     configure_matmul_precision,
     effective_validation_batch_size,
     maybe_compile_loss,
@@ -61,7 +62,8 @@ class Class1ProcessingModel(nn.Module):
             post_convolutional_dense_layer_sizes,
             sequence_input_is_indices=False,
             sequence_input_vector_encoding_name=None,
-            init="glorot_uniform"):
+            init="glorot_uniform",
+            normalization="none"):
         super(Class1ProcessingModel, self).__init__()
 
         self.n_flank_length = n_flank_length
@@ -96,14 +98,27 @@ class Class1ProcessingModel(nn.Module):
         )
 
         # Activation function
-        if convolutional_activation == 'tanh':
-            self.conv_activation = torch.tanh
-        elif convolutional_activation == 'relu':
-            self.conv_activation = F.relu
-        elif convolutional_activation == 'sigmoid':
-            self.conv_activation = torch.sigmoid
+        self.conv_activation = get_activation(convolutional_activation)
+        if self.conv_activation is None:
+            self.conv_activation = lambda value: value
+
+        normalization = str(normalization or "none").lower()
+        if normalization not in {"none", "batch", "layer"}:
+            raise ValueError(
+                "normalization must be one of none, batch, or layer; got %r" %
+                normalization
+            )
+        self.normalization = normalization
+        if normalization == "batch":
+            self.normalization_layer = KerasBatchNorm1d(
+                convolutional_filters,
+                eps=1e-3,
+                momentum=0.01,
+            )
+        elif normalization == "layer":
+            self.normalization_layer = nn.LayerNorm(convolutional_filters)
         else:
-            self.conv_activation = torch.tanh
+            self.normalization_layer = None
 
         # Dropout
         self.dropout_rate = dropout_rate
@@ -203,6 +218,12 @@ class Class1ProcessingModel(nn.Module):
         # Apply main convolution
         x = self.conv1(x)
         x = self.conv_activation(x)
+
+        if self.normalization_layer is not None:
+            if self.normalization == "layer":
+                x = self.normalization_layer(x.transpose(1, 2)).transpose(1, 2)
+            else:
+                x = self.normalization_layer(x)
 
         if self.dropout is not None:
             # Spatial dropout: same dropout mask for all positions
@@ -576,6 +597,7 @@ class Class1ProcessingNeuralNetwork(object):
         dropout_rate=0.5,
         post_convolutional_dense_layer_sizes=[],
         init="glorot_uniform",
+        normalization="none",
     )
     """
     Hyperparameters (and their default values) that affect the neural network
@@ -596,6 +618,7 @@ class Class1ProcessingNeuralNetwork(object):
     early_stopping_hyperparameter_defaults = HyperparameterDefaults(
         patience=30,
         min_delta=0.0,
+        restore_best_weights=False,
     )
     """
     Hyperparameters for early stopping.
@@ -857,6 +880,7 @@ class Class1ProcessingNeuralNetwork(object):
         last_progress_print = None
         min_val_loss_iteration = None
         min_val_loss = None
+        best_state_dict = None
         start = time.time()
 
         for epoch in range(self.hyperparameters["max_epochs"]):
@@ -994,6 +1018,9 @@ class Class1ProcessingNeuralNetwork(object):
                 ):
                     min_val_loss = val_loss
                     min_val_loss_iteration = epoch
+                    if self.hyperparameters["restore_best_weights"]:
+                        best_state_dict = copy_module_state_dict_to_cpu(
+                            eager_network)
 
                 if self.hyperparameters["early_stopping"]:
                     threshold = (
@@ -1025,6 +1052,17 @@ class Class1ProcessingNeuralNetwork(object):
             if progress_callback:
                 progress_callback()
 
+        restored_best_weights = bool(
+            self.hyperparameters["restore_best_weights"]
+            and best_state_dict is not None
+        )
+        if restored_best_weights:
+            eager_network.load_state_dict(best_state_dict)
+        fit_info["best_epoch"] = (
+            min_val_loss_iteration + 1
+            if min_val_loss_iteration is not None else None)
+        fit_info["best_val_loss"] = min_val_loss
+        fit_info["restored_best_weights"] = restored_best_weights
         fit_info["time"] = time.time() - start
         fit_info["num_points"] = len(sequences.dataframe)
         self.fit_info.append(dict(fit_info))
@@ -1348,6 +1386,7 @@ class Class1ProcessingNeuralNetwork(object):
         dropout_rate,
         post_convolutional_dense_layer_sizes,
         init,
+        normalization,
     ):
         """
         Helper function to make a PyTorch network given hyperparameters.
@@ -1376,6 +1415,7 @@ class Class1ProcessingNeuralNetwork(object):
             sequence_input_is_indices=True,
             sequence_input_vector_encoding_name=amino_acid_encoding,
             init=init,
+            normalization=normalization,
         )
 
     def __getstate__(self):

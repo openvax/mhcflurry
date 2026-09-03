@@ -18,6 +18,10 @@ Required:
 
 Experiment controls:
   --mode MODE                        representative (default) or full
+  --design NAME                      optimizer-lsuv-batch-init (default) or
+                                      regularization-activation
+  --regularization-base-recipe NAME  native-pre-1024 (default),
+                                      native-post-1024, or keras-no-lsuv-1024
   --condition NAME                   Run one generated condition; repeatable
   --random-seed INTEGER              Release random seed (default: 42)
 
@@ -56,6 +60,8 @@ RELEASE_HOLDOUT_DIR=""
 PUBLIC_AFFINITY_DIR=""
 SOURCE_COMMIT=""
 FACTORIAL_MODE="representative"
+FACTORIAL_DESIGN="optimizer-lsuv-batch-init"
+REGULARIZATION_BASE_RECIPE="native-pre-1024"
 RELEASE_RANDOM_SEED=42
 MAX_TASKS_PER_WORKER=12
 MAX_WORKERS_PER_GPU="auto"
@@ -90,6 +96,10 @@ while [ "$#" -gt 0 ]; do
             require_value "$@"; SOURCE_COMMIT="$2"; shift 2 ;;
         --mode)
             require_value "$@"; FACTORIAL_MODE="$2"; shift 2 ;;
+        --design)
+            require_value "$@"; FACTORIAL_DESIGN="$2"; shift 2 ;;
+        --regularization-base-recipe)
+            require_value "$@"; REGULARIZATION_BASE_RECIPE="$2"; shift 2 ;;
         --condition)
             require_value "$@"; FACTORIAL_CONDITIONS+=("$2"); shift 2 ;;
         --random-seed)
@@ -141,6 +151,21 @@ case "$FACTORIAL_MODE" in
     representative|full) ;;
     *) printf 'Invalid --mode: %s\n' "$FACTORIAL_MODE" >&2; exit 2 ;;
 esac
+case "$FACTORIAL_DESIGN" in
+    optimizer-lsuv-batch-init|regularization-activation) ;;
+    *) printf 'Invalid --design: %s\n' "$FACTORIAL_DESIGN" >&2; exit 2 ;;
+esac
+case "$REGULARIZATION_BASE_RECIPE" in
+    native-pre-1024|native-post-1024|keras-no-lsuv-1024) ;;
+    *) printf 'Invalid --regularization-base-recipe: %s\n' \
+        "$REGULARIZATION_BASE_RECIPE" >&2; exit 2 ;;
+esac
+if [ "$FACTORIAL_DESIGN" = "regularization-activation" ] && \
+        [ "$FACTORIAL_MODE" != "representative" ]; then
+    printf '%s supports representative mode only\n' \
+        'regularization-activation' >&2
+    exit 2
+fi
 case "$MATMUL_PRECISION" in
     none|highest|high|medium) ;;
     *) printf 'Invalid --matmul-precision: %s\n' "$MATMUL_PRECISION" >&2; exit 2 ;;
@@ -249,6 +274,8 @@ date -u +%Y-%m-%dT%H:%M:%SZ > "$MHCFLURRY_OUT/started_at_utc.txt"
 python "$SCRIPT_DIR/generate_affinity_factorial.py" \
     "$MHCFLURRY_OUT" \
     --mode "$FACTORIAL_MODE" \
+    --design "$FACTORIAL_DESIGN" \
+    --regularization-base-recipe "$REGULARIZATION_BASE_RECIPE" \
     > "$MHCFLURRY_OUT/manifest.stdout.json"
 
 BASELINE_CONDITION="$(python -c \
@@ -291,6 +318,8 @@ fi
         "schema_version=1" \
         "source_commit=$SOURCE_COMMIT" \
         "factorial_mode=$FACTORIAL_MODE" \
+        "factorial_design=$FACTORIAL_DESIGN" \
+        "regularization_base_recipe=$REGULARIZATION_BASE_RECIPE" \
         "factorial_conditions=$FACTORIAL_CONDITIONS_PROVENANCE" \
         "random_seed=$RELEASE_RANDOM_SEED" \
         "gpus=$GPUS" \

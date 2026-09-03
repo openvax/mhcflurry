@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 
 import numpy
+import pandas
 import pytest
 import yaml
 
@@ -27,6 +28,12 @@ PUBLIC_EVALUATOR = (
     / "scripts"
     / "training"
     / "evaluate_affinity_factorial_public.sh"
+)
+PROCESSING_REGULARIZATION_RUNNER = (
+    REPO
+    / "scripts"
+    / "training"
+    / "run_processing_regularization_activation.sh"
 )
 
 
@@ -56,6 +63,8 @@ def test_affinity_factorial_runner_exposes_explicit_cli():
             "--public-affinity-dir",
             "--source-commit",
             "--mode",
+            "--design",
+            "--regularization-base-recipe",
             "--condition",
             "--random-seed",
             "--gpus",
@@ -92,6 +101,32 @@ def test_affinity_public_evaluator_exposes_explicit_cli():
     assert "mhcflurry train plot-loss-curves" in script
     assert "mhcflurry plot-model-comparison" in script
     assert "mhcflurry eval affinity-candidate-figures" in script
+
+
+def test_processing_regularization_runner_exposes_explicit_cli():
+    result = subprocess.run(
+        ["bash", str(PROCESSING_REGULARIZATION_RUNNER), "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    for flag in (
+            "--out",
+            "--train-data",
+            "--data-eval-dir",
+            "--release-holdout-dir",
+            "--source-commit",
+            "--random-seed",
+            "--evaluation",
+            "--experiments-dir",
+            "--experiment-name",
+            "--source-archive",
+            "--gpus",
+            "--num-jobs",
+            "--max-workers-per-gpu",
+            "--dataloader-num-workers",
+            "--max-tasks-per-worker"):
+        assert flag in result.stdout
 
 
 def test_affinity_architecture_runner_exposes_explicit_cli():
@@ -219,6 +254,112 @@ def test_affinity_factorial_has_only_effective_initialization_axes(tmp_path):
             (tmp_path / record["hyperparameters_path"]).read_text()
         )
         assert len(values) == 2
+
+
+@pytest.mark.parametrize(
+    "base_recipe,optimizer,lsuv_target,lsuv_method",
+    [
+        ("native-pre-1024", "pytorch", "pre_activation", "lsuv"),
+        ("native-post-1024", "pytorch", "post_activation", "lsuv"),
+        ("keras-no-lsuv-1024", "keras", "not_applicable", None),
+    ],
+)
+def test_affinity_regularization_activation_design(
+        tmp_path, base_recipe, optimizer, lsuv_target, lsuv_method):
+    module = load_script("generate_affinity_factorial")
+    records = module.build_regularization_activation_conditions(base_recipe)
+
+    assert len(records) == 10
+    assert {len(grid) for _, grid, _ in records} == {2}
+    assert {axes["activation"] for _, _, axes in records} == {
+        "tanh", "relu", "silu", "gelu"}
+    assert {axes["normalization"] for _, _, axes in records} == {
+        "none", "batch", "layer"}
+    assert {axes["dropout_keep_probability"] for _, _, axes in records} == {
+        0.5, 0.75, 1.0}
+    assert {axes["restore_best_weights"] for _, _, axes in records} == {
+        False, True}
+    assert {axes["patience"] for _, _, axes in records} == {20, 40}
+    for _, grid, axes in records:
+        assert {item["optimizer_implementation"] for item in grid} == {
+            optimizer}
+        assert {item["data_dependent_initialization_method"] for item in grid} == {
+            lsuv_method}
+        assert axes["lsuv_target"] == lsuv_target
+
+    out = tmp_path / base_recipe
+    manifest = module.write_conditions(
+        out,
+        design="regularization-activation",
+        regularization_base_recipe=base_recipe,
+    )
+    assert manifest["baseline_condition"] == "%s__control" % base_recipe
+    assert len(manifest["records"]) == 10
+
+
+def test_processing_regularization_activation_design(tmp_path):
+    module = load_script("generate_processing_regularization_activation")
+    records = module.build_conditions()
+
+    assert len(records) == 20
+    for architecture in ("small", "large"):
+        architecture_records = [
+            record for record in records
+            if record[2]["architecture"] == architecture
+        ]
+        assert len(architecture_records) == 10
+        assert {axes["activation"] for _, _, axes in architecture_records} == {
+            "tanh", "relu", "silu", "gelu"}
+        assert {axes["normalization"] for _, _, axes in architecture_records} == {
+            "none", "batch", "layer"}
+        assert {axes["restore_best_weights"] for _, _, axes in (
+            architecture_records
+        )} == {False, True}
+        assert {axes["patience"] for _, _, axes in architecture_records} == {
+            20, 40}
+        for _, grid, axes in architecture_records:
+            assert len(grid) == 1
+            item = grid[0]
+            assert item["n_flank_length"] == 5
+            assert item["c_flank_length"] == 5
+            assert item["minibatch_size"] == 512
+            assert item["optimizer_implementation"] == "keras"
+            assert axes["baseline_condition"] == "%s__control" % architecture
+
+    manifest = module.write_conditions(tmp_path / "processing")
+    assert len(manifest["records"]) == 20
+    assert manifest["fixed_controls"]["flank_length_each_side"] == 5
+
+
+def test_training_stop_summary_tracks_updates_and_validation_tail(tmp_path):
+    module = load_script("summarize_training_stops")
+    history = pandas.DataFrame({
+        "manifest_path": ["condition/models/manifest.csv"] * 4,
+        "model_name": ["model"] * 4,
+        "fit_index": [0] * 4,
+        "phase": ["finetune"] * 4,
+        "fold": [0] * 4,
+        "architecture": [1] * 4,
+        "replicate": [0] * 4,
+        "epoch": [1, 2, 3, 4],
+        "val_loss": [0.4, 0.2, 0.21, 0.22],
+        "epoch_num_train_batches": [10] * 4,
+        "epoch_num_train_rows": [100] * 4,
+        "epoch_train_time": [1.5] * 4,
+        "epoch_total_time": [2.0] * 4,
+    })
+    path = tmp_path / "training_history.csv"
+    history.to_csv(path, index=False)
+
+    details, summary = module.summarize(path)
+
+    assert details.best_epoch.tolist() == [2]
+    assert details.final_epoch.tolist() == [4]
+    assert details.epochs_after_best.tolist() == [2]
+    assert details.optimizer_steps.tolist() == [40.0]
+    assert details.training_rows_seen.tolist() == [400.0]
+    assert summary.total_epochs.tolist() == [4]
+    assert summary.total_optimizer_steps.tolist() == [40.0]
 
 
 def test_affinity_factorial_full_mode_retains_all_architectures():

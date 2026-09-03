@@ -80,8 +80,19 @@ Affinity evaluation uses the frozen 15,027,952-row monoallelic benchmark.
 Candidate models are compared directly with the public 2.2
 `models.no_additional_ms` ensemble after excluding the union of candidate and
 public affinity-training peptide-MHC pairs. Saved predictions from all
-candidates are row-identity checked and joined one-to-one with NetMHCpan 4.0 BA,
-NetMHCpan 4.0 EL, and MixMHCpred scores.
+candidates are row-identity checked and joined with NetMHCpan 4.0 BA,
+NetMHCpan 4.0 EL, and MixMHCpred scores. Repeated biological benchmark
+identities are permitted only when all corresponding external scores are
+identical; the join must remain complete and many-to-one without changing
+candidate row order or row count.
+
+The release affinity architectures use tanh hidden activations and a stored
+dropout keep probability of 0.5 (50% actual dropout). A follow-up experiment
+holds the leading optimizer/LSUV/minibatch recipe fixed while testing ReLU,
+SiLU/Swish, GELU, 25% and 0% actual dropout, BatchNorm, LayerNorm, restoration
+of the best-validation checkpoint, and doubled early-stopping patience. The
+same screen is repeated on the nearest recipe before any result is described
+as recipe-independent.
 
 ### Processing experiments
 
@@ -95,6 +106,12 @@ ReLU, 512 filters, kernel width 17, a 16-unit dense layer, dropout 0.5, and
 convolutional L1 `1e-6`. All comparisons hold learning rate 0.001, minibatch
 512, training rows, folds, seeds, decoy generation, and the public affinity
 predictor fixed.
+
+Because activation was confounded with architecture in the first processing
+panel, a matched five-residue-flank follow-up crosses tanh, ReLU, SiLU, and
+GELU separately within each architecture. It also tests spatial-dropout rate,
+BatchNorm, LayerNorm, checkpoint restoration, and patience without changing
+the initializer, optimizer, folds, samples, or decoys.
 
 We evaluated no flanks, five residues per side, and 15 residues per side. A
 separate topology ablation replaced convolution with either a shared
@@ -212,6 +229,26 @@ union-training-overlap exclusion. Macro values average over 95 alleles; micro
 values pool all retained rows. Color scales differ between panels so that the
 smaller macro differences remain visible.
 
+### Early stopping retains a degraded terminal checkpoint
+
+All frontier fits stopped far below the 5,000-epoch ceiling. The leading
+native/pre-LSUV/minibatch-1024 condition accumulated 482 finetuning
+epoch-records and approximately 907,000 optimizer steps across eight fits,
+compared with 808 epoch-records and 1.53 million steps for native/post-LSUV at
+the same minibatch. Their mean training cost per epoch-record was nearly
+identical (5.74 versus 5.75 seconds); the leading condition's shorter wall time
+therefore reflects earlier convergence rather than a cheaper activation or
+optimizer kernel.
+
+Historical early stopping retains the terminal checkpoint rather than the
+checkpoint with minimum validation loss. Every finetuning fit ended 21 epochs
+after its best validation epoch. For the leading condition, final validation
+loss was a median 10.8% above the best observed loss, with a maximum gap of
+43.8%. This does not show that the held-out benchmark would improve after
+restoration, nor does it exclude a later improvement beyond the patience
+window. Best-checkpoint restoration at patience 20 and 40 are therefore
+explicit release-gating experiments.
+
 ## Discussion
 
 The experiments reject two tempting universal rules. First, a larger minibatch
@@ -233,6 +270,13 @@ Execution-only controls such as prediction chunk size and worker count remain
 outside model provenance, provided that they pass numerical-parity tests and
 never silently shrink the configured scientific minibatch.
 
+Activation findings are presently narrower. Affinity has directly tested tanh
+only, whereas the processing representatives use tanh in the small network and
+ReLU in the large network. Neither comparison identifies an activation effect
+independent of architecture. Claims about tanh, initialization, normalization,
+or checkpoint restoration will remain architecture- and task-specific until
+the matched activation screen completes.
+
 ## Limitations
 
 The processing development benchmark has been queried repeatedly during model
@@ -253,3 +297,9 @@ frontier was trained from commit `ac812c1cdabc6e84d515213fa1ba59341f9ca83b`;
 the combined renderer is commit
 `0b88690040feb9f5e46826fdb6dad91146b2654a`. A final artifact table with
 snapshot paths and SHA256 digests will be added after retrieval.
+
+The immutable raw terminal-frontier snapshot is
+`20260903T111035Z-affinity-frontier-raw-ac812c1cdabc`. Its 394 copied artifacts
+and source archive were verified byte-for-byte after local retrieval. A second
+snapshot will add the model weights, convergence tables, corrected external
+join, and combined figures.

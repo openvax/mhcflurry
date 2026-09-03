@@ -20,6 +20,39 @@ from mhcflurry.cli.generate_training_hyperparameters import (
 
 DEFAULT_MINIBATCH_SIZES = (128, 256, 512, 1024)
 DEFAULT_INITIALIZERS = ("glorot_uniform", "he_uniform", "orthogonal")
+DESIGN_CHOICES = ("optimizer-lsuv-batch-init", "regularization-activation")
+REGULARIZATION_BASE_RECIPES = {
+    "native-pre-1024": {
+        "minibatch_size": 1024,
+        "optimizer_implementation": "pytorch",
+        "data_dependent_initialization_method": "lsuv",
+        "lsuv_target": "pre_activation",
+    },
+    "native-post-1024": {
+        "minibatch_size": 1024,
+        "optimizer_implementation": "pytorch",
+        "data_dependent_initialization_method": "lsuv",
+        "lsuv_target": "post_activation",
+    },
+    "keras-no-lsuv-1024": {
+        "minibatch_size": 1024,
+        "optimizer_implementation": "keras",
+        "data_dependent_initialization_method": None,
+        "lsuv_target": "not_applicable",
+    },
+}
+REGULARIZATION_ACTIVATION_VARIANTS = (
+    ("control", "tanh", "none", 0.50, False, 20),
+    ("activation-relu", "relu", "none", 0.50, False, 20),
+    ("activation-silu", "silu", "none", 0.50, False, 20),
+    ("activation-gelu", "gelu", "none", 0.50, False, 20),
+    ("normalization-batch", "tanh", "batch", 0.50, False, 20),
+    ("normalization-layer", "tanh", "layer", 0.50, False, 20),
+    ("dropout-keep-075", "tanh", "none", 0.75, False, 20),
+    ("dropout-keep-100", "tanh", "none", 1.00, False, 20),
+    ("restore-best", "tanh", "none", 0.50, True, 20),
+    ("restore-best-patience-40", "tanh", "none", 0.50, True, 40),
+)
 REPRESENTATIVE_ARCHITECTURES = (
     ("feedforward", (512, 512), 1e-8),
     ("with-skip-connections", (256, 512, 512), 1e-8),
@@ -37,6 +70,13 @@ MANIFEST_FIELDS = (
     "network_count",
     "hyperparameters_path",
     "hyperparameters_sha256",
+    "design",
+    "base_recipe",
+    "activation",
+    "normalization",
+    "dropout_keep_probability",
+    "restore_best_weights",
+    "patience",
 )
 
 
@@ -145,13 +185,95 @@ def build_conditions(
     return records
 
 
-def write_conditions(out_dir, mode="representative", **factorial_axes):
+def build_regularization_activation_conditions(base_recipe="native-pre-1024"):
+    """Return one-factor-at-a-time variants of a fixed affinity recipe."""
+    if base_recipe not in REGULARIZATION_BASE_RECIPES:
+        raise ValueError("Unknown regularization base recipe: %s" % base_recipe)
+    recipe = REGULARIZATION_BASE_RECIPES[base_recipe]
+    grid = build_affinity_grid(
+        minibatch_size=recipe["minibatch_size"],
+        optimizer_implementation=recipe["optimizer_implementation"],
+        data_dependent_initialization_target=(
+            recipe["lsuv_target"]
+            if recipe["lsuv_target"] != "not_applicable"
+            else "post_activation"
+        ),
+        init="glorot_uniform",
+    )
+    grid = select_representative_architectures(grid)
+    records = []
+    for (
+        variant,
+        activation,
+        normalization,
+        dropout_keep,
+        restore_best_weights,
+        patience,
+    ) in (
+            REGULARIZATION_ACTIVATION_VARIANTS):
+        condition = "%s__%s" % (base_recipe, variant)
+        condition_grid = []
+        for source in grid:
+            item = dict(source)
+            item.update({
+                "activation": activation,
+                "batch_normalization": False,
+                "normalization": normalization,
+                "dropout_probability": dropout_keep,
+                "restore_best_weights": restore_best_weights,
+                "patience": patience,
+                "data_dependent_initialization_method": recipe[
+                    "data_dependent_initialization_method"],
+            })
+            condition_grid.append(item)
+        records.append((condition, condition_grid, {
+            "design": "regularization-activation",
+            "base_recipe": base_recipe,
+            "minibatch_size": recipe["minibatch_size"],
+            "optimizer_implementation": recipe[
+                "optimizer_implementation"],
+            "data_dependent_initialization_method": recipe[
+                "data_dependent_initialization_method"],
+            "lsuv_target": recipe["lsuv_target"],
+            "init": "glorot_uniform",
+            "effective_hidden_initializer": (
+                "orthogonal_then_lsuv"
+                if recipe["data_dependent_initialization_method"] == "lsuv"
+                else "glorot_uniform"
+            ),
+            "activation": activation,
+            "normalization": normalization,
+            "dropout_keep_probability": dropout_keep,
+            "restore_best_weights": restore_best_weights,
+            "patience": patience,
+        }))
+    return records
+
+
+def write_conditions(
+        out_dir, mode="representative",
+        design="optimizer-lsuv-batch-init",
+        regularization_base_recipe="native-pre-1024",
+        **factorial_axes):
     """Write condition YAML files and checksummed JSON/CSV manifests."""
     out_dir = Path(out_dir)
     conditions_dir = out_dir / "conditions"
     conditions_dir.mkdir(parents=True, exist_ok=True)
     records = []
-    for condition, grid, axes in build_conditions(mode=mode, **factorial_axes):
+    if design == "optimizer-lsuv-batch-init":
+        conditions = build_conditions(mode=mode, **factorial_axes)
+        baseline_condition = condition_name(
+            128, "keras", "post_activation", "glorot_uniform")
+    elif design == "regularization-activation":
+        if mode != "representative":
+            raise ValueError(
+                "regularization-activation supports representative mode only")
+        conditions = build_regularization_activation_conditions(
+            regularization_base_recipe)
+        baseline_condition = "%s__control" % regularization_base_recipe
+    else:
+        raise ValueError("Unknown affinity factorial design: %s" % design)
+    for condition, grid, axes in conditions:
         relative_path = Path("conditions") / (condition + ".yaml")
         payload = yaml.safe_dump(grid, sort_keys=True)
         (out_dir / relative_path).write_text(payload)
@@ -167,19 +289,24 @@ def write_conditions(out_dir, mode="representative", **factorial_axes):
             ).hexdigest(),
         })
 
+    fixed_controls = {
+        "fold_count": 4,
+        "learning_rate": 0.001,
+        "optimizer": "rmsprop",
+        "random_seed": 42,
+        "lsuv_replaces_eligible_weights_with_orthogonal": True,
+    }
+    if design == "regularization-activation":
+        fixed_controls.update({
+            "activation_screen": ["tanh", "relu", "silu", "gelu"],
+            "dropout_probability_semantics": "keep_probability",
+        })
     manifest = {
         "schema_version": 1,
+        "design": design,
         "mode": mode,
-        "baseline_condition": condition_name(
-            128, "keras", "post_activation", "glorot_uniform"
-        ),
-        "fixed_controls": {
-            "fold_count": 4,
-            "learning_rate": 0.001,
-            "optimizer": "rmsprop",
-            "random_seed": 42,
-            "lsuv_replaces_eligible_weights_with_orthogonal": True,
-        },
+        "baseline_condition": baseline_condition,
+        "fixed_controls": fixed_controls,
         "records": records,
     }
     (out_dir / "manifest.json").write_text(
@@ -198,6 +325,15 @@ def make_parser():
     parser.add_argument("out_dir")
     parser.add_argument(
         "--mode", choices=("representative", "full"), default="representative"
+    )
+    parser.add_argument(
+        "--design", choices=DESIGN_CHOICES,
+        default="optimizer-lsuv-batch-init",
+    )
+    parser.add_argument(
+        "--regularization-base-recipe",
+        choices=tuple(REGULARIZATION_BASE_RECIPES),
+        default="native-pre-1024",
     )
     parser.add_argument(
         "--minibatch-sizes",
@@ -234,6 +370,8 @@ def main(argv=None):
     manifest = write_conditions(
         args.out_dir,
         mode=args.mode,
+        design=args.design,
+        regularization_base_recipe=args.regularization_base_recipe,
         minibatch_sizes=args.minibatch_sizes,
         optimizer_implementations=args.optimizer_implementations,
         lsuv_targets=args.lsuv_targets,

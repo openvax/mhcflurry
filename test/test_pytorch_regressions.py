@@ -50,8 +50,13 @@ from mhcflurry.pytorch_losses import (
     MultiallelicMassSpecLoss,
     get_pytorch_loss,
 )
-from mhcflurry.pytorch_layers import KerasBatchNorm1d, LocallyConnected1D
+from mhcflurry.pytorch_layers import (
+    KerasBatchNorm1d,
+    LocallyConnected1D,
+    get_activation,
+)
 from mhcflurry.pytorch_training import (
+    copy_module_state_dict_to_cpu,
     effective_validation_batch_size,
     maybe_compile_loss,
     validation_forward_network,
@@ -593,6 +598,20 @@ def test_maybe_compile_loss_requires_network_compile(monkeypatch):
     assert calls == []
 
 
+def test_copy_module_state_dict_to_cpu_is_independent():
+    layer = torch.nn.Linear(2, 1)
+    checkpoint = copy_module_state_dict_to_cpu(layer)
+    expected = {name: value.clone() for name, value in checkpoint.items()}
+
+    with torch.no_grad():
+        for value in layer.state_dict().values():
+            value.add_(1.0)
+
+    for name, value in checkpoint.items():
+        assert value.device.type == "cpu"
+        torch.testing.assert_close(value, expected[name])
+
+
 def test_fit_validation_interval_skips_off_interval_epochs():
     """validation_interval > 1 measures only on-interval + final epoch."""
     peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
@@ -635,6 +654,38 @@ def test_fit_validation_interval_default_runs_every_epoch():
     # least some epochs differ from epoch 0; this is the most we can
     # assert without depending on exact per-step numerics.
     assert any(v != val_loss[0] for v in val_loss[1:])
+
+
+def test_affinity_fit_can_restore_best_validation_checkpoint(monkeypatch):
+    import mhcflurry.class1_neural_network as affinity_module
+
+    calls = []
+
+    def zero_checkpoint(module):
+        calls.append(True)
+        return {
+            name: torch.zeros_like(value, device="cpu")
+            for name, value in module.state_dict().items()
+        }
+
+    monkeypatch.setattr(
+        affinity_module, "copy_module_state_dict_to_cpu", zero_checkpoint)
+    model = _make_simple_affinity_model(
+        max_epochs=2,
+        validation_split=0.5,
+        early_stopping=False,
+        restore_best_weights=True,
+    )
+    model.fit(
+        ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"],
+        np.array([50.0, 30.0, 100.0, 5000.0]),
+    )
+
+    assert calls
+    assert model.fit_info[-1]["restored_best_weights"] is True
+    assert model.fit_info[-1]["best_epoch"] is not None
+    for value in model.network().state_dict().values():
+        assert torch.count_nonzero(value) == 0
 
 
 def test_effective_validation_batch_size_uses_larger_cuda_default():
@@ -820,6 +871,60 @@ def test_batch_norm_updates_keras_population_variance():
     # leaves the initial running variance of 1.0 unchanged. PyTorch's native
     # BatchNorm would use unbiased variance=2.0 and update it to 1.01.
     assert layer.running_var.item() == pytest.approx(1.0)
+
+
+def test_batch_norm_sequence_updates_keras_population_variance():
+    layer = KerasBatchNorm1d(1, eps=1e-3, momentum=0.01)
+    inputs = torch.tensor([[[0.0, 2.0]], [[2.0, 4.0]]])
+
+    observed = layer(inputs)
+
+    expected = (inputs.numpy() - 2.0) / np.sqrt(2.001)
+    np.testing.assert_allclose(observed.detach().numpy(), expected, rtol=1e-6)
+    assert layer.running_mean.item() == pytest.approx(0.02)
+    assert layer.running_var.item() == pytest.approx(1.01)
+
+
+@pytest.mark.parametrize("activation", ["relu", "silu", "swish", "gelu"])
+def test_modern_activations_are_supported(activation):
+    observed = get_activation(activation)(torch.tensor([-1.0, 0.0, 1.0]))
+    assert observed.shape == (3,)
+    assert torch.isfinite(observed).all()
+
+
+def test_affinity_layer_normalization_is_batch_composition_invariant():
+    model = Class1NeuralNetworkModel(
+        peptide_encoding_shape=(3, 2),
+        layer_sizes=[4],
+        normalization="layer",
+    )
+    model.eval()
+    assert model.batch_norm_early is None
+    assert model.layer_norm_early is not None
+    assert model.layer_norms[0] is not None
+
+    inputs = torch.randn(3, 3, 2)
+    single = model({"peptide": inputs[:1]})
+    batched = model({"peptide": inputs})[:1]
+    torch.testing.assert_close(single, batched)
+
+    clone = Class1NeuralNetworkModel(
+        peptide_encoding_shape=(3, 2),
+        layer_sizes=[4],
+        normalization="layer",
+    )
+    clone.set_weights_list(model.get_weights_list(), auto_convert_keras=False)
+    clone.eval()
+    torch.testing.assert_close(single, clone({"peptide": inputs[:1]}))
+
+
+def test_affinity_normalization_rejects_conflicting_legacy_flag():
+    with pytest.raises(ValueError, match="conflicts"):
+        Class1NeuralNetworkModel(
+            peptide_encoding_shape=(3, 2),
+            batch_normalization=True,
+            normalization="layer",
+        )
 
 
 def test_locally_connected_initializer_uses_keras_fans(monkeypatch):

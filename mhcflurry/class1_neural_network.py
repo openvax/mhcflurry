@@ -70,6 +70,7 @@ from .class1_training import (
     validation_split_counts,
 )
 from .pytorch_training import (
+    copy_module_state_dict_to_cpu,
     configure_matmul_precision,
     effective_validation_batch_size,
     maybe_compile_loss,
@@ -195,7 +196,8 @@ class Class1NeuralNetworkModel(nn.Module):
             num_outputs=1,
             init="glorot_uniform",
             peptide_input_is_indices=False,
-            peptide_input_vector_encoding_name=None):
+            peptide_input_vector_encoding_name=None,
+            normalization="none"):
         super(Class1NeuralNetworkModel, self).__init__()
 
         self.peptide_encoding_shape = peptide_encoding_shape
@@ -228,6 +230,20 @@ class Class1NeuralNetworkModel(nn.Module):
         self.peptide_allele_merge_method = peptide_allele_merge_method
         self.peptide_allele_merge_activation = peptide_allele_merge_activation
         self.dropout_probability = dropout_probability
+        normalization = str(normalization or "none").lower()
+        if normalization not in {"none", "batch", "layer"}:
+            raise ValueError(
+                "normalization must be one of none, batch, or layer; got %r" %
+                normalization
+            )
+        if batch_normalization:
+            if normalization not in {"none", "batch"}:
+                raise ValueError(
+                    "batch_normalization=True conflicts with normalization=%r" %
+                    normalization
+                )
+            normalization = "batch"
+        self.normalization = normalization
         self.topology = topology
         self.num_outputs = num_outputs
         self.activation_name = activation
@@ -276,12 +292,15 @@ class Class1NeuralNetworkModel(nn.Module):
 
         # Batch normalization after peptide processing (early)
         self.batch_norm_early = None
-        if batch_normalization:
+        self.layer_norm_early = None
+        if normalization == "batch":
             self.batch_norm_early = KerasBatchNorm1d(
                 peptide_layer_input,
                 eps=KERAS_BATCH_NORM_EPSILON,
                 momentum=KERAS_BATCH_NORM_MOMENTUM,
             )
+        elif normalization == "layer":
+            self.layer_norm_early = nn.LayerNorm(peptide_layer_input)
 
         # Allele embedding and processing
         self.allele_embedding = None
@@ -327,6 +346,7 @@ class Class1NeuralNetworkModel(nn.Module):
         # Main dense layers
         self.dense_layers = nn.ModuleList()
         self.batch_norms = nn.ModuleList()
+        self.layer_norms = nn.ModuleList()
         self.dropouts = nn.ModuleList()
 
         # For DenseNet topology, track input sizes for skip connections
@@ -350,7 +370,7 @@ class Class1NeuralNetworkModel(nn.Module):
             layer = nn.Linear(current_size, size)
             self.dense_layers.append(layer)
 
-            if batch_normalization:
+            if normalization == "batch":
                 self.batch_norms.append(KerasBatchNorm1d(
                     size,
                     eps=KERAS_BATCH_NORM_EPSILON,
@@ -358,6 +378,10 @@ class Class1NeuralNetworkModel(nn.Module):
                 ))
             else:
                 self.batch_norms.append(None)
+            if normalization == "layer":
+                self.layer_norms.append(nn.LayerNorm(size))
+            else:
+                self.layer_norms.append(None)
 
             if dropout_probability > 0:
                 # Dropout probability in MHCflurry hyperparameters is keep-probability.
@@ -465,6 +489,8 @@ class Class1NeuralNetworkModel(nn.Module):
         x = self._forward_peptide_stage_before_early_batch_norm(peptide)
         if self.batch_norm_early is not None:
             x = self.batch_norm_early(x)
+        if self.layer_norm_early is not None:
+            x = self.layer_norm_early(x)
         return x
 
     def _forward_allele_stage(self, allele_idx):
@@ -517,6 +543,8 @@ class Class1NeuralNetworkModel(nn.Module):
                 x = self.activation(x)
             if self.batch_norms[i] is not None:
                 x = self.batch_norms[i](x)
+            if self.layer_norms[i] is not None:
+                x = self.layer_norms[i](x)
             if self.dropouts[i] is not None:
                 x = self.dropouts[i](x)
             prev_outputs.append(x)
@@ -582,6 +610,8 @@ class Class1NeuralNetworkModel(nn.Module):
             peptide_stage = peptide_stage.reshape(
                 peptide_count, repeat_count, peptide_stage.shape[-1]
             )[:, 0, :]
+        if self.layer_norm_early is not None:
+            peptide_stage = self.layer_norm_early(peptide_stage)
 
         allele_stage = self._forward_allele_stage(allele_idx[:repeat_count])
         can_factorize_first_layer = (
@@ -608,6 +638,8 @@ class Class1NeuralNetworkModel(nn.Module):
                 x = self.activation(x)
             if self.batch_norms[0] is not None:
                 x = self.batch_norms[0](x)
+            if self.layer_norms[0] is not None:
+                x = self.layer_norms[0](x)
             if self.dropouts[0] is not None:
                 x = self.dropouts[0](x)
 
@@ -627,6 +659,8 @@ class Class1NeuralNetworkModel(nn.Module):
                     x = self.activation(x)
                 if self.batch_norms[i] is not None:
                     x = self.batch_norms[i](x)
+                if self.layer_norms[i] is not None:
+                    x = self.layer_norms[i](x)
                 if self.dropouts[i] is not None:
                     x = self.dropouts[i](x)
             output = self.output_layer(x)
@@ -709,6 +743,8 @@ class Class1NeuralNetworkModel(nn.Module):
                 x = self.activation(x)
             if self.batch_norms[0] is not None:
                 x = self.batch_norms[0](x)
+            if self.layer_norms[0] is not None:
+                x = self.layer_norms[0](x)
             if self.dropouts[0] is not None:
                 x = self.dropouts[0](x)
 
@@ -763,6 +799,8 @@ class Class1NeuralNetworkModel(nn.Module):
                         new_x = self.activation(new_x)
                     if self.batch_norms[i] is not None:
                         new_x = self.batch_norms[i](new_x)
+                    if self.layer_norms[i] is not None:
+                        new_x = self.layer_norms[i](new_x)
                     if self.dropouts[i] is not None:
                         new_x = self.dropouts[i](new_x)
                     prev_outputs.append(new_x)
@@ -783,6 +821,8 @@ class Class1NeuralNetworkModel(nn.Module):
                         x = self.activation(x)
                     if self.batch_norms[i] is not None:
                         x = self.batch_norms[i](x)
+                    if self.layer_norms[i] is not None:
+                        x = self.layer_norms[i](x)
                     if self.dropouts[i] is not None:
                         x = self.dropouts[i](x)
             output = self.output_layer(x)
@@ -854,6 +894,8 @@ class Class1NeuralNetworkModel(nn.Module):
         # Early batch normalization
         if self.batch_norm_early is not None:
             x = self.batch_norm_early(x)
+        if self.layer_norm_early is not None:
+            x = self.layer_norm_early(x)
 
         # Allele processing and merge
         if self.has_allele:
@@ -901,6 +943,8 @@ class Class1NeuralNetworkModel(nn.Module):
                 x = self.activation(x)
             if self.batch_norms[i] is not None:
                 x = self.batch_norms[i](x)
+            if self.layer_norms[i] is not None:
+                x = self.layer_norms[i](x)
             if self.dropouts[i] is not None:
                 x = self.dropouts[i](x)
 
@@ -1271,6 +1315,7 @@ class Class1NeuralNetworkModel(nn.Module):
             'allele_dense_layer_sizes': allele_dense_sizes,
             'layer_sizes': layer_sizes,
             'batch_normalization': self.batch_norm_early is not None,
+            'normalization': self.normalization,
         }
 
         return json.dumps(config, sort_keys=True)
@@ -1307,6 +1352,7 @@ class Class1NeuralNetwork(object):
         output_activation="sigmoid",
         dropout_probability=0.0,
         batch_normalization=False,
+        normalization="none",
         locally_connected_layers=[
             {"filters": 8, "activation": "tanh", "kernel_size": 3}
         ],
@@ -1373,6 +1419,9 @@ class Class1NeuralNetwork(object):
     early_stopping_hyperparameter_defaults = HyperparameterDefaults(
         patience=20,
         min_delta=0.0,
+        # False preserves historical Keras EarlyStopping behavior. Set True
+        # to retain the state from the minimum measured validation loss.
+        restore_best_weights=False,
         # Run the validation pass every N epochs in fit() / streaming pretrain.
         # Default 1 preserves pre-existing behavior (validate every epoch).
         # Setting to >1 trades resolution-of-early-stop-decision for
@@ -1622,6 +1671,9 @@ class Class1NeuralNetwork(object):
             elif layer_class == 'BatchNormalization':
                 hyperparameters['batch_normalization'] = True
 
+            elif layer_class == 'LayerNormalization':
+                hyperparameters['normalization'] = 'layer'
+
             elif layer_class == 'Embedding':
                 keras_metadata['has_embedding'] = True
                 keras_metadata['embedding_input_dim'] = layer_config.get('input_dim', 0)
@@ -1739,7 +1791,11 @@ class Class1NeuralNetwork(object):
         ))
         if architecture.get(
                 'batch_normalization',
-                hyperparameters.get('batch_normalization', False)):
+                hyperparameters.get('batch_normalization', False)) or (
+                architecture.get(
+                    'normalization',
+                    hyperparameters.get('normalization', 'none'),
+                ) == 'layer'):
             peptide_offset += 2
 
         n = len(network_weights)
@@ -1856,7 +1912,8 @@ class Class1NeuralNetwork(object):
             merged = dict(instance_hyperparameters)
             # Update with parsed hyperparameters (architecture-specific settings)
             for key in ['layer_sizes', 'locally_connected_layers', 'dropout_probability',
-                        'batch_normalization', 'activation', 'output_activation',
+                        'batch_normalization', 'normalization', 'activation',
+                        'output_activation',
                         'peptide_allele_merge_method']:
                 if key in hyperparameters:
                     merged[key] = hyperparameters[key]
@@ -1919,6 +1976,7 @@ class Class1NeuralNetwork(object):
             output_activation=hyperparameters.get('output_activation', 'sigmoid'),
             dropout_probability=hyperparameters.get('dropout_probability', 0.0),
             batch_normalization=hyperparameters.get('batch_normalization', False),
+            normalization=hyperparameters.get('normalization', 'none'),
             dense_layer_l1_regularization=hyperparameters.get('dense_layer_l1_regularization', 0.001),
             dense_layer_l2_regularization=hyperparameters.get('dense_layer_l2_regularization', 0.0),
             topology=hyperparameters.get('topology', 'feedforward'),
@@ -1991,6 +2049,7 @@ class Class1NeuralNetwork(object):
                 output_activation=sub_config.get('output_activation', 'sigmoid'),
                 dropout_probability=sub_config.get('dropout_probability', 0.0),
                 batch_normalization=sub_config.get('batch_normalization', False),
+                normalization=sub_config.get('normalization', 'none'),
                 dense_layer_l1_regularization=base_hyperparameters.get('dense_layer_l1_regularization', 0.001),
                 dense_layer_l2_regularization=base_hyperparameters.get('dense_layer_l2_regularization', 0.0),
                 topology=sub_config.get('topology', 'feedforward'),
@@ -2111,6 +2170,8 @@ class Class1NeuralNetwork(object):
                         hasattr(subnet, 'batch_norms') and bool(subnet.batch_norms) and
                         any(bn is not None for bn in subnet.batch_norms)
                     )
+                    sub_config['normalization'] = getattr(
+                        subnet, 'normalization', 'none')
                     sub_config['activation'] = subnet.activation_name
                     sub_config['output_activation'] = subnet.output_activation_name
                     sub_config['peptide_allele_merge_method'] = subnet.peptide_allele_merge_method
@@ -2667,6 +2728,7 @@ class Class1NeuralNetwork(object):
 
         min_val_loss_iteration = None
         min_val_loss = None
+        best_state_dict = None
         last_progress_print = 0
         first_batch_time = None
 
@@ -2808,6 +2870,7 @@ class Class1NeuralNetwork(object):
                         validation_start, device, timing_enabled
                     )
                 fit_info["val_loss"].append(val_loss)
+                previous_min_val_loss_iteration = min_val_loss_iteration
                 (
                     min_val_loss,
                     min_val_loss_iteration,
@@ -2818,6 +2881,12 @@ class Class1NeuralNetwork(object):
                     min_val_loss_epoch=min_val_loss_iteration,
                     min_delta=min_delta,
                 )
+                if (
+                    self.hyperparameters["restore_best_weights"]
+                    and min_val_loss_iteration != previous_min_val_loss_iteration
+                ):
+                    best_state_dict = copy_module_state_dict_to_cpu(
+                        eager_network)
             else:
                 fit_info["val_loss"].append(val_loss)
 
@@ -2889,6 +2958,17 @@ class Class1NeuralNetwork(object):
                     print(progress_preamble, "STOPPING", progress_message)
                 break
 
+        restored_best_weights = bool(
+            self.hyperparameters["restore_best_weights"]
+            and best_state_dict is not None
+        )
+        if restored_best_weights:
+            eager_network.load_state_dict(best_state_dict)
+        fit_info["best_epoch"] = (
+            min_val_loss_iteration + 1
+            if min_val_loss_iteration is not None else None)
+        fit_info["best_val_loss"] = min_val_loss
+        fit_info["restored_best_weights"] = restored_best_weights
         fit_info["time"] = time.time() - start
         fit_info["num_points"] = mutable_generator_state["yielded_values"]
         if first_batch_time is not None:
@@ -3358,6 +3438,7 @@ class Class1NeuralNetwork(object):
 
         min_val_loss_iteration = None
         min_val_loss = None
+        best_state_dict = None
 
         needs_initialization = (
             self.hyperparameters["data_dependent_initialization_method"] is not None
@@ -3750,6 +3831,7 @@ class Class1NeuralNetwork(object):
             # later epoch that copied the same value).
             if val_split > 0:
                 if should_validate_this_epoch:
+                    previous_min_val_loss_iteration = min_val_loss_iteration
                     min_val_loss, min_val_loss_iteration = (
                         _update_min_validation_loss(
                             val_loss=val_loss,
@@ -3759,6 +3841,12 @@ class Class1NeuralNetwork(object):
                             min_delta=self.hyperparameters["min_delta"],
                         )
                     )
+                    if (
+                        self.hyperparameters["restore_best_weights"]
+                        and min_val_loss_iteration != previous_min_val_loss_iteration
+                    ):
+                        best_state_dict = copy_module_state_dict_to_cpu(
+                            eager_network)
 
                 if self.hyperparameters["early_stopping"]:
                     if _early_stop_reached(
@@ -3854,6 +3942,17 @@ class Class1NeuralNetwork(object):
                     time.perf_counter() - epoch_wall_start
                 )
 
+        restored_best_weights = bool(
+            self.hyperparameters["restore_best_weights"]
+            and best_state_dict is not None
+        )
+        if restored_best_weights:
+            eager_network.load_state_dict(best_state_dict)
+        fit_info["best_epoch"] = (
+            min_val_loss_iteration + 1
+            if min_val_loss_iteration is not None else None)
+        fit_info["best_val_loss"] = min_val_loss
+        fit_info["restored_best_weights"] = restored_best_weights
         fit_info["time"] = time.time() - start
         fit_info["num_points"] = len(peptides)
         if first_batch_time is not None:
@@ -4069,7 +4168,8 @@ class Class1NeuralNetwork(object):
             num_outputs=1,
             allele_representations=None,
             peptide_amino_acid_encoding_torch=True,
-            peptide_amino_acid_encoding_gpu=None):
+            peptide_amino_acid_encoding_gpu=None,
+            normalization="none"):
         """
         Helper function to make a PyTorch network for class 1 affinity prediction.
         """
@@ -4107,6 +4207,7 @@ class Class1NeuralNetwork(object):
             output_activation=output_activation,
             dropout_probability=dropout_probability,
             batch_normalization=batch_normalization,
+            normalization=normalization,
             dense_layer_l1_regularization=dense_layer_l1_regularization,
             dense_layer_l2_regularization=dense_layer_l2_regularization,
             topology=topology,

@@ -46,6 +46,11 @@ def test_snapshot_experiment_exports_reconstructable_tables(tmp_path):
         "hyperparameters": {
             "topology": "feedforward",
             "layer_sizes": [512, 512],
+            "activation": "tanh",
+            "normalization": "layer",
+            "dropout_probability": 0.75,
+            "restore_best_weights": True,
+            "patience": 40,
             "minibatch_size": 256,
             "optimizer": "rmsprop",
             "optimizer_implementation": "keras",
@@ -121,6 +126,11 @@ def test_snapshot_experiment_exports_reconstructable_tables(tmp_path):
     models_table = pandas.read_csv(destination / "data" / "models.csv")
     assert models_table.minibatch_size.tolist() == [256]
     assert models_table.optimizer_implementation.tolist() == ["keras"]
+    assert models_table.activation.tolist() == ["tanh"]
+    assert models_table.normalization.tolist() == ["layer"]
+    assert models_table.dropout_keep_probability.tolist() == [0.75]
+    assert models_table.restore_best_weights.tolist() == [True]
+    assert models_table.patience.tolist() == [40]
     configs = [
         json.loads(line)
         for line in (destination / "data" / "model_configs.jsonl")
@@ -133,8 +143,12 @@ def test_snapshot_experiment_exports_reconstructable_tables(tmp_path):
     weight_row = inventory.loc[
         inventory.relative_path.str.endswith(weight.name)].iloc[0]
     assert weight_row.sha256 == sha256_file(weight)
-    assert not bool(weight_row.copied)
-    assert weight_row.storage == "inventory_only"
+    assert bool(weight_row.copied)
+    assert weight_row.storage == "copy"
+    assert (
+        destination / "artifacts" / "condition-a" /
+        "models.unselected.combined" / weight.name
+    ).read_bytes() == weight.read_bytes()
     metric_row = inventory.loc[
         inventory.relative_path.str.endswith("per_allele.csv")].iloc[0]
     assert bool(metric_row.copied)

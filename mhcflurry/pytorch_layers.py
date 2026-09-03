@@ -27,7 +27,8 @@ def get_activation(name):
     Parameters
     ----------
     name : str
-        Activation name: "tanh", "sigmoid", "relu", "linear", or ""
+        Activation name: "tanh", "sigmoid", "relu", "silu"/"swish",
+        "gelu", "linear", or ""
 
     Returns
     -------
@@ -43,6 +44,10 @@ def get_activation(name):
         return torch.sigmoid
     elif name == "relu":
         return F.relu
+    elif name in {"silu", "swish"}:
+        return F.silu
+    elif name == "gelu":
+        return F.gelu
     else:
         raise ValueError(f"Unknown activation: {name}")
 
@@ -54,19 +59,30 @@ class KerasBatchNorm1d(nn.BatchNorm1d):
     ``running_var`` with an unbiased estimate. Keras uses the biased population
     variance for both. ``momentum`` retains PyTorch's new-batch-coefficient
     convention so ``0.01`` corresponds to Keras ``momentum=0.99``.
+
+    Supports both ``(batch, features)`` dense outputs and
+    ``(batch, channels, positions)`` sequence outputs. In the sequence case,
+    statistics are accumulated over batch and position, matching Keras
+    ``BatchNormalization(axis=-1)`` on the equivalent channels-last tensor.
     """
 
     def forward(self, inputs):
         self._check_input_dim(inputs)
-        if inputs.dim() != 2:
+        if inputs.dim() == 2:
+            reduction_dims = (0,)
+            broadcast_shape = (1, -1)
+        elif inputs.dim() == 3:
+            reduction_dims = (0, 2)
+            broadcast_shape = (1, -1, 1)
+        else:
             raise ValueError(
-                "KerasBatchNorm1d supports the 2D Dense-layer outputs used by "
-                "MHCflurry; got shape %s" % (tuple(inputs.shape),)
+                "KerasBatchNorm1d supports 2D dense or 3D sequence outputs; "
+                "got shape %s" % (tuple(inputs.shape),)
             )
 
         if self.training or not self.track_running_stats:
-            mean = inputs.mean(dim=0)
-            variance = inputs.var(dim=0, unbiased=False)
+            mean = inputs.mean(dim=reduction_dims)
+            variance = inputs.var(dim=reduction_dims, unbiased=False)
             if self.training and self.track_running_stats:
                 with torch.no_grad():
                     self.num_batches_tracked.add_(1)
@@ -76,9 +92,14 @@ class KerasBatchNorm1d(nn.BatchNorm1d):
             mean = self.running_mean
             variance = self.running_var
 
+        mean = mean.view(broadcast_shape)
+        variance = variance.view(broadcast_shape)
         result = (inputs - mean) * torch.rsqrt(variance + self.eps)
         if self.affine:
-            result = result * self.weight + self.bias
+            result = (
+                result * self.weight.view(broadcast_shape) +
+                self.bias.view(broadcast_shape)
+            )
         return result
 
 
