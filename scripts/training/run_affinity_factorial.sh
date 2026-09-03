@@ -24,6 +24,7 @@ Experiment controls:
                                       native-post-1024, or keras-no-lsuv-1024
   --condition NAME                   Run one generated condition; repeatable
   --random-seed INTEGER              Release random seed (default: 42)
+  --evaluation MODE                  all (default) or none
 
 Experiment archiving:
   --experiments-dir PATH             Write a timestamped snapshot after success
@@ -63,6 +64,7 @@ FACTORIAL_MODE="representative"
 FACTORIAL_DESIGN="optimizer-lsuv-batch-init"
 REGULARIZATION_BASE_RECIPE="native-pre-1024"
 RELEASE_RANDOM_SEED=42
+EVALUATION=all
 MAX_TASKS_PER_WORKER=12
 MAX_WORKERS_PER_GPU="auto"
 DATALOADER_NUM_WORKERS=1
@@ -104,6 +106,8 @@ while [ "$#" -gt 0 ]; do
             require_value "$@"; FACTORIAL_CONDITIONS+=("$2"); shift 2 ;;
         --random-seed)
             require_value "$@"; RELEASE_RANDOM_SEED="$2"; shift 2 ;;
+        --evaluation)
+            require_value "$@"; EVALUATION="$2"; shift 2 ;;
         --experiments-dir)
             require_value "$@"; EXPERIMENTS_DIR="$2"; shift 2 ;;
         --experiment-name)
@@ -159,6 +163,10 @@ case "$REGULARIZATION_BASE_RECIPE" in
     native-pre-1024|native-post-1024|keras-no-lsuv-1024) ;;
     *) printf 'Invalid --regularization-base-recipe: %s\n' \
         "$REGULARIZATION_BASE_RECIPE" >&2; exit 2 ;;
+esac
+case "$EVALUATION" in
+    all|none) ;;
+    *) printf 'Invalid --evaluation: %s\n' "$EVALUATION" >&2; exit 2 ;;
 esac
 if [ "$FACTORIAL_DESIGN" = "regularization-activation" ] && \
         [ "$FACTORIAL_MODE" != "representative" ]; then
@@ -320,6 +328,7 @@ fi
         "factorial_mode=$FACTORIAL_MODE" \
         "factorial_design=$FACTORIAL_DESIGN" \
         "regularization_base_recipe=$REGULARIZATION_BASE_RECIPE" \
+        "evaluation=$EVALUATION" \
         "factorial_conditions=$FACTORIAL_CONDITIONS_PROVENANCE" \
         "random_seed=$RELEASE_RANDOM_SEED" \
         "gpus=$GPUS" \
@@ -451,8 +460,9 @@ while IFS= read -r condition; do
     fi
 done
 
-baseline_predictor="$(cat \
-    "$MHCFLURRY_OUT/$BASELINE_CONDITION/predictor_path.txt")"
+if [ "$EVALUATION" = all ]; then
+    baseline_predictor="$(cat \
+        "$MHCFLURRY_OUT/$BASELINE_CONDITION/predictor_path.txt")"
 
 tail -n +2 "$MHCFLURRY_OUT/manifest.csv" | cut -d, -f1 | \
 while IFS= read -r condition; do
@@ -508,6 +518,7 @@ bash "$SCRIPT_DIR/evaluate_affinity_factorial_public.sh" \
     --max-tasks-per-worker "$MAX_TASKS_PER_WORKER" \
     --torch-compile "$TORCH_COMPILE" \
     --matmul-precision "$MATMUL_PRECISION"
+fi
 
 date -u +%Y-%m-%dT%H:%M:%SZ > "$MHCFLURRY_OUT/completed_at_utc.txt"
 stop_gpu_telemetry

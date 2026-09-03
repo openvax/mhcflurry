@@ -67,6 +67,7 @@ def test_affinity_factorial_runner_exposes_explicit_cli():
             "--regularization-base-recipe",
             "--condition",
             "--random-seed",
+            "--evaluation",
             "--gpus",
             "--max-workers-per-gpu",
             "--dataloader-num-workers",
