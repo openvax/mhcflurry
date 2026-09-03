@@ -61,6 +61,40 @@ FLANK_LABELS = {
     "short_flanks": "5 aa",
 }
 METRICS = ("AUROC", "AUPRC", "PPV@N")
+AFFINITY_FRONTIER_CONDITIONS = (
+    (
+        "mb_128__rmsprop_keras__lsuv_post_activation__init_glorot_uniform",
+        "Keras/post-LSUV, mb128",
+    ),
+    (
+        "mb_256__rmsprop_keras__lsuv_post_activation__init_glorot_uniform",
+        "Keras/post-LSUV, mb256",
+    ),
+    (
+        "mb_512__rmsprop_keras__lsuv_post_activation__init_glorot_uniform",
+        "Keras/post-LSUV, mb512",
+    ),
+    (
+        "mb_1024__rmsprop_keras__lsuv_not_applicable__init_glorot_uniform",
+        "Keras/no-LSUV, mb1024",
+    ),
+    (
+        "mb_256__rmsprop_pytorch__lsuv_post_activation__init_glorot_uniform",
+        "PyTorch/post-LSUV, mb256",
+    ),
+    (
+        "mb_512__rmsprop_pytorch__lsuv_post_activation__init_glorot_uniform",
+        "PyTorch/post-LSUV, mb512",
+    ),
+    (
+        "mb_1024__rmsprop_pytorch__lsuv_post_activation__init_glorot_uniform",
+        "PyTorch/post-LSUV, mb1024",
+    ),
+    (
+        "mb_1024__rmsprop_pytorch__lsuv_pre_activation__init_glorot_uniform",
+        "PyTorch/pre-LSUV, mb1024",
+    ),
+)
 
 
 def make_parser():
@@ -69,6 +103,13 @@ def make_parser():
     parser.add_argument("--affinity-ablation-dir", required=True)
     parser.add_argument("--affinity-native128-dir", required=True)
     parser.add_argument("--processing-run-dir", required=True)
+    parser.add_argument(
+        "--affinity-frontier-dir",
+        help=(
+            "Optional terminal eight-condition affinity frontier. When set, "
+            "render the direct candidate-versus-public summary as Figure 4."
+        ),
+    )
     parser.add_argument("--out", required=True)
     parser.add_argument("--formats", default="svg,pdf,png")
     return parser
@@ -105,6 +146,43 @@ def read_release_summary(path, inputs):
     if missing:
         raise ValueError("%s lacks columns: %s" % (path, ", ".join(missing)))
     return result
+
+
+def read_affinity_comparison_summary(path, inputs):
+    """Read and validate one direct affinity comparison summary."""
+    path = require_file(path, inputs)
+    result = json.loads(path.read_text())
+    required_averages = {"macro_mean_over_alleles", "micro_pooled"}
+    missing = sorted(required_averages - set(result))
+    if missing:
+        raise ValueError("%s lacks summaries: %s" % (path, ", ".join(missing)))
+    return result
+
+
+def affinity_benchmark_identity(summary):
+    """Return fields that must match across direct candidate comparisons."""
+    # Metric reductions can differ in their final floating-point accumulator
+    # bits even when the reused public predictions and rows are identical.
+    # Nine decimal places is much tighter than any reported precision while
+    # keeping the identity check focused on material differences.
+    return {
+        "n_rows": summary.get("n_rows"),
+        "n_hits": summary.get("n_hits"),
+        "n_alleles_reported": summary.get("n_alleles_reported"),
+        "public_macro": {
+            metric: round(
+                summary["macro_mean_over_alleles"][metric]["b"], 9)
+            for metric in ("roc_auc", "pr_auc", "ppv_at_n")
+        },
+        "public_micro": {
+            key: (
+                round(value, 9)
+                if key in {"roc_auc", "pr_auc", "ppv_at_n"}
+                else value
+            )
+            for key, value in summary["micro_pooled"]["b"].items()
+        },
+    }
 
 
 def render_heatmap(ax, values, row_labels, column_labels, title):
@@ -295,6 +373,73 @@ def flank_context_figure(
     save_figure(fig, "processing_flank_context", out_dir, formats, outputs)
 
 
+def affinity_frontier_figure(
+        frontier_dir, inputs, outputs, out_dir, formats):
+    """Render all frontier candidates directly against public MHCflurry 2.2."""
+    frontier_dir = Path(frontier_dir)
+    row_labels = []
+    summaries = []
+    for index, (directory, label) in enumerate(AFFINITY_FRONTIER_CONDITIONS):
+        if index == 0:
+            path = (
+                frontier_dir / "baseline-vs-public-no-additional-ms" /
+                "affinity" / "summary.json"
+            )
+        else:
+            path = (
+                frontier_dir / directory /
+                "comparison-vs-public-no-additional-ms" /
+                "affinity" / "summary.json"
+            )
+        summaries.append(read_affinity_comparison_summary(path, inputs))
+        row_labels.append(label)
+
+    reference_identity = affinity_benchmark_identity(summaries[0])
+    for label, summary in zip(row_labels[1:], summaries[1:]):
+        identity = affinity_benchmark_identity(summary)
+        if identity != reference_identity:
+            raise ValueError(
+                "Affinity frontier comparison does not share the baseline "
+                "benchmark identity (%s): %s != %s" % (
+                    label,
+                    json.dumps(identity, sort_keys=True),
+                    json.dumps(reference_identity, sort_keys=True),
+                )
+            )
+
+    metric_keys = ("roc_auc", "pr_auc", "ppv_at_n")
+    import matplotlib.pyplot as plt
+    fig, axes = plt.subplots(1, 2, figsize=(8.8, 4.5), sharey=True)
+    for axis, average in zip(axes, ("Macro", "Micro")):
+        values = numpy.full((len(summaries), len(metric_keys)), numpy.nan)
+        for row_index, summary in enumerate(summaries):
+            if average == "Macro":
+                for column_index, metric in enumerate(metric_keys):
+                    scores = summary["macro_mean_over_alleles"][metric]
+                    values[row_index, column_index] = (
+                        100.0 * (scores["a"] - scores["b"]) / scores["b"]
+                    )
+            else:
+                for column_index, metric in enumerate(metric_keys):
+                    scores = summary["micro_pooled"]
+                    values[row_index, column_index] = (
+                        100.0 *
+                        (scores["a"][metric] - scores["b"][metric]) /
+                        scores["b"][metric]
+                    )
+        image = render_heatmap(
+            axis,
+            values,
+            row_labels,
+            METRICS,
+            "%s change vs public MHCflurry 2.2" % average,
+        )
+        fig.colorbar(
+            image, ax=axis, fraction=0.046, pad=0.04, label="Change (%)")
+    fig.tight_layout(w_pad=1.0)
+    save_figure(fig, "affinity_frontier_vs_public", out_dir, formats, outputs)
+
+
 def save_figure(fig, name, out_dir, formats, outputs):
     """Save one manuscript figure and record all emitted files."""
     import matplotlib.pyplot as plt
@@ -340,6 +485,14 @@ def run(args):
         args.processing_run_dir, inputs, outputs, out_dir, formats)
     flank_context_figure(
         args.processing_run_dir, inputs, outputs, out_dir, formats)
+    if args.affinity_frontier_dir:
+        affinity_frontier_figure(
+            args.affinity_frontier_dir,
+            inputs,
+            outputs,
+            out_dir,
+            formats,
+        )
     manifest = {
         "schema_version": 1,
         "inputs": inputs,

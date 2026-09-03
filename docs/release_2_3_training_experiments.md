@@ -1,9 +1,9 @@
 # Reproducible retraining of MHCflurry: framework semantics, optimization, and antigen context
 
-> **Living manuscript draft (2026-09-02).** The controlled affinity frontier is
-> still being scored against the public 2.2 predictor. Sections labelled
-> *provisional* will be replaced from the terminal experiment snapshot; no
-> value in those sections should yet be interpreted as a release claim.
+> **Living manuscript draft (2026-09-03).** The controlled affinity frontier is
+> complete. External-baseline rendering, terminal artifact retrieval, and
+> end-to-end presentation validation remain in progress; the affinity result
+> reported here will not become a release claim until those gates pass.
 
 ## Abstract
 
@@ -14,17 +14,21 @@ We audited the MHCflurry 2.1.x training recipe during preparation of version
 data-dependent initialization, optimizer equations, validation splitting, and
 random-number handling. We restored explicit compatibility settings and used
 frozen, provenance-tracked benchmarks to separate their effects from batch
-size, neural architecture, and antigen-flank context. In representative
-affinity networks, minibatch size interacted strongly with RMSprop's epsilon
-placement and with LSUV's activation boundary; no previously tested departure
-improved both macro- and micro-averaged AUPRC and PPV@N over the historical
-Keras-compatible recipe. In antigen-processing models, optimizer and
-initializer effects reversed across architectures and flank lengths. Five
+size, neural architecture, and antigen-flank context. Initial paired affinity
+experiments showed that minibatch size interacted strongly with RMSprop's
+epsilon placement and with LSUV's activation boundary; none of those initial
+departures improved both macro- and micro-averaged AUPRC and PPV@N over the
+historical Keras-compatible recipe. In antigen-processing models, optimizer and
+initializer effects reversed across architectures and flank lengths. The final
+affinity frontier nevertheless identified a jointly favorable interaction:
+native PyTorch RMSprop, pre-activation LSUV, and minibatch 1024 improved all six
+macro- and micro-averaged metrics relative to public MHCflurry 2.2, including
+4.56% macro AUPRC and 16.79% micro AUPRC. Five
 residues on each side of the peptide outperformed 15-residue flanks by 5.79%
 macro AUPRC and 3.87% macro PPV@N, winning both metrics in all ten held-out
 samples. Position-wise non-convolutional controls failed decisively, supporting
-the continued use of convolution. A final eight-condition affinity frontier and
-end-to-end presentation validation are in progress. These results show that
+the continued use of convolution. End-to-end presentation validation remains
+in progress. These results show that
 framework-semantic parity is an empirical requirement and that training choices
 should be selected at the component and architecture level rather than treated
 as universal defaults.
@@ -180,16 +184,33 @@ parameter counts for five- and 15-residue inputs do not imply equal behavior:
 convolutional weights are shared across positions, while the longer sequence
 changes activation statistics and pooling opportunities.
 
-### Final affinity frontier and public/external comparison — provisional
+### A native/pre-LSUV/minibatch-1024 interaction leads the affinity frontier
 
-All 64 networks in the eight-condition frontier trained successfully. The fair
-candidate-versus-public comparisons and the combined public 2.2/NetMHCpan
-BA/NetMHCpan EL/MixMHCpred figure are still running. This paragraph, Figure 4,
-and the final affinity recipe will be populated exclusively from the terminal
-snapshot.
+All 64 networks in the eight-condition frontier trained successfully. Direct
+comparison with public MHCflurry 2.2 used the same 15,027,950 rows, 135,387
+positives, and 95 alleles for every candidate after excluding two rows that
+overlapped the union of candidate and public affinity-training data. Native
+PyTorch RMSprop with pre-activation LSUV and minibatch 1024 led every other
+condition on all six aggregate metrics (Figure 4). Relative to public 2.2,
+macro AUROC, AUPRC, and PPV@N increased by 0.72%, 4.56%, and 4.14%; micro
+AUROC, AUPRC, and PPV@N increased by 1.17%, 16.79%, and 11.64%.
 
-**Figure 4 placeholder.** Combined macro overview and paginated allele-level
-AUROC, AUPRC, and PPV@N panels for all eight candidates and four baselines.
+This result is not evidence that pre-activation LSUV is universally superior.
+Earlier Keras-RMSprop experiments found the opposite direction, while native
+RMSprop with post-activation LSUV at minibatch 1024 achieved smaller gains
+(3.05% macro AUPRC and 8.04% micro AUPRC). The frontier instead identifies a
+specific three-way interaction among optimizer equations, the LSUV tensor, and
+minibatch size. The native/pre-LSUV/minibatch-1024 recipe is therefore the
+leading affinity release candidate, subject to external-baseline figures and
+end-to-end presentation validation.
+
+![Affinity frontier compared with public MHCflurry 2.2](figures/release_2_3_training_experiments/affinity_frontier_vs_public.svg)
+
+**Figure 4. Eight-condition affinity frontier.** Percent changes are computed
+from direct candidate-versus-public prediction tables after applying the same
+union-training-overlap exclusion. Macro values average over 95 alleles; micro
+values pool all retained rows. Color scales differ between panels so that the
+smaller macro differences remain visible.
 
 ## Discussion
 
@@ -198,7 +219,10 @@ is not intrinsically better or worse: its effect depends on the optimizer
 equation and initialization procedure. Second, a modern initializer or native
 framework optimizer is not intrinsically preferable after a framework port.
 The correct default depends on the model component, neural architecture, and
-biological input context.
+biological input context. For affinity, the complete interaction happened to
+favor the native optimizer, pre-activation LSUV, and the largest tested
+minibatch; for processing, the five-residue release baseline remains Glorot
+initialization with zero bias and Keras-compatible Adam.
 
 For release engineering, the conservative rule is to restore historical
 semantics unless a controlled comparison supports a departure. For future
@@ -214,10 +238,10 @@ never silently shrink the configured scientific minibatch.
 The processing development benchmark has been queried repeatedly during model
 selection and is not an untouched confirmatory test. Several experiments use
 two representative architectures rather than the full release grid. The
-affinity frontier must still be evaluated against public and external models,
-and the selected affinity/processing models must still pass end-to-end
-presentation validation. We will distinguish exploratory, development, and
-confirmatory evidence in the final manuscript and release notes.
+external affinity comparisons and the selected affinity/processing models must
+still pass end-to-end presentation validation. We will distinguish exploratory,
+development, and confirmatory evidence in the final manuscript and release
+notes.
 
 ## Data and code availability
 
