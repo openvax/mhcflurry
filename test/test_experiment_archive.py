@@ -212,3 +212,34 @@ def test_snapshot_rejects_naive_capture_time(tmp_path):
         assert "timezone-aware" in str(error)
     else:
         raise AssertionError("Expected a timezone-aware timestamp error")
+
+
+def test_snapshot_preserves_same_basename_supplemental_inputs(tmp_path):
+    source = tmp_path / "run"
+    source.mkdir()
+    (source / "provenance.txt").write_text("source_commit=abc1234\n")
+    first = tmp_path / "candidate" / "train_data.csv.bz2"
+    second = tmp_path / "public" / "train_data.csv.bz2"
+    first.parent.mkdir()
+    second.parent.mkdir()
+    first.write_bytes(b"candidate training data")
+    second.write_bytes(b"public training data")
+
+    destination = snapshot_experiment(
+        source,
+        tmp_path / "experiments",
+        "same basename inputs",
+        input_files=[first, second],
+        captured_at=datetime(2026, 9, 2, tzinfo=timezone.utc),
+    )
+
+    experiment = json.loads((destination / "experiment.json").read_text())
+    inputs = experiment["supplemental_files"]
+    assert [record["snapshot_path"] for record in inputs] == [
+        "supplemental/input/000-train_data.csv.bz2",
+        "supplemental/input/001-train_data.csv.bz2",
+    ]
+    for record in inputs:
+        copied = destination / record["snapshot_path"]
+        assert copied.is_file()
+        assert sha256_file(copied) == record["sha256"]

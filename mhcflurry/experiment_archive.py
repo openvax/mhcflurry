@@ -444,8 +444,10 @@ def snapshot_experiment(
 
     supplemental = []
     for role, paths in (("command", command_files), ("input", input_files)):
-        for value in paths:
-            path = Path(value).resolve()
+        resolved_paths = [Path(value).resolve() for value in paths]
+        basenames = [path.name for path in resolved_paths]
+        disambiguate = len(basenames) != len(set(basenames))
+        for index, path in enumerate(resolved_paths):
             if not path.is_file():
                 raise ValueError("%s file does not exist: %s" % (role, path))
             record = {
@@ -456,7 +458,11 @@ def snapshot_experiment(
                 "copied": path.stat().st_size <= max_copy_bytes,
             }
             if record["copied"]:
-                target = temporary / "supplemental" / role / path.name
+                target_name = (
+                    "%03d-%s" % (index, path.name)
+                    if disambiguate else path.name
+                )
+                target = temporary / "supplemental" / role / target_name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(path, target)
                 record["snapshot_path"] = target.relative_to(temporary).as_posix()
