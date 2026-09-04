@@ -2650,6 +2650,9 @@ def test_reassign_mass_spec_training_data_cli(tmp_path):
 def test_remote_launcher_preserves_shared_minibatch_override(
         monkeypatch, tmp_path):
     """Family-specific minibatch env vars should only be set when provided."""
+    monkeypatch.setenv("RUNPLZ_MIN_DISK", "none")
+    monkeypatch.setenv("RUNPLZ_OUTPUT_VOLUME", "test-output-volume")
+    monkeypatch.setenv("RUNPLZ_TIMEOUT_SECONDS", "86400")
     fake_runplz = types.ModuleType("runplz")
     fake_config = types.ModuleType("runplz.config")
 
@@ -2691,7 +2694,10 @@ def test_remote_launcher_preserves_shared_minibatch_override(
         "scripts/training/launch_pan_allele_training_remote.py",
     )
     module = _load_script_module(path, "remote_launcher_under_test")
-    assert "runplz==3.24.31" in pip_packages
+    assert module.MIN_DISK is None
+    assert module.OUTPUT_VOLUMES == {"/out": "test-output-volume"}
+    assert module.FUNCTION_TIMEOUT_SECONDS == 86400
+    assert "runplz==4.2.2" in pip_packages
     assert module.remote_training_env({})["TRAINING_MINIBATCH_SIZE"] == "128"
     env = module.remote_training_env({"TRAINING_MINIBATCH_SIZE": "2048"})
     assert env["TRAINING_MINIBATCH_SIZE"] == "2048"
@@ -2809,6 +2815,12 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     }) == (
         "affinity-ablations",
         "scripts/training/run_release_affinity_ablations.sh",
+    )
+    assert module.remote_workflow_script({
+        "MHCFLURRY_REMOTE_WORKFLOW": "processing-cleavage-boundaries",
+    }) == (
+        "processing-cleavage-boundaries",
+        "scripts/training/run_processing_cleavage_boundaries_remote.sh",
     )
     with pytest.raises(ValueError, match="MHCFLURRY_REMOTE_WORKFLOW"):
         module.remote_workflow_script({

@@ -86,6 +86,11 @@ def make_parser(prog="mhcflurry eval"):
         help="Consolidate precomputed external benchmark predictions.",
         add_help=False,
     )
+    sub.add_parser(
+        "processing-affinity-control",
+        help="Evaluate processing on affinity-controlled risk sets.",
+        add_help=False,
+    )
     paper = sub.add_parser(
         "paper-figures",
         help="Render or run paper-style evaluation figures.",
@@ -143,6 +148,10 @@ def run_argv(argv, prog="mhcflurry eval"):
         from . import merge_external_predictions
         return merge_external_predictions.run_argv(
             rest, prog="%s merge-external-predictions" % prog)
+    if subcommand == "processing-affinity-control":
+        from . import processing_affinity_control
+        return processing_affinity_control.run_argv(
+            rest, prog="%s processing-affinity-control" % prog)
     if subcommand == "paper-figures":
         return _run_paper_figures(rest, "%s paper-figures" % prog)
 
@@ -164,6 +173,8 @@ def format_help(prog="mhcflurry eval"):
         "                          Plot finalists and public on one saved cohort.",
         "  merge-external-predictions",
         "                          Consolidate precomputed external predictions.",
+        "  processing-affinity-control",
+        "                          Score affinity-controlled processing risk sets.",
         "  paper-figures render    Render paper figures from saved inputs.",
         "  paper-figures score-predictions",
         "                          Derive score tables from saved predictions.",

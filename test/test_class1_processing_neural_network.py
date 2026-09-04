@@ -152,6 +152,7 @@ def test_neural_network_input():
         },
     ]
 
+
     for (i, d) in enumerate(tests):
         encoding = FlankingEncoding(
             peptides=[d['peptide']],
@@ -188,6 +189,150 @@ def test_neural_network_input():
     encoding.clear_tensor_cache()
     tensor_results3 = model.network_input_tensors(encoding, device="cpu")
     assert tensor_results3["sequence"] is not tensor_results["sequence"]
+
+
+def _boundary_network(peptide_context=2, context_dropout=0.0):
+    model = Class1ProcessingNeuralNetwork(
+        peptide_max_length=15,
+        n_flank_length=5,
+        c_flank_length=5,
+        flanking_averages=False,
+        convolutional_filters=8,
+        convolutional_kernel_size=3,
+        post_convolutional_dense_layer_sizes=[],
+        dropout_rate=0.0,
+        cleavage_boundary_flank_length=5,
+        cleavage_boundary_peptide_length=peptide_context,
+        cleavage_boundary_hidden_size=4,
+        cleavage_boundary_context_dropout=context_dropout,
+    )
+    network = model.make_network(
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
+    )
+    return model, network
+
+
+def _boundary_windows(model, network, peptide, n_flank, c_flank):
+    inputs = model.network_input_tensors(
+        FlankingEncoding([peptide], [n_flank], [c_flank]), device="cpu")
+    sequence = torch.nn.functional.embedding(
+        inputs["sequence"].long(), network.sequence_embedding_table)
+    return network._extract_boundary_windows(
+        sequence, inputs["peptide_length"])
+
+
+@pytest.mark.parametrize("peptide_context,expected_n,expected_c", [
+    (2, "FGHIKSI", "KLLMNPQ"),
+    (5, "FGHIKSIINF", "NFEKLLMNPQ"),
+])
+def test_cleavage_boundary_windows_cross_both_sides(
+        peptide_context, expected_n, expected_c):
+    model, network = _boundary_network(peptide_context=peptide_context)
+    n_window, c_window = _boundary_windows(
+        model, network, "SIINFEKL", "ACDEFGHIK", "LMNPQRST")
+
+    assert decode_matrix(n_window.detach().numpy()) == [expected_n]
+    assert decode_matrix(c_window.detach().numpy()) == [expected_c]
+
+
+def test_cleavage_boundary_missing_context_uses_unknown_token():
+    model, network = _boundary_network(peptide_context=2)
+    n_window, c_window = _boundary_windows(
+        model, network, "SIINFEKL", "", "")
+
+    assert decode_matrix(n_window.detach().numpy()) == ["XXXXXSI"]
+    assert decode_matrix(c_window.detach().numpy()) == ["KLXXXXX"]
+
+
+def test_cleavage_boundary_context_dropout_preserves_peptide_side():
+    model, network = _boundary_network(
+        peptide_context=2, context_dropout=1.0)
+    n_window, c_window = _boundary_windows(
+        model, network, "SIINFEKL", "FGHIK", "LMNPQ")
+    network.train()
+    n_window, c_window = network._apply_context_dropout(n_window, c_window)
+
+    assert decode_matrix(n_window.detach().numpy()) == ["XXXXXSI"]
+    assert decode_matrix(c_window.detach().numpy()) == ["KLXXXXX"]
+
+
+def test_cleavage_boundary_starts_as_peptide_only_model():
+    model, network = _boundary_network(peptide_context=2)
+    model._network = network
+    network.eval()
+    scores = model.predict(
+        peptides=["SIINFEKL", "SIINFEKL"],
+        n_flanks=["AAAAA", "RRRRR"],
+        c_flanks=["CCCCC", "YYYYY"],
+        batch_size=2,
+    )
+
+    numpy.testing.assert_allclose(scores[0], scores[1], rtol=0, atol=1e-7)
+    numpy.testing.assert_array_equal(
+        network.output_layer.weight.detach().numpy()[0, -2:], [0, 0])
+
+
+def test_cleavage_boundary_base_is_exact_no_flank_function():
+    boundary_model, boundary = _boundary_network(peptide_context=2)
+    no_flank_model = Class1ProcessingNeuralNetwork(
+        peptide_max_length=15,
+        n_flank_length=0,
+        c_flank_length=0,
+        flanking_averages=False,
+        convolutional_filters=8,
+        convolutional_kernel_size=3,
+        post_convolutional_dense_layer_sizes=[],
+        dropout_rate=0.0,
+    )
+    no_flank = no_flank_model.make_network(
+        **no_flank_model.network_hyperparameter_defaults.subselect(
+            no_flank_model.hyperparameters)
+    )
+    no_flank.conv1.load_state_dict(boundary.conv1.state_dict())
+    no_flank.n_flank_post_convs.load_state_dict(
+        boundary.n_flank_post_convs.state_dict())
+    no_flank.c_flank_post_convs.load_state_dict(
+        boundary.c_flank_post_convs.state_dict())
+    with torch.no_grad():
+        no_flank.output_layer.weight.copy_(
+            boundary.output_layer.weight[:, :4])
+        no_flank.output_layer.bias.copy_(boundary.output_layer.bias)
+
+    flanking = FlankingEncoding(
+        ["SIINFEKL", "GILGFVFTL"],
+        ["FGHIK", "AAAAA"],
+        ["LMNPQ", "CCCCC"],
+    )
+    boundary_inputs = boundary_model.network_input_tensors(
+        flanking, device="cpu")
+    no_flank_inputs = no_flank_model.network_input_tensors(
+        flanking, device="cpu")
+    boundary.eval()
+    no_flank.eval()
+    torch.testing.assert_close(
+        boundary(boundary_inputs), no_flank(no_flank_inputs))
+
+
+def test_cleavage_boundary_weight_roundtrip():
+    model, network = _boundary_network(
+        peptide_context=5, context_dropout=0.25)
+    inputs = model.network_input_tensors(
+        FlankingEncoding(
+            ["SIINFEKL", "GILGFVFTL"],
+            ["FGHIK", "AAAAA"],
+            ["LMNPQ", "CCCCC"],
+        ),
+        device="cpu",
+    )
+    network.eval()
+    observed = network(inputs)
+
+    clone = model.make_network(
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
+    )
+    clone.set_weights_list(network.get_weights_list(), auto_convert_keras=False)
+    clone.eval()
+    torch.testing.assert_close(observed, clone(inputs))
 
 
 def test_fit_uses_eager_network_for_validation_by_default(monkeypatch):

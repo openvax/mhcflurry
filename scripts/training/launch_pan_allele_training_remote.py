@@ -44,7 +44,17 @@ NUM_GPUS = int(os.environ.get("RUNPLZ_NUM_GPUS", "4"))
 MIN_GPU_MEMORY = int(os.environ.get("RUNPLZ_MIN_GPU_MEMORY", "35"))
 MIN_CPU = int(os.environ.get("RUNPLZ_MIN_CPU", "32"))
 MIN_MEMORY = int(os.environ.get("RUNPLZ_MIN_MEMORY", "300"))
-MIN_DISK = int(os.environ.get("RUNPLZ_MIN_DISK", "1000"))
+_MIN_DISK_VALUE = os.environ.get("RUNPLZ_MIN_DISK", "1000").strip()
+MIN_DISK = (
+    None if _MIN_DISK_VALUE.lower() in {"", "none", "null"}
+    else int(_MIN_DISK_VALUE)
+)
+_OUTPUT_VOLUME_NAME = os.environ.get("RUNPLZ_OUTPUT_VOLUME", "").strip()
+OUTPUT_VOLUMES = (
+    {"/out": _OUTPUT_VOLUME_NAME} if _OUTPUT_VOLUME_NAME else {}
+)
+FUNCTION_TIMEOUT_SECONDS = int(os.environ.get(
+    "RUNPLZ_TIMEOUT_SECONDS", str(60 * 60 * 24 * 14)))
 DEFAULT_OUT = os.environ.get(
     "MHCFLURRY_OUT", "/root/mhcflurry-pan-allele-training-run"
 )
@@ -58,6 +68,9 @@ REMOTE_WORKFLOW_SCRIPTS = {
     ),
     "processing-ablations": (
         "scripts/training/run_release_processing_ablations.sh"
+    ),
+    "processing-cleavage-boundaries": (
+        "scripts/training/run_processing_cleavage_boundaries_remote.sh"
     ),
 }
 
@@ -375,7 +388,10 @@ image = (
         "procps",
     )
     .pip_install("pypdf")
-    .pip_install("runplz==3.24.31")
+    # The bootstrap re-imports this launcher inside the remote image, so its
+    # runplz runtime must understand every decorator argument used above.
+    # 4.2.2 is the first pin used here with the complete Modal volume contract.
+    .pip_install("runplz==4.2.2")
     .pip_install_local_dir(".", editable=True)
 )
 
@@ -393,12 +409,17 @@ app = App(
     min_cpu=MIN_CPU,
     min_memory=MIN_MEMORY,
     min_disk=MIN_DISK,
-    timeout=60 * 60 * 24 * 14,
+    volumes=OUTPUT_VOLUMES,
+    timeout=FUNCTION_TIMEOUT_SECONDS,
     env=remote_training_env(),
 )
 def train_release_full():
     """Run the selected maintained release or ablation workflow."""
-    repo = Path.cwd()
+    # Bootstrap working directories differ by backend (Brev historically
+    # starts in the repository, while Modal starts at ``/``). Resolve from
+    # this staged launcher so every relative workflow path means the same
+    # thing on every backend.
+    repo = Path(__file__).resolve().parents[2]
     out = Path(
         os.environ.get("RUNPLZ_OUT")
         or os.environ.get("MHCFLURRY_OUT")

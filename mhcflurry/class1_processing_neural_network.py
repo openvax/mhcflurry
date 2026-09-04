@@ -63,16 +63,62 @@ class Class1ProcessingModel(nn.Module):
             sequence_input_is_indices=False,
             sequence_input_vector_encoding_name=None,
             init="glorot_uniform",
-            normalization="none"):
+            normalization="none",
+            cleavage_boundary_flank_length=0,
+            cleavage_boundary_peptide_length=0,
+            cleavage_boundary_hidden_size=32,
+            cleavage_boundary_context_dropout=0.0):
         super(Class1ProcessingModel, self).__init__()
 
         self.n_flank_length = n_flank_length
         self.c_flank_length = c_flank_length
         self.peptide_max_length = peptide_max_length
+        self.base_n_flank_length = n_flank_length
         self.flanking_averages = flanking_averages
         self.sequence_input_is_indices = bool(sequence_input_is_indices)
+        self.cleavage_boundary_flank_length = int(
+            cleavage_boundary_flank_length)
+        self.cleavage_boundary_peptide_length = int(
+            cleavage_boundary_peptide_length)
+        self.cleavage_boundary_hidden_size = int(
+            cleavage_boundary_hidden_size)
+        self.cleavage_boundary_context_dropout = float(
+            cleavage_boundary_context_dropout)
+        boundary_values = (
+            self.cleavage_boundary_flank_length,
+            self.cleavage_boundary_peptide_length,
+        )
+        if any(value < 0 for value in boundary_values):
+            raise ValueError("Cleavage-boundary lengths must be nonnegative")
+        if bool(boundary_values[0]) != bool(boundary_values[1]):
+            raise ValueError(
+                "Cleavage-boundary flank and peptide lengths must both be "
+                "zero or both be positive")
+        self.cleavage_boundary_enabled = bool(boundary_values[0])
+        if self.cleavage_boundary_enabled:
+            if self.cleavage_boundary_flank_length > min(
+                    n_flank_length, c_flank_length):
+                raise ValueError(
+                    "Cleavage-boundary external context exceeds configured "
+                    "flank lengths")
+            if self.cleavage_boundary_peptide_length > peptide_max_length:
+                raise ValueError(
+                    "Cleavage-boundary peptide context exceeds peptide maximum")
+            if self.cleavage_boundary_hidden_size < 1:
+                raise ValueError(
+                    "cleavage_boundary_hidden_size must be positive")
+            if flanking_averages:
+                raise ValueError(
+                    "Cleavage-boundary models require flanking_averages=False "
+                    "so the base path is peptide-only")
+            self.base_n_flank_length = 0
+        if not 0 <= self.cleavage_boundary_context_dropout <= 1:
+            raise ValueError(
+                "cleavage_boundary_context_dropout must be between 0 and 1")
         if sequence_input_vector_encoding_name is None:
             sequence_input_vector_encoding_name = "BLOSUM62"
+        self.sequence_input_vector_encoding_name = (
+            sequence_input_vector_encoding_name)
 
         # Input channels from sequence encoding
         if self.sequence_input_is_indices:
@@ -88,6 +134,24 @@ class Class1ProcessingModel(nn.Module):
             )
         else:
             in_channels = sequence_dims[1]
+
+        self.n_boundary_hidden = None
+        self.c_boundary_hidden = None
+        self.n_boundary_output = None
+        self.c_boundary_output = None
+        if self.cleavage_boundary_enabled:
+            window_length = (
+                self.cleavage_boundary_flank_length +
+                self.cleavage_boundary_peptide_length)
+            boundary_input_size = in_channels * window_length
+            self.n_boundary_hidden = nn.Linear(
+                boundary_input_size, self.cleavage_boundary_hidden_size)
+            self.c_boundary_hidden = nn.Linear(
+                boundary_input_size, self.cleavage_boundary_hidden_size)
+            self.n_boundary_output = nn.Linear(
+                self.cleavage_boundary_hidden_size, 1)
+            self.c_boundary_output = nn.Linear(
+                self.cleavage_boundary_hidden_size, 1)
 
         # Main convolutional layer
         self.conv1 = nn.Conv1d(
@@ -165,6 +229,8 @@ class Class1ProcessingModel(nn.Module):
             num_final_inputs += 1
         if flanking_averages and c_flank_length > 0:
             num_final_inputs += 1
+        if self.cleavage_boundary_enabled:
+            num_final_inputs += 2
 
         self.output_layer = nn.Linear(num_final_inputs, 1)
         # Keras Conv1D and Dense default to GlorotUniform with zero biases.
@@ -189,6 +255,11 @@ class Class1ProcessingModel(nn.Module):
         # Initialize output weights to ones (like Keras initializers.Ones())
         nn.init.ones_(self.output_layer.weight)
         nn.init.zeros_(self.output_layer.bias)
+        if self.cleavage_boundary_enabled:
+            # Start at the peptide-only model. The boundary paths acquire
+            # influence only when supported by the training objective.
+            with torch.no_grad():
+                self.output_layer.weight[:, -2:] = 0
 
     def forward(self, inputs):
         """
@@ -211,6 +282,20 @@ class Class1ProcessingModel(nn.Module):
             sequence = torch.nn.functional.embedding(
                 sequence.long(), self.sequence_embedding_table
             )
+
+        boundary_outputs = []
+        if self.cleavage_boundary_enabled:
+            n_window, c_window = self._extract_boundary_windows(
+                sequence, peptide_length)
+            n_window, c_window = self._apply_context_dropout(
+                n_window, c_window)
+            boundary_outputs = [
+                self._boundary_output(
+                    n_window, self.n_boundary_hidden, self.n_boundary_output),
+                self._boundary_output(
+                    c_window, self.c_boundary_hidden, self.c_boundary_output),
+            ]
+            sequence = self._peptide_only_sequence(sequence, peptide_length)
 
         # Transpose for Conv1d: (batch, channels, seq_len)
         x = sequence.permute(0, 2, 1)
@@ -246,6 +331,7 @@ class Class1ProcessingModel(nn.Module):
             convolutional_result, peptide_length
         )
         outputs_for_final.extend(c_flank_outputs)
+        outputs_for_final.extend(boundary_outputs)
 
         # Concatenate all outputs
         combined = torch.cat(outputs_for_final, dim=-1)
@@ -253,6 +339,74 @@ class Class1ProcessingModel(nn.Module):
         # Final output
         output = torch.sigmoid(self.output_layer(combined))
         return output.squeeze(-1)
+
+    def _unknown_embedding(self, sequence):
+        """Return the configured vector representation of the X token."""
+        if self.sequence_input_is_indices:
+            return self.sequence_embedding_table[amino_acid.X_INDEX].to(
+                dtype=sequence.dtype, device=sequence.device)
+        table = amino_acid.vector_encoding_index_table(
+            self.sequence_input_vector_encoding_name)
+        return torch.as_tensor(
+            table[amino_acid.X_INDEX],
+            dtype=sequence.dtype,
+            device=sequence.device,
+        )
+
+    def _extract_boundary_windows(self, sequence, peptide_length):
+        """Extract N and C windows spanning their respective cut sites."""
+        external = self.cleavage_boundary_flank_length
+        internal = self.cleavage_boundary_peptide_length
+        n_window = sequence[
+            :, self.n_flank_length - external:self.n_flank_length + internal,
+        ]
+
+        peptide_length = peptide_length.view(-1).long()
+        offsets = torch.arange(
+            -internal, external, device=sequence.device).view(1, -1)
+        positions = (
+            self.n_flank_length + peptide_length.view(-1, 1) + offsets)
+        positions = positions.unsqueeze(-1).expand(-1, -1, sequence.size(2))
+        c_window = sequence.gather(1, positions)
+        return n_window, c_window
+
+    def _apply_context_dropout(self, n_window, c_window):
+        """Replace complete external N/C segments with X during training."""
+        probability = self.cleavage_boundary_context_dropout
+        if not self.training or probability <= 0:
+            return n_window, c_window
+        batch_size = n_window.size(0)
+        external = self.cleavage_boundary_flank_length
+        internal = self.cleavage_boundary_peptide_length
+        unknown = self._unknown_embedding(n_window).view(1, 1, -1)
+
+        n_dropped = torch.rand(
+            batch_size, 1, 1, device=n_window.device) < probability
+        c_dropped = torch.rand(
+            batch_size, 1, 1, device=c_window.device) < probability
+        n_window = n_window.clone()
+        c_window = c_window.clone()
+        n_window[:, :external] = torch.where(
+            n_dropped, unknown, n_window[:, :external])
+        c_window[:, internal:] = torch.where(
+            c_dropped, unknown, c_window[:, internal:])
+        return n_window, c_window
+
+    def _peptide_only_sequence(self, sequence, peptide_length):
+        """Return the exact sequence representation used by no-flank models."""
+        positions = torch.arange(
+            sequence.size(1), device=sequence.device).view(1, -1)
+        starts = self.n_flank_length
+        ends = starts + peptide_length.view(-1, 1)
+        peptide_mask = (positions >= starts) & (positions < ends)
+        unknown = self._unknown_embedding(sequence).view(1, 1, -1)
+        masked = torch.where(peptide_mask.unsqueeze(-1), sequence, unknown)
+        return masked[:, starts:starts + self.peptide_max_length]
+
+    def _boundary_output(self, window, hidden_layer, output_layer):
+        """Apply one cleavage-site-specific residual branch."""
+        hidden = self.conv_activation(hidden_layer(window.flatten(start_dim=1)))
+        return torch.tanh(output_layer(hidden))
 
     def _process_n_flank(self, conv_result, peptide_length):
         """Process n_flank feature extraction."""
@@ -271,7 +425,8 @@ class Class1ProcessingModel(nn.Module):
         single_output_result = x.permute(0, 2, 1)  # (batch, seq_len, 1)
 
         # Extract at cleavage position (n_flank_length)
-        cleaved = single_output_result[:, self.n_flank_length, :]  # (batch, 1)
+        cleaved = single_output_result[
+            :, self.base_n_flank_length, :]  # (batch, 1)
         outputs.append(cleaved)
 
         # Max pool over peptide (excluding first position)
@@ -333,8 +488,8 @@ class Class1ProcessingModel(nn.Module):
         positions = torch.arange(seq_len, device=x.device).unsqueeze(0)
 
         # Mask: 1 for positions from n_flank_length+1 to n_flank_length+peptide_length
-        starts = self.n_flank_length + 1
-        ends = (self.n_flank_length + peptide_length).unsqueeze(1)
+        starts = self.base_n_flank_length + 1
+        ends = (self.base_n_flank_length + peptide_length).unsqueeze(1)
         mask = (positions >= starts) & (positions < ends)  # (batch, seq_len)
 
         # Apply mask (assuming x >= -1 from tanh)
@@ -357,8 +512,8 @@ class Class1ProcessingModel(nn.Module):
         positions = torch.arange(seq_len, device=x.device).unsqueeze(0)
 
         # Mask: 1 for positions from n_flank_length to n_flank_length+peptide_length-1
-        starts = self.n_flank_length
-        ends = (self.n_flank_length + peptide_length - 1).unsqueeze(1)
+        starts = self.base_n_flank_length
+        ends = (self.base_n_flank_length + peptide_length - 1).unsqueeze(1)
         mask = (positions >= starts) & (positions < ends)
 
         x_shifted = x + 1
@@ -371,7 +526,7 @@ class Class1ProcessingModel(nn.Module):
     def _extract_c_cleavage(self, x, peptide_length):
         """Extract at c-terminal cleavage position."""
         peptide_length = peptide_length.view(-1)
-        indices = self.n_flank_length + peptide_length - 1
+        indices = self.base_n_flank_length + peptide_length - 1
 
         batch_size = x.size(0)
         indices = indices.long().view(batch_size, 1, 1).expand(-1, -1, x.size(2))
@@ -598,6 +753,10 @@ class Class1ProcessingNeuralNetwork(object):
         post_convolutional_dense_layer_sizes=[],
         init="glorot_uniform",
         normalization="none",
+        cleavage_boundary_flank_length=0,
+        cleavage_boundary_peptide_length=0,
+        cleavage_boundary_hidden_size=32,
+        cleavage_boundary_context_dropout=0.0,
     )
     """
     Hyperparameters (and their default values) that affect the neural network
@@ -717,6 +876,8 @@ class Class1ProcessingNeuralNetwork(object):
                 continue
             if (
                     name == "conv1.weight" or
+                    name.startswith("n_boundary_") or
+                    name.startswith("c_boundary_") or
                     "n_flank_post_convs" in name or
                     "c_flank_post_convs" in name):
                 yield param
@@ -1387,6 +1548,10 @@ class Class1ProcessingNeuralNetwork(object):
         post_convolutional_dense_layer_sizes,
         init,
         normalization,
+        cleavage_boundary_flank_length,
+        cleavage_boundary_peptide_length,
+        cleavage_boundary_hidden_size,
+        cleavage_boundary_context_dropout,
     ):
         """
         Helper function to make a PyTorch network given hyperparameters.
@@ -1416,6 +1581,11 @@ class Class1ProcessingNeuralNetwork(object):
             sequence_input_vector_encoding_name=amino_acid_encoding,
             init=init,
             normalization=normalization,
+            cleavage_boundary_flank_length=cleavage_boundary_flank_length,
+            cleavage_boundary_peptide_length=cleavage_boundary_peptide_length,
+            cleavage_boundary_hidden_size=cleavage_boundary_hidden_size,
+            cleavage_boundary_context_dropout=(
+                cleavage_boundary_context_dropout),
         )
 
     def __getstate__(self):
