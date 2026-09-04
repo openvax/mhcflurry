@@ -20,7 +20,7 @@ ARCHITECTURES = {
     ("tanh", 256, 11): "small_tanh",
     ("relu", 512, 17): "large_relu",
 }
-WINDOWS = {
+DEFAULT_WINDOWS = {
     "compact_5x2": 2,
     "extended_5x5": 5,
 }
@@ -55,10 +55,40 @@ def _controls():
     return result
 
 
-def build_conditions():
+def _window_name(peptide_context_length):
+    """Return stable names for the primary and follow-up window sizes."""
+    primary_names = {
+        value: name for (name, value) in DEFAULT_WINDOWS.items()
+    }
+    return primary_names.get(
+        peptide_context_length,
+        "intermediate_5x%d" % peptide_context_length,
+    )
+
+
+def build_conditions(
+        architectures=None,
+        peptide_context_lengths=None,
+        include_controls=True):
     """Return boundary conditions and their exactly matched legacy controls."""
+    if architectures is None:
+        architectures = tuple(ARCHITECTURES.values())
+    architectures = tuple(architectures)
+    unknown_architectures = set(architectures).difference(ARCHITECTURES.values())
+    if unknown_architectures:
+        raise ValueError(
+            "Unknown architectures: %s" % sorted(unknown_architectures))
+    if peptide_context_lengths is None:
+        peptide_context_lengths = tuple(DEFAULT_WINDOWS.values())
+    peptide_context_lengths = tuple(int(value) for value in peptide_context_lengths)
+    if not peptide_context_lengths or any(
+            value < 1 or value > 15 for value in peptide_context_lengths):
+        raise ValueError("Peptide context lengths must be between 1 and 15")
+
     records = []
     for architecture, control in _controls().items():
+        if architecture not in architectures:
+            continue
         baseline_5aa = "%s__legacy_5aa" % architecture
         baseline_no_flank = "%s__legacy_no_flank" % architecture
         common_axes = {
@@ -67,27 +97,29 @@ def build_conditions():
             "baseline_no_flank_condition": baseline_no_flank,
         }
 
-        records.append((baseline_5aa, [deepcopy(control)], {
-            **common_axes,
-            "model_kind": "legacy_5aa",
-            "window": "legacy_5aa",
-            "external_context_length": 5,
-            "peptide_context_length": 0,
-            "context_dropout": 0.0,
-        }))
+        if include_controls:
+            records.append((baseline_5aa, [deepcopy(control)], {
+                **common_axes,
+                "model_kind": "legacy_5aa",
+                "window": "legacy_5aa",
+                "external_context_length": 5,
+                "peptide_context_length": 0,
+                "context_dropout": 0.0,
+            }))
 
-        no_flank = deepcopy(control)
-        no_flank.update({"n_flank_length": 0, "c_flank_length": 0})
-        records.append((baseline_no_flank, [no_flank], {
-            **common_axes,
-            "model_kind": "legacy_no_flank",
-            "window": "legacy_no_flank",
-            "external_context_length": 0,
-            "peptide_context_length": 0,
-            "context_dropout": 0.0,
-        }))
+            no_flank = deepcopy(control)
+            no_flank.update({"n_flank_length": 0, "c_flank_length": 0})
+            records.append((baseline_no_flank, [no_flank], {
+                **common_axes,
+                "model_kind": "legacy_no_flank",
+                "window": "legacy_no_flank",
+                "external_context_length": 0,
+                "peptide_context_length": 0,
+                "context_dropout": 0.0,
+            }))
 
-        for window, peptide_context_length in WINDOWS.items():
+        for peptide_context_length in peptide_context_lengths:
+            window = _window_name(peptide_context_length)
             item = deepcopy(control)
             item.update({
                 "flanking_averages": False,
@@ -108,13 +140,21 @@ def build_conditions():
     return records
 
 
-def write_conditions(out_dir):
+def write_conditions(
+        out_dir,
+        architectures=None,
+        peptide_context_lengths=None,
+        include_controls=True,
+        design="processing-cleavage-boundaries"):
     """Write condition YAMLs and a checksummed experiment manifest."""
     out_dir = Path(out_dir)
     conditions_dir = out_dir / "conditions"
     conditions_dir.mkdir(parents=True, exist_ok=True)
     records = []
-    for condition, grid, axes in build_conditions():
+    for condition, grid, axes in build_conditions(
+            architectures=architectures,
+            peptide_context_lengths=peptide_context_lengths,
+            include_controls=include_controls):
         relative_path = Path("conditions") / (condition + ".yaml")
         payload = yaml.safe_dump(grid, sort_keys=True)
         (out_dir / relative_path).write_text(payload)
@@ -129,7 +169,7 @@ def write_conditions(out_dir):
         })
     manifest = {
         "schema_version": 1,
-        "design": "processing-cleavage-boundaries",
+        "design": design,
         "fixed_controls": {
             "flank_length_each_side": 5,
             "boundary_hidden_size": 32,
@@ -141,9 +181,13 @@ def write_conditions(out_dir):
             "random_seed": 42,
         },
         "network_budget": {
-            "boundary_networks": 16,
-            "legacy_control_networks": 16,
-            "total_networks": 32,
+            "boundary_networks": 4 * sum(
+                record["model_kind"] == "cleavage_boundary"
+                for record in records),
+            "legacy_control_networks": 4 * sum(
+                record["model_kind"] != "cleavage_boundary"
+                for record in records),
+            "total_networks": 4 * len(records),
         },
         "records": records,
     }
@@ -160,8 +204,25 @@ def main(argv=None):
     """Write the experiment design."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("out_dir")
+    parser.add_argument(
+        "--architectures", nargs="+", choices=tuple(ARCHITECTURES.values()),
+        default=None,
+    )
+    parser.add_argument(
+        "--peptide-context-lengths", nargs="+", type=int, default=None,
+    )
+    parser.add_argument("--no-controls", action="store_true")
+    parser.add_argument(
+        "--design", default="processing-cleavage-boundaries",
+    )
     args = parser.parse_args(argv)
-    print(json.dumps(write_conditions(args.out_dir), indent=2, sort_keys=True))
+    print(json.dumps(write_conditions(
+        args.out_dir,
+        architectures=args.architectures,
+        peptide_context_lengths=args.peptide_context_lengths,
+        include_controls=not args.no_controls,
+        design=args.design,
+    ), indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":

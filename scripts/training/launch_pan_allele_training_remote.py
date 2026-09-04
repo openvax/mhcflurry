@@ -72,6 +72,9 @@ REMOTE_WORKFLOW_SCRIPTS = {
     "processing-cleavage-boundaries": (
         "scripts/training/run_processing_cleavage_boundaries_remote.sh"
     ),
+    "processing-cleavage-boundary-radius": (
+        "scripts/training/run_processing_cleavage_boundary_radius_remote.sh"
+    ),
 }
 
 
@@ -271,6 +274,22 @@ def remote_training_env(environ=os.environ):
         ),
         "MHCFLURRY_REMOTE_WORKFLOW": environ.get(
             "MHCFLURRY_REMOTE_WORKFLOW", "full"
+        ),
+        "BOUNDARY_RADIUS_ARCHITECTURE": environ.get(
+            "BOUNDARY_RADIUS_ARCHITECTURE", "large_relu"
+        ),
+        "BOUNDARY_RADIUS_BASE_RUN": environ.get(
+            "BOUNDARY_RADIUS_BASE_RUN", ""
+        ),
+        "BOUNDARY_RADIUS_HOLDOUT_DIR": environ.get(
+            "BOUNDARY_RADIUS_HOLDOUT_DIR", ""
+        ),
+        "BOUNDARY_RADIUS_OUT": environ.get("BOUNDARY_RADIUS_OUT", ""),
+        "BOUNDARY_RADIUS_PARALLEL_CONDITIONS": environ.get(
+            "BOUNDARY_RADIUS_PARALLEL_CONDITIONS", "1"
+        ),
+        "BOUNDARY_RADIUS_TRAIN_DATA": environ.get(
+            "BOUNDARY_RADIUS_TRAIN_DATA", ""
         ),
         "MATMUL_PRECISION": environ.get("MATMUL_PRECISION", "highest"),
         "MATMUL_PRECISION_CLI": environ.get(

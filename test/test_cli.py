@@ -2712,6 +2712,12 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     assert env["MHCFLURRY_RELEASE_GIT_COMMIT"] == ""
     assert env["MHCFLURRY_RELEASE_VERSION"] == ""
     assert env["MHCFLURRY_REMOTE_WORKFLOW"] == "full"
+    assert env["BOUNDARY_RADIUS_ARCHITECTURE"] == "large_relu"
+    assert env["BOUNDARY_RADIUS_BASE_RUN"] == ""
+    assert env["BOUNDARY_RADIUS_HOLDOUT_DIR"] == ""
+    assert env["BOUNDARY_RADIUS_OUT"] == ""
+    assert env["BOUNDARY_RADIUS_PARALLEL_CONDITIONS"] == "1"
+    assert env["BOUNDARY_RADIUS_TRAIN_DATA"] == ""
     assert env["RELEASE_RANDOM_SEED"] == "42"
     assert env["MHCFLURRY_GPU_TELEMETRY"] == "1"
     assert env["MHCFLURRY_GPU_TELEMETRY_SECONDS"] == "30"
@@ -2821,6 +2827,12 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     }) == (
         "processing-cleavage-boundaries",
         "scripts/training/run_processing_cleavage_boundaries_remote.sh",
+    )
+    assert module.remote_workflow_script({
+        "MHCFLURRY_REMOTE_WORKFLOW": "processing-cleavage-boundary-radius",
+    }) == (
+        "processing-cleavage-boundary-radius",
+        "scripts/training/run_processing_cleavage_boundary_radius_remote.sh",
     )
     with pytest.raises(ValueError, match="MHCFLURRY_REMOTE_WORKFLOW"):
         module.remote_workflow_script({

@@ -75,3 +75,35 @@ def test_cleavage_boundary_design_is_paired_and_minimal(tmp_path):
     for record in manifest["records"]:
         path = tmp_path / record["hyperparameters_path"]
         assert len(yaml.safe_load(path.read_text())) == 1
+
+
+def test_cleavage_boundary_followup_is_two_paired_large_conditions(tmp_path):
+    module = _module()
+    manifest = module.write_conditions(
+        tmp_path,
+        architectures=["large_relu"],
+        peptide_context_lengths=[3, 4],
+        include_controls=False,
+        design="processing-cleavage-boundary-radius",
+    )
+
+    assert manifest["design"] == "processing-cleavage-boundary-radius"
+    assert manifest["network_budget"] == {
+        "boundary_networks": 8,
+        "legacy_control_networks": 0,
+        "total_networks": 8,
+    }
+    assert [record["condition"] for record in manifest["records"]] == [
+        "large_relu__intermediate_5x3",
+        "large_relu__intermediate_5x4",
+    ]
+    assert {
+        record["peptide_context_length"]
+        for record in manifest["records"]
+    } == {3, 4}
+    for record in manifest["records"]:
+        grid = yaml.safe_load(
+            (tmp_path / record["hyperparameters_path"]).read_text())
+        assert len(grid) == 1
+        assert grid[0]["cleavage_boundary_flank_length"] == 5
+        assert grid[0]["cleavage_boundary_context_dropout"] == 0.25
