@@ -43,6 +43,14 @@ def make_parser(prog="mhcflurry eval processing-affinity-control"):
         "--data-dir", required=True,
         help="data_evaluation directory containing cached production affinity.",
     )
+    parser.add_argument(
+        "--existing",
+        help=(
+            "Existing processing-affinity-control output to extend. Its "
+            "ordered cohort and risk-set assignments are verified and reused, "
+            "so only the new --score tables are read."
+        ),
+    )
     parser.add_argument("--out", required=True)
     parser.add_argument("--decoys-per-hit", type=int, default=10)
     parser.add_argument(
@@ -84,6 +92,7 @@ def _load_scores(specs):
     cohort_hash = None
     sources = []
     seen = set()
+    specs_by_path = {}
     for spec in specs:
         name, path, column = _parse_score_spec(spec)
         if name in seen:
@@ -91,13 +100,13 @@ def _load_scores(specs):
         seen.add(name)
         if not os.path.isfile(path):
             raise ValueError("Score table does not exist: %s" % path)
-        usecols = list(IDENTITY_COLUMNS) + [column]
+        specs_by_path.setdefault(path, []).append((name, column))
+
+    for path, path_specs in specs_by_path.items():
+        score_columns = list(dict.fromkeys(
+            column for _, column in path_specs))
+        usecols = list(IDENTITY_COLUMNS) + score_columns
         frame = pandas.read_csv(path, usecols=usecols)
-        values = pandas.to_numeric(frame[column], errors="coerce")
-        if not numpy.isfinite(values).all():
-            raise ValueError(
-                "%s has %d non-finite scores" % (
-                    name, int((~numpy.isfinite(values)).sum())))
         current_hash = _cohort_hash(frame)
         if cohort is None:
             cohort = frame.loc[:, IDENTITY_COLUMNS].copy()
@@ -106,15 +115,80 @@ def _load_scores(specs):
                 len(current_hash) != len(cohort_hash) or
                 not numpy.array_equal(current_hash, cohort_hash)):
             raise ValueError(
-                "Score %s does not use the same ordered benchmark cohort" % name)
-        cohort[name] = values.to_numpy(dtype="float64")
-        sources.append({
-            "name": name,
-            "path": path,
-            "column": column,
-            "sha256": sha256_file(path),
-        })
+                "Scores from %s do not use the same ordered benchmark cohort" %
+                path)
+        digest = sha256_file(path)
+        for name, column in path_specs:
+            values = pandas.to_numeric(frame[column], errors="coerce")
+            if not numpy.isfinite(values).all():
+                raise ValueError(
+                    "%s has %d non-finite scores" % (
+                        name, int((~numpy.isfinite(values)).sum())))
+            cohort[name] = values.to_numpy(dtype="float64")
+            sources.append({
+                "name": name,
+                "path": path,
+                "column": column,
+                "sha256": digest,
+            })
     return cohort, sources
+
+
+def _extend_existing(existing_dir, new_cohort, new_sources):
+    """Attach new score columns to verified saved cohort and risk sets."""
+    existing_dir = Path(existing_dir)
+    experiment_path = existing_dir / "experiment.json"
+    heldout_path = existing_dir / "heldout_predictions.csv.bz2"
+    matched_path = existing_dir / "matched_predictions.csv.bz2"
+    for path in (experiment_path, heldout_path, matched_path):
+        if not path.is_file():
+            raise ValueError("Existing affinity-control artifact missing: %s" % path)
+
+    configuration = json.loads(experiment_path.read_text())
+    old_sources = configuration.get("score_sources", [])
+    old_names = [source["name"] for source in old_sources]
+    new_names = [source["name"] for source in new_sources]
+    duplicates = set(old_names).intersection(new_names)
+    if duplicates:
+        raise ValueError(
+            "New score names already exist: %s" % sorted(duplicates))
+
+    heldout = pandas.read_csv(heldout_path)
+    if (
+            len(heldout) != len(new_cohort) or
+            not numpy.array_equal(
+                _cohort_hash(heldout), _cohort_hash(new_cohort))):
+        raise ValueError(
+            "New scores do not use the existing ordered benchmark cohort")
+    for name in new_names:
+        heldout[name] = new_cohort[name].to_numpy(dtype="float64")
+
+    matched = pandas.read_csv(matched_path)
+    if "source_row" not in matched:
+        raise ValueError("Existing matched predictions lack source_row")
+    source_rows = pandas.to_numeric(
+        matched.source_row, errors="raise").to_numpy(dtype="int64")
+    if (
+            len(source_rows) and
+            (source_rows.min() < 0 or source_rows.max() >= len(heldout))):
+        raise ValueError("Existing matched predictions have invalid source_row")
+    source_identity = heldout.iloc[source_rows].reset_index(drop=True)
+    if not numpy.array_equal(
+            _cohort_hash(source_identity), _cohort_hash(matched)):
+        raise ValueError(
+            "Existing matched predictions do not agree with source_row")
+    for name in new_names:
+        matched[name] = heldout[name].to_numpy()[source_rows]
+
+    return {
+        "heldout": heldout,
+        "matched": matched,
+        "score_sources": old_sources + new_sources,
+        "affinity_sources": configuration.get("affinity_sources", []),
+        "diagnostics": configuration.get("diagnostics", {}),
+        "existing_experiment": str(experiment_path.resolve()),
+        "existing_experiment_sha256": sha256_file(experiment_path),
+    }
 
 
 def _production_paths_by_sample(data_dir):
@@ -380,15 +454,26 @@ def run(args):
     """Run affinity-controlled processing evaluation."""
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    cohort, score_sources = _load_scores(args.score)
+    cohort, new_score_sources = _load_scores(args.score)
+    if args.existing:
+        extended = _extend_existing(
+            args.existing, cohort, new_score_sources)
+        attached = extended["heldout"]
+        matched = extended["matched"]
+        score_sources = extended["score_sources"]
+        affinity_sources = extended["affinity_sources"]
+        diagnostics = extended["diagnostics"]
+    else:
+        score_sources = new_score_sources
     if args.baseline not in set(source["name"] for source in score_sources):
         raise ValueError("--baseline is not one of the named --score values")
-    attached, affinity_sources = _attach_affinity(cohort, args.data_dir)
-    matched, diagnostics = make_affinity_controlled_risk_sets(
-        attached,
-        decoys_per_hit=args.decoys_per_hit,
-        same_protein_caliper=args.same_protein_caliper,
-    )
+    if not args.existing:
+        attached, affinity_sources = _attach_affinity(cohort, args.data_dir)
+        matched, diagnostics = make_affinity_controlled_risk_sets(
+            attached,
+            decoys_per_hit=args.decoys_per_hit,
+            same_protein_caliper=args.same_protein_caliper,
+        )
     score_columns = [source["name"] for source in score_sources]
     metrics = score_risk_sets(matched, score_columns)
     summary, comparisons = summarize_metrics(metrics, args.baseline)
@@ -410,6 +495,12 @@ def run(args):
         "data_dir": os.path.abspath(args.data_dir),
         "diagnostics": diagnostics,
     }
+    if args.existing:
+        configuration.update({
+            "extended_from": extended["existing_experiment"],
+            "extended_from_sha256": extended[
+                "existing_experiment_sha256"],
+        })
     (out / "experiment.json").write_text(
         json.dumps(configuration, indent=2, sort_keys=True) + "\n")
     print(summary.to_string(index=False))

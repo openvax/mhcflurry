@@ -94,3 +94,34 @@ def test_processing_affinity_control_end_to_end(tmp_path):
     }
     experiment = json.loads((out / "experiment.json").read_text())
     assert experiment["diagnostics"]["risk_sets"] == 2
+
+    added = predictions[identity].copy()
+    added["radius3"] = [0.95, 0.7, 0.1, 0.8, 0.4, 0.2]
+    added["radius4"] = [0.9, 0.6, 0.2, 0.75, 0.5, 0.1]
+    added_path = tmp_path / "added.csv.bz2"
+    added.to_csv(added_path, index=False)
+    extended_out = tmp_path / "extended"
+    result = command.run_argv([
+        "--score", "radius3=%s:radius3" % added_path,
+        "--score", "radius4=%s:radius4" % added_path,
+        "--baseline", "baseline",
+        "--data-dir", str(tmp_path),
+        "--existing", str(out),
+        "--out", str(extended_out),
+    ])
+
+    assert result == 0
+    extended = pandas.read_csv(
+        extended_out / "heldout_predictions.csv.bz2")
+    assert extended.radius3.tolist() == added.radius3.tolist()
+    matched = pandas.read_csv(
+        extended_out / "matched_predictions.csv.bz2")
+    assert matched.radius4.tolist() == extended.radius4.iloc[
+        matched.source_row].tolist()
+    assert set(pandas.read_csv(extended_out / "summary.csv").score) == {
+        "candidate", "baseline", "radius3", "radius4",
+    }
+    extended_experiment = json.loads(
+        (extended_out / "experiment.json").read_text())
+    assert extended_experiment["extended_from"].endswith(
+        "out/experiment.json")
