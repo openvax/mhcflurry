@@ -2713,6 +2713,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     assert env["MHCFLURRY_RELEASE_VERSION"] == ""
     assert env["MHCFLURRY_REMOTE_WORKFLOW"] == "full"
     assert env["BOUNDARY_RADIUS_ARCHITECTURE"] == "large_relu"
+    assert env["BOUNDARY_RADIUS_AFFINITY_CONTROL"] == "none"
     assert env["BOUNDARY_RADIUS_BASE_RUN"] == ""
     assert env["BOUNDARY_RADIUS_HOLDOUT_DIR"] == ""
     assert env["BOUNDARY_RADIUS_OUT"] == ""

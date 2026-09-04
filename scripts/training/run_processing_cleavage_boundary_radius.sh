@@ -21,6 +21,7 @@ Execution controls:
   --num-jobs INTEGER          Concurrent jobs per condition (default: auto)
   --dataloader-num-workers N  Workers per dataloader (default: auto)
   --parallel-conditions N     Conditions trained concurrently (default: 1)
+  --affinity-control MODE     all or none (default: all)
   -h, --help                  Show this help
 
 The scientific contrast is fixed to 5 external residues and either 3 or 4
@@ -58,6 +59,7 @@ GPUS=auto
 NUM_JOBS=auto
 DATALOADER_NUM_WORKERS=auto
 PARALLEL_CONDITIONS=1
+AFFINITY_CONTROL=all
 ORIGINAL_ARGS=("$@")
 
 while [ "$#" -gt 0 ]; do
@@ -77,6 +79,8 @@ while [ "$#" -gt 0 ]; do
             require_value "$@"; DATALOADER_NUM_WORKERS="$2"; shift 2 ;;
         --parallel-conditions)
             require_value "$@"; PARALLEL_CONDITIONS="$2"; shift 2 ;;
+        --affinity-control)
+            require_value "$@"; AFFINITY_CONTROL="$2"; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) printf 'Unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
     esac
@@ -98,6 +102,10 @@ esac
 case "$PARALLEL_CONDITIONS" in
     1|2) ;;
     *) printf 'Parallel conditions must be 1 or 2\n' >&2; exit 2 ;;
+esac
+case "$AFFINITY_CONTROL" in
+    all|none) ;;
+    *) printf 'Affinity control must be all or none\n' >&2; exit 2 ;;
 esac
 for path in \
     "$TRAIN_DATA" \
@@ -153,7 +161,8 @@ python "$SCRIPT_DIR/generate_processing_cleavage_boundaries.py" \
         "gpus=$GPUS" \
         "num_jobs=$NUM_JOBS" \
         "dataloader_num_workers=$DATALOADER_NUM_WORKERS" \
-        "parallel_conditions=$PARALLEL_CONDITIONS"
+        "parallel_conditions=$PARALLEL_CONDITIONS" \
+        "affinity_control=$AFFINITY_CONTROL"
     printf '%s  %s\n' "$(sha256_path "$TRAIN_DATA")" "$TRAIN_DATA"
     printf '%s  %s\n' "$(sha256_path "$BASE_RUN/manifest.json")" \
         "$BASE_RUN/manifest.json"
@@ -267,30 +276,32 @@ mhcflurry eval plot-comparison \
     --summary-pdf "$radius_comparison/plots/model_comparison_figures.pdf"
 
 prediction_suffix="processing/predictions_short_flanks.csv.bz2"
-small_anchor="$BASE_RUN/comparisons/small_tanh__legacy_5aa-vs-public/$prediction_suffix"
-large_anchor="$BASE_RUN/comparisons/large_relu__legacy_5aa-vs-small_tanh__legacy_5aa/$prediction_suffix"
-affinity_args=(
-    --score "public_2_1_selected=$small_anchor:b_processing_score"
-    --score "small_tanh__legacy_5aa=$small_anchor:a_processing_score"
-    --score "large_relu__legacy_5aa=$large_anchor:a_processing_score"
-)
-for architecture in small_tanh large_relu; do
-    anchor="${architecture}__legacy_5aa"
-    for window in legacy_no_flank compact_5x2 extended_5x5; do
-        condition="${architecture}__${window}"
-        path="$BASE_RUN/comparisons/$condition-vs-$anchor/$prediction_suffix"
-        affinity_args+=(--score "$condition=$path:a_processing_score")
+if [ "$AFFINITY_CONTROL" = all ]; then
+    small_anchor="$BASE_RUN/comparisons/small_tanh__legacy_5aa-vs-public/$prediction_suffix"
+    large_anchor="$BASE_RUN/comparisons/large_relu__legacy_5aa-vs-small_tanh__legacy_5aa/$prediction_suffix"
+    affinity_args=(
+        --score "public_2_1_selected=$small_anchor:b_processing_score"
+        --score "small_tanh__legacy_5aa=$small_anchor:a_processing_score"
+        --score "large_relu__legacy_5aa=$large_anchor:a_processing_score"
+    )
+    for architecture in small_tanh large_relu; do
+        anchor="${architecture}__legacy_5aa"
+        for window in legacy_no_flank compact_5x2 extended_5x5; do
+            condition="${architecture}__${window}"
+            path="$BASE_RUN/comparisons/$condition-vs-$anchor/$prediction_suffix"
+            affinity_args+=(--score "$condition=$path:a_processing_score")
+        done
     done
-done
-path="$radius_comparison/$prediction_suffix"
-affinity_args+=(--score "${CONDITIONS[0]}=$path:a_processing_score")
-affinity_args+=(--score "${CONDITIONS[1]}=$path:b_processing_score")
-mhcflurry eval processing-affinity-control \
-    "${affinity_args[@]}" \
-    --baseline public_2_1_selected \
-    --data-dir "$DATA_EVAL_DIR" \
-    --decoys-per-hit 10 \
-    --same-protein-caliper 0.25 \
-    --out "$OUT/affinity_controlled"
+    path="$radius_comparison/$prediction_suffix"
+    affinity_args+=(--score "${CONDITIONS[0]}=$path:a_processing_score")
+    affinity_args+=(--score "${CONDITIONS[1]}=$path:b_processing_score")
+    mhcflurry eval processing-affinity-control \
+        "${affinity_args[@]}" \
+        --baseline public_2_1_selected \
+        --data-dir "$DATA_EVAL_DIR" \
+        --decoys-per-hit 10 \
+        --same-protein-caliper 0.25 \
+        --out "$OUT/affinity_controlled"
+fi
 
 date -u +%Y-%m-%dT%H:%M:%SZ > "$OUT/completed_at_utc.txt"

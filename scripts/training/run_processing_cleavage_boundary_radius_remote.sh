@@ -17,6 +17,7 @@ TRAIN_DATA="${BOUNDARY_RADIUS_TRAIN_DATA:-$MHCFLURRY_OUT/processing.shared/train
 HOLDOUT_DIR="${BOUNDARY_RADIUS_HOLDOUT_DIR:-$MHCFLURRY_OUT/release_holdout}"
 ARCHITECTURE="${BOUNDARY_RADIUS_ARCHITECTURE:-large_relu}"
 PARALLEL_CONDITIONS="${BOUNDARY_RADIUS_PARALLEL_CONDITIONS:-1}"
+AFFINITY_CONTROL="${BOUNDARY_RADIUS_AFFINITY_CONTROL:-none}"
 
 mhcflurry-downloads fetch data_evaluation
 
@@ -42,4 +43,5 @@ bash "$SCRIPT_DIR/run_processing_cleavage_boundary_radius.sh" \
     --gpus "$GPUS" \
     --num-jobs "${NUM_JOBS:-auto}" \
     --dataloader-num-workers "${DATALOADER_NUM_WORKERS:-auto}" \
-    --parallel-conditions "$PARALLEL_CONDITIONS"
+    --parallel-conditions "$PARALLEL_CONDITIONS" \
+    --affinity-control "$AFFINITY_CONTROL"

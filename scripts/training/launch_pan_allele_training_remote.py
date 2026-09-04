@@ -278,6 +278,9 @@ def remote_training_env(environ=os.environ):
         "BOUNDARY_RADIUS_ARCHITECTURE": environ.get(
             "BOUNDARY_RADIUS_ARCHITECTURE", "large_relu"
         ),
+        "BOUNDARY_RADIUS_AFFINITY_CONTROL": environ.get(
+            "BOUNDARY_RADIUS_AFFINITY_CONTROL", "none"
+        ),
         "BOUNDARY_RADIUS_BASE_RUN": environ.get(
             "BOUNDARY_RADIUS_BASE_RUN", ""
         ),
