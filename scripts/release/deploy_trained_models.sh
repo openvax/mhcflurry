@@ -24,6 +24,7 @@ Usage:
       --github-release 2.3.0 \
       [--processing-variants "no_flank with_flanks [short_flanks]"] \
       [--repo /path/to/mhcflurry] [--allow-dirty-repo] \
+      [--allow-artifact-source-mismatch] \
       [--date YYYYMMDD] \
       [--assets-dir /path/to/assets] \
       [--dry-run | --draft | --publish | --mode MODE]
@@ -108,6 +109,7 @@ ASSETS_DIR=
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="${REPO:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 ALLOW_DIRTY_REPO=0
+ALLOW_ARTIFACT_SOURCE_MISMATCH=0
 ASSET_DATE=$(date -u +%Y%m%d)
 MODE=dry-run
 PROCESSING_VARIANTS="no_flank with_flanks"
@@ -144,6 +146,10 @@ while [ $# -gt 0 ]; do
             ;;
         --allow-dirty-repo)
             ALLOW_DIRTY_REPO=1
+            shift
+            ;;
+        --allow-artifact-source-mismatch)
+            ALLOW_ARTIFACT_SOURCE_MISMATCH=1
             shift
             ;;
         --dry-run)
@@ -232,6 +238,7 @@ PROCESSING_ASSET="models_class1_processing.selected.${ASSET_DATE}.tar.bz2"
 PRESENTATION_ASSET="models_class1_presentation.${ASSET_DATE}.tar.bz2"
 SHA_FILE="SHA256SUMS"
 SNIPPET_FILE="downloads.${RELEASE}.snippet.yml"
+RELEASE_NOTES_FILE="$REPO/RELEASE_NOTES_${RELEASE}.md"
 
 require_command tar
 require_command python3
@@ -249,6 +256,9 @@ PROVENANCE_ARGS=(
 )
 if [ "$ALLOW_DIRTY_REPO" = "1" ]; then
     PROVENANCE_ARGS+=(--allow-dirty-repo)
+fi
+if [ "$ALLOW_ARTIFACT_SOURCE_MISMATCH" = "1" ]; then
+    PROVENANCE_ARGS+=(--allow-artifact-source-mismatch)
 fi
 "${PROVENANCE_ARGS[@]}" >/dev/null
 
@@ -332,7 +342,12 @@ EOF
 
 if [ "$MODE" = "draft" ]; then
     if ! gh release view "$GITHUB_RELEASE" >/dev/null 2>&1; then
-        gh release create "$GITHUB_RELEASE" --draft --title "MHCflurry $RELEASE"
+        RELEASE_NOTES_ARGS=(--notes "")
+        if [ -f "$RELEASE_NOTES_FILE" ]; then
+            RELEASE_NOTES_ARGS=(--notes-file "$RELEASE_NOTES_FILE")
+        fi
+        gh release create "$GITHUB_RELEASE" --draft \
+            --title "MHCflurry $RELEASE" "${RELEASE_NOTES_ARGS[@]}"
     fi
 elif [ "$MODE" = "publish" ]; then
     gh release view "$GITHUB_RELEASE" >/dev/null 2>&1 || \

@@ -33,10 +33,10 @@ base_hyperparameters = {
     'topology': 'feedfoward',
     'loss': 'custom:mse_with_inequalities',
     'max_epochs': 5000,
-    # See scripts/training/release_exact/generate_hyperparameters.py for
-    # the rationale on this bump.
-    'minibatch_size': 4096,
+    # Held-out validation supports this increase over the published 128.
+    'minibatch_size': 1024,
     'optimizer': 'rmsprop',
+    'optimizer_implementation': 'keras',
     'output_activation': 'sigmoid',
     "patience": 20,
     "min_delta": 0.0,
@@ -79,6 +79,7 @@ base_hyperparameters = {
     },
     'validation_split': 0.1,
     'data_dependent_initialization_method': "lsuv",
+    'data_dependent_initialization_target': "post_activation",
 }
 
 grid = []

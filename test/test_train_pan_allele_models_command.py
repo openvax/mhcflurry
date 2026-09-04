@@ -20,12 +20,14 @@ import shutil
 import tempfile
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import numpy
 import pandas
 import pytest
 
 from mhcflurry import Class1AffinityPredictor
+from mhcflurry.cli import train_pan_allele_models_command as train_command
 from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.downloads import get_path
 from mhcflurry.pseudosequences import LEGACY_ALLELE_SEQUENCES_FILENAME
@@ -100,6 +102,65 @@ SIINFEKL,100.0,200.0
 LLFGYPVYV,150.0,250.0
 KLGGALQAK,300.0,350.0
 """.strip()
+
+
+def test_resource_probe_releases_model_between_architectures(monkeypatch):
+    """Sequential probe tasks must not inherit the prior model's VRAM."""
+    created = []
+    cleanup_calls = []
+
+    class FakeNetwork:
+        hyperparameter_defaults = SimpleNamespace(
+            subselect=lambda values: dict(values))
+
+        def __init__(self, **_kwargs):
+            self._network = object()
+            self.alleles_cleared = False
+            created.append(self)
+
+        def fit(self, **_kwargs):
+            return None
+
+        def clear_allele_representations(self):
+            self.alleles_cleared = True
+
+    monkeypatch.setattr(train_command, "Class1NeuralNetwork", FakeNetwork)
+    monkeypatch.setattr(
+        train_command, "_build_train_peptides", lambda _values: object())
+    monkeypatch.setattr(
+        train_command, "AlleleEncoding", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(
+        train_command, "begin_peak_memory_measurement", lambda: object())
+    monkeypatch.setattr(
+        train_command, "end_peak_memory_measurement", lambda _token: {})
+    monkeypatch.setattr(
+        train_command,
+        "release_unused_torch_memory",
+        lambda: cleanup_calls.append("cleanup"),
+    )
+    constant_data = {
+        "train_data": pandas.DataFrame({
+            "peptide": ["SIINFEKL"],
+            "allele": ["HLA-A*02:01"],
+            "measurement_value": [100.0],
+            "measurement_inequality": ["="],
+        }),
+        "folds_df": pandas.DataFrame({"fold_0": [True]}),
+        "allele_encoding": object(),
+    }
+    hyperparameters = {
+        "minibatch_size": 1,
+        "validation_split": 0.1,
+        "train_data": {},
+    }
+
+    for _ in range(2):
+        train_command._run_resource_probe(
+            hyperparameters, fold_num=0, constant_data=constant_data)
+
+    assert cleanup_calls == ["cleanup", "cleanup"]
+    assert all(model.alleles_cleared for model in created)
+    assert all(model._network is None for model in created)
 
 
 def test_train_data_metadata_drops_preexisting_fold_columns():
@@ -212,7 +273,9 @@ def test_pretrain_network_input_iterator_compact_torch_indices(tmp_path):
 
 
 
-def run_and_check(n_jobs=0, delete=True, additional_args=[]):
+def run_and_check(n_jobs=0, delete=True, additional_args=None):
+    if additional_args is None:
+        additional_args = []
     models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")
     hyperparameters_filename = os.path.join(
         models_dir, "hyperparameters.yaml")

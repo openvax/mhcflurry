@@ -81,7 +81,13 @@ def svd_orthonormal(shape):
     return q
 
 
-def get_activations_pytorch(model, layer_name, x_dict, device=None):
+def get_activations_pytorch(
+    model,
+    layer_name,
+    x_dict,
+    device=None,
+    target="post_activation",
+):
     """
     Get activations from a specific layer in a PyTorch model.
 
@@ -95,19 +101,30 @@ def get_activations_pytorch(model, layer_name, x_dict, device=None):
         Input dictionary with tensors
     device : torch.device, optional
         Device to run on
+    target : {"post_activation", "pre_activation"}
+        Which affine-layer output to return. Historical Keras LSUV used the
+        post-activation Dense output.
 
     Returns
     -------
     numpy.ndarray
         Activations from the specified layer
     """
+    if target not in ("post_activation", "pre_activation"):
+        raise ValueError(
+            "target must be 'post_activation' or 'pre_activation'; got %r"
+            % target
+        )
     if device is None:
         device = next(model.parameters()).device
 
     activations = {}
 
     def hook_fn(module, input, output):
-        activations['output'] = output.detach().cpu().numpy()
+        activation_output = getattr(model, "activation_output_for_layer", None)
+        if target == "post_activation" and activation_output is not None:
+            output = activation_output(module, output)
+        activations["output"] = output.detach().cpu().numpy()
 
     # Find the layer by name
     target_layer = None
@@ -163,7 +180,14 @@ def get_activations(model, layer, X_batch):
     return get_activations_pytorch(model, layer_name, X_batch)
 
 
-def lsuv_init(model, batch, verbose=True, margin=0.1, max_iter=100):
+def lsuv_init(
+    model,
+    batch,
+    verbose=True,
+    margin=0.1,
+    max_iter=100,
+    target="post_activation",
+):
     """
     Initialize neural network weights using layer-sequential unit-variance
     initialization.
@@ -184,6 +208,8 @@ def lsuv_init(model, batch, verbose=True, margin=0.1, max_iter=100):
         Acceptable variance margin
     max_iter : int
         Maximum iterations per layer
+    target : {"post_activation", "pre_activation"}
+        Activation boundary whose variance LSUV normalizes.
 
     Returns
     -------
@@ -204,7 +230,13 @@ def lsuv_init(model, batch, verbose=True, margin=0.1, max_iter=100):
     for layer_name, layer in layers_to_init:
         # Get output shape
         try:
-            activations = get_activations_pytorch(model, layer_name, batch, device)
+            activations = get_activations_pytorch(
+                model,
+                layer_name,
+                batch,
+                device,
+                target=target,
+            )
             output_size = numpy.prod(activations.shape[1:])
         except Exception as e:
             if verbose:
@@ -226,7 +258,13 @@ def lsuv_init(model, batch, verbose=True, margin=0.1, max_iter=100):
             layer.weight.data = torch.from_numpy(ortho_weight).to(device)
 
         # Get activations and compute variance
-        activations = get_activations_pytorch(model, layer_name, batch, device)
+        activations = get_activations_pytorch(
+            model,
+            layer_name,
+            batch,
+            device,
+            target=target,
+        )
         variance = numpy.var(activations)
 
         iteration = 0
@@ -252,7 +290,13 @@ def lsuv_init(model, batch, verbose=True, margin=0.1, max_iter=100):
                 layer.weight.data *= scale_factor
 
             # Recompute activations and variance
-            activations = get_activations_pytorch(model, layer_name, batch, device)
+            activations = get_activations_pytorch(
+                model,
+                layer_name,
+                batch,
+                device,
+                target=target,
+            )
             variance = numpy.var(activations)
 
             iteration += 1

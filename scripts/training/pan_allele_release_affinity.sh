@@ -14,20 +14,32 @@
 #   NUM_JOBS=N                 parallelism (default: $GPUS). Controls
 #                              how many networks train concurrently;
 #                              mhcflurry pairs jobs 1:1 with GPUs.
-#   TRAINING_MINIBATCH_SIZE    shared release-training minibatch default
-#                              (default 1024)
+#   TRAINING_MINIBATCH_SIZE    shared release minibatch default (128)
 #   AFFINITY_MINIBATCH_SIZE    affinity-specific override
+#                              (default 128, matching 2.1.x/2.2.x)
+#   AFFINITY_HYPERPARAMETERS_FILE
+#                              optional pre-generated YAML for controlled
+#                              experiments; release runs leave this unset
+#   RELEASE_RANDOM_SEED        master seed for folds, fits, random negatives,
+#                              and calibration (default 42)
+#   SKIP_CALIBRATE=1           skip percentile calibration for experiments
+#                              that compare raw affinity predictions
 set -euo pipefail
 set -x
 
 : "${MHCFLURRY_OUT:?MHCFLURRY_OUT must be set}"
 
 export PYTHONUNBUFFERED=1
-# torch.compile is on by default. Compile cost (~30-60s codegen) is paid
-# once per worker; we recycle workers after a moderate number of tasks to
-# avoid long-lived-worker death modes on multi-day runs while still
-# amortizing compile / CUDA init across several networks.
-export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
+# Release weights use eager, full-FP32 matrix multiplication unless a caller
+# deliberately overrides these controls. Neither compilation nor TF32 has
+# isolated held-out evidence establishing identical training trajectories.
+export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-0}"
+export MHCFLURRY_TORCH_COMPILE_LOSS="${MHCFLURRY_TORCH_COMPILE_LOSS:-0}"
+export MHCFLURRY_MATMUL_PRECISION="${MHCFLURRY_MATMUL_PRECISION:-highest}"
+RELEASE_RANDOM_SEED="${RELEASE_RANDOM_SEED:-42}"
+# The resource probe should make the configured release minibatch safe. If it
+# does not, changing optimization dynamics is a provenance failure.
+export MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK="${MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK:-1}"
 # Inductor defaults to a large compile helper pool per training process.
 # With 8-16 concurrent mhcflurry workers that multiplies into thousands of
 # short-lived subprocesses and can stall the box. Leave the env unset by
@@ -186,7 +198,7 @@ trap 'on_signal TERM' TERM
 trap cleanup_release_logging EXIT
 
 log_release_event script_start \
-    "pid=$$ out_dir=$MHCFLURRY_OUT pythonunbuffered=$PYTHONUNBUFFERED torch_compile=$MHCFLURRY_TORCH_COMPILE inductor_threads=${TORCHINDUCTOR_COMPILE_THREADS:-auto}"
+    "pid=$$ out_dir=$MHCFLURRY_OUT pythonunbuffered=$PYTHONUNBUFFERED torch_compile=$MHCFLURRY_TORCH_COMPILE inductor_threads=${TORCHINDUCTOR_COMPILE_THREADS:-auto} random_seed=$RELEASE_RANDOM_SEED"
 write_snapshot startup
 start_heartbeat
 
@@ -278,12 +290,12 @@ PARALLELISM_ARGS=(
     # to env (MHCFLURRY_TORCH_COMPILE / MHCFLURRY_MATMUL_PRECISION /
     # MHCFLURRY_ENABLE_TIMING) inside resolve_local_parallelism_args, so
     # the existing maybe_compile_network / configure_matmul_precision /
-    # _timing_enabled call sites continue to read env unchanged. Defaults
-    # to 'auto' for --torch-compile so an env preset (e.g.
-    # MHCFLURRY_TORCH_COMPILE=1 set by the runplz container) still wins
-    # when the shell is invoked outside the runplz path.
-    --torch-compile "${TORCH_COMPILE_CLI:-auto}"
-    --matmul-precision "${MATMUL_PRECISION_CLI:-none}"
+    # _timing_enabled call sites continue to read env unchanged. The release
+    # recipe pins eager/full-FP32 defaults; callers can still override them for
+    # non-release throughput experiments.
+    --random-negative-pool-epochs 1
+    --torch-compile "${TORCH_COMPILE_CLI:-0}"
+    --matmul-precision "${MATMUL_PRECISION_CLI:-highest}"
 )
 if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
     PARALLELISM_ARGS+=(--enable-timing)
@@ -307,20 +319,35 @@ CURRENT_PHASE="data_setup"
 log_release_event phase_info "starting data download and preprocessing"
 mhcflurry-downloads fetch data_curated allele_sequences random_peptide_predictions
 
+RELEASE_HOLDOUT_ARGS=()
+if [ -n "${RELEASE_HOLDOUT_DIR:-}" ]; then
+    RELEASE_HOLDOUT_ARGS=(
+        --exclude-pmhcs "$RELEASE_HOLDOUT_DIR/affinity_pmhcs.csv"
+    )
+fi
 mhcflurry class1-reassign-mass-spec-training-data \
     "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
     --set-measurement-value 100 \
+    "${RELEASE_HOLDOUT_ARGS[@]}" \
     --out-csv "$(pwd)/train_data.csv"
 bzip2 -f "$(pwd)/train_data.csv"
 TRAINING_DATA="$(pwd)/train_data.csv.bz2"
 
 # ---- hyperparameters -------------------------------------------------
 CURRENT_PHASE="hyperparameters"
-TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-1024}"
+TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-128}"
 AFFINITY_MINIBATCH_SIZE="${AFFINITY_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
-mhcflurry class1-generate-training-hyperparameters affinity \
-    --minibatch-size "$AFFINITY_MINIBATCH_SIZE" \
-    > hyperparameters.yaml
+if [ -n "${AFFINITY_HYPERPARAMETERS_FILE:-}" ]; then
+    [ -f "$AFFINITY_HYPERPARAMETERS_FILE" ] || {
+        echo "AFFINITY_HYPERPARAMETERS_FILE not found: $AFFINITY_HYPERPARAMETERS_FILE" >&2
+        exit 2
+    }
+    cp "$AFFINITY_HYPERPARAMETERS_FILE" hyperparameters.yaml
+else
+    mhcflurry class1-generate-training-hyperparameters affinity \
+        --minibatch-size "$AFFINITY_MINIBATCH_SIZE" \
+        > hyperparameters.yaml
+fi
 # ``dataloader_num_workers`` is no longer injected here. The orchestrator
 # overrides each work item's hyperparameters via the
 # ``--dataloader-num-workers`` CLI flag at planning time (see
@@ -356,6 +383,7 @@ do
         --pretrain-data "$PRETRAIN_DATA" \
         --held-out-measurements-per-allele-fraction-and-max 0.25 100 \
         --num-folds 4 \
+        --random-seed "$RELEASE_RANDOM_SEED" \
         --hyperparameters hyperparameters.yaml \
         --out-models-dir "$(pwd)/$UNSELECTED_DIR" \
         --worker-log-dir "$MHCFLURRY_OUT" \
@@ -381,8 +409,7 @@ do
     cp "$UNSELECTED_DIR/train_data.csv.bz2" "$SELECTED_DIR/train_data.csv.bz2"
 
     # ---- percentile rank calibration (matches release) ---------------
-    # Three speedups vs the legacy invocation, individually safe and
-    # stacking to ~10-20x on CUDA on the pan-allele universe:
+    # Two throughput-only speedups vs the legacy invocation:
     #
     #   --gpu-batched: batches many alleles into one forward pass via
     #     the GPU-hoisted fast path. Bit-identical on CUDA; ~5-30x
@@ -390,12 +417,14 @@ do
     #   --alleles-per-work-chunk 30 (was 10): better amortization of
     #     per-chunk fixed costs (pool dispatch, model load, aggregate).
     #     ~3x fewer chunks. Override with CALIBRATE_ALLELES_PER_CHUNK.
-    #   --num-peptides-per-length 50000 (was 100000): linear in
-    #     calibration wall time. Quality trade-off matters only for
-    #     the deep tail of the percent-rank distribution; for
-    #     ranks > 0.5% the noise from halving is negligible.
-    #     Override with CALIBRATE_PEPTIDES_PER_LENGTH.
-    CALIBRATE_PEPTIDES_PER_LENGTH="${CALIBRATE_PEPTIDES_PER_LENGTH:-50000}"
+    # The statistical calibration sample remains the published 100000
+    # peptides per length; only execution batching is changed.
+    SKIP_CALIBRATE="${SKIP_CALIBRATE:-0}"
+    if [ "$SKIP_CALIBRATE" = "1" ]; then
+        log_release_event phase_skipped "SKIP_CALIBRATE=1"
+        continue
+    fi
+    CALIBRATE_PEPTIDES_PER_LENGTH="${CALIBRATE_PEPTIDES_PER_LENGTH:-100000}"
     CALIBRATE_ALLELES_PER_CHUNK="${CALIBRATE_ALLELES_PER_CHUNK:-30}"
     # Calibrate's peak VRAM per worker is dominated by the merged
     # ensemble's peptide-stage cache (~8x stage_dim × n_peptides × 4
@@ -418,8 +447,8 @@ do
         --gpus "$GPUS"
         --max-workers-per-gpu "$CALIBRATE_MAX_WORKERS_PER_GPU"
         --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
-        --torch-compile "${TORCH_COMPILE_CLI:-auto}"
-        --matmul-precision "${MATMUL_PRECISION_CLI:-none}"
+        --torch-compile "${TORCH_COMPILE_CLI:-0}"
+        --matmul-precision "${MATMUL_PRECISION_CLI:-highest}"
     )
     if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
         CALIBRATE_PARALLELISM_ARGS+=(--enable-timing)
@@ -432,6 +461,7 @@ do
         --num-peptides-per-length "$CALIBRATE_PEPTIDES_PER_LENGTH" \
         --alleles-per-work-chunk "$CALIBRATE_ALLELES_PER_CHUNK" \
         --gpu-batched \
+        --random-seed "$RELEASE_RANDOM_SEED" \
         --verbosity 1 \
         "${CALIBRATE_PARALLELISM_ARGS[@]}"
 done
@@ -458,12 +488,20 @@ else
     DATA_EVAL_DIR="$(mhcflurry-downloads path data_evaluation)"
     EVAL_OUT="$MHCFLURRY_OUT/eval_comparison"
     mkdir -p "$EVAL_OUT"
+    COMPARE_HOLDOUT_ARGS=()
+    if [ -n "${RELEASE_HOLDOUT_DIR:-}" ]; then
+        COMPARE_HOLDOUT_ARGS=(
+            --release-holdout-dir "$RELEASE_HOLDOUT_DIR"
+            --affinity-training-overlap-policy audit
+        )
+    fi
     run_logged_step "eval_compare_new_vs_public" "$EVAL_LOG" \
         mhcflurry eval compare-models \
             --a "$MHCFLURRY_OUT/models.combined" \
             --a-label new \
             --b public \
             --data-dir "$DATA_EVAL_DIR" \
+            "${COMPARE_HOLDOUT_ARGS[@]}" \
             --include affinity \
             --out "$EVAL_OUT"
 fi
@@ -477,17 +515,12 @@ SKIP_PLOTS="${SKIP_PLOTS:-0}"
 if [ "$SKIP_PLOTS" = "1" ]; then
     log_release_event phase_skipped "SKIP_PLOTS=1"
 else
-    PLOT_SCRIPT="$SCRIPT_DIR/plot_loss_curves.py"
     PLOT_OUT="$MHCFLURRY_OUT/loss_plots"
-    if [ ! -f "$PLOT_SCRIPT" ]; then
-        log_release_event plot_skipped "missing plot_loss_curves.py"
-    else
-        run_logged_step "plot_loss_curves" "$PLOT_LOG" \
-            python3 "$PLOT_SCRIPT" \
-            --selected-dir "$MHCFLURRY_OUT/models.combined" \
-            --unselected-dir "$MHCFLURRY_OUT/models.unselected.combined" \
-            --out "$PLOT_OUT"
-    fi
+    run_logged_step "plot_loss_curves" "$PLOT_LOG" \
+        mhcflurry train plot-loss-curves \
+        --selected-dir "$MHCFLURRY_OUT/models.combined" \
+        --unselected-dir "$MHCFLURRY_OUT/models.unselected.combined" \
+        --out "$PLOT_OUT"
 fi
 
 CURRENT_PHASE="complete"

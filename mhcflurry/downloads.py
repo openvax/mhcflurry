@@ -166,9 +166,14 @@ def get_default_class1_processing_models_dir(test_exists=True):
         "models_class1_processing", "models.selected.with_flanks", test_exists=test_exists)
 
 
-def get_current_release_downloads():
+def get_release_downloads(release):
     """
-    Return a dict of all available downloads in the current release.
+    Return a dict of all available downloads in a release.
+
+    Parameters
+    ----------
+    release : string
+        Release whose download metadata to return.
 
     The dict keys are the names of the downloads. The values are a dict
     with two entries:
@@ -186,7 +191,7 @@ def get_current_release_downloads():
     downloads = (
         get_downloads_metadata()
         ['releases']
-        [get_current_release()]
+        [release]
         ['downloads'])
 
     def up_to_date(dir, urls):
@@ -205,6 +210,11 @@ def get_current_release_downloads():
             'metadata': download,
         }) for download in downloads
     )
+
+
+def get_current_release_downloads():
+    """Return a dict of all available downloads in the current release."""
+    return get_release_downloads(get_current_release())
 
 
 def get_path(download_name, filename='', test_exists=True):

@@ -14,7 +14,6 @@
 Train Class1 processing models.
 """
 import argparse
-import gc
 import os
 from os.path import join
 import sys
@@ -38,6 +37,7 @@ from ..pytorch_sizing import (
     begin_peak_memory_measurement,
     end_peak_memory_measurement,
     estimate_peak_bytes_per_row,
+    release_unused_torch_memory,
 )
 from ..memory_budget import training_module_bytes
 from ..common import (
@@ -53,7 +53,7 @@ from ..parallelism import (
     add_local_parallelism_args,
     refine_local_parallelism_from_worker_context,
     resolve_local_parallelism_args,
-    run_single_worker_torch_compile_warmup,
+    run_single_worker_resource_probe,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
 from ..workload_planning import (
@@ -75,26 +75,6 @@ WORKER_CONTEXT = {}
 
 _PROCESSING_WORKER_RUNTIME_FLOOR_GB = 2.0
 _PROCESSING_WORKER_SAFETY_FACTOR = 1.3
-
-
-def release_unused_torch_memory():
-    """Return unused CUDA allocator blocks to the driver, best-effort."""
-    # Drop unreachable Python cycles first. Any tensors released by collection
-    # can then be returned by empty_cache() in this same cleanup pass.
-    gc.collect()
-    try:
-        import torch
-    except ImportError:
-        return
-    try:
-        cuda_available = torch.cuda.is_available()
-    except RuntimeError:
-        cuda_available = False
-    if cuda_available:
-        try:
-            torch.cuda.empty_cache()
-        except RuntimeError:
-            pass
 
 
 # Note on parallelization:
@@ -543,7 +523,7 @@ def train_models(args):
             constant_data=WORKER_CONTEXT,
             result_serialization_method="pickle")
     else:
-        run_single_worker_torch_compile_warmup(
+        run_single_worker_resource_probe(
             args,
             work_items,
             train_model,
@@ -650,20 +630,78 @@ def _run_compile_warmup(hyperparameters, fold_num, constant_data):
     )
     started = time.time()
     memory_token = begin_peak_memory_measurement()
-    model = Class1ProcessingNeuralNetwork(**hp)
-    model.fit(
-        sequences=FlankingEncoding(
-            peptides=train_subset.peptide.values,
-            n_flanks=train_subset.n_flank.values,
-            c_flanks=train_subset.c_flank.values),
-        targets=train_subset.hit.values,
-        verbose=0,
+    model = None
+    try:
+        model = Class1ProcessingNeuralNetwork(**hp)
+        model.fit(
+            sequences=FlankingEncoding(
+                peptides=train_subset.peptide.values,
+                n_flanks=train_subset.n_flank.values,
+                c_flanks=train_subset.c_flank.values),
+            targets=train_subset.hit.values,
+            verbose=0,
+        )
+        report = end_peak_memory_measurement(memory_token)
+        report["elapsed_seconds"] = time.time() - started
+        print("compile_warmup_only (processing): completed in %.1f sec" % (
+            report["elapsed_seconds"]))
+        return report
+    finally:
+        if model is not None:
+            model._network = None
+        model = None
+        release_unused_torch_memory()
+
+
+def _run_resource_probe(hyperparameters, fold_num, constant_data):
+    """Measure one full-residency processing fit epoch with validation."""
+    from mhcflurry.flanking_encoding import FlankingEncoding
+
+    df = constant_data["train_data"]
+    folds_df = constant_data["folds_df"]
+    fold_mask = folds_df["fold_%d" % fold_num]
+    train_data = df.loc[fold_mask]
+    if len(train_data) == 0:
+        train_data = df
+
+    hp = Class1ProcessingNeuralNetwork.hyperparameter_defaults.subselect(
+        dict(hyperparameters))
+    hp["max_epochs"] = 1
+    hp["early_stopping"] = False
+    print(
+        "resource_probe_only (processing): convolutional_filters=%s "
+        "post_dense=%s minibatch=%d rows=%d validation_split=%s" % (
+            hp.get("convolutional_filters"),
+            hp.get("post_convolutional_dense_layer_sizes"),
+            int(hp.get("minibatch_size", 128) or 128),
+            len(train_data),
+            hp.get("validation_split"),
+        )
     )
-    report = end_peak_memory_measurement(memory_token)
-    report["elapsed_seconds"] = time.time() - started
-    print("compile_warmup_only (processing): completed in %.1f sec" % (
-        report["elapsed_seconds"]))
-    return report
+    started = time.time()
+    memory_token = begin_peak_memory_measurement()
+    model = None
+    try:
+        model = Class1ProcessingNeuralNetwork(**hp)
+        model.fit(
+            sequences=FlankingEncoding(
+                peptides=train_data.peptide.values,
+                n_flanks=train_data.n_flank.values,
+                c_flanks=train_data.c_flank.values),
+            targets=train_data.hit.values,
+            seed=0,
+            verbose=0,
+        )
+        report = end_peak_memory_measurement(memory_token)
+        report["elapsed_seconds"] = time.time() - started
+        print("resource_probe_only (processing): completed in %.1f sec: %s" % (
+            report["elapsed_seconds"], report))
+        return report
+    finally:
+        if model is not None:
+            model._network = None
+        model = None
+        release_unused_torch_memory()
 
 
 def train_model(
@@ -682,11 +720,14 @@ def train_model(
         predictor,
         save_to,
         compile_warmup_only=False,
-        constant_data=WORKER_CONTEXT):
+        constant_data=WORKER_CONTEXT,
+        resource_probe_only=False):
 
     from sklearn.metrics import roc_auc_score
     from mhcflurry.flanking_encoding import FlankingEncoding
 
+    if resource_probe_only:
+        return _run_resource_probe(hyperparameters, fold_num, constant_data)
     if compile_warmup_only:
         return _run_compile_warmup(hyperparameters, fold_num, constant_data)
 

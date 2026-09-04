@@ -31,16 +31,19 @@
 #   PROCESSING_NUM_JOBS        processing worker count (default auto)
 #   PROCESSING_MAX_WORKERS_PER_GPU
 #                              processing per-GPU worker cap (default auto)
-#   PROCESSING_HELD_OUT_SAMPLES  (default 50; subset script uses 10)
-#   PRESENTATION_DECOYS_PER_HIT (default 99 to match release; subset uses 2)
-#   TRAINING_MINIBATCH_SIZE    shared affinity/processing default (default 1024)
-#   AFFINITY_MINIBATCH_SIZE    affinity-specific override
-#   PROCESSING_MINIBATCH_SIZE  processing-specific override
+#   PROCESSING_HELD_OUT_SAMPLES  processing fold holdout (default 10)
+#   PRESENTATION_DECOYS_PER_HIT presentation decoys per hit (default 2)
+#   PRESENTATION_SAMPLE_FRACTION presentation row subsample (default 0.1)
+#   TRAINING_MINIBATCH_SIZE    affinity training default (default 128)
+#   AFFINITY_MINIBATCH_SIZE    affinity minibatch (default 128)
+#   PROCESSING_MINIBATCH_SIZE  processing minibatch (default 512)
 #   PROCESSING_VARIANTS        space-separated variants to train
 #                              (default "with_flanks no_flank short_flanks")
 #   PRESENTATION_PROCESSING_WITH_FLANKS_KIND
 #                              processing variant used as presentation's
-#                              with-flanks predictor (default with_flanks)
+#                              with-flanks predictor (default short_flanks)
+#   RELEASE_RANDOM_SEED        master seed for data generation, folds, fits,
+#                              random negatives, and calibration (default 42)
 #   MHCFLURRY_GPU_TELEMETRY    0 disables processing/presentation GPU CSVs
 #   MHCFLURRY_GPU_TELEMETRY_SECONDS
 #                              telemetry sampling interval (default 30)
@@ -57,12 +60,29 @@ GPU_TELEMETRY_PID=""
 trap stop_gpu_telemetry EXIT
 
 export PYTHONUNBUFFERED=1
-# Same default as the affinity stage; the orchestrator's CLI flag
-# (--torch-compile auto) reads this when set.
-export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
+# Same eager/full-FP32 release defaults as the affinity stage.
+export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-0}"
+export MHCFLURRY_TORCH_COMPILE_LOSS="${MHCFLURRY_TORCH_COMPILE_LOSS:-0}"
+export MHCFLURRY_MATMUL_PRECISION="${MHCFLURRY_MATMUL_PRECISION:-highest}"
+# Preserve the configured optimization problem for release weights. Affinity
+# training must fail rather than silently shrink its effective minibatch.
+export MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK="${MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK:-1}"
 
 BASE_OUT="$MHCFLURRY_OUT"
 mkdir -p "$BASE_OUT/affinity" "$BASE_OUT/processing" "$BASE_OUT/presentation"
+
+# Freeze the final evaluation boundary before any training work. The public
+# data_evaluation bundle is train-excluded relative to the old public models;
+# these generated manifests remove the candidate-training pMHC intersection
+# and select the independent multiallelic source-study holdout.
+mhcflurry-downloads fetch data_evaluation data_curated data_mass_spec_annotated
+RELEASE_HOLDOUT_DIR="$BASE_OUT/release_holdout"
+mhcflurry train release-holdout build \
+    --data-dir "$(mhcflurry-downloads path data_evaluation)" \
+    --training-data "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
+    --mass-spec-data "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
+    --out-dir "$RELEASE_HOLDOUT_DIR"
+export RELEASE_HOLDOUT_DIR
 
 # Detect GPU count once; reuse for all stages.
 if command -v nvidia-smi >/dev/null 2>&1; then
@@ -76,15 +96,17 @@ fi
 # in-process training command, which sees the hyperparameters and row count.
 MAX_WORKERS_PER_GPU="${MAX_WORKERS_PER_GPU:-auto}"
 DATALOADER_NUM_WORKERS="${DATALOADER_NUM_WORKERS:-auto}"
-PROCESSING_HELD_OUT_SAMPLES="${PROCESSING_HELD_OUT_SAMPLES:-50}"
-PRESENTATION_DECOYS_PER_HIT="${PRESENTATION_DECOYS_PER_HIT:-99}"
+PROCESSING_HELD_OUT_SAMPLES="${PROCESSING_HELD_OUT_SAMPLES:-10}"
+PRESENTATION_DECOYS_PER_HIT="${PRESENTATION_DECOYS_PER_HIT:-2}"
+PRESENTATION_SAMPLE_FRACTION="${PRESENTATION_SAMPLE_FRACTION:-0.1}"
 PRESENTATION_FEATURE_CHUNK_SIZE="${PRESENTATION_FEATURE_CHUNK_SIZE:-250000}"
-TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-1024}"
+TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-128}"
 AFFINITY_MINIBATCH_SIZE="${AFFINITY_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
 AFFINITY_MAX_WORKERS_PER_GPU="${AFFINITY_MAX_WORKERS_PER_GPU:-auto}"
-PROCESSING_MINIBATCH_SIZE="${PROCESSING_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
+PROCESSING_MINIBATCH_SIZE="${PROCESSING_MINIBATCH_SIZE:-512}"
 PROCESSING_VARIANTS="${PROCESSING_VARIANTS:-with_flanks no_flank short_flanks}"
-PRESENTATION_PROCESSING_WITH_FLANKS_KIND="${PRESENTATION_PROCESSING_WITH_FLANKS_KIND:-with_flanks}"
+PRESENTATION_PROCESSING_WITH_FLANKS_KIND="${PRESENTATION_PROCESSING_WITH_FLANKS_KIND:-short_flanks}"
+RELEASE_RANDOM_SEED="${RELEASE_RANDOM_SEED:-42}"
 
 processing_variant_enabled() {
     case " $PROCESSING_VARIANTS " in
@@ -149,17 +171,15 @@ fi
 DATALOADER_NUM_WORKERS_REQUESTED="$DATALOADER_NUM_WORKERS"
 
 # Shared parallelism args for the later stages. The affinity stage uses its own
-# worker cap and job count below. --torch-compile auto reads
-# MHCFLURRY_TORCH_COMPILE env (set above), so the env path and the CLI path
-# produce identical orchestrator state.
+# worker cap and job count below.
 COMMON_PARALLELISM_ARGS=(
     --num-jobs "$NUM_JOBS"
     --max-tasks-per-worker 1000
     --gpus "$GPUS"
     --max-workers-per-gpu "$MAX_WORKERS_PER_GPU"
     --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
-    --torch-compile auto
-    --matmul-precision "${MATMUL_PRECISION:-none}"
+    --torch-compile "${TORCH_COMPILE_CLI:-0}"
+    --matmul-precision "${MATMUL_PRECISION:-highest}"
 )
 if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
     COMMON_PARALLELISM_ARGS+=(--enable-timing)
@@ -178,8 +198,8 @@ PROCESSING_PARALLELISM_ARGS=(
     --gpus "$GPUS"
     --max-workers-per-gpu "$PROCESSING_MAX_WORKERS_PER_GPU"
     --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
-    --torch-compile auto
-    --matmul-precision "${MATMUL_PRECISION:-none}"
+    --torch-compile "${TORCH_COMPILE_CLI:-0}"
+    --matmul-precision "${MATMUL_PRECISION:-highest}"
 )
 if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
     PROCESSING_PARALLELISM_ARGS+=(--enable-timing)
@@ -195,8 +215,8 @@ PRESENTATION_PARALLELISM_ARGS=(
     --gpus "$GPUS"
     --max-workers-per-gpu "$PRESENTATION_MAX_WORKERS_PER_GPU"
     --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
-    --torch-compile auto
-    --matmul-precision "${MATMUL_PRECISION:-none}"
+    --torch-compile "${TORCH_COMPILE_CLI:-0}"
+    --matmul-precision "${MATMUL_PRECISION:-highest}"
 )
 if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
     PRESENTATION_PARALLELISM_ARGS+=(--enable-timing)
@@ -215,8 +235,8 @@ PRESENTATION_CALIBRATION_PARALLELISM_ARGS=(
     --gpus "$GPUS"
     --max-workers-per-gpu "$PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU"
     --dataloader-num-workers "$DATALOADER_NUM_WORKERS"
-    --torch-compile auto
-    --matmul-precision "${MATMUL_PRECISION:-none}"
+    --torch-compile "${TORCH_COMPILE_CLI:-0}"
+    --matmul-precision "${MATMUL_PRECISION:-highest}"
 )
 if [ "${MHCFLURRY_ENABLE_TIMING:-0}" = "1" ]; then
     PRESENTATION_CALIBRATION_PARALLELISM_ARGS+=(--enable-timing)
@@ -266,7 +286,7 @@ echo "affinity predictor: $AFFINITY_PREDICTOR"
 # ============================================================
 # STAGE 2 — PROCESSING
 # Trains the configured processing variants. Presentation consumes no_flank and
-# the configured with-flanks source (with_flanks by default).
+# the configured with-flanks source (short_flanks by default).
 # ============================================================
 echo "=== STAGE 2: PROCESSING ==="
 STAGE2_START=$(date +%s)
@@ -290,17 +310,32 @@ python make_train_data.processing.py \
     --proteome-reference-csv "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \
     --ppv-multiplier 100 \
     --hit-multiplier-to-take 2 \
+    --exclude-samples-file "$RELEASE_HOLDOUT_DIR/processing_samples.csv" \
+    --random-seed "$RELEASE_RANDOM_SEED" \
     --out "$(pwd)/train_data.csv" \
     "${COMMON_PARALLELISM_ARGS[@]}"
 compress_csv_bzip2 "$(pwd)/train_data.csv"
 
 mhcflurry class1-generate-training-hyperparameters processing-base \
     --minibatch-size "$PROCESSING_MINIBATCH_SIZE" \
+    --optimizer-implementation keras \
+    --init glorot_uniform \
     > hyperparameters.base.yaml
 
 for kind in $PROCESSING_VARIANTS; do
+    PROCESSING_VARIANT_HYPERPARAMETER_ARGS=(
+        --optimizer-implementation keras
+        --init glorot_uniform
+    )
+    if [[ "$kind" == "with_flanks" ]]; then
+        PROCESSING_VARIANT_HYPERPARAMETER_ARGS=(
+            --optimizer-implementation pytorch
+            --init kaiming_uniform_fan_in
+        )
+    fi
     mhcflurry class1-generate-training-hyperparameters processing-variant \
         hyperparameters.base.yaml "$kind" \
+        "${PROCESSING_VARIANT_HYPERPARAMETER_ARGS[@]}" \
         > "hyperparameters.$kind.yaml"
     ARCH_COUNT=$(python -c \
         "import yaml; print(len(yaml.safe_load(open('hyperparameters.$kind.yaml'))))")
@@ -310,6 +345,7 @@ for kind in $PROCESSING_VARIANTS; do
         --data "$(pwd)/train_data.csv.bz2" \
         --held-out-samples "$PROCESSING_HELD_OUT_SAMPLES" \
         --num-folds 4 \
+        --random-seed "$RELEASE_RANDOM_SEED" \
         --hyperparameters "hyperparameters.$kind.yaml" \
         --out-models-dir "$(pwd)/models.unselected.$kind" \
         --worker-log-dir "$BASE_OUT/processing" \
@@ -345,7 +381,10 @@ python make_train_data.presentation.py \
     --proteome-reference-csv "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \
     --decoys-per-hit "$PRESENTATION_DECOYS_PER_HIT" \
     --exclude-pmid 31844290 31495665 31154438 \
+    --exclude-samples-file "$RELEASE_HOLDOUT_DIR/presentation_samples.csv" \
     --only-format MULTIALLELIC \
+    --sample-fraction "$PRESENTATION_SAMPLE_FRACTION" \
+    --random-seed "$RELEASE_RANDOM_SEED" \
     --out "$(pwd)/train_data.csv"
 compress_csv_bzip2 "$(pwd)/train_data.csv"
 
@@ -355,6 +394,7 @@ mhcflurry-class1-train-presentation-models \
     --processing-predictor-with-flanks "$BASE_OUT/processing/models.selected.$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" \
     --processing-predictor-without-flanks "$BASE_OUT/processing/models.selected.no_flank" \
     --out-models-dir "$(pwd)/models" \
+    --random-seed "$RELEASE_RANDOM_SEED" \
     --feature-chunk-size "$PRESENTATION_FEATURE_CHUNK_SIZE" \
     "${PRESENTATION_PARALLELISM_ARGS[@]}"
 
@@ -363,10 +403,11 @@ mhcflurry-calibrate-percentile-ranks \
     --match-amino-acid-distribution-data "$AFFINITY_PREDICTOR/train_data.csv.bz2" \
     --alleles-file "$AFFINITY_PREDICTOR/train_data.csv.bz2" \
     --predictor-kind class1_presentation \
-    --num-peptides-per-length 100000 \
+    --num-peptides-per-length 10000 \
     --alleles-per-genotype 1 \
     --num-genotypes 50 \
     --prediction-batch-size "$PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE" \
+    --random-seed "$RELEASE_RANDOM_SEED" \
     --verbosity 1 \
     "${PRESENTATION_CALIBRATION_PARALLELISM_ARGS[@]}"
 
@@ -378,6 +419,13 @@ cp "$BASE_OUT/processing/models.selected.$PRESENTATION_PROCESSING_WITH_FLANKS_KI
     "$(pwd)/models/processing_predictor_with_flanks_train_data.csv.bz2"
 cp "$BASE_OUT/processing/models.selected.no_flank/train_data.csv.bz2" \
     "$(pwd)/models/processing_predictor_no_flank_train_data.csv.bz2"
+
+mhcflurry train release-holdout validate \
+    --holdout-dir "$RELEASE_HOLDOUT_DIR" \
+    --affinity-training-data "$AFFINITY_PREDICTOR/train_data.csv.bz2" \
+    --processing-training-data "$BASE_OUT/processing/train_data.csv.bz2" \
+    --presentation-training-data "$(pwd)/train_data.csv.bz2" \
+    --out "$RELEASE_HOLDOUT_DIR/validation.json"
 
 stop_gpu_telemetry
 echo "STAGE 3 duration: $(( $(date +%s) - STAGE3_START )) sec"

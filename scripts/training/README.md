@@ -21,6 +21,9 @@ the ignored `jobs/` directory, not here.
   calibrates presentation models.
 - **`pan_allele_release_full.sh`** runs both stages in order for a complete
   local training pass.
+- **`run_release_affinity_ablations.sh`** and
+  **`run_release_processing_ablations.sh`** run the small, paired parity panels
+  described in the neural hyperparameter audit before a full release retrain.
 - **`launch_pan_allele_training_remote.py`** transports the same stages through
   runplz. Use it directly only when debugging transport; normal remote releases
   should use `mhcflurry train pan-allele-release`.
@@ -38,11 +41,17 @@ RUNPLZ_BREV_AUTO_CREATE=0 runplz brev \
     scripts/training/launch_pan_allele_training_remote.py
 ```
 
+Set `MHCFLURRY_REMOTE_WORKFLOW=affinity-ablations` or
+`MHCFLURRY_REMOTE_WORKFLOW=processing-ablations` to run the corresponding
+committed parity panel through the same image and transport. The default is
+`full`.
+
 ## Training data and hyperparameters
 
 - **`mhcflurry class1-generate-training-hyperparameters`** generates the
-  maintained affinity and processing grids. The base minibatch defaults to 1024
-  and can be changed with `--minibatch-size`.
+  maintained affinity and processing grids. The affinity minibatch defaults to
+  the published value 128; processing defaults to 512. Both can be changed with
+  `--minibatch-size`.
 - **`release_exact/generate_hyperparameters*.py`** are compatibility shims for
   historical direct-script workflows.
 - **`release_exact/make_train_data.processing.py`** and
@@ -71,8 +80,19 @@ paper figures, saved-prediction tables, and external predictors.
   paths; explicit values are for controlled comparisons.
 - **`plot_minibatch_sweep.py`** renders throughput and loss plots from
   `sweep_summary.csv`.
-- **`plot_loss_curves.py`** renders per-architecture loss curves from a trained
-  ensemble.
+- **`run_affinity_factorial.sh`** trains controlled affinity-recipe conditions,
+  saves per-epoch histories and held-out predictions, and compares every
+  condition directly to an explicitly supplied public
+  `models.no_additional_ms` predictor. The direct comparisons exclude union
+  training overlap, assert one common cohort identity, and render one review
+  PDF per condition. **`evaluate_affinity_factorial_public.sh`** applies the
+  same evaluation/figure gate to an already-trained factorial directory.
+- **`mhcflurry eval affinity-candidate-figures`** combines shortlisted
+  conditions, public 2.2, and any available canonical NetMHCpan/MixMHCpred
+  columns into one reusable held-out prediction table and paper-figure suite.
+- **`mhcflurry train plot-loss-curves`** renders per-architecture loss curves
+  from a trained ensemble. The historical `plot_loss_curves.py` path remains a
+  compatibility shim.
 - **`benchmark_training_profile.py`** reports data-load, encoding, fit, and save
   timings for one architecture.
 

@@ -25,11 +25,13 @@ from mhcflurry.parallelism import (
     auto_max_workers_per_gpu,
     chunk_ranges_for_local_parallelism,
     estimate_worker_context_bytes,
+    free_vram_per_gpu_from_nvidia_smi_gb,
     non_daemon_context,
     num_workers_per_gpu_from_args,
     refine_local_parallelism_from_spawn_context,
     resolve_local_parallelism_args,
     refine_local_parallelism_from_warmup,
+    resolve_cpu_thread_budget,
     resolve_cpu_threads_per_worker,
     resolve_max_workers_per_gpu,
     validate_worker_pool_args,
@@ -61,6 +63,10 @@ def _set_shared_initializer_state(shared_value, per_process_value):
 
 def _read_shared_initializer_state(_):
     return _SHARED_INITIALIZER_STATE
+
+
+def _record_initializer_slot(seen_slots, slot):
+    seen_slots.put(slot)
 
 
 @pytest.fixture(autouse=True)
@@ -97,6 +103,58 @@ def test_worker_init_kwargs_honors_cuda_visible_devices(monkeypatch):
         {"backend": "gpu", "gpu_device_nums": ["3"], "max_workers_per_gpu": 2},
         {"backend": "cpu", "gpu_device_nums": [], "max_workers_per_gpu": 2},
     ]
+
+
+def test_worker_init_kwargs_propagates_budget_only_to_gpu_workers():
+    assert worker_init_kwargs_for_scheduler(
+        num_jobs=3,
+        num_gpus=1,
+        backend="auto",
+        max_workers_per_gpu=2,
+        device_memory_budget_bytes=1234,
+    ) == [
+        {
+            "backend": "gpu",
+            "gpu_device_nums": [0],
+            "max_workers_per_gpu": 2,
+            "device_memory_budget_bytes": 1234,
+        },
+        {
+            "backend": "gpu",
+            "gpu_device_nums": [0],
+            "max_workers_per_gpu": 2,
+            "device_memory_budget_bytes": 1234,
+        },
+        {"backend": "cpu", "gpu_device_nums": [], "max_workers_per_gpu": 2},
+    ]
+
+
+def test_worker_init_exports_fixed_device_budget(monkeypatch):
+    # Register the key with monkeypatch before worker_init mutates os.environ
+    # directly, so the process-level value cannot leak into later sizing tests.
+    monkeypatch.setenv("MHCFLURRY_DEVICE_MEMORY_BUDGET_BYTES", "")
+    monkeypatch.setenv(
+        "MHCFLURRY_CUDA_FREE_BEFORE_CONTEXT_BYTES", "")
+    monkeypatch.setattr(
+        worker_runtime_module, "configure_pytorch", lambda **kwargs: None)
+    monkeypatch.setattr(
+        worker_runtime_module,
+        "cuda_free_memory_before_context_bytes",
+        lambda device_id: 8 * (1 << 30),
+    )
+
+    worker_runtime_module.worker_init(
+        backend="gpu",
+        gpu_device_nums=[0],
+        max_workers_per_gpu=2,
+        device_memory_budget_bytes=1234,
+    )
+
+    assert os.environ["MHCFLURRY_DEVICE_MEMORY_BUDGET_BYTES"] == "1234"
+    assert (
+        os.environ["MHCFLURRY_CUDA_FREE_BEFORE_CONTEXT_BYTES"]
+        == str(8 * (1 << 30))
+    )
 
 
 def test_worker_init_kwargs_without_gpu_scheduling_uses_backend():
@@ -530,12 +588,19 @@ def test_warmup_measurement_can_only_tighten_an_auto_plan(monkeypatch):
     )
     resolve_local_parallelism_args(args)
     initial_workers = args.max_workers_per_gpu
+    initial_budget = args.device_memory_budget_bytes
+    # Refinement must use the launch snapshot, not a later live-free reading
+    # that may temporarily include allocations from the probe or peers.
+    monkeypatch.setenv(
+        "MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "10")
     refine_local_parallelism_from_warmup(args, [{
         "cuda_peak_reserved_bytes": 20 * (1 << 30),
         "host_peak_rss_bytes": 4 * (1 << 30),
     }])
     assert args.max_workers_per_gpu < initial_workers
     assert args.max_workers_per_gpu == 3
+    assert args.device_memory_budget_bytes > initial_budget
+    assert args.workload_plan.device_memory_budget_gb == pytest.approx(24.0)
     assert args.workload_plan.warmup_device_peak_gb == 20.0
     assert args.workload_plan.warmup_host_peak_gb == 4.0
 
@@ -759,7 +824,7 @@ def test_stale_auto_thread_marker_does_not_override_new_explicit_value(
     # Simulate a caller overriding one inherited setting between commands
     # without knowing about MHCflurry's private ownership marker.
     monkeypatch.setenv("OMP_NUM_THREADS", "7")
-    threads, auto_owned = planning._resolve_cpu_thread_budget(
+    threads, auto_owned = resolve_cpu_thread_budget(
         plan, cpu_count=6)
 
     assert threads == 2
@@ -1303,8 +1368,12 @@ def test_worker_initializer_restart_queue_excludes_shared_context(monkeypatch):
     finalized = []
 
     class FakeQueue:
-        def __init__(self, value):
+        def __init__(self, value, empty=False):
             self.value = value
+            self.is_empty = empty
+
+        def empty(self):
+            return self.is_empty
 
         def get(self, **kwargs):
             del kwargs
@@ -1328,6 +1397,101 @@ def test_worker_initializer_restart_queue_excludes_shared_context(monkeypatch):
 
     assert finalized == [{"per_process": 1}]
     assert set(received) == {"per_process", "worker_context_data"}
+
+
+def test_worker_initializer_uses_backup_only_when_primary_is_empty(monkeypatch):
+    finalized = []
+
+    class FakeQueue:
+        def __init__(self, value, empty=False):
+            self.value = value
+            self.is_empty = empty
+            self.put_values = []
+
+        def empty(self):
+            return self.is_empty
+
+        def get(self):
+            return self.value
+
+        def put(self, value):
+            self.put_values.append(value)
+
+    primary = FakeQueue({"primary": 1}, empty=True)
+    backup = FakeQueue({"backup": 1})
+    monkeypatch.setattr(
+        worker_runtime_module,
+        "Finalize",
+        lambda _obj, _callback, args, **kwargs: finalized.append(args[0]),
+    )
+    received = {}
+
+    worker_runtime_module.worker_init_entry_point(
+        lambda **kwargs: received.update(kwargs),
+        arg_queue=primary,
+        backup_arg_queue=backup,
+    )
+
+    assert received == {"backup": 1}
+    assert backup.put_values == [{"backup": 1}]
+    assert finalized == [{"backup": 1}]
+
+
+@pytest.mark.skipif(
+    "fork" not in multiprocessing.get_all_start_methods(),
+    reason="fork start method unavailable",
+)
+def test_fork_pool_assigns_every_initializer_slot_once_and_joins():
+    num_workers = 16
+    seen_slots = multiprocessing.get_context("fork").SimpleQueue()
+    pool = worker_pool_module.make_worker_pool(
+        processes=num_workers,
+        initializer=_record_initializer_slot,
+        initializer_kwargs_per_process=[
+            {"slot": slot} for slot in range(num_workers)
+        ],
+        initializer_shared_kwargs={"seen_slots": seen_slots},
+        start_method="fork",
+    )
+    try:
+        pool.close()
+        pool.join()
+    except BaseException:
+        pool.terminate()
+        pool.join()
+        raise
+
+    assert sorted(seen_slots.get() for _ in range(num_workers)) == list(
+        range(num_workers))
+
+
+@pytest.mark.skipif(
+    "fork" not in multiprocessing.get_all_start_methods(),
+    reason="fork start method unavailable",
+)
+def test_fork_pool_reuses_initializer_slots_after_worker_restart():
+    pool = worker_pool_module.make_worker_pool(
+        processes=2,
+        initializer=_set_shared_initializer_state,
+        initializer_kwargs_per_process=[
+            {"per_process_value": "worker-0"},
+            {"per_process_value": "worker-1"},
+        ],
+        initializer_shared_kwargs={"shared_value": "shared"},
+        max_tasks_per_worker=1,
+        start_method="fork",
+    )
+    try:
+        results = pool.map(_read_shared_initializer_state, range(6), chunksize=1)
+        pool.close()
+        pool.join()
+    except BaseException:
+        pool.terminate()
+        pool.join()
+        raise
+
+    assert {result[0] for result in results} == {"shared"}
+    assert {result[1] for result in results} == {"worker-0", "worker-1"}
 
 
 def test_spawn_pool_installs_shared_initializer_data_once_per_worker():
@@ -1486,6 +1650,7 @@ def test_detect_free_vram_per_gpu_preserves_heterogeneity(monkeypatch):
     monkeypatch.setattr(
         planning.subprocess, "check_output",
         lambda args, **kw: b"8192\n71680\n")  # 8 GB, 70 GB
+    assert free_vram_per_gpu_from_nvidia_smi_gb(2) == [8.0, 70.0]
     assert planning.detect_free_vram_per_gpu_gb(2) == [8.0, 70.0]
     assert planning.free_vram_from_nvidia_smi_gb(2) == 8.0
 

@@ -211,30 +211,24 @@ def cuda_calibration_total_rows(
     fixed_safety_multiplier = env.fixed_safety_multiplier
 
     workers = max(int(num_workers_per_gpu), 1)
-    free, total_memory = cuda_device_memory_bytes(device)
     peak_bytes = estimate_calibration_peak_bytes_per_row(model)
-    from ..memory_budget import (
-        memory_reserve_bytes,
-        per_worker_memory_budget_bytes,
-    )
-    reserve_bytes = memory_reserve_bytes(
-        free,
-        min_reserve_bytes=reserve_min_bytes,
+    from ..pytorch_sizing import device_memory_budget
+    memory = device_memory_budget(
+        device,
+        num_workers_per_gpu=workers,
+        free_memory_fraction=free_memory_fraction,
+        reserve_min_bytes=reserve_min_bytes,
         reserve_fraction=reserve_fraction,
     )
-    reserved_headroom_budget = per_worker_memory_budget_bytes(
-        free,
-        workers,
-        min_reserve_bytes=reserve_min_bytes,
-        reserve_fraction=reserve_fraction,
+    free = memory.free_bytes
+    total_memory = memory.total_bytes
+    reserve_bytes = memory.reserve_bytes
+    fraction_budget = (
+        int(total_memory * float(free_memory_fraction) / workers)
+        if free_memory_fraction is not None
+        else memory.worker_entitlement_bytes
     )
-    if free_memory_fraction is None:
-        fraction_budget = free // workers
-        per_worker_budget = reserved_headroom_budget
-    else:
-        fraction_budget = int(
-            free * float(free_memory_fraction) / workers)
-        per_worker_budget = min(fraction_budget, reserved_headroom_budget)
+    per_worker_budget = memory.available_bytes
     sub_networks = getattr(model, "networks", None)
     if num_sub_networks is None:
         num_sub_networks = (
@@ -275,6 +269,8 @@ def cuda_calibration_total_rows(
         "reserve_gb": reserve_bytes / 1e9,
         "fraction_budget_gb": fraction_budget / 1e9,
         "per_worker_budget_gb": per_worker_budget / 1e9,
+        "worker_entitlement_gb": memory.worker_entitlement_bytes / 1e9,
+        "process_gb": memory.process_bytes / 1e9,
         "peptide_feature_dim": peptide_feature_dim,
         "num_sub_networks": num_sub_networks,
         "num_cached_networks": num_cached_networks,
@@ -292,7 +288,9 @@ def cuda_calibration_total_rows(
         "workers=%(workers)d, total=%(total_gb).2f GB, "
         "reserve=%(reserve_gb).2f GB, "
         "fraction_budget=%(fraction_budget_gb).2f GB, "
-        "per_worker_budget=%(per_worker_budget_gb).2f GB, "
+        "worker_entitlement=%(worker_entitlement_gb).2f GB, "
+        "process=%(process_gb).2f GB, "
+        "remaining_budget=%(per_worker_budget_gb).2f GB, "
         "peptide_feature_dim=%(peptide_feature_dim)d "
         "(sub_networks=%(num_sub_networks)d, "
         "num_cached=%(num_cached_networks)d), "

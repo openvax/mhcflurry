@@ -18,18 +18,21 @@ import time
 import collections
 import json
 import logging
+import math
 import numpy
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from . import amino_acid
 from .hyperparameters import HyperparameterDefaults
-from .class1_training import torch_from_numpy
+from .class1_training import torch_from_numpy, validation_split_counts
+from .keras_optimizers import KerasAdam, KerasRMSprop
 from .pytorch_sizing import DEFAULT_PREDICT_BATCH_SIZE, env_workers_per_gpu
+from .pytorch_layers import KerasBatchNorm1d, get_activation
 from .flanking_encoding import FlankingEncoding
 from .common import get_pytorch_device
 from .pytorch_training import (
+    copy_module_state_dict_to_cpu,
     configure_matmul_precision,
     effective_validation_batch_size,
     maybe_compile_loss,
@@ -58,7 +61,9 @@ class Class1ProcessingModel(nn.Module):
             dropout_rate,
             post_convolutional_dense_layer_sizes,
             sequence_input_is_indices=False,
-            sequence_input_vector_encoding_name=None):
+            sequence_input_vector_encoding_name=None,
+            init="glorot_uniform",
+            normalization="none"):
         super(Class1ProcessingModel, self).__init__()
 
         self.n_flank_length = n_flank_length
@@ -93,14 +98,27 @@ class Class1ProcessingModel(nn.Module):
         )
 
         # Activation function
-        if convolutional_activation == 'tanh':
-            self.conv_activation = torch.tanh
-        elif convolutional_activation == 'relu':
-            self.conv_activation = F.relu
-        elif convolutional_activation == 'sigmoid':
-            self.conv_activation = torch.sigmoid
+        self.conv_activation = get_activation(convolutional_activation)
+        if self.conv_activation is None:
+            self.conv_activation = lambda value: value
+
+        normalization = str(normalization or "none").lower()
+        if normalization not in {"none", "batch", "layer"}:
+            raise ValueError(
+                "normalization must be one of none, batch, or layer; got %r" %
+                normalization
+            )
+        self.normalization = normalization
+        if normalization == "batch":
+            self.normalization_layer = KerasBatchNorm1d(
+                convolutional_filters,
+                eps=1e-3,
+                momentum=0.01,
+            )
+        elif normalization == "layer":
+            self.normalization_layer = nn.LayerNorm(convolutional_filters)
         else:
-            self.conv_activation = torch.tanh
+            self.normalization_layer = None
 
         # Dropout
         self.dropout_rate = dropout_rate
@@ -149,6 +167,25 @@ class Class1ProcessingModel(nn.Module):
             num_final_inputs += 1
 
         self.output_layer = nn.Linear(num_final_inputs, 1)
+        # Keras Conv1D and Dense default to GlorotUniform with zero biases.
+        # Keep the rejected port's former Kaiming behavior selectable for
+        # controlled ablations, but never implicit.
+        for module in self.modules():
+            if not isinstance(module, (nn.Conv1d, nn.Linear)):
+                continue
+            if init == "glorot_uniform":
+                nn.init.xavier_uniform_(module.weight)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
+            elif init == "kaiming_uniform_fan_in":
+                nn.init.kaiming_uniform_(module.weight, a=math.sqrt(5))
+                if module.bias is not None:
+                    fan_in, _ = nn.init._calculate_fan_in_and_fan_out(
+                        module.weight)
+                    bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
+                    nn.init.uniform_(module.bias, -bound, bound)
+            else:
+                raise ValueError("Unsupported processing initializer: %s" % init)
         # Initialize output weights to ones (like Keras initializers.Ones())
         nn.init.ones_(self.output_layer.weight)
         nn.init.zeros_(self.output_layer.bias)
@@ -181,6 +218,12 @@ class Class1ProcessingModel(nn.Module):
         # Apply main convolution
         x = self.conv1(x)
         x = self.conv_activation(x)
+
+        if self.normalization_layer is not None:
+            if self.normalization == "layer":
+                x = self.normalization_layer(x.transpose(1, 2)).transpose(1, 2)
+            else:
+                x = self.normalization_layer(x)
 
         if self.dropout is not None:
             # Spatial dropout: same dropout mask for all positions
@@ -553,6 +596,8 @@ class Class1ProcessingNeuralNetwork(object):
         convolutional_kernel_l1_l2=[0.0001, 0.0001],
         dropout_rate=0.5,
         post_convolutional_dense_layer_sizes=[],
+        init="glorot_uniform",
+        normalization="none",
     )
     """
     Hyperparameters (and their default values) that affect the neural network
@@ -573,6 +618,7 @@ class Class1ProcessingNeuralNetwork(object):
     early_stopping_hyperparameter_defaults = HyperparameterDefaults(
         patience=30,
         min_delta=0.0,
+        restore_best_weights=False,
     )
     """
     Hyperparameters for early stopping.
@@ -580,6 +626,7 @@ class Class1ProcessingNeuralNetwork(object):
 
     compile_hyperparameter_defaults = HyperparameterDefaults(
         optimizer="adam",
+        optimizer_implementation="keras",
         learning_rate=None,
     )
     """
@@ -807,8 +854,7 @@ class Class1ProcessingNeuralNetwork(object):
         # Validation split
         val_split = self.hyperparameters["validation_split"]
         n_total = len(targets)
-        n_val = int(n_total * val_split)
-        n_train = n_total - n_val
+        n_train, n_val = validation_split_counts(n_total, val_split)
 
         # Hoist all per-batch H2D copies to a single up-front device
         # transfer. The processing dataset is small (peptide flanks for
@@ -834,6 +880,7 @@ class Class1ProcessingNeuralNetwork(object):
         last_progress_print = None
         min_val_loss_iteration = None
         min_val_loss = None
+        best_state_dict = None
         start = time.time()
 
         for epoch in range(self.hyperparameters["max_epochs"]):
@@ -971,6 +1018,9 @@ class Class1ProcessingNeuralNetwork(object):
                 ):
                     min_val_loss = val_loss
                     min_val_loss_iteration = epoch
+                    if self.hyperparameters["restore_best_weights"]:
+                        best_state_dict = copy_module_state_dict_to_cpu(
+                            eager_network)
 
                 if self.hyperparameters["early_stopping"]:
                     threshold = (
@@ -1002,6 +1052,17 @@ class Class1ProcessingNeuralNetwork(object):
             if progress_callback:
                 progress_callback()
 
+        restored_best_weights = bool(
+            self.hyperparameters["restore_best_weights"]
+            and best_state_dict is not None
+        )
+        if restored_best_weights:
+            eager_network.load_state_dict(best_state_dict)
+        fit_info["best_epoch"] = (
+            min_val_loss_iteration + 1
+            if min_val_loss_iteration is not None else None)
+        fit_info["best_val_loss"] = min_val_loss
+        fit_info["restored_best_weights"] = restored_best_weights
         fit_info["time"] = time.time() - start
         fit_info["num_points"] = len(sequences.dataframe)
         self.fit_info.append(dict(fit_info))
@@ -1010,24 +1071,61 @@ class Class1ProcessingNeuralNetwork(object):
             print("Output weights", self.network().output_layer.weight.data.cpu().numpy())
 
     def _create_optimizer(self, network):
-        """Create an optimizer for the network."""
+        """Create an optimizer with the historical Keras update equations."""
         optimizer_name = self.hyperparameters["optimizer"].lower()
-        lr = (
-            self.hyperparameters["learning_rate"]
-            if self.hyperparameters["learning_rate"] is not None
-            else 0.001
-        )
+        implementation = self.hyperparameters["optimizer_implementation"].lower()
+        if implementation not in ("keras", "pytorch"):
+            raise ValueError(
+                "optimizer_implementation must be 'keras' or 'pytorch'; got %r"
+                % implementation
+            )
+        configured_lr = self.hyperparameters["learning_rate"]
 
         if optimizer_name == "adam":
-            # Match Keras default epsilon=1e-07.
-            return torch.optim.Adam(network.parameters(), lr=lr, eps=1e-07)
+            lr = 0.001 if configured_lr is None else configured_lr
+            if implementation == "keras":
+                return KerasAdam(
+                    network.parameters(),
+                    lr=lr,
+                    beta_1=0.9,
+                    beta_2=0.999,
+                    epsilon=1e-7,
+                )
+            return torch.optim.Adam(
+                network.parameters(),
+                lr=lr,
+                betas=(0.9, 0.999),
+                eps=1e-7,
+                weight_decay=0.0,
+                amsgrad=False,
+            )
         elif optimizer_name == "rmsprop":
-            # Match Keras defaults: rho=0.9, epsilon=1e-07.
-            return torch.optim.RMSprop(network.parameters(), lr=lr, alpha=0.9, eps=1e-07)
+            lr = 0.001 if configured_lr is None else configured_lr
+            if implementation == "keras":
+                return KerasRMSprop(
+                    network.parameters(),
+                    lr=lr,
+                    rho=0.9,
+                    epsilon=1e-7,
+                )
+            return torch.optim.RMSprop(
+                network.parameters(),
+                lr=lr,
+                alpha=0.9,
+                eps=1e-7,
+                weight_decay=0.0,
+                momentum=0.0,
+                centered=False,
+            )
         elif optimizer_name == "sgd":
-            return torch.optim.SGD(network.parameters(), lr=lr)
-        else:
-            return torch.optim.Adam(network.parameters(), lr=lr, eps=1e-07)
+            return torch.optim.SGD(
+                network.parameters(),
+                lr=0.01 if configured_lr is None else configured_lr,
+                momentum=0.0,
+                weight_decay=0.0,
+                nesterov=False,
+            )
+        raise ValueError("Unsupported optimizer: %s" % optimizer_name)
 
     def predict(
         self,
@@ -1108,10 +1206,12 @@ class Class1ProcessingNeuralNetwork(object):
         numpy for the public API.
         """
         from .pytorch_sizing import (
+            calibrate_prediction_batch_size,
             env_workers_per_gpu,
             is_device_out_of_memory_error,
             release_device_memory_after_oom,
             resolve_prediction_batch_size,
+            synchronize_device,
         )
 
         auto_batch_size = batch_size in (None, "auto")
@@ -1122,24 +1222,48 @@ class Class1ProcessingNeuralNetwork(object):
             device = torch.device(device)
         configure_matmul_precision(device)
 
+        # Automatic accelerator inference streams encoded inputs one batch at
+        # a time. Previously the complete worker chunk was copied before the
+        # elastic retry loop, so a transfer peak could not be recovered by
+        # shrinking the batch. Explicit batches retain the cached resident
+        # tensor path for callers that intentionally choose it.
+        stream_inputs = (
+            auto_batch_size and device.type in ("cuda", "mps")
+        )
+        input_device = torch.device("cpu") if stream_inputs else device
         x_dict = self.network_input_tensors(
-            sequences=sequences, device=device, throw=throw)
+            sequences=sequences, device=input_device, throw=throw)
         network = self.network()
         network.to(device)
         network = maybe_compile_network(network, device)
         network.eval()
 
         n_samples = len(x_dict["sequence"])
+        workers_per_gpu = env_workers_per_gpu(1)
         batch_size = resolve_prediction_batch_size(
             batch_size,
             device,
             model=network,
-            num_workers_per_gpu=env_workers_per_gpu(1),
+            num_workers_per_gpu=workers_per_gpu,
             total_rows=n_samples,
         )
 
         if n_samples == 0:
             return torch.empty((0,), dtype=torch.float32, device=device)
+
+        if auto_batch_size:
+            batch_size = calibrate_prediction_batch_size(
+                batch_size,
+                device,
+                network,
+                {
+                    "sequence": x_dict["sequence"],
+                    "peptide_length": x_dict["peptide_length"],
+                },
+                num_workers_per_gpu=workers_per_gpu,
+                total_rows=n_samples,
+                transfer_inputs_to_device=stream_inputs,
+            )
 
         predictions = torch.empty(
             (n_samples,), dtype=torch.float32, device=device)
@@ -1153,6 +1277,9 @@ class Class1ProcessingNeuralNetwork(object):
                         seq_batch = x_dict["sequence"][batch_start:batch_end]
                         length_batch = x_dict[
                             "peptide_length"][batch_start:batch_end]
+                        if stream_inputs:
+                            seq_batch = seq_batch.to(device)
+                            length_batch = length_batch.to(device)
 
                         inputs = {
                             "sequence": seq_batch,
@@ -1160,6 +1287,11 @@ class Class1ProcessingNeuralNetwork(object):
                         }
                         batch_predictions = network(inputs)
                         predictions[batch_start:batch_end] = batch_predictions
+                    # Surface asynchronous CUDA/MPS errors while they are
+                    # still inside the elastic retry boundary. Otherwise the
+                    # next ensemble member's input transfer can receive a
+                    # misleading deferred OOM.
+                    synchronize_device(device)
                 break
             except RuntimeError as exc:
                 if (
@@ -1253,6 +1385,8 @@ class Class1ProcessingNeuralNetwork(object):
         convolutional_kernel_l1_l2,
         dropout_rate,
         post_convolutional_dense_layer_sizes,
+        init,
+        normalization,
     ):
         """
         Helper function to make a PyTorch network given hyperparameters.
@@ -1280,6 +1414,8 @@ class Class1ProcessingNeuralNetwork(object):
             # arg is retained for signature/config compatibility but ignored.
             sequence_input_is_indices=True,
             sequence_input_vector_encoding_name=amino_acid_encoding,
+            init=init,
+            normalization=normalization,
         )
 
     def __getstate__(self):

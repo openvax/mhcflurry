@@ -54,17 +54,9 @@ _PRESENTATION_PREDICT_TARGET_ROWS = int(
 )
 
 _PRESENTATION_LOGISTIC_REGRESSION_KWARGS = {
-    # The presentation combiner has a tiny dense feature matrix; Newton-CG is
-    # deterministic and avoids sklearn's SciPy L-BFGS-B wrapper warnings.
-    #
-    # NOTE: this solver was deliberately changed from lbfgs (used through
-    # 2.2.x) to newton-cg. Because the two optimizers converge to slightly
-    # different optima, presentation models *newly trained* with this code will
-    # have slightly different fitted weights than 2.2.x. This is intentional —
-    # do not "fix" it by reverting to lbfgs. (Pre-trained shipped models load
-    # their saved weights and are unaffected.)
-    "solver": "newton-cg",
-    "max_iter": 1000,
+    # Keep newly trained presentation combiners on the published 2.1.x/2.2.x
+    # recipe. Shipped models load their saved coefficients and are unaffected.
+    "solver": "lbfgs",
 }
 
 # Presentation scores are probabilities, but their useful dynamic range depends
@@ -706,9 +698,23 @@ class Class1PresentationPredictor(object):
                     )
                 )
 
-            model.fit(
-                X=df[self.model_inputs].values,
-                y=df.target.astype(float))
+            with warnings.catch_warnings():
+                # scikit-learn <=1.5 passes deprecated ``disp`` / ``iprint``
+                # options to SciPy's L-BFGS-B implementation even when its
+                # own verbose setting is zero. Preserve the published lbfgs
+                # recipe while suppressing only that upstream compatibility
+                # warning; fitting inputs and results are unchanged.
+                warnings.filterwarnings(
+                    "ignore",
+                    message=(
+                        r"scipy\.optimize: The `disp` and `iprint` options of "
+                        r"the L-BFGS-B solver are deprecated.*"
+                    ),
+                    category=DeprecationWarning,
+                )
+                model.fit(
+                    X=df[self.model_inputs].values,
+                    y=df.target.astype(float))
 
             (intercept,) = model.intercept_.flatten()
             self.weights_dataframe.loc[model_name, "intercept"] = intercept

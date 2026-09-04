@@ -19,12 +19,15 @@ integration suites, not here.
 """
 
 import argparse
+import hashlib
 import importlib
 import json
 import os
 import pathlib
 import subprocess
 import sys
+import tarfile
+import time
 import types
 
 import numpy
@@ -117,7 +120,87 @@ def test_train_help_runs(capsys):
     assert cli_main.main(["train", "--help"]) == 0
     captured = capsys.readouterr().out
     assert "pan-allele-release" in captured
+    assert "plot-loss-curves" in captured
+    assert "snapshot-experiment" in captured
     assert "Deployment is opt-in" in captured
+
+
+def test_compare_models_accepts_train_excluded_affinity_source():
+    parser = compare_models.make_parser()
+    args = parser.parse_args([
+        "--a", "candidate",
+        "--b", "baseline",
+        "--out", "comparison",
+        "--affinity-source", "no_additional_ms",
+    ])
+    assert args.affinity_source == "no_additional_ms"
+
+
+def test_release_affinity_excludes_union_of_both_sides_training(tmp_path):
+    dirs = [tmp_path / "a", tmp_path / "b"]
+    for directory, rows in zip(dirs, [
+            [("HLA-A0201", "SIINFEKL")],
+            [("HLA-A*03:01", "KLGGALQAK")],
+    ]):
+        directory.mkdir()
+        pandas.DataFrame(rows, columns=["allele", "peptide"]).to_csv(
+            directory / "train_data.csv", index=False)
+    side_a = {
+        "letter": "a", "label": "candidate",
+        "paths": {"affinity": str(dirs[0])},
+    }
+    side_b = {
+        "letter": "b", "label": "baseline",
+        "paths": {"affinity": str(dirs[1])},
+    }
+    benchmark = pandas.DataFrame({
+        "hla": ["HLA-A*02:01", "HLA-A*03:01", "HLA-B*07:02"],
+        "peptide": ["SIINFEKL", "KLGGALQAK", "RPHERNGFTV"],
+        "hit": [1, 1, 0],
+    })
+
+    filtered, report = compare_models._exclude_affinity_training_overlap(
+        benchmark, side_a, side_b)
+
+    assert filtered.peptide.tolist() == ["RPHERNGFTV"]
+    assert report["union_overlap_rows"] == 2
+    assert report["union_overlap_hits"] == 2
+    assert report["sides"]["a"]["overlap_unique_pmhcs"] == 1
+    assert report["sides"]["b"]["overlap_unique_pmhcs"] == 1
+
+
+def test_release_affinity_can_audit_overlap_without_excluding(tmp_path):
+    dirs = [tmp_path / "a", tmp_path / "b"]
+    for directory, rows in zip(dirs, [
+            [("HLA-A0201", "SIINFEKL")],
+            [("HLA-A*03:01", "KLGGALQAK")],
+    ]):
+        directory.mkdir()
+        pandas.DataFrame(rows, columns=["allele", "peptide"]).to_csv(
+            directory / "train_data.csv", index=False)
+    side_a = {
+        "letter": "a", "label": "candidate",
+        "paths": {"affinity": str(dirs[0])},
+    }
+    side_b = {
+        "letter": "b", "label": "baseline",
+        "paths": {"affinity": str(dirs[1])},
+    }
+    benchmark = pandas.DataFrame({
+        "hla": ["HLA-A*02:01", "HLA-A*03:01", "HLA-B*07:02"],
+        "peptide": ["SIINFEKL", "KLGGALQAK", "RPHERNGFTV"],
+        "hit": [1, 1, 0],
+    })
+
+    filtered, report = compare_models._exclude_affinity_training_overlap(
+        benchmark, side_a, side_b, policy="audit")
+
+    assert filtered.equals(benchmark)
+    assert report["policy"] == "audit"
+    assert report["exclusion_applied"] is False
+    assert report["union_overlap_rows"] == 2
+    assert report["rows_after"] == 3
+    assert report["hits_after"] == 2
 
 
 def test_train_pan_allele_release_delegates(monkeypatch, tmp_path):
@@ -184,7 +267,9 @@ def _write_minimal_deployable_run(run_dir):
         ["git", "rev-parse", "HEAD"], text=True).strip()
     info = (
         "package\tmhcflurry %s\n"
-        "git commit\t%s\n" % (__version__, source_commit)
+        "git commit\t%s\n"
+        "workflow id\ttest-training-workflow\n" % (
+            __version__, source_commit)
     )
     for relative in model_directories:
         (run_dir / relative / "info.txt").write_text(info)
@@ -200,6 +285,35 @@ def _write_minimal_deployable_run(run_dir):
         "model_name\nmodel\n")
     (run_dir / "presentation/models/percent_ranks.csv").write_text(
         "allele\nHLA-A*02:01\n")
+
+    holdout_dir = run_dir / "release_holdout"
+    holdout_dir.mkdir()
+    manifest_records = {}
+    for filename, header in (
+            ("affinity_pmhcs.csv", "allele,peptide\n"),
+            ("affinity_samples.csv", "sample_id\n"),
+            ("processing_samples.csv", "sample_id\n"),
+            ("presentation_samples.csv", "sample_id\n")):
+        path = holdout_dir / filename
+        path.write_text(header)
+        manifest_records[filename] = {
+            "rows": 0,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+    policy_path = holdout_dir / "policy.json"
+    policy_path.write_text(json.dumps({
+        "schema_version": 1,
+        "holdout_files": manifest_records,
+    }))
+    (holdout_dir / "validation.json").write_text(json.dumps({
+        "schema_version": 1,
+        "policy_sha256": hashlib.sha256(
+            policy_path.read_bytes()).hexdigest(),
+        "holdout_files": manifest_records,
+        "affinity_overlap_rows": 0,
+        "processing_overlap_rows": 0,
+        "presentation_overlap_rows": 0,
+    }))
 
 
 def test_deploy_packages_only_requested_processing_variants(tmp_path):
@@ -241,6 +355,50 @@ def test_deploy_packages_only_requested_processing_variants(tmp_path):
         if "models_class1_processing" in line and "tar " in line
     )
     assert "models.selected.short_flanks" in all_tar
+
+
+def test_deploy_creates_draft_noninteractively_with_release_notes(tmp_path):
+    run_dir = tmp_path / "release-run"
+    assets_dir = tmp_path / "assets"
+    _write_minimal_deployable_run(run_dir)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    gh_log = tmp_path / "gh.log"
+    fake_gh = fake_bin / "gh"
+    fake_gh.write_text(
+        "#!/usr/bin/env bash\n"
+        "printf '%s\\n' \"$*\" >> \"$GH_LOG\"\n"
+        "if [ \"$1 $2\" = \"release view\" ]; then exit 1; fi\n"
+    )
+    fake_gh.chmod(0o755)
+    env = os.environ.copy()
+    env["PATH"] = "%s:%s" % (fake_bin, env["PATH"])
+    env["GH_LOG"] = str(gh_log)
+
+    subprocess.run(
+        [
+            "bash", "scripts/release/deploy_trained_models.sh",
+            "--run-dir", str(run_dir),
+            "--release", "2.3.0",
+            "--github-release", "2.3.0",
+            "--repo", ".",
+            "--assets-dir", str(assets_dir),
+            "--date", "20260825",
+            "--allow-dirty-repo",
+            "--draft",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
+
+    calls = gh_log.read_text().splitlines()
+    create = next(line for line in calls if line.startswith("release create "))
+    assert "--notes-file " in create
+    assert "RELEASE_NOTES_2.3.0.md" in create
+    assert create.startswith("release create 2.3.0 --draft --title ")
+    assert any(line.startswith("release upload 2.3.0 ") for line in calls)
 
 
 def test_deploy_rejects_artifacts_from_a_different_commit(tmp_path):
@@ -292,6 +450,7 @@ def test_release_workflow_forwards_processing_variants_to_deploy(tmp_path):
     output = result.stdout + result.stderr
     assert "deploy_trained_models.sh" in output
     assert "--processing-variants with_flanks\\ no_flank" in output
+    assert "--allow-artifact-source-mismatch" in output
     assert (
         "variants=with_flanks no_flank; eval_modes=with_flanks,no_flank"
     ) in output
@@ -392,6 +551,10 @@ def test_release_workflow_rejects_invalid_processing_configuration_before_train(
     ("extra_args", "expected_error"),
     [
         (
+            ["--random-seed", "-1"],
+            "--random-seed must be a non-negative integer",
+        ),
+        (
             ["--processing-minibatch-size", "0"],
             "--processing-minibatch-size must be a positive integer",
         ),
@@ -477,6 +640,10 @@ def test_release_workflow_eval_max_benchmark_files_is_forwarded(tmp_path):
     output = result.stdout + result.stderr
     assert "mhcflurry eval compare-models" in output
     assert "--include affinity" in output
+    assert "--affinity-source no_additional_ms" in output
+    assert "--affinity-training-overlap-policy audit" in output
+    assert "--affinity-training-overlap-policy exclude" in output
+    assert "eval_comparison_train_excluded_affinity" in output
     assert "--limit-files 1" in output
 
 
@@ -506,6 +673,7 @@ def test_release_workflow_plots_include_paper_figures_by_default(tmp_path):
     assert "--paper-figures-scores-dir %s" % (
         run_dir / "eval_comparison"
     ) in output
+    assert "--include-paper-figures-in-summary-pdf" in output
 
 
 def test_release_workflow_honors_repo_env_override(tmp_path):
@@ -827,8 +995,10 @@ def test_release_workflow_forwards_presentation_recipe_controls(tmp_path):
             "--backend", "local",
             "--skip-eval",
             "--skip-plots",
+            "--random-seed", "271",
             "--processing-held-out-samples", "17",
             "--presentation-decoys-per-hit", "7",
+            "--presentation-sample-fraction", "0.25",
             "--presentation-feature-chunk-size", "12345",
             "--presentation-num-jobs", "8",
             "--presentation-max-workers-per-gpu", "2",
@@ -844,8 +1014,10 @@ def test_release_workflow_forwards_presentation_recipe_controls(tmp_path):
 
     output = result.stdout + result.stderr
     for expected in (
+            "RELEASE_RANDOM_SEED=271",
             "PROCESSING_HELD_OUT_SAMPLES=17",
             "PRESENTATION_DECOYS_PER_HIT=7",
+            "PRESENTATION_SAMPLE_FRACTION=0.25",
             "PRESENTATION_FEATURE_CHUNK_SIZE=12345",
             "PRESENTATION_NUM_JOBS=8",
             "PRESENTATION_MAX_WORKERS_PER_GPU=2",
@@ -855,14 +1027,218 @@ def test_release_workflow_forwards_presentation_recipe_controls(tmp_path):
         assert expected in output
 
 
+def test_release_workflow_defaults_to_validated_published_recipe(tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "local",
+            "--skip-eval",
+            "--skip-plots",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    output = result.stdout + result.stderr
+    for expected in (
+            "RELEASE_RANDOM_SEED=42",
+            "AFFINITY_MINIBATCH_SIZE=128",
+            "PROCESSING_MINIBATCH_SIZE=512",
+            "PROCESSING_HELD_OUT_SAMPLES=10",
+            "PRESENTATION_PROCESSING_WITH_FLANKS_KIND=short_flanks",
+            "PRESENTATION_DECOYS_PER_HIT=2",
+            "PRESENTATION_SAMPLE_FRACTION=0.1",
+            "MHCFLURRY_TORCH_COMPILE=0",
+            "MHCFLURRY_TORCH_COMPILE_LOSS=0",
+            "MHCFLURRY_MATMUL_PRECISION=highest"):
+        assert expected in output
+
+    affinity_workflow = pathlib.Path(
+        "scripts/training/pan_allele_release_affinity.sh").read_text()
+    assert "--random-negative-pool-epochs 1" in affinity_workflow
+    assert 'CALIBRATE_PEPTIDES_PER_LENGTH:-100000' in affinity_workflow
+
+    full_workflow = pathlib.Path(
+        "scripts/training/pan_allele_release_full.sh").read_text()
+    assert '--exclude-pmid 31844290 31495665 31154438' in full_workflow
+    assert '--sample-fraction "$PRESENTATION_SAMPLE_FRACTION"' in full_workflow
+    assert "--num-peptides-per-length 10000" in full_workflow
+
+
 def test_release_workflow_sync_is_workflow_id_scoped():
     script = pathlib.Path(
         "scripts/release/retrain_evaluate_deploy.sh").read_text()
+    assert 'RUNPLZ_REQUIRED_VERSION="3.24.31"' in script
+    assert "require_clean_runplz" in script
     assert "run_dir_matches_workflow || return 1" in script
     assert "remote_workflow_id" in script
     assert "Refusing to sync Brev output for workflow" in script
     assert "add_path .runplz/mhcflurry_release_workflow_id" in script
     assert "add_path .runplz/mhcflurry_release_workflow_exit_code" in script
+
+
+def test_release_workflow_validates_selected_runplz_interpreter(tmp_path):
+    fake_checkout = tmp_path / "mhcflurry-checkout"
+    selected_environment = fake_checkout / ".venv"
+    subprocess.run(
+        [sys.executable, "-m", "venv", str(selected_environment)],
+        check=True,
+    )
+    selected_python = selected_environment / "bin" / "python"
+    site_packages = (
+        selected_environment
+        / "lib"
+        / ("python%d.%d" % sys.version_info[:2])
+        / "site-packages"
+    )
+    package_dir = site_packages / "runplz"
+    distribution_dir = site_packages / "runplz-3.24.31.dist-info"
+    package_dir.mkdir(parents=True)
+    distribution_dir.mkdir()
+    (fake_checkout / ".git").mkdir()
+    (package_dir / "__init__.py").write_text(
+        '__version__ = "3.24.31"\n'
+    )
+    (distribution_dir / "METADATA").write_text(
+        "Metadata-Version: 2.1\nName: runplz\nVersion: 3.24.31\n"
+    )
+
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    runplz = fake_bin / "runplz"
+    runplz.write_text(
+        "#!%s\nimport sys\nsys.exit(23)\n" % selected_python
+    )
+    runplz.chmod(0o755)
+    brev = fake_bin / "brev"
+    brev.write_text(
+        "#!/bin/sh\n"
+        "if [ \"$1\" = ls ]; then printf '[]\\n'; fi\n"
+    )
+    brev.chmod(0o755)
+    env = dict(os.environ)
+    env["PATH"] = "%s:%s" % (fake_bin, env["PATH"])
+
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "release-run"),
+            "--release", "2.3.0",
+            "--backend", "brev-existing",
+            "--brev-instance", "missing-test-instance",
+            "--no-sync-remote-output",
+            "--skip-eval",
+            "--skip-plots",
+            "--allow-dirty-repo",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    output = result.stdout + result.stderr
+    assert result.returncode == 23, output
+    assert "runplz provenance:" in output
+    assert "executable=%s" % runplz in output
+    assert "module=%s" % (package_dir / "__init__.py") in output
+    assert "from PyPI or a clean checkout is required" not in output
+
+
+def test_runplz_provenance_rejects_stale_distribution_version(tmp_path):
+    selected_environment = tmp_path / ".venv"
+    subprocess.run(
+        [sys.executable, "-m", "venv", str(selected_environment)],
+        check=True,
+    )
+    selected_python = selected_environment / "bin" / "python"
+    site_packages = (
+        selected_environment
+        / "lib"
+        / ("python%d.%d" % sys.version_info[:2])
+        / "site-packages"
+    )
+    package_dir = site_packages / "runplz"
+    distribution_dir = site_packages / "runplz-3.17.0.dist-info"
+    package_dir.mkdir(parents=True)
+    distribution_dir.mkdir()
+    (package_dir / "__init__.py").write_text(
+        '__version__ = "3.20.0"\n'
+    )
+    (distribution_dir / "METADATA").write_text(
+        "Metadata-Version: 2.1\nName: runplz\nVersion: 3.17.0\n"
+    )
+
+    result = subprocess.run(
+        [
+            str(selected_python),
+            "scripts/release/validate_runplz_provenance.py",
+            "--executable", str(selected_environment / "bin" / "runplz"),
+            "--required-version", "3.17.0",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert result.returncode == 2, output
+    assert "source/distribution version mismatch" in output
+    assert "source reports 3.20.0" in output
+    assert "metadata reports 3.17.0" in output
+
+
+def test_brev_postprocess_archive_includes_release_holdout(tmp_path):
+    run_dir = tmp_path / "release-run"
+    _write_minimal_deployable_run(run_dir)
+    unselected = run_dir / "affinity/models.unselected.combined"
+    unselected.mkdir()
+    (unselected / "manifest.csv").write_text("model_name\nmodel\n")
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    brev = fake_bin / "brev"
+    brev.write_text(
+        "#!/bin/sh\n"
+        "if [ \"$1\" = ls ]; then printf '[]\\n'; fi\n"
+    )
+    brev.chmod(0o755)
+    env = dict(os.environ)
+    env["PATH"] = "%s:%s" % (fake_bin, env["PATH"])
+
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(run_dir),
+            "--release", "2.3.0",
+            "--backend", "brev-existing",
+            "--brev-instance", "missing-test-instance",
+            "--skip-train",
+            "--allow-dirty-repo",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode != 0
+    archive = run_dir / ".brev-postprocess" / "model_artifacts.tar.bz2"
+    assert archive.is_file()
+    with tarfile.open(archive, "r:bz2") as tar:
+        archived_paths = set(tar.getnames())
+    assert {
+        "release_holdout/policy.json",
+        "release_holdout/validation.json",
+        "release_holdout/affinity_pmhcs.csv",
+        "release_holdout/affinity_samples.csv",
+        "release_holdout/processing_samples.csv",
+        "release_holdout/presentation_samples.csv",
+        "affinity/models.unselected.combined/manifest.csv",
+    }.issubset(archived_paths)
 
 
 def test_release_sync_archive_preserves_comparison_predictions(tmp_path):
@@ -876,6 +1252,10 @@ def test_release_sync_archive_preserves_comparison_predictions(tmp_path):
         "eval_comparison/affinity/predictions.csv.bz2",
         "eval_comparison/processing/predictions_with_flanks.csv.bz2",
         "eval_comparison/presentation/predictions_without_flanks.csv.bz2",
+        (
+            "eval_comparison_train_excluded_affinity/affinity/"
+            "predictions.csv.bz2"
+        ),
     ]
     for relative in expected:
         path = out_dir / relative
@@ -927,6 +1307,75 @@ def test_release_workflow_brev_prepare_uses_remote_postprocess(tmp_path):
     assert "plotting will run in a Brev postprocess after sync" in output
     assert "Would run Brev postprocess-only eval/plot" in output
     assert "Using plots produced on the Brev instance" in output
+
+
+def test_brev_postprocess_reuses_training_python_without_compile_fanout():
+    workflow = pathlib.Path(
+        "scripts/release/retrain_evaluate_deploy.sh").read_text()
+
+    assert "if [ -x /opt/conda/bin/python ]; then" in workflow
+    assert 'export PATH="/opt/conda/bin:$PATH"' in workflow
+    assert (
+        'export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-0}"'
+        in workflow
+    )
+    assert (
+        'export COMPARE_TORCH_COMPILE=%q\\n' in workflow
+    )
+    assert workflow.count(
+        "--include-paper-figures-in-summary-pdf"
+    ) == 2
+
+
+@pytest.mark.parametrize("body_status", [0, 23])
+def test_brev_postprocess_replay_guard_runs_body_once(tmp_path, body_status):
+    """A replay waits for and returns the original invocation's status."""
+    workflow = pathlib.Path(
+        "scripts/release/retrain_evaluate_deploy.sh").read_text()
+    guard = workflow.split(
+        "# BEGIN BREV POSTPROCESS REPLAY GUARD\n", 1)[1].split(
+            "# END BREV POSTPROCESS REPLAY GUARD\n", 1)[0]
+    remote_root = tmp_path / "remote"
+    remote_root.mkdir()
+    script = tmp_path / "remote-postprocess.sh"
+    script.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        f"remote_root={str(remote_root)!r}\n"
+        f"{guard}\n"
+        'printf "run\\n" >> "$remote_root/body_runs"\n'
+        "sleep 0.5\n"
+        f"exit {body_status}\n"
+    )
+    script.chmod(0o755)
+
+    original = subprocess.Popen(
+        ["bash", str(script)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    for _ in range(100):
+        if (remote_root / "postprocess_state").is_dir():
+            break
+        time.sleep(0.01)
+    else:
+        original.kill()
+        pytest.fail("original invocation did not claim replay guard")
+
+    replay = subprocess.run(
+        ["bash", str(script)],
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+    original_stdout, original_stderr = original.communicate(timeout=5)
+
+    assert original.returncode == body_status, (original_stdout, original_stderr)
+    assert replay.returncode == body_status, (replay.stdout, replay.stderr)
+    assert (remote_root / "body_runs").read_text() == "run\n"
+    assert "Detected replay" in replay.stderr
+    assert f"returning original status {body_status}" in replay.stderr
 
 
 def test_release_workflow_brev_provider_aliases(tmp_path):
@@ -1119,7 +1568,25 @@ def test_eval_help_runs(capsys):
     assert "paper-figures score-predictions" in captured
     assert "paper-figures external-predictors" in captured
     assert "paper-figures run" in captured
+    assert "affinity-candidate-figures" in captured
     assert "Compatibility:" in captured
+
+
+def test_eval_affinity_candidate_figures_help_runs(capsys):
+    with pytest.raises(SystemExit):
+        cli_main.main(["eval", "affinity-candidate-figures", "--help"])
+    captured = capsys.readouterr().out
+    assert "usage: mhcflurry eval affinity-candidate-figures" in captured
+    assert "--condition" in captured
+    assert "--external-predictions" in captured
+
+
+def test_eval_merge_external_predictions_help_runs(capsys):
+    with pytest.raises(SystemExit):
+        cli_main.main(["eval", "merge-external-predictions", "--help"])
+    captured = capsys.readouterr().out
+    assert "usage: mhcflurry eval merge-external-predictions" in captured
+    assert "--group" in captured
 
 
 def test_eval_compare_models_help_runs(capsys):
@@ -1520,10 +1987,145 @@ def test_compare_models_help_runs(capsys):
     for flag in ["--a", "--b", "--include", "--out", "--data-dir",
                  "--num-jobs", "--gpus", "--max-workers-per-gpu",
                  "--processing-modes", "--presentation-modes",
+                 "--skip-affinity-predictions",
                  "--presentation-num-jobs",
                  "--presentation-max-workers-per-gpu",
                  "--presentation-torch-compile"]:
         assert flag in captured, "missing flag in help: %s" % flag
+
+
+def test_compare_models_can_skip_large_affinity_prediction_artifact(
+        tmp_path, monkeypatch):
+    rows = []
+    for index in range(40):
+        rows.append({
+            "peptide": "AAAAAAAAA" if index % 2 else "CCCCCCCCC",
+            "hla": "HLA-A*02:01",
+            "hit": index % 2,
+            "sample_id": "sample",
+            "source_file": "benchmark.csv",
+        })
+    benchmark = pandas.DataFrame(rows)
+    prediction_calls = []
+
+    monkeypatch.setattr(
+        compare_models,
+        "_load_affinity_benchmark",
+        lambda *args, **kwargs: benchmark.copy(),
+    )
+    monkeypatch.setattr(
+        compare_models,
+        "_read_supported_alleles",
+        lambda path: {"HLA-A*02:01"},
+    )
+    monkeypatch.setattr(
+        compare_models,
+        "_parallelism_args_for_component",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        compare_models,
+        "model_artifact_size_bytes",
+        lambda path: 1,
+    )
+
+    def predict(*args, **kwargs):
+        prediction_calls.append(args)
+        return numpy.where(benchmark.hit.values, 50.0, 5000.0)
+
+    monkeypatch.setattr(compare_models, "_parallel_affinity_predict", predict)
+    out = tmp_path / "comparison"
+    args = compare_models.make_parser().parse_args([
+        "--a", "a",
+        "--b", "b",
+        "--out", str(out),
+        "--skip-affinity-predictions",
+    ])
+    side_a = {"label": "a", "paths": {"affinity": "a"}}
+    side_b = {"label": "b", "paths": {"affinity": "b"}}
+
+    summary = compare_models._run_affinity(side_a, side_b, args)
+
+    assert len(prediction_calls) == 2
+    assert summary["n_rows"] == 40
+    identity = summary["benchmark_identity"]
+    assert identity["row_count"] == 40
+    assert identity["columns"] == ["source_file", "hla", "peptide", "hit"]
+    assert len(identity["sha256"]) == 64
+    assert compare_models._affinity_benchmark_identity(
+        benchmark.copy()) == identity
+    assert compare_models._affinity_benchmark_identity(
+        benchmark.iloc[::-1].copy())["sha256"] != identity["sha256"]
+    assert not (out / "affinity" / "predictions.csv.bz2").exists()
+    assert (out / "affinity" / "summary.json").exists()
+    assert (out / "affinity" / "per_allele.csv").exists()
+
+
+def test_compare_models_reuses_only_row_identical_affinity_predictions(
+        tmp_path, monkeypatch):
+    benchmark = pandas.DataFrame({
+        "source_file": "benchmark.csv",
+        "peptide": ["AAAAAAAAA", "CCCCCCCCC"] * 20,
+        "hla": "HLA-A*02:01",
+        "hit": [1, 0] * 20,
+    })
+    saved = benchmark.copy()
+    saved["b_pred"] = numpy.where(saved.hit, 50.0, 5000.0)
+    saved_path = tmp_path / "public-predictions.csv.bz2"
+    saved.to_csv(saved_path, index=False)
+    prediction_calls = []
+
+    monkeypatch.setattr(
+        compare_models, "_load_affinity_benchmark",
+        lambda *args, **kwargs: benchmark.copy())
+    monkeypatch.setattr(
+        compare_models, "_read_supported_alleles",
+        lambda path: {"HLA-A*02:01"})
+    monkeypatch.setattr(
+        compare_models, "_parallelism_args_for_component",
+        lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        compare_models, "model_artifact_size_bytes", lambda path: 1)
+
+    def predict(*args, **kwargs):
+        prediction_calls.append(args)
+        return numpy.where(benchmark.hit.values, 40.0, 6000.0)
+
+    monkeypatch.setattr(compare_models, "_parallel_affinity_predict", predict)
+    args = compare_models.make_parser().parse_args([
+        "--a", "a",
+        "--b", "b",
+        "--out", str(tmp_path / "comparison"),
+        "--b-affinity-predictions", str(saved_path),
+        "--skip-affinity-predictions",
+    ])
+    summary = compare_models._run_affinity(
+        {"label": "a", "paths": {"affinity": "a"}},
+        {"label": "b", "paths": {"affinity": "b"}},
+        args,
+    )
+
+    assert len(prediction_calls) == 1
+    assert summary["prediction_sources"]["a"]["mode"] == "computed"
+    assert summary["prediction_sources"]["b"]["mode"] == "reused"
+    assert summary["prediction_sources"]["b"]["sha256"] == (
+        compare_models._sha256_file(saved_path))
+
+    mismatched = saved.iloc[::-1]
+    mismatch_path = tmp_path / "mismatch.csv.bz2"
+    mismatched.to_csv(mismatch_path, index=False)
+    mismatch_args = compare_models.make_parser().parse_args([
+        "--a", "a",
+        "--b", "b",
+        "--out", str(tmp_path / "mismatch-comparison"),
+        "--b-affinity-predictions", str(mismatch_path),
+    ])
+    with pytest.raises(ValueError, match="different benchmark rows"):
+        compare_models._run_affinity(
+            {"label": "a", "paths": {"affinity": "a"}},
+            {"label": "b", "paths": {"affinity": "b"}},
+            mismatch_args,
+        )
 
 
 def test_compare_models_presentation_parallelism_overrides():
@@ -1669,6 +2271,17 @@ def test_affinity_hyperparameter_generator_is_importable():
     grid = module.build_grid(minibatch_size=2048)
     assert len(grid) == 35
     assert {item["minibatch_size"] for item in grid} == {2048}
+    published_recipe_grid = module.build_grid()
+    assert {item["minibatch_size"] for item in published_recipe_grid} == {128}
+    assert {item["max_epochs"] for item in published_recipe_grid} == {5000}
+    assert {item["min_delta"] for item in published_recipe_grid} == {0.0}
+    assert {item["validation_interval"] for item in published_recipe_grid} == {1}
+    assert {
+        item["optimizer_implementation"] for item in published_recipe_grid
+    } == {"keras"}
+    assert {
+        item["random_negative_pool_epochs"] for item in published_recipe_grid
+    } == {1}
 
 
 def test_processing_hyperparameter_generator_is_importable():
@@ -1680,6 +2293,10 @@ def test_processing_hyperparameter_generator_is_importable():
     grid = module.build_grid(minibatch_size=2048)
     assert len(grid) == 128
     assert {item["minibatch_size"] for item in grid} == {2048}
+    assert {item["minibatch_size"] for item in module.build_grid()} == {512}
+    assert {
+        item["optimizer_implementation"] for item in module.build_grid()
+    } == {"keras"}
 
 
 def test_training_hyperparameter_cli_generates_processing_variant(tmp_path, capsys):
@@ -1693,6 +2310,7 @@ def test_training_hyperparameter_cli_generates_processing_variant(tmp_path, caps
     base = yaml.safe_load(base_text)
     assert len(base) == 128
     assert {item["minibatch_size"] for item in base} == {2048}
+    assert {item["optimizer_implementation"] for item in base} == {"keras"}
 
     base_path = tmp_path / "hyperparameters.base.yaml"
     base_path.write_text(base_text)
@@ -1706,6 +2324,29 @@ def test_training_hyperparameter_cli_generates_processing_variant(tmp_path, caps
     assert len(variant) == 128
     assert {item["n_flank_length"] for item in variant} == {5}
     assert {item["c_flank_length"] for item in variant} == {5}
+    assert {item["optimizer_implementation"] for item in variant} == {"keras"}
+    assert {item["init"] for item in variant} == {"glorot_uniform"}
+
+    cli_main.main([
+        "class1-generate-training-hyperparameters",
+        "processing-variant",
+        str(base_path),
+        "with_flanks",
+        "--optimizer-implementation",
+        "pytorch",
+        "--init",
+        "kaiming_uniform_fan_in",
+    ])
+    with_flanks = yaml.safe_load(capsys.readouterr().out)
+    assert len(with_flanks) == 128
+    assert {item["n_flank_length"] for item in with_flanks} == {15}
+    assert {item["c_flank_length"] for item in with_flanks} == {15}
+    assert {
+        item["optimizer_implementation"] for item in with_flanks
+    } == {"pytorch"}
+    assert {item["init"] for item in with_flanks} == {
+        "kaiming_uniform_fan_in"
+    }
 
 
 def test_training_hyperparameter_helpers_reject_invalid_configuration():
@@ -1718,6 +2359,271 @@ def test_training_hyperparameter_helpers_reject_invalid_configuration():
         generator.make_parser().parse_args([
             "affinity", "--minibatch-size", "0",
         ])
+    with pytest.raises(ValueError, match="Unknown optimizer implementation"):
+        generator.transform_processing_hyperparameters(
+            "with_flanks",
+            {"n_flank_length": 15, "c_flank_length": 15},
+            optimizer_implementation="typo",
+        )
+    with pytest.raises(ValueError, match="Unknown processing initializer"):
+        generator.transform_processing_hyperparameters(
+            "with_flanks",
+            {"n_flank_length": 15, "c_flank_length": 15},
+            init="typo",
+        )
+
+
+def test_training_hyperparameter_generator_tracks_ablation_switches():
+    from mhcflurry.cli import generate_training_hyperparameters as generator
+
+    affinity = generator.build_affinity_grid(
+        optimizer_implementation="pytorch",
+        data_dependent_initialization_target="pre_activation",
+        init="he_uniform",
+    )
+    assert {item["optimizer_implementation"] for item in affinity} == {"pytorch"}
+    assert {
+        item["data_dependent_initialization_target"] for item in affinity
+    } == {"pre_activation"}
+    assert {item["init"] for item in affinity} == {"he_uniform"}
+
+    with pytest.raises(ValueError, match="Unknown affinity initializer"):
+        generator.build_affinity_grid(init="typo")
+
+    processing = generator.build_processing_base_grid(
+        optimizer_implementation="pytorch",
+        init="kaiming_uniform_fan_in",
+    )
+    assert {item["optimizer_implementation"] for item in processing} == {"pytorch"}
+    assert {item["init"] for item in processing} == {"kaiming_uniform_fan_in"}
+
+
+def test_release_hyperparameter_ablation_panels_are_paired():
+    from mhcflurry.cli import generate_training_hyperparameters as generator
+
+    affinity = generator.build_affinity_ablation_panels()
+    assert set(affinity) == {
+        "published_parity",
+        "proposed_release",
+        "pre_activation_lsuv",
+        "no_lsuv",
+        "pytorch_rmsprop",
+        "pytorch_rmsprop_batch128",
+    }
+    assert {len(values) for values in affinity.values()} == {2}
+    affinity_architectures = {
+        condition: [
+            (item["topology"], item["layer_sizes"], item["dense_layer_l1_regularization"])
+            for item in values
+        ]
+        for condition, values in affinity.items()
+    }
+    assert len({repr(value) for value in affinity_architectures.values()}) == 1
+    assert {
+        item["data_dependent_initialization_method"]
+        for item in affinity["no_lsuv"]
+    } == {None}
+    assert {
+        item["minibatch_size"]
+        for item in affinity["pytorch_rmsprop_batch128"]
+    } == {128}
+    assert {
+        item["optimizer_implementation"]
+        for item in affinity["pytorch_rmsprop_batch128"]
+    } == {"pytorch"}
+
+    processing = generator.build_processing_ablation_panels()
+    assert set(processing) == {
+        "glorot_keras_adam",
+        "kaiming_keras_adam",
+        "glorot_pytorch_adam",
+        "kaiming_pytorch_adam",
+    }
+    assert {len(values) for values in processing.values()} == {2}
+
+
+def test_processing_batch_sweep_panels_are_focused_and_paired():
+    from mhcflurry.cli import generate_training_hyperparameters as generator
+
+    panels = generator.build_processing_batch_sweep_panels()
+    assert set(panels) == {
+        "batch%d.%s" % (batch, variant)
+        for batch in (128, 256, 512, 1024)
+        for variant in ("short_flanks", "no_flank")
+    }
+    for batch in (128, 256, 512, 1024):
+        short = panels["batch%d.short_flanks" % batch]
+        no_flank = panels["batch%d.no_flank" % batch]
+        assert len(short) == 4
+        assert len(no_flank) == 3
+        assert {item["minibatch_size"] for item in short + no_flank} == {
+            batch
+        }
+        assert {
+            (item["n_flank_length"], item["c_flank_length"])
+            for item in short
+        } == {(5, 5)}
+        assert {
+            (item["n_flank_length"], item["c_flank_length"])
+            for item in no_flank
+        } == {(0, 0)}
+        short_small = [
+            item for item in short
+            if item["convolutional_activation"] == "tanh"
+        ]
+        assert len(short_small) == 1
+        assert {
+            (item["init"], item["optimizer_implementation"])
+            for item in short_small
+        } == {("glorot_uniform", "keras")}
+        short_large = [
+            item for item in short
+            if item["convolutional_activation"] == "relu"
+        ]
+        assert {
+            (item["init"], item["optimizer_implementation"])
+            for item in short_large
+        } == {
+            ("glorot_uniform", "keras"),
+            ("glorot_uniform", "pytorch"),
+            ("kaiming_uniform_fan_in", "pytorch"),
+        }
+        no_flank_large = [
+            item for item in no_flank
+            if item["convolutional_activation"] == "relu"
+        ]
+        assert len(no_flank_large) == 1
+        assert (
+            no_flank_large[0]["init"],
+            no_flank_large[0]["optimizer_implementation"],
+        ) == ("glorot_uniform", "keras")
+
+
+@pytest.mark.parametrize("sizes", [(), (0,), (128, 128), (True,)])
+def test_processing_batch_sweep_rejects_invalid_sizes(sizes):
+    from mhcflurry.cli import generate_training_hyperparameters as generator
+
+    with pytest.raises(ValueError):
+        generator.build_processing_batch_sweep_panels(sizes)
+
+
+def test_release_ablation_generator_writes_all_processing_flank_variants(
+        tmp_path):
+    path = pathlib.Path(
+        "scripts/training/generate_release_hyperparameter_ablations.py"
+    )
+    generator = _load_script_module(path, "release_ablations_under_test")
+    manifest = generator.write_panels(tmp_path)
+    processing_paths = {
+        record["path"]
+        for record in manifest["records"]
+        if record["path"].startswith("processing.")
+    }
+    assert len(processing_paths) == 12
+    for condition in (
+            "glorot_keras_adam",
+            "kaiming_keras_adam",
+            "glorot_pytorch_adam",
+            "kaiming_pytorch_adam"):
+        for variant in ("with_flanks", "no_flank", "short_flanks"):
+            assert "processing.%s.%s.yaml" % (
+                condition, variant) in processing_paths
+    batch_paths = {
+        record["path"]
+        for record in manifest["records"]
+        if record["path"].startswith("processing_batch_sweep.")
+    }
+    assert batch_paths == {
+        "processing_batch_sweep.batch%d.%s.yaml" % (batch, variant)
+        for batch in (128, 256, 512, 1024)
+        for variant in ("short_flanks", "no_flank")
+    }
+    assert manifest["processing_batch_sweep"] == {
+        "minibatch_sizes": [128, 256, 512, 1024],
+        "priority": ["short_flanks", "no_flank"],
+        "with_flanks_policy": "excluded_except_targeted_8mer_diagnostic",
+    }
+
+
+def test_processing_ablation_runner_includes_focused_batch_sweep():
+    runner = pathlib.Path(
+        "scripts/training/run_release_processing_ablations.sh"
+    ).read_text()
+    assert "batch_sweep_variants=(short_flanks no_flank)" in runner
+    assert "for minibatch_size in 128 256 512 1024" in runner
+    assert "processing_batch_sweep.batch$minibatch_size.$variant.yaml" in runner
+    assert "--processing-modes short_flanks,no_flank" in runner
+
+    focused_runner = pathlib.Path(
+        "scripts/training/run_processing_batch_sweep.sh"
+    ).read_text()
+    for option in (
+        "--out",
+        "--train-data",
+        "--data-eval-dir",
+        "--release-holdout-dir",
+        "--source-commit",
+        "--gpus",
+        "--max-workers-per-gpu",
+        "--dataloader-num-workers",
+    ):
+        assert option in focused_runner
+    assert "MHCFLURRY_OUT" not in focused_runner
+    assert "train_panel \"$minibatch_size\" short_flanks" in focused_runner
+    assert "train_panel \"$minibatch_size\" no_flank" in focused_runner
+
+
+def test_affinity_release_script_accepts_tracked_ablation_yaml():
+    affinity_script = pathlib.Path(
+        "scripts/training/pan_allele_release_affinity.sh"
+    ).read_text()
+    runner = pathlib.Path(
+        "scripts/training/run_release_affinity_ablations.sh"
+    ).read_text()
+    assert "AFFINITY_HYPERPARAMETERS_FILE" in affinity_script
+    assert "SKIP_CALIBRATE" in affinity_script
+    for condition in (
+        "published_parity",
+        "proposed_release",
+        "pre_activation_lsuv",
+        "no_lsuv",
+        "pytorch_rmsprop",
+        "pytorch_rmsprop_batch128",
+    ):
+        assert condition in runner
+    assert "release-holdout build" in runner
+    assert "--release-holdout-dir" in runner
+    assert "--affinity-training-overlap-policy audit" in runner
+    assert "published_parity/models.combined" in runner
+    assert "AFFINITY_ABLATION_CONDITIONS" in runner
+    assert "AFFINITY_ABLATION_BASELINE_DIR" in runner
+    assert "SKIP_CALIBRATE=1" in runner
+    assert "SKIP_EVAL=1" in runner
+
+
+def test_processing_release_script_runs_paired_seeded_ablations():
+    runner = pathlib.Path(
+        "scripts/training/run_release_processing_ablations.sh"
+    ).read_text()
+    for condition in (
+        "glorot_keras_adam",
+        "kaiming_keras_adam",
+        "glorot_pytorch_adam",
+        "kaiming_pytorch_adam",
+    ):
+        assert condition in runner
+    assert "--random-seed \"$RELEASE_RANDOM_SEED\"" in runner
+    assert "--exclude-samples-file \"$HOLDOUT_DIR/processing_samples.csv\"" in runner
+    assert "PROCESSING_ABLATION_VARIANTS" in runner
+    assert "PROCESSING_ABLATION_COMPARE_MODES" in runner
+    assert "with_flanks|no_flank|short_flanks" in runner
+    assert "vs-glorot_keras_adam" in runner
+    assert "glorot_keras_adam-vs-public" in runner
+    assert runner.count('"${TRAINING_PARALLELISM_ARGS[@]}"') == 4
+    assert runner.count('"${COMMON_PARALLELISM_ARGS[@]}"') == 5
+    comparison_block = runner[runner.index("DATA_EVAL_DIR="):]
+    assert "--dataloader-num-workers" not in comparison_block
+    assert '"${COMMON_PARALLELISM_ARGS[@]}"' in comparison_block
 
 
 def test_reassign_mass_spec_training_data_cli(tmp_path):
@@ -1741,10 +2647,13 @@ def test_reassign_mass_spec_training_data_cli(tmp_path):
     assert result.measurement_value.tolist() == [100.0, 456.0]
 
 
-def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
+def test_remote_launcher_preserves_shared_minibatch_override(
+        monkeypatch, tmp_path):
     """Family-specific minibatch env vars should only be set when provided."""
     fake_runplz = types.ModuleType("runplz")
     fake_config = types.ModuleType("runplz.config")
+
+    pip_packages = []
 
     class FakeImage:
         @classmethod
@@ -1754,7 +2663,8 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
         def apt_install(self, *_args, **_kwargs):
             return self
 
-        def pip_install(self, *_args, **_kwargs):
+        def pip_install(self, *args, **_kwargs):
+            pip_packages.extend(args)
             return self
 
         def pip_install_local_dir(self, *_args, **_kwargs):
@@ -1781,6 +2691,8 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
         "scripts/training/launch_pan_allele_training_remote.py",
     )
     module = _load_script_module(path, "remote_launcher_under_test")
+    assert "runplz==3.24.31" in pip_packages
+    assert module.remote_training_env({})["TRAINING_MINIBATCH_SIZE"] == "128"
     env = module.remote_training_env({"TRAINING_MINIBATCH_SIZE": "2048"})
     assert env["TRAINING_MINIBATCH_SIZE"] == "2048"
     assert env["COMPARE_BASELINE"] == "public:2.0.0"
@@ -1788,14 +2700,18 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert env["COMPARE_BACKEND"] == "auto"
     assert env["EVAL_MAX_BENCHMARK_FILES"] == ""
     assert env["COMPARE_GPUS"] == "auto"
-    assert env["COMPARE_TORCH_COMPILE"] == "auto"
-    assert env["COMPARE_MATMUL_PRECISION"] == "high"
+    assert env["COMPARE_TORCH_COMPILE"] == "0"
+    assert env["COMPARE_MATMUL_PRECISION"] == "highest"
     assert env["MHCFLURRY_RELEASE_WORKFLOW_ID"] == ""
     assert env["MHCFLURRY_RELEASE_GIT_COMMIT"] == ""
     assert env["MHCFLURRY_RELEASE_VERSION"] == ""
+    assert env["MHCFLURRY_REMOTE_WORKFLOW"] == "full"
+    assert env["RELEASE_RANDOM_SEED"] == "42"
     assert env["MHCFLURRY_GPU_TELEMETRY"] == "1"
     assert env["MHCFLURRY_GPU_TELEMETRY_SECONDS"] == "30"
     assert env["NUM_JOBS"] == "auto"
+    assert env["AFFINITY_ABLATION_CONDITIONS"] == ""
+    assert env["AFFINITY_ABLATION_BASELINE_DIR"] == ""
     assert env["MKL_THREADING_LAYER"] == "GNU"
     assert env["COMPARE_PRESENTATION_NUM_JOBS"] == "auto"
     assert env["COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU"] == "auto"
@@ -1806,8 +2722,13 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert "PROCESSING_MINIBATCH_SIZE" not in env
     assert env["PROCESSING_NUM_JOBS"] == "auto"
     assert env["PROCESSING_MAX_WORKERS_PER_GPU"] == "auto"
-    assert env["PROCESSING_HELD_OUT_SAMPLES"] == "50"
-    assert env["PRESENTATION_DECOYS_PER_HIT"] == "99"
+    assert env["PROCESSING_HELD_OUT_SAMPLES"] == "10"
+    assert env["PRESENTATION_DECOYS_PER_HIT"] == "2"
+    assert env["PRESENTATION_SAMPLE_FRACTION"] == "0.1"
+    assert env["PRESENTATION_PROCESSING_WITH_FLANKS_KIND"] == "short_flanks"
+    assert env["MHCFLURRY_TORCH_COMPILE"] == "0"
+    assert env["MHCFLURRY_TORCH_COMPILE_LOSS"] == "0"
+    assert env["MHCFLURRY_MATMUL_PRECISION"] == "highest"
     assert env["PRESENTATION_FEATURE_CHUNK_SIZE"] == "250000"
     assert env["PRESENTATION_NUM_JOBS"] == "auto"
     assert env["PRESENTATION_MAX_WORKERS_PER_GPU"] == "auto"
@@ -1823,6 +2744,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
         "PROCESSING_MAX_WORKERS_PER_GPU": "1",
         "PROCESSING_HELD_OUT_SAMPLES": "17",
         "PRESENTATION_DECOYS_PER_HIT": "7",
+        "PRESENTATION_SAMPLE_FRACTION": "0.25",
         "PRESENTATION_FEATURE_CHUNK_SIZE": "12345",
         "PRESENTATION_NUM_JOBS": "8",
         "PRESENTATION_MAX_WORKERS_PER_GPU": "2",
@@ -1839,9 +2761,13 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
         "MHCFLURRY_RELEASE_WORKFLOW_ID": "run-123",
         "MHCFLURRY_RELEASE_GIT_COMMIT": "abc123",
         "MHCFLURRY_RELEASE_VERSION": "2.3.0",
+        "MHCFLURRY_REMOTE_WORKFLOW": "processing-ablations",
+        "RELEASE_RANDOM_SEED": "271",
         "MHCFLURRY_GPU_TELEMETRY": "0",
         "MHCFLURRY_GPU_TELEMETRY_SECONDS": "5",
         "NUM_JOBS": "6",
+        "AFFINITY_ABLATION_CONDITIONS": "pytorch_rmsprop_batch128",
+        "AFFINITY_ABLATION_BASELINE_DIR": "/remote/baseline",
         "MKL_THREADING_LAYER": "TBB",
     })
     assert env["AFFINITY_MINIBATCH_SIZE"] == "512"
@@ -1850,6 +2776,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert env["PROCESSING_MAX_WORKERS_PER_GPU"] == "1"
     assert env["PROCESSING_HELD_OUT_SAMPLES"] == "17"
     assert env["PRESENTATION_DECOYS_PER_HIT"] == "7"
+    assert env["PRESENTATION_SAMPLE_FRACTION"] == "0.25"
     assert env["PRESENTATION_FEATURE_CHUNK_SIZE"] == "12345"
     assert env["PRESENTATION_NUM_JOBS"] == "8"
     assert env["PRESENTATION_MAX_WORKERS_PER_GPU"] == "2"
@@ -1866,10 +2793,27 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     assert env["MHCFLURRY_RELEASE_WORKFLOW_ID"] == "run-123"
     assert env["MHCFLURRY_RELEASE_GIT_COMMIT"] == "abc123"
     assert env["MHCFLURRY_RELEASE_VERSION"] == "2.3.0"
+    assert env["MHCFLURRY_REMOTE_WORKFLOW"] == "processing-ablations"
+    assert env["RELEASE_RANDOM_SEED"] == "271"
     assert env["MHCFLURRY_GPU_TELEMETRY"] == "0"
     assert env["MHCFLURRY_GPU_TELEMETRY_SECONDS"] == "5"
     assert env["NUM_JOBS"] == "6"
+    assert env["AFFINITY_ABLATION_CONDITIONS"] == "pytorch_rmsprop_batch128"
+    assert env["AFFINITY_ABLATION_BASELINE_DIR"] == "/remote/baseline"
     assert env["MKL_THREADING_LAYER"] == "TBB"
+
+    assert module.remote_workflow_script({}) == (
+        "full", "scripts/training/pan_allele_release_full.sh")
+    assert module.remote_workflow_script({
+        "MHCFLURRY_REMOTE_WORKFLOW": "affinity-ablations",
+    }) == (
+        "affinity-ablations",
+        "scripts/training/run_release_affinity_ablations.sh",
+    )
+    with pytest.raises(ValueError, match="MHCFLURRY_REMOTE_WORKFLOW"):
+        module.remote_workflow_script({
+            "MHCFLURRY_REMOTE_WORKFLOW": "typo",
+        })
 
     brev_config = module.brev_config_from_env({
         "RUNPLZ_BREV_AUTO_CREATE": "1",
@@ -1898,6 +2842,16 @@ def test_remote_launcher_preserves_shared_minibatch_override(monkeypatch):
     }) == "high"
     with pytest.raises(ValueError):
         module.compare_torch_compile_value({"COMPARE_TORCH_COMPILE": "maybe"})
+
+    plot_commands = []
+
+    def capture_plot_command(command, **_kwargs):
+        plot_commands.append(command)
+
+    monkeypatch.setattr(module.subprocess, "run", capture_plot_command)
+    module.run_release_plots(tmp_path, tmp_path / "release-run", env)
+    assert len(plot_commands) == 1
+    assert "--include-paper-figures-in-summary-pdf" in plot_commands[0]
     with pytest.raises(ValueError):
         module.compare_matmul_precision_value({
             "COMPARE_MATMUL_PRECISION": "fast",
@@ -3200,6 +4154,69 @@ def test_comparison_curves_use_shared_finite_rows():
     assert b_score.tolist() == [0.7, 0.3]
 
 
+def test_comparison_curves_move_long_legends_below_axes():
+    figsize, kwargs = plot_model_comparison._curve_legend_layout(
+        "MHCflurry 2.3.0",
+        "MHCflurry no-additional-MS (train-excluded)",
+    )
+
+    assert figsize == (4.2, 3.6)
+    assert kwargs["loc"] == "upper center"
+    assert kwargs["bbox_to_anchor"][1] < 0
+
+
+def test_comparison_curves_keep_short_legends_inside_axes():
+    figsize, kwargs = plot_model_comparison._curve_legend_layout(
+        "MHCflurry 2.3.0", "MHCflurry 2.2.0")
+
+    assert figsize == (3.2, 3.0)
+    assert kwargs == {}
+
+
+def test_release_summary_keeps_long_labels_clear_of_panels(
+        tmp_path, monkeypatch):
+    matplotlib = pytest.importorskip("matplotlib")
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    pandas.DataFrame([
+        {
+            "component": "affinity",
+            "eval": "affinity",
+            "metric": metric,
+            "average": "Macro",
+            "side_a": 0.8,
+            "side_b": 0.7,
+            "diff": 0.1,
+        }
+        for metric in ("AUROC", "AUPRC", "PPV@N")
+    ]).to_csv(tmp_path / "release_summary.csv", index=False)
+    saved = []
+    monkeypatch.setattr(
+        plot_model_comparison,
+        "_save_figure",
+        lambda fig, path: saved.append((path, fig)),
+    )
+    labels = {
+        "a": "MHCflurry 2.3.0",
+        "b": "MHCflurry no-additional-MS (train-excluded)",
+    }
+
+    plot_model_comparison._plot_release_summary(
+        str(tmp_path), str(tmp_path / "paper"), labels)
+
+    assert len(saved) == 2
+    accuracy_fig = saved[0][1]
+    assert len(accuracy_fig.legends) == 1
+    assert all(ax.get_legend() is None for ax in accuracy_fig.axes)
+    delta_fig = saved[1][1]
+    assert [ax.get_ylabel() for ax in delta_fig.axes] == [
+        "Macro difference", "", ""]
+    assert any(labels["b"] in text.get_text() for text in delta_fig.texts)
+    for _, fig in saved:
+        plt.close(fig)
+
+
 def test_plot_model_comparison_writes_paper_plots_from_summaries(tmp_path):
     pytest.importorskip("matplotlib")
 
@@ -3497,6 +4514,8 @@ def test_paper_figures_score_predictions_uses_explicit_orientation(tmp_path):
     assert all_scores.set_index("predictor").loc[
         "netmhcpan4.2.el", "auc"] == 1.0
     assert "percent_change_auc_ba" in scores.columns
+    assert "pr_auc" in scores.columns
+    assert "percent_change_pr_auc_ba" in scores.columns
 
 
 def test_paper_figures_score_predictions_uses_schema_not_numeric_dtype(tmp_path):
@@ -3672,6 +4691,7 @@ def test_paper_figures_mean_ppv_small_uses_with_flanks_and_weighted_external():
             ("netmhcpan4.el", "el"),
         ),
         preferred_predictors=(),
+        monoallelic_panel_predictors=(),
         presentation_panel_predictors=(),
         presentation_panel_baselines=(),
     )
@@ -4041,9 +5061,19 @@ def test_current_comparison_labels_counts_as_evaluation_peptides(
     class CaptureWriter:
         def __init__(self):
             self.xlabels = {}
+            self.figure_legend_counts = {}
+            self.axes_legend_counts = {}
+            self.minor_formatter_names = {}
 
         def save(self, fig, name, _family, note=""):
             self.xlabels[name] = [ax.get_xlabel() for ax in fig.axes]
+            self.figure_legend_counts[name] = len(fig.legends)
+            self.axes_legend_counts[name] = sum(
+                ax.get_legend() is not None for ax in fig.axes)
+            self.minor_formatter_names[name] = [
+                type(ax.xaxis.get_minor_formatter()).__name__
+                for ax in fig.axes
+            ]
             plt.close(fig)
 
         def skip(self, *_args, **_kwargs):
@@ -4063,6 +5093,10 @@ def test_current_comparison_labels_counts_as_evaluation_peptides(
         "fig.1_model_selection_predictor_accuracy.scores.hla_a"]
     assert "Evaluation peptides" in xlabels
     assert "Training peptides" not in xlabels
+    figure_name = "fig.1_model_selection_predictor_accuracy.scores.hla_a"
+    assert writer.figure_legend_counts[figure_name] == 1
+    assert writer.axes_legend_counts[figure_name] == 0
+    assert "NullFormatter" in writer.minor_formatter_names[figure_name]
 
 
 def test_current_model_information_uses_only_final_manifests(tmp_path):
@@ -4189,7 +5223,7 @@ def test_paper_figures_monoallelic_scatter_uses_all_length_rows(monkeypatch):
         captured["pivot"] = pivot
 
     monkeypatch.setattr(
-        paper_figures, "_plot_scatter_triptych_from_pivot", fake_scatter)
+        paper_figures, "_plot_scatter_grid_from_pivot", fake_scatter)
 
     scores = pandas.DataFrame([
         {
@@ -4225,6 +5259,7 @@ def test_paper_figures_monoallelic_scatter_uses_all_length_rows(monkeypatch):
         candidate="candidate",
         external_baselines=(("baseline", "baseline"),),
         preferred_predictors=("candidate", "baseline"),
+        monoallelic_panel_predictors=(),
         presentation_panel_predictors=("candidate",),
         presentation_panel_baselines=("baseline",),
     )
@@ -4248,6 +5283,45 @@ def test_paper_figures_monoallelic_scatter_uses_all_length_rows(monkeypatch):
     assert pivot.loc["HLA-A*02:01", "candidate"] == 0.90
     assert pivot.loc["HLA-A*02:01", "baseline"] == 0.80
     assert len(pivot) == 1
+
+
+def test_paper_figures_monoallelic_scatter_paginates_all_candidates(
+        monkeypatch):
+    captured = []
+
+    def fake_scatter(
+            _pivot, _predictor_info, candidates, _metric_label, _max_points,
+            name, _family, _writer, _predictors, baselines=None):
+        captured.append((tuple(candidates), name, baselines))
+
+    monkeypatch.setattr(
+        paper_figures, "_plot_scatter_grid_from_pivot", fake_scatter)
+    candidates = tuple("candidate_%d" % index for index in range(5))
+    rows = []
+    for predictor in candidates + ("public",):
+        rows.append({
+            "allele": "HLA-A*02:01",
+            "length": numpy.nan,
+            "length_label": "All",
+            "predictor": predictor,
+            "auc": 0.8,
+        })
+    predictors = paper_figures.PredictorConfig(
+        candidate=candidates[0],
+        external_baselines=(("public", "public"),),
+        preferred_predictors=candidates + ("public",),
+        monoallelic_panel_predictors=candidates,
+        presentation_panel_predictors=(),
+        presentation_panel_baselines=(),
+    )
+
+    paper_figures._plot_monoallelic_scatter(
+        pandas.DataFrame(rows), pandas.DataFrame(), "auc", "AUC", 100,
+        "mono", object(), predictors)
+
+    assert [item[0] for item in captured] == [candidates[:4], candidates[4:]]
+    assert [item[1] for item in captured] == [
+        "mono.page_01", "mono.page_02"]
 
 
 def test_paper_figures_prediction_scoring_drops_invalid_hit_rows():
@@ -4408,6 +5482,7 @@ def test_paper_figures_external_baseline_geometry_is_configurable(tmp_path):
         ),
         preferred_predictors=(
             "candidate", "baseline_a", "baseline_b", "baseline_c"),
+        monoallelic_panel_predictors=(),
         presentation_panel_predictors=("candidate",),
         presentation_panel_baselines=("baseline_a", "baseline_b", "baseline_c"),
     )
@@ -4533,6 +5608,7 @@ def test_paper_figures_predictor_config_parser():
         "--candidate-predictor", "candidate",
         "--external-baselines", "baseline_a:ba,baseline_b",
         "--preferred-predictors", "candidate,baseline_a",
+        "--monoallelic-panel-predictors", "candidate,candidate_b",
         "--presentation-panel-predictors", "candidate_ps",
         "--presentation-panel-baselines", "baseline_a,baseline_b",
     ])
@@ -4543,5 +5619,7 @@ def test_paper_figures_predictor_config_parser():
         ("baseline_b", "baseline_b"),
     )
     assert config.preferred_predictors == ("candidate", "baseline_a")
+    assert config.monoallelic_panel_predictors == (
+        "candidate", "candidate_b")
     assert config.presentation_panel_predictors == ("candidate_ps",)
     assert config.presentation_panel_baselines == ("baseline_a", "baseline_b")

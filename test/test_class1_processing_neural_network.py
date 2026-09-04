@@ -321,6 +321,51 @@ def test_fit_uses_effective_validation_batch_size(monkeypatch):
     assert validation_batch_sizes == [8, 2]
 
 
+def test_processing_fit_can_restore_best_validation_checkpoint(monkeypatch):
+    import mhcflurry.class1_processing_neural_network as processing_module
+
+    calls = []
+
+    def zero_checkpoint(module):
+        calls.append(True)
+        return {
+            name: torch.zeros_like(value, device="cpu")
+            for name, value in module.state_dict().items()
+        }
+
+    monkeypatch.setattr(
+        processing_module, "copy_module_state_dict_to_cpu", zero_checkpoint)
+    model = Class1ProcessingNeuralNetwork(
+        max_epochs=2,
+        validation_split=0.5,
+        early_stopping=False,
+        restore_best_weights=True,
+        minibatch_size=2,
+        peptide_max_length=9,
+        n_flank_length=4,
+        c_flank_length=4,
+        convolutional_filters=4,
+        convolutional_kernel_size=3,
+        post_convolutional_dense_layer_sizes=[],
+    )
+    model.fit(
+        sequences=FlankingEncoding(
+            peptides=["SIINFEKL"] * 4,
+            n_flanks=["AAAA"] * 4,
+            c_flanks=["FFFF"] * 4,
+        ),
+        targets=numpy.array([0, 1, 0, 1], dtype=numpy.float32),
+        verbose=-1,
+        progress_print_interval=None,
+    )
+
+    assert calls
+    assert model.fit_info[-1]["restored_best_weights"] is True
+    assert model.fit_info[-1]["best_epoch"] is not None
+    for value in model.network().state_dict().values():
+        assert torch.count_nonzero(value) == 0
+
+
 def test_fit_does_not_force_full_gc_each_epoch(monkeypatch):
     """Worker-level model cleanup owns GC; fit must not collect per epoch."""
     import mhcflurry.class1_processing_neural_network as processing_module
@@ -409,11 +454,31 @@ def test_processing_predict_auto_batch_uses_worker_env(monkeypatch):
     monkeypatch.setenv("MHCFLURRY_MAX_WORKERS_PER_GPU", "4")
     monkeypatch.setattr(pytorch_sizing, "resolve_prediction_batch_size", fake_resolve)
 
+    def fake_calibrate(
+            batch_size, device, network, inputs, num_workers_per_gpu=1,
+            total_rows=None, **_kwargs):
+        captured.update({
+            "calibration_batch_size": batch_size,
+            "calibration_device": device.type,
+            "calibration_workers_per_gpu": num_workers_per_gpu,
+            "calibration_total_rows": total_rows,
+            "calibration_sequence_shape": tuple(inputs["sequence"].shape),
+            "calibration_kernel_size": tuple(network.conv1.kernel_size),
+        })
+        return batch_size
+
+    monkeypatch.setattr(
+        pytorch_sizing,
+        "calibrate_prediction_batch_size",
+        fake_calibrate,
+    )
+
     model = Class1ProcessingNeuralNetwork(
         peptide_max_length=12,
         n_flank_length=2,
         c_flank_length=2,
         convolutional_filters=8,
+        convolutional_kernel_size=5,
     )
     model._network = model.make_network(
         **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
@@ -428,6 +493,12 @@ def test_processing_predict_auto_batch_uses_worker_env(monkeypatch):
 
     assert len(predictions) == len(peptides)
     assert captured["num_workers_per_gpu"] == 4
+    assert captured["calibration_batch_size"] == 2
+    assert captured["calibration_device"] == "cpu"
+    assert captured["calibration_workers_per_gpu"] == 4
+    assert captured["calibration_total_rows"] == 3
+    assert captured["calibration_sequence_shape"] == (3, 16)
+    assert captured["calibration_kernel_size"] == (5,)
 
 
 def test_processing_predict_auto_batch_retries_device_oom(monkeypatch):
@@ -470,6 +541,45 @@ def test_processing_predict_auto_batch_retries_device_oom(monkeypatch):
     )
     assert len(predictions) == len(peptides)
     assert model._network.raised
+
+
+def test_processing_predict_auto_batch_retries_deferred_device_oom(monkeypatch):
+    """A deferred accelerator OOM is synchronized inside the retry loop."""
+    from mhcflurry import pytorch_sizing
+
+    synchronize_calls = []
+
+    def oom_once(_device):
+        synchronize_calls.append(True)
+        if len(synchronize_calls) == 1:
+            raise RuntimeError("CUDA out of memory in deferred test kernel")
+
+    monkeypatch.setattr(
+        pytorch_sizing,
+        "resolve_prediction_batch_size",
+        lambda *args, **kwargs: 2,
+    )
+    monkeypatch.setattr(pytorch_sizing, "synchronize_device", oom_once)
+
+    model = Class1ProcessingNeuralNetwork(
+        peptide_max_length=12,
+        n_flank_length=2,
+        c_flank_length=2,
+        convolutional_filters=8,
+    )
+    model._network = model.make_network(
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
+    )
+    peptides = ["SIINFEKL", "GILGFVFTL", "NLVPMVATV"]
+    predictions = model.predict(
+        peptides=peptides,
+        n_flanks=["AA"] * len(peptides),
+        c_flanks=["GG"] * len(peptides),
+        batch_size="auto",
+    )
+
+    assert len(predictions) == len(peptides)
+    assert len(synchronize_calls) == 2
 
 
 def test_processing_validation_is_batched(monkeypatch):
@@ -593,6 +703,62 @@ def test_small():
         dropout_rate=0.0,
         convolutional_kernel_l1_l2=[0.0, 0.0],
         learning_rate=0.01)
+
+
+@pytest.mark.parametrize("normalization", ["batch", "layer"])
+def test_processing_normalization_roundtrip(normalization):
+    """Normalization is shape-safe and serialized in the PyTorch weight order."""
+    kwargs = dict(
+        sequence_dims=(9, 21),
+        n_flank_length=0,
+        c_flank_length=0,
+        peptide_max_length=9,
+        flanking_averages=False,
+        convolutional_filters=4,
+        convolutional_kernel_size=3,
+        convolutional_activation="tanh",
+        convolutional_kernel_l1_l2=(0.0, 0.0),
+        dropout_rate=0.0,
+        post_convolutional_dense_layer_sizes=[2],
+        normalization=normalization,
+    )
+    model = Class1ProcessingModel(**kwargs)
+    model.eval()
+    inputs = {
+        "sequence": torch.randn(3, 9, 21),
+        "peptide_length": torch.full((3, 1), 9),
+    }
+    observed = model(inputs)
+    assert observed.shape == (3,)
+    assert torch.isfinite(observed).all()
+
+    clone = Class1ProcessingModel(**kwargs)
+    clone.set_weights_list(model.get_weights_list(), auto_convert_keras=False)
+    clone.eval()
+    torch.testing.assert_close(observed, clone(inputs))
+
+
+@pytest.mark.parametrize("activation", ["relu", "silu", "swish", "gelu"])
+def test_processing_modern_activations(activation):
+    model = Class1ProcessingModel(
+        sequence_dims=(9, 21),
+        n_flank_length=0,
+        c_flank_length=0,
+        peptide_max_length=9,
+        flanking_averages=False,
+        convolutional_filters=4,
+        convolutional_kernel_size=3,
+        convolutional_activation=activation,
+        convolutional_kernel_l1_l2=(0.0, 0.0),
+        dropout_rate=0.0,
+        post_convolutional_dense_layer_sizes=[2],
+    )
+    observed = model({
+        "sequence": torch.randn(3, 9, 21),
+        "peptide_length": torch.full((3, 1), 9),
+    })
+    assert observed.shape == (3,)
+    assert torch.isfinite(observed).all()
 
 
 @pytest.mark.slow
@@ -735,7 +901,7 @@ def make_indexing_dataset_factory(first, last):
 
 
 def train_basic_network(
-        num, do_assertions=True, is_hit=None, dataset_factory=None,
+        num, do_assertions=True, is_hit=None, dataset_factory=None, seed=1,
         **hyperparameters):
     """Train a processing network and check performance."""
     use_hyperparameters = {
@@ -800,6 +966,7 @@ def train_basic_network(
             n_flanks=train_df.n_flank.values,
             c_flanks=train_df.c_flank.values),
         targets=train_df.hit.values,
+        seed=seed,
         verbose=0)
 
     print(network.network())

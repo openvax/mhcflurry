@@ -17,9 +17,9 @@ import sys
 import time
 
 from ..common import normalize_pytorch_backend
+from ..memory_budget import per_worker_memory_budget_bytes
 from ..workload_planning import env_int
 from .planning import (
-    num_workers_per_gpu_from_args,
     refine_local_parallelism_from_warmup,
     resolve_local_parallelism_args,
 )
@@ -32,8 +32,8 @@ _INDUCTOR_WARMUP_THREAD_HARD_CAP = 64
 WORKER_CONTEXT = {}
 
 
-def _run_compile_warmup_item(work_function, work_item):
-    """Run one warmup using constant data installed once in this process."""
+def _run_resource_probe_item(work_function, work_item):
+    """Run one resource probe using data installed once in this process."""
     item = dict(work_item)
     if "constant_data" not in item and "constant_data" in WORKER_CONTEXT:
         item["constant_data"] = WORKER_CONTEXT["constant_data"]
@@ -268,29 +268,47 @@ def _arch_compile_key(hyperparameters):
     )
 
 
-def run_single_worker_torch_compile_warmup(
+_RESOURCE_KEY_HYPERPARAMS = _COMPILE_KEY_HYPERPARAMS + (
+    "minibatch_size",
+    "validation_batch_size",
+    "validation_split",
+    "fit_tensor_residency",
+    "optimizer",
+    "random_negative_rate",
+    "random_negative_constant",
+    "random_negative_method",
+    "random_negative_pool_epochs",
+    "train_data",
+)
+
+
+def _resource_probe_key(hyperparameters):
+    """Stable fingerprint for parameters that can change peak resources."""
+    import json
+    return json.dumps(
+        {k: hyperparameters.get(k) for k in _RESOURCE_KEY_HYPERPARAMS},
+        sort_keys=True,
+        default=str,
+    )
+
+
+def run_single_worker_resource_probe(
         args,
         work_items,
         work_function,
         constant_data=None):
-    """Prime the torch.compile on-disk cache for every unique architecture.
+    """Measure one real peak phase for every resource-distinct architecture.
 
-    Walks ``work_items`` and groups them by architecture-compile fingerprint
-    (``_arch_compile_key``). For each unique fingerprint, runs **one** work
-    item in compile-warmup mode in a single non-daemon worker process —
-    ``compile_warmup_only=True`` short-circuits the work function to one
-    forward+backward pass after the network is constructed and compiled,
-    skipping pretraining, validation, and full training. The same worker
-    process handles every architecture sequentially so its CUDA context
-    and Inductor cache are populated incrementally.
+    The command's ``resource_probe_only`` path must exercise its true resident
+    data, configured minibatch, and validation phase for one bounded epoch.
+    The single spawned worker records process-level CUDA memory (including the
+    context), allocator peaks, and host RSS. Those observations may only tighten
+    automatic concurrency before the production pool starts.
 
-    Skipped entirely when ``MHCFLURRY_TORCH_COMPILE`` is off — there is
-    no compile cache to warm.
+    When torch.compile is enabled the same pass also primes its on-disk cache;
+    resource safety is intentionally independent of compile being enabled.
 
-    ``work_items`` is **not** mutated: every task still runs in the
-    production pool. The trade-off is one extra ~1-batch fit per
-    architecture (typically <1 sec each after compile codegen) for
-    eliminating staggered first-compile costs in the production pool.
+    ``work_items`` is not mutated: every task still runs in production.
 
     Returns ``None`` when skipped, otherwise the number of unique
     architectures warmed.
@@ -302,10 +320,9 @@ def run_single_worker_torch_compile_warmup(
         return None
     if int(getattr(args, "num_jobs", 0) or 0) <= 1:
         return None
-    if not _torch_compile_enabled():
+    if os.environ.get("MHCFLURRY_RESOURCE_PROBE", "1") == "0":
         return None
-    if os.environ.get("MHCFLURRY_TORCH_COMPILE_WARMUP", "1") == "0":
-        return None
+    compile_enabled = _torch_compile_enabled()
 
     backend = normalize_pytorch_backend(getattr(args, "backend", "auto") or "auto")
     if backend in ("cpu", "mps"):
@@ -315,7 +332,7 @@ def run_single_worker_torch_compile_warmup(
     unique_warmup_items = []
     for item in work_items:
         hp = item.get("hyperparameters") or {}
-        key = _arch_compile_key(hp)
+        key = _resource_probe_key(hp)
         if key in seen_keys:
             continue
         seen_keys.add(key)
@@ -325,24 +342,25 @@ def run_single_worker_torch_compile_warmup(
         return None
 
     print(
-        "torch.compile warmup: priming on-disk cache for %d unique "
-        "architecture(s) of %d work items "
-        "(1 forward+backward per architecture, single-worker phase)" % (
+        "Resource probe: measuring %d resource-distinct architecture(s) "
+        "of %d work items (full residency + train + validation, "
+        "single-worker phase%s)" % (
             len(unique_warmup_items), len(work_items),
+            "; also priming torch.compile cache" if compile_enabled else "",
         ),
         file=sys.stderr,
     )
 
-    explicit_threads = (
+    explicit_threads = compile_enabled and (
         "TORCHINDUCTOR_COMPILE_THREADS" in os.environ
         and not _compile_threads_env_is_auto_owned()
     )
-    if not explicit_threads:
+    if compile_enabled and not explicit_threads:
         threads = _set_auto_torchinductor_compile_threads(
             num_jobs=1, phase="warmup"
         )
         print(
-            "torch.compile warmup: TORCHINDUCTOR_COMPILE_THREADS=%d "
+            "Resource probe: TORCHINDUCTOR_COMPILE_THREADS=%d "
             "(single-worker codegen phase)" % threads,
             file=sys.stderr,
         )
@@ -350,11 +368,27 @@ def run_single_worker_torch_compile_warmup(
     warmup_pool = None
     reports = []
     try:
+        # The probe is the only GPU worker in this phase. Give it the full
+        # launch-time usable envelope so it measures the requested production
+        # minibatch and validation peak instead of inheriting (and potentially
+        # shrinking to) the preliminary N-worker slice we are validating.
+        launch_available_bytes = getattr(
+            args, "_device_memory_available_bytes_at_launch", None)
+        probe_device_budget_bytes = (
+            per_worker_memory_budget_bytes(launch_available_bytes, 1)
+            if launch_available_bytes is not None
+            else None
+        )
         warmup_pool = worker_pool_with_gpu_assignments(
             num_jobs=1,
             num_gpus=1 if int(getattr(args, "gpus", 0) or 0) > 0 else 0,
             backend=backend,
-            max_workers_per_gpu=max(num_workers_per_gpu_from_args(args), 1),
+            # This phase intentionally has one resident GPU worker. Keep the
+            # advertised co-resident count consistent with the full launch
+            # entitlement above; otherwise runtime batch sizing divides the
+            # probe's budget by the preliminary production density again.
+            max_workers_per_gpu=1,
+            device_memory_budget_bytes=probe_device_budget_bytes,
             max_tasks_per_worker=len(unique_warmup_items) + 1,
             worker_log_dir=getattr(args, "worker_log_dir", None),
             cpu_threads_per_worker=getattr(
@@ -373,9 +407,9 @@ def run_single_worker_torch_compile_warmup(
         warmup_started_at = time.time()
         for warmup_item in unique_warmup_items:
             item_for_worker = dict(warmup_item)
-            item_for_worker["compile_warmup_only"] = True
+            item_for_worker["resource_probe_only"] = True
             report = warmup_pool.apply(
-                _run_compile_warmup_item, (work_function, item_for_worker)
+                _run_resource_probe_item, (work_function, item_for_worker)
             )
             if report:
                 reports.append(report)
@@ -383,7 +417,7 @@ def run_single_worker_torch_compile_warmup(
         warmup_pool.join()
         warmup_pool = None
         print(
-            "torch.compile warmup: completed %d architecture warmup(s) in "
+            "Resource probe: completed %d architecture probe(s) in "
             "%.1f sec." % (
                 len(unique_warmup_items), time.time() - warmup_started_at,
             ),
@@ -393,7 +427,22 @@ def run_single_worker_torch_compile_warmup(
         if warmup_pool is not None:
             warmup_pool.terminate()
             warmup_pool.join()
-        hoist_torchinductor_compile_threads(args, phase="production")
+        if compile_enabled:
+            hoist_torchinductor_compile_threads(args, phase="production")
 
     refine_local_parallelism_from_warmup(args, reports)
     return len(unique_warmup_items)
+
+
+def run_single_worker_torch_compile_warmup(
+        args,
+        work_items,
+        work_function,
+        constant_data=None):
+    """Compatibility alias for :func:`run_single_worker_resource_probe`."""
+    return run_single_worker_resource_probe(
+        args,
+        work_items,
+        work_function,
+        constant_data=constant_data,
+    )

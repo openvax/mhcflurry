@@ -29,6 +29,10 @@ available:
   saved benchmark prediction table.
 * ``mhcflurry eval paper-figures run`` runs compare-models, paper-figures, and
   plot-model-comparison as one local evaluation/figure pipeline.
+* ``mhcflurry eval affinity-candidate-figures`` builds a common held-out
+  prediction table and paper-figure suite for shortlisted affinity candidates.
+* ``mhcflurry eval merge-external-predictions`` consolidates aligned
+  per-sample external-predictor benchmark groups for those figures.
 
 Future benchmark-prediction and external-predictor registration commands should
 be added under this namespace rather than as new top-level commands.
@@ -70,6 +74,16 @@ def make_parser(prog="mhcflurry eval"):
     sub.add_parser(
         "plot-model-comparison",
         help="Compatibility alias for plot-comparison.",
+        add_help=False,
+    )
+    sub.add_parser(
+        "affinity-candidate-figures",
+        help="Compare shortlisted affinity candidates on one saved cohort.",
+        add_help=False,
+    )
+    sub.add_parser(
+        "merge-external-predictions",
+        help="Consolidate precomputed external benchmark predictions.",
         add_help=False,
     )
     paper = sub.add_parser(
@@ -121,6 +135,14 @@ def run_argv(argv, prog="mhcflurry eval"):
         from . import plot_model_comparison
         return _run_existing_command(
             plot_model_comparison, rest, "%s %s" % (prog, subcommand))
+    if subcommand == "affinity-candidate-figures":
+        from . import affinity_candidate_figures
+        return affinity_candidate_figures.run_argv(
+            rest, prog="%s affinity-candidate-figures" % prog)
+    if subcommand == "merge-external-predictions":
+        from . import merge_external_predictions
+        return merge_external_predictions.run_argv(
+            rest, prog="%s merge-external-predictions" % prog)
     if subcommand == "paper-figures":
         return _run_paper_figures(rest, "%s paper-figures" % prog)
 
@@ -138,6 +160,10 @@ def format_help(prog="mhcflurry eval"):
         "Subcommands:",
         "  compare-models          Compare two model ensembles.",
         "  plot-comparison         Render diagnostic plots from compare output.",
+        "  affinity-candidate-figures",
+        "                          Plot finalists and public on one saved cohort.",
+        "  merge-external-predictions",
+        "                          Consolidate precomputed external predictions.",
         "  paper-figures render    Render paper figures from saved inputs.",
         "  paper-figures score-predictions",
         "                          Derive score tables from saved predictions.",
@@ -581,6 +607,10 @@ def _make_paper_figures_run_parser(prog):
         help="data_evaluation directory. Defaults to installed data_evaluation.",
     )
     parser.add_argument(
+        "--release-holdout-dir",
+        help="Frozen release-evaluation sample manifests for compare-models.",
+    )
+    parser.add_argument(
         "--include",
         default="auto",
         help="compare-models component subset. Default: %(default)s.",
@@ -677,6 +707,7 @@ def _run_paper_figures_pipeline(args):
             (args.a_label, "--a-label"),
             (args.b_label, "--b-label"),
             (args.data_dir, "--data-dir"),
+            (args.release_holdout_dir, "--release-holdout-dir"),
             (args.limit_files, "--limit-files")]:
         if source is not None:
             compare_argv.extend([flag, str(source)])

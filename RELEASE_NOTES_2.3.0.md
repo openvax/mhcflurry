@@ -1,8 +1,46 @@
 # MHCflurry 2.3.0
 
-Release-candidate notes for 2.3.0. Held in this file (vs upstream into a
-single `CHANGELOG.md`) until after the validation training run completes
-and any last revisions land; will move to `CHANGELOG.md` at tag time.
+Release notes for 2.3.0. Held in this file until the final tag so the measured
+model-validation record stays distinct from the package changelog.
+
+## rc20
+
+- Honor `mhcflurry-downloads fetch --release` when
+  `MHCFLURRY_DOWNLOADS_DIR` points at a custom destination. Previously this
+  combination selected metadata using a missing implicit release and failed
+  with `KeyError: None` before downloading.
+- Restore framework-level 2.1.x training semantics that numeric
+  hyperparameters alone did not capture: post-activation affinity LSUV,
+  Keras-equation RMSprop/Adam, Keras validation-split rounding, processing
+  Glorot/zero-bias initialization, and Keras BatchNorm moving variance.
+  Optimizer equation, LSUV boundary, and processing initializer are serialized
+  switches with paired frozen-holdout ablations before the full retrain.
+- Require runplz 3.16.0 for remote release provenance and use its updated
+  staging/bootstrap behavior.
+- Restore the published 2.1.x/2.2.x scientific recipe after auditing the first
+  full candidate. Restore affinity minibatch 128 after a paired frozen-holdout
+  comparison rejected 1024, and restore affinity early stopping/calibration,
+  processing batch and
+  fold holdout, and presentation decoy/sampling/flank/solver/calibration
+  settings. Pin fresh affinity negatives each epoch, eager execution, and full
+  float32 matmul precision for release provenance. Processing layers now pin
+  Keras-compatible Glorot initialization instead of inheriting PyTorch's
+  Kaiming default. See
+  [the recipe audit](docs/release_training_recipe.md).
+- Freeze a provenance-recorded final holdout before training. Affinity uses all
+  103 monoallelic benchmark samples plus the final multiallelic holdout and
+  removes every current-training pMHC found in those benchmark rows, including
+  decoys. Processing and presentation final metrics use the 10 multiallelic
+  samples from PMID 31154438; presentation excludes those complete samples
+  from training. Persist, checksum, and validate the generated manifests with
+  the release run.
+- Pin Ruff 0.16.0 in CI, commit an explicit correctness-focused lint rule set,
+  and run `./lint.sh` on every pull request. Mutable defaults, environment
+  defaults, and loop-closure findings uncovered during lint triage are fixed.
+- Interpret any processing-metric change alongside affinity-driven decoy
+  difficulty. The working hypothesis is that a stronger affinity predictor
+  selects higher-quality, harder processing negatives; final acceptance still
+  reports processing metrics on the strictly held-out evaluation set.
 
 ## rc19
 
@@ -44,7 +82,8 @@ MHCflurry 2.3 modernizes pan-allele training and release evaluation:
 - affinity training keeps its working tensors on the active device;
 - one resumable workflow covers selection, calibration, evaluation, and plots;
 - automatic resource planning replaces machine-specific worker overrides; and
-- training defaults stop unproductive runs earlier.
+- prediction-affecting release settings remain anchored to the published
+  2.1.x/2.2.x recipe unless held-out evidence supports a change.
 
 The sections below describe measured performance, behavioral changes, and
 compatibility. Maintainer-level parallelism and tensor-residency details are in
@@ -60,13 +99,9 @@ class-II, or non-MHC records; these rows were never valid prediction targets.
 - **~2–3× per-task training speedup** from device-resident affinity
   training tensors (closes 0–30% GPU utilization observed on the
   2026-04-25 8×A100 baseline run).
-- **~10–20× calibration speedup** from `--gpu-batched`, larger work
-  chunks, and the affinity release wrapper calibrating at 50 K peptides
-  per length (the `--num-peptides-per-length` CLI default is unchanged at
-  100 K).
-- **30–40% fewer wasted training epochs** from the recipe changes
-  (`min_delta=1e-7`, `max_epochs=500`) terminating noise-floor
-  patience-reset trajectories.
+- **Calibration throughput improvements** from `--gpu-batched` and larger work
+  chunks while retaining the published 100 K affinity calibration peptides per
+  length.
 
 ## New public API
 
@@ -76,23 +111,16 @@ class-II, or non-MHC records; these rows were never valid prediction targets.
 - `mhcflurry/training_benchmark.py` — micro-benchmarks for the
   training inner loop (used for sweep_workers analysis).
 
-## Recipe changes (`scripts/training/release_exact/generate_hyperparameters.py`)
+## Release recipe
 
-These produce **different model weights** from the published 2.2.x
-release. Quantitative deltas vs the 2.2.0 ensemble on the
-data_evaluation hit/decoy benchmark are reported in
-[validation results](#validation-results) below once the 2.3.0
-validation run completes.
-
-| Hyperparameter | 2.2.x | 2.3.0 | Why |
-|---|---|---|---|
-| `max_epochs` | 5000 | 500 | Observed runs had a median of 67 epochs and a maximum of 174; 500 retains headroom while bounding pathological runs. |
-| `min_delta` | 0.0 | 1e-7 | With `min_delta=0`, a 1e-9 RMSprop noise-floor improvement resets the 20-epoch patience counter, stretching some tasks to 174+ epochs at val_loss ~0.28 with no real signal. 1e-7 is two orders of magnitude above the observed noise rate; preserves real escape trajectories (typically ≥1e-3/epoch). |
-| `validation_interval` | 1 (always validated) | 5 | Skip the validation forward pass on 4 of 5 epochs; saves ~150 ms/epoch + a GPU sync barrier. The final epoch and any patience-trigger epoch are always measured (the saved model reflects an up-to-date val_loss). |
-| `dataloader_num_workers` (job-env default) | 0 | 1 | Applies to streaming pretraining batches only. Affinity fine-tuning no longer uses a per-fit DataLoader; it batches from device-resident tensors. One streaming worker per fit is the release wrapper default; tune upward only when CPU headroom and measurements justify it. |
-| `peptide_amino_acid_encoding_torch` | n/a | `true` | Renamed replacement for the legacy `peptide_amino_acid_encoding_gpu` key, which is still accepted as an alias. Fixed peptide vector expansion moves from a numpy lookup at encode time to a frozen torch embedding table in the network's forward pass. `peptides_to_network_input` now returns int8 amino-acid indices by default; CUDA/MPS/CPU widens to the configured fixed vector encoding (`BLOSUM62`, `one-hot`, `PMBEC`, `contact`, `physchem` explicit descriptors, `atchley` factors, or composites such as `BLOSUM62+physchem`). Encodings may use a `:minmax` suffix, e.g. `PMBEC:minmax+contact:minmax`, to scale non-X values to [-1, 1] while preserving X as zero. Eliminates the ~17 sec/epoch CPU bottleneck in random-negative regeneration with `random_negative_pool_epochs=1`. Forward parity vs numpy path verified by `test_peptide_amino_acid_encoding_torch_forward_parity`. |
-
-`patience` stays at 20.
+The release recipe matches the published 2.1.x/2.2.x scientific settings,
+including affinity minibatch 128. Affinity `max_epochs=5000`, `min_delta=0`,
+validation every epoch, and fresh negatives every epoch remain unchanged.
+Processing uses minibatch 512 and 10 held-out samples. Presentation uses 2
+proteome decoys per hit, a 0.1 sample fraction, `short_flanks` (5 aa per side),
+L-BFGS, and 10 K calibration peptides per length. The full audit distinguishes
+these settings from execution-only implementation changes in
+[docs/release_training_recipe.md](docs/release_training_recipe.md).
 
 ## CLI changes
 
@@ -104,13 +132,25 @@ validation run completes.
   `mhcflurry compare-models` and `mhcflurry plot-model-comparison`.
 - **`mhcflurry-class1-train-pan-allele-models --max-workers-per-gpu`**
   default changed from `1000` (effectively unlimited per-GPU) to
-  `auto`. Auto-detect picks `min(num_jobs/num_gpus,
-  0.6×free_vram/per_worker_gb, hard_cap=4)` without importing torch or
-  initializing CUDA in the parent process. `per_worker_gb` defaults to
-  4 GB (the affinity-fit footprint).
+  `auto`. The planner reads free memory on every visible GPU without
+  initializing CUDA in the parent, sizes to the least-free card, subtracts the
+  shared allocator/context reserve, and divides the remainder by a
+  workload-specific complete-worker estimate. Affinity training estimates
+  include the configured encoding width, network topology, training rows,
+  random-negative residency, and minibatch. Host RAM, CPUs, available work
+  items, and an explicit job count can further reduce concurrency. There is no
+  default fixed worker cap; an expert hard-cap environment override remains.
 
-  Cross-checks: 8 GPUs + 16 jobs → 2 (num-jobs-limited); 8 GPUs +
-  32 jobs → 4 (hard cap, ample VRAM); CPU-only → 1.
+  Before a parallel affinity or processing pool starts, one isolated worker
+  runs a bounded full-residency train-and-validation pass for every
+  resource-distinct architecture. Process-level CUDA and host peaks may only
+  tighten the analytic plan. Each production worker then receives a fixed
+  launch-time device-memory entitlement, so startup order cannot inflate or
+  double-discount its batch budget. Prediction and validation batches use an
+  architecture-aware activation estimate plus a real CUDA forward probe;
+  elastic OOM halving remains a last-resort recovery path. CPU-only resolves
+  to one worker per accelerator slot, and explicit sizing flags remain
+  authoritative.
 
   Pass `--max-workers-per-gpu N` to pin explicitly.
 - **`mhcflurry-class1-train-pan-allele-models --dataloader-num-workers`**
@@ -267,6 +307,8 @@ negatives are refilled into the top slice of that row space each epoch.
 `matplotlib` is now an installed package dependency, so the documented
 evaluation and paper-figure commands work in a clean MHCflurry installation;
 remote launchers no longer install it as an undeclared workaround.
+Percent-change paper figures now use finite axis limits for degenerate
+all-equal metrics, restoring compatibility with Matplotlib 3.11.
 Paper and diagnostic output paths are validated before comparison, cleanup, or
 rendering, preventing a custom summary path or paper directory from deleting or
 overwriting command-owned PDFs.
@@ -280,10 +322,11 @@ When to use which:
   candidates against each other.
 - **`plot_loss_curves.py`** — diagnostic. Doesn't need a baseline.
 
-Dev-workstation helper: `scripts/dev/relocate_run_outputs.sh` moves
-`brev_runs/` and `results/` outside the repo (with symlinks) so runplz's
-rsync_up doesn't ship 15+ GB of stale prior-run artifacts to the box on every
-launch. Run with `--apply` once per workstation.
+Remote release launches require runplz 3.15.3. Its Git-aware staging excludes
+ignored output directories such as `brev_runs/` and `results/`, so the former
+workstation-specific relocation and symlink workaround is no longer needed.
+The wrapper records the runplz module path and, for an editable checkout, its
+clean Git commit before launching.
 
 ## Pipeline orchestration
 
@@ -301,20 +344,86 @@ Each stage runs through `run_logged_step` with its own log file under
 now runs `bash -n` over every `scripts/**/*.sh` to catch syntax
 regressions before a multi-hour training run discovers them.
 
-## Validation results
+## Rejected candidate results (not release results)
 
-> **TODO: filled in after the 2.3.0 validation training run completes.**
->
-> Will include `mhcflurry compare-models` output comparing the 2.3.0
-> candidate vs the 2026-04-25 baseline run:
->
-> - End-to-end wall time delta.
-> - Per-task training time distribution shift.
-> - Per-allele eval metric deltas (mean + p25) on the data_evaluation
->   benchmark.
->
-> Acceptance: existing-allele PR-AUC / ROC-AUC mean delta ≥ 0,
-> p25 ≥ −0.005. Not shipped to master until this passes.
+The following measurements are retained as diagnostic evidence only. These
+weights are rejected because the run predated the recipe audit and changed
+processing/presentation training data and several optimizer settings at once.
+They must not be packaged or published as 2.3.0. Replacement results will be
+filled in after a clean retrain from the corrected recipe.
+
+The rejected weights were trained from commit
+`121ed667b770d27b395fb92da1eca5f5c3f0e339` in workflow
+`20260823T043004Z-26013` on 4×A100 40 GB. Final evaluation used commit
+`ad8e0f1d22265928a62f4fd6c7ea3ffff1658940` in workflow
+`20260825T054920Z-43847`. Training completed all 140 affinity candidates and
+all 512 candidates for each processing mode; the selected release contains 8
+affinity models, 8 models for each processing mode, and 2 presentation models.
+
+The frozen holdout contains 103 monoallelic samples (132,049 unique pMHCs) and
+10 multiallelic samples from PMID 31154438. The final artifacts have zero
+affinity, processing, or presentation training overlap with their respective
+holdout manifests. Evaluation scored 15,027,952 monoallelic rows with 135,388
+hits and 2,054,263 multiallelic rows with 18,507 hits.
+
+### Fair affinity comparison
+
+The published 2.2.0 ensemble contains 135,451 rows from the frozen affinity
+benchmark in its training data, including all 135,388 hits. Its direct score
+against the cleanly held-out 2.3.0 candidate is therefore descriptive, not a
+valid release gate. The decision-grade comparison uses the 2.2.0
+`models.no_additional_ms` ensemble and excludes the union of both sides'
+training pMHCs. That union removes only 2 rows and 1 hit; the 2.3.0 candidate
+itself overlaps zero rows.
+
+| Average | Metric | 2.3.0 | train-excluded 2.2.0 | Absolute delta | Relative delta |
+|---|---|---:|---:|---:|---:|
+| Macro | AUROC | 0.967238 | 0.958759 | +0.008480 | +0.88% |
+| Macro | AUPRC | 0.606905 | 0.569811 | +0.037094 | +6.51% |
+| Macro | PPV@N | 0.610859 | 0.578031 | +0.032829 | +5.68% |
+| Micro | AUROC | 0.974173 | 0.962068 | +0.012105 | +1.26% |
+| Micro | AUPRC | 0.554248 | 0.456353 | +0.097895 | +21.45% |
+| Micro | PPV@N | 0.588949 | 0.516815 | +0.072134 | +13.96% |
+
+Across the 95 reported alleles, the p25 deltas are +0.002005 AUROC,
++0.001586 AUPRC, and 0.000000 PPV@N. The predeclared affinity acceptance gate
+(mean delta non-negative and p25 at least -0.005) passes.
+
+### Processing and presentation
+
+Processing AUROC is essentially flat to slightly improved, while AUPRC and
+PPV@N regress systematically:
+
+| Processing mode | Macro AUROC | Micro AUROC | Macro AUPRC | Micro AUPRC | Macro PPV@N | Micro PPV@N |
+|---|---:|---:|---:|---:|---:|---:|
+| with flanks | +0.28% | +0.20% | -17.86% | -18.06% | -9.68% | -9.43% |
+| no flank | +0.20% | +0.07% | -10.51% | -11.62% | -7.49% | -7.35% |
+| short flanks | +0.06% | -0.01% | -12.93% | -13.75% | -8.05% | -7.32% |
+
+End-to-end presentation regresses less than the processing-only ranking:
+
+| Presentation mode | Macro AUROC | Micro AUROC | Macro AUPRC | Micro AUPRC | Macro PPV@N | Micro PPV@N |
+|---|---:|---:|---:|---:|---:|---:|
+| with flanks | -0.10% | -0.20% | -4.55% | -5.75% | -3.54% | -3.76% |
+| without flanks | -0.29% | -0.38% | -4.92% | -5.76% | -3.01% | -3.93% |
+
+The corrected presentation-percentile calculation agrees closely with raw
+score AUROC (candidate micro AUROC 0.898903 vs 0.898975 with flanks, and
+0.892751 vs 0.892767 without flanks) but has lower candidate micro AUPRC
+(0.262658 vs 0.287274, and 0.244795 vs 0.265738). Raw presentation score
+therefore remains the preferred ranking output.
+
+One plausible interpretation, established before the final run, is that the
+stronger affinity model selects higher-quality decoys and consequently makes
+the processing subproblem harder. The holdout results are consistent with
+that hypothesis—processing AUROC is retained while precision-focused metrics
+fall—but do not prove causality. The regressions are not accepted as a release
+tradeoff because this was not a controlled 2.1.x-compatible comparison.
+
+All six processing inference passes and all four presentation passes completed
+on 4×A100 without an OOM, batch retry, or calibration warning after the final
+autosizing changes. The complete exact-source evaluation and training-loss
+figure set is archived as one 65-page PDF for release review.
 
 ## Dependencies
 
@@ -337,12 +446,13 @@ required and is used for device-resident training and optional
        `epoch // pool_epochs` boundary. Set `random_negative_pool_epochs=1`
        to recover the pre-2.3.0 "fresh negatives every epoch" semantics
        (at the ~17 s/epoch encode cost).
-    2. The 1-batch-per-architecture warmup primes torch.compile's
-       on-disk cache with one synthetic forward+backward; the
-       compiled-graph cache it writes does not affect weights, but
-       running it does advance the global RNG before training proper
-       starts. Pin a per-arch seed if you need bit-equivalence across
-       runs.
+    2. A single-worker resource probe runs one bounded, full-residency training
+       epoch with validation for each resource-distinct architecture before the
+       production pool starts. It tightens automatic concurrency from measured
+       process-level CUDA and host peaks; when compilation is enabled, the same
+       pass primes torch.compile's on-disk cache. The probe runs in a separate
+       process with a fixed probe seed and does not contribute weights or advance
+       any production worker's RNG stream.
     3. Device-resident random-negative sampling
        (`encode_random_negatives_on_device`) draws negative peptides as
        amino-acid indices via `torch.multinomial` rather than the host

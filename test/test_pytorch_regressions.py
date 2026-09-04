@@ -33,6 +33,10 @@ from mhcflurry.class1_neural_network import (
 )
 from mhcflurry.class1_training import (
     _batched_validation_loss,
+    validation_split_counts,
+)
+from mhcflurry.data_dependent_weights_initialization import (
+    get_activations_pytorch,
 )
 from mhcflurry.class1_processing_neural_network import (
     Class1ProcessingModel,
@@ -40,12 +44,19 @@ from mhcflurry.class1_processing_neural_network import (
 )
 from mhcflurry.common import load_weights
 from mhcflurry.flanking_encoding import FlankingEncoding
+from mhcflurry.keras_optimizers import KerasAdam, KerasRMSprop
 from mhcflurry.pytorch_losses import (
     MSEWithInequalities,
     MultiallelicMassSpecLoss,
     get_pytorch_loss,
 )
+from mhcflurry.pytorch_layers import (
+    KerasBatchNorm1d,
+    LocallyConnected1D,
+    get_activation,
+)
 from mhcflurry.pytorch_training import (
+    copy_module_state_dict_to_cpu,
     effective_validation_batch_size,
     maybe_compile_loss,
     validation_forward_network,
@@ -100,6 +111,48 @@ def _plain_or_shared_tensor(value):
     return torch.from_numpy(np.ascontiguousarray(value)).clone()
 
 
+def test_validation_split_counts_match_keras_rounding():
+    assert validation_split_counts(11, 0.1) == (9, 2)
+    assert validation_split_counts(10, 0.1) == (9, 1)
+    assert validation_split_counts(11, 0.0) == (11, 0)
+    with pytest.raises(ValueError, match="leaves 0 training rows"):
+        validation_split_counts(1, 0.1)
+
+
+def test_affinity_lsuv_observes_post_activation_dense_output():
+    model = Class1NeuralNetworkModel(
+        peptide_encoding_shape=(2, 2),
+        layer_sizes=[3],
+        activation="tanh",
+        output_activation="sigmoid",
+        peptide_input_is_indices=False,
+    )
+    peptide = np.array(
+        [
+            [[2.0, -1.0], [0.5, 3.0]],
+            [[-2.0, 1.0], [1.5, -3.0]],
+        ],
+        dtype=np.float32,
+    )
+    inputs = {"peptide": peptide}
+    with torch.no_grad():
+        flattened = torch.from_numpy(peptide).reshape(2, -1)
+        raw = model.dense_layers[0](flattened)
+        expected = torch.tanh(raw).numpy()
+
+    observed = get_activations_pytorch(model, "dense_layers.0", inputs)
+    pre_activation = get_activations_pytorch(
+        model,
+        "dense_layers.0",
+        inputs,
+        target="pre_activation",
+    )
+
+    np.testing.assert_allclose(observed, expected, rtol=0, atol=0)
+    assert not np.array_equal(observed, raw.numpy())
+    np.testing.assert_allclose(pre_activation, raw.numpy(), rtol=0, atol=0)
+
+
 def test_mps_free_memory_preserves_zero_headroom(monkeypatch):
     monkeypatch.setattr(torch.mps, "recommended_max_memory", lambda: 8 << 30)
     monkeypatch.setattr(torch.mps, "driver_allocated_memory", lambda: 8 << 30)
@@ -127,6 +180,254 @@ def test_explicit_batch_size_helpers_reject_nonpositive_values():
         pytorch_sizing.check_training_batch_fits(0, device, model=None)
 
 
+@pytest.mark.parametrize("device_type", ["cpu", "mps"])
+def test_prediction_batch_calibration_uses_analytic_fallback_off_cuda(
+        device_type):
+    """CPU/MPS have no CUDA peak probe and keep the analytic batch."""
+    class MustNotRun:
+        def __call__(self, inputs):
+            raise AssertionError("non-CUDA calibration ran a forward probe")
+
+    result = pytorch_sizing.calibrate_prediction_batch_size(
+        123,
+        torch.device(device_type),
+        MustNotRun(),
+        {"sequence": torch.zeros((10, 5))},
+        total_rows=10,
+    )
+
+    assert result == 123
+
+
+def test_prediction_batch_calibration_measures_real_cuda_forward(monkeypatch):
+    """A measured peak can only tighten the analytic CUDA batch."""
+    from types import SimpleNamespace
+
+    calls = []
+
+    class RecordingModel:
+        def __call__(self, inputs):
+            calls.append(tuple(inputs["sequence"].shape))
+            return inputs["sequence"].sum(dim=1)
+
+    budget = SimpleNamespace(available_bytes=10_000)
+    monkeypatch.setattr(
+        pytorch_sizing, "estimate_peak_bytes_per_row", lambda model: 10)
+    monkeypatch.setattr(
+        pytorch_sizing, "device_memory_budget", lambda *args, **kwargs: budget)
+    monkeypatch.setattr(torch.cuda, "synchronize", lambda device: None)
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: 100)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 200)
+    monkeypatch.setattr(
+        torch.cuda, "reset_peak_memory_stats", lambda device: None)
+    monkeypatch.setattr(
+        torch.cuda, "max_memory_allocated", lambda device: 20_100)
+    monkeypatch.setattr(
+        torch.cuda, "max_memory_reserved", lambda device: 10_200)
+
+    result = pytorch_sizing.calibrate_prediction_batch_size(
+        1000,
+        torch.device("cuda"),
+        RecordingModel(),
+        {"sequence": torch.ones((1000, 7))},
+        total_rows=1000,
+        probe_rows=100,
+    )
+
+    # 20,000-byte incremental peak / 100 rows * 2x extrapolation safety;
+    # 10,000-byte remaining entitlement therefore fits 25 rows.
+    assert result == 25
+    assert calls == [(1, 7), (100, 7)]
+
+
+def test_prediction_batch_calibration_measures_streamed_input_transfer(
+        monkeypatch):
+    """Host-resident probe slices move inside the protected CUDA attempt."""
+    from types import SimpleNamespace
+
+    transfers = []
+    calls = []
+
+    class HostInput:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def __len__(self):
+            return self.rows
+
+        def __getitem__(self, item):
+            start, stop, step = item.indices(self.rows)
+            assert step == 1
+            return HostInput(max(stop - start, 0))
+
+        def to(self, device):
+            transfers.append((self.rows, device.type))
+            return torch.ones((self.rows, 7))
+
+    class RecordingModel:
+        def __call__(self, inputs):
+            calls.append(tuple(inputs["sequence"].shape))
+            return inputs["sequence"].sum(dim=1)
+
+    budget = SimpleNamespace(available_bytes=100_000)
+    released = []
+    monkeypatch.setattr(
+        pytorch_sizing, "estimate_peak_bytes_per_row", lambda model: 10)
+    monkeypatch.setattr(
+        pytorch_sizing, "device_memory_budget", lambda *args, **kwargs: budget)
+    monkeypatch.setattr(
+        pytorch_sizing,
+        "release_cached_device_memory",
+        lambda device: released.append(device.type),
+    )
+    monkeypatch.setattr(torch.cuda, "synchronize", lambda device: None)
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: 100)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 200)
+    monkeypatch.setattr(
+        torch.cuda, "reset_peak_memory_stats", lambda device: None)
+    monkeypatch.setattr(
+        torch.cuda, "max_memory_allocated", lambda device: 20_100)
+    monkeypatch.setattr(
+        torch.cuda, "max_memory_reserved", lambda device: 10_200)
+
+    result = pytorch_sizing.calibrate_prediction_batch_size(
+        1000,
+        torch.device("cuda"),
+        RecordingModel(),
+        {"sequence": HostInput(1000)},
+        total_rows=1000,
+        probe_rows=100,
+        transfer_inputs_to_device=True,
+    )
+
+    assert result == 100
+    assert transfers == [(1, "cuda"), (100, "cuda")]
+    assert calls == [(1, 7), (100, 7)]
+    assert released == ["cuda"]
+
+
+def test_prediction_batch_calibration_does_not_extrapolate_past_probe(
+        monkeypatch):
+    """A successful small CUDA forward is not proof that a larger one fits."""
+    from types import SimpleNamespace
+
+    calls = []
+
+    class RecordingModel:
+        def __call__(self, inputs):
+            calls.append(tuple(inputs["sequence"].shape))
+            return inputs["sequence"].sum(dim=1)
+
+    budget = SimpleNamespace(available_bytes=100_000)
+    monkeypatch.setattr(
+        pytorch_sizing, "estimate_peak_bytes_per_row", lambda model: 10)
+    monkeypatch.setattr(
+        pytorch_sizing, "device_memory_budget", lambda *args, **kwargs: budget)
+    monkeypatch.setattr(torch.cuda, "synchronize", lambda device: None)
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: 100)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 200)
+    monkeypatch.setattr(
+        torch.cuda, "reset_peak_memory_stats", lambda device: None)
+    monkeypatch.setattr(
+        torch.cuda, "max_memory_allocated", lambda device: 20_100)
+    monkeypatch.setattr(
+        torch.cuda, "max_memory_reserved", lambda device: 10_200)
+
+    result = pytorch_sizing.calibrate_prediction_batch_size(
+        1000,
+        torch.device("cuda"),
+        RecordingModel(),
+        {"sequence": torch.ones((1000, 7))},
+        total_rows=1000,
+        probe_rows=100,
+    )
+
+    # The measured arithmetic would allow 250 rows, but only 100 actually ran.
+    assert result == 100
+    assert calls == [(1, 7), (100, 7)]
+
+
+def test_prediction_batch_calibration_halves_an_oom_probe(monkeypatch):
+    """A failed probe must find a verified smaller batch, not guess upward."""
+    from types import SimpleNamespace
+
+    calls = []
+
+    class ThresholdModel:
+        def __call__(self, inputs):
+            rows = len(inputs["sequence"])
+            calls.append(rows)
+            if rows > 50:
+                raise RuntimeError("CUDA out of memory")
+            return inputs["sequence"].sum(dim=1)
+
+    budget = SimpleNamespace(available_bytes=100_000)
+    monkeypatch.setattr(
+        pytorch_sizing, "estimate_peak_bytes_per_row", lambda model: 10)
+    monkeypatch.setattr(
+        pytorch_sizing, "device_memory_budget", lambda *args, **kwargs: budget)
+    monkeypatch.setattr(
+        pytorch_sizing, "release_device_memory_after_oom", lambda device: None)
+    monkeypatch.setattr(torch.cuda, "synchronize", lambda device: None)
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: 100)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 200)
+    monkeypatch.setattr(
+        torch.cuda, "reset_peak_memory_stats", lambda device: None)
+    monkeypatch.setattr(
+        torch.cuda, "max_memory_allocated", lambda device: 20_100)
+    monkeypatch.setattr(
+        torch.cuda, "max_memory_reserved", lambda device: 10_200)
+
+    result = pytorch_sizing.calibrate_prediction_batch_size(
+        1000,
+        torch.device("cuda"),
+        ThresholdModel(),
+        {"sequence": torch.ones((1000, 7))},
+        total_rows=1000,
+        probe_rows=100,
+    )
+
+    assert result == 50
+    assert calls == [1, 100, 50]
+
+
+def test_prediction_batch_calibration_uses_probe_when_counters_fail(
+        monkeypatch):
+    """Missing allocator telemetry cannot restore an unverified large batch."""
+    from types import SimpleNamespace
+
+    calls = []
+
+    class RecordingModel:
+        def __call__(self, inputs):
+            calls.append(len(inputs["sequence"]))
+            return inputs["sequence"].sum(dim=1)
+
+    budget = SimpleNamespace(available_bytes=100_000)
+    monkeypatch.setattr(
+        pytorch_sizing, "estimate_peak_bytes_per_row", lambda model: 10)
+    monkeypatch.setattr(
+        pytorch_sizing, "device_memory_budget", lambda *args, **kwargs: budget)
+    monkeypatch.setattr(torch.cuda, "synchronize", lambda device: None)
+    monkeypatch.setattr(
+        torch.cuda,
+        "memory_allocated",
+        lambda device: (_ for _ in ()).throw(RuntimeError("no counter")),
+    )
+
+    result = pytorch_sizing.calibrate_prediction_batch_size(
+        1000,
+        torch.device("cuda"),
+        RecordingModel(),
+        {"sequence": torch.ones((1000, 7))},
+        total_rows=1000,
+        probe_rows=100,
+    )
+
+    assert result == 100
+    assert calls == [1, 100]
+
+
 @pytest.mark.parametrize(
     ("keyword", "value", "message"),
     [
@@ -145,6 +446,107 @@ def test_prediction_batch_sizing_rejects_unsafe_inputs(
     with pytest.raises(ValueError, match=message):
         pytorch_sizing.compute_prediction_batch_size(
             torch.device("cpu"), **kwargs)
+
+
+def test_cuda_worker_budget_uses_total_entitlement_not_free_divided_twice(
+        monkeypatch):
+    gib = 1 << 30
+    monkeypatch.delenv(
+        "MHCFLURRY_DEVICE_MEMORY_BUDGET_BYTES", raising=False)
+    monkeypatch.delenv(
+        pytorch_sizing.CUDA_FREE_BEFORE_CONTEXT_ENV, raising=False)
+    live_free = {"bytes": 28 * gib}
+    monkeypatch.setattr(
+        pytorch_sizing,
+        "free_device_memory_bytes",
+        lambda device: live_free["bytes"],
+    )
+    monkeypatch.setattr(
+        torch.cuda,
+        "mem_get_info",
+        lambda device: (live_free["bytes"], 40 * gib),
+    )
+    monkeypatch.setattr(
+        pytorch_sizing,
+        "cuda_process_memory_bytes",
+        lambda pid=None: 3 * gib,
+    )
+
+    first = pytorch_sizing.device_memory_budget(
+        torch.device("cuda"), num_workers_per_gpu=4)
+    assert first.worker_entitlement_bytes == 9 * gib
+    assert first.available_bytes == 6 * gib
+
+    # Allocations made by earlier-starting peer workers reduce global free
+    # memory, but do not divide this worker's fixed entitlement a second time.
+    live_free["bytes"] = 10 * gib
+    later = pytorch_sizing.device_memory_budget(
+        torch.device("cuda"), num_workers_per_gpu=4)
+    assert later.worker_entitlement_bytes == first.worker_entitlement_bytes
+    assert later.available_bytes == first.available_bytes
+
+    monkeypatch.setenv(
+        "MHCFLURRY_DEVICE_MEMORY_BUDGET_BYTES", str(5 * gib))
+    occupied_at_launch = pytorch_sizing.device_memory_budget(
+        torch.device("cuda"), num_workers_per_gpu=4)
+    assert occupied_at_launch.worker_entitlement_bytes == 5 * gib
+    assert occupied_at_launch.available_bytes == 2 * gib
+
+    monkeypatch.delenv(
+        "MHCFLURRY_DEVICE_MEMORY_BUDGET_BYTES", raising=False)
+    monkeypatch.setenv(
+        pytorch_sizing.CUDA_FREE_BEFORE_CONTEXT_ENV, str(32 * gib))
+    monkeypatch.setattr(
+        pytorch_sizing, "cuda_process_memory_bytes", lambda pid=None: None)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 0)
+    co_resident = pytorch_sizing.device_memory_budget(
+        torch.device("cuda"), num_workers_per_gpu=4)
+    assert co_resident.process_bytes == 0
+    assert co_resident.available_bytes == 9 * gib
+
+    baseline_fallback = pytorch_sizing.device_memory_budget(
+        torch.device("cuda"), num_workers_per_gpu=1)
+    assert baseline_fallback.process_bytes == 22 * gib
+    assert baseline_fallback.available_bytes == 10 * gib
+
+
+def test_cuda_process_memory_includes_all_rows_for_pid(monkeypatch):
+    monkeypatch.setattr(
+        pytorch_sizing.subprocess,
+        "check_output",
+        lambda *args, **kwargs: b"10, 512\n11, 2048\n10, 256\n",
+    )
+
+    assert pytorch_sizing.cuda_process_memory_bytes(10) == 768 * (1 << 20)
+
+
+def test_cuda_process_memory_matches_pid_namespace_alias(monkeypatch):
+    monkeypatch.setattr(
+        pytorch_sizing, "_process_namespace_pids", lambda: {10, 10010})
+    monkeypatch.setattr(
+        pytorch_sizing.subprocess,
+        "check_output",
+        lambda *args, **kwargs: b"10010, 640\n11, 2048\n",
+    )
+
+    assert pytorch_sizing.cuda_process_memory_bytes() == 640 * (1 << 20)
+
+
+def test_cuda_free_memory_before_context_uses_physical_device(monkeypatch):
+    calls = []
+
+    def fake_check_output(command, **kwargs):
+        calls.append(command)
+        return b"32768\n"
+
+    monkeypatch.setattr(
+        pytorch_sizing.subprocess, "check_output", fake_check_output)
+
+    assert (
+        pytorch_sizing.cuda_free_memory_before_context_bytes("GPU-abc")
+        == 32 * (1 << 30)
+    )
+    assert "--id=GPU-abc" in calls[0]
 
 
 def test_maybe_compile_loss_defaults_on_with_network_compile_cuda(monkeypatch):
@@ -196,6 +598,20 @@ def test_maybe_compile_loss_requires_network_compile(monkeypatch):
     assert calls == []
 
 
+def test_copy_module_state_dict_to_cpu_is_independent():
+    layer = torch.nn.Linear(2, 1)
+    checkpoint = copy_module_state_dict_to_cpu(layer)
+    expected = {name: value.clone() for name, value in checkpoint.items()}
+
+    with torch.no_grad():
+        for value in layer.state_dict().values():
+            value.add_(1.0)
+
+    for name, value in checkpoint.items():
+        assert value.device.type == "cpu"
+        torch.testing.assert_close(value, expected[name])
+
+
 def test_fit_validation_interval_skips_off_interval_epochs():
     """validation_interval > 1 measures only on-interval + final epoch."""
     peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
@@ -238,6 +654,38 @@ def test_fit_validation_interval_default_runs_every_epoch():
     # least some epochs differ from epoch 0; this is the most we can
     # assert without depending on exact per-step numerics.
     assert any(v != val_loss[0] for v in val_loss[1:])
+
+
+def test_affinity_fit_can_restore_best_validation_checkpoint(monkeypatch):
+    import mhcflurry.class1_neural_network as affinity_module
+
+    calls = []
+
+    def zero_checkpoint(module):
+        calls.append(True)
+        return {
+            name: torch.zeros_like(value, device="cpu")
+            for name, value in module.state_dict().items()
+        }
+
+    monkeypatch.setattr(
+        affinity_module, "copy_module_state_dict_to_cpu", zero_checkpoint)
+    model = _make_simple_affinity_model(
+        max_epochs=2,
+        validation_split=0.5,
+        early_stopping=False,
+        restore_best_weights=True,
+    )
+    model.fit(
+        ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"],
+        np.array([50.0, 30.0, 100.0, 5000.0]),
+    )
+
+    assert calls
+    assert model.fit_info[-1]["restored_best_weights"] is True
+    assert model.fit_info[-1]["best_epoch"] is not None
+    for value in model.network().state_dict().values():
+        assert torch.count_nonzero(value) == 0
 
 
 def test_effective_validation_batch_size_uses_larger_cuda_default():
@@ -406,6 +854,98 @@ def test_batch_norm_uses_keras_defaults():
     assert model.batch_norms[0] is not None
     assert model.batch_norms[0].eps == pytest.approx(1e-3, abs=1e-12)
     assert model.batch_norms[0].momentum == pytest.approx(0.01, abs=1e-12)
+
+
+def test_batch_norm_updates_keras_population_variance():
+    layer = KerasBatchNorm1d(1, eps=1e-3, momentum=0.01)
+    inputs = torch.tensor([[0.0], [2.0]])
+
+    observed = layer(inputs)
+
+    np.testing.assert_allclose(
+        observed.detach().numpy(),
+        np.array([[-1.0], [1.0]]) / np.sqrt(1.001),
+        rtol=1e-6,
+    )
+    # Population variance is 1.0, so the Keras 0.99/0.01 moving update
+    # leaves the initial running variance of 1.0 unchanged. PyTorch's native
+    # BatchNorm would use unbiased variance=2.0 and update it to 1.01.
+    assert layer.running_var.item() == pytest.approx(1.0)
+
+
+def test_batch_norm_sequence_updates_keras_population_variance():
+    layer = KerasBatchNorm1d(1, eps=1e-3, momentum=0.01)
+    inputs = torch.tensor([[[0.0, 2.0]], [[2.0, 4.0]]])
+
+    observed = layer(inputs)
+
+    expected = (inputs.numpy() - 2.0) / np.sqrt(2.001)
+    np.testing.assert_allclose(observed.detach().numpy(), expected, rtol=1e-6)
+    assert layer.running_mean.item() == pytest.approx(0.02)
+    assert layer.running_var.item() == pytest.approx(1.01)
+
+
+@pytest.mark.parametrize("activation", ["relu", "silu", "swish", "gelu"])
+def test_modern_activations_are_supported(activation):
+    observed = get_activation(activation)(torch.tensor([-1.0, 0.0, 1.0]))
+    assert observed.shape == (3,)
+    assert torch.isfinite(observed).all()
+
+
+def test_affinity_layer_normalization_is_batch_composition_invariant():
+    model = Class1NeuralNetworkModel(
+        peptide_encoding_shape=(3, 2),
+        layer_sizes=[4],
+        normalization="layer",
+    )
+    model.eval()
+    assert model.batch_norm_early is None
+    assert model.layer_norm_early is not None
+    assert model.layer_norms[0] is not None
+
+    inputs = torch.randn(3, 3, 2)
+    single = model({"peptide": inputs[:1]})
+    batched = model({"peptide": inputs})[:1]
+    torch.testing.assert_close(single, batched)
+
+    clone = Class1NeuralNetworkModel(
+        peptide_encoding_shape=(3, 2),
+        layer_sizes=[4],
+        normalization="layer",
+    )
+    clone.set_weights_list(model.get_weights_list(), auto_convert_keras=False)
+    clone.eval()
+    torch.testing.assert_close(single, clone({"peptide": inputs[:1]}))
+
+
+def test_affinity_normalization_rejects_conflicting_legacy_flag():
+    with pytest.raises(ValueError, match="conflicts"):
+        Class1NeuralNetworkModel(
+            peptide_encoding_shape=(3, 2),
+            batch_normalization=True,
+            normalization="layer",
+        )
+
+
+def test_locally_connected_initializer_uses_keras_fans(monkeypatch):
+    calls = []
+
+    def record_uniform(tensor, lower, upper):
+        calls.append((tuple(tensor.shape), lower, upper))
+        return tensor
+
+    monkeypatch.setattr(torch.nn.init, "uniform_", record_uniform)
+    LocallyConnected1D(
+        in_channels=21,
+        out_channels=8,
+        input_length=15,
+        kernel_size=3,
+    )
+
+    expected_bound = np.sqrt(6.0 / (13 * 63 + 13 * 8))
+    assert calls == [
+        ((13, 8, 63), -expected_bound, expected_bound),
+    ]
 
 
 def test_network_forward_requires_allele_key_to_match_model_type():
@@ -1390,7 +1930,7 @@ def test_validation_forward_network_uses_eager_by_default(monkeypatch):
 
 
 def test_optimizer_defaults_match_keras():
-    affinity_model = _make_simple_affinity_model(optimizer="adam")
+    affinity_model = _make_simple_affinity_model(optimizer="rmsprop")
     affinity_model._network = affinity_model.make_network(
         allele_representations=None,
         **affinity_model.network_hyperparameter_defaults.subselect(
@@ -1398,10 +1938,12 @@ def test_optimizer_defaults_match_keras():
         )
     )
     affinity_optimizer = affinity_model._create_optimizer(affinity_model.network())
-    assert affinity_optimizer.defaults["eps"] == pytest.approx(1e-07, abs=1e-12)
+    assert isinstance(affinity_optimizer, KerasRMSprop)
+    assert affinity_optimizer.defaults["rho"] == pytest.approx(0.9)
+    assert affinity_optimizer.defaults["epsilon"] == pytest.approx(1e-7)
 
     processing_model = Class1ProcessingNeuralNetwork(
-        optimizer="rmsprop",
+        optimizer="adam",
         learning_rate=0.001,
     )
     processing_model._network = processing_model.make_network(
@@ -1412,8 +1954,97 @@ def test_optimizer_defaults_match_keras():
     processing_optimizer = processing_model._create_optimizer(
         processing_model.network()
     )
-    assert processing_optimizer.defaults["alpha"] == pytest.approx(0.9, abs=1e-12)
-    assert processing_optimizer.defaults["eps"] == pytest.approx(1e-07, abs=1e-12)
+    assert isinstance(processing_optimizer, KerasAdam)
+    assert processing_optimizer.defaults["beta_1"] == pytest.approx(0.9)
+    assert processing_optimizer.defaults["beta_2"] == pytest.approx(0.999)
+    assert processing_optimizer.defaults["epsilon"] == pytest.approx(1e-7)
+
+    native_affinity = _make_simple_affinity_model(
+        optimizer="rmsprop",
+        optimizer_implementation="pytorch",
+    )
+    native_affinity._network = native_affinity.make_network(
+        allele_representations=None,
+        **native_affinity.network_hyperparameter_defaults.subselect(
+            native_affinity.hyperparameters
+        ),
+    )
+    native_optimizer = native_affinity._create_optimizer(native_affinity.network())
+    assert isinstance(native_optimizer, torch.optim.RMSprop)
+
+
+def test_keras_rmsprop_matches_historical_update_equation():
+    parameter = torch.nn.Parameter(torch.tensor([1.0, -2.0], dtype=torch.float64))
+    optimizer = KerasRMSprop([parameter], lr=0.001, rho=0.9, epsilon=1e-7)
+    velocity = np.zeros(2)
+    expected = parameter.detach().numpy().copy()
+    for gradient in (np.array([0.25, -0.5]), np.array([-0.1, 0.2])):
+        velocity = 0.9 * velocity + 0.1 * gradient ** 2
+        expected -= 0.001 * gradient / np.sqrt(velocity + 1e-7)
+        parameter.grad = torch.from_numpy(gradient)
+        optimizer.step()
+    np.testing.assert_allclose(parameter.detach().numpy(), expected, rtol=0, atol=1e-15)
+
+
+def test_keras_adam_matches_historical_update_equation():
+    parameter = torch.nn.Parameter(torch.tensor([1.0, -2.0], dtype=torch.float64))
+    optimizer = KerasAdam(
+        [parameter],
+        lr=0.001,
+        beta_1=0.9,
+        beta_2=0.999,
+        epsilon=1e-7,
+    )
+    momentum = np.zeros(2)
+    velocity = np.zeros(2)
+    expected = parameter.detach().numpy().copy()
+    for step, gradient in enumerate(
+        (np.array([0.25, -0.5]), np.array([-0.1, 0.2])),
+        start=1,
+    ):
+        momentum = 0.9 * momentum + 0.1 * gradient
+        velocity = 0.999 * velocity + 0.001 * gradient ** 2
+        alpha = 0.001 * np.sqrt(1.0 - 0.999 ** step) / (1.0 - 0.9 ** step)
+        expected -= alpha * momentum / (np.sqrt(velocity) + 1e-7)
+        parameter.grad = torch.from_numpy(gradient)
+        optimizer.step()
+    np.testing.assert_allclose(parameter.detach().numpy(), expected, rtol=0, atol=1e-15)
+
+
+def test_processing_initializers_match_keras(monkeypatch):
+    initialized_shapes = []
+
+    def record_xavier(tensor):
+        initialized_shapes.append(tuple(tensor.shape))
+        return torch.nn.init.constant_(tensor, 0.125)
+
+    monkeypatch.setattr(torch.nn.init, "xavier_uniform_", record_xavier)
+    model = Class1ProcessingModel(
+        sequence_dims=(41, 21),
+        peptide_max_length=15,
+        n_flank_length=15,
+        c_flank_length=15,
+        flanking_averages=True,
+        convolutional_filters=8,
+        convolutional_kernel_size=11,
+        convolutional_activation="tanh",
+        convolutional_kernel_l1_l2=(0.0, 0.0),
+        dropout_rate=0.3,
+        post_convolutional_dense_layer_sizes=[4],
+    )
+
+    trainable_layers = [
+        module for module in model.modules()
+        if isinstance(module, (torch.nn.Conv1d, torch.nn.Linear))
+    ]
+    assert len(initialized_shapes) == len(trainable_layers)
+    assert all(torch.count_nonzero(layer.bias) == 0 for layer in trainable_layers)
+    assert torch.all(model.output_layer.weight == 1)
+    assert all(
+        torch.all(layer.weight == 0.125)
+        for layer in trainable_layers
+        if layer is not model.output_layer
+    )
 
 
 def test_weight_and_embedding_updates_preserve_device():

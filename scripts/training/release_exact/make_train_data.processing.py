@@ -26,8 +26,11 @@ from mhcgnomes import parse
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 from mhcflurry.common import (
+    add_random_seed_arg,
     allele_locus_name,
     configure_logging,
+    configure_random_seed,
+    derive_seed,
     normalize_allele_name,
     positive_float_arg,
     positive_int_arg,
@@ -47,6 +50,7 @@ from mhcflurry.proteome_decoys import (
     peptides_by_length_from_frame,
     sample_peptide_frame_for_accessions,
 )
+from mhcflurry.release_holdout import exclude_samples
 from mhcflurry.cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
@@ -149,6 +153,9 @@ parser.add_argument(
     "--exclude-contig",
     help="Exclude entries annotated to the given contig")
 parser.add_argument(
+    "--exclude-samples-file",
+    help="Generated release-holdout CSV of sample_id values to exclude")
+parser.add_argument(
     "--out",
     metavar="CSV",
     required=True,
@@ -158,11 +165,13 @@ parser.add_argument(
     nargs="+",
     help="Include only the specified alleles")
 
+add_random_seed_arg(parser)
+
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
 
 
-def do_process_samples(samples, constant_data=None):
+def do_process_samples(samples, seed=None, constant_data=None):
     import mhcflurry
     import pandas
     import tqdm
@@ -181,6 +190,9 @@ def do_process_samples(samples, constant_data=None):
 
     if constant_data is None:
         constant_data = WORKER_CONTEXT
+
+    if seed is not None:
+        numpy.random.seed(int(seed) % (2 ** 32))
 
     args = constant_data['args']
     lengths = constant_data['lengths']
@@ -279,6 +291,8 @@ def run():
     args = parser.parse_args(sys.argv[1:])
 
     configure_logging()
+    master_seed = configure_random_seed(
+        args.random_seed, name="make-processing-train-data")
     resolve_local_parallelism_args(
         args,
         cap_auto_num_jobs=not args.cluster_parallelism,
@@ -309,6 +323,9 @@ def run():
     print("Loaded hits from %d samples" % hit_df.sample_id.nunique())
     hit_df = hit_df.loc[hit_df.format == "MONOALLELIC"].copy()
     print("Subselected to %d monoallelic samples" % hit_df.sample_id.nunique())
+    if args.exclude_samples_file:
+        hit_df = exclude_samples(
+            hit_df, args.exclude_samples_file, "processing")
     hit_df["allele"] = hit_df.hla.map(canonicalize_processing_allele)
     hit_df = hit_df.loc[~hit_df.allele.isnull()].copy()
     print(
@@ -404,14 +421,22 @@ def run():
     worker_pool = None
     start = time.time()
 
+    sample_order = list(hit_df.sample_id.unique())
     tasks = [
-        {"samples": [sample]} for sample in hit_df.sample_id.unique()
+        {
+            "samples": [sample],
+            "seed": derive_seed(master_seed, "sample", sample),
+        }
+        for sample in sample_order
     ]
 
     if serial_run:
         # Serial run
         print("Running in serial.")
-        results = [do_process_samples(hit_df.sample_id.unique())]
+        results = [
+            do_process_samples(**task)
+            for task in tasks
+        ]
     elif args.cluster_parallelism:
         # Run using separate processes HPC cluster.
         print("Running on cluster.")
@@ -438,7 +463,7 @@ def run():
 
     print("Reading results")
 
-    result_df = []
+    result_by_sample = {}
     try:
         for worker_result in tqdm.tqdm(results, total=len(tasks)):
             for sample_id, selected_df in worker_result.groupby("sample_id"):
@@ -447,7 +472,11 @@ def run():
                     sample_id,
                     "with hit and decoys:\n",
                     selected_df.hit.value_counts())
-            result_df.append(worker_result)
+                if sample_id in result_by_sample:
+                    raise RuntimeError(
+                        "Received duplicate processing result for sample %s" %
+                        sample_id)
+                result_by_sample[sample_id] = selected_df
         if worker_pool:
             worker_pool.close()
             worker_pool.join()
@@ -459,7 +488,18 @@ def run():
 
     print("Received all results in %0.2f sec" % (time.time() - start))
 
-    result_df = pandas.concat(result_df, ignore_index=True, sort=False)
+    missing_samples = [
+        sample for sample in sample_order if sample not in result_by_sample
+    ]
+    if missing_samples:
+        raise RuntimeError(
+            "Missing processing result for sample(s): %s" %
+            ", ".join(map(str, missing_samples)))
+    result_df = pandas.concat(
+        [result_by_sample[sample] for sample in sample_order],
+        ignore_index=True,
+        sort=False,
+    )
     result_df["hla"] = result_df.sample_id.map(sample_table.allele)
 
     print(result_df)

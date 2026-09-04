@@ -23,15 +23,18 @@ Usage:
       --release 2.3.0 \
       [--backend local|brev-existing|brev-provision|ssh] \
       [--release-profile full|fast-8xa100|minimal-processing|fast-minimal] \
-      [--minibatch-size 1024] \
-      [--affinity-minibatch-size 1024] \
+      [--random-seed 42] \
+      [--minibatch-size 128] \
+      [--affinity-minibatch-size 128] \
       [--affinity-max-workers-per-gpu auto] \
-      [--processing-minibatch-size 1024] \
+      [--processing-minibatch-size 512] \
       [--processing-num-jobs auto] \
       [--processing-max-workers-per-gpu auto] \
-      [--processing-held-out-samples 50] \
+      [--processing-held-out-samples 10] \
       [--processing-variants "with_flanks no_flank short_flanks"] \
-      [--presentation-decoys-per-hit 99] \
+      [--presentation-processing-with-flanks-kind short_flanks] \
+      [--presentation-decoys-per-hit 2] \
+      [--presentation-sample-fraction 0.1] \
       [--presentation-feature-chunk-size 250000] \
       [--presentation-num-jobs auto] \
       [--presentation-max-workers-per-gpu 1] \
@@ -114,6 +117,11 @@ Evaluation:
   closest older public release available in downloads.yml, public:2.0.0; pass
   --compare-baseline public to compare against the currently configured public
   release, or pass a model-run directory / public:<release_name>.
+  When affinity is included, the workflow also writes
+  RUN_DIR/eval_comparison_train_excluded_affinity using the official
+  models.no_additional_ms predictor and its matching train-excluded benchmark.
+  This is the generalization gate; a production-release comparison may overlap
+  historical training data and is retained only for descriptive continuity.
   --eval-max-benchmark-files limits each evaluation benchmark family to the
   first N benchmark input CSV files. It is intended only for smoke proofs that
   the end-to-end command wiring works.
@@ -176,6 +184,28 @@ require_command() {
     command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"
 }
 
+require_clean_runplz() {
+    local runplz_executable
+    local runplz_shebang
+    local -a runplz_python
+    runplz_executable="$(command -v runplz)" || \
+        die "Required command not found: runplz"
+    IFS= read -r runplz_shebang < "$runplz_executable" || \
+        die "Could not read runplz executable: $runplz_executable"
+    case "$runplz_shebang" in
+        '#!'*) ;;
+        *) die "runplz executable has no interpreter shebang: $runplz_executable" ;;
+    esac
+    read -r -a runplz_python <<< "${runplz_shebang#\#!}"
+    [ "${#runplz_python[@]}" -gt 0 ] || \
+        die "Could not resolve the runplz interpreter: $runplz_executable"
+    "${runplz_python[@]}" \
+        "$SCRIPT_DIR/validate_runplz_provenance.py" \
+        --executable "$runplz_executable" \
+        --required-version "$RUNPLZ_REQUIRED_VERSION" || \
+        die "runplz $RUNPLZ_REQUIRED_VERSION from PyPI or a clean checkout is required"
+}
+
 validate_release_provenance() {
     local step="$1"
     local require_artifacts="$2"
@@ -196,6 +226,9 @@ validate_release_provenance() {
     fi
     if [ "$ALLOW_DIRTY_REPO" = "1" ]; then
         args+=(--allow-dirty-repo)
+    fi
+    if [ "$require_artifacts" = "1" ] && [ "$SKIP_TRAIN" = "1" ]; then
+        args+=(--allow-artifact-source-mismatch)
     fi
     run_logged_step "$step" "${args[@]}"
 }
@@ -330,6 +363,15 @@ validate_positive_number() {
     fi
 }
 
+validate_fraction() {
+    local option=$1
+    local value=$2
+    validate_positive_number "$option" "$value"
+    if ! awk -v value="$value" 'BEGIN { exit !(value <= 1) }'; then
+        die "$option must be no greater than 1; got '$value'"
+    fi
+}
+
 brev_provider_instance_type() {
     case "$(lowercase "$1")" in
         auto|'')
@@ -364,6 +406,9 @@ apply_minimal_processing_profile() {
     fi
     if [ "$PROCESSING_MODES_EXPLICIT" = "0" ]; then
         PROCESSING_MODES="with_flanks,no_flank"
+    fi
+    if [ "$PRESENTATION_PROCESSING_WITH_FLANKS_KIND_EXPLICIT" = "0" ]; then
+        PRESENTATION_PROCESSING_WITH_FLANKS_KIND=with_flanks
     fi
 }
 
@@ -726,6 +771,8 @@ run_dir_matches_workflow() {
 run_dir_has_synced_brev_outputs() {
     run_dir_matches_workflow || return 1
     run_dir_has_model_artifacts || return 1
+    [ -f "$RUN_DIR/release_holdout/policy.json" ] || return 1
+    [ -f "$RUN_DIR/release_holdout/validation.json" ] || return 1
     if [ "${BREV_EXPECT_REMOTE_EVAL:-0}" = "1" ] && \
             [ ! -d "$RUN_DIR/eval_comparison" ]; then
         return 1
@@ -871,20 +918,24 @@ build_brev_postprocess_archives() {
     local remote_data_dir="$3"
     local repo_archive="$staging/repo.tar.bz2"
     local models_archive="$staging/model_artifacts.tar.bz2"
-    local model_paths=(
+    local artifact_paths=(
         affinity/models.combined
         presentation/models
+        release_holdout
     )
+    if [ "$SKIP_PLOTS" != "1" ]; then
+        artifact_paths+=(affinity/models.unselected.combined)
+    fi
     local kind
     for kind in $PROCESSING_VARIANTS; do
-        model_paths+=("processing/models.selected.$kind")
+        artifact_paths+=("processing/models.selected.$kind")
     done
 
     run_cmd mkdir -p "$staging"
     run_logged_step postprocess_package_repo \
         write_git_repo_archive "$repo_archive"
     run_logged_step postprocess_package_models \
-        tar -C "$RUN_DIR" -cjf "$models_archive" "${model_paths[@]}"
+        tar -C "$RUN_DIR" -cjf "$models_archive" "${artifact_paths[@]}"
     build_brev_paper_input_archive "$staging" "$remote_paper_inputs_root"
     build_brev_data_dir_archive "$staging" "$remote_data_dir"
 }
@@ -1193,9 +1244,74 @@ remote_root=/root/mhcflurry-postprocess
 repo_dir="$remote_root/repo"
 run_dir="$remote_root/run"
 
+# BEGIN BREV POSTPROCESS REPLAY GUARD
+# Some Brev CLI versions replay the complete remote command after an SSH
+# transport failure. Coalesce that retry with the original invocation so setup
+# and evaluation are never executed twice. The outer workflow recreates
+# remote_root for every intentional run, so this state cannot block a later
+# user-requested rerun.
+postprocess_state_dir="$remote_root/postprocess_state"
+postprocess_status_file="$postprocess_state_dir/exit_status"
+postprocess_owner_file="$postprocess_state_dir/owner_pid"
+if ! mkdir "$postprocess_state_dir" 2>/dev/null; then
+    echo "Detected replay of Brev postprocess command; waiting for original invocation." >&2
+    while [ ! -f "$postprocess_status_file" ]; do
+        postprocess_owner_pid="$(cat "$postprocess_owner_file" 2>/dev/null || true)"
+        postprocess_owner_state=""
+        if [ -n "$postprocess_owner_pid" ]; then
+            postprocess_owner_state="$(
+                awk '{print $3}' "/proc/$postprocess_owner_pid/stat" \
+                    2>/dev/null || true
+            )"
+        fi
+        if [ -n "$postprocess_owner_pid" ] && {
+                [ -z "$postprocess_owner_state" ] || \
+                [ "$postprocess_owner_state" = "Z" ];
+        }; then
+            # The owner may have exited between its final command and the EXIT
+            # trap's atomic marker rename. Give that narrow race one interval
+            # to publish the real status before declaring the run abandoned.
+            sleep 1
+            [ -f "$postprocess_status_file" ] && continue
+            printf '70\n' > "$postprocess_status_file.tmp.$$"
+            mv "$postprocess_status_file.tmp.$$" "$postprocess_status_file"
+            echo "Original Brev postprocess owner exited without a status marker." >&2
+            break
+        fi
+        sleep 1
+    done
+    postprocess_original_status="$(cat "$postprocess_status_file")"
+    echo "Brev postprocess replay returning original status $postprocess_original_status." >&2
+    exit "$postprocess_original_status"
+fi
+printf '%s\n' "$$" > "$postprocess_owner_file"
+
+record_postprocess_status() {
+    local status="$?"
+    trap - EXIT
+    printf '%s\n' "$status" > "$postprocess_status_file.tmp.$$"
+    mv "$postprocess_status_file.tmp.$$" "$postprocess_status_file"
+    exit "$status"
+}
+trap record_postprocess_status EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+# END BREV POSTPROCESS REPLAY GUARD
+
+# Reuse the PyTorch environment that produced the models when the Brev
+# training image exposes it. Falling back to the host interpreter here can
+# silently install a newer Torch/CUDA stack for evaluation than for training.
+if [ -x /opt/conda/bin/python ]; then
+    export PATH="/opt/conda/bin:$PATH"
+fi
+
 export MKL_THREADING_LAYER="${MKL_THREADING_LAYER:-GNU}"
-export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-1}"
-export MHCFLURRY_MATMUL_PRECISION="${MHCFLURRY_MATMUL_PRECISION:-high}"
+# Compiling every model in every short-lived comparison worker multiplies
+# Inductor compiler pools by the worker count. Eager inference is the safe
+# default; COMPARE_TORCH_COMPILE still carries any explicit caller override.
+export MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-0}"
+export MHCFLURRY_MATMUL_PRECISION="${MHCFLURRY_MATMUL_PRECISION:-highest}"
 export MHCFLURRY_ENABLE_TIMING="${MHCFLURRY_ENABLE_TIMING:-1}"
 
 apt-get update
@@ -1234,6 +1350,9 @@ else
         models_class1_processing models_class1_presentation
     data_dir="$(mhcflurry downloads path data_evaluation)"
 fi
+case ",${COMPARE_INCLUDE:-affinity,processing,presentation}," in
+    *,affinity,*) mhcflurry downloads fetch models_class1_pan_variants ;;
+esac
 baseline_release="${COMPARE_BASELINE#public:}"
 if [ "$baseline_release" != "$COMPARE_BASELINE" ]; then
     MHCFLURRY_DOWNLOADS_CURRENT_RELEASE="$baseline_release" \
@@ -1248,6 +1367,8 @@ compare_args=(
     --b "${COMPARE_BASELINE:-public:2.0.0}" \
     --b-label "${COMPARE_BASELINE_LABEL:-MHCflurry 2.0}" \
     --data-dir "$data_dir" \
+    --release-holdout-dir "$run_dir/release_holdout" \
+    --affinity-training-overlap-policy audit \
     --include "${COMPARE_INCLUDE:-affinity,processing,presentation}" \
     --processing-modes "${PROCESSING_MODES:-with_flanks,no_flank,short_flanks}" \
     --presentation-modes "${PRESENTATION_MODES:-with_flanks,without_flanks}" \
@@ -1275,6 +1396,44 @@ case "$(printf '%s' "$COMPARE_GPUS" | tr '[:upper:]' '[:lower:]')" in
 esac
 "${compare_args[@]}"
 
+case ",${COMPARE_INCLUDE:-affinity,processing,presentation}," in
+    *,affinity,*)
+        train_excluded_affinity_dir="$(
+            mhcflurry downloads path models_class1_pan_variants
+        )/models.no_additional_ms"
+        fair_affinity_args=(
+            mhcflurry eval compare-models
+            --a "$run_dir"
+            --a-label "${RUN_LABEL:-new}"
+            --b "$train_excluded_affinity_dir"
+            --b-affinity-dir "$train_excluded_affinity_dir"
+            --b-label "MHCflurry no-additional-MS (train-excluded)"
+            --data-dir "$data_dir"
+            --release-holdout-dir "$run_dir/release_holdout"
+            --affinity-training-overlap-policy exclude
+            --include affinity
+            --affinity-source no_additional_ms
+            --out "$run_dir/eval_comparison_train_excluded_affinity"
+            --backend "$COMPARE_BACKEND"
+            --num-jobs "$COMPARE_NUM_JOBS"
+            --max-workers-per-gpu "$COMPARE_MAX_WORKERS_PER_GPU"
+            --max-tasks-per-worker "$COMPARE_MAX_TASKS_PER_WORKER"
+            --worker-log-dir \
+                "$run_dir/eval_comparison_train_excluded_affinity/worker_logs"
+            --torch-compile "$COMPARE_TORCH_COMPILE"
+            --matmul-precision "$COMPARE_MATMUL_PRECISION"
+        )
+        if [ -n "${EVAL_MAX_BENCHMARK_FILES:-}" ]; then
+            fair_affinity_args+=(--limit-files "$EVAL_MAX_BENCHMARK_FILES")
+        fi
+        case "$(printf '%s' "$COMPARE_GPUS" | tr '[:upper:]' '[:lower:]')" in
+            auto) ;;
+            *) fair_affinity_args+=(--gpus "$COMPARE_GPUS") ;;
+        esac
+        "${fair_affinity_args[@]}"
+        ;;
+esac
+
 if [ "${RUN_RELEASE_PLOTS:-1}" = "1" ]; then
     plot_args=(
         mhcflurry eval plot-comparison
@@ -1285,6 +1444,7 @@ if [ "${RUN_RELEASE_PLOTS:-1}" = "1" ]; then
         --paper-figures-out "$run_dir/eval_comparison/plots/paper_figures"
         --paper-figures-formats "${PAPER_FIGURES_FORMATS:-svg,pdf,png}"
         --paper-figures-scores-dir "${PAPER_FIGURES_SCORES_DIR:-$run_dir/eval_comparison}"
+        --include-paper-figures-in-summary-pdf
     )
     if [ -n "${PAPER_FIGURES_MULTIALLELIC_PREDICTIONS:-}" ]; then
         plot_args+=(--paper-figures-multiallelic-predictions "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS")
@@ -1308,8 +1468,17 @@ if [ "${RUN_RELEASE_PLOTS:-1}" = "1" ]; then
         plot_args+=(--paper-figures-presentation-panel-baselines "$PAPER_FIGURES_PRESENTATION_PANEL_BASELINES")
     fi
     "${plot_args[@]}"
-    python scripts/training/plot_loss_curves.py \
+    if [ -d "$run_dir/eval_comparison_train_excluded_affinity" ]; then
+        mhcflurry eval plot-comparison \
+            --input "$run_dir/eval_comparison_train_excluded_affinity" \
+            --a-label "${RUN_LABEL:-new}" \
+            --b-label "MHCflurry no-additional-MS (train-excluded)" \
+            --summary-pdf \
+                "$run_dir/eval_comparison_train_excluded_affinity/plots/model_comparison_figures.pdf"
+    fi
+    mhcflurry train plot-loss-curves \
         --selected-dir "$run_dir/affinity/models.combined" \
+        --unselected-dir "$run_dir/affinity/models.unselected.combined" \
         --out "$run_dir/affinity/loss_plots"
 fi
 EOF
@@ -1354,9 +1523,21 @@ add_path eval_comparison/side_b.json
 add_path eval_comparison/plots
 add_path affinity/loss_plots
 add_glob eval_comparison/*/summary.json
+add_glob eval_comparison/*/training_overlap.json
 add_glob eval_comparison/*/summary_table.csv
 add_glob eval_comparison/*/per_*.csv
 add_glob eval_comparison/*/predictions*.csv.bz2
+
+add_path eval_comparison_train_excluded_affinity/release_summary.csv
+add_path eval_comparison_train_excluded_affinity/release_summary.md
+add_path eval_comparison_train_excluded_affinity/summary.md
+add_path eval_comparison_train_excluded_affinity/side_a.json
+add_path eval_comparison_train_excluded_affinity/side_b.json
+add_path eval_comparison_train_excluded_affinity/plots
+add_glob eval_comparison_train_excluded_affinity/*/summary.json
+add_glob eval_comparison_train_excluded_affinity/*/training_overlap.json
+add_glob eval_comparison_train_excluded_affinity/*/per_*.csv
+add_glob eval_comparison_train_excluded_affinity/*/predictions*.csv.bz2
 
 sort -u "$manifest" -o "$manifest"
 tar -cjf "$archive" -T "$manifest"
@@ -1490,9 +1671,21 @@ add_path eval_comparison/side_a.json
 add_path eval_comparison/side_b.json
 add_path eval_comparison/plots
 add_glob eval_comparison/*/summary.json
+add_glob eval_comparison/*/training_overlap.json
 add_glob eval_comparison/*/summary_table.csv
 add_glob eval_comparison/*/per_*.csv
 add_glob eval_comparison/*/predictions*.csv.bz2
+
+add_path eval_comparison_train_excluded_affinity/release_summary.csv
+add_path eval_comparison_train_excluded_affinity/release_summary.md
+add_path eval_comparison_train_excluded_affinity/summary.md
+add_path eval_comparison_train_excluded_affinity/side_a.json
+add_path eval_comparison_train_excluded_affinity/side_b.json
+add_path eval_comparison_train_excluded_affinity/plots
+add_glob eval_comparison_train_excluded_affinity/*/summary.json
+add_glob eval_comparison_train_excluded_affinity/*/training_overlap.json
+add_glob eval_comparison_train_excluded_affinity/*/per_*.csv
+add_glob eval_comparison_train_excluded_affinity/*/predictions*.csv.bz2
 
 add_path affinity/models.combined
 add_path affinity/eval_comparison
@@ -1509,6 +1702,8 @@ add_path affinity/select.log
 add_path affinity/train.log
 add_glob affinity/LOG-worker.*.txt
 
+add_path release_holdout
+
 add_glob processing/models.selected.*
 add_path processing/hits_with_tpm.csv.bz2
 add_path processing/gpu_occupancy.csv
@@ -1520,6 +1715,7 @@ add_glob processing/LOG-worker.*.txt
 add_path presentation/models
 add_path presentation/gpu_occupancy.csv
 add_path presentation/make_train_data.presentation.py
+add_path presentation/train_data.csv.bz2
 
 sort -u "$manifest" -o "$manifest"
 tar -cjf "$archive" -T "$manifest"
@@ -1619,6 +1815,7 @@ run_brev_training() {
     local auto_create=$1
     if [ "$DRY_RUN" != "1" ]; then
         require_command runplz
+        require_clean_runplz
     fi
     run_cmd mkdir -p "$RUN_DIR"
     local runplz_on_finish=leave
@@ -1655,6 +1852,7 @@ run_brev_training() {
     local runplz_env=(
         "MHCFLURRY_OUT=$RUN_DIR"
         "REPO=$REPO"
+        "RELEASE_RANDOM_SEED=$RELEASE_RANDOM_SEED"
         "TRAINING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE"
         "AFFINITY_MINIBATCH_SIZE=$AFFINITY_MINIBATCH_SIZE"
         "AFFINITY_MAX_WORKERS_PER_GPU=$AFFINITY_MAX_WORKERS_PER_GPU"
@@ -1665,6 +1863,7 @@ run_brev_training() {
         "PROCESSING_VARIANTS=$PROCESSING_VARIANTS"
         "PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$PRESENTATION_PROCESSING_WITH_FLANKS_KIND"
         "PRESENTATION_DECOYS_PER_HIT=$PRESENTATION_DECOYS_PER_HIT"
+        "PRESENTATION_SAMPLE_FRACTION=$PRESENTATION_SAMPLE_FRACTION"
         "PRESENTATION_FEATURE_CHUNK_SIZE=$PRESENTATION_FEATURE_CHUNK_SIZE"
         "PRESENTATION_NUM_JOBS=$PRESENTATION_NUM_JOBS"
         "PRESENTATION_MAX_WORKERS_PER_GPU=$PRESENTATION_MAX_WORKERS_PER_GPU"
@@ -1689,6 +1888,11 @@ run_brev_training() {
         "COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU=$COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU"
         "COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER=$COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER"
         "COMPARE_PRESENTATION_TORCH_COMPILE=$COMPARE_PRESENTATION_TORCH_COMPILE"
+        "MHCFLURRY_TORCH_COMPILE=$MHCFLURRY_TORCH_COMPILE"
+        "MHCFLURRY_TORCH_COMPILE_LOSS=$MHCFLURRY_TORCH_COMPILE_LOSS"
+        "MHCFLURRY_MATMUL_PRECISION=$MHCFLURRY_MATMUL_PRECISION"
+        "MATMUL_PRECISION=$MATMUL_PRECISION"
+        "MATMUL_PRECISION_CLI=$MATMUL_PRECISION_CLI"
         "PROCESSING_MODES=$PROCESSING_MODES"
         "PRESENTATION_MODES=$PRESENTATION_MODES"
         "PAPER_FIGURES_SCORES_DIR=$remote_paper_scores_dir"
@@ -1814,6 +2018,7 @@ BREV_INSTANCE_TYPE="${RUNPLZ_BREV_INSTANCE_TYPE:-${BREV_INSTANCE_TYPE:-}}"
 DEFAULT_BREV_PROVISION_INSTANCE_TYPE="${DEFAULT_BREV_PROVISION_INSTANCE_TYPE:-}"
 BREV_CONTAINER_IMAGE="${BREV_CONTAINER_IMAGE:-pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime}"
 BREV_MAX_RUNTIME_SECONDS="${RUNPLZ_BREV_MAX_RUNTIME_SECONDS:-${BREV_MAX_RUNTIME_SECONDS:-}}"
+RUNPLZ_REQUIRED_VERSION="3.24.31"
 BREV_INSTANCE_TYPE_FALLBACK_COUNT="${RUNPLZ_BREV_INSTANCE_TYPE_FALLBACK_COUNT:-3}"
 BREV_EXCLUDE_PROVIDERS="${RUNPLZ_BREV_EXCLUDE_PROVIDERS:-oci}"
 BREV_STOP_FAILURE_ACTION_EXPLICIT=0
@@ -1846,8 +2051,13 @@ COMPARE_BACKEND="${COMPARE_BACKEND:-auto}"
 COMPARE_NUM_JOBS="${COMPARE_NUM_JOBS:-auto}"
 COMPARE_MAX_WORKERS_PER_GPU="${COMPARE_MAX_WORKERS_PER_GPU:-auto}"
 COMPARE_MAX_TASKS_PER_WORKER="${COMPARE_MAX_TASKS_PER_WORKER:-12}"
-COMPARE_TORCH_COMPILE="${COMPARE_TORCH_COMPILE:-${MHCFLURRY_TORCH_COMPILE:-auto}}"
-COMPARE_MATMUL_PRECISION="${COMPARE_MATMUL_PRECISION:-${MHCFLURRY_MATMUL_PRECISION:-high}}"
+MHCFLURRY_TORCH_COMPILE="${MHCFLURRY_TORCH_COMPILE:-0}"
+MHCFLURRY_TORCH_COMPILE_LOSS="${MHCFLURRY_TORCH_COMPILE_LOSS:-0}"
+MHCFLURRY_MATMUL_PRECISION="${MHCFLURRY_MATMUL_PRECISION:-highest}"
+MATMUL_PRECISION="${MATMUL_PRECISION:-highest}"
+MATMUL_PRECISION_CLI="${MATMUL_PRECISION_CLI:-highest}"
+COMPARE_TORCH_COMPILE="${COMPARE_TORCH_COMPILE:-$MHCFLURRY_TORCH_COMPILE}"
+COMPARE_MATMUL_PRECISION="${COMPARE_MATMUL_PRECISION:-$MHCFLURRY_MATMUL_PRECISION}"
 COMPARE_GPUS="${COMPARE_GPUS:-auto}"
 COMPARE_PRESENTATION_NUM_JOBS="${COMPARE_PRESENTATION_NUM_JOBS:-auto}"
 COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU="${COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU:-auto}"
@@ -1871,7 +2081,8 @@ PAPER_FIGURES_PRESENTATION_PANEL_BASELINES="${PAPER_FIGURES_PRESENTATION_PANEL_B
 RUN_LABEL="${RUN_LABEL:-}"
 DRY_RUN=0
 ALLOW_DIRTY_REPO="${ALLOW_DIRTY_REPO:-0}"
-TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-1024}"
+RELEASE_RANDOM_SEED="${RELEASE_RANDOM_SEED:-42}"
+TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-128}"
 AFFINITY_MINIBATCH_SIZE=
 AFFINITY_MAX_WORKERS_PER_GPU_EXPLICIT=0
 if [ -n "${AFFINITY_MAX_WORKERS_PER_GPU:-}" ]; then
@@ -1881,14 +2092,19 @@ AFFINITY_MAX_WORKERS_PER_GPU="${AFFINITY_MAX_WORKERS_PER_GPU:-auto}"
 PROCESSING_MINIBATCH_SIZE=
 PROCESSING_NUM_JOBS="${PROCESSING_NUM_JOBS:-auto}"
 PROCESSING_MAX_WORKERS_PER_GPU="${PROCESSING_MAX_WORKERS_PER_GPU:-auto}"
-PROCESSING_HELD_OUT_SAMPLES="${PROCESSING_HELD_OUT_SAMPLES:-50}"
+PROCESSING_HELD_OUT_SAMPLES="${PROCESSING_HELD_OUT_SAMPLES:-10}"
 PROCESSING_VARIANTS_EXPLICIT=0
 if [ -n "${PROCESSING_VARIANTS:-}" ]; then
     PROCESSING_VARIANTS_EXPLICIT=1
 fi
 PROCESSING_VARIANTS="${PROCESSING_VARIANTS:-with_flanks no_flank short_flanks}"
-PRESENTATION_PROCESSING_WITH_FLANKS_KIND="${PRESENTATION_PROCESSING_WITH_FLANKS_KIND:-with_flanks}"
-PRESENTATION_DECOYS_PER_HIT="${PRESENTATION_DECOYS_PER_HIT:-99}"
+PRESENTATION_PROCESSING_WITH_FLANKS_KIND_EXPLICIT=0
+if [ -n "${PRESENTATION_PROCESSING_WITH_FLANKS_KIND:-}" ]; then
+    PRESENTATION_PROCESSING_WITH_FLANKS_KIND_EXPLICIT=1
+fi
+PRESENTATION_PROCESSING_WITH_FLANKS_KIND="${PRESENTATION_PROCESSING_WITH_FLANKS_KIND:-short_flanks}"
+PRESENTATION_DECOYS_PER_HIT="${PRESENTATION_DECOYS_PER_HIT:-2}"
+PRESENTATION_SAMPLE_FRACTION="${PRESENTATION_SAMPLE_FRACTION:-0.1}"
 PRESENTATION_FEATURE_CHUNK_SIZE="${PRESENTATION_FEATURE_CHUNK_SIZE:-250000}"
 PRESENTATION_NUM_JOBS="${PRESENTATION_NUM_JOBS:-auto}"
 PRESENTATION_MAX_WORKERS_PER_GPU="${PRESENTATION_MAX_WORKERS_PER_GPU:-auto}"
@@ -2119,6 +2335,10 @@ while [ $# -gt 0 ]; do
             TRAINING_MINIBATCH_SIZE=$2
             shift 2
             ;;
+        --random-seed)
+            RELEASE_RANDOM_SEED=$2
+            shift 2
+            ;;
         --affinity-minibatch-size)
             AFFINITY_MINIBATCH_SIZE=$2
             shift 2
@@ -2151,10 +2371,15 @@ while [ $# -gt 0 ]; do
             ;;
         --presentation-processing-with-flanks-kind)
             PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$2
+            PRESENTATION_PROCESSING_WITH_FLANKS_KIND_EXPLICIT=1
             shift 2
             ;;
         --presentation-decoys-per-hit)
             PRESENTATION_DECOYS_PER_HIT=$2
+            shift 2
+            ;;
+        --presentation-sample-fraction)
+            PRESENTATION_SAMPLE_FRACTION=$2
             shift 2
             ;;
         --presentation-feature-chunk-size)
@@ -2218,14 +2443,16 @@ if [ -z "$AFFINITY_MINIBATCH_SIZE" ]; then
     AFFINITY_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE
 fi
 if [ -z "$PROCESSING_MINIBATCH_SIZE" ]; then
-    PROCESSING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE
+    PROCESSING_MINIBATCH_SIZE=512
 fi
 apply_release_profile
 validate_processing_configuration
+validate_nonnegative_integer "--random-seed" "$RELEASE_RANDOM_SEED"
 validate_positive_integer "--affinity-minibatch-size" "$AFFINITY_MINIBATCH_SIZE"
 validate_positive_integer "--processing-minibatch-size" "$PROCESSING_MINIBATCH_SIZE"
 validate_positive_integer "--processing-held-out-samples" "$PROCESSING_HELD_OUT_SAMPLES"
 validate_positive_number "--presentation-decoys-per-hit" "$PRESENTATION_DECOYS_PER_HIT"
+validate_fraction "--presentation-sample-fraction" "$PRESENTATION_SAMPLE_FRACTION"
 validate_positive_integer "--presentation-feature-chunk-size" "$PRESENTATION_FEATURE_CHUNK_SIZE"
 validate_auto_or_positive_integer "--affinity-max-workers-per-gpu" "$AFFINITY_MAX_WORKERS_PER_GPU"
 validate_auto_or_nonnegative_integer "--processing-num-jobs" "$PROCESSING_NUM_JOBS"
@@ -2411,11 +2638,12 @@ note "Run directory: $RUN_DIR"
 note "Release:       $RELEASE"
 note "Backend:       $BACKEND"
 note "Profile:       $RELEASE_PROFILE"
+note "Random seed:   $RELEASE_RANDOM_SEED"
 note "Batch sizes:   affinity=$AFFINITY_MINIBATCH_SIZE processing=$PROCESSING_MINIBATCH_SIZE"
 note "Compare:       $RUN_LABEL vs $COMPARE_BASELINE_LABEL ($COMPARE_BASELINE)"
 note "Affinity MWPG: $AFFINITY_MAX_WORKERS_PER_GPU"
 note "Processing:    variants=$PROCESSING_VARIANTS; eval_modes=$PROCESSING_MODES; jobs=$PROCESSING_NUM_JOBS; workers/gpu=$PROCESSING_MAX_WORKERS_PER_GPU"
-note "Presentation:  decoys/hit=$PRESENTATION_DECOYS_PER_HIT; jobs=$PRESENTATION_NUM_JOBS; workers/gpu=$PRESENTATION_MAX_WORKERS_PER_GPU"
+note "Presentation:  decoys/hit=$PRESENTATION_DECOYS_PER_HIT; sample_fraction=$PRESENTATION_SAMPLE_FRACTION; jobs=$PRESENTATION_NUM_JOBS; workers/gpu=$PRESENTATION_MAX_WORKERS_PER_GPU"
 if [ -n "$PAPER_FIGURES_PREPARE_COMMAND" ]; then
     note "Paper inputs:  local prepare command configured"
 fi
@@ -2454,6 +2682,7 @@ if [ "$SKIP_TRAIN" != "1" ]; then
                 "REPO=$REPO" \
                 "MHCFLURRY_RELEASE_WORKFLOW_ID=$WORKFLOW_RUN_ID" \
                 "MHCFLURRY_RELEASE_GIT_COMMIT=$RELEASE_GIT_COMMIT" \
+                "RELEASE_RANDOM_SEED=$RELEASE_RANDOM_SEED" \
                 "TRAINING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE" \
                 "AFFINITY_MINIBATCH_SIZE=$AFFINITY_MINIBATCH_SIZE" \
                 "AFFINITY_MAX_WORKERS_PER_GPU=$AFFINITY_MAX_WORKERS_PER_GPU" \
@@ -2464,12 +2693,18 @@ if [ "$SKIP_TRAIN" != "1" ]; then
                 "PROCESSING_VARIANTS=$PROCESSING_VARIANTS" \
                 "PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" \
                 "PRESENTATION_DECOYS_PER_HIT=$PRESENTATION_DECOYS_PER_HIT" \
+                "PRESENTATION_SAMPLE_FRACTION=$PRESENTATION_SAMPLE_FRACTION" \
                 "PRESENTATION_FEATURE_CHUNK_SIZE=$PRESENTATION_FEATURE_CHUNK_SIZE" \
                 "PRESENTATION_NUM_JOBS=$PRESENTATION_NUM_JOBS" \
                 "PRESENTATION_MAX_WORKERS_PER_GPU=$PRESENTATION_MAX_WORKERS_PER_GPU" \
                 "PRESENTATION_CALIBRATION_NUM_JOBS=$PRESENTATION_CALIBRATION_NUM_JOBS" \
                 "PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU=$PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU" \
                 "PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE=$PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE" \
+                "MHCFLURRY_TORCH_COMPILE=$MHCFLURRY_TORCH_COMPILE" \
+                "MHCFLURRY_TORCH_COMPILE_LOSS=$MHCFLURRY_TORCH_COMPILE_LOSS" \
+                "MHCFLURRY_MATMUL_PRECISION=$MHCFLURRY_MATMUL_PRECISION" \
+                "MATMUL_PRECISION=$MATMUL_PRECISION" \
+                "MATMUL_PRECISION_CLI=$MATMUL_PRECISION_CLI" \
                 bash "$REPO/scripts/training/pan_allele_release_full.sh"
             ;;
         brev-existing)
@@ -2491,6 +2726,7 @@ if [ "$SKIP_TRAIN" != "1" ]; then
             REMOTE_COMMAND="$REMOTE_COMMAND REPO=$(shell_quote "$REMOTE_REPO")"
             REMOTE_COMMAND="$REMOTE_COMMAND MHCFLURRY_RELEASE_WORKFLOW_ID=$(shell_quote "$WORKFLOW_RUN_ID")"
             REMOTE_COMMAND="$REMOTE_COMMAND MHCFLURRY_RELEASE_GIT_COMMIT=\$(git -C $REMOTE_REPO_QUOTED rev-parse HEAD)"
+            REMOTE_COMMAND="$REMOTE_COMMAND RELEASE_RANDOM_SEED=$(shell_quote "$RELEASE_RANDOM_SEED")"
             REMOTE_COMMAND="$REMOTE_COMMAND TRAINING_MINIBATCH_SIZE=$(shell_quote "$TRAINING_MINIBATCH_SIZE")"
             REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_MINIBATCH_SIZE=$(shell_quote "$AFFINITY_MINIBATCH_SIZE")"
             REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_MAX_WORKERS_PER_GPU=$(shell_quote "$AFFINITY_MAX_WORKERS_PER_GPU")"
@@ -2501,12 +2737,18 @@ if [ "$SKIP_TRAIN" != "1" ]; then
             REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_VARIANTS=$(shell_quote "$PROCESSING_VARIANTS")"
             REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$(shell_quote "$PRESENTATION_PROCESSING_WITH_FLANKS_KIND")"
             REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_DECOYS_PER_HIT=$(shell_quote "$PRESENTATION_DECOYS_PER_HIT")"
+            REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_SAMPLE_FRACTION=$(shell_quote "$PRESENTATION_SAMPLE_FRACTION")"
             REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_FEATURE_CHUNK_SIZE=$(shell_quote "$PRESENTATION_FEATURE_CHUNK_SIZE")"
             REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_NUM_JOBS=$(shell_quote "$PRESENTATION_NUM_JOBS")"
             REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_MAX_WORKERS_PER_GPU=$(shell_quote "$PRESENTATION_MAX_WORKERS_PER_GPU")"
             REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_CALIBRATION_NUM_JOBS=$(shell_quote "$PRESENTATION_CALIBRATION_NUM_JOBS")"
             REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU=$(shell_quote "$PRESENTATION_CALIBRATION_MAX_WORKERS_PER_GPU")"
             REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE=$(shell_quote "$PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE")"
+            REMOTE_COMMAND="$REMOTE_COMMAND MHCFLURRY_TORCH_COMPILE=$(shell_quote "$MHCFLURRY_TORCH_COMPILE")"
+            REMOTE_COMMAND="$REMOTE_COMMAND MHCFLURRY_TORCH_COMPILE_LOSS=$(shell_quote "$MHCFLURRY_TORCH_COMPILE_LOSS")"
+            REMOTE_COMMAND="$REMOTE_COMMAND MHCFLURRY_MATMUL_PRECISION=$(shell_quote "$MHCFLURRY_MATMUL_PRECISION")"
+            REMOTE_COMMAND="$REMOTE_COMMAND MATMUL_PRECISION=$(shell_quote "$MATMUL_PRECISION")"
+            REMOTE_COMMAND="$REMOTE_COMMAND MATMUL_PRECISION_CLI=$(shell_quote "$MATMUL_PRECISION_CLI")"
             REMOTE_COMMAND="$REMOTE_COMMAND bash"
             REMOTE_COMMAND="$REMOTE_COMMAND scripts/training/pan_allele_release_full.sh"
             run_logged_step train_ssh ssh "$REMOTE" \
@@ -2560,6 +2802,12 @@ if [ "$SKIP_EVAL" != "1" ]; then
                 DATA_DIR="$(mhcflurry-downloads path data_evaluation)"
             fi
         fi
+        case ",$COMPARE_INCLUDE," in
+            *,affinity,*)
+                run_logged_step fetch_train_excluded_affinity_baseline \
+                    mhcflurry-downloads fetch models_class1_pan_variants
+                ;;
+        esac
         run_logged_step fetch_compare_baseline_downloads \
             fetch_pinned_public_baseline_downloads
         compare_args=(
@@ -2569,6 +2817,8 @@ if [ "$SKIP_EVAL" != "1" ]; then
             --b "$COMPARE_BASELINE"
             --b-label "$COMPARE_BASELINE_LABEL"
             --data-dir "$DATA_DIR"
+            --release-holdout-dir "$RUN_DIR/release_holdout"
+            --affinity-training-overlap-policy audit
             --include "$COMPARE_INCLUDE"
             --processing-modes "$PROCESSING_MODES"
             --presentation-modes "$PRESENTATION_MODES"
@@ -2592,6 +2842,47 @@ if [ "$SKIP_EVAL" != "1" ]; then
             *) compare_args+=(--gpus "$COMPARE_GPUS") ;;
         esac
         run_logged_step compare_models "${compare_args[@]}"
+        case ",$COMPARE_INCLUDE," in
+            *,affinity,*)
+                if [ "$DRY_RUN" = "1" ]; then
+                    TRAIN_EXCLUDED_AFFINITY_DIR='<mhcflurry-downloads path models_class1_pan_variants>/models.no_additional_ms'
+                else
+                    TRAIN_EXCLUDED_AFFINITY_DIR="$(
+                        mhcflurry-downloads path models_class1_pan_variants
+                    )/models.no_additional_ms"
+                fi
+                fair_affinity_args=(
+                    mhcflurry eval compare-models
+                    --a "$RUN_DIR"
+                    --a-label "$RUN_LABEL"
+                    --b "$TRAIN_EXCLUDED_AFFINITY_DIR"
+                    --b-affinity-dir "$TRAIN_EXCLUDED_AFFINITY_DIR"
+                    --b-label "MHCflurry no-additional-MS (train-excluded)"
+                    --data-dir "$DATA_DIR"
+                    --release-holdout-dir "$RUN_DIR/release_holdout"
+                    --affinity-training-overlap-policy exclude
+                    --include affinity
+                    --affinity-source no_additional_ms
+                    --backend "$COMPARE_BACKEND"
+                    --num-jobs "$COMPARE_NUM_JOBS"
+                    --max-workers-per-gpu "$COMPARE_MAX_WORKERS_PER_GPU"
+                    --max-tasks-per-worker "$COMPARE_MAX_TASKS_PER_WORKER"
+                    --torch-compile "$COMPARE_TORCH_COMPILE"
+                    --matmul-precision "$COMPARE_MATMUL_PRECISION"
+                    --out "$RUN_DIR/eval_comparison_train_excluded_affinity"
+                )
+                if [ -n "$EVAL_MAX_BENCHMARK_FILES" ]; then
+                    fair_affinity_args+=(
+                        --limit-files "$EVAL_MAX_BENCHMARK_FILES")
+                fi
+                case "$(lowercase "$COMPARE_GPUS")" in
+                    auto) ;;
+                    *) fair_affinity_args+=(--gpus "$COMPARE_GPUS") ;;
+                esac
+                run_logged_step compare_models_train_excluded_affinity \
+                    "${fair_affinity_args[@]}"
+                ;;
+        esac
     fi
 else
     note "Skipping evaluation."
@@ -2611,6 +2902,7 @@ if [ "$SKIP_PLOTS" != "1" ]; then
             --paper-figures-out "$RUN_DIR/eval_comparison/plots/paper_figures"
             --paper-figures-formats "$PAPER_FIGURES_FORMATS"
             --paper-figures-scores-dir "${PAPER_FIGURES_SCORES_DIR:-$RUN_DIR/eval_comparison}"
+            --include-paper-figures-in-summary-pdf
         )
         if [ -n "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS" ]; then
             plot_args+=(--paper-figures-multiallelic-predictions "$PAPER_FIGURES_MULTIALLELIC_PREDICTIONS")
@@ -2635,6 +2927,15 @@ if [ "$SKIP_PLOTS" != "1" ]; then
         fi
         run_logged_step plot_model_comparison \
             "${plot_args[@]}"
+        if [ -d "$RUN_DIR/eval_comparison_train_excluded_affinity" ]; then
+            run_logged_step plot_train_excluded_affinity_comparison \
+                mhcflurry eval plot-comparison \
+                --input "$RUN_DIR/eval_comparison_train_excluded_affinity" \
+                --a-label "$RUN_LABEL" \
+                --b-label "MHCflurry no-additional-MS (train-excluded)" \
+                --summary-pdf \
+                    "$RUN_DIR/eval_comparison_train_excluded_affinity/plots/model_comparison_figures.pdf"
+        fi
     fi
 else
     note "Skipping plots."
@@ -2652,6 +2953,9 @@ if [ "$DEPLOY_MODE" != "none" ]; then
     )
     if [ "$ALLOW_DIRTY_REPO" = "1" ]; then
         deploy_args+=(--allow-dirty-repo)
+    fi
+    if [ "$SKIP_TRAIN" = "1" ]; then
+        deploy_args+=(--allow-artifact-source-mismatch)
     fi
     run_logged_step deploy_trained_models \
         "${deploy_args[@]}"

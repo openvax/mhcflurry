@@ -54,6 +54,7 @@ except ImportError:
 from ..downloads import (
     get_current_release,
     get_current_release_downloads,
+    get_release_downloads,
     get_downloads_dir,
     get_path,
     ENVIRONMENT_VARIABLES)
@@ -194,7 +195,7 @@ def fetch_subcommand(args):
             "a custom models directory. Specify --release to indicate "
             "the release to download.")
 
-    downloads = get_current_release_downloads()
+    downloads = get_release_downloads(args.release)
     invalid_download_names = set(
         item for item in args.download_name if item not in downloads)
     if invalid_download_names:

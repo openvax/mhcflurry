@@ -215,7 +215,7 @@ class TestGetActivation:
     def test_unknown_raises(self):
         from mhcflurry.pytorch_layers import get_activation
         with pytest.raises(ValueError, match="Unknown activation"):
-            get_activation("swish")
+            get_activation("mish")
 
 
 class TestLocallyConnected1D:

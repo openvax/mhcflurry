@@ -17,11 +17,17 @@ mhcflurry train pan-allele-release \
 
 The workflow runs these stages in order:
 
-1. Train affinity, processing, and presentation models.
-2. Compare the new models with a configured public release or run directory.
-3. Render diagnostic plots and a combined PDF.
-4. Copy remote artifacts back when using a remote backend.
-5. Optionally package or deploy model archives.
+1. Build and persist the pMHC and sample manifests for the frozen release
+   holdout (all monoallelic samples for affinity; PMID 31154438 for processing
+   and presentation).
+2. Train affinity outside the benchmark pMHC intersection and presentation
+   outside the complete multiallelic holdout samples.
+3. Validate zero holdout overlap in the final training artifacts.
+4. Compare the new models with a configured public release or run directory,
+   restricted to the frozen component-specific evaluation samples.
+5. Render diagnostic plots and a combined PDF.
+6. Copy remote artifacts back when using a remote backend.
+7. Optionally package or deploy model archives.
 
 Each stage has a `--skip-*` option for controlled resumption. Logs and
 `status.tsv` are written under `<run-dir>/workflow_logs/`. Deployment is off by
@@ -87,8 +93,8 @@ needs every candidate model and training intermediate table.
 ## Release profiles and performance
 
 `--release-profile full` is the default. It trains the complete processing set:
-`with_flanks`, `no_flank`, and `short_flanks`. Presentation uses the true
-`with_flanks` predictor by default.
+`with_flanks`, `no_flank`, and `short_flanks`. Presentation uses the published
+`short_flanks` predictor (5 aa on each side) by default.
 
 Optional profiles are:
 
@@ -97,9 +103,9 @@ Optional profiles are:
 - `minimal-processing`: omits `short_flanks` from both training and evaluation.
 - `fast-minimal`: combines those two choices.
 
-The shared training minibatch defaults to 1024. Use
-`--affinity-minibatch-size` or `--processing-minibatch-size` only when a model
-family needs a different value.
+Affinity minibatch defaults to the held-out-validated value 1024. Processing
+retains the published minibatch 512. Use `--affinity-minibatch-size` or
+`--processing-minibatch-size` only for a deliberate experiment.
 
 Affinity worker packing defaults to `--affinity-max-workers-per-gpu auto`. The
 training command estimates the complete per-worker working set from the model,

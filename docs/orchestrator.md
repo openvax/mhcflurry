@@ -124,6 +124,9 @@ the unit-test matrix in `test/test_orchestrator_helpers.py`. The
 production recipes pass `auto` for each; pin a literal int only when
 intentionally re-benchmarking.
 
+The design boundaries and remaining follow-up work are recorded in
+{doc}`auto_sizing_audit`.
+
 ### `--max-workers-per-gpu auto` → `auto_max_workers_per_gpu`
 
 Picks per-GPU worker concurrency from the number of complete estimated worker
@@ -141,12 +144,27 @@ current available RAM; fork pools retain copy-on-write sharing and skip that
 copy multiplier. If no additional spawn copy fits safely, automatic local
 execution falls back to serial work in the parent instead of forcing one child.
 
-When torch compilation is enabled, the existing one-worker compile warmup also
-records CUDA peak-reserved memory and process peak RSS. A measured peak can
-tighten an automatic plan before the production pool starts, but can never
-change explicit CLI values. Runtime validation and inference batches use the
-same shared reserve against live free memory, so they do not independently
-spend VRAM already assigned to workers.
+Before affinity or processing training starts, a one-worker resource probe runs
+one bounded epoch for each resource-distinct architecture with production-shaped
+data residency, minibatching, and validation. It records PyTorch allocator peaks,
+whole-process CUDA memory (including the CUDA context), and process peak RSS. A
+measured peak can tighten an automatic plan before the production pool starts,
+but can never change explicit CLI values. When torch compilation is enabled the
+same pass also primes its on-disk cache.
+
+Runtime validation, calibration, and inference do not divide live free VRAM by
+the worker count. That value already reflects whichever peer workers happened to
+initialize first and made batch sizing depend on startup order. Instead, every
+worker receives a fixed share of launch-time free device capacity after one
+shared reserve, subtracts its own resident process working set, and caps the
+remainder by live global headroom. The launch snapshot accounts for unrelated
+processes that already occupy a card. This keeps launch packing and runtime
+batches within the same resource envelope.
+
+Release training sets ``MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK=1``. The public
+API continues to warn and shrink an oversized affinity-training batch, but a
+release run fails because changing the effective minibatch changes the
+optimization problem and therefore the resulting weights.
 
 For the generic 4 GiB fallback, 80 GiB free fits 18 workers and 40 GiB fits 9;
 workload-specific estimates, host RAM, vCPUs, and the number of work items can
@@ -376,18 +394,18 @@ therefore have no `AffinityDeviceTrainingData`.
 
 ## rsync hygiene (laptop ↔ remote training box)
 
-`runplz` rsyncs the working tree up to the box on every launch, and
-the run's `out/` directory back to the laptop on completion. Two
-asymmetries to know about:
+`runplz` stages the working tree on the box for every launch, and the run's
+`out/` directory returns to the laptop on completion. Two asymmetries to know
+about:
 
-- **Up direction:** runplz's hardcoded exclude list (`.git`, `.venv`,
-  `__pycache__`, etc.) doesn't anticipate per-project output dirs.
-  In mhcflurry, `brev_runs/` accumulates 7-15 GB of past-run
-  artifacts that ride along on every launch unless relocated. Run
-  `bash scripts/dev/relocate_run_outputs.sh --apply` once to move
-  `brev_runs/` and `results/` to `~/mhcflurry-brev-runs/` and
-  `~/mhcflurry-results/`, with symlinks back into the repo. After
-  that, rsync ships ~tiny symlinks instead of multi-GB directories.
+- **Up direction:** runplz 3.24.31 uses Git-aware staging, HUP-safe detached
+  bootstraps, shared backend retries, and retryable idempotent SSH preparation.
+  Tracked files and
+  intentional untracked inputs are staged, while ignored directories such as
+  `brev_runs/`, `results/`, `.venv/`, and `out/` are excluded without a
+  workstation-specific relocation or symlink workaround. The release wrapper
+  requires exactly 3.24.31 and rejects a dirty editable runplz checkout or a
+  source/distribution version mismatch.
 - **Down direction:** the post-run rsync has NO excludes — everything
   under `out/` returns. Keep large throwaway run artifacts outside
   `out/` unless they are meant to ship back.
