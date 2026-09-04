@@ -5,6 +5,10 @@ model-validation record stays distinct from the package changelog.
 
 ## rc20
 
+- Honor `mhcflurry-downloads fetch --release` when
+  `MHCFLURRY_DOWNLOADS_DIR` points at a custom destination. Previously this
+  combination selected metadata using a missing implicit release and failed
+  with `KeyError: None` before downloading.
 - Restore framework-level 2.1.x training semantics that numeric
   hyperparameters alone did not capture: post-activation affinity LSUV,
   Keras-equation RMSprop/Adam, Keras validation-split rounding, processing
