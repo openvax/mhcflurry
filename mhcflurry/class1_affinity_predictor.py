@@ -214,6 +214,44 @@ class Class1AffinityPredictor(object):
         return result
 
     @classmethod
+    def _allele_to_sequence_for_merge(cls, predictors):
+        """Return a safe pseudosequence mapping for a predictor merge."""
+        pan_predictors = [
+            predictor for predictor in predictors
+            if predictor.class1_pan_allele_models
+        ]
+        if not pan_predictors:
+            for predictor in predictors:
+                if predictor.allele_to_sequence is not None:
+                    return dict(predictor.allele_to_sequence)
+            return None
+
+        expected = dict(pan_predictors[0].allele_to_sequence)
+        for (index, predictor) in enumerate(pan_predictors[1:], start=1):
+            observed = dict(predictor.allele_to_sequence)
+            if observed == expected:
+                continue
+            expected_keys = set(expected)
+            observed_keys = set(observed)
+            conflicting = sorted(
+                allele for allele in expected_keys & observed_keys
+                if expected[allele] != observed[allele]
+            )
+            missing = sorted(expected_keys - observed_keys)
+            extra = sorted(observed_keys - expected_keys)
+            raise ValueError(
+                "Cannot merge pan-allele predictors with incompatible "
+                "allele_to_sequence mappings. Pan predictor %d differs from "
+                "the first: conflicting=%s, missing=%s, extra=%s" % (
+                    index,
+                    conflicting[:5],
+                    missing[:5],
+                    extra[:5],
+                )
+            )
+        return expected
+
+    @classmethod
     def merge(cls, predictors):
         """
         Merge the ensembles of two or more `Class1AffinityPredictor` instances.
@@ -236,7 +274,7 @@ class Class1AffinityPredictor(object):
 
         allele_to_allele_specific_models = collections.defaultdict(list)
         class1_pan_allele_models = []
-        allele_to_sequence = predictors[0].allele_to_sequence
+        allele_to_sequence = cls._allele_to_sequence_for_merge(predictors)
 
         for predictor in predictors:
             for (allele, networks) in (
@@ -264,6 +302,9 @@ class Class1AffinityPredictor(object):
         -------
         list of string : names of newly added models
         """
+        others = list(others)
+        allele_to_sequence = self._allele_to_sequence_for_merge(
+            [self] + others)
         new_model_names = []
         original_manifest = self.manifest_df
         new_manifest_rows = []
@@ -298,6 +339,7 @@ class Class1AffinityPredictor(object):
                     current_models.append(model)
                     new_model_names.append(model_name)
 
+        self.allele_to_sequence = allele_to_sequence
         self._manifest_df = pandas.concat(
             [original_manifest] + new_manifest_rows,
             ignore_index=True)
@@ -592,6 +634,18 @@ class Class1AffinityPredictor(object):
         string
         """
         return join(models_dir, "weights_%s.npz" % model_name)
+
+    @staticmethod
+    def checkpoint_weights_path(models_dir, model_name, policy):
+        """Generate the path to a retained training-checkpoint weight file."""
+        if policy not in ("terminal", "best"):
+            raise ValueError("Unknown checkpoint policy: %s" % policy)
+        return join(
+            models_dir,
+            "checkpoints",
+            policy,
+            "weights_%s.npz" % model_name,
+        )
 
     @property
     def master_allele_encoding(self):

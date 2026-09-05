@@ -216,6 +216,15 @@ parser.add_argument(
     default=False,
     help="Do not actually train models. The initialized run can be continued "
     "later with --continue-incomplete.")
+parser.add_argument(
+    "--save-all-checkpoints",
+    action="store_true",
+    default=False,
+    help=(
+        "Retain both terminal and minimum-validation weights for every fit. "
+        "The restore_best_weights hyperparameter still selects the primary "
+        "predictor weights."
+    ))
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
 
@@ -730,6 +739,8 @@ def initialize_training(args):
     # separate invocation via --continue-incomplete) derives per-fit seeds
     # from the same value used for fold assignment.
     training_init_info["seed"] = master_seed
+    training_init_info["save_all_checkpoints"] = bool(
+        args.save_all_checkpoints)
 
     # Save empty predictor (for metadata)
     predictor.save(args.out_models_dir)
@@ -787,6 +798,9 @@ def train_models(args):
         item['predictor'] = predictor if serial_run else None
         item['save_to'] = args.out_models_dir if serial_run else None
         item['verbose'] = args.verbosity
+        item['save_all_checkpoints'] = bool(
+            WORKER_CONTEXT.get("save_all_checkpoints", False)
+            or args.save_all_checkpoints)
         if args.pretrain_data:
             item['pretrain_data_filename'] = args.pretrain_data
 
@@ -1049,6 +1063,7 @@ def train_model(
         progress_print_interval,
         predictor,
         save_to,
+        save_all_checkpoints=False,
         compile_warmup_only=False,
         constant_data=WORKER_CONTEXT,
         resource_probe_only=False):
@@ -1246,7 +1261,8 @@ def train_model(
         progress_callback=progress_callback,
         progress_print_interval=progress_print_interval,
         seed=work_item_seed,
-        verbose=verbose)
+        verbose=verbose,
+        save_all_checkpoints=save_all_checkpoints)
 
     # Save model-specific training info
     train_peptide_hash = hashlib.sha1()

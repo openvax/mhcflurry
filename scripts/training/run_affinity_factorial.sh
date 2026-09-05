@@ -429,6 +429,7 @@ while IFS= read -r condition; do
                 --out-models-dir "$predictor" \
                 --min-models-per-fold 2 \
                 --max-models-per-fold 8 \
+                --save-validation-predictions \
                 --num-jobs auto \
                 --max-tasks-per-worker "$MAX_TASKS_PER_WORKER" \
                 --gpus "$GPUS" \

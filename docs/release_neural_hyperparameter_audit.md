@@ -18,6 +18,15 @@ latest-code comparison on the frozen release holdout, batch 1024 was worse than
 128. Batch 128 therefore remains the release baseline. The ablations below test
 optimizer/minibatch interactions explicitly rather than coupling them.
 
+**Status.** This document records the compatibility audit and its intermediate
+batch-128 control. The later eight-condition crossed frontier found that native
+PyTorch RMSprop, pre-activation LSUV, and minibatch 1024 work as a favorable
+three-way interaction. That combination supersedes the control for the frozen
+final candidate; see {doc}`release_2_3_training_experiments` and
+{doc}`final_230_candidate_experiment`. Statements below that batch 128
+"remains" the release choice should be read as conclusions of the earlier
+paired panel, not the final architecture decision.
+
 ## Release-grid audit
 
 ### Affinity
@@ -97,8 +106,9 @@ claim of universal optimizer superiority, determines the affinity and 0/0- and
 on the controlled held-out comparison below.
 
 The public predictor class defaults are independent of the release YAML.
-Current release generators explicitly use affinity minibatch 128 and processing
-minibatch 512, and the generated YAML records the actual values.
+The compatibility generators default to affinity minibatch 128 and processing
+minibatch 512. The final-candidate profile explicitly overrides affinity to
+1024; every generated YAML records the actual values.
 
 ## Controlled experiment matrix
 

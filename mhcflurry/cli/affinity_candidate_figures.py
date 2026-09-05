@@ -335,6 +335,13 @@ def build_candidate_figure_inputs(
                 raise ValueError(
                     "Prediction row count changed for %s: %d versus %d" % (
                         condition, len(predictions), len(combined)))
+            candidate_identity = predictions.loc[:, IDENTITY_COLUMNS]
+            combined_identity = combined.loc[:, IDENTITY_COLUMNS]
+            if not candidate_identity.reset_index(drop=True).equals(
+                    combined_identity.reset_index(drop=True)):
+                raise ValueError(
+                    "Prediction row identity or order changed for %s" %
+                    condition)
             comparison_public_scores = predictions["b_score"].to_numpy()
             finite_difference = numpy.abs(
                 comparison_public_scores - public_scores)

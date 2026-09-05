@@ -17,6 +17,11 @@
 #   TRAINING_MINIBATCH_SIZE    shared release minibatch default (128)
 #   AFFINITY_MINIBATCH_SIZE    affinity-specific override
 #                              (default 128, matching 2.1.x/2.2.x)
+#   AFFINITY_OPTIMIZER_IMPLEMENTATION
+#                              keras or pytorch (default keras)
+#   AFFINITY_LSUV_TARGET       post_activation or pre_activation
+#                              (default post_activation)
+#   AFFINITY_INIT              affinity initializer (default glorot_uniform)
 #   AFFINITY_HYPERPARAMETERS_FILE
 #                              optional pre-generated YAML for controlled
 #                              experiments; release runs leave this unset
@@ -24,6 +29,11 @@
 #                              and calibration (default 42)
 #   SKIP_CALIBRATE=1           skip percentile calibration for experiments
 #                              that compare raw affinity predictions
+#
+# Every fit retains both terminal and minimum-validation checkpoint sidecars.
+# Materialize either policy with `mhcflurry train
+# materialize-affinity-checkpoint`; the configured restore_best_weights value
+# still determines the primary weights used by this release workflow.
 set -euo pipefail
 set -x
 
@@ -337,6 +347,9 @@ TRAINING_DATA="$(pwd)/train_data.csv.bz2"
 CURRENT_PHASE="hyperparameters"
 TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-128}"
 AFFINITY_MINIBATCH_SIZE="${AFFINITY_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
+AFFINITY_OPTIMIZER_IMPLEMENTATION="${AFFINITY_OPTIMIZER_IMPLEMENTATION:-keras}"
+AFFINITY_LSUV_TARGET="${AFFINITY_LSUV_TARGET:-post_activation}"
+AFFINITY_INIT="${AFFINITY_INIT:-glorot_uniform}"
 if [ -n "${AFFINITY_HYPERPARAMETERS_FILE:-}" ]; then
     [ -f "$AFFINITY_HYPERPARAMETERS_FILE" ] || {
         echo "AFFINITY_HYPERPARAMETERS_FILE not found: $AFFINITY_HYPERPARAMETERS_FILE" >&2
@@ -346,6 +359,9 @@ if [ -n "${AFFINITY_HYPERPARAMETERS_FILE:-}" ]; then
 else
     mhcflurry class1-generate-training-hyperparameters affinity \
         --minibatch-size "$AFFINITY_MINIBATCH_SIZE" \
+        --optimizer-implementation "$AFFINITY_OPTIMIZER_IMPLEMENTATION" \
+        --data-dependent-initialization-target "$AFFINITY_LSUV_TARGET" \
+        --init "$AFFINITY_INIT" \
         > hyperparameters.yaml
 fi
 # ``dataloader_num_workers`` is no longer injected here. The orchestrator
@@ -386,6 +402,7 @@ do
         --random-seed "$RELEASE_RANDOM_SEED" \
         --hyperparameters hyperparameters.yaml \
         --out-models-dir "$(pwd)/$UNSELECTED_DIR" \
+        --save-all-checkpoints \
         --worker-log-dir "$MHCFLURRY_OUT" \
         "${PARALLELISM_ARGS[@]}" \
         "${CONTINUE_ARGS[@]}"
@@ -405,6 +422,7 @@ do
         --out-models-dir "$SELECTED_DIR" \
         --min-models-per-fold 2 \
         --max-models-per-fold 8 \
+        --save-validation-predictions \
         "${PARALLELISM_ARGS[@]}"
     cp "$UNSELECTED_DIR/train_data.csv.bz2" "$SELECTED_DIR/train_data.csv.bz2"
 

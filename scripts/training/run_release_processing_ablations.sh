@@ -159,6 +159,7 @@ train_processing_panel() {
             --out-models-dir "$selected" \
             --min-models-per-fold 1 \
             --max-models-per-fold 2 \
+            --save-validation-predictions \
             "${TRAINING_PARALLELISM_ARGS[@]}"
         cp "$unselected/train_data.csv.bz2" \
             "$selected/train_data.csv.bz2"

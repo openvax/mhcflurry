@@ -21,12 +21,17 @@ stable ``mhcflurry`` entry point.
 """
 
 import argparse
+import os
 from pathlib import Path
 import subprocess
 import sys
 
 
 WORKFLOW_SCRIPT = Path("scripts/release/retrain_evaluate_deploy.sh")
+TRAINING_SCRIPTS = {
+    "compose-processing-ensemble": Path(
+        "scripts/training/compose_processing_ensemble.py"),
+}
 
 
 def make_parser(prog="mhcflurry train"):
@@ -74,6 +79,18 @@ def make_parser(prog="mhcflurry train"):
         help="Archive reproducible experiment metadata and plotting tables.",
     )
     snapshot.add_argument("snapshot_args", nargs=argparse.REMAINDER)
+    checkpoints = sub.add_parser(
+        "materialize-affinity-checkpoint",
+        add_help=False,
+        help="Create a predictor from retained terminal or best checkpoints.",
+    )
+    checkpoints.add_argument("checkpoint_args", nargs=argparse.REMAINDER)
+    compose = sub.add_parser(
+        "compose-processing-ensemble",
+        add_help=False,
+        help="Combine complete processing predictors with recorded provenance.",
+    )
+    compose.add_argument("compose_args", nargs=argparse.REMAINDER)
     return parser
 
 
@@ -81,7 +98,9 @@ def _format_help(prog):
     return "\n".join([
         (
             "usage: %s {pan-allele-release,release-holdout,"
-            "plot-loss-curves,snapshot-experiment} ..." % prog
+            "plot-loss-curves,snapshot-experiment,"
+            "materialize-affinity-checkpoint,compose-processing-ensemble} ..." %
+            prog
         ),
         "",
         "Training workflows.",
@@ -91,12 +110,20 @@ def _format_help(prog):
         "  release-holdout     Build/validate frozen evaluation exclusions.",
         "  plot-loss-curves    Plot candidate losses and selected models.",
         "  snapshot-experiment Archive hashes, provenance, metrics, and epoch tables.",
+        "  materialize-affinity-checkpoint",
+        "                      Select retained terminal or best affinity weights.",
+        "  compose-processing-ensemble",
+        "                      Build a provenance-recorded processing ensemble.",
         "",
         "Examples:",
         "  %s pan-allele-release --run-dir runs/2.3.0 --release 2.3.0 --backend local" % prog,
         "  %s pan-allele-release --run-dir runs/2.3.0 --release 2.3.0 --backend brev-provision" % prog,
         "  %s plot-loss-curves --selected-dir models.combined --out plots" % prog,
         "  %s snapshot-experiment --source-dir results/run --name batch-sweep" % prog,
+        (
+            "  %s materialize-affinity-checkpoint --models-dir models.unselected.combined "
+            "--policy best --out-models-dir models.unselected.best" % prog
+        ),
         "",
         "Deployment is opt-in. Pass --deploy-mode dry-run, draft, or publish "
         "to run the model-artifact deployment step.",
@@ -117,6 +144,27 @@ def _workflow_script_path():
         "or an editable install that includes the scripts/ directory." %
         WORKFLOW_SCRIPT
     )
+
+
+def _training_script_path(subcommand):
+    relative = TRAINING_SCRIPTS[subcommand]
+    repo_root = Path(__file__).resolve().parents[2]
+    for candidate in (repo_root / relative, Path.cwd() / relative):
+        if candidate.exists():
+            return candidate
+    raise SystemExit(
+        "Could not find %s. This command must be run from a source checkout "
+        "or editable install." % relative)
+
+
+def _run_training_script(subcommand, argv):
+    env = os.environ.copy()
+    env["MHCFLURRY_CLI_PROG"] = "mhcflurry train %s" % subcommand
+    return subprocess.call([
+        sys.executable,
+        str(_training_script_path(subcommand)),
+        *argv,
+    ], env=env)
 
 
 def _print_pan_allele_release_help(script, prog):
@@ -158,6 +206,12 @@ def run_argv(argv, prog="mhcflurry train"):
         from . import experiment_snapshot
         return experiment_snapshot.run_argv(
             argv[1:], prog="%s snapshot-experiment" % prog)
+    if argv[0] == "materialize-affinity-checkpoint":
+        from . import materialize_affinity_checkpoint
+        return materialize_affinity_checkpoint.run_argv(
+            argv[1:], prog="%s materialize-affinity-checkpoint" % prog)
+    if argv[0] in TRAINING_SCRIPTS:
+        return _run_training_script(argv[0], argv[1:])
     make_parser(prog).parse_args(argv)
     return 2
 

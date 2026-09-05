@@ -54,7 +54,7 @@ from ..workload_planning import (
 from ..cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
-from ..regression_target import from_ic50
+from ..regression_target import from_ic50, to_ic50
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
@@ -111,6 +111,13 @@ parser.add_argument(
     type=int,
     help="Verbosity. Default: %(default)s",
     default=0)
+parser.add_argument(
+    "--save-validation-predictions",
+    action="store_true",
+    default=False,
+    help=(
+        "Save row-level out-of-fold predictions from the selected ensemble "
+        "as model_selection_predictions.csv.bz2."))
 
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
@@ -272,6 +279,7 @@ def run(argv=sys.argv[1:]):
             'models': models,
             'min_models': args.min_models_per_fold,
             'max_models': args.max_models_per_fold,
+            'save_validation_predictions': args.save_validation_predictions,
         })
 
     WORKER_CONTEXT["data"] = df
@@ -325,9 +333,13 @@ def run(argv=sys.argv[1:]):
 
     models_by_fold = {}
     summary_dfs = []
+    validation_prediction_dfs = []
     try:
         for result in tqdm.tqdm(results, total=len(work_items)):
-            pprint(result)
+            pprint({
+                key: value for (key, value) in result.items()
+                if key != "validation_predictions"
+            })
             fold_num = result['fold_num']
             (all_models_for_fold, _) = folds_to_predictors[fold_num]
             models = result['selected_models']
@@ -335,6 +347,9 @@ def run(argv=sys.argv[1:]):
             summary_df.index = summary_df.index.map(
                 lambda idx, models=all_models_for_fold: models[idx])
             summary_dfs.append(summary_df)
+            if result['validation_predictions'] is not None:
+                validation_prediction_dfs.append(
+                    result['validation_predictions'])
 
             print("Selected %d models for fold %d: %s" % (
                 len(models), fold_num, result['selected_indices']))
@@ -354,6 +369,13 @@ def run(argv=sys.argv[1:]):
     summary_df["model_config"] = summary_df.index.map(lambda m: m.get_config())
     result_predictor.metadata_dataframes["model_selection_summary"] = (
         summary_df.reset_index(drop=True))
+    if validation_prediction_dfs:
+        result_predictor.metadata_dataframes[
+            "model_selection_predictions"] = pandas.concat(
+                validation_prediction_dfs, ignore_index=True).sort_values(
+                    ["validation_row_index", "fold_num"],
+                    kind="stable",
+                )
 
     result_predictor.save(args.out_models_dir)
     write_generate_sh(args.out_models_dir)
@@ -374,7 +396,8 @@ def do_model_select_task(item, constant_data=WORKER_CONTEXT):
 
 
 def model_select(
-        fold_num, models, min_models, max_models, constant_data=WORKER_CONTEXT):
+        fold_num, models, min_models, max_models,
+        save_validation_predictions=False, constant_data=WORKER_CONTEXT):
     """
     Model select for a fold.
 
@@ -448,11 +471,28 @@ def model_select(
     ].to_frame()
     summary_df.columns = ['mse_score']
 
+    validation_predictions = None
+    if save_validation_predictions:
+        output_columns = [
+            column for column in df.columns
+            if not re.match(r"^fold_\d+$", column)
+        ]
+        validation_predictions = df[output_columns].copy()
+        validation_predictions.insert(
+            0, "validation_row_index", df.index.to_numpy())
+        validation_predictions["fold_num"] = fold_num
+        prediction_01 = predictions_df[selected].mean(axis=1).to_numpy()
+        validation_predictions["affinity_prediction_01"] = prediction_01
+        validation_predictions["affinity_prediction"] = to_ic50(prediction_01)
+        validation_predictions["selected_model_indices"] = ",".join(
+            str(index) for index in selected)
+
     return {
         'fold_num': fold_num,
         'selected_indices': selected,
         'selected_models': selected_models,
         'summary': summary_df,  # indexed by model index
+        'validation_predictions': validation_predictions,
     }
 
 

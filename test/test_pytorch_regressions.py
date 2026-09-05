@@ -22,6 +22,7 @@ import types
 import pytest
 
 import numpy as np
+import pandas
 import torch
 
 from mhcflurry.class1_affinity_predictor import Class1AffinityPredictor
@@ -43,6 +44,7 @@ from mhcflurry.class1_processing_neural_network import (
     Class1ProcessingNeuralNetwork,
 )
 from mhcflurry.common import load_weights
+from mhcflurry.cli.materialize_affinity_checkpoint import materialize
 from mhcflurry.flanking_encoding import FlankingEncoding
 from mhcflurry.keras_optimizers import KerasAdam, KerasRMSprop
 from mhcflurry.pytorch_losses import (
@@ -686,6 +688,118 @@ def test_affinity_fit_can_restore_best_validation_checkpoint(monkeypatch):
     assert model.fit_info[-1]["best_epoch"] is not None
     for value in model.network().state_dict().values():
         assert torch.count_nonzero(value) == 0
+
+
+def test_affinity_zero_epoch_fit_can_retain_terminal_checkpoint():
+    model = _make_simple_affinity_model(
+        max_epochs=0,
+        validation_split=0.0,
+        early_stopping=False,
+        restore_best_weights=False,
+    )
+    model.fit(
+        ["SIINFEKLM", "ARTLAVELS"],
+        np.array([50.0, 5000.0]),
+        save_all_checkpoints=True,
+    )
+
+    assert model.available_checkpoint_policies() == ["terminal"]
+    assert model.fit_info[-1]["best_epoch"] is None
+    assert model.fit_info[-1]["saved_checkpoint_policies"] == ["terminal"]
+    for actual, expected in zip(
+            model.get_weights(), model.get_checkpoint_weights("terminal")):
+        np.testing.assert_array_equal(actual, expected)
+
+
+def test_affinity_fit_retains_distinct_terminal_and_best_checkpoints(
+        monkeypatch, tmp_path):
+    import mhcflurry.class1_neural_network as affinity_module
+
+    def zero_checkpoint(module):
+        return {
+            name: torch.zeros_like(value, device="cpu")
+            for name, value in module.state_dict().items()
+        }
+
+    monkeypatch.setattr(
+        affinity_module, "copy_module_state_dict_to_cpu", zero_checkpoint)
+    model = _make_simple_affinity_model(
+        max_epochs=2,
+        validation_split=0.5,
+        early_stopping=False,
+        restore_best_weights=False,
+    )
+    peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
+    affinities = np.array([50.0, 30.0, 100.0, 5000.0])
+    model.fit(peptides, affinities, save_all_checkpoints=True)
+
+    assert model.available_checkpoint_policies() == ["terminal", "best"]
+    terminal = model.get_checkpoint_weights("terminal")
+    best = model.get_checkpoint_weights("best")
+    assert any(np.count_nonzero(value) for value in terminal)
+    assert all(np.count_nonzero(value) == 0 for value in best)
+    assert all(
+        not np.shares_memory(terminal_value, best_value)
+        for terminal_value, best_value in zip(terminal, best)
+    )
+    for actual, expected in zip(model.get_weights(), terminal):
+        np.testing.assert_array_equal(actual, expected)
+
+    source = tmp_path / "source"
+    predictor = Class1AffinityPredictor(
+        allele_to_allele_specific_models={"HLA-A*02:01": [model]},
+    )
+    predictor.save(str(source))
+
+    manifest = pandas.read_csv(source / "manifest.csv")
+    assert set(manifest[[
+        "checkpoint_terminal_weights",
+        "checkpoint_best_weights",
+    ]].columns) == {
+        "checkpoint_terminal_weights",
+        "checkpoint_best_weights",
+    }
+    loaded = Class1AffinityPredictor.load(
+        str(source), optimization_level=0)
+    loaded_model = loaded.neural_networks[0]
+    assert loaded_model.available_checkpoint_policies() == ["terminal", "best"]
+    for policy, expected in (("terminal", terminal), ("best", best)):
+        for actual, expected_value in zip(
+                loaded_model.get_checkpoint_weights(policy), expected):
+            np.testing.assert_array_equal(actual, expected_value)
+
+    # Cluster workers serialize their result as a predictor directory, then
+    # the parent loads and saves it into the combined run directory. Exercise
+    # that second persistence hop so lazy sidecar paths cannot be dropped.
+    resaved = tmp_path / "resaved"
+    loaded.save(str(resaved))
+    reloaded = Class1AffinityPredictor.load(
+        str(resaved), optimization_level=0)
+    assert reloaded.neural_networks[0].available_checkpoint_policies() == [
+        "terminal", "best"]
+
+    (source / "percent_ranks.csv").write_text("stale\n")
+    (source / "optimization_info.json").write_text("{}\n")
+    best_dir = materialize(source, "best", tmp_path / "best")
+    best_predictor = Class1AffinityPredictor.load(
+        str(best_dir), optimization_level=0)
+    assert all(
+        np.count_nonzero(value) == 0
+        for value in best_predictor.neural_networks[0].get_weights()
+    )
+    provenance = json.loads(
+        (best_dir / "checkpoint_selection.json").read_text())
+    assert provenance["checkpoint_policy"] == "best"
+    assert provenance["models"][0]["checkpoint_sha256"] == (
+        provenance["models"][0]["primary_weights_sha256"])
+    assert provenance["removed_stale_metadata"] == [
+        "percent_ranks.csv",
+        "optimization_info.json",
+    ]
+    assert not (best_dir / "percent_ranks.csv").exists()
+    assert not (best_dir / "optimization_info.json").exists()
+    with pytest.raises(ValueError, match="Output already exists"):
+        materialize(source, "best", best_dir)
 
 
 def test_effective_validation_batch_size_uses_larger_cuda_default():

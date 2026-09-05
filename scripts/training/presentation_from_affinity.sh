@@ -246,6 +246,7 @@ for kind in $PROCESSING_VARIANTS; do
         --out-models-dir "$(pwd)/models.selected.$kind" \
         --min-models-per-fold 1 \
         --max-models-per-fold 2 \
+        --save-validation-predictions \
         "${PROCESSING_PARALLELISM_ARGS[@]}"
     cp "$(pwd)/models.unselected.$kind/train_data.csv.bz2" \
         "$(pwd)/models.selected.$kind/train_data.csv.bz2"

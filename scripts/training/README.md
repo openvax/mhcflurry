@@ -41,6 +41,31 @@ RUNPLZ_BREV_AUTO_CREATE=0 runplz brev \
     scripts/training/launch_pan_allele_training_remote.py
 ```
 
+The same maintained launcher runs on Modal. For the frozen 2.3.0 candidate,
+use a persistent volume and the shared recipe preset so interruption and
+backend choice do not change the architecture decision set:
+
+```shell
+MHCFLURRY_RELEASE_RECIPE=final-2.3.0-candidate \
+RUNPLZ_OUTPUT_VOLUME=mhcflurry-230-final-weights \
+RUNPLZ_OUT=/out/runs/final-2.3.0-candidate \
+RUNPLZ_TIMEOUT_SECONDS=604800 \
+MHCFLURRY_RELEASE_VERSION=2.3.0 \
+MHCFLURRY_RELEASE_GIT_COMMIT="$(git rev-parse HEAD)" \
+MHCFLURRY_RELEASE_WORKFLOW_ID=final-2.3.0-candidate \
+RUN_RELEASE_EVAL=1 RUN_RELEASE_PLOTS=1 \
+runplz modal scripts/training/launch_pan_allele_training_remote.py
+```
+
+This command remains attached until runplz provides supported detached Modal
+collection (pirl-unc/runplz#165). The Modal volume is durable, and processing
+training resumes from its manifests if the command is launched again from the
+same clean source commit and output path.
+
+The exact candidate decision set is also stored in
+`final_230_candidate_recipe.json`; completed outputs copy it to
+`config/final_architecture_decision.json` for plotting and provenance.
+
 Set `MHCFLURRY_REMOTE_WORKFLOW=affinity-ablations` or
 `MHCFLURRY_REMOTE_WORKFLOW=processing-ablations` to run the corresponding
 committed parity panel through the same image and transport. The default is
@@ -90,6 +115,13 @@ paper figures, saved-prediction tables, and external predictors.
 - **`mhcflurry eval affinity-candidate-figures`** combines shortlisted
   conditions, public 2.2, and any available canonical NetMHCpan/MixMHCpred
   columns into one reusable held-out prediction table and paper-figure suite.
+- **`mhcflurry train compose-processing-ensemble`** builds a fixed processing
+  ensemble while hashing every source predictor.
+- **`mhcflurry eval processing-ensemble`** and
+  **`mhcflurry eval presentation-affinity-ensemble`** score preserved
+  prediction tables without rerunning inference.
+- **`mhcflurry eval release-experiment-figures`** regenerates the release
+  training figures from archived experiment inputs.
 - **`mhcflurry train plot-loss-curves`** renders per-architecture loss curves
   from a trained ensemble. The historical `plot_loss_curves.py` path remains a
   compatibility shim.

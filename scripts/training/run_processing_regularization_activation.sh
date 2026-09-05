@@ -203,6 +203,7 @@ while IFS= read -r condition; do
             --out-models-dir "$selected" \
             --min-models-per-fold 1 \
             --max-models-per-fold 1 \
+            --save-validation-predictions \
             "${TRAINING_PARALLELISM_ARGS[@]}"
         cp "$unselected/train_data.csv.bz2" "$selected/train_data.csv.bz2"
     fi

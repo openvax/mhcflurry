@@ -15,25 +15,30 @@ model-validation record stays distinct from the package changelog.
   Glorot/zero-bias initialization, and Keras BatchNorm moving variance.
   Optimizer equation, LSUV boundary, and processing initializer are serialized
   switches with paired frozen-holdout ablations before the full retrain.
-- Require runplz 3.16.0 for remote release provenance and use its updated
-  staging/bootstrap behavior.
-- Restore the published 2.1.x/2.2.x scientific recipe after auditing the first
-  full candidate. Restore affinity minibatch 128 after a paired frozen-holdout
-  comparison rejected 1024, and restore affinity early stopping/calibration,
-  processing batch and
-  fold holdout, and presentation decoy/sampling/flank/solver/calibration
-  settings. Pin fresh affinity negatives each epoch, eager execution, and full
-  float32 matmul precision for release provenance. Processing layers now pin
-  Keras-compatible Glorot initialization instead of inheriting PyTorch's
-  Kaiming default. See
-  [the recipe audit](docs/release_training_recipe.md).
-- Freeze a provenance-recorded final holdout before training. Affinity uses all
-  103 monoallelic benchmark samples plus the final multiallelic holdout and
-  removes every current-training pMHC found in those benchmark rows, including
-  decoys. Processing and presentation final metrics use the 10 multiallelic
-  samples from PMID 31154438; presentation excludes those complete samples
-  from training. Persist, checksum, and validate the generated manifests with
-  the release run.
+- Require runplz 3.24.31 for the release control process and use its updated
+  staging/bootstrap behavior. The maintained remote image separately pins
+  runplz 4.2.2 for the Modal persistent-volume contract.
+- Establish the published 2.1.x/2.2.x recipe as the compatibility control,
+  then permit only held-out, crossed departures. The final affinity candidate
+  uses the winning interaction of minibatch 1024, native PyTorch RMSprop, and
+  pre-activation LSUV; it retains 50% dropout, patience 20, and terminal weights
+  as primary while saving both terminal and minimum-validation checkpoints.
+  Processing retains minibatch 512 and Glorot/Keras Adam for no-flank and
+  5-aa models, uses the tested Kaiming/native-Adam recipe for the independently
+  trained 15-aa compatibility grid, and adds a four-model radius-5
+  cleavage-boundary family to the selected 5-aa presentation ensemble. The
+  presentation component remains swappable until the cached 2x2 component gate
+  and final external comparisons pass. See the
+  [recipe audit](docs/release_training_recipe.md) and
+  [frozen candidate](docs/final_230_candidate_experiment.md).
+- Freeze a provenance-recorded final holdout before training. Affinity metrics
+  use all 103 monoallelic benchmark samples. Affinity training exclusions also
+  include every current-training pMHC found in the final multiallelic holdout,
+  including decoys, so presentation evaluation cannot leak through the
+  affinity component. Processing and presentation final metrics use the 10
+  multiallelic samples from PMID 31154438; presentation excludes those complete
+  samples from training. Persist, checksum, and validate the generated
+  manifests with the release run.
 - Pin Ruff 0.16.0 in CI, commit an explicit correctness-focused lint rule set,
   and run `./lint.sh` on every pull request. Mutable defaults, environment
   defaults, and loop-closure findings uncovered during lint triage are fixed.
@@ -113,13 +118,19 @@ class-II, or non-MHC records; these rows were never valid prediction targets.
 
 ## Release recipe
 
-The release recipe matches the published 2.1.x/2.2.x scientific settings,
-including affinity minibatch 128. Affinity `max_epochs=5000`, `min_delta=0`,
-validation every epoch, and fresh negatives every epoch remain unchanged.
+The published 2.1.x/2.2.x settings are the compatibility control. The frozen
+2.3.0 candidate makes one crossed affinity departure—minibatch 1024, native
+PyTorch RMSprop, and pre-activation LSUV—and one processing architecture
+addition: four radius-5 cleavage-boundary models blended equally by family with
+the selected 5-aa ensemble. Affinity `max_epochs=5000`, `min_delta=0`,
+validation every epoch, fresh negatives every epoch, 50% dropout, and patience
+20 remain unchanged. Both terminal and best checkpoints are retained, with
+terminal primary based on the completed checkpoint-policy conditions.
 Processing uses minibatch 512 and 10 held-out samples. Presentation uses 2
-proteome decoys per hit, a 0.1 sample fraction, `short_flanks` (5 aa per side),
-L-BFGS, and 10 K calibration peptides per length. The full audit distinguishes
-these settings from execution-only implementation changes in
+proteome decoys per hit, a 0.1 sample fraction, L-BFGS, and 10 K calibration
+peptides per length. The exact machine-readable decision set is
+`scripts/training/final_230_candidate_recipe.json`; the audit distinguishes
+compatibility controls from later held-out departures in
 [docs/release_training_recipe.md](docs/release_training_recipe.md).
 
 ## CLI changes
@@ -322,7 +333,7 @@ When to use which:
   candidates against each other.
 - **`plot_loss_curves.py`** — diagnostic. Doesn't need a baseline.
 
-Remote release launches require runplz 3.15.3. Its Git-aware staging excludes
+Remote release launches require runplz 3.24.31. Its Git-aware staging excludes
 ignored output directories such as `brev_runs/` and `results/`, so the former
 workstation-specific relocation and symlink workaround is no longer needed.
 The wrapper records the runplz module path and, for an editable checkout, its

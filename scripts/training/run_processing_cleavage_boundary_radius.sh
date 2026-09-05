@@ -243,6 +243,7 @@ for condition in "${CONDITIONS[@]}"; do
         --out-models-dir "$selected" \
         --min-models-per-fold 1 \
         --max-models-per-fold 1 \
+        --save-validation-predictions \
         "${TRAINING_ARGS[@]}"
     cp "$unselected/train_data.csv.bz2" "$selected/train_data.csv.bz2"
     printf '%s\n' "$condition_out" > "$condition_out/predictor_path.txt"

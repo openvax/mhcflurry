@@ -124,6 +124,10 @@ def test_build_apply_and_validate_release_holdout(tmp_path, monkeypatch):
         "multiallelic": 1,
     }
     assert policy["affinity_pmhc_count"] == 3
+    assert policy["policy"]["affinity"].startswith(
+        "Evaluate affinity metrics on all monoallelic samples.")
+    assert "presentation evaluation cannot leak" in (
+        policy["policy"]["affinity"])
     assert set(map(tuple, pandas.read_csv(
         holdout_dir / AFFINITY_PMHCS_FILE).to_numpy())) == {
             ("HLA-A*02:01", "SIINFEKL"),

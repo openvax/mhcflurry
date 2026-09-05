@@ -81,6 +81,7 @@ from .pytorch_training import (
 
 
 DEFAULT_PREDICT_BATCH_SIZE = pytorch_sizing.DEFAULT_PREDICT_BATCH_SIZE
+CHECKPOINT_POLICIES = ("terminal", "best")
 check_training_batch_fits = pytorch_sizing.check_training_batch_fits
 compute_prediction_batch_size = pytorch_sizing.compute_prediction_batch_size
 env_workers_per_gpu = pytorch_sizing.env_workers_per_gpu
@@ -1523,6 +1524,9 @@ class Class1NeuralNetwork(object):
         self.network_weights = None
         self.network_weights_loader = None
         self.network_weight_paths = ()
+        self.checkpoint_weights = {}
+        self.checkpoint_weights_loaders = {}
+        self.checkpoint_weight_paths = {}
 
         self.fit_info = []
         self.prediction_cache = weakref.WeakKeyDictionary()
@@ -2206,6 +2210,9 @@ class Class1NeuralNetwork(object):
         result["network_weights"] = None
         result["network_weights_loader"] = None
         result.pop("network_weight_paths", None)
+        result["checkpoint_weights"] = {}
+        result["checkpoint_weights_loaders"] = {}
+        result.pop("checkpoint_weight_paths", None)
         result["prediction_cache"] = None
         return result
 
@@ -2254,6 +2261,12 @@ class Class1NeuralNetwork(object):
             cls._normalize_network_weight_paths(weight_paths)
             or cls._network_weight_paths_from_loader(weights_loader)
         )
+        # Checkpoint sidecars are attached by the predictor persistence layer.
+        # They deliberately stay out of config_json because weight arrays do
+        # not belong in JSON and older predictor directories have none.
+        instance.checkpoint_weights = {}
+        instance.checkpoint_weights_loaders = {}
+        instance.checkpoint_weight_paths = {}
         instance.prediction_cache = weakref.WeakKeyDictionary()
         return instance
 
@@ -2334,6 +2347,85 @@ class Class1NeuralNetwork(object):
             # Store flag for auto-conversion
             self._auto_convert_keras_weights = auto_convert_keras
 
+    @staticmethod
+    def _copy_weights_list(weights):
+        """Return owned numpy arrays, avoiding tensor/numpy view aliasing."""
+        return [numpy.array(value, copy=True) for value in weights]
+
+    def available_checkpoint_policies(self):
+        """Return retained checkpoint policies in stable order."""
+        available = set(getattr(self, "checkpoint_weights", {}))
+        available.update(getattr(self, "checkpoint_weights_loaders", {}))
+        return [policy for policy in CHECKPOINT_POLICIES if policy in available]
+
+    def get_checkpoint_weights(self, policy):
+        """Return retained weights for ``policy``, loading lazily if needed."""
+        if policy not in CHECKPOINT_POLICIES:
+            raise ValueError("Unknown checkpoint policy: %s" % policy)
+        checkpoint_weights = getattr(self, "checkpoint_weights", {})
+        if policy not in checkpoint_weights:
+            loader = getattr(
+                self, "checkpoint_weights_loaders", {}).get(policy)
+            if loader is None:
+                raise KeyError("Checkpoint policy not retained: %s" % policy)
+            checkpoint_weights[policy] = loader()
+            self.checkpoint_weights = checkpoint_weights
+        return checkpoint_weights[policy]
+
+    def set_checkpoint_weights_loader(self, policy, loader, weight_path=None):
+        """Attach a lazy loader for a retained training checkpoint."""
+        if policy not in CHECKPOINT_POLICIES:
+            raise ValueError("Unknown checkpoint policy: %s" % policy)
+        if not hasattr(self, "checkpoint_weights"):
+            self.checkpoint_weights = {}
+        if not hasattr(self, "checkpoint_weights_loaders"):
+            self.checkpoint_weights_loaders = {}
+        if not hasattr(self, "checkpoint_weight_paths"):
+            self.checkpoint_weight_paths = {}
+        self.checkpoint_weights.pop(policy, None)
+        self.checkpoint_weights_loaders[policy] = loader
+        if weight_path is not None:
+            self.checkpoint_weight_paths[policy] = os.fspath(weight_path)
+
+    def _clear_training_checkpoints(self):
+        """Discard checkpoint sidecars made stale by a new fit."""
+        self.checkpoint_weights = {}
+        self.checkpoint_weights_loaders = {}
+        self.checkpoint_weight_paths = {}
+
+    def _finalize_training_checkpoints(
+            self, eager_network, best_state_dict, save_all_checkpoints):
+        """Select the primary state and optionally retain both fit states."""
+        restore_best = bool(
+            self.hyperparameters["restore_best_weights"]
+            and best_state_dict is not None
+        )
+        terminal_weights = None
+        if save_all_checkpoints:
+            terminal_weights = self._copy_weights_list(
+                eager_network.get_weights_list())
+
+        if best_state_dict is not None and (restore_best or save_all_checkpoints):
+            eager_network.load_state_dict(best_state_dict)
+
+        if save_all_checkpoints:
+            retained = {"terminal": terminal_weights}
+            if best_state_dict is not None:
+                retained["best"] = self._copy_weights_list(
+                    eager_network.get_weights_list())
+            self.checkpoint_weights = retained
+            self.checkpoint_weights_loaders = {}
+            self.checkpoint_weight_paths = {}
+
+            # Loading the best state above was only for capture when terminal
+            # remains primary. Restore from an owned copy, never a numpy view
+            # of the live module parameters.
+            if not restore_best:
+                eager_network.set_weights_list(
+                    terminal_weights, auto_convert_keras=False)
+
+        return restore_best
+
     def __getstate__(self):
         """
         serialize to a dict. Model weights are included. For pickle support.
@@ -2345,8 +2437,11 @@ class Class1NeuralNetwork(object):
         """
         self.update_network_description()
         self.load_weights()
+        for policy in self.available_checkpoint_policies():
+            self.get_checkpoint_weights(policy)
         result = dict(self.__dict__)
         result["_network"] = None
+        result["checkpoint_weights_loaders"] = {}
         result["prediction_cache"] = None
         return result
 
@@ -2516,7 +2611,8 @@ class Class1NeuralNetwork(object):
             progress_print_interval=5.0,
             generator_factory=None,
             generator_batches_are_encoded=False,
-            seed=None):
+            seed=None,
+            save_all_checkpoints=False):
         """Pretrain from a stream of already batched examples.
 
         This is the streaming pretraining path used by pan-allele training. It
@@ -2544,7 +2640,12 @@ class Class1NeuralNetwork(object):
         pass derive from it; None leaves the worker's entropy seeding in
         place. Mirrors :meth:`fit`'s ``seed`` so one value can drive both
         phases of a pan-allele fit.
+
+        ``save_all_checkpoints`` retains both the terminal and
+        minimum-validation weights. It does not change which state is primary;
+        that remains controlled by the ``restore_best_weights`` hyperparameter.
         """
+        self._clear_training_checkpoints()
         device = self.get_device()
         configure_matmul_precision(device)
 
@@ -2882,7 +2983,10 @@ class Class1NeuralNetwork(object):
                     min_delta=min_delta,
                 )
                 if (
-                    self.hyperparameters["restore_best_weights"]
+                    (
+                        self.hyperparameters["restore_best_weights"]
+                        or save_all_checkpoints
+                    )
                     and min_val_loss_iteration != previous_min_val_loss_iteration
                 ):
                     best_state_dict = copy_module_state_dict_to_cpu(
@@ -2958,17 +3062,19 @@ class Class1NeuralNetwork(object):
                     print(progress_preamble, "STOPPING", progress_message)
                 break
 
-        restored_best_weights = bool(
-            self.hyperparameters["restore_best_weights"]
-            and best_state_dict is not None
+        restored_best_weights = self._finalize_training_checkpoints(
+            eager_network,
+            best_state_dict,
+            save_all_checkpoints,
         )
-        if restored_best_weights:
-            eager_network.load_state_dict(best_state_dict)
         fit_info["best_epoch"] = (
             min_val_loss_iteration + 1
             if min_val_loss_iteration is not None else None)
         fit_info["best_val_loss"] = min_val_loss
         fit_info["restored_best_weights"] = restored_best_weights
+        fit_info["saved_checkpoint_policies"] = (
+            self.available_checkpoint_policies()
+        )
         fit_info["time"] = time.time() - start
         fit_info["num_points"] = mutable_generator_state["yielded_values"]
         if first_batch_time is not None:
@@ -2993,7 +3099,8 @@ class Class1NeuralNetwork(object):
             progress_preamble="",
             progress_print_interval=5.0,
             generator_factory=None,
-            generator_batches_are_encoded=False):
+            generator_batches_are_encoded=False,
+            save_all_checkpoints=False):
         """Backward-compatible alias for :meth:`fit_streaming_batches`.
 
         The name is historical from the old Keras API. New internal code should
@@ -3019,6 +3126,7 @@ class Class1NeuralNetwork(object):
             progress_print_interval=progress_print_interval,
             generator_factory=generator_factory,
             generator_batches_are_encoded=generator_batches_are_encoded,
+            save_all_checkpoints=save_all_checkpoints,
         )
 
     def _random_negatives_pool_for_fit(
@@ -3130,7 +3238,8 @@ class Class1NeuralNetwork(object):
             progress_callback=None,
             progress_preamble="",
             progress_print_interval=5.0,
-            seed=None):
+            seed=None,
+            save_all_checkpoints=False):
         """
         Fit the neural network.
 
@@ -3173,7 +3282,12 @@ class Class1NeuralNetwork(object):
             ``cudnn.benchmark`` autotuning, and convolutional
             ``locally_connected_layers`` variants are not guaranteed
             bit-identical run-to-run. CPU runs are fully deterministic.
+        save_all_checkpoints : bool
+            Retain both terminal and minimum-validation weights from this fit.
+            This does not change the primary state selected by the
+            ``restore_best_weights`` hyperparameter.
         """
+        self._clear_training_checkpoints()
         device = self.get_device()
         configure_matmul_precision(device)
 
@@ -3345,6 +3459,12 @@ class Class1NeuralNetwork(object):
 
         if allele_representations is not None:
             self.set_allele_representations(allele_representations)
+
+        # Keep an eager handle even when max_epochs == 0. Ordinarily this is
+        # refreshed after optional LSUV initialization and torch.compile in
+        # the epoch loop, but checkpoint finalization also runs for zero-epoch
+        # fits (used by command smoke tests and model initialization flows).
+        eager_network = uncompiled_network(network)
 
         # Guard against silent training-time OOMs. When many workers
         # share one GPU (pan-allele default max_workers_per_gpu=2 on
@@ -3842,7 +3962,10 @@ class Class1NeuralNetwork(object):
                         )
                     )
                     if (
-                        self.hyperparameters["restore_best_weights"]
+                        (
+                            self.hyperparameters["restore_best_weights"]
+                            or save_all_checkpoints
+                        )
                         and min_val_loss_iteration != previous_min_val_loss_iteration
                     ):
                         best_state_dict = copy_module_state_dict_to_cpu(
@@ -3942,17 +4065,19 @@ class Class1NeuralNetwork(object):
                     time.perf_counter() - epoch_wall_start
                 )
 
-        restored_best_weights = bool(
-            self.hyperparameters["restore_best_weights"]
-            and best_state_dict is not None
+        restored_best_weights = self._finalize_training_checkpoints(
+            eager_network,
+            best_state_dict,
+            save_all_checkpoints,
         )
-        if restored_best_weights:
-            eager_network.load_state_dict(best_state_dict)
         fit_info["best_epoch"] = (
             min_val_loss_iteration + 1
             if min_val_loss_iteration is not None else None)
         fit_info["best_val_loss"] = min_val_loss
         fit_info["restored_best_weights"] = restored_best_weights
+        fit_info["saved_checkpoint_policies"] = (
+            self.available_checkpoint_policies()
+        )
         fit_info["time"] = time.time() - start
         fit_info["num_points"] = len(peptides)
         if first_batch_time is not None:

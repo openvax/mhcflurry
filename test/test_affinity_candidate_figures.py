@@ -95,6 +95,46 @@ def test_candidate_figure_inputs_include_public_and_external_predictions(
         "netmhcpan4.ba", "netmhcpan4.el"]
 
 
+def test_candidate_figure_inputs_reject_reordered_prediction_rows(tmp_path):
+    factorial = tmp_path / "factorial"
+    factorial.mkdir()
+    baseline = "keras_128"
+    candidate = "native_1024"
+    (factorial / "manifest.json").write_text(json.dumps({
+        "baseline_condition": baseline,
+        "records": [
+            {"condition": baseline},
+            {"condition": candidate},
+        ],
+    }))
+    identity = {
+        "algorithm": "test",
+        "columns": list(affinity_candidate_figures.IDENTITY_COLUMNS),
+        "ordered_rows": True,
+        "row_count": 40,
+        "sha256": "c" * 64,
+    }
+    _write_comparison(factorial, baseline, baseline, identity, 0.01)
+    _write_comparison(factorial, candidate, baseline, identity, 0.02)
+
+    predictions_path = (
+        factorial / candidate / "comparison-vs-public-no-additional-ms" /
+        "affinity" / "predictions.csv.bz2")
+    predictions = pandas.read_csv(predictions_path)
+    # Rows 0 and 2 have identical public scores and labels, so the previous
+    # consistency checks could not detect this positional corruption.
+    predictions.iloc[[0, 2]] = predictions.iloc[[2, 0]].to_numpy()
+    predictions.to_csv(predictions_path, index=False)
+
+    with pytest.raises(ValueError, match="row identity or order changed"):
+        affinity_candidate_figures.build_candidate_figure_inputs(
+            factorial,
+            tmp_path / "figures",
+            [baseline, candidate],
+            "public_2_2",
+        )
+
+
 def test_candidate_figure_inputs_join_external_prediction_table(tmp_path):
     factorial = tmp_path / "factorial"
     factorial.mkdir()

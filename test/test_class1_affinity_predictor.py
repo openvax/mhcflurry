@@ -356,6 +356,38 @@ def test_save_writes_named_pseudosequence_alias(
     }
 
 
+def test_merge_rejects_incompatible_pan_allele_pseudosequences():
+    first = Class1AffinityPredictor(
+        class1_pan_allele_models=[Class1NeuralNetwork()],
+        allele_to_sequence={"HLA-A*02:01": "SEQUENCE1"},
+    )
+    second = Class1AffinityPredictor(
+        class1_pan_allele_models=[Class1NeuralNetwork()],
+        allele_to_sequence={"HLA-A*02:01": "SEQUENCE2"},
+    )
+
+    with pytest.raises(ValueError, match="incompatible.*HLA-A\\*02:01"):
+        Class1AffinityPredictor.merge([first, second])
+
+
+def test_merge_in_place_rejects_incompatible_pseudosequences_atomically():
+    first_network = Class1NeuralNetwork()
+    first = Class1AffinityPredictor(
+        class1_pan_allele_models=[first_network],
+        allele_to_sequence={"HLA-A*02:01": "SEQUENCE1"},
+    )
+    second = Class1AffinityPredictor(
+        class1_pan_allele_models=[Class1NeuralNetwork()],
+        allele_to_sequence={"HLA-A*02:01": "SEQUENCE2"},
+    )
+
+    with pytest.raises(ValueError, match="incompatible.*HLA-A\\*02:01"):
+        first.merge_in_place([second])
+
+    assert first.class1_pan_allele_models == [first_network]
+    assert first.allele_to_sequence == {"HLA-A*02:01": "SEQUENCE1"}
+
+
 def test_percent_rank_calibrated_allele_direct_equivalent_missing():
     transform = PercentRankTransform()
     transform.fit(numpy.array([10.0, 20.0, 30.0]), bins=3)

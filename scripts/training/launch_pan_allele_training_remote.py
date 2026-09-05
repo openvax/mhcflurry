@@ -159,6 +159,34 @@ def remote_workflow_script(environ=os.environ):
         ) from error
 
 
+def validate_local_release_source(repo, environ=os.environ):
+    """Reject mislabeled or locally modified source for release launches."""
+    expected_commit = environ.get(
+        "MHCFLURRY_RELEASE_GIT_COMMIT", "").strip()
+    if not expected_commit:
+        return
+    actual_commit = subprocess.check_output(
+        ["git", "-C", str(repo), "rev-parse", "HEAD"],
+        text=True,
+    ).strip()
+    if actual_commit != expected_commit:
+        raise ValueError(
+            "MHCFLURRY_RELEASE_GIT_COMMIT=%s does not match local HEAD %s" % (
+                expected_commit, actual_commit))
+    status = subprocess.check_output(
+        [
+            "git", "-C", str(repo), "status", "--porcelain",
+            "--untracked-files=all", "--", "mhcflurry", "scripts",
+            "setup.py", "setup.cfg",
+        ],
+        text=True,
+    ).strip()
+    if status:
+        raise ValueError(
+            "Release launch source has modified or untracked executable files; "
+            "commit them before running:\n%s" % status)
+
+
 def brev_config_from_env(environ=os.environ):
     return BrevConfig(
         auto_create_instances=env_bool(
@@ -243,6 +271,15 @@ def remote_training_env(environ=os.environ):
         "AFFINITY_ABLATION_BASELINE_DIR": environ.get(
             "AFFINITY_ABLATION_BASELINE_DIR", ""
         ),
+        "AFFINITY_OPTIMIZER_IMPLEMENTATION": environ.get(
+            "AFFINITY_OPTIMIZER_IMPLEMENTATION", "keras"
+        ),
+        "AFFINITY_LSUV_TARGET": environ.get(
+            "AFFINITY_LSUV_TARGET", "post_activation"
+        ),
+        "AFFINITY_INIT": environ.get(
+            "AFFINITY_INIT", "glorot_uniform"
+        ),
         "MAX_TASKS_PER_WORKER": environ.get("MAX_TASKS_PER_WORKER", "12"),
         "MAX_WORKERS_PER_GPU": environ.get("MAX_WORKERS_PER_GPU", "auto"),
         # PyTorch/Inductor workers load GNU OpenMP (libgomp). The PyTorch
@@ -272,6 +309,10 @@ def remote_training_env(environ=os.environ):
         "MHCFLURRY_RELEASE_VERSION": environ.get(
             "MHCFLURRY_RELEASE_VERSION", ""
         ),
+        "MHCFLURRY_RELEASE_RECIPE": environ.get(
+            "MHCFLURRY_RELEASE_RECIPE", ""
+        ),
+        "RUNPLZ_OUT": environ.get("RUNPLZ_OUT", ""),
         "MHCFLURRY_REMOTE_WORKFLOW": environ.get(
             "MHCFLURRY_REMOTE_WORKFLOW", "full"
         ),
@@ -360,6 +401,9 @@ def remote_training_env(environ=os.environ):
         ),
         "PROCESSING_VARIANTS": environ.get(
             "PROCESSING_VARIANTS", "with_flanks no_flank short_flanks"
+        ),
+        "PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS": environ.get(
+            "PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS", "0"
         ),
         "PROCESSING_HELD_OUT_SAMPLES": environ.get(
             "PROCESSING_HELD_OUT_SAMPLES", "10"
@@ -698,4 +742,5 @@ def run_release_plots(repo, out, env):
 
 @app.local_entrypoint()
 def main():
+    validate_local_release_source(Path.cwd())
     train_release_full.remote()

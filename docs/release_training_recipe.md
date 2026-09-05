@@ -1,23 +1,34 @@
 # Release training recipe compatibility
 
-The MHCflurry 2.3 release recipe uses the published 2.1.x/2.2.x scientific
-configuration as its baseline. The 2.1.x and 2.2.x public model downloads use
-the same affinity, processing, and presentation generation recipes.
+The MHCflurry 2.3 release work uses the published 2.1.x/2.2.x scientific
+configuration as its compatibility baseline. The 2.1.x and 2.2.x public model
+downloads use the same affinity, processing, and presentation generation
+recipes.
 
-No training-hyperparameter exception is currently supported by direct held-out
-evidence. A rejected full candidate trained with a Class I pan-allele affinity
+The first paired audit supported no training-hyperparameter exception. A
+rejected full candidate trained with a Class I pan-allele affinity
 minibatch of 1024 outperformed an older public ensemble, but that comparison
 changed many settings and could not attribute the improvement to batch size. A
 direct latest-code comparison with restored Keras optimizer equations on the
 frozen release holdout instead favored 128. Prediction-affecting recipe changes
-are reverted unless and until they have isolated held-out evidence.
+were reverted at that stage.
+
+A later crossed frontier supplied the missing interaction evidence: native
+PyTorch RMSprop, pre-activation LSUV, and minibatch 1024 together led all eight
+conditions on the common frozen affinity cohort. That three-way combination is
+the frozen final-candidate exception; it does not imply that minibatch 1024 or
+pre-activation LSUV is better under the Keras optimizer control. The exact
+current decision set is `scripts/training/final_230_candidate_recipe.json` and
+is described in {doc}`final_230_candidate_experiment`.
 
 The processing initializer/optimizer panel reached the same compatibility
-decision. Kaiming initialization, native PyTorch Adam, and their coupled use
-showed flank-dependent gains at 0 or 15 aa, but all three alternatives reduced
-AUPRC and PPV@N for the 5-aa processing input used by presentation. The release
-therefore retains Glorot initialization with zero biases and Keras-compatible
-Adam. The complete crossed table is in
+decision for the 5-aa presentation input. Kaiming initialization, native
+PyTorch Adam, and their coupled use showed flank-dependent gains at 0 or 15 aa,
+but all three alternatives reduced AUPRC and PPV@N for 5-aa models. The final
+candidate therefore retains Glorot initialization with zero biases and
+Keras-compatible Adam for 5-aa and no-flank models, while the independently
+trained 15-aa compatibility grid uses the tested Kaiming/native combination.
+The complete crossed table is in
 {doc}`release_neural_hyperparameter_audit`.
 
 The layer-by-layer comparison, framework-equation audit, discrepancy register,
@@ -26,7 +37,7 @@ and controlled experiment plan are in
 
 ## Exact release settings
 
-| Stage | Setting | Published 2.1.x | 2.3 release recipe | Status |
+| Stage | Setting | Published 2.1.x | Compatibility control | Status |
 |---|---|---:|---:|---|
 | Affinity | minibatch | 128 | 128 | Restored after paired frozen-holdout comparison |
 | Affinity | maximum epochs | 5000 | 5000 | Restored |
@@ -52,6 +63,10 @@ The affinity architecture grid, processing architecture grid, loss functions,
 optimizers, learning rates, dropout, regularization, early-stop patience,
 peptide lengths, affinity-random-negative distribution, fold counts, and model
 selection minima/maxima otherwise match the published recipe.
+
+The final candidate applies the crossed affinity exception above, the tested
+15-aa processing recipe, and the radius-5 cleavage-boundary family; those later
+decisions do not rewrite this compatibility-control table.
 
 ## Execution changes that remain
 

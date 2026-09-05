@@ -40,6 +40,7 @@ from mhcflurry.cli import eval_command
 from mhcflurry.cli import paper_figures
 from mhcflurry.cli import plot_model_comparison
 from mhcflurry.cli import train_command
+from mhcflurry.cli import materialize_affinity_checkpoint
 from mhcflurry.version import __version__
 
 
@@ -229,6 +230,54 @@ def test_train_pan_allele_release_delegates(monkeypatch, tmp_path):
         "--run-dir", "runs/2.3.0",
         "--release", "2.3.0",
     ]]
+
+
+def test_train_materialize_affinity_checkpoint_delegates(monkeypatch):
+    calls = []
+
+    def fake_run(argv, prog):
+        calls.append((argv, prog))
+        return 19
+
+    monkeypatch.setattr(materialize_affinity_checkpoint, "run_argv", fake_run)
+    status = train_command.run_argv([
+        "materialize-affinity-checkpoint",
+        "--models-dir", "source",
+        "--policy", "best",
+        "--out-models-dir", "best",
+    ])
+
+    assert status == 19
+    assert calls == [(
+        [
+            "--models-dir", "source",
+            "--policy", "best",
+            "--out-models-dir", "best",
+        ],
+        "mhcflurry train materialize-affinity-checkpoint",
+    )]
+
+
+def test_train_compose_processing_ensemble_delegates(monkeypatch, tmp_path):
+    script = tmp_path / "compose_processing_ensemble.py"
+    script.write_text("")
+    calls = []
+    monkeypatch.setattr(
+        train_command, "_training_script_path", lambda _subcommand: script)
+
+    def fake_call(argv, env):
+        calls.append((argv, env["MHCFLURRY_CLI_PROG"]))
+        return 23
+
+    monkeypatch.setattr(train_command.subprocess, "call", fake_call)
+    status = train_command.run_argv([
+        "compose-processing-ensemble", "--out-models-dir", "combined",
+    ])
+
+    assert status == 23
+    assert calls == [([
+        sys.executable, str(script), "--out-models-dir", "combined",
+    ], "mhcflurry train compose-processing-ensemble")]
 
 
 def test_release_workflow_deploy_is_opt_in_by_default(tmp_path):
@@ -1068,6 +1117,35 @@ def test_release_workflow_defaults_to_validated_published_recipe(tmp_path):
     assert '--exclude-pmid 31844290 31495665 31154438' in full_workflow
     assert '--sample-fraction "$PRESENTATION_SAMPLE_FRACTION"' in full_workflow
     assert "--num-peptides-per-length 10000" in full_workflow
+    assert "--continue-incomplete" in full_workflow
+    assert "PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS" in full_workflow
+
+
+def test_final_230_candidate_profile_freezes_decision_set(tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "candidate"),
+            "--release", "2.3.0",
+            "--backend", "local",
+            "--release-profile", "final-2.3.0-candidate",
+            "--skip-train",
+            "--skip-eval",
+            "--skip-plots",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert "Profile:       final-2.3.0-candidate" in output
+    assert "Batch sizes:   affinity=1024 processing=512" in output
+    assert "optimizer=pytorch; lsuv=pre_activation; init=glorot_uniform" in output
+    assert "variants=with_flanks no_flank short_flanks" in output
+    assert "boundary_radius=5" in output
 
 
 def test_release_workflow_sync_is_workflow_id_scoped():
@@ -1611,6 +1689,31 @@ def test_eval_paper_figures_render_help_runs(capsys):
     captured = capsys.readouterr().out
     assert "usage: mhcflurry eval paper-figures render" in captured
     assert "--scores-dir" in captured
+
+
+@pytest.mark.parametrize("subcommand", [
+    "processing-ensemble",
+    "presentation-affinity-ensemble",
+    "release-experiment-figures",
+])
+def test_eval_experiment_script_commands_delegate(
+        monkeypatch, tmp_path, subcommand):
+    script = tmp_path / (subcommand + ".py")
+    script.write_text("")
+    calls = []
+    monkeypatch.setitem(eval_command.EVALUATION_SCRIPTS, subcommand, script)
+
+    def fake_call(argv, env):
+        calls.append((argv, env["MHCFLURRY_CLI_PROG"]))
+        return 29
+
+    monkeypatch.setattr(eval_command.subprocess, "call", fake_call)
+    status = eval_command.run_argv([subcommand, "--input", "saved.csv"])
+
+    assert status == 29
+    assert calls == [([
+        sys.executable, str(script), "--input", "saved.csv",
+    ], "mhcflurry eval %s" % subcommand)]
 
 
 def test_eval_paper_figures_score_predictions_writes_cache(tmp_path):
@@ -2711,6 +2814,8 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     assert env["MHCFLURRY_RELEASE_WORKFLOW_ID"] == ""
     assert env["MHCFLURRY_RELEASE_GIT_COMMIT"] == ""
     assert env["MHCFLURRY_RELEASE_VERSION"] == ""
+    assert env["MHCFLURRY_RELEASE_RECIPE"] == ""
+    assert env["RUNPLZ_OUT"] == ""
     assert env["MHCFLURRY_REMOTE_WORKFLOW"] == "full"
     assert env["BOUNDARY_RADIUS_ARCHITECTURE"] == "large_relu"
     assert env["BOUNDARY_RADIUS_AFFINITY_CONTROL"] == "none"
@@ -2725,6 +2830,9 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     assert env["NUM_JOBS"] == "auto"
     assert env["AFFINITY_ABLATION_CONDITIONS"] == ""
     assert env["AFFINITY_ABLATION_BASELINE_DIR"] == ""
+    assert env["AFFINITY_OPTIMIZER_IMPLEMENTATION"] == "keras"
+    assert env["AFFINITY_LSUV_TARGET"] == "post_activation"
+    assert env["AFFINITY_INIT"] == "glorot_uniform"
     assert env["MKL_THREADING_LAYER"] == "GNU"
     assert env["COMPARE_PRESENTATION_NUM_JOBS"] == "auto"
     assert env["COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU"] == "auto"
@@ -2736,6 +2844,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     assert env["PROCESSING_NUM_JOBS"] == "auto"
     assert env["PROCESSING_MAX_WORKERS_PER_GPU"] == "auto"
     assert env["PROCESSING_HELD_OUT_SAMPLES"] == "10"
+    assert env["PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS"] == "0"
     assert env["PRESENTATION_DECOYS_PER_HIT"] == "2"
     assert env["PRESENTATION_SAMPLE_FRACTION"] == "0.1"
     assert env["PRESENTATION_PROCESSING_WITH_FLANKS_KIND"] == "short_flanks"
@@ -2774,6 +2883,8 @@ def test_remote_launcher_preserves_shared_minibatch_override(
         "MHCFLURRY_RELEASE_WORKFLOW_ID": "run-123",
         "MHCFLURRY_RELEASE_GIT_COMMIT": "abc123",
         "MHCFLURRY_RELEASE_VERSION": "2.3.0",
+        "MHCFLURRY_RELEASE_RECIPE": "final-2.3.0-candidate",
+        "RUNPLZ_OUT": "/out/candidate",
         "MHCFLURRY_REMOTE_WORKFLOW": "processing-ablations",
         "RELEASE_RANDOM_SEED": "271",
         "MHCFLURRY_GPU_TELEMETRY": "0",
@@ -2781,6 +2892,10 @@ def test_remote_launcher_preserves_shared_minibatch_override(
         "NUM_JOBS": "6",
         "AFFINITY_ABLATION_CONDITIONS": "pytorch_rmsprop_batch128",
         "AFFINITY_ABLATION_BASELINE_DIR": "/remote/baseline",
+        "AFFINITY_OPTIMIZER_IMPLEMENTATION": "pytorch",
+        "AFFINITY_LSUV_TARGET": "pre_activation",
+        "AFFINITY_INIT": "he_uniform",
+        "PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS": "5",
         "MKL_THREADING_LAYER": "TBB",
     })
     assert env["AFFINITY_MINIBATCH_SIZE"] == "512"
@@ -2806,6 +2921,8 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     assert env["MHCFLURRY_RELEASE_WORKFLOW_ID"] == "run-123"
     assert env["MHCFLURRY_RELEASE_GIT_COMMIT"] == "abc123"
     assert env["MHCFLURRY_RELEASE_VERSION"] == "2.3.0"
+    assert env["MHCFLURRY_RELEASE_RECIPE"] == "final-2.3.0-candidate"
+    assert env["RUNPLZ_OUT"] == "/out/candidate"
     assert env["MHCFLURRY_REMOTE_WORKFLOW"] == "processing-ablations"
     assert env["RELEASE_RANDOM_SEED"] == "271"
     assert env["MHCFLURRY_GPU_TELEMETRY"] == "0"
@@ -2813,6 +2930,10 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     assert env["NUM_JOBS"] == "6"
     assert env["AFFINITY_ABLATION_CONDITIONS"] == "pytorch_rmsprop_batch128"
     assert env["AFFINITY_ABLATION_BASELINE_DIR"] == "/remote/baseline"
+    assert env["AFFINITY_OPTIMIZER_IMPLEMENTATION"] == "pytorch"
+    assert env["AFFINITY_LSUV_TARGET"] == "pre_activation"
+    assert env["AFFINITY_INIT"] == "he_uniform"
+    assert env["PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS"] == "5"
     assert env["MKL_THREADING_LAYER"] == "TBB"
 
     assert module.remote_workflow_script({}) == (
@@ -2881,6 +3002,73 @@ def test_remote_launcher_preserves_shared_minibatch_override(
         module.compare_matmul_precision_value({
             "COMPARE_MATMUL_PRECISION": "fast",
         })
+
+
+def test_remote_launcher_rejects_dirty_or_mislabeled_release_source(
+        monkeypatch, tmp_path):
+    monkeypatch.setenv("RUNPLZ_MIN_DISK", "none")
+    fake_runplz = types.ModuleType("runplz")
+    fake_config = types.ModuleType("runplz.config")
+
+    class FakeImage:
+        @classmethod
+        def from_registry(cls, *_args, **_kwargs):
+            return cls()
+
+        def apt_install(self, *_args, **_kwargs):
+            return self
+
+        def pip_install(self, *_args, **_kwargs):
+            return self
+
+        def pip_install_local_dir(self, *_args, **_kwargs):
+            return self
+
+    class FakeApp:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def function(self, *_args, **_kwargs):
+            return lambda fn: fn
+
+        def local_entrypoint(self, *_args, **_kwargs):
+            return lambda fn: fn
+
+    fake_runplz.App = FakeApp
+    fake_runplz.Image = FakeImage
+    fake_config.BrevConfig = lambda **kwargs: kwargs
+    monkeypatch.setitem(sys.modules, "runplz", fake_runplz)
+    monkeypatch.setitem(sys.modules, "runplz.config", fake_config)
+
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "scripts/training/launch_pan_allele_training_remote.py",
+    )
+    module = _load_script_module(path, "remote_launcher_provenance_test")
+    repo = tmp_path / "source"
+    (repo / "mhcflurry").mkdir(parents=True)
+    source = repo / "mhcflurry" / "example.py"
+    source.write_text("VALUE = 1\n")
+    subprocess.run(["git", "init", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+    subprocess.run([
+        "git", "-C", str(repo),
+        "-c", "user.name=Test", "-c", "user.email=test@example.com",
+        "commit", "-m", "source",
+    ], check=True, capture_output=True)
+    commit = subprocess.check_output(
+        ["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+
+    module.validate_local_release_source(
+        repo, {"MHCFLURRY_RELEASE_GIT_COMMIT": commit})
+    with pytest.raises(ValueError, match="does not match local HEAD"):
+        module.validate_local_release_source(
+            repo, {"MHCFLURRY_RELEASE_GIT_COMMIT": "deadbeef"})
+
+    source.write_text("VALUE = 2\n")
+    with pytest.raises(ValueError, match="modified or untracked executable"):
+        module.validate_local_release_source(
+            repo, {"MHCFLURRY_RELEASE_GIT_COMMIT": commit})
 
 
 def test_main_help_does_not_import_predict_command():

@@ -15,10 +15,9 @@
 # artifacts don't collide (affinity/, processing/, presentation/). The
 # downstream eval step in stage 3 uses all three predictors together.
 #
-# Resumption: re-running this script reuses any models that the affinity
-# stage already trained (via --continue-incomplete inside that stage).
-# Stages 2-3 are not yet incremental — they re-run from scratch each
-# time. The dominant wall-time is in stage 1, so this is OK in practice.
+# Resumption: re-running this script reuses incomplete affinity and processing
+# training directories via --continue-incomplete. Selection, presentation, and
+# evaluation are deterministic and may be regenerated after training completes.
 #
 # Env (caller-tunable; all have sensible defaults):
 #   MHCFLURRY_OUT              required — root for all artifacts
@@ -39,6 +38,11 @@
 #   PROCESSING_MINIBATCH_SIZE  processing minibatch (default 512)
 #   PROCESSING_VARIANTS        space-separated variants to train
 #                              (default "with_flanks no_flank short_flanks")
+#   PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS
+#                              0 disables the optional cleavage-boundary family
+#                              (default); 1-15 adds one large-ReLU architecture
+#                              over four folds and forms a fixed 50/50 hybrid
+#                              with one selected legacy short-flank model/fold
 #   PRESENTATION_PROCESSING_WITH_FLANKS_KIND
 #                              processing variant used as presentation's
 #                              with-flanks predictor (default short_flanks)
@@ -47,6 +51,8 @@
 #   MHCFLURRY_GPU_TELEMETRY    0 disables processing/presentation GPU CSVs
 #   MHCFLURRY_GPU_TELEMETRY_SECONDS
 #                              telemetry sampling interval (default 30)
+#   MHCFLURRY_RELEASE_RECIPE   optional shared recipe preset; currently
+#                              final-2.3.0-candidate
 set -euo pipefail
 set -x
 
@@ -56,6 +62,8 @@ RECIPE_DIR="$SCRIPT_DIR/release_exact"
 : "${REPO:=$(cd "$SCRIPT_DIR/../.." && pwd)}"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/gpu_telemetry.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/release_recipes.sh"
 GPU_TELEMETRY_PID=""
 trap stop_gpu_telemetry EXIT
 
@@ -104,9 +112,26 @@ TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-128}"
 AFFINITY_MINIBATCH_SIZE="${AFFINITY_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
 AFFINITY_MAX_WORKERS_PER_GPU="${AFFINITY_MAX_WORKERS_PER_GPU:-auto}"
 PROCESSING_MINIBATCH_SIZE="${PROCESSING_MINIBATCH_SIZE:-512}"
+PROCESSING_WITH_FLANKS_OPTIMIZER_IMPLEMENTATION="${PROCESSING_WITH_FLANKS_OPTIMIZER_IMPLEMENTATION:-keras}"
+PROCESSING_WITH_FLANKS_INIT="${PROCESSING_WITH_FLANKS_INIT:-glorot_uniform}"
 PROCESSING_VARIANTS="${PROCESSING_VARIANTS:-with_flanks no_flank short_flanks}"
+PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS="${PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS:-0}"
 PRESENTATION_PROCESSING_WITH_FLANKS_KIND="${PRESENTATION_PROCESSING_WITH_FLANKS_KIND:-short_flanks}"
 RELEASE_RANDOM_SEED="${RELEASE_RANDOM_SEED:-42}"
+case "${MHCFLURRY_RELEASE_RECIPE:-}" in
+    '') ;;
+    final-2.3.0-candidate) apply_final_230_candidate_recipe ;;
+    *)
+        echo "Unknown MHCFLURRY_RELEASE_RECIPE: $MHCFLURRY_RELEASE_RECIPE" >&2
+        exit 2
+        ;;
+esac
+
+mkdir -p "$BASE_OUT/config"
+if [ "${MHCFLURRY_RELEASE_RECIPE:-}" = final-2.3.0-candidate ]; then
+    cp "$SCRIPT_DIR/final_230_candidate_recipe.json" \
+        "$BASE_OUT/config/final_architecture_decision.json"
+fi
 
 processing_variant_enabled() {
     case " $PROCESSING_VARIANTS " in
@@ -147,6 +172,32 @@ processing_variant_enabled "$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" || {
     echo "PROCESSING_VARIANTS must include PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$PRESENTATION_PROCESSING_WITH_FLANKS_KIND." >&2
     exit 2
 }
+case "$PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS" in
+    0) ;;
+    *[!0-9]*|'')
+        echo "PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS must be 0 or an integer from 1 to 15." >&2
+        exit 2
+        ;;
+    *)
+        if [ "$PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS" -lt 1 ] || \
+                [ "$PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS" -gt 15 ]; then
+            echo "PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS must be 0 or an integer from 1 to 15." >&2
+            exit 2
+        fi
+        processing_variant_enabled short_flanks || {
+            echo "Boundary hybrid requires short_flanks in PROCESSING_VARIANTS." >&2
+            exit 2
+        }
+        if [ "$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" != short_flanks ]; then
+            echo "Boundary hybrid requires PRESENTATION_PROCESSING_WITH_FLANKS_KIND=short_flanks." >&2
+            exit 2
+        fi
+        if [ "$PROCESSING_MINIBATCH_SIZE" -ne 512 ]; then
+            echo "Boundary hybrid is frozen at PROCESSING_MINIBATCH_SIZE=512." >&2
+            exit 2
+        fi
+        ;;
+esac
 
 if [ "$GPUS" -eq 0 ]; then
     NUM_JOBS=1
@@ -274,6 +325,9 @@ AFFINITY_ENV=(
     "SKIP_PLOTS=${SKIP_PLOTS:-0}"
     "TRAINING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE"
     "AFFINITY_MINIBATCH_SIZE=$AFFINITY_MINIBATCH_SIZE"
+    "AFFINITY_OPTIMIZER_IMPLEMENTATION=${AFFINITY_OPTIMIZER_IMPLEMENTATION:-keras}"
+    "AFFINITY_LSUV_TARGET=${AFFINITY_LSUV_TARGET:-post_activation}"
+    "AFFINITY_INIT=${AFFINITY_INIT:-glorot_uniform}"
 )
 if [ -n "$AFFINITY_NUM_JOBS" ]; then
     AFFINITY_ENV+=("NUM_JOBS=$AFFINITY_NUM_JOBS")
@@ -329,8 +383,8 @@ for kind in $PROCESSING_VARIANTS; do
     )
     if [[ "$kind" == "with_flanks" ]]; then
         PROCESSING_VARIANT_HYPERPARAMETER_ARGS=(
-            --optimizer-implementation pytorch
-            --init kaiming_uniform_fan_in
+            --optimizer-implementation "$PROCESSING_WITH_FLANKS_OPTIMIZER_IMPLEMENTATION"
+            --init "$PROCESSING_WITH_FLANKS_INIT"
         )
     fi
     mhcflurry class1-generate-training-hyperparameters processing-variant \
@@ -341,15 +395,22 @@ for kind in $PROCESSING_VARIANTS; do
         "import yaml; print(len(yaml.safe_load(open('hyperparameters.$kind.yaml'))))")
     echo "processing.$kind: using $ARCH_COUNT architectures"
 
-    mhcflurry-class1-train-processing-models \
-        --data "$(pwd)/train_data.csv.bz2" \
-        --held-out-samples "$PROCESSING_HELD_OUT_SAMPLES" \
-        --num-folds 4 \
-        --random-seed "$RELEASE_RANDOM_SEED" \
-        --hyperparameters "hyperparameters.$kind.yaml" \
-        --out-models-dir "$(pwd)/models.unselected.$kind" \
-        --worker-log-dir "$BASE_OUT/processing" \
-        "${PROCESSING_PARALLELISM_ARGS[@]}"
+    if [ -f "$(pwd)/models.unselected.$kind/manifest.csv" ]; then
+        mhcflurry-class1-train-processing-models \
+            --out-models-dir "$(pwd)/models.unselected.$kind" \
+            --continue-incomplete \
+            "${PROCESSING_PARALLELISM_ARGS[@]}"
+    else
+        mhcflurry-class1-train-processing-models \
+            --data "$(pwd)/train_data.csv.bz2" \
+            --held-out-samples "$PROCESSING_HELD_OUT_SAMPLES" \
+            --num-folds 4 \
+            --random-seed "$RELEASE_RANDOM_SEED" \
+            --hyperparameters "hyperparameters.$kind.yaml" \
+            --out-models-dir "$(pwd)/models.unselected.$kind" \
+            --worker-log-dir "$BASE_OUT/processing" \
+            "${PROCESSING_PARALLELISM_ARGS[@]}"
+    fi
 
     mhcflurry-class1-select-processing-models \
         --data "$(pwd)/models.unselected.$kind/train_data.csv.bz2" \
@@ -357,10 +418,102 @@ for kind in $PROCESSING_VARIANTS; do
         --out-models-dir "$(pwd)/models.selected.$kind" \
         --min-models-per-fold 1 \
         --max-models-per-fold 2 \
+        --save-validation-predictions \
         "${PROCESSING_PARALLELISM_ARGS[@]}"
     cp "$(pwd)/models.unselected.$kind/train_data.csv.bz2" \
         "$(pwd)/models.selected.$kind/train_data.csv.bz2"
 done
+
+PRESENTATION_PROCESSING_WITH_FLANKS_PATH="$BASE_OUT/processing/models.selected.$PRESENTATION_PROCESSING_WITH_FLANKS_KIND"
+if [ "$PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS" -ne 0 ]; then
+    BOUNDARY_RADIUS="$PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS"
+    BOUNDARY_ROOT="$BASE_OUT/processing/boundary-radius-$BOUNDARY_RADIUS"
+    mkdir -p "$BOUNDARY_ROOT"
+    python "$SCRIPT_DIR/generate_processing_cleavage_boundaries.py" \
+        "$BOUNDARY_ROOT" \
+        --architectures large_relu \
+        --peptide-context-lengths "$BOUNDARY_RADIUS" \
+        --no-controls \
+        --design final-2.3.0-processing-boundary \
+        > "$BOUNDARY_ROOT/manifest.stdout.json"
+    BOUNDARY_CONDITION=$(python - "$BOUNDARY_ROOT/manifest.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1]) as fd:
+    manifest = json.load(fd)
+(record,) = manifest["records"]
+print(record["condition"])
+PY
+)
+    BOUNDARY_HYPERPARAMETERS="$BOUNDARY_ROOT/conditions/$BOUNDARY_CONDITION.yaml"
+    python - "$BOUNDARY_HYPERPARAMETERS" "$BOUNDARY_RADIUS" <<'PY'
+import sys
+import yaml
+
+with open(sys.argv[1]) as fd:
+    (item,) = yaml.safe_load(fd)
+assert item["minibatch_size"] == 512, item
+assert item["optimizer_implementation"] == "keras", item
+assert item["init"] == "glorot_uniform", item
+assert item["cleavage_boundary_flank_length"] == 5, item
+assert item["cleavage_boundary_peptide_length"] == int(sys.argv[2]), item
+assert item["cleavage_boundary_context_dropout"] == 0.25, item
+PY
+
+    BOUNDARY_UNSELECTED="$BASE_OUT/processing/models.unselected.boundary-radius-$BOUNDARY_RADIUS"
+    BOUNDARY_SELECTED="$BASE_OUT/processing/models.selected.boundary-radius-$BOUNDARY_RADIUS"
+    if [ -f "$BOUNDARY_UNSELECTED/manifest.csv" ]; then
+        mhcflurry-class1-train-processing-models \
+            --out-models-dir "$BOUNDARY_UNSELECTED" \
+            --continue-incomplete \
+            "${PROCESSING_PARALLELISM_ARGS[@]}"
+    else
+        mhcflurry-class1-train-processing-models \
+            --data "$BASE_OUT/processing/train_data.csv.bz2" \
+            --held-out-samples "$PROCESSING_HELD_OUT_SAMPLES" \
+            --num-folds 4 \
+            --random-seed "$RELEASE_RANDOM_SEED" \
+            --hyperparameters "$BOUNDARY_HYPERPARAMETERS" \
+            --out-models-dir "$BOUNDARY_UNSELECTED" \
+            --worker-log-dir "$BASE_OUT/processing" \
+            "${PROCESSING_PARALLELISM_ARGS[@]}"
+    fi
+    mhcflurry-class1-select-processing-models \
+        --data "$BOUNDARY_UNSELECTED/train_data.csv.bz2" \
+        --models-dir "$BOUNDARY_UNSELECTED" \
+        --out-models-dir "$BOUNDARY_SELECTED" \
+        --min-models-per-fold 1 \
+        --max-models-per-fold 1 \
+        --save-validation-predictions \
+        "${PROCESSING_PARALLELISM_ARGS[@]}"
+    cp "$BOUNDARY_UNSELECTED/train_data.csv.bz2" \
+        "$BOUNDARY_SELECTED/train_data.csv.bz2"
+
+    LEGACY_FOUR="$BASE_OUT/processing/models.selected.short_flanks.legacy-four"
+    mhcflurry-class1-select-processing-models \
+        --data "$BASE_OUT/processing/models.unselected.short_flanks/train_data.csv.bz2" \
+        --models-dir "$BASE_OUT/processing/models.unselected.short_flanks" \
+        --out-models-dir "$LEGACY_FOUR" \
+        --min-models-per-fold 1 \
+        --max-models-per-fold 1 \
+        --save-validation-predictions \
+        "${PROCESSING_PARALLELISM_ARGS[@]}"
+    cp "$BASE_OUT/processing/models.unselected.short_flanks/train_data.csv.bz2" \
+        "$LEGACY_FOUR/train_data.csv.bz2"
+
+    PROCESSING_HYBRID="$BASE_OUT/processing/models.selected.short_flanks-boundary-radius-$BOUNDARY_RADIUS"
+    if [ ! -f "$PROCESSING_HYBRID/ensemble_provenance.json" ]; then
+        python "$SCRIPT_DIR/compose_processing_ensemble.py" \
+            --predictor "legacy=$LEGACY_FOUR" \
+            --predictor "boundary=$BOUNDARY_SELECTED" \
+            --require-equal-counts \
+            --out "$PROCESSING_HYBRID"
+    fi
+    cp "$BASE_OUT/processing/train_data.csv.bz2" \
+        "$PROCESSING_HYBRID/train_data.csv.bz2"
+    PRESENTATION_PROCESSING_WITH_FLANKS_PATH="$PROCESSING_HYBRID"
+fi
 
 stop_gpu_telemetry
 echo "STAGE 2 duration: $(( $(date +%s) - STAGE2_START )) sec"
@@ -391,7 +544,7 @@ compress_csv_bzip2 "$(pwd)/train_data.csv"
 mhcflurry-class1-train-presentation-models \
     --data "$(pwd)/train_data.csv.bz2" \
     --affinity-predictor "$AFFINITY_PREDICTOR" \
-    --processing-predictor-with-flanks "$BASE_OUT/processing/models.selected.$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" \
+    --processing-predictor-with-flanks "$PRESENTATION_PROCESSING_WITH_FLANKS_PATH" \
     --processing-predictor-without-flanks "$BASE_OUT/processing/models.selected.no_flank" \
     --out-models-dir "$(pwd)/models" \
     --random-seed "$RELEASE_RANDOM_SEED" \
@@ -415,7 +568,7 @@ mhcflurry-calibrate-percentile-ranks \
 # so it's self-contained for distribution.
 cp "$AFFINITY_PREDICTOR/train_data.csv.bz2" \
     "$(pwd)/models/affinity_predictor_train_data.csv.bz2"
-cp "$BASE_OUT/processing/models.selected.$PRESENTATION_PROCESSING_WITH_FLANKS_KIND/train_data.csv.bz2" \
+cp "$PRESENTATION_PROCESSING_WITH_FLANKS_PATH/train_data.csv.bz2" \
     "$(pwd)/models/processing_predictor_with_flanks_train_data.csv.bz2"
 cp "$BASE_OUT/processing/models.selected.no_flank/train_data.csv.bz2" \
     "$(pwd)/models/processing_predictor_no_flank_train_data.csv.bz2"
@@ -433,5 +586,6 @@ echo "STAGE 3 duration: $(( $(date +%s) - STAGE3_START )) sec"
 echo "=== DONE ==="
 echo "affinity:     $AFFINITY_PREDICTOR"
 echo "processing:   $BASE_OUT/processing/models.selected.{${PROCESSING_VARIANTS// /,}}"
+echo "presentation with-flank processing: $PRESENTATION_PROCESSING_WITH_FLANKS_PATH"
 echo "presentation: $BASE_OUT/presentation/models"
 ls -la "$BASE_OUT/presentation/models" | head -20

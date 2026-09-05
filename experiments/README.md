@@ -31,14 +31,12 @@ Each snapshot contains:
 - optional source archive and exact command files.
 
 Held-out prediction tables are copied even when they exceed `--max-copy-mb`, so
-performance figures can be regenerated without rerunning inference. On the same
-filesystem they are hard-linked into the immutable snapshot to avoid duplicating
-multi-gigabyte tables; `source_files.csv` records `storage=hardlink` or `copy`.
-Cross-filesystem snapshots fall back to normal copies. Weights and training
-tables are hashed but are not duplicated by default. Other files larger than
-`--max-copy-mb` remain inventory-only. Do not modify hard-linked source outputs;
-preserve the original run until the snapshot and required model archives have
-been copied to durable storage.
+performance figures can be regenerated without rerunning inference. They are
+always copied rather than hard-linked, so modifying a live run cannot mutate an
+immutable snapshot or invalidate its recorded hash. Weights and training tables
+are hashed but are not duplicated by default. Other files larger than
+`--max-copy-mb` remain inventory-only. Preserve the original run until the
+snapshot and required model archives have been copied to durable storage.
 
 Generated snapshot directories are ignored by Git; this README is tracked.
 
@@ -101,3 +99,10 @@ factorial heatmaps. `data/training_history.csv` is the corresponding tidy
 model/fit/epoch table. Publication-style figures and correlation heatmaps can
 be regenerated with `mhcflurry eval paper-figures` when a run preserved its
 saved score tables.
+
+The cross-experiment release panels, including cleavage-boundary and cached
+presentation-factorial conclusions, are regenerated with:
+
+```bash
+mhcflurry eval release-experiment-figures --help
+```

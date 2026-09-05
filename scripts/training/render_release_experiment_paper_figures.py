@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import matplotlib
@@ -99,7 +100,8 @@ AFFINITY_FRONTIER_CONDITIONS = (
 
 def make_parser():
     """Build the command-line parser."""
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        prog=os.environ.get("MHCFLURRY_CLI_PROG"), description=__doc__)
     parser.add_argument("--affinity-ablation-dir", required=True)
     parser.add_argument("--affinity-native128-dir", required=True)
     parser.add_argument("--processing-run-dir", required=True)
@@ -109,6 +111,14 @@ def make_parser():
             "Optional terminal eight-condition affinity frontier. When set, "
             "render the direct candidate-versus-public summary as Figure 4."
         ),
+    )
+    parser.add_argument(
+        "--processing-boundary-summary",
+        help="Optional affinity-controlled cleavage-boundary summary CSV.",
+    )
+    parser.add_argument(
+        "--presentation-factorial-summary",
+        help="Optional cached 2x2 presentation factorial summary CSV.",
     )
     parser.add_argument("--out", required=True)
     parser.add_argument("--formats", default="svg,pdf,png")
@@ -440,6 +450,116 @@ def affinity_frontier_figure(
     save_figure(fig, "affinity_frontier_vs_public", out_dir, formats, outputs)
 
 
+def processing_boundary_figure(path, inputs, outputs, out_dir, formats):
+    """Plot affinity-controlled local-boundary architecture performance."""
+    table = pandas.read_csv(require_file(path, inputs)).set_index("score")
+    rows = (
+        ("large_relu__legacy_5aa", "Legacy 5-aa"),
+        ("large_relu__compact_5x2", "Boundary 5x2"),
+        ("large_relu__intermediate_5x3", "Boundary 5x3"),
+        ("large_relu__intermediate_5x4", "Boundary 5x4"),
+        ("large_relu__extended_5x5", "Boundary 5x5"),
+    )
+    missing = [name for name, _ in rows if name not in table.index]
+    if missing or "public_2_1_selected" not in table.index:
+        raise ValueError(
+            "Boundary summary lacks required rows: %s" %
+            ", ".join(missing or ["public_2_1_selected"]))
+
+    import matplotlib.pyplot as plt
+    fig, axes = plt.subplots(1, 2, figsize=(8.8, 3.6), sharex=True)
+    x = numpy.arange(len(rows))
+    for axis, (column, title) in zip(axes, (
+            ("macro_pr_auc", "Macro AUPRC"),
+            ("macro_ppv_at_n", "Macro PPV@N"))):
+        public = table.loc["public_2_1_selected", column]
+        values = numpy.asarray([
+            100.0 * (table.loc[name, column] - public) / public
+            for name, _ in rows
+        ])
+        axis.bar(
+            x, values,
+            color=[POSITIVE_DELTA_COLOR if value >= 0
+                   else NEGATIVE_DELTA_COLOR for value in values],
+            width=0.72)
+        axis.axhline(0.0, color="0.35", linewidth=0.8)
+        for position, value in zip(x, values):
+            axis.annotate(
+                "%+.2f%%" % value,
+                (position, value),
+                xytext=(0, 4 if value >= 0 else -12),
+                textcoords="offset points",
+                ha="center",
+                fontsize=7,
+            )
+        axis.set_xticks(x)
+        axis.set_xticklabels(
+            [label for _, label in rows], rotation=35, ha="right")
+        axis.set_ylabel("Change vs selected public 2.1.x (%)")
+        axis.set_title(title)
+        despine(axis)
+    fig.suptitle("Affinity-controlled cleavage-boundary comparison")
+    fig.tight_layout()
+    save_figure(
+        fig, "processing_cleavage_boundary_context",
+        out_dir, formats, outputs)
+
+
+def presentation_factorial_figure(path, inputs, outputs, out_dir, formats):
+    """Plot the cached public/new affinity-processing component factorial."""
+    table = pandas.read_csv(require_file(path, inputs))
+    table = table.loc[
+        table.flank_mode.eq("with_flanks") & table.average.eq("Macro") &
+        table.metric.isin(["AUPRC", "PPV@N"])
+    ].copy()
+    labels = (
+        ("public_affinity__public_processing", "Public + public"),
+        ("new_affinity__public_processing", "New affinity"),
+        ("public_affinity__new_processing", "New processing"),
+        ("new_affinity__new_processing", "New + new"),
+    )
+    expected = {(condition, metric) for condition, _ in labels
+                for metric in ("AUPRC", "PPV@N")}
+    observed = set(zip(table.condition, table.metric))
+    if not expected.issubset(observed):
+        raise ValueError("Presentation factorial summary is incomplete")
+
+    import matplotlib.pyplot as plt
+    fig, axes = plt.subplots(1, 2, figsize=(8.4, 3.6), sharex=True)
+    x = numpy.arange(len(labels))
+    for axis, metric in zip(axes, ("AUPRC", "PPV@N")):
+        subset = table.loc[table.metric == metric].set_index("condition")
+        values = numpy.asarray([
+            subset.loc[condition, "pct_change"] for condition, _ in labels
+        ])
+        axis.bar(
+            x, values,
+            color=[POSITIVE_DELTA_COLOR if value >= 0
+                   else NEGATIVE_DELTA_COLOR for value in values],
+            width=0.72)
+        axis.axhline(0.0, color="0.35", linewidth=0.8)
+        for position, value in zip(x, values):
+            axis.annotate(
+                "%+.2f%%" % value,
+                (position, value),
+                xytext=(0, 4 if value >= 0 else -12),
+                textcoords="offset points",
+                ha="center",
+                fontsize=7,
+            )
+        axis.set_xticks(x)
+        axis.set_xticklabels(
+            [label for _, label in labels], rotation=35, ha="right")
+        axis.set_ylabel("Change vs public 2.2 (%)")
+        axis.set_title("Macro %s" % metric)
+        despine(axis)
+    fig.suptitle("Presentation component factorial (with flanks)")
+    fig.tight_layout()
+    save_figure(
+        fig, "presentation_component_factorial",
+        out_dir, formats, outputs)
+
+
 def save_figure(fig, name, out_dir, formats, outputs):
     """Save one manuscript figure and record all emitted files."""
     import matplotlib.pyplot as plt
@@ -488,6 +608,22 @@ def run(args):
     if args.affinity_frontier_dir:
         affinity_frontier_figure(
             args.affinity_frontier_dir,
+            inputs,
+            outputs,
+            out_dir,
+            formats,
+        )
+    if args.processing_boundary_summary:
+        processing_boundary_figure(
+            args.processing_boundary_summary,
+            inputs,
+            outputs,
+            out_dir,
+            formats,
+        )
+    if args.presentation_factorial_summary:
+        presentation_factorial_figure(
+            args.presentation_factorial_summary,
             inputs,
             outputs,
             out_dir,

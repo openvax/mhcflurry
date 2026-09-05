@@ -22,16 +22,20 @@ Usage:
       --run-dir /path/to/release-run \
       --release 2.3.0 \
       [--backend local|brev-existing|brev-provision|ssh] \
-      [--release-profile full|fast-8xa100|minimal-processing|fast-minimal] \
+      [--release-profile full|final-2.3.0-candidate|fast-8xa100|minimal-processing|fast-minimal] \
       [--random-seed 42] \
       [--minibatch-size 128] \
       [--affinity-minibatch-size 128] \
+      [--affinity-optimizer-implementation keras|pytorch] \
+      [--affinity-lsuv-target post_activation|pre_activation] \
+      [--affinity-init glorot_uniform|glorot_normal|he_uniform|he_normal|orthogonal] \
       [--affinity-max-workers-per-gpu auto] \
       [--processing-minibatch-size 512] \
       [--processing-num-jobs auto] \
       [--processing-max-workers-per-gpu auto] \
       [--processing-held-out-samples 10] \
       [--processing-variants "with_flanks no_flank short_flanks"] \
+      [--processing-short-flank-boundary-radius 0] \
       [--presentation-processing-with-flanks-kind short_flanks] \
       [--presentation-decoys-per-hit 2] \
       [--presentation-sample-fraction 0.1] \
@@ -95,6 +99,13 @@ Remote output:
 Release profiles:
   full                Default. Train all release processing artifacts on the
                       configured backend/provider.
+  final-2.3.0-candidate
+                      Frozen decision set from the 2.3.0 screens: affinity
+                      mb1024/PyTorch RMSprop/pre-LSUV/Glorot, processing mb512
+                      with all three legacy context grids, and a radius-5
+                      cleavage-boundary family blended 50/50 with selected
+                      5-aa models for presentation. All affinity fits retain
+                      both terminal and best checkpoints.
   fast-8xa100         For throughput runs on 8xA100 / 80 GB machines. When
                       provisioning Brev and no provider/type was explicitly
                       set, request the Denvr 8xA100 80 GB shape. Worker
@@ -416,6 +427,9 @@ apply_release_profile() {
     case "$RELEASE_PROFILE" in
         full)
             ;;
+        final-2.3.0-candidate)
+            apply_final_230_candidate_recipe
+            ;;
         fast-8xa100)
             apply_fast_gpu_profile
             ;;
@@ -427,7 +441,7 @@ apply_release_profile() {
             apply_minimal_processing_profile
             ;;
         *)
-            die "--release-profile must be one of: full, fast-8xa100, minimal-processing, fast-minimal"
+            die "--release-profile must be one of: full, final-2.3.0-candidate, fast-8xa100, minimal-processing, fast-minimal"
             ;;
     esac
 }
@@ -447,6 +461,13 @@ validate_processing_configuration() {
     local seen_modes=" "
     local seen_variants=" "
     local variant
+
+    validate_nonnegative_integer \
+        "--processing-short-flank-boundary-radius" \
+        "$PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS"
+    if [ "$PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS" -gt 15 ]; then
+        die "--processing-short-flank-boundary-radius must be no greater than 15"
+    fi
 
     for variant in $PROCESSING_VARIANTS; do
         case "$variant" in
@@ -499,6 +520,12 @@ validate_processing_configuration() {
         processing_variant_requested \
             "$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" || die \
             "--processing-variants must include the presentation with-flanks variant '$PRESENTATION_PROCESSING_WITH_FLANKS_KIND'"
+        if [ "$PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS" -ne 0 ]; then
+            processing_variant_requested short_flanks || die \
+                "--processing-short-flank-boundary-radius requires short_flanks"
+            [ "$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" = short_flanks ] || \
+                die "--processing-short-flank-boundary-radius requires short_flanks presentation processing"
+        fi
     fi
     if [ "$DEPLOY_MODE" != "none" ]; then
         processing_variant_requested with_flanks || die \
@@ -1852,15 +1879,20 @@ run_brev_training() {
     local runplz_env=(
         "MHCFLURRY_OUT=$RUN_DIR"
         "REPO=$REPO"
+        "MHCFLURRY_RELEASE_RECIPE=$MHCFLURRY_RELEASE_RECIPE"
         "RELEASE_RANDOM_SEED=$RELEASE_RANDOM_SEED"
         "TRAINING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE"
         "AFFINITY_MINIBATCH_SIZE=$AFFINITY_MINIBATCH_SIZE"
+        "AFFINITY_OPTIMIZER_IMPLEMENTATION=$AFFINITY_OPTIMIZER_IMPLEMENTATION"
+        "AFFINITY_LSUV_TARGET=$AFFINITY_LSUV_TARGET"
+        "AFFINITY_INIT=$AFFINITY_INIT"
         "AFFINITY_MAX_WORKERS_PER_GPU=$AFFINITY_MAX_WORKERS_PER_GPU"
         "PROCESSING_MINIBATCH_SIZE=$PROCESSING_MINIBATCH_SIZE"
         "PROCESSING_NUM_JOBS=$PROCESSING_NUM_JOBS"
         "PROCESSING_MAX_WORKERS_PER_GPU=$PROCESSING_MAX_WORKERS_PER_GPU"
         "PROCESSING_HELD_OUT_SAMPLES=$PROCESSING_HELD_OUT_SAMPLES"
         "PROCESSING_VARIANTS=$PROCESSING_VARIANTS"
+        "PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS=$PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS"
         "PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$PRESENTATION_PROCESSING_WITH_FLANKS_KIND"
         "PRESENTATION_DECOYS_PER_HIT=$PRESENTATION_DECOYS_PER_HIT"
         "PRESENTATION_SAMPLE_FRACTION=$PRESENTATION_SAMPLE_FRACTION"
@@ -2038,6 +2070,7 @@ SKIP_PLOTS=0
 SKIP_DEPLOY=0
 DEPLOY_MODE=none
 RELEASE_PROFILE="${RELEASE_PROFILE:-full}"
+MHCFLURRY_RELEASE_RECIPE="${MHCFLURRY_RELEASE_RECIPE:-}"
 DATA_DIR=
 COMPARE_INCLUDE=affinity,processing,presentation
 EVAL_MAX_BENCHMARK_FILES="${EVAL_MAX_BENCHMARK_FILES:-}"
@@ -2083,13 +2116,16 @@ DRY_RUN=0
 ALLOW_DIRTY_REPO="${ALLOW_DIRTY_REPO:-0}"
 RELEASE_RANDOM_SEED="${RELEASE_RANDOM_SEED:-42}"
 TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-128}"
-AFFINITY_MINIBATCH_SIZE=
+AFFINITY_MINIBATCH_SIZE="${AFFINITY_MINIBATCH_SIZE:-}"
+AFFINITY_OPTIMIZER_IMPLEMENTATION="${AFFINITY_OPTIMIZER_IMPLEMENTATION:-keras}"
+AFFINITY_LSUV_TARGET="${AFFINITY_LSUV_TARGET:-post_activation}"
+AFFINITY_INIT="${AFFINITY_INIT:-glorot_uniform}"
 AFFINITY_MAX_WORKERS_PER_GPU_EXPLICIT=0
 if [ -n "${AFFINITY_MAX_WORKERS_PER_GPU:-}" ]; then
     AFFINITY_MAX_WORKERS_PER_GPU_EXPLICIT=1
 fi
 AFFINITY_MAX_WORKERS_PER_GPU="${AFFINITY_MAX_WORKERS_PER_GPU:-auto}"
-PROCESSING_MINIBATCH_SIZE=
+PROCESSING_MINIBATCH_SIZE="${PROCESSING_MINIBATCH_SIZE:-}"
 PROCESSING_NUM_JOBS="${PROCESSING_NUM_JOBS:-auto}"
 PROCESSING_MAX_WORKERS_PER_GPU="${PROCESSING_MAX_WORKERS_PER_GPU:-auto}"
 PROCESSING_HELD_OUT_SAMPLES="${PROCESSING_HELD_OUT_SAMPLES:-10}"
@@ -2098,6 +2134,7 @@ if [ -n "${PROCESSING_VARIANTS:-}" ]; then
     PROCESSING_VARIANTS_EXPLICIT=1
 fi
 PROCESSING_VARIANTS="${PROCESSING_VARIANTS:-with_flanks no_flank short_flanks}"
+PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS="${PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS:-0}"
 PRESENTATION_PROCESSING_WITH_FLANKS_KIND_EXPLICIT=0
 if [ -n "${PRESENTATION_PROCESSING_WITH_FLANKS_KIND:-}" ]; then
     PRESENTATION_PROCESSING_WITH_FLANKS_KIND_EXPLICIT=1
@@ -2122,6 +2159,8 @@ BREV_REMOTE_PLOTS_DONE=0
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="${REPO:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/../training/release_recipes.sh"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -2343,6 +2382,18 @@ while [ $# -gt 0 ]; do
             AFFINITY_MINIBATCH_SIZE=$2
             shift 2
             ;;
+        --affinity-optimizer-implementation)
+            AFFINITY_OPTIMIZER_IMPLEMENTATION=$2
+            shift 2
+            ;;
+        --affinity-lsuv-target)
+            AFFINITY_LSUV_TARGET=$2
+            shift 2
+            ;;
+        --affinity-init)
+            AFFINITY_INIT=$2
+            shift 2
+            ;;
         --affinity-max-workers-per-gpu)
             AFFINITY_MAX_WORKERS_PER_GPU=$2
             AFFINITY_MAX_WORKERS_PER_GPU_EXPLICIT=1
@@ -2367,6 +2418,10 @@ while [ $# -gt 0 ]; do
         --processing-variants)
             PROCESSING_VARIANTS=$2
             PROCESSING_VARIANTS_EXPLICIT=1
+            shift 2
+            ;;
+        --processing-short-flank-boundary-radius)
+            PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS=$2
             shift 2
             ;;
         --presentation-processing-with-flanks-kind)
@@ -2450,6 +2505,18 @@ validate_processing_configuration
 validate_nonnegative_integer "--random-seed" "$RELEASE_RANDOM_SEED"
 validate_positive_integer "--affinity-minibatch-size" "$AFFINITY_MINIBATCH_SIZE"
 validate_positive_integer "--processing-minibatch-size" "$PROCESSING_MINIBATCH_SIZE"
+case "$AFFINITY_OPTIMIZER_IMPLEMENTATION" in
+    keras|pytorch) ;;
+    *) die "--affinity-optimizer-implementation must be keras or pytorch" ;;
+esac
+case "$AFFINITY_LSUV_TARGET" in
+    post_activation|pre_activation) ;;
+    *) die "--affinity-lsuv-target must be post_activation or pre_activation" ;;
+esac
+case "$AFFINITY_INIT" in
+    glorot_uniform|glorot_normal|he_uniform|he_normal|orthogonal) ;;
+    *) die "unsupported --affinity-init: $AFFINITY_INIT" ;;
+esac
 validate_positive_integer "--processing-held-out-samples" "$PROCESSING_HELD_OUT_SAMPLES"
 validate_positive_number "--presentation-decoys-per-hit" "$PRESENTATION_DECOYS_PER_HIT"
 validate_fraction "--presentation-sample-fraction" "$PRESENTATION_SAMPLE_FRACTION"
@@ -2640,9 +2707,10 @@ note "Backend:       $BACKEND"
 note "Profile:       $RELEASE_PROFILE"
 note "Random seed:   $RELEASE_RANDOM_SEED"
 note "Batch sizes:   affinity=$AFFINITY_MINIBATCH_SIZE processing=$PROCESSING_MINIBATCH_SIZE"
+note "Affinity:      optimizer=$AFFINITY_OPTIMIZER_IMPLEMENTATION; lsuv=$AFFINITY_LSUV_TARGET; init=$AFFINITY_INIT"
 note "Compare:       $RUN_LABEL vs $COMPARE_BASELINE_LABEL ($COMPARE_BASELINE)"
 note "Affinity MWPG: $AFFINITY_MAX_WORKERS_PER_GPU"
-note "Processing:    variants=$PROCESSING_VARIANTS; eval_modes=$PROCESSING_MODES; jobs=$PROCESSING_NUM_JOBS; workers/gpu=$PROCESSING_MAX_WORKERS_PER_GPU"
+note "Processing:    variants=$PROCESSING_VARIANTS; eval_modes=$PROCESSING_MODES; boundary_radius=$PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS; jobs=$PROCESSING_NUM_JOBS; workers/gpu=$PROCESSING_MAX_WORKERS_PER_GPU"
 note "Presentation:  decoys/hit=$PRESENTATION_DECOYS_PER_HIT; sample_fraction=$PRESENTATION_SAMPLE_FRACTION; jobs=$PRESENTATION_NUM_JOBS; workers/gpu=$PRESENTATION_MAX_WORKERS_PER_GPU"
 if [ -n "$PAPER_FIGURES_PREPARE_COMMAND" ]; then
     note "Paper inputs:  local prepare command configured"
@@ -2682,15 +2750,20 @@ if [ "$SKIP_TRAIN" != "1" ]; then
                 "REPO=$REPO" \
                 "MHCFLURRY_RELEASE_WORKFLOW_ID=$WORKFLOW_RUN_ID" \
                 "MHCFLURRY_RELEASE_GIT_COMMIT=$RELEASE_GIT_COMMIT" \
+                "MHCFLURRY_RELEASE_RECIPE=$MHCFLURRY_RELEASE_RECIPE" \
                 "RELEASE_RANDOM_SEED=$RELEASE_RANDOM_SEED" \
                 "TRAINING_MINIBATCH_SIZE=$TRAINING_MINIBATCH_SIZE" \
                 "AFFINITY_MINIBATCH_SIZE=$AFFINITY_MINIBATCH_SIZE" \
+                "AFFINITY_OPTIMIZER_IMPLEMENTATION=$AFFINITY_OPTIMIZER_IMPLEMENTATION" \
+                "AFFINITY_LSUV_TARGET=$AFFINITY_LSUV_TARGET" \
+                "AFFINITY_INIT=$AFFINITY_INIT" \
                 "AFFINITY_MAX_WORKERS_PER_GPU=$AFFINITY_MAX_WORKERS_PER_GPU" \
                 "PROCESSING_MINIBATCH_SIZE=$PROCESSING_MINIBATCH_SIZE" \
                 "PROCESSING_NUM_JOBS=$PROCESSING_NUM_JOBS" \
                 "PROCESSING_MAX_WORKERS_PER_GPU=$PROCESSING_MAX_WORKERS_PER_GPU" \
                 "PROCESSING_HELD_OUT_SAMPLES=$PROCESSING_HELD_OUT_SAMPLES" \
                 "PROCESSING_VARIANTS=$PROCESSING_VARIANTS" \
+                "PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS=$PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS" \
                 "PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" \
                 "PRESENTATION_DECOYS_PER_HIT=$PRESENTATION_DECOYS_PER_HIT" \
                 "PRESENTATION_SAMPLE_FRACTION=$PRESENTATION_SAMPLE_FRACTION" \
@@ -2726,15 +2799,20 @@ if [ "$SKIP_TRAIN" != "1" ]; then
             REMOTE_COMMAND="$REMOTE_COMMAND REPO=$(shell_quote "$REMOTE_REPO")"
             REMOTE_COMMAND="$REMOTE_COMMAND MHCFLURRY_RELEASE_WORKFLOW_ID=$(shell_quote "$WORKFLOW_RUN_ID")"
             REMOTE_COMMAND="$REMOTE_COMMAND MHCFLURRY_RELEASE_GIT_COMMIT=\$(git -C $REMOTE_REPO_QUOTED rev-parse HEAD)"
+            REMOTE_COMMAND="$REMOTE_COMMAND MHCFLURRY_RELEASE_RECIPE=$(shell_quote "$MHCFLURRY_RELEASE_RECIPE")"
             REMOTE_COMMAND="$REMOTE_COMMAND RELEASE_RANDOM_SEED=$(shell_quote "$RELEASE_RANDOM_SEED")"
             REMOTE_COMMAND="$REMOTE_COMMAND TRAINING_MINIBATCH_SIZE=$(shell_quote "$TRAINING_MINIBATCH_SIZE")"
             REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_MINIBATCH_SIZE=$(shell_quote "$AFFINITY_MINIBATCH_SIZE")"
+            REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_OPTIMIZER_IMPLEMENTATION=$(shell_quote "$AFFINITY_OPTIMIZER_IMPLEMENTATION")"
+            REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_LSUV_TARGET=$(shell_quote "$AFFINITY_LSUV_TARGET")"
+            REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_INIT=$(shell_quote "$AFFINITY_INIT")"
             REMOTE_COMMAND="$REMOTE_COMMAND AFFINITY_MAX_WORKERS_PER_GPU=$(shell_quote "$AFFINITY_MAX_WORKERS_PER_GPU")"
             REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_MINIBATCH_SIZE=$(shell_quote "$PROCESSING_MINIBATCH_SIZE")"
             REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_NUM_JOBS=$(shell_quote "$PROCESSING_NUM_JOBS")"
             REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_MAX_WORKERS_PER_GPU=$(shell_quote "$PROCESSING_MAX_WORKERS_PER_GPU")"
             REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_HELD_OUT_SAMPLES=$(shell_quote "$PROCESSING_HELD_OUT_SAMPLES")"
             REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_VARIANTS=$(shell_quote "$PROCESSING_VARIANTS")"
+            REMOTE_COMMAND="$REMOTE_COMMAND PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS=$(shell_quote "$PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS")"
             REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_PROCESSING_WITH_FLANKS_KIND=$(shell_quote "$PRESENTATION_PROCESSING_WITH_FLANKS_KIND")"
             REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_DECOYS_PER_HIT=$(shell_quote "$PRESENTATION_DECOYS_PER_HIT")"
             REMOTE_COMMAND="$REMOTE_COMMAND PRESENTATION_SAMPLE_FRACTION=$(shell_quote "$PRESENTATION_SAMPLE_FRACTION")"

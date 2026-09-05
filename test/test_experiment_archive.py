@@ -178,11 +178,15 @@ def test_snapshot_experiment_exports_reconstructable_tables(tmp_path):
     ).is_file()
     prediction_row = inventory.loc[
         inventory.relative_path.str.endswith("predictions.csv.bz2")].iloc[0]
-    assert prediction_row.storage == "hardlink"
-    assert (
+    prediction_snapshot = (
         destination / "artifacts" / "condition-a" /
         "comparison-vs-baseline" / "affinity" / "predictions.csv.bz2"
-    ).stat().st_ino == predictions.stat().st_ino
+    )
+    original_prediction_bytes = predictions.read_bytes()
+    assert prediction_row.storage == "copy"
+    assert prediction_snapshot.stat().st_ino != predictions.stat().st_ino
+    predictions.write_bytes(b"mutated live prediction table")
+    assert prediction_snapshot.read_bytes() == original_prediction_bytes
     assert (
         destination / "artifacts" / "condition-a" /
         "comparison-vs-baseline" / "affinity" / "plots" /

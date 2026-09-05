@@ -104,6 +104,15 @@ KLGGALQAK,300.0,350.0
 """.strip()
 
 
+def test_train_parser_accepts_save_all_checkpoints():
+    args = train_command.parser.parse_args([
+        "--out-models-dir", "models",
+        "--continue-incomplete",
+        "--save-all-checkpoints",
+    ])
+    assert args.save_all_checkpoints is True
+
+
 def test_resource_probe_releases_model_between_architectures(monkeypatch):
     """Sequential probe tasks must not inherit the prior model's VRAM."""
     created = []

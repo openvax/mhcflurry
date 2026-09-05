@@ -65,11 +65,13 @@ def build_release_holdout(
         chunksize=500_000):
     """Derive release exclusions for one frozen source-study holdout.
 
-    Affinity is evaluated on every monoallelic benchmark sample and on the
-    selected multiallelic holdout. Every pMHC from current affinity training
-    that appears in those benchmark rows (hit or decoy) is excluded. Processing
-    and presentation are evaluated only on the named multiallelic source-study
-    holdout; presentation excludes those samples from training in full.
+    Affinity metrics are evaluated on every monoallelic benchmark sample.
+    Every pMHC from current affinity training that appears in those rows or in
+    the selected multiallelic holdout (hit or decoy) is excluded so downstream
+    presentation evaluation cannot leak through the affinity component.
+    Processing and presentation are evaluated only on the named multiallelic
+    source-study holdout; presentation excludes those samples from training in
+    full.
     """
     data_dir = Path(data_dir).resolve()
     training_data = Path(training_data).resolve()
@@ -192,10 +194,12 @@ def build_release_holdout(
         "schema_version": 1,
         "policy": {
             "affinity": (
-                "Evaluate all monoallelic samples and the named multiallelic "
-                "source-study holdout. Exclude every current-training pMHC "
-                "that occurs in those benchmark rows, including decoys; "
-                "expand multiallelic genotypes to every listed allele."
+                "Evaluate affinity metrics on all monoallelic samples. "
+                "Exclude every current-training pMHC that occurs in those "
+                "rows or in the named multiallelic source-study holdout, "
+                "including decoys; expand multiallelic genotypes to every "
+                "listed allele so presentation evaluation cannot leak "
+                "through the affinity component."
             ),
             "processing": (
                 "Evaluate only the named multiallelic source-study holdout; "
