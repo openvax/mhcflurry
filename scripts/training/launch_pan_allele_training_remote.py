@@ -53,8 +53,11 @@ _OUTPUT_VOLUME_NAME = os.environ.get("RUNPLZ_OUTPUT_VOLUME", "").strip()
 OUTPUT_VOLUMES = (
     {"/out": _OUTPUT_VOLUME_NAME} if _OUTPUT_VOLUME_NAME else {}
 )
+# Modal rejects function timeouts above 24 hours before allocating a worker.
+# Keep the shared launcher valid on every backend by default; long release
+# jobs resume from their persistent manifests in another 24-hour window.
 FUNCTION_TIMEOUT_SECONDS = int(os.environ.get(
-    "RUNPLZ_TIMEOUT_SECONDS", str(60 * 60 * 24 * 14)))
+    "RUNPLZ_TIMEOUT_SECONDS", str(60 * 60 * 24)))
 DEFAULT_OUT = os.environ.get(
     "MHCFLURRY_OUT", "/root/mhcflurry-pan-allele-training-run"
 )

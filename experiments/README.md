@@ -27,7 +27,8 @@ Each snapshot contains:
 - `data/training_history.csv`: one plot-friendly row per model/fit/epoch;
 - `data/models.csv`, `data/fits.csv`, and `data/model_configs.jsonl`;
 - `artifacts/`: copied hyperparameters, manifests, metrics, telemetry, and logs;
-- held-out `predictions.csv[.bz2]` tables and generated PDF/PNG/SVG figures;
+- held-out prediction tables, cached component-score arrays, and generated
+  PDF/PNG/SVG figures;
 - optional source archive and exact command files.
 
 Held-out prediction tables are copied even when they exceed `--max-copy-mb`, so

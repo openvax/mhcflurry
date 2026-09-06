@@ -49,7 +49,7 @@ backend choice do not change the architecture decision set:
 MHCFLURRY_RELEASE_RECIPE=final-2.3.0-candidate \
 RUNPLZ_OUTPUT_VOLUME=mhcflurry-230-final-weights \
 RUNPLZ_OUT=/out/runs/final-2.3.0-candidate \
-RUNPLZ_TIMEOUT_SECONDS=604800 \
+RUNPLZ_TIMEOUT_SECONDS=86400 \
 MHCFLURRY_RELEASE_VERSION=2.3.0 \
 MHCFLURRY_RELEASE_GIT_COMMIT="$(git rev-parse HEAD)" \
 MHCFLURRY_RELEASE_WORKFLOW_ID=final-2.3.0-candidate \
@@ -58,9 +58,11 @@ runplz modal scripts/training/launch_pan_allele_training_remote.py
 ```
 
 This command remains attached until runplz provides supported detached Modal
-collection (pirl-unc/runplz#165). The Modal volume is durable, and processing
-training resumes from its manifests if the command is launched again from the
-same clean source commit and output path.
+collection (pirl-unc/runplz#165). Modal caps one function invocation at 24
+hours, so `RUNPLZ_TIMEOUT_SECONDS` must not exceed 86400 there. The Modal volume
+is durable, and processing training resumes from its manifests when the same
+command is launched again from the same clean source commit and output path.
+Larger timeout overrides may still be used with backends that support them.
 
 The exact candidate decision set is also stored in
 `final_230_candidate_recipe.json`; completed outputs copy it to

@@ -2755,7 +2755,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     """Family-specific minibatch env vars should only be set when provided."""
     monkeypatch.setenv("RUNPLZ_MIN_DISK", "none")
     monkeypatch.setenv("RUNPLZ_OUTPUT_VOLUME", "test-output-volume")
-    monkeypatch.setenv("RUNPLZ_TIMEOUT_SECONDS", "86400")
+    monkeypatch.delenv("RUNPLZ_TIMEOUT_SECONDS", raising=False)
     fake_runplz = types.ModuleType("runplz")
     fake_config = types.ModuleType("runplz.config")
 

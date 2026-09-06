@@ -72,13 +72,17 @@ under the executable source directories.
 MHCFLURRY_RELEASE_RECIPE=final-2.3.0-candidate \
 RUNPLZ_OUTPUT_VOLUME=mhcflurry-230-final-weights \
 RUNPLZ_OUT=/out/runs/final-2.3.0-candidate \
-RUNPLZ_TIMEOUT_SECONDS=604800 \
+RUNPLZ_TIMEOUT_SECONDS=86400 \
 MHCFLURRY_RELEASE_VERSION=2.3.0 \
 MHCFLURRY_RELEASE_GIT_COMMIT="$(git rev-parse HEAD)" \
 MHCFLURRY_RELEASE_WORKFLOW_ID=final-2.3.0-candidate \
 RUN_RELEASE_EVAL=1 RUN_RELEASE_PLOTS=1 \
 runplz modal scripts/training/launch_pan_allele_training_remote.py
 ```
+
+Modal limits a single function invocation to 24 hours. If this complete run
+does not finish within that window, rerun the identical command: the persistent
+volume and `--continue-incomplete` manifests resume completed processing fits.
 
 After collection, archive the immutable experiment record with the semantic
 command (use the commit recorded by the remote run):
