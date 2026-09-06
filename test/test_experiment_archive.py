@@ -92,6 +92,9 @@ def test_snapshot_experiment_exports_reconstructable_tables(tmp_path):
         json.dumps({"conditions": ["new_new"]}))
     (source / "new_new.weights.csv").write_text(
         "feature,weight\naffinity,1.0\n")
+    runplz_driver = source / ".runplz" / "evaluation_driver.sh"
+    runplz_driver.parent.mkdir()
+    runplz_driver.write_text("mhcflurry eval processing-ensemble --help\n")
     (combined_predictions.parent / "predictor_info.csv").write_text(
         "predictor,description\ncandidate,test\n")
     (combined_predictions.parent / "accuracy_scores.monoallelic.csv").write_text(
@@ -199,6 +202,9 @@ def test_snapshot_experiment_exports_reconstructable_tables(tmp_path):
     assert (
         destination / "artifacts" / "new_new.weights.csv"
     ).is_file()
+    assert (
+        destination / "artifacts" / ".runplz" / runplz_driver.name
+    ).read_bytes() == runplz_driver.read_bytes()
     assert (
         destination / "artifacts" / "candidate_figures" /
         "accuracy_scores.monoallelic.csv"

@@ -240,6 +240,10 @@ def _artifact_role(relative_path):
     if name.endswith((".log", ".txt")) and (
             "log" in name.lower() or name.startswith("LOG-worker")):
         return "log"
+    if (
+            path.parent.name == ".runplz" and
+            path.suffix.lower() in (".py", ".sh")):
+        return "provenance"
     if "condition" in path.parts and path.suffix in (".yaml", ".yml"):
         return "configuration"
     if name.startswith("provenance") or name in {
