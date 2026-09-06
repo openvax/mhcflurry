@@ -225,9 +225,9 @@ def remote_training_env(environ=os.environ):
         "EVAL_MAX_BENCHMARK_FILES": environ.get(
             "EVAL_MAX_BENCHMARK_FILES", ""
         ),
-        "COMPARE_BASELINE": environ.get("COMPARE_BASELINE", "public:2.0.0"),
+        "COMPARE_BASELINE": environ.get("COMPARE_BASELINE", "public:2.2.0"),
         "COMPARE_BASELINE_LABEL": environ.get(
-            "COMPARE_BASELINE_LABEL", "MHCflurry 2.0"
+            "COMPARE_BASELINE_LABEL", "MHCflurry 2.2"
         ),
         "COMPARE_BACKEND": environ.get("COMPARE_BACKEND", "auto"),
         "COMPARE_GPUS": environ.get("COMPARE_GPUS", "auto"),
@@ -619,7 +619,7 @@ def run_release_evaluation(repo, out, env):
             env=env,
             text=True,
         ).strip()
-    baseline = env.get("COMPARE_BASELINE", "public:2.0.0")
+    baseline = env.get("COMPARE_BASELINE", "public:2.2.0")
     if baseline.startswith("public:"):
         baseline_env = env.copy()
         baseline_env["MHCFLURRY_DOWNLOADS_CURRENT_RELEASE"] = (
@@ -645,8 +645,8 @@ def run_release_evaluation(repo, out, env):
         "compare-models",
         "--a", str(out),
         "--a-label", env.get("RUN_LABEL", "new"),
-        "--b", env.get("COMPARE_BASELINE", "public:2.0.0"),
-        "--b-label", env.get("COMPARE_BASELINE_LABEL", "MHCflurry 2.0"),
+        "--b", env.get("COMPARE_BASELINE", "public:2.2.0"),
+        "--b-label", env.get("COMPARE_BASELINE_LABEL", "MHCflurry 2.2"),
         "--data-dir", data_dir,
         "--include", env.get("COMPARE_INCLUDE", "affinity,processing,presentation"),
         "--processing-modes", env.get(
@@ -696,7 +696,7 @@ def run_release_plots(repo, out, env):
         "plot-comparison",
         "--input", str(out / "eval_comparison"),
         "--a-label", env.get("RUN_LABEL", "new"),
-        "--b-label", env.get("COMPARE_BASELINE_LABEL", "MHCflurry 2.0"),
+        "--b-label", env.get("COMPARE_BASELINE_LABEL", "MHCflurry 2.2"),
         "--summary-pdf",
         str(out / "eval_comparison" / "plots" / "model_comparison_figures.pdf"),
         "--paper-figures-out",

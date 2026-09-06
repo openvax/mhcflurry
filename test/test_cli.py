@@ -2804,8 +2804,8 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     assert module.remote_training_env({})["TRAINING_MINIBATCH_SIZE"] == "128"
     env = module.remote_training_env({"TRAINING_MINIBATCH_SIZE": "2048"})
     assert env["TRAINING_MINIBATCH_SIZE"] == "2048"
-    assert env["COMPARE_BASELINE"] == "public:2.0.0"
-    assert env["COMPARE_BASELINE_LABEL"] == "MHCflurry 2.0"
+    assert env["COMPARE_BASELINE"] == "public:2.2.0"
+    assert env["COMPARE_BASELINE_LABEL"] == "MHCflurry 2.2"
     assert env["COMPARE_BACKEND"] == "auto"
     assert env["EVAL_MAX_BENCHMARK_FILES"] == ""
     assert env["COMPARE_GPUS"] == "auto"

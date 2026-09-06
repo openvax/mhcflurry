@@ -116,9 +116,10 @@ a known machine; explicit values bypass automatic packing decisions.
 
 Evaluation covers affinity, processing, and presentation. The workflow writes
 component metrics, `release_summary.csv`, `release_summary.md`, individual
-plots, and `plots/model_comparison_figures.pdf`. Its default baseline is
-`public:2.0.0`; use `--compare-baseline public` for the currently configured
-public release or provide another run directory/version.
+plots, and `plots/model_comparison_figures.pdf`. Its default baseline is the
+explicit pre-2.3 public release, `public:2.2.0`; use `--compare-baseline public`
+to follow the currently configured release or provide another run
+directory/version.
 
 On Brev, comparison and diagnostic plotting run on the GPU instance before
 synchronization. This avoids repeating release-scale inference on a laptop.

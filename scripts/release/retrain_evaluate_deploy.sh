@@ -49,8 +49,8 @@ Usage:
       [--compare-presentation-max-workers-per-gpu 1] \
       [--compare-presentation-torch-compile 0] \
       [--eval-max-benchmark-files N] \
-      [--compare-baseline public:2.0.0] \
-      [--compare-baseline-label "MHCflurry 2.0"] \
+      [--compare-baseline public:2.2.0] \
+      [--compare-baseline-label "MHCflurry 2.2"] \
       [--compare-gpus auto|N] \
       [--brev-instance NAME] [--brev-on-finish leave|stop|delete] \
       [--brev-provider auto|gcp|denvr|denvr-80gb] \
@@ -125,7 +125,7 @@ Evaluation:
   affinity, processing, and presentation release-gate tables. Presentation
   inference is memory-heavier than affinity/processing, so the release wrapper
   defaults it to one GPU worker unless overridden. The default baseline is the
-  closest older public release available in downloads.yml, public:2.0.0; pass
+  current pre-2.3 public release in downloads.yml, public:2.2.0; pass
   --compare-baseline public to compare against the currently configured public
   release, or pass a model-run directory / public:<release_name>.
   When affinity is included, the workflow also writes
@@ -1391,8 +1391,8 @@ compare_args=(
     mhcflurry eval compare-models
     --a "$run_dir" \
     --a-label "${RUN_LABEL:-new}" \
-    --b "${COMPARE_BASELINE:-public:2.0.0}" \
-    --b-label "${COMPARE_BASELINE_LABEL:-MHCflurry 2.0}" \
+    --b "${COMPARE_BASELINE:-public:2.2.0}" \
+    --b-label "${COMPARE_BASELINE_LABEL:-MHCflurry 2.2}" \
     --data-dir "$data_dir" \
     --release-holdout-dir "$run_dir/release_holdout" \
     --affinity-training-overlap-policy audit \
@@ -1466,7 +1466,7 @@ if [ "${RUN_RELEASE_PLOTS:-1}" = "1" ]; then
         mhcflurry eval plot-comparison
         --input "$run_dir/eval_comparison"
         --a-label "${RUN_LABEL:-new}"
-        --b-label "${COMPARE_BASELINE_LABEL:-MHCflurry 2.0}"
+        --b-label "${COMPARE_BASELINE_LABEL:-MHCflurry 2.2}"
         --summary-pdf "$run_dir/eval_comparison/plots/model_comparison_figures.pdf"
         --paper-figures-out "$run_dir/eval_comparison/plots/paper_figures"
         --paper-figures-formats "${PAPER_FIGURES_FORMATS:-svg,pdf,png}"
@@ -2096,7 +2096,7 @@ COMPARE_PRESENTATION_NUM_JOBS="${COMPARE_PRESENTATION_NUM_JOBS:-auto}"
 COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU="${COMPARE_PRESENTATION_MAX_WORKERS_PER_GPU:-auto}"
 COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER="${COMPARE_PRESENTATION_MAX_TASKS_PER_WORKER:-1}"
 COMPARE_PRESENTATION_TORCH_COMPILE="${COMPARE_PRESENTATION_TORCH_COMPILE:-0}"
-COMPARE_BASELINE="${COMPARE_BASELINE:-public:2.0.0}"
+COMPARE_BASELINE="${COMPARE_BASELINE:-public:2.2.0}"
 COMPARE_BASELINE_LABEL="${COMPARE_BASELINE_LABEL:-}"
 PAPER_FIGURES_ARTIFACTS_DIR="${PAPER_FIGURES_ARTIFACTS_DIR:-}"
 PAPER_FIGURES_SCORES_DIR="${PAPER_FIGURES_SCORES_DIR:-$PAPER_FIGURES_ARTIFACTS_DIR}"
