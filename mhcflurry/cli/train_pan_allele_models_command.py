@@ -30,6 +30,7 @@ import numpy
 import pandas
 import yaml
 import tqdm  # progress bar
+from ..training_folds import extract_training_folds
 
 from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..class1_encoding import peptide_sequences_to_network_input
@@ -137,6 +138,9 @@ def _log_process_telemetry(marker):
     )
 
 parser = argparse.ArgumentParser(usage=__doc__)
+parser.add_argument(
+    "--reuse-folds", action="store_true",
+    help="Use existing fold_0..N columns instead of generating new folds.")
 
 parser.add_argument(
     "--data",
@@ -649,12 +653,15 @@ def initialize_training(args):
     (held_out_fraction, held_out_max) = (
         args.held_out_measurements_per_allele_fraction_and_max)
 
-    folds_df = assign_folds(
-        df=df,
-        num_folds=args.num_folds,
-        held_out_fraction=held_out_fraction,
-        held_out_max=held_out_max,
-        seed=master_seed)
+    df, folds_df = extract_training_folds(
+        df, args.num_folds, reuse=getattr(args, "reuse_folds", False))
+    if folds_df is None:
+        folds_df = assign_folds(
+            df=df,
+            num_folds=args.num_folds,
+            held_out_fraction=held_out_fraction,
+            held_out_max=held_out_max,
+            seed=master_seed)
     print(f"TIMING_MARKER data_loaded {time.time():.3f}")
 
     allele_sequences_in_use = allele_sequences[
@@ -680,23 +687,11 @@ def initialize_training(args):
         os.mkdir(args.out_models_dir)
         print("Done.")
 
-    # Strip any pre-existing fold_* columns from ``df`` before joining the
-    # freshly-computed ``folds_df``. Public 2.2.0 train_data.csv.bz2 ships
-    # with fold_0..3 already attached; without this, ``pandas.merge`` adds
-    # ``_x``/``_y`` suffixes to disambiguate, which then breaks
-    # ``select_pan_allele_models_command``'s ``int(col.split("_")[-1])``
-    # parser. Re-folding is the intended behavior — fold assignment is a
-    # function of (data, num_folds, held_out_*), so any prior fold cols
-    # are stale.
-    df_no_folds = df.drop(
-        columns=[c for c in df.columns if c.startswith("fold_")],
-        errors="ignore",
-    )
     predictor = Class1AffinityPredictor(
         allele_to_sequence=allele_encoding.allele_to_sequence,
         metadata_dataframes={
             'train_data': pandas.merge(
-                df_no_folds,
+                df,
                 folds_df,
                 left_index=True,
                 right_index=True)

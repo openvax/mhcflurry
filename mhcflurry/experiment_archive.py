@@ -233,8 +233,10 @@ def _artifact_role(relative_path):
         return "prediction"
     if name.startswith("benchmark.") and name.endswith((".csv", ".csv.bz2")):
         return "prediction"
-    if "training_feature_cache" in path.parts and path.suffix == ".npy":
+    if set(path.parts) & {"training_feature_cache", "component_scores"} and path.suffix == ".npy":
         return "prediction"
+    if name == "bootstrap_deltas.npz":
+        return "metric"
     if path.suffix.lower() in (".pdf", ".png", ".svg"):
         return "figure"
     if name.endswith((".log", ".txt")) and (

@@ -172,7 +172,8 @@ def test_resource_probe_releases_model_between_architectures(monkeypatch):
     assert all(model._network is None for model in created)
 
 
-def test_train_data_metadata_drops_preexisting_fold_columns():
+@pytest.mark.parametrize("reuse", [False, True])
+def test_train_data_metadata_drops_preexisting_fold_columns(tmp_path, monkeypatch, reuse):
     """Regression: when ``--data`` already has ``fold_*`` columns
     (public 2.2.0 train_data ships with fold_0..3), the train command's
     metadata-DataFrame join used to produce ``fold_0_x``/``fold_0_y``
@@ -180,17 +181,35 @@ def test_train_data_metadata_drops_preexisting_fold_columns():
     select command parsing ``int("x")`` and crashing. The fix drops
     the stale fold columns before the merge, so the saved metadata
     has clean ``fold_<int>`` columns regardless of input shape."""
-    import inspect
-    from mhcflurry import train_pan_allele_models_command as mod
+    data = pandas.DataFrame({
+        "allele": ["HLA-A*02:01"] * 2,
+        "peptide": ["SIINFEKL", "GILGFVFTL"],
+        "measurement_value": [100.0, 200.0],
+        "measurement_inequality": ["=", "="],
+        "fold_0": [True, False], "fold_1": [False, True]})
+    data.to_csv(tmp_path / "data.csv", index=False)
+    pandas.Series({"HLA-A*02:01": "A" * 34}, name="sequence").to_csv(
+        tmp_path / "alleles.csv")
+    (tmp_path / "hp.yaml").write_text("- max_epochs: 1\n")
+    folds = data[["fold_0", "fold_1"]]
 
-    src = inspect.getsource(mod.initialize_training)
-    # The drop-stale-folds helper must run before the merge.
-    assert "df_no_folds" in src, (
-        "initialize_training must drop pre-existing fold_* cols before merge")
-    drop_idx = src.index("df_no_folds")
-    merge_idx = src.index("pandas.merge(\n                df_no_folds")
-    assert drop_idx < merge_idx, (
-        "df_no_folds must be computed before being passed to merge")
+    def assign(**kwargs):
+        assert not reuse, "Reused folds must not be reassigned"
+        assert not set(folds).intersection(kwargs["df"])
+        return ~folds
+
+    monkeypatch.setattr(train_command, "assign_folds", assign)
+    argv = [
+        "--data", str(tmp_path / "data.csv"),
+        "--allele-sequences", str(tmp_path / "alleles.csv"),
+        "--hyperparameters", str(tmp_path / "hp.yaml"),
+        "--out-models-dir", str(tmp_path / "models"), "--num-folds", "2"]
+    if reuse:
+        argv.append("--reuse-folds")
+    train_command.initialize_training(train_command.parser.parse_args(argv))
+    saved = pandas.read_csv(tmp_path / "models/train_data.csv.bz2")
+    pandas.testing.assert_frame_equal(saved[list(folds)], folds if reuse else ~folds)
+    assert not any(name.endswith(("_x", "_y")) for name in saved)
 
 
 def test_pop_train_param_supports_pretrain_peptides_per_epoch_alias():

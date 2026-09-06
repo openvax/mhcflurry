@@ -29,6 +29,8 @@ import sys
 
 WORKFLOW_SCRIPT = Path("scripts/release/retrain_evaluate_deploy.sh")
 TRAINING_SCRIPTS = {
+    "exact-public-processing": Path("scripts/training/run_exact_public_processing.py"),
+    "audit-training-data": Path("scripts/training/audit_training_data_identity.py"),
     "compose-processing-ensemble": Path(
         "scripts/training/compose_processing_ensemble.py"),
 }
@@ -43,6 +45,10 @@ def make_parser(prog="mhcflurry train"):
         ),
     )
     sub = parser.add_subparsers(dest="train_subcommand")
+    sub.add_parser("exact-public-processing", add_help=False,
+                   help="Replay the frozen processing candidate on exact public rows/folds.")
+    sub.add_parser("audit-training-data", add_help=False,
+                   help="Audit exact training row identity between two tables.")
     pan = sub.add_parser(
         "pan-allele-release",
         add_help=False,
@@ -99,7 +105,8 @@ def _format_help(prog):
         (
             "usage: %s {pan-allele-release,release-holdout,"
             "plot-loss-curves,snapshot-experiment,"
-            "materialize-affinity-checkpoint,compose-processing-ensemble} ..." %
+            "materialize-affinity-checkpoint,compose-processing-ensemble,"
+            "audit-training-data,exact-public-processing} ..." %
             prog
         ),
         "",
@@ -114,6 +121,8 @@ def _format_help(prog):
         "                      Select retained terminal or best affinity weights.",
         "  compose-processing-ensemble",
         "                      Build a provenance-recorded processing ensemble.",
+        "  audit-training-data Audit exact row identity and multiplicities.",
+        "  exact-public-processing Replay exact public processing/presentation data.",
         "",
         "Examples:",
         "  %s pan-allele-release --run-dir runs/2.3.0 --release 2.3.0 --backend local" % prog,

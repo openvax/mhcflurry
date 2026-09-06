@@ -31,6 +31,7 @@ import yaml
 import tqdm  # progress bar
 
 from ..class1_processing_predictor import Class1ProcessingPredictor
+from ..training_folds import extract_training_folds
 from ..class1_processing_neural_network import Class1ProcessingNeuralNetwork
 from ..pytorch_sizing import (
     TRAINING_PEAK_MULTIPLIER,
@@ -82,6 +83,9 @@ _PROCESSING_WORKER_SAFETY_FACTOR = 1.3
 # process. Model loading and inference should happen in worker processes.
 
 parser = argparse.ArgumentParser(usage=__doc__)
+parser.add_argument(
+    "--reuse-folds", action="store_true",
+    help="Use existing fold_0..N columns instead of generating new folds.")
 
 parser.add_argument(
     "--data",
@@ -395,11 +399,14 @@ def initialize_training(args):
     master_seed = configure_random_seed(
         args.random_seed, name="train-processing")
 
-    folds_df = assign_folds(
-        df=df,
-        num_folds=args.num_folds,
-        held_out_samples=args.held_out_samples,
-        seed=master_seed)
+    df, folds_df = extract_training_folds(
+        df, args.num_folds, reuse=getattr(args, "reuse_folds", False))
+    if folds_df is None:
+        folds_df = assign_folds(
+            df=df,
+            num_folds=args.num_folds,
+            held_out_samples=args.held_out_samples,
+            seed=master_seed)
 
     if not os.path.exists(args.out_models_dir):
         print("Attempting to create directory: %s" % args.out_models_dir)
