@@ -81,6 +81,17 @@ def test_snapshot_experiment_exports_reconstructable_tables(tmp_path):
         "benchmark.monoallelic.csv.bz2")
     combined_predictions.parent.mkdir()
     combined_predictions.write_bytes(b"combined predictions" * 10)
+    named_predictions = source / "predictions_with_flanks.csv.bz2"
+    named_predictions.write_bytes(b"named predictions" * 10)
+    feature_cache = source / "training_feature_cache" / "processing.npy"
+    feature_cache.parent.mkdir()
+    feature_cache.write_bytes(b"cached component scores" * 10)
+    (source / "factorial_release_summary.csv").write_text(
+        "condition,auprc\nnew_new,0.4\n")
+    (source / "factorial_manifest.json").write_text(
+        json.dumps({"conditions": ["new_new"]}))
+    (source / "new_new.weights.csv").write_text(
+        "feature,weight\naffinity,1.0\n")
     (combined_predictions.parent / "predictor_info.csv").write_text(
         "predictor,description\ncandidate,test\n")
     (combined_predictions.parent / "accuracy_scores.monoallelic.csv").write_text(
@@ -172,6 +183,22 @@ def test_snapshot_experiment_exports_reconstructable_tables(tmp_path):
         destination / "artifacts" / "candidate_figures" /
         combined_predictions.name
     ).read_bytes() == combined_predictions.read_bytes()
+    assert (
+        destination / "artifacts" / named_predictions.name
+    ).read_bytes() == named_predictions.read_bytes()
+    assert (
+        destination / "artifacts" / "training_feature_cache" /
+        feature_cache.name
+    ).read_bytes() == feature_cache.read_bytes()
+    assert (
+        destination / "artifacts" / "factorial_release_summary.csv"
+    ).is_file()
+    assert (
+        destination / "artifacts" / "factorial_manifest.json"
+    ).is_file()
+    assert (
+        destination / "artifacts" / "new_new.weights.csv"
+    ).is_file()
     assert (
         destination / "artifacts" / "candidate_figures" /
         "accuracy_scores.monoallelic.csv"

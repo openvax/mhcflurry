@@ -218,6 +218,7 @@ def export_training_tables(source_dir, out_dir):
 def _artifact_role(relative_path):
     path = Path(relative_path)
     name = path.name
+    lower_name = name.lower()
     if name.startswith("weights_") and path.suffix == ".npz":
         return "weight"
     if name == "train_data.csv.bz2":
@@ -226,9 +227,13 @@ def _artifact_role(relative_path):
         return "model_manifest"
     if name == "gpu_occupancy.csv":
         return "telemetry"
-    if name.endswith(("predictions.csv", "predictions.csv.bz2")):
+    if (
+            "prediction" in lower_name and
+            lower_name.endswith((".csv", ".csv.bz2", ".parquet"))):
         return "prediction"
     if name.startswith("benchmark.") and name.endswith((".csv", ".csv.bz2")):
+        return "prediction"
+    if "training_feature_cache" in path.parts and path.suffix == ".npy":
         return "prediction"
     if path.suffix.lower() in (".pdf", ".png", ".svg"):
         return "figure"
@@ -250,6 +255,12 @@ def _artifact_role(relative_path):
         return "metric"
     if name == "predictor_info.csv" or name.startswith("accuracy_scores."):
         return "metric"
+    if lower_name == "weights.csv" or lower_name.endswith(".weights.csv"):
+        return "weight"
+    if lower_name.endswith((".csv", ".csv.bz2")):
+        return "metric"
+    if path.suffix.lower() == ".json":
+        return "provenance"
     return "other"
 
 
