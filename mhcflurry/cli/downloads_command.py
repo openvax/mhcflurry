@@ -211,11 +211,12 @@ def fetch_subcommand(args):
                 "\nThe requested download '%s' has already been downloaded. "
                 "To re-download this data, first run: \n\t%s\nin a shell "
                 "and then re-run this command.\n" +
-                "*" * 40) % (name, 'rm -rf ' + quote(get_path(name))))
+                "*" * 40) % (name, 'rm -rf ' + quote(
+                    get_path(name, release=args.release))))
         if not info['downloaded'] and (name in args.download_name or default):
             items_to_fetch.add(name)
 
-    mkdir_p(get_downloads_dir())
+    mkdir_p(get_downloads_dir(args.release))
 
     qprint("Fetching %d/%d downloads from release %s" % (
         len(items_to_fetch), len(downloads), args.release))
@@ -282,7 +283,7 @@ def fetch_subcommand(args):
             if bad_names:
                 raise RuntimeError(
                     "Archive has suspicious names: %s" % bad_names)
-            result_dir = get_path(item, test_exists=False)
+            result_dir = get_path(item, test_exists=False, release=args.release)
             os.mkdir(result_dir)
 
             for member in tqdm(members, desc='Extracting'):

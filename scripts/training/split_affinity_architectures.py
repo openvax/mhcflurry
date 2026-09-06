@@ -20,7 +20,6 @@ ARCHITECTURE_FIELDS = (
 SHARED_METADATA_NAMES = (
     "allele_sequences.csv",
     "info.txt",
-    "percent_ranks.csv",
     "train_data.csv.bz2",
 )
 
@@ -123,7 +122,8 @@ def split_models(models_dir, out_dir, expected_folds=4):
         names = [record["model_name"] for record in architecture_records]
         target = out_dir / ("architecture_%d" % architecture_num)
         provenance = {
-            "schema_version": 1,
+            "schema_version": 2,
+            "calibration": "omitted; recalibrate each subset before using ranks",
             "source_models_dir": str(models_dir.resolve()),
             "source_manifest_sha256": manifest_sha256,
             "architecture_num": architecture_num,
@@ -158,6 +158,19 @@ def split_models(models_dir, out_dir, expected_folds=4):
                 if not source.is_file():
                     raise ValueError("Missing model weights: %s" % source)
                 link_modes.add(link_or_copy(source, temp / source.name))
+            for column in ("checkpoint_terminal_weights", "checkpoint_best_weights"):
+                if column not in subset:
+                    continue
+                for filename in subset[column].dropna().unique():
+                    relative = Path(filename)
+                    if relative.is_absolute() or ".." in relative.parts:
+                        raise ValueError("Invalid checkpoint path: %s" % filename)
+                    source = models_dir / relative
+                    if not source.is_file():
+                        raise ValueError("Missing checkpoint weights: %s" % source)
+                    destination = temp / relative
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    link_modes.add(link_or_copy(source, destination))
             for source in shared_metadata_paths(models_dir):
                 link_modes.add(link_or_copy(source, temp / source.name))
             (temp / "subset_provenance.json").write_text(

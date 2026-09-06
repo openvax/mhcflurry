@@ -16,6 +16,8 @@ import multiprocessing
 import builtins
 import os
 import pytest
+import subprocess
+import sys
 
 from mhcflurry.parallelism import (
     NonDaemonPool,
@@ -1364,77 +1366,80 @@ def test_install_worker_context_updates_existing_mapping(monkeypatch):
     assert target == {"fresh": 1}
 
 
-def test_worker_initializer_restart_queue_excludes_shared_context(monkeypatch):
+def test_worker_initializer_finalizer_keeps_only_slot_identity(monkeypatch):
     finalized = []
-
-    class FakeQueue:
-        def __init__(self, value, empty=False):
-            self.value = value
-            self.is_empty = empty
-
-        def empty(self):
-            return self.is_empty
-
-        def get(self, **kwargs):
-            del kwargs
-            return self.value
-
-        def put(self, value):
-            del value
-
+    slots = multiprocessing.Array("q", 1)
+    sequence = multiprocessing.Value("q", 0, lock=False)
     monkeypatch.setattr(
         worker_runtime_module,
         "Finalize",
-        lambda _obj, _callback, args, **kwargs: finalized.append(args[0]),
+        lambda _obj, _callback, args, **kwargs: finalized.append(args),
     )
     received = {}
     worker_runtime_module.worker_init_entry_point(
         lambda **kwargs: received.update(kwargs),
-        arg_queue=FakeQueue({"per_process": 1}),
-        backup_arg_queue=FakeQueue({"backup": 1}),
+        kwargs_per_process=[{"per_process": 1}],
+        slots=slots, sequence=sequence,
         shared_kwargs={"worker_context_data": {"large": object()}},
     )
 
-    assert finalized == [{"per_process": 1}]
+    assert finalized == [(slots, 0, 1)]
     assert set(received) == {"per_process", "worker_context_data"}
 
 
-def test_worker_initializer_uses_backup_only_when_primary_is_empty(monkeypatch):
+def test_worker_initializer_reuses_released_slot_and_ignores_old_finalizer(monkeypatch):
     finalized = []
-
-    class FakeQueue:
-        def __init__(self, value, empty=False):
-            self.value = value
-            self.is_empty = empty
-            self.put_values = []
-
-        def empty(self):
-            return self.is_empty
-
-        def get(self):
-            return self.value
-
-        def put(self, value):
-            self.put_values.append(value)
-
-    primary = FakeQueue({"primary": 1}, empty=True)
-    backup = FakeQueue({"backup": 1})
+    slots = multiprocessing.Array("q", 2)
+    sequence = multiprocessing.Value("q", 0, lock=False)
     monkeypatch.setattr(
         worker_runtime_module,
         "Finalize",
-        lambda _obj, _callback, args, **kwargs: finalized.append(args[0]),
+        lambda _obj, _callback, args, **kwargs: finalized.append(args),
     )
-    received = {}
+    received = []
 
-    worker_runtime_module.worker_init_entry_point(
-        lambda **kwargs: received.update(kwargs),
-        arg_queue=primary,
-        backup_arg_queue=backup,
-    )
+    def initialize():
+        worker_runtime_module.worker_init_entry_point(
+            lambda slot: received.append(slot),
+            kwargs_per_process=[{"slot": 0}, {"slot": 1}],
+            slots=slots, sequence=sequence)
 
-    assert received == {"backup": 1}
-    assert backup.put_values == [{"backup": 1}]
-    assert finalized == [{"backup": 1}]
+    initialize()
+    initialize()
+    worker_runtime_module.release_initializer_slot(*finalized[1])
+    initialize()
+    assert received == [0, 1, 1]
+    worker_runtime_module.release_initializer_slot(*finalized[1])
+    assert list(slots) == [1, 3]
+
+
+@pytest.mark.parametrize("start_method", [
+    method for method in ("fork", "spawn")
+    if method in multiprocessing.get_all_start_methods()
+])
+def test_large_initializer_payload_starts_recycles_and_joins(start_method):
+    # A subprocess deadline makes startup/shutdown deadlocks fail instead of
+    # hanging pytest. Reuse importable functions for the spawn start method.
+    code = """
+from mhcflurry.parallelism.worker_pool import make_worker_pool
+from test.test_local_parallelism import (
+    _set_shared_initializer_state, _read_shared_initializer_state)
+if __name__ == '__main__':
+    payload = 'x' * 100_000
+    pool = make_worker_pool(
+        processes=2, initializer=_set_shared_initializer_state,
+        initializer_kwargs_per_process=[
+            {'per_process_value': payload + str(i)} for i in range(2)],
+        initializer_shared_kwargs={'shared_value': 'shared'},
+        start_method=START_METHOD, max_tasks_per_worker=1)
+    result = pool.map(_read_shared_initializer_state, range(6), chunksize=1)
+    pool.close()
+    pool.join()
+    assert len(result) == 6
+    assert {v[1] for v in result} == {payload + '0', payload + '1'}
+""".replace("START_METHOD", repr(start_method))
+    subprocess.run([sys.executable, "-c", code], check=True, timeout=120,
+                   capture_output=True, text=True)
 
 
 @pytest.mark.skipif(

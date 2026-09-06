@@ -717,28 +717,22 @@ def make_worker_pool(
 
     if initializer:
         if initializer_kwargs_per_process:
-            queue_context = pool_context or multiprocessing.get_context()
-            # Queue.put() is asynchronous and starts a feeder thread. Forking
-            # the pool immediately after filling such a queue can make workers
-            # see it as transiently empty, while worker-side puts can deadlock
-            # process shutdown in the queue feeder finalizer. SimpleQueue puts
-            # synchronously and has no feeder thread.
-            kwargs_queue = queue_context.SimpleQueue()
-            kwargs_queue_backup = queue_context.SimpleQueue()
-            for kwargs in initializer_kwargs_per_process:
-                kwargs_queue.put(kwargs)
-                kwargs_queue_backup.put(kwargs)
+            assignment_context = pool_context or multiprocessing.get_context()
+            slots = assignment_context.Array("q", processes)
+            sequence = assignment_context.Value("q", 0, lock=False)
             pool_kwargs["initializer"] = worker_init_entry_point
             pool_kwargs["initargs"] = (
                 initializer,
-                kwargs_queue,
-                kwargs_queue_backup,
+                initializer_kwargs_per_process,
+                slots,
+                sequence,
                 initializer_shared_kwargs,
             )
         elif initializer_shared_kwargs:
             pool_kwargs["initializer"] = worker_init_entry_point
             pool_kwargs["initargs"] = (
                 initializer,
+                None,
                 None,
                 None,
                 initializer_shared_kwargs,
@@ -751,12 +745,12 @@ def make_worker_pool(
     worker_pool = NonDaemonPool(**pool_kwargs)
     print("Started pool: %s" % str(worker_pool), file=sys.stderr)
     printable_pool_kwargs = dict(pool_kwargs)
-    if initializer_shared_kwargs:
+    if initializer_shared_kwargs or initializer_kwargs_per_process:
         printable_pool_kwargs["initargs"] = (
             initializer,
-            "<per-worker argument queues>",
+            "<per-worker assignments>",
             "<shared initializer data: %s>" % ", ".join(
-                sorted(initializer_shared_kwargs)
+                sorted(initializer_shared_kwargs or {})
             ),
         )
     pprint(printable_pool_kwargs, stream=sys.stderr)

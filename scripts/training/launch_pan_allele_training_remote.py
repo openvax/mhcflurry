@@ -606,6 +606,9 @@ def run_release_evaluation(repo, out, env):
             "models_class1_processing",
             "models_class1_presentation",
         ]
+    if "affinity" in env.get(
+            "COMPARE_INCLUDE", "affinity,processing,presentation").split(","):
+        download_names.append("models_class1_pan_variants")
     subprocess.run(
         ["mhcflurry", "downloads", "fetch"] + download_names,
         check=True,
@@ -648,6 +651,8 @@ def run_release_evaluation(repo, out, env):
         "--b", env.get("COMPARE_BASELINE", "public:2.2.0"),
         "--b-label", env.get("COMPARE_BASELINE_LABEL", "MHCflurry 2.2"),
         "--data-dir", data_dir,
+        "--release-holdout-dir", str(out / "release_holdout"),
+        "--affinity-training-overlap-policy", "audit",
         "--include", env.get("COMPARE_INCLUDE", "affinity,processing,presentation"),
         "--processing-modes", env.get(
             "PROCESSING_MODES", "with_flanks,no_flank,short_flanks"
@@ -686,6 +691,30 @@ def run_release_evaluation(repo, out, env):
     if eval_max_benchmark_files:
         compare_args.extend(["--limit-files", eval_max_benchmark_files])
     subprocess.run(compare_args, check=True, cwd=repo, env=env)
+
+    if "affinity" in env.get(
+            "COMPARE_INCLUDE", "affinity,processing,presentation").split(","):
+        variants_dir = subprocess.check_output(
+            ["mhcflurry", "downloads", "path", "models_class1_pan_variants"],
+            cwd=repo, env=env, text=True).strip()
+        baseline_dir = str(Path(variants_dir) / "models.no_additional_ms")
+        fair_out = out / "eval_comparison_train_excluded_affinity"
+        fair_args = list(compare_args)
+        replacements = {
+            "--b": baseline_dir,
+            "--b-label": "MHCflurry no-additional-MS (train-excluded)",
+            "--include": "affinity",
+            "--affinity-training-overlap-policy": "exclude",
+            "--out": str(fair_out),
+            "--worker-log-dir": str(fair_out / "worker_logs"),
+        }
+        for flag, value in replacements.items():
+            fair_args[fair_args.index(flag) + 1] = value
+        fair_args.extend([
+            "--b-affinity-dir", baseline_dir,
+            "--affinity-source", "no_additional_ms",
+        ])
+        subprocess.run(fair_args, check=True, cwd=repo, env=env)
 
 
 def run_release_plots(repo, out, env):
@@ -741,6 +770,15 @@ def run_release_plots(repo, out, env):
         if value:
             plot_args.extend([flag, value])
     subprocess.run(plot_args, check=True, cwd=repo, env=env)
+    fair_out = out / "eval_comparison_train_excluded_affinity"
+    if fair_out.is_dir():
+        subprocess.run([
+            "mhcflurry", "eval", "plot-comparison",
+            "--input", str(fair_out),
+            "--a-label", env.get("RUN_LABEL", "new"),
+            "--b-label", "MHCflurry no-additional-MS (train-excluded)",
+            "--summary-pdf", str(fair_out / "plots/model_comparison_figures.pdf"),
+        ], check=True, cwd=repo, env=env)
 
 
 @app.local_entrypoint()

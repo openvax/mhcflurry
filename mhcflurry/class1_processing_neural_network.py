@@ -362,12 +362,21 @@ class Class1ProcessingModel(nn.Module):
         ]
 
         peptide_length = peptide_length.view(-1).long()
+        unknown = self._unknown_embedding(sequence).view(1, 1, -1)
+        n_offsets = torch.arange(
+            -external, internal, device=sequence.device).view(1, -1)
+        n_window = torch.where(
+            (n_offsets < peptide_length.view(-1, 1)).unsqueeze(-1),
+            n_window, unknown)
         offsets = torch.arange(
             -internal, external, device=sequence.device).view(1, -1)
         positions = (
             self.n_flank_length + peptide_length.view(-1, 1) + offsets)
         positions = positions.unsqueeze(-1).expand(-1, -1, sequence.size(2))
-        c_window = sequence.gather(1, positions)
+        c_window = sequence.gather(1, positions.clamp(0, sequence.size(1) - 1))
+        c_window = torch.where(
+            (offsets >= -peptide_length.view(-1, 1)).unsqueeze(-1),
+            c_window, unknown)
         return n_window, c_window
 
     def _apply_context_dropout(self, n_window, c_window):

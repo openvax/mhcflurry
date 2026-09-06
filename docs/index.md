@@ -71,5 +71,6 @@ presentation_component_factorial_experiment
 presentation_affinity_orthogonality_diagnostic
 presentation_affinity_ensemble_followup
 final_230_candidate_experiment
+review_fixes_230_spec
 maintainers
 ```

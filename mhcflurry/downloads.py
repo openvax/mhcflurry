@@ -16,7 +16,7 @@ Manage local downloaded data.
 
 import logging
 import yaml
-from os.path import join, exists
+from os.path import join, exists, dirname
 from os import environ
 from shlex import quote
 from importlib.resources import files
@@ -43,11 +43,13 @@ _MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS_DIR = environ.get(
     "MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS_DIR")
 
 
-def get_downloads_dir():
+def get_downloads_dir(release=None):
     """
-    Return the path to local downloaded data
+    Return the download directory for a release, respecting custom overrides.
     """
-    return _DOWNLOADS_DIR
+    if release is None or _CURRENT_RELEASE is None:
+        return _DOWNLOADS_DIR
+    return join(dirname(_DOWNLOADS_DIR), release)
 
 
 def get_current_release():
@@ -203,9 +205,9 @@ def get_release_downloads(release):
 
     return OrderedDict(
         (download["name"], {
-            'downloaded': exists(join(get_downloads_dir(), download["name"])),
+            'downloaded': exists(join(get_downloads_dir(release), download["name"])),
             'up_to_date': up_to_date(
-                join(get_downloads_dir(), download["name"]),
+                join(get_downloads_dir(release), download["name"]),
                 [download['url']] if 'url' in download else download['part_urls']),
             'metadata': download,
         }) for download in downloads
@@ -217,7 +219,7 @@ def get_current_release_downloads():
     return get_release_downloads(get_current_release())
 
 
-def get_path(download_name, filename='', test_exists=True):
+def get_path(download_name, filename='', test_exists=True, release=None):
     """
     Get the local path to a file in a MHCflurry download
 
@@ -232,12 +234,15 @@ def get_path(download_name, filename='', test_exists=True):
         If True (default) throw an error telling the user how to download the
         data if the file does not exist
 
+    release : string, optional
+        Requested release; defaults to the configured current release.
+
     Returns
     -----------
     string giving local absolute path
     """
     assert '/' not in download_name, "Invalid download: %s" % download_name
-    path = join(get_downloads_dir(), download_name, filename)
+    path = join(get_downloads_dir(release), download_name, filename)
     if test_exists and not exists(path):
         raise RuntimeError(
             "Missing MHCflurry downloadable file: %s. "

@@ -711,6 +711,30 @@ def test_affinity_zero_epoch_fit_can_retain_terminal_checkpoint():
         np.testing.assert_array_equal(actual, expected)
 
 
+@pytest.mark.parametrize("save_in_place", [False, True])
+def test_affinity_refit_discards_persisted_checkpoint_references(tmp_path, save_in_place):
+    model = _make_simple_affinity_model(
+        max_epochs=1, validation_split=0.5, early_stopping=False)
+    peptides = ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"]
+    affinities = np.array([50.0, 30.0, 100.0, 5000.0])
+    model.fit(peptides, affinities, save_all_checkpoints=True)
+    source = tmp_path / "source"
+    predictor = Class1AffinityPredictor(
+        allele_to_allele_specific_models={"HLA-A*02:01": [model]})
+    predictor.save(str(source))
+    loaded = Class1AffinityPredictor.load(str(source), optimization_level=0)
+    loaded.neural_networks[0].fit(peptides, affinities, save_all_checkpoints=False)
+    destination = source if save_in_place else tmp_path / "resaved"
+    loaded.save(str(destination))
+    manifest = pandas.read_csv(destination / "manifest.csv")
+    assert manifest[["checkpoint_terminal_weights", "checkpoint_best_weights"]].isna().all().all()
+    reloaded = Class1AffinityPredictor.load(str(destination), optimization_level=0)
+    assert reloaded.neural_networks[0].available_checkpoint_policies() == []
+    np.testing.assert_array_equal(
+        reloaded.predict(peptides, allele="HLA-A*02:01"),
+        loaded.predict(peptides, allele="HLA-A*02:01"))
+
+
 def test_affinity_fit_retains_distinct_terminal_and_best_checkpoints(
         monkeypatch, tmp_path):
     import mhcflurry.class1_neural_network as affinity_module

@@ -76,32 +76,39 @@ def configure_worker_cpu_threads(num_threads, auto_owned=True):
     return num_threads
 
 
+def release_initializer_slot(slots, slot, generation):
+    """Return a worker's assignment without writing a shutdown pipe."""
+    with slots.get_lock():
+        if slots[slot] == generation:
+            slots[slot] = 0
+
+
 def worker_init_entry_point(
-        init_function, arg_queue=None, backup_arg_queue=None,
+        init_function, kwargs_per_process=None, slots=None, sequence=None,
         shared_kwargs=None):
     kwargs = {}
-    if arg_queue:
-        if arg_queue.empty():
-            print(
-                "Argument queue empty. Using round robin arg queue.",
-                file=sys.stderr)
-            kwargs = backup_arg_queue.get()
-            backup_arg_queue.put(kwargs)
-        else:
-            kwargs = arg_queue.get()
+    if kwargs_per_process:
+        # Arguments travel through normal process startup (shared under fork),
+        # never a preloaded pipe. Only assignment generations use shared memory.
+        with slots.get_lock():
+            count = len(kwargs_per_process)
+            start = sequence.value % count
+            slot = next((
+                (start + offset) % count for offset in range(count)
+                if slots[(start + offset) % count] == 0
+            ), start)
+            # If a killed worker skipped finalizers, retain the previous
+            # round-robin fallback. Generations protect a reclaimed slot from
+            # a late finalizer belonging to its previous owner.
+            sequence.value += 1
+            generation = sequence.value
+            slots[slot] = generation
+        kwargs = dict(kwargs_per_process[slot])
+        Finalize(
+            None, release_initializer_slot, (slots, slot, generation),
+            exitpriority=1)
 
-        # On exit we add the init args back to the queue so restarted workers
-        # (e.g. when when running with maxtasksperchild) will pickup init
-        # arguments from a previously exited worker.
-        # Keep a separate small mapping for worker replacement. ``kwargs`` is
-        # extended with shared context below; registering the same mutable
-        # object would make every exiting worker enqueue the entire dataset.
-        # With no reader during pool shutdown, that fills the pipe and hangs
-        # join() indefinitely.
-        restart_kwargs = dict(kwargs)
-        Finalize(None, arg_queue.put, (restart_kwargs,), exitpriority=1)
-
-    print("Initializing worker: %s" % str(kwargs), file=sys.stderr)
+    print("Initializing worker with: %s" % sorted(kwargs), file=sys.stderr)
     if shared_kwargs:
         overlap = set(kwargs).intersection(shared_kwargs)
         if overlap:

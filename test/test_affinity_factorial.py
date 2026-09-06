@@ -618,9 +618,14 @@ def test_split_affinity_architectures_writes_fold_complete_subsets(tmp_path):
         for fold_num in range(4):
             name = "model-%d-%d" % (architecture_num, fold_num)
             numpy.savez(models_dir / ("weights_%s.npz" % name), value=[1])
+            checkpoint = "checkpoints/best/weights_%s.npz" % name
+            (models_dir / checkpoint).parent.mkdir(parents=True, exist_ok=True)
+            numpy.savez(models_dir / checkpoint, value=[fold_num])
             rows.append({
                 "model_name": name,
                 "allele": "pan-class1",
+                "checkpoint_best_weights": checkpoint,
+                "checkpoint_terminal_weights": None,
                 "config_json": json.dumps({
                     "hyperparameters": {
                         "topology": topology,
@@ -638,6 +643,7 @@ def test_split_affinity_architectures_writes_fold_complete_subsets(tmp_path):
     pandas = pytest.importorskip("pandas")
     pandas.DataFrame(rows).to_csv(models_dir / "manifest.csv", index=False)
     (models_dir / "train_data.csv.bz2").write_bytes(b"training")
+    (models_dir / "percent_ranks.csv").write_text("ensemble calibration\n")
     (models_dir / "allele_sequences.csv").write_text(
         "allele,sequence\nHLA-A*02:01," + "A" * 39 + "\n"
     )
@@ -652,6 +658,9 @@ def test_split_affinity_architectures_writes_fold_complete_subsets(tmp_path):
             "model-%d-%d" % (architecture_num, fold) for fold in range(4)
         }
         assert (target / "train_data.csv.bz2").read_bytes() == b"training"
+        assert not (target / "percent_ranks.csv").exists()
+        for filename in subset.checkpoint_best_weights:
+            assert (target / filename).read_bytes() == (models_dir / filename).read_bytes()
         provenance = json.loads((target / "subset_provenance.json").read_text())
         assert provenance["folds"] == [0, 1, 2, 3]
         assert provenance["architecture_num"] == architecture_num
@@ -661,3 +670,29 @@ def test_split_affinity_architectures_writes_fold_complete_subsets(tmp_path):
         str(tmp_path / "subsets" / "architecture_0"),
         str(tmp_path / "subsets" / "architecture_1"),
     ]
+
+
+def test_split_retained_checkpoint_predictor_loads(tmp_path):
+    from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
+
+    model = Class1NeuralNetwork(
+        max_epochs=1, validation_split=0.5, layer_sizes=[4],
+        random_negative_rate=0.0, random_negative_constant=0)
+    model.fit(
+        ["SIINFEKLM", "ARTLAVELS", "GILGFVFTL", "RTLNAWVKV"],
+        numpy.array([50.0, 30.0, 100.0, 5000.0]), save_all_checkpoints=True)
+    model.fit_info[-1]["training_info"] = {"architecture_num": 0, "fold_num": 0}
+    predictor = Class1AffinityPredictor(
+        class1_pan_allele_models=[model],
+        allele_to_sequence={"HLA-A*02:01": "A" * 39})
+    source = tmp_path / "source"
+    predictor.save(str(source))
+    subsets = load_script("split_affinity_architectures").split_models(
+        source, tmp_path / "subsets", expected_folds=1)
+    loaded = Class1AffinityPredictor.load(subsets[0]["models_dir"], optimization_level=0)
+    assert loaded.neural_networks[0].available_checkpoint_policies() == ["terminal", "best"]
+    for policy in ("terminal", "best"):
+        for actual, expected in zip(
+                loaded.neural_networks[0].get_checkpoint_weights(policy),
+                model.get_checkpoint_weights(policy)):
+            numpy.testing.assert_array_equal(actual, expected)

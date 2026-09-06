@@ -5,6 +5,17 @@ model-validation record stays distinct from the package changelog.
 
 ## rc20
 
+- Apply the same release holdout and train-excluded affinity evaluation to
+  remote and local release runs. Resolve explicit download releases for both
+  installed status and extraction destination.
+- Fix worker startup with large initializer payloads, clear discarded affinity
+  checkpoint references after refits, preserve retained sidecars in architecture
+  subsets, and require subset-specific percentile calibration.
+- Pad oversized cleavage-boundary peptide context with unknown tokens at the
+  actual peptide boundary. Previously these configurations could read the
+  opposite flank or crash; the tested 5x2 through 5x5 recipes are unaffected.
+- Add `mhcflurry eval paired-sample-metrics` for reproducible paired uncertainty
+  intervals and plots from archived per-sample experiment metrics.
 - Honor `mhcflurry-downloads fetch --release` when
   `MHCFLURRY_DOWNLOADS_DIR` points at a custom destination. Previously this
   combination selected metadata using a missing implicit release and failed

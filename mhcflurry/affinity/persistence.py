@@ -152,6 +152,12 @@ def save_predictor(predictor, models_dir, model_names_to_write=None, write_metad
             save_weights(row.model.get_weights(), weights_path)
             logging.info("Wrote: %s", weights_path)
 
+            # A refit may discard one or both previously retained policies.
+            # Never leave references to sidecars from the previous fit.
+            for policy in ("terminal", "best"):
+                column = _checkpoint_manifest_column(policy)
+                if column in predictor.manifest_df.columns:
+                    predictor.manifest_df.at[row.name, column] = None
             for policy in row.model.available_checkpoint_policies():
                 checkpoint_path = predictor.checkpoint_weights_path(
                     models_dir, row.model_name, policy)

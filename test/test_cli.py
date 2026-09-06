@@ -1076,7 +1076,10 @@ def test_release_workflow_forwards_presentation_recipe_controls(tmp_path):
         assert expected in output
 
 
-def test_release_workflow_defaults_to_validated_published_recipe(tmp_path):
+def test_release_workflow_defaults_to_validated_published_recipe(tmp_path, monkeypatch):
+    for name in ("MHCFLURRY_TORCH_COMPILE", "MHCFLURRY_TORCH_COMPILE_LOSS",
+                 "MHCFLURRY_MATMUL_PRECISION"):
+        monkeypatch.delenv(name, raising=False)
     result = subprocess.run(
         [
             "bash",
@@ -2998,6 +3001,33 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     module.run_release_plots(tmp_path, tmp_path / "release-run", env)
     assert len(plot_commands) == 1
     assert "--include-paper-figures-in-summary-pdf" in plot_commands[0]
+    eval_commands = []
+    monkeypatch.setattr(
+        module.subprocess, "run", lambda command, **kwargs: eval_commands.append(command))
+    monkeypatch.setattr(
+        module.subprocess, "check_output",
+        lambda command, **kwargs: str(tmp_path / command[-1]))
+    eval_env = dict(env, DATA_DIR=str(tmp_path), COMPARE_INCLUDE="affinity,processing,presentation")
+    run_dir = tmp_path / "evaluation-run"
+    module.run_release_evaluation(tmp_path, run_dir, eval_env)
+    comparisons = [cmd for cmd in eval_commands if cmd[:3] == ["mhcflurry", "eval", "compare-models"]]
+    assert len(comparisons) == 2
+    for cmd in comparisons:
+        assert cmd[cmd.index("--release-holdout-dir") + 1] == str(run_dir / "release_holdout")
+        assert cmd[cmd.index("--limit-files") + 1] == "1"
+        assert cmd[cmd.index("--gpus") + 1] == "1"
+    public, fair = comparisons
+    assert public[public.index("--affinity-training-overlap-policy") + 1] == "audit"
+    assert fair[fair.index("--affinity-training-overlap-policy") + 1] == "exclude"
+    assert fair[fair.index("--affinity-source") + 1] == "no_additional_ms"
+    assert fair[fair.index("--include") + 1] == "affinity"
+    assert fair[fair.index("--b-affinity-dir") + 1] == str(
+        tmp_path / "models_class1_pan_variants/models.no_additional_ms")
+    assert "models_class1_pan_variants" in eval_commands[0]
+    eval_commands.clear()
+    module.run_release_evaluation(tmp_path, run_dir, dict(eval_env, COMPARE_INCLUDE="processing"))
+    assert len([cmd for cmd in eval_commands if "compare-models" in cmd]) == 1
+    assert "models_class1_pan_variants" not in eval_commands[0]
     with pytest.raises(ValueError):
         module.compare_matmul_precision_value({
             "COMPARE_MATMUL_PRECISION": "fast",

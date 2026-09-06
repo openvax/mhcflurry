@@ -224,6 +224,8 @@ def _boundary_windows(model, network, peptide, n_flank, c_flank):
 @pytest.mark.parametrize("peptide_context,expected_n,expected_c", [
     (2, "FGHIKSI", "KLLMNPQ"),
     (5, "FGHIKSIINF", "NFEKLLMNPQ"),
+    (10, "FGHIKSIINFEKLXX", "XXSIINFEKLLMNPQ"),
+    (15, "FGHIKSIINFEKLXXXXXXX", "XXXXXXXSIINFEKLLMNPQ"),
 ])
 def test_cleavage_boundary_windows_cross_both_sides(
         peptide_context, expected_n, expected_c):
@@ -233,6 +235,16 @@ def test_cleavage_boundary_windows_cross_both_sides(
 
     assert decode_matrix(n_window.detach().numpy()) == [expected_n]
     assert decode_matrix(c_window.detach().numpy()) == [expected_c]
+
+
+def test_oversized_boundary_windows_predict_mixed_peptide_lengths():
+    model, network = _boundary_network(peptide_context=15)
+    model._network = network
+    result = model.predict(
+        peptides=["SIINFEKL", "SIINFEKLSIINFEK"],
+        n_flanks=["FGHIK", ""], c_flanks=["LMNPQ", ""], batch_size=2)
+    assert result.shape == (2,)
+    assert numpy.isfinite(result).all()
 
 
 def test_cleavage_boundary_missing_context_uses_unknown_token():
