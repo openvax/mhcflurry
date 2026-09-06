@@ -280,6 +280,8 @@ def test_snapshot_preserves_same_basename_supplemental_inputs(tmp_path):
         copied = destination / record["snapshot_path"]
         assert copied.is_file()
         assert sha256_file(copied) == record["sha256"]
+
+
 def test_preserve_bootstrap_draws_and_component_score_cache():
     from mhcflurry.experiment_archive import _artifact_role
 
