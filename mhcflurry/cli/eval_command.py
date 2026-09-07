@@ -55,6 +55,7 @@ from ..common import normalize_sequence_resolved_allele_name
 
 
 EVALUATION_SCRIPTS = {
+    "saved-candidate": Path("scripts/training/evaluate_saved_candidate.py"),
     "collate-figures": Path("scripts/training/collate_experiment_figures.py"),
     "paired-sample-metrics": Path("scripts/training/paired_sample_metrics.py"),
     "processing-ensemble": Path(
@@ -105,6 +106,7 @@ def make_parser(prog="mhcflurry eval"):
         add_help=False,
     )
     for name, help_text in (
+            ("saved-candidate", "Evaluate saved full ensembles without retraining."),
             ("collate-figures", "Combine annotated experiment figures into a PDF."),
             ("paired-sample-metrics",
              "Estimate paired sample uncertainty from saved metric tables."),
@@ -194,6 +196,7 @@ def format_help(prog="mhcflurry eval"):
         "",
         "Subcommands:",
         "  compare-models          Compare two model ensembles.",
+        "  saved-candidate         Finish saved candidate evaluation without training.",
         "  plot-comparison         Render diagnostic plots from compare output.",
         "  affinity-candidate-figures",
         "                          Plot finalists and public on one saved cohort.",

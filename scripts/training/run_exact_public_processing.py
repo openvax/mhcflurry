@@ -147,6 +147,7 @@ def fit_combiners(out, training_data, affinity_dir, no_flank_dir, processing_dir
             processing_scores_by_model={"with_flanks": scores, "without_flanks": without},
             verbose=1)
         models_dir = out / name / "presentation/models"
+        models_dir.parent.mkdir(parents=True, exist_ok=True)
         stack.save(str(models_dir), write_percent_ranks=False)
         joined = data.copy()
         joined["affinity"] = affinities

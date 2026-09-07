@@ -89,6 +89,7 @@ def run(args):
             source["label"] for source in sources
         ),
     )
+    out.parent.mkdir(parents=True, exist_ok=True)
     result.save(str(out))
     reloaded = Class1ProcessingPredictor.load(str(out))
     if len(reloaded.models) != sum(counts):

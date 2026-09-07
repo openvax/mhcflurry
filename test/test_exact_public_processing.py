@@ -88,3 +88,42 @@ def test_completed_stages_refuse_changed_commands(tmp_path, driver_module):
     runner.run("test", ["same"])
     with pytest.raises(ValueError, match="changed command"):
         runner.run("test", ["different"])
+
+
+def test_composition_creates_nested_parent(tmp_path, driver_module):
+    from compose_processing_ensemble import main
+    from mhcflurry import Class1ProcessingPredictor
+    from .test_class1_processing_neural_network import train_basic_network
+
+    network = train_basic_network(num=20, do_assertions=False, max_epochs=1)
+    source = tmp_path / "source"
+    Class1ProcessingPredictor(models=[network]).save(str(source))
+    destination = tmp_path / "hybrid/processing/models.selected.short_flanks"
+    assert main(["--predictor", "a=" + str(source), "--predictor", "b=" + str(source),
+                 "--require-equal-counts", "--out", str(destination)]) == 0
+    result = Class1ProcessingPredictor.load(str(destination))
+    assert len(result.models) == 2
+    numpy.testing.assert_array_equal(
+        result.predict(["SIINFEKL"]), Class1ProcessingPredictor.load(str(source)).predict(["SIINFEKL"]))
+
+
+def test_fit_combiners_creates_presentation_parent(tmp_path, driver_module, monkeypatch):
+    from mhcflurry import Class1AffinityPredictor, Class1PresentationPredictor, Class1ProcessingPredictor
+
+    data = tmp_path / "data.csv"
+    pandas.DataFrame({"peptide": ["SIINFEKL", "SIINFEKL"], "hla": ["HLA-A*02:01"] * 2,
+                      "hit": [0, 1], "n_flank": ["AAA"] * 2, "c_flank": ["AAA"] * 2}).to_csv(data, index=False)
+    monkeypatch.setattr(Class1AffinityPredictor, "load", lambda *a, **k: object())
+    monkeypatch.setattr(Class1ProcessingPredictor, "load", lambda *a, **k: object())
+    monkeypatch.setattr(driver_module, "cached_scores", lambda *a, **k: numpy.array([0.1, 0.2]))
+    monkeypatch.setattr(Class1PresentationPredictor, "fit_from_scores", lambda *a, **k: None)
+    saved = []
+
+    def save(self, path, **kwargs):
+        # Match the real save contract: mkdir, not makedirs.
+        Path(path).mkdir()
+        saved.append(path)
+
+    monkeypatch.setattr(Class1PresentationPredictor, "save", save)
+    driver_module.fit_combiners(tmp_path, data, tmp_path, tmp_path, {"new": tmp_path})
+    assert saved == [str(tmp_path / "new/presentation/models")]
