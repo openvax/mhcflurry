@@ -290,6 +290,13 @@ def register_subparser(parser):
             "the presentation component."
         ),
     )
+    parser.add_argument(
+        "--presentation-score-kinds",
+        default=",".join(PRESENTATION_SCORE_KINDS),
+        help=("Comma-separated subset of {presentation_score, presentation_percentile}. "
+              "Default evaluates and requires both. Use presentation_score explicitly "
+              "for an uncalibrated research combiner; this does not validate release percentiles."),
+    )
     add_prediction_parallelism_args(parser)
     parser.add_argument(
         "--presentation-num-jobs",
@@ -2049,11 +2056,11 @@ def _require_valid_affinity_predictions(scored, labels):
         )
 
 
-def _require_finite_presentation_scores(scored, mode, labels):
+def _require_finite_presentation_scores(scored, mode, labels, score_kinds=PRESENTATION_SCORE_KINDS):
     """Fail when either presentation model omits a release benchmark row."""
     failures = []
     for side, label in zip(("a", "b"), labels):
-        for score_kind in PRESENTATION_SCORE_KINDS:
+        for score_kind in score_kinds:
             column = "%s_%s" % (side, score_kind)
             values = pandas.to_numeric(scored[column], errors="coerce").values
             bad = ~numpy.isfinite(values)
@@ -2069,9 +2076,9 @@ def _require_finite_presentation_scores(scored, mode, labels):
     if failures:
         raise ValueError(
             "Presentation comparison mode %s requires every benchmark row to "
-            "have both a presentation score and percentile on both sides. %s. "
+            "have finite requested scores (%s) on both sides. %s. "
             "Check allele support, peptide validity, and percentile "
-            "calibration." % (mode, "; ".join(failures))
+            "calibration." % (mode, ", ".join(score_kinds), "; ".join(failures))
         )
 
 
@@ -2216,6 +2223,8 @@ def _run_presentation(side_a, side_b, args):
     data_dir = args.data_dir or _default_data_evaluation_dir()
     requested_modes = _requested_modes(
         args.presentation_modes, PRESENTATION_MODES, "--presentation-modes")
+    requested_score_kinds = _requested_modes(
+        args.presentation_score_kinds, PRESENTATION_SCORE_KINDS, "--presentation-score-kinds")
 
     benchmark = _load_presentation_benchmark_for_component(
         data_dir, args, "presentation")
@@ -2247,6 +2256,7 @@ def _run_presentation(side_a, side_b, args):
             scored,
             mode=mode,
             labels=(side_a["label"], side_b["label"]),
+            score_kinds=requested_score_kinds,
         )
         pred_path = os.path.join(
             component_dir, "predictions_%s.csv.bz2" % mode)
@@ -2254,7 +2264,7 @@ def _run_presentation(side_a, side_b, args):
         _stamp("  wrote %s" % pred_path)
 
         summaries[mode] = {}
-        for score_kind in PRESENTATION_SCORE_KINDS:
+        for score_kind in requested_score_kinds:
             shared_scored = _shared_score_rows(scored, score_kind)
             _require_binary_comparison_rows(
                 shared_scored,
@@ -2300,6 +2310,7 @@ def _run_presentation(side_a, side_b, args):
     _stamp("  wrote summary.json + summary_table.csv")
     return {
         "modes": requested_modes,
+        "score_kinds": requested_score_kinds,
         "summaries": summaries,
     }
 
@@ -2517,8 +2528,7 @@ def _write_summary_markdown(headline, side_a, side_b, out_dir, components):
         s = headline["presentation"]
         lines.append("## presentation")
         for mode in s["modes"]:
-            for score_kind in PRESENTATION_SCORE_KINDS:
-                msum = s["summaries"][mode][score_kind]
+            for score_kind, msum in s["summaries"][mode].items():
                 pooled_a = msum["micro_pooled"]["a"]["roc_auc"]
                 pooled_b = msum["micro_pooled"]["b"]["roc_auc"]
                 lines.append(

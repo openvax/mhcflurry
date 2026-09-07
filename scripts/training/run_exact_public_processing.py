@@ -261,6 +261,7 @@ def main(argv=None):
             "--data-dir", args.public_root / "data_evaluation",
             "--release-holdout-dir", args.release_holdout_dir,
             "--include", "processing,presentation", "--processing-modes", "short_flanks",
+            "--presentation-score-kinds", "presentation_score",
             "--presentation-modes", "with_flanks,without_flanks", "--out", comparison, *parallel])
         driver.run(name + "-plots", ["mhcflurry", "eval", "plot-comparison",
             "--input", comparison, "--components", "processing,presentation",

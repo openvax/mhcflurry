@@ -103,7 +103,7 @@ def finish_exact_replay(args, driver):
     for name in processors:
         evaluate(driver, args, "exact-" + name, out / name, "processing,presentation", [
             "--a-processing-dir", processing_root if name == "public_refit" else out / name / "processing",
-            "--processing-modes", "short_flanks"])
+            "--processing-modes", "short_flanks", "--presentation-score-kinds", "presentation_score"])
     write_json(out / "completed.json", {"at": utc_now(), "networks_trained_here": 0,
         "scope": "eight-network exact-data replay, not full architecture selection"})
 
@@ -117,11 +117,14 @@ def make_parser():
     parser.add_argument("--backend", choices=("gpu", "cpu", "mps", "auto"), default="gpu")
     parser.add_argument("--gpus", type=int, default=1)
     parser.add_argument("--prepare-only", action="store_true")
+    parser.add_argument("--phase", choices=("all", "full", "exact"), default="all")
     return parser
 
 
 def main(argv=None):
     args = make_parser().parse_args(argv)
+    if args.phase == "exact" and args.exact_processing_run is None:
+        raise ValueError("--phase exact requires --exact-processing-run")
     for name in ("candidate", "out", "public_root", "release_holdout_dir", "exact_processing_run"):
         value = getattr(args, name)
         if value is not None:
@@ -155,7 +158,7 @@ def main(argv=None):
         "public_root": str(args.public_root), "public_models": public_models,
         "affinity_training_sha256": sha256_file(args.candidate / "affinity/models.combined/train_data.csv.bz2"),
         "holdout": fingerprint_directory(args.release_holdout_dir),
-        "networks_trained_here": 0, "release_accepted": False,
+        "networks_trained_here": 0, "release_accepted": False, "phase": args.phase,
         "exact_processing_run": str(args.exact_processing_run) if args.exact_processing_run else None}
     args.out.mkdir(parents=True, exist_ok=True)
     document = args.out / "evaluation.json"
@@ -169,6 +172,10 @@ def main(argv=None):
     os.environ.update({"MHCFLURRY_TORCH_COMPILE": "0", "MHCFLURRY_TORCH_COMPILE_LOSS": "0",
                        "MHCFLURRY_MATMUL_PRECISION": "highest"})
     driver = Driver(args.out)
+    if args.phase == "exact":
+        finish_exact_replay(args, driver)
+        write_json(args.out / "completed.json", {"at": utc_now(), "release_accepted": False})
+        return 0
     candidate = args.out / "candidate"
     copy_predictor(bundle, candidate / "presentation/models")
     # Use the bundle's actual components for both standalone and joint evaluation.
@@ -200,7 +207,7 @@ def main(argv=None):
         "--summary-pdf", args.out / "comparisons/full-affinity-train-excluded/plots/model_comparison_figures.pdf"])
     evaluate(driver, args, "full-affinity-descriptive", candidate, "affinity")
     write_json(args.out / "full_candidate_completed.json", {"at": utc_now(), "release_accepted": False})
-    if args.exact_processing_run:
+    if args.exact_processing_run and args.phase == "all":
         finish_exact_replay(args, driver)
     write_json(args.out / "completed.json", {"at": utc_now(), "release_accepted": False})
     return 0

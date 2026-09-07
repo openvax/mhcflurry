@@ -55,3 +55,23 @@ def test_output_cannot_overlap_source(module, tmp_path):
         module.main(["--candidate", str(tmp_path / "run"), "--out", str(tmp_path / "run/eval"),
                      "--public-root", str(tmp_path / "public"), "--release-holdout-dir", str(tmp_path / "holdout"),
                      "--source-commit", "test"])
+
+
+def test_exact_phase_requires_saved_processing_run(module, tmp_path):
+    with pytest.raises(ValueError, match="requires --exact-processing-run"):
+        module.main(["--candidate", str(tmp_path / "run"), "--out", str(tmp_path / "eval"),
+                     "--public-root", str(tmp_path / "public"), "--release-holdout-dir", str(tmp_path / "holdout"),
+                     "--source-commit", "test", "--phase", "exact"])
+
+
+def test_paired_comparison_adapter_preserves_both_sides(module):
+    import pandas
+    from paired_sample_metrics import comparison_long_frame
+
+    data = pandas.DataFrame({"sample": ["one", "two"], "n": [100, 200], "n_pos": [10, 20],
+                             "a_pr_auc": [0.3, 0.4], "b_pr_auc": [0.2, 0.3]})
+    result = comparison_long_frame(data, units=["sample"], condition="model", metrics=["pr_auc"],
+                                   labels=["candidate", "public"])
+    assert result.pr_auc.tolist() == [0.3, 0.4, 0.2, 0.3]
+    assert result.n.tolist() == [100, 200, 100, 200]
+    assert result.model.tolist() == ["candidate", "candidate", "public", "public"]

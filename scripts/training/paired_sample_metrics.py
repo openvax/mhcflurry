@@ -11,6 +11,20 @@ import numpy
 import pandas
 
 
+def comparison_long_frame(frame, *, units, condition, metrics, labels):
+    """Convert compare-models paired a_/b_ columns without changing cohorts."""
+    if len(labels) != 2 or labels[0] == labels[1]:
+        raise ValueError("Require distinct side A and B labels")
+    shared = units + [name for name in ("n", "n_pos") if name in frame and name not in units]
+    pieces = []
+    for prefix, label in zip(("a", "b"), labels):
+        columns = {prefix + "_" + metric: metric for metric in metrics}
+        piece = frame[shared + list(columns)].rename(columns=columns).copy()
+        piece[condition] = label
+        pieces.append(piece)
+    return pandas.concat(pieces, ignore_index=True)
+
+
 def paired_summary(frame, *, units, condition, metrics, baseline,
                    replicates=10000, seed=42):
     """Bootstrap complete matched samples; never silently drop unmatched rows."""
@@ -67,6 +81,8 @@ def main(argv=None):
     parser.add_argument("--condition-column", required=True)
     parser.add_argument("--metric-columns", nargs="+", required=True)
     parser.add_argument("--baseline", required=True)
+    parser.add_argument("--comparison-labels", nargs=2, metavar=("A", "B"),
+                        help="Read compare-models a_/b_ metric columns with these side labels.")
     parser.add_argument("--scope", help="Select rows whose scope column equals this value")
     parser.add_argument("--replicates", type=int, default=10000)
     parser.add_argument("--seed", type=int, default=42)
@@ -76,12 +92,16 @@ def main(argv=None):
     frame = pandas.read_csv(source, dtype={name: str for name in args.unit_columns})
     if args.scope:
         frame = frame.loc[frame.scope == args.scope].copy()
+    if args.comparison_labels:
+        frame = comparison_long_frame(frame, units=args.unit_columns, condition=args.condition_column,
+                                      metrics=args.metric_columns, labels=args.comparison_labels)
     summary, differences, draws = paired_summary(
         frame, units=args.unit_columns, condition=args.condition_column,
         metrics=args.metric_columns, baseline=args.baseline,
         replicates=args.replicates, seed=args.seed)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(out / "paired_input.csv", index=False)
     summary.to_csv(out / "summary.csv", index=False)
     differences.to_csv(out / "sample_differences.csv", index=False)
     numpy.savez_compressed(out / "bootstrap_deltas.npz", **draws)

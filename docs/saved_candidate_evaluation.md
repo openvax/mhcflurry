@@ -77,3 +77,21 @@ per-process RSS as an explicitly labelled fallback, not as a container memory
 limit or an OOM counter. The running `b6370ece4` evaluation is not hot-patched;
 its memory checks use read-only `ps` queries and its original source identity
 is retained.
+
+Uncalibrated exact-data combiners are evaluated explicitly with
+`--presentation-score-kinds presentation_score` (issue #401). This preserves
+raw scores and does not fabricate percentile ranks or pass percentile release
+validation. Default comparisons still require both scores and calibrated
+percentiles. Use `--phase exact` (`SAVED_EVAL_PHASE=exact` remotely) to finish
+that replay independently, without repeating the full candidate comparisons.
+
+Paired sample intervals can be generated directly from comparison tables:
+
+```shell
+mhcflurry eval paired-sample-metrics \
+  --metrics COMPARISON/presentation/per_sample_with_flanks_presentation_score.csv \
+  --unit-columns sample_id --condition-column model \
+  --metric-columns pr_auc ppv_at_n \
+  --comparison-labels full-candidate selected-public --baseline selected-public \
+  --out EXPERIMENT/paired-presentation-with-flanks
+```
