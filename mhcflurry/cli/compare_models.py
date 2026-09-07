@@ -761,7 +761,7 @@ def _metrics(y_true, y_score):
     )
 
 
-def _require_binary_comparison_rows(df, context):
+def _require_binary_comparison_rows(df, context, require_both_classes=True):
     """Require at least one positive and one negative evaluation row."""
     if "hit" not in df:
         raise ValueError("%s is missing the hit column" % context)
@@ -775,7 +775,7 @@ def _require_binary_comparison_rows(df, context):
     n_rows = int(len(hits))
     n_pos = int((hits == 1).sum())
     n_neg = int((hits == 0).sum())
-    if n_rows == 0 or n_pos == 0 or n_neg == 0:
+    if require_both_classes and (n_rows == 0 or n_pos == 0 or n_neg == 0):
         raise ValueError(
             "%s has no valid binary comparison set after shared-row "
             "filtering (rows=%d, positives=%d, negatives=%d)" % (
@@ -1088,7 +1088,37 @@ def _read_supported_alleles(predictor_dir):
     return result
 
 
-def _load_affinity_benchmark(data_dir, source, limit_files):
+def _read_holdout_benchmark_files(files, samples, context):
+    """Validate all input rows, retaining only heldout rows in bounded chunks.
+
+    File and row order are unchanged. A chunk need not contain both classes;
+    the assembled comparison is checked again by its component evaluator.
+    """
+    frames = []
+    empty = None
+    loaded = retained = 0
+    for index, path in enumerate(files):
+        with pandas.read_csv(path, chunksize=100000) as reader:
+            for frame in reader:
+                _require_complete_benchmark_rows(
+                    frame, ("peptide", "sample_id", "hla", "hit"), context)
+                _require_binary_comparison_rows(frame, context, require_both_classes=False)
+                loaded += len(frame)
+                frame["source_file"] = os.path.basename(path)
+                selected = frame.loc[frame.sample_id.astype(str).isin(samples)].copy()
+                retained += len(selected)
+                if len(selected):
+                    frames.append(selected)
+                elif empty is None:
+                    empty = selected
+        _stamp("  scanned %d/%d files: %d rows, retained %d holdout rows" % (
+            index + 1, len(files), loaded, retained))
+    if frames:
+        return pandas.concat(frames, ignore_index=True)
+    return empty if empty is not None else pandas.DataFrame()
+
+
+def _load_affinity_benchmark(data_dir, source, limit_files, samples=None):
     if source == "both":
         patterns = ["mixmhcpred", "netmhcpan4"]
     else:
@@ -1104,6 +1134,8 @@ def _load_affinity_benchmark(data_dir, source, limit_files):
     _stamp("affinity benchmark: %d files" % len(files))
     if not files:
         raise SystemExit("No affinity benchmark files in %s" % data_dir)
+    if samples is not None:
+        return _read_holdout_benchmark_files(files, samples, "Affinity benchmark")
     dfs = []
     for i, f in enumerate(files):
         df = pandas.read_csv(f)
@@ -1233,16 +1265,20 @@ def _load_presentation_benchmark_for_component(data_dir, args, component):
     """Load, holdout-filter, then file-limit a presentation benchmark."""
     initial_file_limit = None if args.release_holdout_dir else args.limit_files
     row_filter = None
+    options = {}
     if args.release_holdout_dir:
         row_filter = partial(
             _filter_release_holdout_samples,
             args=args,
             component=component,
         )
+        options["samples"] = load_excluded_samples(os.path.join(
+            args.release_holdout_dir, component + "_samples.csv"))
     return _load_presentation_benchmark(
         data_dir,
         initial_file_limit,
         row_filter=row_filter,
+        **options,
     )
 
 
@@ -1292,8 +1328,12 @@ def _run_affinity(side_a, side_b, args):
 
     data_dir = args.data_dir or _default_data_evaluation_dir()
     initial_file_limit = None if args.release_holdout_dir else args.limit_files
+    load_options = {}
+    if args.release_holdout_dir:
+        load_options["samples"] = load_excluded_samples(os.path.join(
+            args.release_holdout_dir, "affinity_samples.csv"))
     test = _load_affinity_benchmark(
-        data_dir, args.affinity_source, initial_file_limit)
+        data_dir, args.affinity_source, initial_file_limit, **load_options)
     test = _filter_release_holdout_samples(test, args, "affinity")
     _require_complete_benchmark_rows(
         test, ("peptide", "hla", "hit"), "Affinity benchmark")
@@ -1828,7 +1868,7 @@ def _parallel_presentation_predict(
     )
 
 
-def _load_presentation_benchmark(data_dir, limit_files, row_filter=None):
+def _load_presentation_benchmark(data_dir, limit_files, row_filter=None, samples=None):
     files = sorted(glob.glob(os.path.join(
         data_dir,
         "benchmark.multiallelic.train_excluded.*.csv.bz2",
@@ -1840,14 +1880,17 @@ def _load_presentation_benchmark(data_dir, limit_files, row_filter=None):
             "No presentation benchmark files in %s "
             "(benchmark.multiallelic.train_excluded.*.csv.bz2)" % data_dir)
     _stamp("presentation benchmark: %d files" % len(files))
-    dfs = []
-    for i, path in enumerate(files):
-        df = pandas.read_csv(path)
-        df["source_file"] = os.path.basename(path)
-        dfs.append(df)
-        if (i + 1) % 25 == 0:
-            _stamp("  loaded %d/%d" % (i + 1, len(files)))
-    result = pandas.concat(dfs, ignore_index=True)
+    if samples is not None:
+        result = _read_holdout_benchmark_files(files, samples, "Presentation benchmark")
+    else:
+        dfs = []
+        for i, path in enumerate(files):
+            df = pandas.read_csv(path)
+            df["source_file"] = os.path.basename(path)
+            dfs.append(df)
+            if (i + 1) % 25 == 0:
+                _stamp("  loaded %d/%d" % (i + 1, len(files)))
+        result = pandas.concat(dfs, ignore_index=True)
     required = {"peptide", "sample_id", "hla", "hit"}
     missing = sorted(required - set(result.columns))
     if missing:

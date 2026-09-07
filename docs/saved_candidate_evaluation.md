@@ -53,3 +53,21 @@ use `mhcflurry train snapshot-experiment` and `mhcflurry eval collate-figures`.
 
 Assembly parent-directory failures are tracked in
 [issue #399](https://github.com/openvax/mhcflurry/issues/399).
+
+## Backend and loading failure record
+
+The first evaluation launch (`20260907-saved-candidate-eval-0c638372e`,
+Modal app `ap-AFYKcpQzSeHGVwWs0rBUQ9`) received a cancellation signal at
+2026-09-07 11:35:56 UTC while loading the presentation benchmark. No completed
+comparison or Python error traceback was produced. The cause is not established;
+do not call it an OOM or a training failure. Evidence and the missing durable
+backend status/collection contract are reported in
+[runplz #165](https://github.com/pirl-unc/runplz/issues/165#issuecomment-5570409980).
+
+Independently, [mhcflurry #400](https://github.com/openvax/mhcflurry/issues/400)
+tracks the confirmed eager-loading problem: all 76 multiallelic benchmark
+files were retained before frozen-holdout filtering. The loader now validates
+all inputs in bounded chunks and retains only the frozen samples before
+concatenation. Required fields and labels remain checked even on discarded
+rows, and file limiting still follows holdout selection. This reduces memory
+requirements without changing the evaluation negatives, row order or metrics.

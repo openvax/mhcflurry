@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import threading
+import time
 
 from runplz import App, Image
 from runplz.backends import modal as runplz_modal
@@ -82,15 +84,42 @@ def evaluate():
     if EXACT_RUN:
         command += ["--exact-processing-run", "/persist/runs/" + EXACT_RUN]
     (out / "driver_command.json").write_text(json.dumps(command, indent=2) + "\n")
+    monitor_stop = threading.Event()
+
+    def monitor_memory():
+        # Durable cgroup counters distinguish OOM pressure from other
+        # cancellations without relying on a surviving Python traceback.
+        with (out / "memory_occupancy.jsonl").open("a") as fd:
+            while not monitor_stop.is_set():
+                record = {"unix_time": time.time()}
+                for name in ("memory.current", "memory.peak", "memory.max", "memory.events"):
+                    path = Path("/sys/fs/cgroup") / name
+                    if path.is_file():
+                        record[name] = path.read_text().strip()
+                fd.write(json.dumps(record) + "\n")
+                fd.flush()
+                monitor_stop.wait(5)
+
+    monitor = threading.Thread(target=monitor_memory, daemon=True)
+    monitor.start()
     with (out / "gpu_occupancy.csv").open("a") as telemetry_file, (out / "driver.log").open("a") as log:
         telemetry = subprocess.Popen([
             "nvidia-smi", "--query-gpu=timestamp,index,utilization.gpu,memory.used,memory.total",
             "--format=csv,noheader,nounits", "--loop-ms=5000"], stdout=telemetry_file)
         try:
             subprocess.run(command, check=True, stdout=log, stderr=subprocess.STDOUT)
+        except BaseException as error:
+            (out / "failure.json").write_text(json.dumps({
+                "unix_time": time.time(), "error": repr(error),
+                "returncode": getattr(error, "returncode", None),
+            }, indent=2) + "\n")
+            print("Saved evaluation failed; durable driver log:", out / "driver.log", flush=True)
+            raise
         finally:
             telemetry.terminate()
             telemetry.wait(timeout=10)
+            monitor_stop.set()
+            monitor.join(timeout=10)
     Path("/out/modal-volume-receipt.json").write_text(json.dumps({
         "status": "complete", "volume": VOLUME, "path": str(out)}, indent=2) + "\n")
 
