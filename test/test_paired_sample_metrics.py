@@ -48,3 +48,11 @@ def test_paired_samples_reject_invalid_comparisons(problem):
         frame.loc[0, "n"] = 11
     with pytest.raises(ValueError):
         summarize(frame)
+
+
+def test_select_conditions_requires_present_baseline_and_names():
+    frame = example()
+    assert len(module().select_conditions(frame, "condition", ["old"], "old")) == 3
+    for names in (["new"], ["old", "missing"]):
+        with pytest.raises(ValueError):
+            module().select_conditions(frame, "condition", names, "old")

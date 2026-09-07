@@ -95,3 +95,110 @@ mhcflurry eval paired-sample-metrics \
   --comparison-labels full-candidate selected-public --baseline selected-public \
   --out EXPERIMENT/paired-presentation-with-flanks
 ```
+
+## Fixed-weight flank diagnostic: spec
+
+Compare the saved full and public flank/no-flank ensembles on the identical
+random-decoy cohort and existing affinity-matched risk sets. Audit flank
+completeness and sample/length effects before interpreting the aggregate gap.
+These independently selected ensembles are not a controlled flank ablation.
+
+For direct reliance on flanks, use `mhcflurry eval processing-flank-ablation`
+on the saved matched table: score each unchanged predictor with real flanks,
+both external flanks masked as unknown, and paired N/C flanks shuffled within
+sample and peptide length, without conditioning the shuffle on the hit label.
+Repeated source rows receive identical perturbations; save the donor row IDs,
+seed, model hashes, predictions, per-sample metrics and flank audit. No fitting,
+model selection or holdout-label optimization is allowed in this diagnostic.
+Masking/shuffling measures sensitivity of already-trained models, not the
+performance of an optimally retrained peptide-only model, and can shift the
+input distribution. Affinity matching also changes prevalence, so compare
+flank/no-flank deltas within each cohort, not absolute AUPRC between cohorts.
+
+Example (local inference; no cloud allocation):
+
+```shell
+mhcflurry eval processing-flank-ablation \
+  --input CONTROLLED/matched_predictions.csv.bz2 \
+  --predictor candidate=CANDIDATE/presentation/models/processing_predictor_with_flanks \
+  --predictor public=PUBLIC/models_class1_processing/models.selected.short_flanks \
+  --backend cpu --out EXPERIMENT/fixed-weight-flanks
+```
+
+Use `--backend mps` where the local Apple GPU is available. For a focused
+paired plot from a larger cached screen, `paired-sample-metrics --conditions`
+accepts explicit score names and requires the baseline to be included.
+
+The second Modal attempt (`b6370ece4`) completed presentation, all processing
+modes and legacy-only processing, then was cancelled during affinity evaluation
+at 2026-09-07 14:40:02 UTC. The host traceback shows a DNS/connection failure
+while awaiting `runner.remote()`; no agent stop was sent. Durable outputs were
+collected. This is stronger evidence for a client-lifetime problem than the
+first cancellation; it does not retroactively establish the first cause.
+See [runplz #165](https://github.com/pirl-unc/runplz/issues/165#issuecomment-5572663748).
+
+## Flank diagnostic results (2026-09-07)
+
+All values below are sample-macro AUPRC / PPV@N on the same 10 frozen samples.
+These are actual selected ensemble weights, not architecture-only proxies.
+
+| Cohort | New hybrid 5-aa | New no-flank | Public 5-aa | Public no-flank |
+| --- | --- | --- | --- | --- |
+| Original random decoys | 0.2375 / 0.3183 | 0.2142 / 0.3085 | 0.2202 / 0.2995 | 0.2279 / 0.3173 |
+| Affinity/length-matched decoys | 0.3945 / 0.4284 | 0.3470 / 0.3949 | 0.3971 / 0.4284 | 0.3506 / 0.3981 |
+
+The original cohort has 2,054,263 rows and 18,507 hits. The matched cohort has
+203,577 rows (one hit and ten decoys per risk set), with reused decoys and
+143,879 unique source rows. Same sample/length is required; same-protein decoys
+are preferred within a log10-affinity caliper of 0.25, but only 28.1% of decoys
+are same-protein matches. Median affinity distance is 0.000606 log10 units;
+the 95th percentile is 0.1896. This controls predicted affinity, not measured
+binding, and does not fully control protein origin.
+
+The new flank-vs-no-flank AUPRC gain is +0.04751 (paired sample bootstrap
+95% interval +0.03785 to +0.05637; 10/10 samples improve). PPV@N gain is
++0.03348 (+0.02226 to +0.04530; 9/10 improve). These exploratory intervals
+condition on the selected weights and do not correct for prior model search.
+Different decoy prevalence prevents interpreting the higher matched AUPRC
+itself as a performance gain.
+
+Fixed-weight counterfactual inference (local MPS, seed 42):
+
+| External context | New hybrid AUPRC / PPV@N | Public 5-aa AUPRC / PPV@N |
+| --- | --- | --- |
+| Real | 0.3945 / 0.4285 | 0.3971 / 0.4284 |
+| Masked to unknown | 0.3233 / 0.3771 | 0.2224 / 0.2715 |
+| Shuffled within sample/length | 0.2878 / 0.3307 | 0.2639 / 0.3149 |
+
+All six inference conditions use unchanged weights. Real-context MPS scores
+differ from archived CUDA scores by at most 0.000214 (new) / 0.000314 (public);
+the slight rounding/tie differences above are not new fits. Masking and
+shuffling both shift the input distribution. Shuffling preserves paired N/C
+flanks and is independent of hit labels; repeated decoys use the same donor.
+
+The data and code support three conclusions:
+
+1. Flanks contain useful information and these ensembles actively rely on it.
+2. No-flank models still see the entire peptide, including residues on the
+   peptide side of both cleavage sites and the length-dependent pooling path.
+   The target is ligand-vs-decoy discrimination, not direct cleavage labels.
+   Training selects strong predicted binders, as in the original
+   [MHCflurry 2.0 study](https://pubmed.ncbi.nlm.nih.gov/32711842/); this reduces
+   binding confounding but does not make processing a pure protease assay.
+3. The original benchmark mixes affinity, length and processing discrimination.
+   Nine-mers are 68.9% of hits but about 25% of decoys. Even before affinity
+   matching, within 9-mers new 5-aa versus new no-flank gives macro AUPRC
+   0.3959 versus 0.3453. Matching changes both length composition and affinity;
+   do not attribute the whole change exclusively to affinity.
+
+Missing context is not the main explanation: among unique matched source rows,
+97.58% / 97.03% of hits and 99.10% / 99.26% of decoys have complete standard-AA
+local N/C contexts. This is a completeness audit, not proof of correct protein
+or isoform assignment. The new hybrid's boundary members use context dropout
+0.25, but no dropout-only causal comparison was performed here.
+
+Do not accept the changed-data candidate yet: it ties public processing under
+affinity control, the standalone new no-flank and 15-aa ensembles regress,
+and presentation-percentile AUPRC regresses despite better raw presentation
+scores ([issue #402](https://github.com/openvax/mhcflurry/issues/402)). Full
+affinity evaluation and exact-data replay evaluation remain unfinished.

@@ -55,6 +55,7 @@ from ..common import normalize_sequence_resolved_allele_name
 
 
 EVALUATION_SCRIPTS = {
+    "processing-flank-ablation": Path("scripts/training/processing_flank_ablation.py"),
     "saved-candidate": Path("scripts/training/evaluate_saved_candidate.py"),
     "collate-figures": Path("scripts/training/collate_experiment_figures.py"),
     "paired-sample-metrics": Path("scripts/training/paired_sample_metrics.py"),
@@ -106,6 +107,7 @@ def make_parser(prog="mhcflurry eval"):
         add_help=False,
     )
     for name, help_text in (
+            ("processing-flank-ablation", "Test real, masked and shuffled flanks with fixed weights."),
             ("saved-candidate", "Evaluate saved full ensembles without retraining."),
             ("collate-figures", "Combine annotated experiment figures into a PDF."),
             ("paired-sample-metrics",
@@ -202,6 +204,7 @@ def format_help(prog="mhcflurry eval"):
         "                          Plot finalists and public on one saved cohort.",
         "  merge-external-predictions",
         "                          Consolidate precomputed external predictions.",
+        "  processing-flank-ablation  Test fixed weights with perturbed external flanks.",
         "  processing-affinity-control",
         "                          Score affinity-controlled processing risk sets.",
         "  processing-ensemble     Score an ensemble from saved predictions.",

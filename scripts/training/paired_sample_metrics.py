@@ -73,6 +73,15 @@ def paired_summary(frame, *, units, condition, metrics, baseline,
     return pandas.DataFrame(summary), pandas.concat(differences), draws
 
 
+def select_conditions(frame, column, names, baseline):
+    """Restrict an archived screen to explicitly named comparisons."""
+    if not names:
+        return frame
+    if baseline not in names or set(names) - set(frame[column]):
+        raise ValueError("Selected conditions must exist and include the baseline")
+    return frame.loc[frame[column].isin(names)].copy()
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog=os.environ.get("MHCFLURRY_CLI_PROG"), description=__doc__)
@@ -84,6 +93,7 @@ def main(argv=None):
     parser.add_argument("--comparison-labels", nargs=2, metavar=("A", "B"),
                         help="Read compare-models a_/b_ metric columns with these side labels.")
     parser.add_argument("--scope", help="Select rows whose scope column equals this value")
+    parser.add_argument("--conditions", nargs="+", help="Include only these named conditions, including baseline.")
     parser.add_argument("--replicates", type=int, default=10000)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--out", required=True)
@@ -95,6 +105,7 @@ def main(argv=None):
     if args.comparison_labels:
         frame = comparison_long_frame(frame, units=args.unit_columns, condition=args.condition_column,
                                       metrics=args.metric_columns, labels=args.comparison_labels)
+    frame = select_conditions(frame, args.condition_column, args.conditions, args.baseline)
     summary, differences, draws = paired_summary(
         frame, units=args.unit_columns, condition=args.condition_column,
         metrics=args.metric_columns, baseline=args.baseline,
