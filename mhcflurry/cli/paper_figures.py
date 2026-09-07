@@ -102,8 +102,6 @@ PREFERRED_PREDICTORS = (
     "mhcflurry_production",
     "presentation_without_flanks_presentation_score",
     "presentation_with_flanks_presentation_score",
-    "presentation_without_flanks_processing_score",
-    "presentation_with_flanks_processing_score",
 )
 
 LENGTH_LABEL_ORDER = ("All", "8-mer", "9-mer", "10-mer", "11-mer")
@@ -2063,12 +2061,9 @@ def _generate_processing_notebook_figures(
     )
     training_path = inputs.scores_dir / "train_data.ap.production.csv"
 
-    no_c_scores = _read_cysteine_removed_scores(
-        inputs, no_c_path, writer, predictors, predictor_info)
-    if no_c_scores is not None:
-        _plot_cysteine_removed_panels(
-            inputs, no_c_scores, predictor_info, writer, predictors)
-    elif _plot_current_ap_vs_summary(inputs, writer):
+    # Historical no-C tables have no matching assignments/provenance. They
+    # must not silently supply processing-performance claims in new reports.
+    if _plot_current_ap_vs_summary(inputs, writer):
         writer.skip(
             "antigen-processing",
             "fig.4_processing_predictor_plots.auc.ap.c_removed.scatter",
@@ -2271,13 +2266,13 @@ def _plot_ap_vs_others(scores, predictor_info, writer, predictors):
 def _plot_current_ap_vs_summary(inputs, writer):
     if inputs.comparison_dir is None:
         return False
+    from .plot_model_comparison import _processing_cohort_policy
+    if _processing_cohort_policy(inputs.comparison_dir) != "matched":
+        return False
     processing_path = (
         Path(inputs.comparison_dir) / "processing" / "summary_table.csv"
     )
-    presentation_path = (
-        Path(inputs.comparison_dir) / "presentation" / "summary_table.csv"
-    )
-    if not processing_path.is_file() and not presentation_path.is_file():
+    if not processing_path.is_file():
         return False
     frames = []
     if processing_path.is_file():
@@ -2285,19 +2280,6 @@ def _plot_current_ap_vs_summary(inputs, writer):
         for _, row in processing.iterrows():
             frames.append({
                 "label": "AP %s" % str(row.get("mode", "")).replace("_", " "),
-                "AUROC": row.get("a_macro_roc_auc"),
-                "AUPRC": row.get("a_macro_pr_auc"),
-                "PPV@N": row.get("a_macro_ppv_at_n"),
-            })
-    if presentation_path.is_file():
-        presentation = pandas.read_csv(presentation_path)
-        if "score_kind" in presentation.columns:
-            presentation = presentation.loc[
-                presentation["score_kind"] == "presentation_score"
-            ]
-        for _, row in presentation.iterrows():
-            frames.append({
-                "label": "PS %s" % str(row.get("mode", "")).replace("_", " "),
                 "AUROC": row.get("a_macro_roc_auc"),
                 "AUPRC": row.get("a_macro_pr_auc"),
                 "PPV@N": row.get("a_macro_ppv_at_n"),
@@ -2330,7 +2312,7 @@ def _plot_current_ap_vs_summary(inputs, writer):
         fig,
         "fig.4_processing_predictor_plots.bar.ap_vs_others",
         "antigen-processing",
-        note="Generated from current compare-models processing/presentation summaries.",
+        note="Affinity/length-matched processing only; presentation has a different cohort.",
     )
     return True
 

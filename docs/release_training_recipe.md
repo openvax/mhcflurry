@@ -5,6 +5,13 @@ configuration as its compatibility baseline. The 2.1.x and 2.2.x public model
 downloads use the same affinity, processing, and presentation generation
 recipes.
 
+**Processing data policy update (2026-09-07):** the settings below describe
+historical compatibility experiments, not authorization to reuse their
+unmatched training tables. Future processing training and primary evaluation
+require sample/length/affinity-matched negatives. See {doc}`training` and
+{doc}`saved_candidate_evaluation`. Existing weights remain legacy-trained;
+their performance does not establish the outcome of the new training recipe.
+
 The first paired audit supported no training-hyperparameter exception. A
 rejected full candidate trained with a Class I pan-allele affinity
 minibatch of 1024 outperformed an older public ensemble, but that comparison

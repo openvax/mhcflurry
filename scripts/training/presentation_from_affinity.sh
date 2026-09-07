@@ -197,12 +197,17 @@ python annotate_hits_with_expression.py \
     --out "$(pwd)/hits_with_tpm.csv"
 compress_csv_bzip2 "$(pwd)/hits_with_tpm.csv"
 
-python make_train_data.processing.py \
+# Keep the processing matching reference independent of the candidate affinity.
+if [ -z "${PROCESSING_AFFINITY_REFERENCE:-}" ]; then
+    mhcflurry-downloads fetch models_class1_pan
+fi
+PROCESSING_AFFINITY_REFERENCE="${PROCESSING_AFFINITY_REFERENCE:-$(mhcflurry-downloads path models_class1_pan)/models.combined}"
+mhcflurry train processing-data \
     --hits "$(pwd)/hits_with_tpm.csv.bz2" \
-    --affinity-predictor "$AFFINITY_PREDICTOR" \
+    --affinity-predictor "$PROCESSING_AFFINITY_REFERENCE" \
     --proteome-reference-csv "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \
     --ppv-multiplier 100 \
-    --hit-multiplier-to-take 2 \
+    --negative-policy matched --decoys-per-hit 1 --max-affinity-distance 0.25 \
     --random-seed "$RELEASE_RANDOM_SEED" \
     --out "$(pwd)/train_data.csv" \
     "${COMMON_PARALLELISM_ARGS[@]}"

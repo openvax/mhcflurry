@@ -71,6 +71,7 @@ if [ ! -d "$DATA_EVAL_DIR" ]; then
     exit 2
 fi
 
+mhcflurry train validate-processing-data --data "$TRAIN_DATA"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/gpu_telemetry.sh"

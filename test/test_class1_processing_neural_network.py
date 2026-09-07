@@ -478,6 +478,50 @@ def test_fit_uses_effective_validation_batch_size(monkeypatch):
     assert validation_batch_sizes == [8, 2]
 
 
+@pytest.mark.parametrize("mask", [[False, True, False, True], [False] * 4])
+def test_explicit_validation_mask_survives_input_shuffle(monkeypatch, mask):
+    import mhcflurry.class1_processing_neural_network as module
+    inputs_seen = []
+    original = Class1ProcessingModel.forward
+
+    def recording_forward(self, inputs):
+        if not self.training:
+            inputs_seen.append(inputs["sequence"].detach().cpu().numpy())
+        return original(self, inputs)
+
+    monkeypatch.setattr(Class1ProcessingModel, "forward", recording_forward)
+    monkeypatch.setattr(module, "maybe_compile_network", lambda network, device: network)
+    model = Class1ProcessingNeuralNetwork(
+        max_epochs=1, validation_split=0.75, early_stopping=False,
+        minibatch_size=4, validation_batch_size=4, peptide_max_length=9,
+        n_flank_length=2, c_flank_length=2, convolutional_filters=4,
+        convolutional_kernel_size=3, post_convolutional_dense_layer_sizes=[])
+    sequences = FlankingEncoding(
+        peptides=["SIINFEKL", "SIINFEKA", "SIINFEKY", "SIINFEKF"],
+        n_flanks=["AA"] * 4, c_flanks=["CC"] * 4)
+    encoded = model.network_input(sequences)["sequence"]
+    permutation = numpy.array([3, 0, 1, 2])
+    model.fit(sequences, [1, 0, 1, 0], validation_mask=mask,
+              shuffle_permutation=permutation, verbose=-1)
+    info = model.fit_info[-1]
+    assert info["validation_policy"] == "explicit-mask"
+    assert info["validation_rows"] == sum(mask)
+    assert info["training_rows"] == 4 - sum(mask)
+    if any(mask):
+        expected = encoded[permutation][numpy.array(mask)[permutation]]
+        numpy.testing.assert_array_equal(numpy.concatenate(inputs_seen), expected)
+    else:
+        assert not inputs_seen
+
+
+@pytest.mark.parametrize("mask", [[True] * 4, [0, 1, 0, 1], [True, False]])
+def test_invalid_explicit_validation_masks_rejected(mask):
+    model = Class1ProcessingNeuralNetwork(max_epochs=1)
+    sequences = FlankingEncoding(["SIINFEKL"] * 4, ["AA"] * 4, ["CC"] * 4)
+    with pytest.raises(ValueError, match="validation_mask"):
+        model.fit(sequences, [1, 0, 1, 0], validation_mask=mask, verbose=-1)
+
+
 def test_processing_fit_can_restore_best_validation_checkpoint(monkeypatch):
     import mhcflurry.class1_processing_neural_network as processing_module
 

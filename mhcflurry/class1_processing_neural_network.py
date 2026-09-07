@@ -928,6 +928,7 @@ class Class1ProcessingNeuralNetwork(object):
         progress_preamble="",
         progress_print_interval=5.0,
         seed=None,
+        validation_mask=None,
     ):
         """
         Fit the neural network.
@@ -940,6 +941,9 @@ class Class1ProcessingNeuralNetwork(object):
             1 indicates hit, 0 indicates decoy
         sample_weights : list of float
             If not specified all samples have equal weight.
+        validation_mask : array of bool, optional
+            Explicit per-row validation membership, overriding validation_split.
+            Used by matched processing training to keep complete samples together.
         shuffle_permutation : list of int
             Permutation (integer list) of same length as peptides and affinities
             If None, then a random permutation will be generated.
@@ -981,6 +985,13 @@ class Class1ProcessingNeuralNetwork(object):
         # Shuffle
         if shuffle_permutation is None:
             shuffle_permutation = numpy.random.permutation(len(targets))
+        if validation_mask is not None:
+            validation_mask = numpy.asarray(validation_mask)
+            if validation_mask.dtype != bool or validation_mask.shape != (len(targets),):
+                raise ValueError("validation_mask must be one boolean per training row")
+            if validation_mask.all():
+                raise ValueError("validation_mask leaves no training rows")
+            validation_mask = validation_mask[shuffle_permutation]
         targets = numpy.array(targets)[shuffle_permutation]
         assert numpy.isnan(targets).sum() == 0, targets
         if sample_weights is not None:
@@ -1024,7 +1035,18 @@ class Class1ProcessingNeuralNetwork(object):
         # Validation split
         val_split = self.hyperparameters["validation_split"]
         n_total = len(targets)
-        n_train, n_val = validation_split_counts(n_total, val_split)
+        if validation_mask is None:
+            n_train, n_val = validation_split_counts(n_total, val_split)
+            train_rows = numpy.arange(n_train)
+            val_rows = numpy.arange(n_train, n_total)
+            fit_info["validation_policy"] = "random-row"
+        else:
+            train_rows = numpy.flatnonzero(~validation_mask)
+            val_rows = numpy.flatnonzero(validation_mask)
+            n_train, n_val = len(train_rows), len(val_rows)
+            fit_info["validation_policy"] = "explicit-mask"
+        fit_info["training_rows"] = n_train
+        fit_info["validation_rows"] = n_val
 
         # Hoist all per-batch H2D copies to a single up-front device
         # transfer. The processing dataset is small (peptide flanks for
@@ -1044,8 +1066,8 @@ class Class1ProcessingNeuralNetwork(object):
             else None
         )
 
-        train_indices_dev = torch.arange(n_train, device=device, dtype=torch.long)
-        val_indices_dev = torch.arange(n_train, n_total, device=device, dtype=torch.long)
+        train_indices_dev = torch.as_tensor(train_rows, device=device, dtype=torch.long)
+        val_indices_dev = torch.as_tensor(val_rows, device=device, dtype=torch.long)
 
         last_progress_print = None
         min_val_loss_iteration = None
@@ -1104,7 +1126,7 @@ class Class1ProcessingNeuralNetwork(object):
             # Validation. Keep this batched: release-scale processing folds can
             # hold tens of thousands of validation rows, and a single Conv1d
             # forward over the whole fold can consume most of an A100-40GB.
-            if val_split > 0:
+            if n_val > 0:
                 validation_network = validation_forward_network(
                     network, eager_network)
                 validation_network.eval()
@@ -1182,7 +1204,7 @@ class Class1ProcessingNeuralNetwork(object):
                 )
                 last_progress_print = time.time()
 
-            if val_split > 0:
+            if n_val > 0:
                 if min_val_loss is None or (
                     val_loss < min_val_loss - self.hyperparameters["min_delta"]
                 ):

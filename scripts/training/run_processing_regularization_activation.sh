@@ -115,6 +115,7 @@ if [ -n "$SOURCE_ARCHIVE" ] && [ ! -f "$SOURCE_ARCHIVE" ]; then
     exit 2
 fi
 
+mhcflurry train validate-processing-data --data "$TRAIN_DATA"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ "$GPUS" = auto ]; then
     if command -v nvidia-smi >/dev/null 2>&1; then

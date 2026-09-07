@@ -66,6 +66,7 @@ WORKER_CONTEXT = {}
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
+parser.add_argument("--processing-data-policy", choices=("matched", "legacy"), default="matched")
 
 parser.add_argument(
     "--data",
@@ -140,6 +141,8 @@ def run(argv=sys.argv[1:]):
     )
 
     df = pandas.read_csv(args.data)
+    from ..processing_matching import validate_matched_training_data
+    validate_matched_training_data(df, args.processing_data_policy)
     print("Loaded data: %s" % (str(df.shape)))
 
     input_predictor = Class1ProcessingPredictor.load(args.models_dir)

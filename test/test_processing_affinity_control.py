@@ -3,6 +3,7 @@
 import json
 
 import pandas
+import pytest
 
 from mhcflurry.cli import processing_affinity_control as command
 
@@ -125,3 +126,18 @@ def test_processing_affinity_control_end_to_end(tmp_path):
         (extended_out / "experiment.json").read_text())
     assert extended_experiment["extended_from"].endswith(
         "out/experiment.json")
+
+    # An archived ordered affinity table gives exactly the same assignments.
+    cached_out = tmp_path / "cached"
+    assert command.run_argv([
+        "--score", "candidate=%s:a_processing_score" % prediction_path,
+        "--baseline", "candidate", "--affinity-cache", str(out / "heldout_predictions.csv.bz2"),
+        "--decoys-per-hit", "2", "--out", str(cached_out)]) == 0
+    assert pandas.read_csv(cached_out / "matched_predictions.csv.bz2").source_row.tolist() == matched.source_row.tolist()
+
+    # Do not trust saved distances when a reused artifact has been changed.
+    corrupt = pandas.read_csv(out / "matched_predictions.csv.bz2")
+    corrupt.loc[1, "mhcflurry_production_affinity"] = 50000
+    corrupt.to_csv(out / "matched_predictions.csv.bz2", index=False)
+    with pytest.raises(ValueError, match="affinities disagree"):
+        command._extend_existing(out, added.rename(columns={"radius3": "new"}), [{"name": "new"}])

@@ -1,5 +1,36 @@
 # Evaluation-only completion of saved 2.3.0 candidates
 
+## Processing matching policy change: implementation spec
+
+New processing comparisons and new processing training must use the same
+sample/length/affinity matching algorithm. Require identical peptide length,
+the same sample, and absolute log10 predicted-affinity distance at most 0.25
+for every negative; prefer same-protein matches within that bound. Use a
+frozen public affinity reference, never the processing candidate's associated
+new affinity model. Fail with an actionable error if the candidate pool cannot
+supply the requested number of distinct negatives. Do not drop hits, widen the
+caliper or fall back to random peptides silently. Evaluation uses ten negatives
+per hit; training defaults to one to keep the new data recipe approximately
+balanced without multiplying the training budget tenfold. Both ratios are
+explicitly recorded and cannot be compared as equal-prevalence AUPRC tasks.
+
+Persist risk-set/source identities, affinities, match ranks and distances,
+reference fingerprints, full candidate-pool predictions for joins, and matched
+prediction tables used by metrics and plots. Match assignments must not depend
+on processing scores or model choice. Training/selection validate the saved
+matching contract, including on resume; historical exact-data replay requires
+an explicit legacy policy. Inner early-stopping validation groups complete
+samples to prevent reused decoys crossing its row split. Public weights and
+historical experiment archives remain unchanged and labelled legacy-trained.
+
+Affinity and end-to-end presentation tasks retain their own objectives and
+cohorts. Their processing score columns are reusable caches, not unmatched
+processing-quality claims. Processing figure paths must clearly carry the
+cohort policy and must not put matched processing AUPRC and unmatched
+presentation AUPRC on a common comparison axis. No large retraining is
+authorized by changing this policy; validate with cached held-out scores and
+small regression/smoke tests first.
+
 ## Spec and acceptance criteria
 
 Evaluate the completed full train-and-select candidate before spending more
@@ -139,6 +170,11 @@ See [runplz #165](https://github.com/pirl-unc/runplz/issues/165#issuecomment-557
 
 ## Flank diagnostic results (2026-09-07)
 
+The first tables below are preserved historical diagnostics. The stricter
+re-evaluation at the end of this document supersedes their primary matched
+metrics by requiring distinct negative peptide sequences within every risk
+set, as well as a hard affinity caliper for all fallback matches.
+
 All values below are sample-macro AUPRC / PPV@N on the same 10 frozen samples.
 These are actual selected ensemble weights, not architecture-only proxies.
 
@@ -182,7 +218,7 @@ The data and code support three conclusions:
 2. No-flank models still see the entire peptide, including residues on the
    peptide side of both cleavage sites and the length-dependent pooling path.
    The target is ligand-vs-decoy discrimination, not direct cleavage labels.
-   Training selects strong predicted binders, as in the original
+   Historical training selected strong predicted binders, as in the original
    [MHCflurry 2.0 study](https://pubmed.ncbi.nlm.nih.gov/32711842/); this reduces
    binding confounding but does not make processing a pure protease assay.
 3. The original benchmark mixes affinity, length and processing discrimination.
@@ -202,3 +238,46 @@ affinity control, the standalone new no-flank and 15-aa ensembles regress,
 and presentation-percentile AUPRC regresses despite better raw presentation
 scores ([issue #402](https://github.com/openvax/mhcflurry/issues/402)). Full
 affinity evaluation and exact-data replay evaluation remain unfinished.
+
+## Strict matching-policy validation (2026-09-07)
+
+The reusable matcher now caps **every** hit/decoy affinity difference at 0.25
+log10 units and permits each negative peptide sequence only once per risk set.
+It is shared by new training, evaluation and cached-data validation; see
+[issue #403](https://github.com/openvax/mhcflurry/issues/403).
+Rebuilt risk sets retain all 18,507 hits across the same ten frozen samples
+(203,577 rows). No new weights were trained for this re-evaluation.
+
+| Saved ensemble | Macro AUPRC | Macro PPV@N |
+| --- | ---: | ---: |
+| New hybrid, 4 new legacy-CNN + 4 new boundary-CNN networks | 0.395247 | 0.428876 |
+| Public flank | 0.397445 | 0.428589 |
+| New no-flank | 0.347097 | 0.394391 |
+| Public no-flank | 0.351409 | 0.398763 |
+
+The older matched table contained 1,064 repeated negative peptide entries
+within risk sets (a sequence could appear through different protein mappings).
+The revised matcher removes those duplicates without dropping hits; 7,630
+assignment-row positions change, including rank shifts. The maximum affinity
+distance is 0.249999. These slightly revised metrics supersede the original
+matched ensemble table above, not the original weight/provenance records.
+
+Against public flank weights, the new hybrid's AUPRC difference is -0.002199
+(95% paired sample interval -0.010675 to +0.006749); PPV@N is +0.000287
+(-0.006837 to +0.007734). It does not pass the joint improvement gate.
+The hybrid contains **no reused public processing weights**: "legacy" names
+the architecture of four newly trained members. Its four boundary members
+also retain a whole-peptide CNN trunk. The fixed family balance was a
+diversity hedge, not evidence that four plus four is optimal.
+
+The next controlled comparison should train CNN-only and boundary candidates
+on the same newly matched data/folds/seeds, then select and compare CNN-only,
+boundary-only and freely mixed ensembles. Keep public weights as the fixed
+reference and retain per-sample/micro safeguards. Do not launch another full
+grid or claim matched-training gains from this cached evaluation.
+
+Reproduce with `output/processing-matching-policy-20260907/reproduce.sh`.
+The output directory retains the canonical full-cohort scores, matched
+predictions, per-sample and per-length metrics, paired bootstrap draws,
+input hashes and figure inputs. A timestamped `experiments/` snapshot preserves
+this revision independently of the earlier diagnostic archive.

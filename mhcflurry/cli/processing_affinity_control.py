@@ -18,6 +18,9 @@ import pandas
 
 from .compare_models import _metrics
 from ..experiment_archive import sha256_file
+from ..processing_matching import (
+    MATCHING_POLICY, make_affinity_controlled_risk_sets,
+    validate_matching_assignments)
 
 
 IDENTITY_COLUMNS = (
@@ -39,10 +42,13 @@ def make_parser(prog="mhcflurry eval processing-affinity-control"):
         "--baseline", required=True,
         help="Score name used as the paired comparison baseline.",
     )
-    parser.add_argument(
-        "--data-dir", required=True,
+    affinity_input = parser.add_mutually_exclusive_group()
+    affinity_input.add_argument(
+        "--data-dir",
         help="data_evaluation directory containing cached production affinity.",
     )
+    affinity_input.add_argument(
+        "--affinity-cache", help="Archived ordered cohort with frozen production-affinity scores.")
     parser.add_argument(
         "--existing",
         help=(
@@ -79,8 +85,10 @@ def _parse_score_spec(value):
 
 def _cohort_hash(frame):
     normalized = frame.loc[:, list(IDENTITY_COLUMNS)].copy()
-    normalized["hit"] = pandas.to_numeric(
-        normalized["hit"], errors="raise").astype("int8")
+    labels = pandas.to_numeric(normalized["hit"], errors="raise")
+    if not labels.isin([0, 1]).all():
+        raise ValueError("Prediction cohort requires nonmissing binary labels")
+    normalized["hit"] = labels.astype("int8")
     for column in ("sample_id", "peptide", "n_flank", "c_flank"):
         normalized[column] = normalized[column].fillna("").astype(str)
     return pandas.util.hash_pandas_object(
@@ -166,8 +174,10 @@ def _extend_existing(existing_dir, new_cohort, new_sources):
     matched = pandas.read_csv(matched_path)
     if "source_row" not in matched:
         raise ValueError("Existing matched predictions lack source_row")
-    source_rows = pandas.to_numeric(
-        matched.source_row, errors="raise").to_numpy(dtype="int64")
+    numeric_rows = pandas.to_numeric(matched.source_row, errors="raise").to_numpy()
+    if not numpy.isfinite(numeric_rows).all() or not numpy.equal(numeric_rows, numpy.floor(numeric_rows)).all():
+        raise ValueError("Existing matched predictions have noninteger source_row")
+    source_rows = numeric_rows.astype("int64")
     if (
             len(source_rows) and
             (source_rows.min() < 0 or source_rows.max() >= len(heldout))):
@@ -177,6 +187,15 @@ def _extend_existing(existing_dir, new_cohort, new_sources):
             _cohort_hash(source_identity), _cohort_hash(matched)):
         raise ValueError(
             "Existing matched predictions do not agree with source_row")
+    if not numpy.array_equal(source_identity[AFFINITY_COLUMN], matched[AFFINITY_COLUMN]):
+        raise ValueError("Existing matched affinities disagree with their source")
+    expected_hits = numpy.flatnonzero(heldout.hit.to_numpy() == 1)
+    if not numpy.array_equal(numpy.sort(source_rows[matched.hit == 1]), expected_hits):
+        raise ValueError("Existing matching omitted or repeated held-out hits")
+    diagnostics = dict(configuration.get("diagnostics", {}))
+    validate_matching_assignments(
+        matched, AFFINITY_COLUMN, diagnostics["decoys_per_hit"])
+    diagnostics.update(policy=MATCHING_POLICY, max_log10_affinity_distance=0.25)
     for name in new_names:
         matched[name] = heldout[name].to_numpy()[source_rows]
 
@@ -185,7 +204,7 @@ def _extend_existing(existing_dir, new_cohort, new_sources):
         "matched": matched,
         "score_sources": old_sources + new_sources,
         "affinity_sources": configuration.get("affinity_sources", []),
-        "diagnostics": configuration.get("diagnostics", {}),
+        "diagnostics": diagnostics,
         "existing_experiment": str(experiment_path.resolve()),
         "existing_experiment_sha256": sha256_file(experiment_path),
     }
@@ -210,18 +229,25 @@ def _production_paths_by_sample(data_dir):
     return result
 
 
-def _attach_affinity(cohort, data_dir):
+def _attach_affinity(cohort, data_dir=None, cached_affinity=None):
     frames = []
     paths = []
-    paths_by_sample = _production_paths_by_sample(data_dir)
     usecols = list(IDENTITY_COLUMNS) + [
         "protein_accession", AFFINITY_COLUMN,
     ]
-    for sample_id in cohort.sample_id.drop_duplicates():
-        path = paths_by_sample.get(str(sample_id))
-        if path is None:
-            raise ValueError(
-                "No cached production-affinity file for sample %s" % sample_id)
+    if cached_affinity:
+        input_paths = [cached_affinity]
+    elif data_dir:
+        paths_by_sample = _production_paths_by_sample(data_dir)
+        input_paths = []
+        for sample_id in cohort.sample_id.drop_duplicates():
+            path = paths_by_sample.get(str(sample_id))
+            if path is None:
+                raise ValueError("No cached production-affinity file for sample %s" % sample_id)
+            input_paths.append(path)
+    else:
+        raise ValueError("Specify --data-dir or --affinity-cache for the frozen reference")
+    for path in input_paths:
         frame = pandas.read_csv(path, usecols=usecols)
         frame["n_flank"] = frame.n_flank.fillna("")
         frame["c_flank"] = frame.c_flank.fillna("")
@@ -247,159 +273,16 @@ def _attach_affinity(cohort, data_dir):
     return result, paths
 
 
-def _sorted_pool(frame, indices):
-    indices = numpy.asarray(indices, dtype="int64")
-    order = numpy.argsort(
-        frame.log10_affinity.to_numpy()[indices], kind="stable")
-    indices = indices[order]
-    return (
-        indices,
-        frame.log10_affinity.to_numpy()[indices],
-    )
-
-
-def _nearest(pool, target, count, excluded=(), max_distance=None):
-    indices, values = pool
-    if count <= 0 or not len(indices):
-        return []
-    position = int(numpy.searchsorted(values, target))
-    radius = min(len(indices), max(count * 3, count + len(excluded)))
-    start = max(0, position - radius)
-    end = min(len(indices), position + radius)
-    candidates = indices[start:end]
-    candidate_values = values[start:end]
-    order = numpy.argsort(numpy.abs(candidate_values - target), kind="stable")
-    excluded = set(excluded)
-    selected = []
-    for offset in order:
-        index = int(candidates[offset])
-        if (
-                max_distance is not None and
-                abs(float(candidate_values[offset]) - target) > max_distance):
-            continue
-        if index not in excluded:
-            selected.append(index)
-            if len(selected) == count:
-                break
-    if len(selected) < count and len(candidates) < len(indices):
-        # A very dense set of excluded near-neighbors can exhaust the local
-        # slice. The full stable ordering is the deterministic fallback.
-        order = numpy.argsort(numpy.abs(values - target), kind="stable")
-        for offset in order:
-            index = int(indices[offset])
-            if (
-                    max_distance is not None and
-                    abs(float(values[offset]) - target) > max_distance):
-                continue
-            if index not in excluded and index not in selected:
-                selected.append(index)
-                if len(selected) == count:
-                    break
-    return selected
-
-
-def make_affinity_controlled_risk_sets(
-        frame, decoys_per_hit=10, same_protein_caliper=0.25):
-    """Return hit-centered risk sets with nearest-affinity decoys."""
-    if decoys_per_hit < 1:
-        raise ValueError("decoys_per_hit must be positive")
-    if same_protein_caliper is not None and same_protein_caliper < 0:
-        raise ValueError("same_protein_caliper must be nonnegative")
-    negatives = frame.index[frame.hit == 0].to_numpy(dtype="int64")
-    global_pools = {}
-    protein_pools = {}
-    for key, group in frame.loc[negatives].groupby(
-            ["sample_id", "peptide_len"], sort=False):
-        global_pools[key] = _sorted_pool(frame, group.index)
-    for key, group in frame.loc[negatives].groupby(
-            ["sample_id", "peptide_len", "protein_accession"],
-            sort=False, dropna=False):
-        protein_pools[key] = _sorted_pool(frame, group.index)
-
-    row_indices = []
-    risk_ids = []
-    match_ranks = []
-    same_protein = []
-    distances = []
-    fallback_count = 0
-    incomplete = 0
-    for risk_id, (hit_index, hit) in enumerate(
-            frame.loc[frame.hit == 1].iterrows()):
-        target = float(hit.log10_affinity)
-        protein_key = (
-            hit.sample_id, hit.peptide_len, hit.protein_accession)
-        selected = _nearest(
-            protein_pools.get(protein_key, (numpy.array([], dtype="int64"),
-                                            numpy.array([], dtype="float64"))),
-            target,
-            decoys_per_hit,
-            max_distance=same_protein_caliper,
-        )
-        selected_same_protein = [True] * len(selected)
-        if len(selected) < decoys_per_hit:
-            needed = decoys_per_hit - len(selected)
-            fallback = _nearest(
-                global_pools[(hit.sample_id, hit.peptide_len)],
-                target,
-                needed,
-                excluded=selected,
-            )
-            fallback_count += len(fallback)
-            selected.extend(fallback)
-            selected_same_protein.extend([False] * len(fallback))
-        if len(selected) != decoys_per_hit:
-            incomplete += 1
-            continue
-
-        row_indices.append(int(hit_index))
-        risk_ids.append(risk_id)
-        match_ranks.append(0)
-        same_protein.append(True)
-        distances.append(0.0)
-        for rank, (index, is_same) in enumerate(
-                zip(selected, selected_same_protein), 1):
-            row_indices.append(index)
-            risk_ids.append(risk_id)
-            match_ranks.append(rank)
-            same_protein.append(is_same)
-            distances.append(abs(
-                float(frame.at[index, "log10_affinity"]) - target))
-
-    if incomplete:
-        raise ValueError(
-            "%d hits could not be assigned %d affinity-matched decoys" % (
-                incomplete, decoys_per_hit))
-    result = frame.loc[row_indices].copy().reset_index().rename(
-        columns={"index": "source_row"})
-    result["risk_set_id"] = numpy.asarray(risk_ids, dtype="int64")
-    result["match_rank"] = numpy.asarray(match_ranks, dtype="int16")
-    result["same_protein_match"] = numpy.asarray(same_protein, dtype=bool)
-    result["log10_affinity_distance"] = numpy.asarray(
-        distances, dtype="float64")
-    diagnostics = {
-        "risk_sets": int(result.risk_set_id.nunique()),
-        "rows": int(len(result)),
-        "decoys_per_hit": int(decoys_per_hit),
-        "same_protein_caliper": same_protein_caliper,
-        "fallback_decoys": int(fallback_count),
-        "same_protein_decoy_fraction": float(
-            result.loc[result.hit == 0, "same_protein_match"].mean()),
-        "median_log10_affinity_distance": float(
-            result.loc[result.hit == 0, "log10_affinity_distance"].median()),
-        "p95_log10_affinity_distance": float(
-            result.loc[result.hit == 0, "log10_affinity_distance"].quantile(.95)),
-    }
-    return result, diagnostics
 
 
 def _concordance(frame, score_column):
-    values = []
-    for _, group in frame.groupby("risk_set_id", sort=False):
-        hit_score = float(group.loc[group.hit == 1, score_column].iloc[0])
-        decoy_scores = group.loc[group.hit == 0, score_column].to_numpy()
-        values.append(float(numpy.mean(
-            (hit_score > decoy_scores) + 0.5 * (hit_score == decoy_scores))))
-    return float(numpy.mean(values))
+    keys = ["sample_id", "risk_set_id"]
+    hits = frame.loc[frame.hit == 1].set_index(keys)[score_column]
+    decoys = frame.loc[frame.hit == 0]
+    targets = pandas.MultiIndex.from_frame(decoys[keys]).map(hits).to_numpy()
+    scores = decoys[score_column].to_numpy()
+    wins = (targets > scores) + 0.5 * (targets == scores)
+    return float(decoys[keys].assign(win=wins).groupby(keys).win.mean().mean())
 
 
 def _metric_record(frame, score, scope, group):
@@ -468,7 +351,7 @@ def run(args):
     if args.baseline not in set(source["name"] for source in score_sources):
         raise ValueError("--baseline is not one of the named --score values")
     if not args.existing:
-        attached, affinity_sources = _attach_affinity(cohort, args.data_dir)
+        attached, affinity_sources = _attach_affinity(cohort, args.data_dir, args.affinity_cache)
         matched, diagnostics = make_affinity_controlled_risk_sets(
             attached,
             decoys_per_hit=args.decoys_per_hit,
@@ -492,7 +375,7 @@ def run(args):
         "score_sources": score_sources,
         "affinity_sources": affinity_sources,
         "baseline": args.baseline,
-        "data_dir": os.path.abspath(args.data_dir),
+        "data_dir": os.path.abspath(args.data_dir) if args.data_dir else None,
         "diagnostics": diagnostics,
     }
     if args.existing:

@@ -283,6 +283,9 @@ def register_subparser(parser):
         ),
     )
     parser.add_argument(
+        "--processing-negative-policy", choices=("matched", "random-diagnostic"),
+        default="matched", help="Processing headline cohort. Unmatched random decoys are diagnostic only.")
+    parser.add_argument(
         "--presentation-modes",
         default=",".join(PRESENTATION_MODES),
         help=(
@@ -1703,6 +1706,19 @@ def _run_processing(side_a, side_b, args):
     data_dir = args.data_dir or _default_data_evaluation_dir()
     benchmark = _load_presentation_benchmark_for_component(
         data_dir, args, "processing")
+    policy = getattr(args, "processing_negative_policy", "matched")
+    assignments = None
+    cohort_info = {"policy": policy, "processing_release_eligible": policy == "matched"}
+    if policy == "matched":
+        from .processing_affinity_control import _attach_affinity
+        from ..processing_matching import make_affinity_controlled_risk_sets
+        benchmark, affinity_sources = _attach_affinity(benchmark, data_dir)
+        assignments, diagnostics = make_affinity_controlled_risk_sets(benchmark)
+        cohort_info.update(diagnostics=diagnostics, affinity_sources=affinity_sources,
+                           affinity_reference="frozen cached production affinity")
+        assignments.to_csv(os.path.join(component_dir, "matching_assignments.csv.bz2"), index=False)
+    with open(os.path.join(component_dir, "cohort.json"), "w") as fd:
+        json.dump(cohort_info, fd, indent=2, sort_keys=True)
     summaries = {}
     summary_rows = []
     for mode in requested_modes:
@@ -1728,6 +1744,17 @@ def _run_processing(side_a, side_b, args):
             mode=mode,
             labels=(side_a["label"], side_b["label"]),
         )
+
+        # The complete unique-row cohort remains available for external joins;
+        # primary metrics and plots consume only the fixed matched risk sets.
+        scored.insert(0, "source_row", numpy.arange(len(scored)))
+        scored.to_csv(os.path.join(component_dir, "heldout_predictions_%s.csv.bz2" % mode), index=False)
+        if assignments is not None:
+            values = scored[["a_processing_score", "b_processing_score"]].iloc[
+                assignments.source_row].reset_index(drop=True)
+            scored = assignments.copy()
+            scored[values.columns] = values
+        scored["processing_negative_policy"] = policy
 
         pred_path = os.path.join(
             component_dir, "predictions_%s.csv.bz2" % mode)
@@ -1762,6 +1789,7 @@ def _run_processing(side_a, side_b, args):
             )
         summary = _presentation_mode_summary(
             shared_scored, per_sample, per_length, mode, "processing_score")
+        summary["processing_negative_policy"] = policy
         summaries[mode] = {"processing_score": summary}
         summary_rows.append(_presentation_summary_row(summary))
 
@@ -1769,10 +1797,12 @@ def _run_processing(side_a, side_b, args):
         json.dump(summaries, fd, indent=2, sort_keys=True)
     summary_table = pandas.DataFrame(
         summary_rows, columns=_component_summary_table_columns())
+    summary_table["processing_negative_policy"] = policy
     summary_table.to_csv(
         os.path.join(component_dir, "summary_table.csv"), index=False)
     _stamp("  wrote processing summary.json + summary_table.csv")
     return {
+        "negative_policy": policy,
         "modes": [row["mode"] for row in summary_rows],
         "summaries": summaries,
     }
@@ -2510,6 +2540,8 @@ def _write_summary_markdown(headline, side_a, side_b, out_dir, components):
     if "processing" in components:
         s = headline["processing"]
         lines.append("## processing")
+        lines.append("- Negative cohort: `%s` (unmatched cohorts are diagnostic only)." %
+                     s.get("negative_policy", "legacy-unmatched"))
         for mode in s["modes"]:
             msum = s["summaries"][mode]["processing_score"]
             pooled_a = msum["micro_pooled"]["a"]["roc_auc"]

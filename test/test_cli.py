@@ -4465,6 +4465,7 @@ def test_plot_model_comparison_writes_paper_plots_from_summaries(tmp_path):
 
     (tmp_path / "affinity").mkdir()
     (tmp_path / "processing").mkdir()
+    (tmp_path / "processing" / "cohort.json").write_text(json.dumps({"policy": "matched"}))
     (tmp_path / "presentation").mkdir()
     (tmp_path / "side_a.json").write_text(json.dumps({"label": "new"}))
     (tmp_path / "side_b.json").write_text(json.dumps({"label": "public"}))

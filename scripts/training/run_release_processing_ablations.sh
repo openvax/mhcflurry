@@ -84,18 +84,19 @@ if [ ! -f "$SHARED_DIR/train_data.csv.bz2" ]; then
         --out "$SHARED_DIR/hits_with_tpm.csv"
     compress_csv_bzip2 "$SHARED_DIR/hits_with_tpm.csv"
 
-    python "$SCRIPT_DIR/release_exact/make_train_data.processing.py" \
+    mhcflurry train processing-data \
         --hits "$SHARED_DIR/hits_with_tpm.csv.bz2" \
         --affinity-predictor "$AFFINITY_PREDICTOR" \
         --proteome-reference-csv "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \
         --ppv-multiplier 100 \
-        --hit-multiplier-to-take 2 \
+        --negative-policy matched --decoys-per-hit 1 --max-affinity-distance 0.25 \
         --exclude-samples-file "$HOLDOUT_DIR/processing_samples.csv" \
         --random-seed "$RELEASE_RANDOM_SEED" \
         --out "$SHARED_DIR/train_data.csv" \
         "${TRAINING_PARALLELISM_ARGS[@]}"
     compress_csv_bzip2 "$SHARED_DIR/train_data.csv"
 fi
+mhcflurry train validate-processing-data --data "$SHARED_DIR/train_data.csv.bz2"
 
 conditions=(
     glorot_keras_adam

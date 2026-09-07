@@ -111,6 +111,7 @@ for holdout_file in policy.json processing_samples.csv; do
     fi
 done
 
+mhcflurry train validate-processing-data --data "$TRAIN_DATA"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ "$GPUS" = auto ]; then
     if command -v nvidia-smi >/dev/null 2>&1; then

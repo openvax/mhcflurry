@@ -64,6 +64,7 @@ from ..workload_planning import (
 from ..cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
+from ..processing_matching import validate_matched_training_data, sample_validation_mask
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
@@ -83,6 +84,8 @@ _PROCESSING_WORKER_SAFETY_FACTOR = 1.3
 # process. Model loading and inference should happen in worker processes.
 
 parser = argparse.ArgumentParser(usage=__doc__)
+parser.add_argument("--processing-data-policy", choices=("matched", "legacy"), default="matched",
+                    help="Require matched processing data; legacy is explicit historical replay only.")
 parser.add_argument(
     "--reuse-folds", action="store_true",
     help="Use existing fold_0..N columns instead of generating new folds.")
@@ -385,6 +388,7 @@ def initialize_training(args):
     print("Length of hyperparameters list: %d" % (len(hyperparameters_lst)))
 
     df = pandas.read_csv(args.data)
+    validate_matched_training_data(df, getattr(args, "processing_data_policy", "matched"))
     print("Loaded training data: %s" % (str(df.shape)))
     df = df.loc[
         (df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)
@@ -407,6 +411,8 @@ def initialize_training(args):
             num_folds=args.num_folds,
             held_out_samples=args.held_out_samples,
             seed=master_seed)
+    if getattr(args, "processing_data_policy", "matched") == "matched":
+        validate_matched_training_data(pandas.concat([df, folds_df], axis=1))
 
     if not os.path.exists(args.out_models_dir):
         print("Attempting to create directory: %s" % args.out_models_dir)
@@ -468,6 +474,9 @@ def train_models(args):
 
     with open(join(args.out_models_dir, "training_init_info.pkl"), "rb") as fd:
         WORKER_CONTEXT.update(pickle.load(fd))
+    validate_matched_training_data(
+        pandas.concat([WORKER_CONTEXT["train_data"], WORKER_CONTEXT["folds_df"]], axis=1),
+        getattr(args, "processing_data_policy", "matched"))
     print("Loaded training init info.")
 
     # Work items are dispatched separately. Do not copy the complete queue
@@ -785,12 +794,18 @@ def train_model(
         architecture_num, fold_num, replicate_num)
 
     model = Class1ProcessingNeuralNetwork(**hyperparameters)
+    validation_mask = None
+    if "processing_matching_policy" in train_data:
+        validation_mask = sample_validation_mask(
+            train_data, model.hyperparameters["validation_split"],
+            derive_seed(constant_data.get("seed"), "processing-validation", fold_num))
     model.fit(
         sequences=FlankingEncoding(
             peptides=train_data.peptide.values,
             n_flanks=train_data.n_flank.values,
             c_flanks=train_data.c_flank.values),
         targets=train_data.hit.values,
+        validation_mask=validation_mask,
         progress_preamble=progress_preamble,
         progress_print_interval=progress_print_interval,
         seed=work_item_seed,
@@ -829,6 +844,9 @@ def train_model(
         "work_item_name": work_item_name,
         "train_auc": train_auc,
         "test_auc": test_auc,
+        "processing_data_policy": "matched" if "processing_matching_policy" in train_data else "legacy",
+        "validation_samples": sorted(train_data.loc[validation_mask, "sample_id"].unique().tolist())
+        if validation_mask is not None else None,
     })
 
     numpy.testing.assert_equal(

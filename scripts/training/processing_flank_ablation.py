@@ -12,6 +12,7 @@ from mhcflurry.cli.processing_affinity_control import (
     IDENTITY_COLUMNS, score_risk_sets, summarize_metrics)
 from mhcflurry.common import configure_pytorch
 from mhcflurry.experiment_archive import sha256_file
+from mhcflurry.processing_matching import MATCHING_POLICY, validate_matching_assignments
 
 
 def perturbation_table(frame, seed):
@@ -95,6 +96,9 @@ def main(argv=None):
                                  for name, path in models.items()},
                   "training": False, "release_accepted": False}
     frame = pandas.read_csv(args.input)
+    counts = frame.groupby(["sample_id", "risk_set_id"]).size() - 1
+    validate_matching_assignments(frame, "mhcflurry_production_affinity", counts.iloc[0])
+    provenance["processing_matching_policy"] = MATCHING_POLICY
     unique = perturbation_table(frame, args.seed)
     args.out.mkdir(parents=True)
     (args.out / "experiment.json").write_text(json.dumps(provenance, indent=2) + "\n")

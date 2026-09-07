@@ -221,10 +221,12 @@ def main(argv=None):
         # Always use the same resume command: initialize only before its first invocation.
         if not (unselected / "training_init_info.pkl").exists():
             driver.run(name + "-initialize", ["mhcflurry", "class1-train-processing-models",
+                "--processing-data-policy", "legacy",
                 "--data", processing_data, "--reuse-folds", "--num-folds", "4",
                 "--random-seed", args.random_seed, "--hyperparameters", out / "inputs" / (name + ".yaml"),
                 "--out-models-dir", unselected, "--only-initialize", *training_parallel])
         driver.run(name + "-train", ["mhcflurry", "class1-train-processing-models",
+            "--processing-data-policy", "legacy",
             "--out-models-dir", unselected, "--continue-incomplete", *training_parallel])
         columns = IDENTITY_COLUMNS + ["fold_%d" % i for i in range(4)]
         reference = pandas.read_csv(processing_data, dtype=str, keep_default_na=False)
@@ -234,6 +236,7 @@ def main(argv=None):
         if not identity["same_ordered_rows"]:
             raise ValueError("Training command changed public rows/folds")
         driver.run(name + "-select", ["mhcflurry", "class1-select-processing-models",
+            "--processing-data-policy", "legacy",
             "--data", unselected / "train_data.csv.bz2", "--models-dir", unselected,
             "--out-models-dir", selected, "--min-models-per-fold", "1",
             "--max-models-per-fold", "1", "--save-validation-predictions", *training_parallel])

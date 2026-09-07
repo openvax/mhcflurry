@@ -29,6 +29,7 @@ import sys
 
 WORKFLOW_SCRIPT = Path("scripts/release/retrain_evaluate_deploy.sh")
 TRAINING_SCRIPTS = {
+    "processing-data": Path("scripts/training/release_exact/make_train_data.processing.py"),
     "exact-public-processing": Path("scripts/training/run_exact_public_processing.py"),
     "audit-training-data": Path("scripts/training/audit_training_data_identity.py"),
     "compose-processing-ensemble": Path(
@@ -45,6 +46,10 @@ def make_parser(prog="mhcflurry train"):
         ),
     )
     sub = parser.add_subparsers(dest="train_subcommand")
+    sub.add_parser("processing-data", add_help=False,
+                   help="Generate affinity/length-matched processing training data.")
+    sub.add_parser("validate-processing-data", add_help=False,
+                   help="Verify cached matched processing data before reuse.")
     sub.add_parser("exact-public-processing", add_help=False,
                    help="Replay the frozen processing candidate on exact public rows/folds.")
     sub.add_parser("audit-training-data", add_help=False,
@@ -106,7 +111,8 @@ def _format_help(prog):
             "usage: %s {pan-allele-release,release-holdout,"
             "plot-loss-curves,snapshot-experiment,"
             "materialize-affinity-checkpoint,compose-processing-ensemble,"
-            "audit-training-data,exact-public-processing} ..." %
+            "audit-training-data,exact-public-processing,processing-data,"
+            "validate-processing-data} ..." %
             prog
         ),
         "",
@@ -123,6 +129,8 @@ def _format_help(prog):
         "                      Build a provenance-recorded processing ensemble.",
         "  audit-training-data Audit exact row identity and multiplicities.",
         "  exact-public-processing Replay exact public processing/presentation data.",
+        "  processing-data      Generate matched processing training data.",
+        "  validate-processing-data Verify cached matching assignments and metadata.",
         "",
         "Examples:",
         "  %s pan-allele-release --run-dir runs/2.3.0 --release 2.3.0 --backend local" % prog,
@@ -203,6 +211,16 @@ def run_argv(argv, prog="mhcflurry train"):
     if argv[0] == "pan-allele-release":
         return _run_pan_allele_release(
             argv[1:], "%s pan-allele-release" % prog)
+    if argv[0] == "validate-processing-data":
+        import pandas
+        from ..processing_matching import validate_matched_training_data
+        validation_parser = argparse.ArgumentParser(prog=prog + " validate-processing-data")
+        validation_parser.add_argument("--data", required=True)
+        validation_args = validation_parser.parse_args(argv[1:])
+        frame = pandas.read_csv(validation_args.data)
+        validate_matched_training_data(frame)
+        print("Validated %d matched rows across %d samples" % (len(frame), frame.sample_id.nunique()))
+        return 0
     if argv[0] == "release-holdout":
         from mhcflurry import release_holdout
         return release_holdout.run_argv(
