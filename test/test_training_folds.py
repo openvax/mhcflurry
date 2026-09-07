@@ -35,19 +35,30 @@ def test_malformed_old_fold_columns_are_removed_or_rejected():
         extract_training_folds(data, 1, reuse=True)
 
 
-def test_processing_initialization_reuses_folds_without_suffixes(tmp_path, monkeypatch):
+@pytest.mark.parametrize("policy", ["legacy", "matched"])
+def test_processing_initialization_reuses_folds_without_suffixes(tmp_path, monkeypatch, policy):
     from mhcflurry.cli import train_processing_models_command as command
 
     data = pandas.DataFrame({
         "peptide": ["SIINFEKL", "GILGFVFTL"], "n_flank": ["AAAAA"] * 2,
         "c_flank": ["CCCCC"] * 2, "hit": [1, 0], "sample_id": ["a", "b"],
         "fold_0": [True, False], "fold_1": [False, True]})
+    if policy == "matched":
+        from mhcflurry.processing_matching import matched_training_data
+        data = pandas.DataFrame({
+            "peptide": ["SIINFEKL", "SIINFEKA", "GILGFVFTL", "GILGFVFTA"],
+            "n_flank": ["AAAAA"] * 4, "c_flank": ["CCCCC"] * 4,
+            "hit": [1, 0, 1, 0], "sample_id": ["a", "a", "b", "b"],
+            "protein_accession": "p1", "affinity_prediction": [100, 110, 200, 210],
+            "fold_0": [True, True, False, False], "fold_1": [False, False, True, True]})
+        data, _ = matched_training_data(data, {"sha256": "a" * 64})
     data_path = tmp_path / "data.csv"
     data.to_csv(data_path, index=False)
     hp = tmp_path / "hp.yaml"
     hp.write_text("- max_epochs: 1\n  convolutional_filters: 4\n")
     out = tmp_path / "models"
     args = command.parser.parse_args([
+        "--processing-data-policy", policy,
         "--data", str(data_path), "--hyperparameters", str(hp),
         "--out-models-dir", str(out), "--num-folds", "2", "--reuse-folds"])
 
