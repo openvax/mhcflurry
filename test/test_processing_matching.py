@@ -128,6 +128,16 @@ def test_default_processing_comparison_scores_only_matched_risk_sets(tmp_path, m
     assert info["processing_release_eligible"] is True
     assert len(info["affinity_sources"][0]["sha256"]) == 64
 
+    def fail_prediction(*a, **kw):
+        raise RuntimeError("prediction failed")
+
+    monkeypatch.setattr(command, "_parallel_processing_predict", fail_prediction)
+    with pytest.raises(RuntimeError, match="prediction failed"):
+        command._run_processing({"label": "a"}, {"label": "b"}, args)
+    info = json.loads((out / "cohort.json").read_text())
+    assert info["policy"] == "incomplete"
+    assert info["processing_release_eligible"] is False
+
 
 def test_unmatched_plot_guard_preserves_existing_figures(tmp_path):
     from mhcflurry.cli import plot_model_comparison as command

@@ -1702,11 +1702,17 @@ def _run_processing(side_a, side_b, args):
 
     component_dir = os.path.join(args.out, "processing")
     os.makedirs(component_dir, exist_ok=True)
+    # Invalidate a prior completion marker before attempting a rerun. A failed
+    # prediction must not leave old tables labelled as this matched evaluation.
+    cohort_path = os.path.join(component_dir, "cohort.json")
+    policy = getattr(args, "processing_negative_policy", "matched")
+    with open(cohort_path, "w") as fd:
+        json.dump({"policy": "incomplete", "requested_policy": policy,
+                   "processing_release_eligible": False}, fd, indent=2)
     processing_args = _parallelism_args_for_component(args, "processing")
     data_dir = args.data_dir or _default_data_evaluation_dir()
     benchmark = _load_presentation_benchmark_for_component(
         data_dir, args, "processing")
-    policy = getattr(args, "processing_negative_policy", "matched")
     assignments = None
     cohort_info = {"policy": policy, "processing_release_eligible": policy == "matched"}
     if policy == "matched":
@@ -1717,8 +1723,6 @@ def _run_processing(side_a, side_b, args):
         cohort_info.update(diagnostics=diagnostics, affinity_sources=affinity_sources,
                            affinity_reference="frozen cached production affinity")
         assignments.to_csv(os.path.join(component_dir, "matching_assignments.csv.bz2"), index=False)
-    with open(os.path.join(component_dir, "cohort.json"), "w") as fd:
-        json.dump(cohort_info, fd, indent=2, sort_keys=True)
     summaries = {}
     summary_rows = []
     for mode in requested_modes:
@@ -1800,6 +1804,8 @@ def _run_processing(side_a, side_b, args):
     summary_table["processing_negative_policy"] = policy
     summary_table.to_csv(
         os.path.join(component_dir, "summary_table.csv"), index=False)
+    with open(cohort_path, "w") as fd:
+        json.dump(cohort_info, fd, indent=2, sort_keys=True)
     _stamp("  wrote processing summary.json + summary_table.csv")
     return {
         "negative_policy": policy,
