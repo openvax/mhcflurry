@@ -96,6 +96,14 @@ def evaluate():
                     path = Path("/sys/fs/cgroup") / name
                     if path.is_file():
                         record[name] = path.read_text().strip()
+                if "memory.current" not in record:
+                    # Modal's sandbox may hide cgroups. RSS is not a cgroup
+                    # usage/limit measurement (shared pages may be counted twice).
+                    result = subprocess.run(["ps", "-eo", "pid=,ppid=,rss="],
+                                            capture_output=True, text=True)
+                    record["process_rss_kib"] = result.stdout.strip()
+                    record["process_rss_returncode"] = result.returncode
+                    record["cgroup_counters_available"] = False
                 fd.write(json.dumps(record) + "\n")
                 fd.flush()
                 monitor_stop.wait(5)

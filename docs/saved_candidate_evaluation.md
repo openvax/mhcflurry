@@ -71,3 +71,9 @@ all inputs in bounded chunks and retains only the frozen samples before
 concatenation. Required fields and labels remain checked even on discarded
 rows, and file limiting still follows holdout selection. This reduces memory
 requirements without changing the evaluation negatives, row order or metrics.
+
+The retry container does not expose cgroup files. Future launches record
+per-process RSS as an explicitly labelled fallback, not as a container memory
+limit or an OOM counter. The running `b6370ece4` evaluation is not hot-patched;
+its memory checks use read-only `ps` queries and its original source identity
+is retained.
