@@ -50,9 +50,11 @@ def _correlation(
         predictors,
         alleles=None,
         num_peptides_per_length=1000,
-        lengths=[8, 9, 10],
+        lengths=None,
         debug=False,
         return_result=False):
+    if lengths is None:
+        lengths = [8, 9, 10]
     peptides = []
     for length in lengths:
         peptides.extend(random_peptides(num_peptides_per_length, length))

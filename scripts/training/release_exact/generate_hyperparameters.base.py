@@ -14,7 +14,7 @@
 Generate grid of hyperparameters.
 """
 from mhcflurry.cli.generate_training_hyperparameters import (
-    DEFAULT_MINIBATCH_SIZE,
+    PROCESSING_DEFAULT_MINIBATCH_SIZE,
     add_minibatch_argument,
     build_processing_base_grid as build_grid,
     processing_base_grid_iter as hyperparameters_grid,
@@ -26,7 +26,7 @@ def make_parser():
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__)
-    add_minibatch_argument(parser)
+    add_minibatch_argument(parser, PROCESSING_DEFAULT_MINIBATCH_SIZE)
     return parser
 
 

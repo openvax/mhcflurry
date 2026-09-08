@@ -180,7 +180,9 @@ def test_hoist_torchinductor_warmup_uses_larger_single_worker_budget(monkeypatch
     assert os.environ["TORCHINDUCTOR_COMPILE_THREADS"] == "64"
 
 
-def test_compile_warmup_preserves_numeric_return_contract(monkeypatch):
+@pytest.mark.parametrize("compile_value", ["0", "1"])
+def test_resource_probe_preserves_numeric_return_contract(
+        monkeypatch, compile_value):
     from mhcflurry.parallelism import torch_compile
 
     reports = []
@@ -205,14 +207,12 @@ def test_compile_warmup_preserves_numeric_return_contract(monkeypatch):
             raise AssertionError("successful warmup should not terminate")
 
     refined = []
-    monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", "1")
+    monkeypatch.setenv("MHCFLURRY_TORCH_COMPILE", compile_value)
     monkeypatch.setenv("TORCHINDUCTOR_COMPILE_THREADS", "1")
     monkeypatch.delenv(
         "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO", raising=False)
     monkeypatch.setattr(
         torch_compile, "resolve_local_parallelism_args", lambda args: None)
-    monkeypatch.setattr(
-        torch_compile, "num_workers_per_gpu_from_args", lambda args: 1)
     def fake_worker_pool(**kwargs):
         pool_kwargs.update(kwargs)
         return FakePool()
@@ -228,6 +228,7 @@ def test_compile_warmup_preserves_numeric_return_contract(monkeypatch):
         torch_compile, "hoist_torchinductor_compile_threads",
         lambda args, phase: None)
     args = argparse.Namespace(
+        _device_memory_available_bytes_at_launch=40 * (1 << 30),
         backend="gpu",
         cluster_parallelism=False,
         cpu_threads_per_worker=1,
@@ -244,7 +245,7 @@ def test_compile_warmup_preserves_numeric_return_contract(monkeypatch):
     ]
 
     constant_data = {"large": object()}
-    warmed = torch_compile.run_single_worker_torch_compile_warmup(
+    warmed = torch_compile.run_single_worker_resource_probe(
         args=args,
         work_items=work_items,
         work_function=lambda **kwargs: None,
@@ -258,7 +259,26 @@ def test_compile_warmup_preserves_numeric_return_contract(monkeypatch):
     assert pool_kwargs["worker_context_data"] == {
         "constant_data": constant_data,
     }
+    assert pool_kwargs["max_workers_per_gpu"] == 1
+    assert pool_kwargs["device_memory_budget_bytes"] == 36 * (1 << 30)
     assert all("constant_data" not in item for item in applied_items)
+    assert all(item["resource_probe_only"] for item in applied_items)
+
+
+def test_resource_probe_key_includes_memory_shaping_hyperparameters():
+    from mhcflurry.parallelism import torch_compile
+
+    base = {"layer_sizes": [16], "minibatch_size": 128}
+    larger_batch = {"layer_sizes": [16], "minibatch_size": 1024}
+
+    assert (
+        torch_compile._arch_compile_key(base)
+        == torch_compile._arch_compile_key(larger_batch)
+    )
+    assert (
+        torch_compile._resource_probe_key(base)
+        != torch_compile._resource_probe_key(larger_batch)
+    )
 
 
 def test_cluster_worker_compile_threads_auto(monkeypatch):

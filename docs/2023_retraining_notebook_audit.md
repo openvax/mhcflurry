@@ -54,8 +54,8 @@ committed as the workflow.
   supplemental sources, and hand-authored architecture artwork remain separate
   inputs.
 - The processing-variant ambiguity has been resolved. The full release trains
-  `with_flanks`, `no_flank`, and `short_flanks`, and presentation uses the true
-  `with_flanks` predictor by default.
+  `with_flanks`, `no_flank`, and `short_flanks`; the published presentation
+  recipe uses `short_flanks` (5 aa on each side).
 - Historical runplz files in `jobs/` patched scripts in place for one experiment
   and called deleted comparison scripts. Remote execution is now represented by
   maintained scripts instead of patching a remote copy.
@@ -108,12 +108,21 @@ committed as the workflow.
 3. External predictor binaries remain outside MHCflurry's core dependencies.
    The maintained adapter invokes an optional local runner and imports canonical
    saved columns.
-4. Decide the 2.3.0 holdout policy in one place: PMIDs, pMHC overlap removal,
-   and whether evaluation data is filtered out of affinity / processing /
-   presentation training. Move any useful logic from `jobs/filter_training...`
-   into maintained scripts after that decision.
+4. The 2.3.0 holdout policy uses component-appropriate identities. Affinity is
+   evaluated on all 103 monoallelic benchmark samples plus the multiallelic
+   final holdout; every current-training `(allele, peptide)` found in those
+   benchmark rows (hits or decoys) is removed, expanding multiallelic genotypes
+   to every listed allele. Processing and presentation are evaluated on the 10
+   multiallelic samples from PMID 31154438, a source study absent from
+   monoallelic processing training. Presentation excludes those whole samples
+   from training. This avoids the invalid alternative of excluding all 179
+   `data_evaluation` samples, which are exactly the full annotated MS input and
+   would leave no processing or presentation training data. The workflow
+   persists/checksums the manifests, filters final evaluation to them, and
+   fails if any specified training overlap remains.
 5. Processing variant naming is resolved: the release trains a real
-   `models.selected.with_flanks` artifact and uses it for presentation.
+   `models.selected.with_flanks` artifact, while presentation retains the
+   published `models.selected.short_flanks` input.
 6. Release retraining is available as one command:
    `mhcflurry train pan-allele-release`. It trains, evaluates, plots, syncs
    remote artifacts, and leaves deployment opt-in through `--deploy-mode`.

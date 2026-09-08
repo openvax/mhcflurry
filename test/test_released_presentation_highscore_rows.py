@@ -25,6 +25,7 @@ import numpy as np
 import pandas as pd
 
 from mhcflurry import Class1AffinityPredictor, Class1PresentationPredictor
+from mhcflurry.common import normalize_sequence_resolved_allele_name
 from mhcflurry.testing_utils import startup, cleanup
 
 
@@ -63,6 +64,14 @@ def _atol_for_output(column):
     if "affinity" in column:
         return 0.1
     return 1e-5
+
+
+def _normalized_alleles(values):
+    """Return predictor-API canonical spellings for allele identifiers."""
+    return np.array([
+        normalize_sequence_resolved_allele_name(value)
+        for value in values
+    ])
 
 
 def test_expected_data_has_high_and_low_contexts():
@@ -110,7 +119,9 @@ def test_presentation_predictions():
     np.testing.assert_array_equal(
         aff_df["peptide"].to_numpy(), expected_df["peptide"].to_numpy())
     np.testing.assert_array_equal(
-        aff_df["allele"].to_numpy(), expected_df["allele"].to_numpy())
+        aff_df["allele"].to_numpy(),
+        _normalized_alleles(expected_df["allele"]),
+    )
 
     sample_names = alleles
     allele_map = {allele: [allele] for allele in sorted(set(alleles))}
@@ -177,8 +188,8 @@ def test_presentation_predictions():
 
     for col in STRING_COLUMNS:
         np.testing.assert_array_equal(
-            predicted[col].astype(str).to_numpy(),
-            expected_df[col].astype(str).to_numpy(),
+            _normalized_alleles(predicted[col].astype(str)),
+            _normalized_alleles(expected_df[col].astype(str)),
         )
 
     numeric_columns = [

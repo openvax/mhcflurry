@@ -23,6 +23,9 @@ import tqdm
 
 import mhcflurry
 from mhcflurry.common import (
+    add_random_seed_arg,
+    configure_random_seed,
+    derive_seed,
     fraction_arg,
     normalize_class1_genotype,
     normalize_sequence_resolved_allele_name,
@@ -34,6 +37,7 @@ from mhcflurry.proteome_decoys import (
     peptides_by_length_from_frame,
     sample_peptide_frame_for_accessions,
 )
+from mhcflurry.release_holdout import exclude_samples
 
 parser = argparse.ArgumentParser(usage=__doc__)
 
@@ -58,7 +62,7 @@ parser.add_argument(
     "--decoys-per-hit",
     type=positive_float_arg,
     metavar="N",
-    default=99,
+    default=2,
     help="Decoys per hit")
 parser.add_argument(
     "--exclude-pmid",
@@ -76,6 +80,9 @@ parser.add_argument(
     default=[],
     help="Remove hits and decoys included in the given training data")
 parser.add_argument(
+    "--exclude-samples-file",
+    help="Generated release-holdout CSV of sample_id values to exclude")
+parser.add_argument(
     "--only-format",
     choices=("MONOALLELIC", "MULTIALLELIC"),
     help="Include only data of the given format")
@@ -88,6 +95,8 @@ parser.add_argument(
     metavar="CSV",
     required=True,
     help="File to write")
+
+add_random_seed_arg(parser)
 
 
 def canonicalize_training_allele(raw_name):
@@ -102,6 +111,8 @@ def split_hla_genotype(value):
 
 def run():
     args = parser.parse_args(sys.argv[1:])
+    master_seed = configure_random_seed(
+        args.random_seed, name="make-presentation-train-data")
     hit_df = pandas.read_csv(args.hits)
     hit_df["pmid"] = hit_df["pmid"].astype(str)
     original_samples_pmids = hit_df.pmid.unique()
@@ -124,6 +135,10 @@ def run():
         hit_df = hit_df.loc[hit_df.format == args.only_format].copy()
         print("Subselected to %d %s samples" % (
             hit_df.sample_id.nunique(), args.only_format))
+
+    if args.exclude_samples_file:
+        hit_df = exclude_samples(
+            hit_df, args.exclude_samples_file, "presentation")
 
     if args.only_pmid or args.exclude_pmid:
         assert not (args.only_pmid and args.exclude_pmid)
@@ -216,6 +231,10 @@ def run():
 
     for sample_id, sub_df in tqdm.tqdm(
             hit_df.groupby("sample_id"), total=hit_df.sample_id.nunique()):
+        # Make each sample independent of group iteration order while keeping
+        # every decoy draw rooted in the one recorded release seed.
+        numpy.random.seed(
+            derive_seed(master_seed, "sample", sample_id) % (2 ** 32))
         result_df.append(
             sub_df[[
                 "protein_accession",
@@ -284,7 +303,12 @@ def run():
 
     if args.sample_fraction:
         print("Subsampling to ", args.sample_fraction)
-        result_df = result_df.sample(frac=args.sample_fraction)
+        result_df = result_df.sample(
+            frac=args.sample_fraction,
+            random_state=(
+                derive_seed(master_seed, "sample_fraction") % (2 ** 32)
+            ),
+        )
         print("Subsampled:")
         print(result_df)
         print("Hit rates:")

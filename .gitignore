@@ -82,7 +82,10 @@ artifacts/
 jobs/
 out/
 brev_runs/
+results/
 sweep_results/
+experiments/*
+!experiments/README.md
 
 # Claude Code local state
 .claude/

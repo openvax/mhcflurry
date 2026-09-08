@@ -17,6 +17,8 @@ import sys
 
 import pandas
 
+from mhcflurry.release_holdout import exclude_affinity_pmhcs
+
 
 def make_parser(prog=None):
     """Build the command-line parser."""
@@ -26,6 +28,9 @@ def make_parser(prog=None):
     parser.add_argument("--drop-negative-ms", action="store_true", default=False)
     parser.add_argument("--set-measurement-value", type=float)
     parser.add_argument("--out-csv")
+    parser.add_argument(
+        "--exclude-pmhcs",
+        help="CSV of frozen evaluation allele,peptide pairs to exclude.")
     parser.add_argument(
         "--verbose",
         action="store_true",
@@ -39,6 +44,7 @@ def reassign_mass_spec_training_data(
         ms_only=False,
         drop_negative_ms=False,
         set_measurement_value=None,
+        exclude_pmhcs=None,
         out_csv=None,
         verbose=False):
     """Return a curated training dataframe with requested MS-row edits."""
@@ -58,6 +64,9 @@ def reassign_mass_spec_training_data(
     if ms_only:
         print("Filtering to MS only", file=sys.stderr)
         df = df.loc[df.measurement_kind == "mass_spec"].copy()
+
+    if exclude_pmhcs:
+        df = exclude_affinity_pmhcs(df, exclude_pmhcs)
 
     if set_measurement_value is not None:
         indexer = df.measurement_kind == "mass_spec"
@@ -85,6 +94,7 @@ def run_argv(argv=None, prog=None):
         ms_only=args.ms_only,
         drop_negative_ms=args.drop_negative_ms,
         set_measurement_value=args.set_measurement_value,
+        exclude_pmhcs=args.exclude_pmhcs,
         out_csv=args.out_csv,
         verbose=args.verbose)
 

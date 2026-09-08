@@ -14,11 +14,11 @@
 """
 Launch pan-allele training on remote GPU machines.
 
-This is the maintained runplz wrapper for pan_allele_release_full.sh. The
-release workflow chooses whether Brev should use an existing instance or
-intentionally provision one by setting RUNPLZ_BREV_* environment variables
-before invoking ``runplz brev``. Local runs should call the shell script
-directly.
+This is the maintained runplz wrapper for the full release workflow and its
+paired pre-release ablation panels. The release workflow chooses whether Brev
+should use an existing instance or intentionally provision one by setting
+RUNPLZ_BREV_* environment variables before invoking ``runplz brev``. Local
+runs should call the shell scripts directly.
 """
 
 from __future__ import annotations
@@ -44,13 +44,41 @@ NUM_GPUS = int(os.environ.get("RUNPLZ_NUM_GPUS", "4"))
 MIN_GPU_MEMORY = int(os.environ.get("RUNPLZ_MIN_GPU_MEMORY", "35"))
 MIN_CPU = int(os.environ.get("RUNPLZ_MIN_CPU", "32"))
 MIN_MEMORY = int(os.environ.get("RUNPLZ_MIN_MEMORY", "300"))
-MIN_DISK = int(os.environ.get("RUNPLZ_MIN_DISK", "1000"))
+_MIN_DISK_VALUE = os.environ.get("RUNPLZ_MIN_DISK", "1000").strip()
+MIN_DISK = (
+    None if _MIN_DISK_VALUE.lower() in {"", "none", "null"}
+    else int(_MIN_DISK_VALUE)
+)
+_OUTPUT_VOLUME_NAME = os.environ.get("RUNPLZ_OUTPUT_VOLUME", "").strip()
+OUTPUT_VOLUMES = (
+    {"/out": _OUTPUT_VOLUME_NAME} if _OUTPUT_VOLUME_NAME else {}
+)
+# Modal rejects function timeouts above 24 hours before allocating a worker.
+# Keep the shared launcher valid on every backend by default; long release
+# jobs resume from their persistent manifests in another 24-hour window.
+FUNCTION_TIMEOUT_SECONDS = int(os.environ.get(
+    "RUNPLZ_TIMEOUT_SECONDS", str(60 * 60 * 24)))
 DEFAULT_OUT = os.environ.get(
     "MHCFLURRY_OUT", "/root/mhcflurry-pan-allele-training-run"
 )
 
 TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
 FALSE_ENV_VALUES = {"0", "false", "no", "off"}
+REMOTE_WORKFLOW_SCRIPTS = {
+    "full": "scripts/training/pan_allele_release_full.sh",
+    "affinity-ablations": (
+        "scripts/training/run_release_affinity_ablations.sh"
+    ),
+    "processing-ablations": (
+        "scripts/training/run_release_processing_ablations.sh"
+    ),
+    "processing-cleavage-boundaries": (
+        "scripts/training/run_processing_cleavage_boundaries_remote.sh"
+    ),
+    "processing-cleavage-boundary-radius": (
+        "scripts/training/run_processing_cleavage_boundary_radius_remote.sh"
+    ),
+}
 
 
 def env_bool(environ, name, default=False):
@@ -93,7 +121,7 @@ def compare_torch_compile_value(environ):
 def compare_matmul_precision_value(environ):
     value = environ.get(
         "COMPARE_MATMUL_PRECISION",
-        environ.get("MHCFLURRY_MATMUL_PRECISION", "high"),
+        environ.get("MHCFLURRY_MATMUL_PRECISION", "highest"),
     )
     normalized = value.strip().lower()
     if normalized not in {"none", "highest", "high", "medium"}:
@@ -118,6 +146,48 @@ def env_csv_tuple(environ, name, default):
     if not value.strip():
         return ()
     return tuple(item.strip() for item in value.split(",") if item.strip())
+
+
+def remote_workflow_script(environ=os.environ):
+    """Return the committed shell entrypoint selected for this remote run."""
+    workflow = environ.get("MHCFLURRY_REMOTE_WORKFLOW", "full")
+    try:
+        return workflow, REMOTE_WORKFLOW_SCRIPTS[workflow]
+    except KeyError as error:
+        raise ValueError(
+            "MHCFLURRY_REMOTE_WORKFLOW must be one of %s; got %r" % (
+                ", ".join(sorted(REMOTE_WORKFLOW_SCRIPTS)),
+                workflow,
+            )
+        ) from error
+
+
+def validate_local_release_source(repo, environ=os.environ):
+    """Reject mislabeled or locally modified source for release launches."""
+    expected_commit = environ.get(
+        "MHCFLURRY_RELEASE_GIT_COMMIT", "").strip()
+    if not expected_commit:
+        return
+    actual_commit = subprocess.check_output(
+        ["git", "-C", str(repo), "rev-parse", "HEAD"],
+        text=True,
+    ).strip()
+    if actual_commit != expected_commit:
+        raise ValueError(
+            "MHCFLURRY_RELEASE_GIT_COMMIT=%s does not match local HEAD %s" % (
+                expected_commit, actual_commit))
+    status = subprocess.check_output(
+        [
+            "git", "-C", str(repo), "status", "--porcelain",
+            "--untracked-files=all", "--", "mhcflurry", "scripts",
+            "setup.py", "setup.cfg",
+        ],
+        text=True,
+    ).strip()
+    if status:
+        raise ValueError(
+            "Release launch source has modified or untracked executable files; "
+            "commit them before running:\n%s" % status)
 
 
 def brev_config_from_env(environ=os.environ):
@@ -155,15 +225,15 @@ def remote_training_env(environ=os.environ):
         "EVAL_MAX_BENCHMARK_FILES": environ.get(
             "EVAL_MAX_BENCHMARK_FILES", ""
         ),
-        "COMPARE_BASELINE": environ.get("COMPARE_BASELINE", "public:2.0.0"),
+        "COMPARE_BASELINE": environ.get("COMPARE_BASELINE", "public:2.2.0"),
         "COMPARE_BASELINE_LABEL": environ.get(
-            "COMPARE_BASELINE_LABEL", "MHCflurry 2.0"
+            "COMPARE_BASELINE_LABEL", "MHCflurry 2.2"
         ),
         "COMPARE_BACKEND": environ.get("COMPARE_BACKEND", "auto"),
         "COMPARE_GPUS": environ.get("COMPARE_GPUS", "auto"),
         "COMPARE_MATMUL_PRECISION": environ.get(
             "COMPARE_MATMUL_PRECISION",
-            environ.get("MHCFLURRY_MATMUL_PRECISION", "high"),
+            environ.get("MHCFLURRY_MATMUL_PRECISION", "highest"),
         ),
         "COMPARE_MAX_TASKS_PER_WORKER": environ.get(
             "COMPARE_MAX_TASKS_PER_WORKER",
@@ -187,7 +257,7 @@ def remote_training_env(environ=os.environ):
         ),
         "COMPARE_TORCH_COMPILE": environ.get(
             "COMPARE_TORCH_COMPILE",
-            environ.get("MHCFLURRY_TORCH_COMPILE", "auto"),
+            environ.get("MHCFLURRY_TORCH_COMPILE", "0"),
         ),
         # This must be a path visible inside the remote runplz job. Do not
         # inherit DATA_DIR from the local shell; in the release wrapper that is
@@ -197,6 +267,21 @@ def remote_training_env(environ=os.environ):
         "AFFINITY_NUM_JOBS": environ.get("AFFINITY_NUM_JOBS", ""),
         "AFFINITY_DATALOADER_NUM_WORKERS": environ.get(
             "AFFINITY_DATALOADER_NUM_WORKERS", ""
+        ),
+        "AFFINITY_ABLATION_CONDITIONS": environ.get(
+            "AFFINITY_ABLATION_CONDITIONS", ""
+        ),
+        "AFFINITY_ABLATION_BASELINE_DIR": environ.get(
+            "AFFINITY_ABLATION_BASELINE_DIR", ""
+        ),
+        "AFFINITY_OPTIMIZER_IMPLEMENTATION": environ.get(
+            "AFFINITY_OPTIMIZER_IMPLEMENTATION", "keras"
+        ),
+        "AFFINITY_LSUV_TARGET": environ.get(
+            "AFFINITY_LSUV_TARGET", "post_activation"
+        ),
+        "AFFINITY_INIT": environ.get(
+            "AFFINITY_INIT", "glorot_uniform"
         ),
         "MAX_TASKS_PER_WORKER": environ.get("MAX_TASKS_PER_WORKER", "12"),
         "MAX_WORKERS_PER_GPU": environ.get("MAX_WORKERS_PER_GPU", "auto"),
@@ -211,12 +296,12 @@ def remote_training_env(environ=os.environ):
         "MHCFLURRY_GPU_TELEMETRY_SECONDS": environ.get(
             "MHCFLURRY_GPU_TELEMETRY_SECONDS", "30"
         ),
-        "MHCFLURRY_TORCH_COMPILE": environ.get("MHCFLURRY_TORCH_COMPILE", "1"),
+        "MHCFLURRY_TORCH_COMPILE": environ.get("MHCFLURRY_TORCH_COMPILE", "0"),
         "MHCFLURRY_TORCH_COMPILE_LOSS": environ.get(
-            "MHCFLURRY_TORCH_COMPILE_LOSS", "1"
+            "MHCFLURRY_TORCH_COMPILE_LOSS", "0"
         ),
         "MHCFLURRY_MATMUL_PRECISION": environ.get(
-            "MHCFLURRY_MATMUL_PRECISION", "high"
+            "MHCFLURRY_MATMUL_PRECISION", "highest"
         ),
         "MHCFLURRY_RELEASE_WORKFLOW_ID": environ.get(
             "MHCFLURRY_RELEASE_WORKFLOW_ID", ""
@@ -227,14 +312,45 @@ def remote_training_env(environ=os.environ):
         "MHCFLURRY_RELEASE_VERSION": environ.get(
             "MHCFLURRY_RELEASE_VERSION", ""
         ),
-        "MATMUL_PRECISION": environ.get("MATMUL_PRECISION", "high"),
-        "MATMUL_PRECISION_CLI": environ.get("MATMUL_PRECISION_CLI", "high"),
+        "MHCFLURRY_RELEASE_RECIPE": environ.get(
+            "MHCFLURRY_RELEASE_RECIPE", ""
+        ),
+        "RUNPLZ_OUT": environ.get("RUNPLZ_OUT", ""),
+        "MHCFLURRY_REMOTE_WORKFLOW": environ.get(
+            "MHCFLURRY_REMOTE_WORKFLOW", "full"
+        ),
+        "BOUNDARY_RADIUS_ARCHITECTURE": environ.get(
+            "BOUNDARY_RADIUS_ARCHITECTURE", "large_relu"
+        ),
+        "BOUNDARY_RADIUS_AFFINITY_CONTROL": environ.get(
+            "BOUNDARY_RADIUS_AFFINITY_CONTROL", "none"
+        ),
+        "BOUNDARY_RADIUS_BASE_RUN": environ.get(
+            "BOUNDARY_RADIUS_BASE_RUN", ""
+        ),
+        "BOUNDARY_RADIUS_HOLDOUT_DIR": environ.get(
+            "BOUNDARY_RADIUS_HOLDOUT_DIR", ""
+        ),
+        "BOUNDARY_RADIUS_OUT": environ.get("BOUNDARY_RADIUS_OUT", ""),
+        "BOUNDARY_RADIUS_PARALLEL_CONDITIONS": environ.get(
+            "BOUNDARY_RADIUS_PARALLEL_CONDITIONS", "1"
+        ),
+        "BOUNDARY_RADIUS_TRAIN_DATA": environ.get(
+            "BOUNDARY_RADIUS_TRAIN_DATA", ""
+        ),
+        "MATMUL_PRECISION": environ.get("MATMUL_PRECISION", "highest"),
+        "MATMUL_PRECISION_CLI": environ.get(
+            "MATMUL_PRECISION_CLI", "highest"
+        ),
         "NUM_JOBS": environ.get("NUM_JOBS", "auto"),
         "PRESENTATION_PROCESSING_WITH_FLANKS_KIND": environ.get(
-            "PRESENTATION_PROCESSING_WITH_FLANKS_KIND", "with_flanks"
+            "PRESENTATION_PROCESSING_WITH_FLANKS_KIND", "short_flanks"
         ),
         "PRESENTATION_DECOYS_PER_HIT": environ.get(
-            "PRESENTATION_DECOYS_PER_HIT", "99"
+            "PRESENTATION_DECOYS_PER_HIT", "2"
+        ),
+        "PRESENTATION_SAMPLE_FRACTION": environ.get(
+            "PRESENTATION_SAMPLE_FRACTION", "0.1"
         ),
         "PRESENTATION_FEATURE_CHUNK_SIZE": environ.get(
             "PRESENTATION_FEATURE_CHUNK_SIZE", "250000"
@@ -289,8 +405,11 @@ def remote_training_env(environ=os.environ):
         "PROCESSING_VARIANTS": environ.get(
             "PROCESSING_VARIANTS", "with_flanks no_flank short_flanks"
         ),
+        "PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS": environ.get(
+            "PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS", "0"
+        ),
         "PROCESSING_HELD_OUT_SAMPLES": environ.get(
-            "PROCESSING_HELD_OUT_SAMPLES", "50"
+            "PROCESSING_HELD_OUT_SAMPLES", "10"
         ),
         "PROCESSING_NUM_JOBS": environ.get("PROCESSING_NUM_JOBS", "auto"),
         "PROCESSING_MAX_WORKERS_PER_GPU": environ.get(
@@ -302,10 +421,11 @@ def remote_training_env(environ=os.environ):
         "RUN_LABEL": environ.get("RUN_LABEL", "new"),
         "RUN_RELEASE_EVAL": environ.get("RUN_RELEASE_EVAL", "0"),
         "RUN_RELEASE_PLOTS": environ.get("RUN_RELEASE_PLOTS", "0"),
+        "RELEASE_RANDOM_SEED": environ.get("RELEASE_RANDOM_SEED", "42"),
         "TORCHINDUCTOR_COMPILE_THREADS": environ.get(
             "TORCHINDUCTOR_COMPILE_THREADS", "auto"
         ),
-        "TRAINING_MINIBATCH_SIZE": environ.get("TRAINING_MINIBATCH_SIZE", "1024"),
+        "TRAINING_MINIBATCH_SIZE": environ.get("TRAINING_MINIBATCH_SIZE", "128"),
     }
     for name in (
         "AFFINITY_MINIBATCH_SIZE",
@@ -337,7 +457,10 @@ image = (
         "procps",
     )
     .pip_install("pypdf")
-    .pip_install("runplz>=3.11.0")
+    # The bootstrap re-imports this launcher inside the remote image, so its
+    # runplz runtime must understand every decorator argument used above.
+    # 4.2.2 is the first pin used here with the complete Modal volume contract.
+    .pip_install("runplz==4.2.2")
     .pip_install_local_dir(".", editable=True)
 )
 
@@ -355,12 +478,17 @@ app = App(
     min_cpu=MIN_CPU,
     min_memory=MIN_MEMORY,
     min_disk=MIN_DISK,
-    timeout=60 * 60 * 24 * 14,
+    volumes=OUTPUT_VOLUMES,
+    timeout=FUNCTION_TIMEOUT_SECONDS,
     env=remote_training_env(),
 )
 def train_release_full():
-    """Run the maintained full release training script."""
-    repo = Path.cwd()
+    """Run the selected maintained release or ablation workflow."""
+    # Bootstrap working directories differ by backend (Brev historically
+    # starts in the repository, while Modal starts at ``/``). Resolve from
+    # this staged launcher so every relative workflow path means the same
+    # thing on every backend.
+    repo = Path(__file__).resolve().parents[2]
     out = Path(
         os.environ.get("RUNPLZ_OUT")
         or os.environ.get("MHCFLURRY_OUT")
@@ -368,6 +496,13 @@ def train_release_full():
     ).resolve()
     env = os.environ.copy()
     env.update({"MHCFLURRY_OUT": str(out), "REPO": str(repo)})
+    workflow, workflow_script = remote_workflow_script(env)
+    if workflow != "full" and (
+            env_bool(env, "RUN_RELEASE_EVAL", default=False) or
+            env_bool(env, "RUN_RELEASE_PLOTS", default=False)):
+        raise ValueError(
+            "Remote evaluation/plotting is only valid for the full workflow"
+        )
     workflow_id = env.get("MHCFLURRY_RELEASE_WORKFLOW_ID", "").strip()
     exit_path = None
     if workflow_id:
@@ -379,18 +514,22 @@ def train_release_full():
             exit_path.unlink()
         except FileNotFoundError:
             pass
+    marker_dir = out / ".runplz"
+    marker_dir.mkdir(parents=True, exist_ok=True)
+    (marker_dir / "mhcflurry_remote_workflow").write_text(workflow)
     try:
         subprocess.run(
-            ["bash", "scripts/training/pan_allele_release_full.sh"],
+            ["bash", workflow_script],
             check=True,
             cwd=repo,
             env=env,
         )
-        validate_remote_release_artifacts(repo, out, env)
-        if env_bool(env, "RUN_RELEASE_EVAL", default=False):
-            run_release_evaluation(repo, out, env)
-        if env_bool(env, "RUN_RELEASE_PLOTS", default=False):
-            run_release_plots(repo, out, env)
+        if workflow == "full":
+            validate_remote_release_artifacts(repo, out, env)
+            if env_bool(env, "RUN_RELEASE_EVAL", default=False):
+                run_release_evaluation(repo, out, env)
+            if env_bool(env, "RUN_RELEASE_PLOTS", default=False):
+                run_release_plots(repo, out, env)
     except subprocess.CalledProcessError as e:
         if exit_path is not None:
             exit_path.write_text(str(e.returncode))
@@ -467,6 +606,9 @@ def run_release_evaluation(repo, out, env):
             "models_class1_processing",
             "models_class1_presentation",
         ]
+    if "affinity" in env.get(
+            "COMPARE_INCLUDE", "affinity,processing,presentation").split(","):
+        download_names.append("models_class1_pan_variants")
     subprocess.run(
         ["mhcflurry", "downloads", "fetch"] + download_names,
         check=True,
@@ -480,7 +622,7 @@ def run_release_evaluation(repo, out, env):
             env=env,
             text=True,
         ).strip()
-    baseline = env.get("COMPARE_BASELINE", "public:2.0.0")
+    baseline = env.get("COMPARE_BASELINE", "public:2.2.0")
     if baseline.startswith("public:"):
         baseline_env = env.copy()
         baseline_env["MHCFLURRY_DOWNLOADS_CURRENT_RELEASE"] = (
@@ -506,9 +648,11 @@ def run_release_evaluation(repo, out, env):
         "compare-models",
         "--a", str(out),
         "--a-label", env.get("RUN_LABEL", "new"),
-        "--b", env.get("COMPARE_BASELINE", "public:2.0.0"),
-        "--b-label", env.get("COMPARE_BASELINE_LABEL", "MHCflurry 2.0"),
+        "--b", env.get("COMPARE_BASELINE", "public:2.2.0"),
+        "--b-label", env.get("COMPARE_BASELINE_LABEL", "MHCflurry 2.2"),
         "--data-dir", data_dir,
+        "--release-holdout-dir", str(out / "release_holdout"),
+        "--affinity-training-overlap-policy", "audit",
         "--include", env.get("COMPARE_INCLUDE", "affinity,processing,presentation"),
         "--processing-modes", env.get(
             "PROCESSING_MODES", "with_flanks,no_flank,short_flanks"
@@ -548,6 +692,30 @@ def run_release_evaluation(repo, out, env):
         compare_args.extend(["--limit-files", eval_max_benchmark_files])
     subprocess.run(compare_args, check=True, cwd=repo, env=env)
 
+    if "affinity" in env.get(
+            "COMPARE_INCLUDE", "affinity,processing,presentation").split(","):
+        variants_dir = subprocess.check_output(
+            ["mhcflurry", "downloads", "path", "models_class1_pan_variants"],
+            cwd=repo, env=env, text=True).strip()
+        baseline_dir = str(Path(variants_dir) / "models.no_additional_ms")
+        fair_out = out / "eval_comparison_train_excluded_affinity"
+        fair_args = list(compare_args)
+        replacements = {
+            "--b": baseline_dir,
+            "--b-label": "MHCflurry no-additional-MS (train-excluded)",
+            "--include": "affinity",
+            "--affinity-training-overlap-policy": "exclude",
+            "--out": str(fair_out),
+            "--worker-log-dir": str(fair_out / "worker_logs"),
+        }
+        for flag, value in replacements.items():
+            fair_args[fair_args.index(flag) + 1] = value
+        fair_args.extend([
+            "--b-affinity-dir", baseline_dir,
+            "--affinity-source", "no_additional_ms",
+        ])
+        subprocess.run(fair_args, check=True, cwd=repo, env=env)
+
 
 def run_release_plots(repo, out, env):
     """Render compare-models plots before the remote instance is cleaned up."""
@@ -557,13 +725,14 @@ def run_release_plots(repo, out, env):
         "plot-comparison",
         "--input", str(out / "eval_comparison"),
         "--a-label", env.get("RUN_LABEL", "new"),
-        "--b-label", env.get("COMPARE_BASELINE_LABEL", "MHCflurry 2.0"),
+        "--b-label", env.get("COMPARE_BASELINE_LABEL", "MHCflurry 2.2"),
         "--summary-pdf",
         str(out / "eval_comparison" / "plots" / "model_comparison_figures.pdf"),
         "--paper-figures-out",
         str(out / "eval_comparison" / "plots" / "paper_figures"),
         "--paper-figures-formats",
         env.get("PAPER_FIGURES_FORMATS", "svg,pdf,png"),
+        "--include-paper-figures-in-summary-pdf",
     ]
     scores_dir = (
         env.get("PAPER_FIGURES_SCORES_DIR", "").strip()
@@ -601,8 +770,18 @@ def run_release_plots(repo, out, env):
         if value:
             plot_args.extend([flag, value])
     subprocess.run(plot_args, check=True, cwd=repo, env=env)
+    fair_out = out / "eval_comparison_train_excluded_affinity"
+    if fair_out.is_dir():
+        subprocess.run([
+            "mhcflurry", "eval", "plot-comparison",
+            "--input", str(fair_out),
+            "--a-label", env.get("RUN_LABEL", "new"),
+            "--b-label", "MHCflurry no-additional-MS (train-excluded)",
+            "--summary-pdf", str(fair_out / "plots/model_comparison_figures.pdf"),
+        ], check=True, cwd=repo, env=env)
 
 
 @app.local_entrypoint()
 def main():
+    validate_local_release_source(Path.cwd())
     train_release_full.remote()

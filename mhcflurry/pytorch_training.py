@@ -34,6 +34,14 @@ from .parallelism import resolve_torchinductor_compile_threads_env
 _TRITON_AUTOGRAD_WARMED_DEVICES = set()
 
 
+def copy_module_state_dict_to_cpu(module):
+    """Return an independent CPU checkpoint of a module's complete state."""
+    return {
+        name: value.detach().cpu().clone()
+        for name, value in module.state_dict().items()
+    }
+
+
 def configure_matmul_precision(device):
     """Optionally enable TF32 + cuDNN benchmark on CUDA Ampere+.
 

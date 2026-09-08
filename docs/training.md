@@ -81,6 +81,53 @@ locate it.
 
 ## Pan-allele and release training
 
+### Processing-specific data policy
+
+New processing training and model selection require affinity/length-matched
+hit/decoy risk sets. Generate them with the maintained command:
+
+```shell
+mhcflurry train processing-data \
+    --hits hits_with_tpm.csv.bz2 \
+    --affinity-predictor PUBLIC_AFFINITY/models.combined \
+    --proteome-reference-csv uniprot_proteins.csv.bz2 \
+    --exclude-samples-file RELEASE_HOLDOUT/processing_samples.csv \
+    --negative-policy matched --decoys-per-hit 1 \
+    --max-affinity-distance 0.25 --ppv-multiplier 100 \
+    --random-seed 42 --out processing_train.csv
+mhcflurry train validate-processing-data --data processing_train.csv
+```
+
+The frozen reference is independent of the newly trained affinity candidate.
+Each negative has the same sample and peptide length as its hit and differs
+by at most 0.25 log10 predicted-affinity units. Same-protein matches are
+preferred. If the scored candidate pool is insufficient, generation fails;
+increase the pool multiplier in a fresh experiment instead of dropping hits
+or using unmatched fallback peptides. Preserve `processing_train.csv.matching/`
+alongside the final table: it contains reference/input fingerprints, the scored
+candidate pools, matching diagnostics, and any failure records. The table
+itself retains risk-set/source identities and matching metadata.
+
+Training and selection default to `--processing-data-policy matched`, including
+resume validation. Inner early stopping keeps whole samples together so reused
+decoys do not leak across its split. For historical exact-data replay only,
+pass `--processing-data-policy legacy`; reproducing the old generator also
+requires `--negative-policy legacy-top-binders`. The `exact-public-processing`
+workflow sets the legacy policy explicitly. Do not call a matched-data retrain
+an exact-public-data comparison.
+
+Processing evaluation defaults to the same matching algorithm with ten decoys
+per hit. It saves both the full benchmark prediction table for external joins
+and the matched risk-set predictions used for metrics. Training uses one decoy
+per hit by default to remain balanced; these two prevalences do not give
+directly comparable AUPRC values. Historical random-decoy evaluation requires
+`--processing-negative-policy random-diagnostic`, and its plotting requires
+`--allow-legacy-processing-plots`. Affinity regression and end-to-end
+presentation retain their separate objectives/cohorts; matched processing
+results are not plotted on their absolute-performance axes.
+
+### Release workflow
+
 Pan-allele training additionally needs an allele pseudosequence table and a
 model-selection step. Each training allele must resolve to a key in that table;
 rows for alleles without a matching pseudosequence are excluded. Start with

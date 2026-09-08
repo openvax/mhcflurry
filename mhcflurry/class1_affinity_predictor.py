@@ -53,7 +53,7 @@ from .affinity import calibration_sizing, model_selection, persistence
 DEFAULT_CENTRALITY_MEASURE = "mean"
 
 # Any value > 0 will result in attempting to optimize models after loading.
-OPTIMIZATION_LEVEL = int(environ.get("MHCFLURRY_OPTIMIZATION_LEVEL", 1))
+OPTIMIZATION_LEVEL = int(environ.get("MHCFLURRY_OPTIMIZATION_LEVEL", "1"))
 
 
 class Class1AffinityPredictor(object):
@@ -214,6 +214,44 @@ class Class1AffinityPredictor(object):
         return result
 
     @classmethod
+    def _allele_to_sequence_for_merge(cls, predictors):
+        """Return a safe pseudosequence mapping for a predictor merge."""
+        pan_predictors = [
+            predictor for predictor in predictors
+            if predictor.class1_pan_allele_models
+        ]
+        if not pan_predictors:
+            for predictor in predictors:
+                if predictor.allele_to_sequence is not None:
+                    return dict(predictor.allele_to_sequence)
+            return None
+
+        expected = dict(pan_predictors[0].allele_to_sequence)
+        for (index, predictor) in enumerate(pan_predictors[1:], start=1):
+            observed = dict(predictor.allele_to_sequence)
+            if observed == expected:
+                continue
+            expected_keys = set(expected)
+            observed_keys = set(observed)
+            conflicting = sorted(
+                allele for allele in expected_keys & observed_keys
+                if expected[allele] != observed[allele]
+            )
+            missing = sorted(expected_keys - observed_keys)
+            extra = sorted(observed_keys - expected_keys)
+            raise ValueError(
+                "Cannot merge pan-allele predictors with incompatible "
+                "allele_to_sequence mappings. Pan predictor %d differs from "
+                "the first: conflicting=%s, missing=%s, extra=%s" % (
+                    index,
+                    conflicting[:5],
+                    missing[:5],
+                    extra[:5],
+                )
+            )
+        return expected
+
+    @classmethod
     def merge(cls, predictors):
         """
         Merge the ensembles of two or more `Class1AffinityPredictor` instances.
@@ -236,7 +274,7 @@ class Class1AffinityPredictor(object):
 
         allele_to_allele_specific_models = collections.defaultdict(list)
         class1_pan_allele_models = []
-        allele_to_sequence = predictors[0].allele_to_sequence
+        allele_to_sequence = cls._allele_to_sequence_for_merge(predictors)
 
         for predictor in predictors:
             for (allele, networks) in (
@@ -264,6 +302,9 @@ class Class1AffinityPredictor(object):
         -------
         list of string : names of newly added models
         """
+        others = list(others)
+        allele_to_sequence = self._allele_to_sequence_for_merge(
+            [self] + others)
         new_model_names = []
         original_manifest = self.manifest_df
         new_manifest_rows = []
@@ -298,6 +339,7 @@ class Class1AffinityPredictor(object):
                     current_models.append(model)
                     new_model_names.append(model_name)
 
+        self.allele_to_sequence = allele_to_sequence
         self._manifest_df = pandas.concat(
             [original_manifest] + new_manifest_rows,
             ignore_index=True)
@@ -593,6 +635,18 @@ class Class1AffinityPredictor(object):
         """
         return join(models_dir, "weights_%s.npz" % model_name)
 
+    @staticmethod
+    def checkpoint_weights_path(models_dir, model_name, policy):
+        """Generate the path to a retained training-checkpoint weight file."""
+        if policy not in ("terminal", "best"):
+            raise ValueError("Unknown checkpoint policy: %s" % policy)
+        return join(
+            models_dir,
+            "checkpoints",
+            policy,
+            "weights_%s.npz" % model_name,
+        )
+
     @property
     def master_allele_encoding(self):
         """
@@ -781,7 +835,8 @@ class Class1AffinityPredictor(object):
             models_dir_for_save=None,
             verbose=1,
             progress_preamble="",
-            progress_print_interval=5.0):
+            progress_print_interval=5.0,
+            seed=None):
         """
         Fit one or more pan-allele predictors using a single neural network
         architecture.
@@ -820,6 +875,12 @@ class Class1AffinityPredictor(object):
         progress_print_interval : float
             How often (in seconds) to print progress. Set to None to disable.
 
+        seed : int, optional
+            Base seed for these fits. When given, each ensemble member gets a
+            distinct sub-seed derived from it, so members are decorrelated but
+            the whole call is reproducible. When None, each
+            `Class1NeuralNetwork.fit` is left entropy-seeded as before.
+
         Returns
         -------
         list of `Class1NeuralNetwork`
@@ -835,12 +896,14 @@ class Class1AffinityPredictor(object):
         for i in range(n_models):
             logging.info("Training model %d / %d", i + 1, n_models)
             model = Class1NeuralNetwork(**architecture_hyperparameters)
+            fit_seed = None if seed is None else derive_seed(seed, i)
             model.fit(
                 encodable_peptides,
                 affinities,
                 inequalities=inequalities,
                 allele_encoding=allele_encoding,
                 verbose=verbose,
+                seed=fit_seed,
                 progress_preamble=progress_preamble,
                 progress_print_interval=progress_print_interval)
 
@@ -1038,7 +1101,7 @@ class Class1AffinityPredictor(object):
             allele=None,
             throw=True,
             centrality_measure=DEFAULT_CENTRALITY_MEASURE,
-            model_kwargs={}):
+            model_kwargs=None):
         """
         Predict nM binding affinities.
 
@@ -1068,6 +1131,8 @@ class Class1AffinityPredictor(object):
         -------
         numpy.array of predictions
         """
+        if model_kwargs is None:
+            model_kwargs = {}
         df = self.predict_to_dataframe(
             peptides=peptides,
             alleles=alleles,
@@ -1332,7 +1397,7 @@ class Class1AffinityPredictor(object):
             include_percentile_ranks=True,
             include_confidence_intervals=True,
             centrality_measure=DEFAULT_CENTRALITY_MEASURE,
-            model_kwargs={}):
+            model_kwargs=None):
         """
         Predict nM binding affinities. Gives more detailed output than `predict`
         method, including 5-95% prediction intervals.
@@ -1371,6 +1436,8 @@ class Class1AffinityPredictor(object):
         -------
         `pandas.DataFrame` of predictions
         """
+        if model_kwargs is None:
+            model_kwargs = {}
         if isinstance(peptides, str):
             raise TypeError("peptides must be a list or array, not a string")
         if isinstance(alleles, str):
@@ -1640,9 +1707,9 @@ class Class1AffinityPredictor(object):
             alleles=None,
             bins=None,
             motif_summary=False,
-            summary_top_peptide_fractions=[0.001],
+            summary_top_peptide_fractions=None,
             verbose=False,
-            model_kwargs={}):
+            model_kwargs=None):
         """
         Compute the cumulative distribution of ic50 values for a set of alleles
         over a large universe of random peptides, to enable taking quantiles
@@ -1683,6 +1750,10 @@ class Class1AffinityPredictor(object):
         "length_distributions". Otherwise it will be empty.
 
         """
+        if summary_top_peptide_fractions is None:
+            summary_top_peptide_fractions = [0.001]
+        if model_kwargs is None:
+            model_kwargs = {}
         if bins is None:
             bins = to_ic50(numpy.linspace(1, 0, 1000))
 

@@ -14,7 +14,6 @@
 Train Class1 processing models.
 """
 import argparse
-import gc
 import os
 from os.path import join
 import sys
@@ -32,12 +31,14 @@ import yaml
 import tqdm  # progress bar
 
 from ..class1_processing_predictor import Class1ProcessingPredictor
+from ..training_folds import extract_training_folds
 from ..class1_processing_neural_network import Class1ProcessingNeuralNetwork
 from ..pytorch_sizing import (
     TRAINING_PEAK_MULTIPLIER,
     begin_peak_memory_measurement,
     end_peak_memory_measurement,
     estimate_peak_bytes_per_row,
+    release_unused_torch_memory,
 )
 from ..memory_budget import training_module_bytes
 from ..common import (
@@ -53,7 +54,7 @@ from ..parallelism import (
     add_local_parallelism_args,
     refine_local_parallelism_from_worker_context,
     resolve_local_parallelism_args,
-    run_single_worker_torch_compile_warmup,
+    run_single_worker_resource_probe,
     worker_pool_with_gpu_assignments_from_args,
     call_wrapped_kwargs)
 from ..workload_planning import (
@@ -63,6 +64,7 @@ from ..workload_planning import (
 from ..cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
+from ..processing_matching import validate_matched_training_data, sample_validation_mask
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
@@ -77,31 +79,16 @@ _PROCESSING_WORKER_RUNTIME_FLOOR_GB = 2.0
 _PROCESSING_WORKER_SAFETY_FACTOR = 1.3
 
 
-def release_unused_torch_memory():
-    """Return unused CUDA allocator blocks to the driver, best-effort."""
-    # Drop unreachable Python cycles first. Any tensors released by collection
-    # can then be returned by empty_cache() in this same cleanup pass.
-    gc.collect()
-    try:
-        import torch
-    except ImportError:
-        return
-    try:
-        cuda_available = torch.cuda.is_available()
-    except RuntimeError:
-        cuda_available = False
-    if cuda_available:
-        try:
-            torch.cuda.empty_cache()
-        except RuntimeError:
-            pass
-
-
 # Note on parallelization:
 # When running in parallel, avoid using the neural network backend in the main
 # process. Model loading and inference should happen in worker processes.
 
 parser = argparse.ArgumentParser(usage=__doc__)
+parser.add_argument("--processing-data-policy", choices=("matched", "legacy"), default="matched",
+                    help="Require matched processing data; legacy is explicit historical replay only.")
+parser.add_argument(
+    "--reuse-folds", action="store_true",
+    help="Use existing fold_0..N columns instead of generating new folds.")
 
 parser.add_argument(
     "--data",
@@ -401,6 +388,7 @@ def initialize_training(args):
     print("Length of hyperparameters list: %d" % (len(hyperparameters_lst)))
 
     df = pandas.read_csv(args.data)
+    validate_matched_training_data(df, getattr(args, "processing_data_policy", "matched"))
     print("Loaded training data: %s" % (str(df.shape)))
     df = df.loc[
         (df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)
@@ -415,11 +403,16 @@ def initialize_training(args):
     master_seed = configure_random_seed(
         args.random_seed, name="train-processing")
 
-    folds_df = assign_folds(
-        df=df,
-        num_folds=args.num_folds,
-        held_out_samples=args.held_out_samples,
-        seed=master_seed)
+    df, folds_df = extract_training_folds(
+        df, args.num_folds, reuse=getattr(args, "reuse_folds", False))
+    if folds_df is None:
+        folds_df = assign_folds(
+            df=df,
+            num_folds=args.num_folds,
+            held_out_samples=args.held_out_samples,
+            seed=master_seed)
+    if getattr(args, "processing_data_policy", "matched") == "matched":
+        validate_matched_training_data(pandas.concat([df, folds_df], axis=1))
 
     if not os.path.exists(args.out_models_dir):
         print("Attempting to create directory: %s" % args.out_models_dir)
@@ -481,6 +474,9 @@ def train_models(args):
 
     with open(join(args.out_models_dir, "training_init_info.pkl"), "rb") as fd:
         WORKER_CONTEXT.update(pickle.load(fd))
+    validate_matched_training_data(
+        pandas.concat([WORKER_CONTEXT["train_data"], WORKER_CONTEXT["folds_df"]], axis=1),
+        getattr(args, "processing_data_policy", "matched"))
     print("Loaded training init info.")
 
     # Work items are dispatched separately. Do not copy the complete queue
@@ -543,7 +539,7 @@ def train_models(args):
             constant_data=WORKER_CONTEXT,
             result_serialization_method="pickle")
     else:
-        run_single_worker_torch_compile_warmup(
+        run_single_worker_resource_probe(
             args,
             work_items,
             train_model,
@@ -650,20 +646,78 @@ def _run_compile_warmup(hyperparameters, fold_num, constant_data):
     )
     started = time.time()
     memory_token = begin_peak_memory_measurement()
-    model = Class1ProcessingNeuralNetwork(**hp)
-    model.fit(
-        sequences=FlankingEncoding(
-            peptides=train_subset.peptide.values,
-            n_flanks=train_subset.n_flank.values,
-            c_flanks=train_subset.c_flank.values),
-        targets=train_subset.hit.values,
-        verbose=0,
+    model = None
+    try:
+        model = Class1ProcessingNeuralNetwork(**hp)
+        model.fit(
+            sequences=FlankingEncoding(
+                peptides=train_subset.peptide.values,
+                n_flanks=train_subset.n_flank.values,
+                c_flanks=train_subset.c_flank.values),
+            targets=train_subset.hit.values,
+            verbose=0,
+        )
+        report = end_peak_memory_measurement(memory_token)
+        report["elapsed_seconds"] = time.time() - started
+        print("compile_warmup_only (processing): completed in %.1f sec" % (
+            report["elapsed_seconds"]))
+        return report
+    finally:
+        if model is not None:
+            model._network = None
+        model = None
+        release_unused_torch_memory()
+
+
+def _run_resource_probe(hyperparameters, fold_num, constant_data):
+    """Measure one full-residency processing fit epoch with validation."""
+    from mhcflurry.flanking_encoding import FlankingEncoding
+
+    df = constant_data["train_data"]
+    folds_df = constant_data["folds_df"]
+    fold_mask = folds_df["fold_%d" % fold_num]
+    train_data = df.loc[fold_mask]
+    if len(train_data) == 0:
+        train_data = df
+
+    hp = Class1ProcessingNeuralNetwork.hyperparameter_defaults.subselect(
+        dict(hyperparameters))
+    hp["max_epochs"] = 1
+    hp["early_stopping"] = False
+    print(
+        "resource_probe_only (processing): convolutional_filters=%s "
+        "post_dense=%s minibatch=%d rows=%d validation_split=%s" % (
+            hp.get("convolutional_filters"),
+            hp.get("post_convolutional_dense_layer_sizes"),
+            int(hp.get("minibatch_size", 128) or 128),
+            len(train_data),
+            hp.get("validation_split"),
+        )
     )
-    report = end_peak_memory_measurement(memory_token)
-    report["elapsed_seconds"] = time.time() - started
-    print("compile_warmup_only (processing): completed in %.1f sec" % (
-        report["elapsed_seconds"]))
-    return report
+    started = time.time()
+    memory_token = begin_peak_memory_measurement()
+    model = None
+    try:
+        model = Class1ProcessingNeuralNetwork(**hp)
+        model.fit(
+            sequences=FlankingEncoding(
+                peptides=train_data.peptide.values,
+                n_flanks=train_data.n_flank.values,
+                c_flanks=train_data.c_flank.values),
+            targets=train_data.hit.values,
+            seed=0,
+            verbose=0,
+        )
+        report = end_peak_memory_measurement(memory_token)
+        report["elapsed_seconds"] = time.time() - started
+        print("resource_probe_only (processing): completed in %.1f sec: %s" % (
+            report["elapsed_seconds"], report))
+        return report
+    finally:
+        if model is not None:
+            model._network = None
+        model = None
+        release_unused_torch_memory()
 
 
 def train_model(
@@ -682,11 +736,14 @@ def train_model(
         predictor,
         save_to,
         compile_warmup_only=False,
-        constant_data=WORKER_CONTEXT):
+        constant_data=WORKER_CONTEXT,
+        resource_probe_only=False):
 
     from sklearn.metrics import roc_auc_score
     from mhcflurry.flanking_encoding import FlankingEncoding
 
+    if resource_probe_only:
+        return _run_resource_probe(hyperparameters, fold_num, constant_data)
     if compile_warmup_only:
         return _run_compile_warmup(hyperparameters, fold_num, constant_data)
 
@@ -737,12 +794,18 @@ def train_model(
         architecture_num, fold_num, replicate_num)
 
     model = Class1ProcessingNeuralNetwork(**hyperparameters)
+    validation_mask = None
+    if "processing_matching_policy" in train_data:
+        validation_mask = sample_validation_mask(
+            train_data, model.hyperparameters["validation_split"],
+            derive_seed(constant_data.get("seed"), "processing-validation", fold_num))
     model.fit(
         sequences=FlankingEncoding(
             peptides=train_data.peptide.values,
             n_flanks=train_data.n_flank.values,
             c_flanks=train_data.c_flank.values),
         targets=train_data.hit.values,
+        validation_mask=validation_mask,
         progress_preamble=progress_preamble,
         progress_print_interval=progress_print_interval,
         seed=work_item_seed,
@@ -781,6 +844,9 @@ def train_model(
         "work_item_name": work_item_name,
         "train_auc": train_auc,
         "test_auc": test_auc,
+        "processing_data_policy": "matched" if "processing_matching_policy" in train_data else "legacy",
+        "validation_samples": sorted(train_data.loc[validation_mask, "sample_id"].unique().tolist())
+        if validation_mask is not None else None,
     })
 
     numpy.testing.assert_equal(

@@ -66,6 +66,7 @@ WORKER_CONTEXT = {}
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
+parser.add_argument("--processing-data-policy", choices=("matched", "legacy"), default="matched")
 
 parser.add_argument(
     "--data",
@@ -103,6 +104,13 @@ parser.add_argument(
     type=int,
     help="Verbosity. Default: %(default)s",
     default=0)
+parser.add_argument(
+    "--save-validation-predictions",
+    action="store_true",
+    default=False,
+    help=(
+        "Save row-level out-of-fold predictions from the selected ensemble "
+        "as model_selection_predictions.csv.bz2."))
 
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
@@ -133,6 +141,8 @@ def run(argv=sys.argv[1:]):
     )
 
     df = pandas.read_csv(args.data)
+    from ..processing_matching import validate_matched_training_data
+    validate_matched_training_data(df, args.processing_data_policy)
     print("Loaded data: %s" % (str(df.shape)))
 
     input_predictor = Class1ProcessingPredictor.load(args.models_dir)
@@ -181,6 +191,7 @@ def run(argv=sys.argv[1:]):
             'models': models,
             'min_models': args.min_models_per_fold,
             'max_models': args.max_models_per_fold,
+            'save_validation_predictions': args.save_validation_predictions,
         })
 
     WORKER_CONTEXT["data"] = df
@@ -233,9 +244,13 @@ def run(argv=sys.argv[1:]):
 
     models_by_fold = {}
     summary_dfs = []
+    validation_prediction_dfs = []
     try:
         for result in tqdm.tqdm(results, total=len(work_items)):
-            pprint(result)
+            pprint({
+                key: value for (key, value) in result.items()
+                if key != "validation_predictions"
+            })
             fold_num = result['fold_num']
             (all_models_for_fold, _) = folds_to_predictors[fold_num]
             models = [
@@ -244,8 +259,11 @@ def run(argv=sys.argv[1:]):
             ]
             summary_df = result['summary'].copy()
             summary_df.index = summary_df.index.map(
-                lambda idx: all_models_for_fold[idx])
+                lambda idx, models=all_models_for_fold: models[idx])
             summary_dfs.append(summary_df)
+            if result['validation_predictions'] is not None:
+                validation_prediction_dfs.append(
+                    result['validation_predictions'])
 
             print("Selected %d models for fold %d: %s" % (
                 len(models), fold_num, result['selected_indices']))
@@ -264,6 +282,13 @@ def run(argv=sys.argv[1:]):
     summary_df["model_config"] = summary_df.index.map(lambda m: m.get_config())
     result_predictor.metadata_dataframes["model_selection_summary"] = (
         summary_df.reset_index(drop=True))
+    if validation_prediction_dfs:
+        result_predictor.metadata_dataframes[
+            "model_selection_predictions"] = pandas.concat(
+                validation_prediction_dfs, ignore_index=True).sort_values(
+                    ["validation_row_index", "fold_num"],
+                    kind="stable",
+                )
 
     result_predictor.save(args.out_models_dir)
     write_generate_sh(args.out_models_dir)
@@ -280,7 +305,8 @@ def do_model_select_task(item, constant_data=WORKER_CONTEXT):
 
 
 def model_select(
-        fold_num, models, min_models, max_models, constant_data=WORKER_CONTEXT):
+        fold_num, models, min_models, max_models,
+        save_validation_predictions=False, constant_data=WORKER_CONTEXT):
     """
     Model select for a fold.
 
@@ -359,12 +385,28 @@ def model_select(
     summary_df["ensemble_score_when_selected"] = pandas.Series(
         ensemble_score_when_selected)
 
+    validation_predictions = None
+    if save_validation_predictions:
+        output_columns = [
+            column for column in df.columns
+            if not re.match(r"^fold_\d+$", column)
+        ]
+        validation_predictions = df[output_columns].copy()
+        validation_predictions.insert(
+            0, "validation_row_index", df.index.to_numpy())
+        validation_predictions["fold_num"] = fold_num
+        validation_predictions["processing_score"] = (
+            prediction_matrix[:, selected].mean(axis=1))
+        validation_predictions["selected_model_indices"] = ",".join(
+            str(index) for index in selected)
+
     print(summary_df)
 
     return {
         'fold_num': fold_num,
         'selected_indices': selected,
         'summary': summary_df,  # indexed by model index
+        'validation_predictions': validation_predictions,
     }
 
 

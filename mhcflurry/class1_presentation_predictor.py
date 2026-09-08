@@ -54,38 +54,36 @@ _PRESENTATION_PREDICT_TARGET_ROWS = int(
 )
 
 _PRESENTATION_LOGISTIC_REGRESSION_KWARGS = {
-    # The presentation combiner has a tiny dense feature matrix; Newton-CG is
-    # deterministic and avoids sklearn's SciPy L-BFGS-B wrapper warnings.
-    #
-    # NOTE: this solver was deliberately changed from lbfgs (used through
-    # 2.2.x) to newton-cg. Because the two optimizers converge to slightly
-    # different optima, presentation models *newly trained* with this code will
-    # have slightly different fitted weights than 2.2.x. This is intentional —
-    # do not "fix" it by reverting to lbfgs. (Pre-trained shipped models load
-    # their saved weights and are unaffected.)
-    "solver": "newton-cg",
-    "max_iter": 1000,
+    # Keep newly trained presentation combiners on the published 2.1.x/2.2.x
+    # recipe. Shipped models load their saved coefficients and are unaffected.
+    "solver": "lbfgs",
 }
 
 # Presentation scores are probabilities, but their useful dynamic range depends
 # on the class balance used to fit the logistic combiner. Release training with
 # many decoys can place most scores far below 0.001. Uniform bins over [0, 1]
 # collapse that entire region to one percentile and destroy rank-based metrics.
-# Quantile bins give the transform consistent resolution wherever the fitted
-# model places its scores.
+# Uniform quantiles preserve resolution throughout that compressed range, but
+# still merge informative high scores into large ties. Supplement them with
+# log-spaced upper-tail probabilities: ranking metrics are particularly
+# sensitive to resolution among the strongest predictions.
 PRESENTATION_PERCENT_RANK_NUM_BINS = 10000
+PRESENTATION_PERCENT_RANK_TAIL_FRACTION = 0.01
 
 
 def presentation_percent_rank_bins(
         scores, num_bins=PRESENTATION_PERCENT_RANK_NUM_BINS):
-    """Return data-adaptive bins for presentation percentile calibration.
+    """Return quantile bins with extra resolution in the upper score tail.
 
     Parameters
     ----------
     scores : sequence of float
         Calibration presentation scores.
     num_bins : int
-        Maximum number of quantile bins.
+        Base uniform-quantile bin budget. At most this many additional bins
+        refine the top 1% with logarithmically spaced tail probabilities,
+        down to one observation's probability mass. Small calibration sets
+        and repeated scores can result in fewer bins.
 
     Returns
     -------
@@ -99,11 +97,20 @@ def presentation_percent_rank_bins(
     if num_bins < 1:
         raise ValueError("num_bins must be at least 1")
 
-    quantile_count = min(int(num_bins), scores.size) + 1
-    edges = numpy.quantile(
-        scores,
-        numpy.linspace(0.0, 1.0, quantile_count),
-    )
+    num_bins = int(num_bins)
+    quantiles = numpy.linspace(0.0, 1.0, min(num_bins, scores.size) + 1)
+    if scores.size > num_bins:
+        tail_bins = min(
+            num_bins, int(scores.size * PRESENTATION_PERCENT_RANK_TAIL_FRACTION))
+        if tail_bins > 1:
+            tail_probabilities = numpy.geomspace(
+                PRESENTATION_PERCENT_RANK_TAIL_FRACTION,
+                1.0 / scores.size,
+                tail_bins,
+            )
+            quantiles = numpy.unique(numpy.concatenate([
+                quantiles, 1.0 - tail_probabilities]))
+    edges = numpy.quantile(scores, quantiles)
     edges = numpy.unique(edges)
     if edges.size < 2:
         raise ValueError(
@@ -706,9 +713,23 @@ class Class1PresentationPredictor(object):
                     )
                 )
 
-            model.fit(
-                X=df[self.model_inputs].values,
-                y=df.target.astype(float))
+            with warnings.catch_warnings():
+                # scikit-learn <=1.5 passes deprecated ``disp`` / ``iprint``
+                # options to SciPy's L-BFGS-B implementation even when its
+                # own verbose setting is zero. Preserve the published lbfgs
+                # recipe while suppressing only that upstream compatibility
+                # warning; fitting inputs and results are unchanged.
+                warnings.filterwarnings(
+                    "ignore",
+                    message=(
+                        r"scipy\.optimize: The `disp` and `iprint` options of "
+                        r"the L-BFGS-B solver are deprecated.*"
+                    ),
+                    category=DeprecationWarning,
+                )
+                model.fit(
+                    X=df[self.model_inputs].values,
+                    y=df.target.astype(float))
 
             (intercept,) = model.intercept_.flatten()
             self.weights_dataframe.loc[model_name, "intercept"] = intercept
@@ -1449,8 +1470,10 @@ class Class1PresentationPredictor(object):
         bins : object
             Anything that can be passed to numpy.histogram's "bins" argument
             can be used here, i.e. either an integer or a sequence giving bin
-            edges. By default, data-adaptive quantile bins are used so models
-            with compressed probability ranges retain ranking resolution.
+            edges. By default, data-adaptive quantile bins preserve compressed
+            probability ranges, with additional log-spaced quantiles in the
+            top 1% to reduce ties among the strongest predictions. Existing
+            saved transforms are unaffected until explicitly recalibrated.
         """
         if bins is None:
             bins = presentation_percent_rank_bins(scores)

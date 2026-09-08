@@ -20,7 +20,22 @@ import yaml
 from ..common import positive_int_arg
 
 
-DEFAULT_MINIBATCH_SIZE = 1024
+AFFINITY_DEFAULT_MINIBATCH_SIZE = 128
+PROCESSING_DEFAULT_MINIBATCH_SIZE = 512
+DEFAULT_OPTIMIZER_IMPLEMENTATION = "keras"
+OPTIMIZER_IMPLEMENTATION_CHOICES = ("keras", "pytorch")
+LSUV_TARGET_CHOICES = ("post_activation", "pre_activation")
+AFFINITY_INIT_CHOICES = (
+    "glorot_uniform",
+    "glorot_normal",
+    "he_uniform",
+    "he_normal",
+    "orthogonal",
+)
+PROCESSING_INIT_CHOICES = ("glorot_uniform", "kaiming_uniform_fan_in")
+PROCESSING_BATCH_SWEEP_SIZES = (128, 256, 512, 1024)
+# Compatibility name used by the historical affinity generator wrapper.
+DEFAULT_MINIBATCH_SIZE = AFFINITY_DEFAULT_MINIBATCH_SIZE
 PROCESSING_VARIANT_CHOICES = (
     "with_flanks",
     "no_n_flank",
@@ -44,22 +59,16 @@ AFFINITY_BASE_HYPERPARAMETERS = {
     "locally_connected_layers": [],
     "topology": "feedfoward",
     "loss": "custom:mse_with_inequalities",
-    # Hard cap for runaway patience-reset tails. Recent full release
-    # cohorts had median task lengths under 100 epochs; 500 leaves broad
-    # headroom while preventing accidental multi-thousand-epoch tasks.
-    "max_epochs": 500,
-    "minibatch_size": DEFAULT_MINIBATCH_SIZE,
+    # Preserve the published 2.1.x/2.2.x scientific recipe. Early stopping
+    # normally terminates well before this safety ceiling.
+    "max_epochs": 5000,
+    "minibatch_size": AFFINITY_DEFAULT_MINIBATCH_SIZE,
     "optimizer": "rmsprop",
+    "optimizer_implementation": DEFAULT_OPTIMIZER_IMPLEMENTATION,
     "output_activation": "sigmoid",
     "patience": 20,
-    # Keep min_delta above the observed RMSprop noise floor so tiny
-    # numerical improvements do not reset patience indefinitely, while
-    # still preserving genuine late-escape trajectories.
-    "min_delta": 1e-7,
-    # Validation is a GPU-sync barrier. Checking every 5 epochs keeps
-    # early stopping responsive relative to patience=20 while cutting
-    # repeated validation overhead.
-    "validation_interval": 5,
+    "min_delta": 0.0,
+    "validation_interval": 1,
     "peptide_encoding": {
         "vector_encoding_name": "BLOSUM62",
         "alignment_method": "left_pad_centered_right_pad",
@@ -94,6 +103,7 @@ AFFINITY_BASE_HYPERPARAMETERS = {
     },
     "validation_split": 0.1,
     "data_dependent_initialization_method": "lsuv",
+    "data_dependent_initialization_target": "post_activation",
 }
 
 
@@ -105,11 +115,13 @@ PROCESSING_BASE_HYPERPARAMETERS = {
     "n_flank_length": 15,
     "c_flank_length": 15,
     "post_convolutional_dense_layer_sizes": [],
-    "minibatch_size": DEFAULT_MINIBATCH_SIZE,
+    "minibatch_size": PROCESSING_DEFAULT_MINIBATCH_SIZE,
     "dropout_rate": 0.5,
     "convolutional_activation": "relu",
     "patience": 20,
     "learning_rate": 0.001,
+    "optimizer_implementation": DEFAULT_OPTIMIZER_IMPLEMENTATION,
+    "init": "glorot_uniform",
 }
 
 
@@ -122,11 +134,28 @@ def unique_hyperparameters(items):
     return result
 
 
-def build_affinity_grid(minibatch_size=DEFAULT_MINIBATCH_SIZE):
+def build_affinity_grid(
+    minibatch_size=AFFINITY_DEFAULT_MINIBATCH_SIZE,
+    optimizer_implementation=DEFAULT_OPTIMIZER_IMPLEMENTATION,
+    data_dependent_initialization_target="post_activation",
+    init="glorot_uniform",
+):
     """Return the 35-architecture Class I pan-allele affinity grid."""
+    if init not in AFFINITY_INIT_CHOICES:
+        raise ValueError(
+            "Unknown affinity initializer %r; expected one of: %s" % (
+                init,
+                ", ".join(AFFINITY_INIT_CHOICES),
+            )
+        )
     grid = []
     base = deepcopy(AFFINITY_BASE_HYPERPARAMETERS)
     base["minibatch_size"] = minibatch_size
+    base["optimizer_implementation"] = optimizer_implementation
+    base["init"] = init
+    base["data_dependent_initialization_target"] = (
+        data_dependent_initialization_target
+    )
     for layer_sizes in [[512, 256], [512, 512], [1024, 512], [1024, 1024]]:
         l1_base = 0.0000001
         for l1 in [l1_base, l1_base / 10, l1_base / 100, l1_base / 1000, 0.0]:
@@ -149,10 +178,16 @@ def build_affinity_grid(minibatch_size=DEFAULT_MINIBATCH_SIZE):
     return grid
 
 
-def processing_base_grid_iter(minibatch_size=DEFAULT_MINIBATCH_SIZE):
+def processing_base_grid_iter(
+    minibatch_size=PROCESSING_DEFAULT_MINIBATCH_SIZE,
+    optimizer_implementation=DEFAULT_OPTIMIZER_IMPLEMENTATION,
+    init="glorot_uniform",
+):
     """Yield the base processing architecture grid before flank variants."""
     base = deepcopy(PROCESSING_BASE_HYPERPARAMETERS)
     base["minibatch_size"] = minibatch_size
+    base["optimizer_implementation"] = optimizer_implementation
+    base["init"] = init
     for learning_rate in [0.001]:
         for convolutional_activation in ["tanh", "relu"]:
             for convolutional_filters in [256, 512]:
@@ -179,14 +214,28 @@ def processing_base_grid_iter(minibatch_size=DEFAULT_MINIBATCH_SIZE):
                                     yield new
 
 
-def build_processing_base_grid(minibatch_size=DEFAULT_MINIBATCH_SIZE):
+def build_processing_base_grid(
+    minibatch_size=PROCESSING_DEFAULT_MINIBATCH_SIZE,
+    optimizer_implementation=DEFAULT_OPTIMIZER_IMPLEMENTATION,
+    init="glorot_uniform",
+):
     """Return the processing architecture grid before flank variants."""
     return unique_hyperparameters(
-        processing_base_grid_iter(minibatch_size=minibatch_size))
+        processing_base_grid_iter(
+            minibatch_size=minibatch_size,
+            optimizer_implementation=optimizer_implementation,
+            init=init,
+        ))
 
 
-def transform_processing_hyperparameters(kind, hyperparameters):
-    """Return one processing flank variant for a hyperparameter dict."""
+def transform_processing_hyperparameters(
+        kind, hyperparameters, optimizer_implementation=None, init=None):
+    """Return one processing flank variant for a hyperparameter dict.
+
+    ``optimizer_implementation`` and ``init`` are optional explicit overrides.
+    When omitted, the values already serialized in ``hyperparameters`` are
+    retained.
+    """
     if kind not in PROCESSING_VARIANT_CHOICES:
         raise ValueError(
             "Unknown processing variant %r; expected one of: %s" % (
@@ -202,15 +251,222 @@ def transform_processing_hyperparameters(kind, hyperparameters):
     if kind == "short_flanks":
         new_hyperparameters["c_flank_length"] = 5
         new_hyperparameters["n_flank_length"] = 5
+    if optimizer_implementation is not None:
+        if optimizer_implementation not in OPTIMIZER_IMPLEMENTATION_CHOICES:
+            raise ValueError(
+                "Unknown optimizer implementation %r; expected one of: %s" % (
+                    optimizer_implementation,
+                    ", ".join(OPTIMIZER_IMPLEMENTATION_CHOICES),
+                )
+            )
+        new_hyperparameters["optimizer_implementation"] = (
+            optimizer_implementation)
+    if init is not None:
+        if init not in PROCESSING_INIT_CHOICES:
+            raise ValueError(
+                "Unknown processing initializer %r; expected one of: %s" % (
+                    init,
+                    ", ".join(PROCESSING_INIT_CHOICES),
+                )
+            )
+        new_hyperparameters["init"] = init
     return new_hyperparameters
 
 
-def build_processing_variant_grid(production_hyperparameters, kind):
+def build_processing_variant_grid(
+        production_hyperparameters, kind, optimizer_implementation=None,
+        init=None):
     """Return a flank-mode variant of a processing hyperparameter grid."""
     return unique_hyperparameters(
-        transform_processing_hyperparameters(kind, item)
+        transform_processing_hyperparameters(
+            kind,
+            item,
+            optimizer_implementation=optimizer_implementation,
+            init=init,
+        )
         for item in production_hyperparameters
     )
+
+
+def build_affinity_ablation_panels():
+    """Return the paired, representative affinity audit panels."""
+    architecture_keys = (
+        ("feedforward", (512, 512), 1e-8),
+        ("with-skip-connections", (256, 512, 512), 1e-8),
+    )
+    conditions = {
+        "published_parity": dict(
+            minibatch_size=128,
+            optimizer_implementation="keras",
+            data_dependent_initialization_target="post_activation",
+        ),
+        "proposed_release": dict(
+            minibatch_size=1024,
+            optimizer_implementation="keras",
+            data_dependent_initialization_target="post_activation",
+        ),
+        "pre_activation_lsuv": dict(
+            minibatch_size=1024,
+            optimizer_implementation="keras",
+            data_dependent_initialization_target="pre_activation",
+        ),
+        "no_lsuv": dict(
+            minibatch_size=1024,
+            optimizer_implementation="keras",
+            data_dependent_initialization_target="post_activation",
+        ),
+        "pytorch_rmsprop": dict(
+            minibatch_size=1024,
+            optimizer_implementation="pytorch",
+            data_dependent_initialization_target="post_activation",
+        ),
+        "pytorch_rmsprop_batch128": dict(
+            minibatch_size=128,
+            optimizer_implementation="pytorch",
+            data_dependent_initialization_target="post_activation",
+        ),
+    }
+    result = {}
+    for condition, options in conditions.items():
+        grid = build_affinity_grid(**options)
+        selected = [
+            item for item in grid
+            if (
+                item["topology"],
+                tuple(item["layer_sizes"]),
+                item["dense_layer_l1_regularization"],
+            ) in architecture_keys
+        ]
+        if len(selected) != len(architecture_keys):
+            raise RuntimeError(
+                "Affinity ablation architecture selection returned %d rows"
+                % len(selected)
+            )
+        if condition == "no_lsuv":
+            for item in selected:
+                item["data_dependent_initialization_method"] = None
+        result[condition] = selected
+    return result
+
+
+def build_processing_ablation_panels():
+    """Return the paired, representative processing audit panels."""
+    architecture_keys = (
+        ("tanh", 256, 11, (0.0, 0.0), (8,), 0.3),
+        ("relu", 512, 17, (1e-6, 0.0), (16,), 0.5),
+    )
+    conditions = {
+        "glorot_keras_adam": ("glorot_uniform", "keras"),
+        "kaiming_keras_adam": ("kaiming_uniform_fan_in", "keras"),
+        "glorot_pytorch_adam": ("glorot_uniform", "pytorch"),
+        "kaiming_pytorch_adam": ("kaiming_uniform_fan_in", "pytorch"),
+    }
+    result = {}
+    for condition, (init, optimizer_implementation) in conditions.items():
+        grid = build_processing_base_grid(
+            init=init,
+            optimizer_implementation=optimizer_implementation,
+        )
+        selected = [
+            item for item in grid
+            if (
+                item["convolutional_activation"],
+                item["convolutional_filters"],
+                item["convolutional_kernel_size"],
+                tuple(item["convolutional_kernel_l1_l2"]),
+                tuple(item["post_convolutional_dense_layer_sizes"]),
+                item["dropout_rate"],
+            ) in architecture_keys
+        ]
+        if len(selected) != len(architecture_keys):
+            raise RuntimeError(
+                "Processing ablation architecture selection returned %d rows"
+                % len(selected)
+            )
+        result[condition] = selected
+    return result
+
+
+def build_processing_batch_sweep_panels(
+        minibatch_sizes=PROCESSING_BATCH_SWEEP_SIZES):
+    """Return focused 5-aa and no-flank processing batch-sweep panels.
+
+    This is a screening grid, not the production architecture grid. It keeps
+    the two representative architectures used by the initializer/optimizer
+    audit and prunes recipe combinations that were dominated on the primary
+    held-out metrics. The same candidate recipes are emitted at every batch
+    size so minibatch size is the only between-panel change.
+    """
+    minibatch_sizes = tuple(minibatch_sizes)
+    if not minibatch_sizes:
+        raise ValueError("minibatch_sizes must not be empty")
+    if any(
+            isinstance(value, bool) or not isinstance(value, int) or value <= 0
+            for value in minibatch_sizes):
+        raise ValueError("minibatch_sizes must contain positive integers")
+    if len(set(minibatch_sizes)) != len(minibatch_sizes):
+        raise ValueError("minibatch_sizes must not contain duplicates")
+
+    architecture_keys = {
+        "small": ("tanh", 256, 11, (0.0, 0.0), (8,), 0.3),
+        "large": ("relu", 512, 17, (1e-6, 0.0), (16,), 0.5),
+    }
+    # Primary 5-aa candidates: alternatives hurt the small/tanh model. For
+    # large/ReLU, Kaiming+Keras was dominated by the two retained alternatives.
+    # Secondary no-flank candidates: Kaiming+Keras improved all three primary
+    # small/tanh metrics; every alternative hurt large/ReLU.
+    candidate_recipes = {
+        "short_flanks": (
+            ("small", "glorot_uniform", "keras"),
+            ("large", "glorot_uniform", "keras"),
+            ("large", "glorot_uniform", "pytorch"),
+            ("large", "kaiming_uniform_fan_in", "pytorch"),
+        ),
+        "no_flank": (
+            ("small", "glorot_uniform", "keras"),
+            ("small", "kaiming_uniform_fan_in", "keras"),
+            ("large", "glorot_uniform", "keras"),
+        ),
+    }
+
+    result = {}
+    for minibatch_size in minibatch_sizes:
+        recipe_grids = {}
+        for recipes in candidate_recipes.values():
+            for _, init, optimizer_implementation in recipes:
+                recipe_key = (init, optimizer_implementation)
+                if recipe_key not in recipe_grids:
+                    recipe_grids[recipe_key] = build_processing_base_grid(
+                        minibatch_size=minibatch_size,
+                        init=init,
+                        optimizer_implementation=optimizer_implementation,
+                    )
+        for variant, recipes in candidate_recipes.items():
+            selected = []
+            for architecture, init, optimizer_implementation in recipes:
+                architecture_key = architecture_keys[architecture]
+                matches = [
+                    item for item in recipe_grids[
+                        (init, optimizer_implementation)]
+                    if (
+                        item["convolutional_activation"],
+                        item["convolutional_filters"],
+                        item["convolutional_kernel_size"],
+                        tuple(item["convolutional_kernel_l1_l2"]),
+                        tuple(item["post_convolutional_dense_layer_sizes"]),
+                        item["dropout_rate"],
+                    ) == architecture_key
+                ]
+                if len(matches) != 1:
+                    raise RuntimeError(
+                        "Processing batch-sweep architecture selection "
+                        "returned %d rows for %s/%s/%s" % (
+                            len(matches), variant, architecture, recipe_key))
+                selected.append(transform_processing_hyperparameters(
+                    variant, matches[0]))
+            result["batch%d.%s" % (minibatch_size, variant)] = (
+                unique_hyperparameters(selected))
+    return result
 
 
 def read_hyperparameters_yaml(path):
@@ -231,15 +487,28 @@ def dump_hyperparameters(hyperparameters, stream=None):
     yaml.safe_dump(hyperparameters, stream or sys.stdout)
 
 
-def add_minibatch_argument(parser):
+def add_minibatch_argument(parser, default=DEFAULT_MINIBATCH_SIZE):
     """Add the common training-minibatch-size argument to ``parser``."""
     parser.add_argument(
         "--minibatch-size",
         type=positive_int_arg,
-        default=DEFAULT_MINIBATCH_SIZE,
+        default=default,
         help=(
             "Training minibatch size to write into every architecture. "
             "Default: %(default)s"
+        ),
+    )
+
+
+def add_optimizer_implementation_argument(parser):
+    """Add the optimizer-equation implementation argument."""
+    parser.add_argument(
+        "--optimizer-implementation",
+        choices=OPTIMIZER_IMPLEMENTATION_CHOICES,
+        default=DEFAULT_OPTIMIZER_IMPLEMENTATION,
+        help=(
+            "Optimizer update equations to write into every architecture. "
+            "Default: %(default)s (published 2.1.x parity)"
         ),
     )
 
@@ -252,12 +521,32 @@ def make_parser(prog=None):
     affinity = subparsers.add_parser(
         "affinity",
         help="Generate the Class I pan-allele affinity grid.")
-    add_minibatch_argument(affinity)
+    add_minibatch_argument(affinity, AFFINITY_DEFAULT_MINIBATCH_SIZE)
+    add_optimizer_implementation_argument(affinity)
+    affinity.add_argument(
+        "--data-dependent-initialization-target",
+        choices=LSUV_TARGET_CHOICES,
+        default="post_activation",
+        help="LSUV activation boundary. Default: %(default)s (2.1.x parity)",
+    )
+    affinity.add_argument(
+        "--init",
+        choices=AFFINITY_INIT_CHOICES,
+        default="glorot_uniform",
+        help="Affinity-layer initializer. Default: %(default)s (2.1.x parity)",
+    )
 
     processing_base = subparsers.add_parser(
         "processing-base",
         help="Generate the base Class I processing grid.")
-    add_minibatch_argument(processing_base)
+    add_minibatch_argument(processing_base, PROCESSING_DEFAULT_MINIBATCH_SIZE)
+    add_optimizer_implementation_argument(processing_base)
+    processing_base.add_argument(
+        "--init",
+        choices=PROCESSING_INIT_CHOICES,
+        default="glorot_uniform",
+        help="Processing-layer initializer. Default: %(default)s (2.1.x parity)",
+    )
 
     processing_variant = subparsers.add_parser(
         "processing-variant",
@@ -270,6 +559,24 @@ def make_parser(prog=None):
         "kind",
         choices=PROCESSING_VARIANT_CHOICES,
         help="Processing flank variant to output.")
+    processing_variant.add_argument(
+        "--optimizer-implementation",
+        choices=OPTIMIZER_IMPLEMENTATION_CHOICES,
+        default=None,
+        help=(
+            "Override the optimizer equations in every architecture. "
+            "If omitted, retain the value from the base YAML."
+        ),
+    )
+    processing_variant.add_argument(
+        "--init",
+        choices=PROCESSING_INIT_CHOICES,
+        default=None,
+        help=(
+            "Override the initializer in every architecture. If omitted, "
+            "retain the value from the base YAML."
+        ),
+    )
 
     return parser
 
@@ -278,13 +585,27 @@ def run_argv(argv=None, prog=None):
     """Run the unified generator command."""
     args = make_parser(prog=prog).parse_args(argv)
     if args.recipe == "affinity":
-        grid = build_affinity_grid(minibatch_size=args.minibatch_size)
+        grid = build_affinity_grid(
+            minibatch_size=args.minibatch_size,
+            optimizer_implementation=args.optimizer_implementation,
+            data_dependent_initialization_target=(
+                args.data_dependent_initialization_target
+            ),
+            init=args.init,
+        )
     elif args.recipe == "processing-base":
-        grid = build_processing_base_grid(minibatch_size=args.minibatch_size)
+        grid = build_processing_base_grid(
+            minibatch_size=args.minibatch_size,
+            optimizer_implementation=args.optimizer_implementation,
+            init=args.init,
+        )
     elif args.recipe == "processing-variant":
         grid = build_processing_variant_grid(
             read_hyperparameters_yaml(args.production_hyperparameters),
-            args.kind)
+            args.kind,
+            optimizer_implementation=args.optimizer_implementation,
+            init=args.init,
+        )
     else:
         raise ValueError("Unsupported recipe: %s" % args.recipe)
     print("Hyperparameters grid size: %d" % len(grid), file=sys.stderr)

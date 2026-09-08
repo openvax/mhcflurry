@@ -71,10 +71,13 @@ jobs:
       - name: Install python dependencies
         run: |
           pip install --upgrade pip
-          pip install flake8 nose-py3 pytest pytest-cov coveralls
+          pip install flake8 nose-py3 pytest pytest-cov coveralls ruff==0.16.0
           pip install -r requirements.txt
           pip install -r docs/requirements.txt
           pip install .
+
+      - name: Lint Python
+        run: ./lint.sh
       #- name: Lint with flake8
       #  run: |
       #    # stop the build if there are Python syntax errors or undefined names

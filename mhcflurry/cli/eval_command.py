@@ -29,6 +29,10 @@ available:
   saved benchmark prediction table.
 * ``mhcflurry eval paper-figures run`` runs compare-models, paper-figures, and
   plot-model-comparison as one local evaluation/figure pipeline.
+* ``mhcflurry eval affinity-candidate-figures`` builds a common held-out
+  prediction table and paper-figure suite for shortlisted affinity candidates.
+* ``mhcflurry eval merge-external-predictions`` consolidates aligned
+  per-sample external-predictor benchmark groups for those figures.
 
 Future benchmark-prediction and external-predictor registration commands should
 be added under this namespace rather than as new top-level commands.
@@ -42,11 +46,26 @@ import shlex
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 
 import pandas
 
 from ..common import positive_int_arg
 from ..common import normalize_sequence_resolved_allele_name
+
+
+EVALUATION_SCRIPTS = {
+    "processing-flank-ablation": Path("scripts/training/processing_flank_ablation.py"),
+    "saved-candidate": Path("scripts/training/evaluate_saved_candidate.py"),
+    "collate-figures": Path("scripts/training/collate_experiment_figures.py"),
+    "paired-sample-metrics": Path("scripts/training/paired_sample_metrics.py"),
+    "processing-ensemble": Path(
+        "scripts/training/summarize_processing_ensemble.py"),
+    "presentation-affinity-ensemble": Path(
+        "scripts/training/summarize_presentation_affinity_ensemble.py"),
+    "release-experiment-figures": Path(
+        "scripts/training/render_release_experiment_paper_figures.py"),
+}
 
 
 def make_parser(prog="mhcflurry eval"):
@@ -72,6 +91,34 @@ def make_parser(prog="mhcflurry eval"):
         help="Compatibility alias for plot-comparison.",
         add_help=False,
     )
+    sub.add_parser(
+        "affinity-candidate-figures",
+        help="Compare shortlisted affinity candidates on one saved cohort.",
+        add_help=False,
+    )
+    sub.add_parser(
+        "merge-external-predictions",
+        help="Consolidate precomputed external benchmark predictions.",
+        add_help=False,
+    )
+    sub.add_parser(
+        "processing-affinity-control",
+        help="Evaluate processing on affinity-controlled risk sets.",
+        add_help=False,
+    )
+    for name, help_text in (
+            ("processing-flank-ablation", "Test real, masked and shuffled flanks with fixed weights."),
+            ("saved-candidate", "Evaluate saved full ensembles without retraining."),
+            ("collate-figures", "Combine annotated experiment figures into a PDF."),
+            ("paired-sample-metrics",
+             "Estimate paired sample uncertainty from saved metric tables."),
+            ("processing-ensemble",
+             "Score a fixed ensemble from saved processing predictions."),
+            ("presentation-affinity-ensemble",
+             "Evaluate public/new affinity mixtures from saved predictions."),
+            ("release-experiment-figures",
+             "Render figures from archived release experiments.")):
+        sub.add_parser(name, help=help_text, add_help=False)
     paper = sub.add_parser(
         "paper-figures",
         help="Render or run paper-style evaluation figures.",
@@ -121,6 +168,20 @@ def run_argv(argv, prog="mhcflurry eval"):
         from . import plot_model_comparison
         return _run_existing_command(
             plot_model_comparison, rest, "%s %s" % (prog, subcommand))
+    if subcommand == "affinity-candidate-figures":
+        from . import affinity_candidate_figures
+        return affinity_candidate_figures.run_argv(
+            rest, prog="%s affinity-candidate-figures" % prog)
+    if subcommand == "merge-external-predictions":
+        from . import merge_external_predictions
+        return merge_external_predictions.run_argv(
+            rest, prog="%s merge-external-predictions" % prog)
+    if subcommand == "processing-affinity-control":
+        from . import processing_affinity_control
+        return processing_affinity_control.run_argv(
+            rest, prog="%s processing-affinity-control" % prog)
+    if subcommand in EVALUATION_SCRIPTS:
+        return _run_evaluation_script(subcommand, rest)
     if subcommand == "paper-figures":
         return _run_paper_figures(rest, "%s paper-figures" % prog)
 
@@ -137,7 +198,22 @@ def format_help(prog="mhcflurry eval"):
         "",
         "Subcommands:",
         "  compare-models          Compare two model ensembles.",
+        "  saved-candidate         Finish saved candidate evaluation without training.",
         "  plot-comparison         Render diagnostic plots from compare output.",
+        "  affinity-candidate-figures",
+        "                          Plot finalists and public on one saved cohort.",
+        "  merge-external-predictions",
+        "                          Consolidate precomputed external predictions.",
+        "  processing-flank-ablation  Test fixed weights with perturbed external flanks.",
+        "  processing-affinity-control",
+        "                          Score affinity-controlled processing risk sets.",
+        "  processing-ensemble     Score an ensemble from saved predictions.",
+        "  paired-sample-metrics   Bootstrap matched per-sample metric differences.",
+        "  collate-figures         Combine annotated experiment figures into a PDF.",
+        "  presentation-affinity-ensemble",
+        "                          Evaluate saved public/new affinity mixtures.",
+        "  release-experiment-figures",
+        "                          Render archived release experiment figures.",
         "  paper-figures render    Render paper figures from saved inputs.",
         "  paper-figures score-predictions",
         "                          Derive score tables from saved predictions.",
@@ -159,6 +235,20 @@ def _run_existing_command(module, argv, prog):
     command_parser = module.make_parser()
     command_parser.prog = prog
     return module.run(command_parser.parse_args(argv))
+
+
+def _run_evaluation_script(subcommand, argv):
+    relative = EVALUATION_SCRIPTS[subcommand]
+    repo_root = Path(__file__).resolve().parents[2]
+    for candidate in (repo_root / relative, Path.cwd() / relative):
+        if candidate.exists():
+            env = os.environ.copy()
+            env["MHCFLURRY_CLI_PROG"] = "mhcflurry eval %s" % subcommand
+            return subprocess.call(
+                [sys.executable, str(candidate), *argv], env=env)
+    raise SystemExit(
+        "Could not find %s. This command must be run from a source checkout "
+        "or editable install." % relative)
 
 
 def _run_paper_figures(argv, prog):
@@ -581,6 +671,10 @@ def _make_paper_figures_run_parser(prog):
         help="data_evaluation directory. Defaults to installed data_evaluation.",
     )
     parser.add_argument(
+        "--release-holdout-dir",
+        help="Frozen release-evaluation sample manifests for compare-models.",
+    )
+    parser.add_argument(
         "--include",
         default="auto",
         help="compare-models component subset. Default: %(default)s.",
@@ -677,6 +771,7 @@ def _run_paper_figures_pipeline(args):
             (args.a_label, "--a-label"),
             (args.b_label, "--b-label"),
             (args.data_dir, "--data-dir"),
+            (args.release_holdout_dir, "--release-holdout-dir"),
             (args.limit_files, "--limit-files")]:
         if source is not None:
             compare_argv.extend([flag, str(source)])

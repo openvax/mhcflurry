@@ -495,6 +495,35 @@ def test_check_training_batch_fits_shrinks_loudly_on_oom(caplog):
         pytorch_sizing.free_device_memory_bytes = saved
 
 
+def test_check_training_batch_fits_can_forbid_release_shrink(monkeypatch):
+    """Release provenance fails instead of accepting changed dynamics."""
+    from mhcflurry import pytorch_sizing
+
+    class FakeCUDA:
+        type = "cuda"
+
+        def __str__(self):
+            return "cuda:0"
+
+    monkeypatch.setenv("MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK", "1")
+    monkeypatch.setattr(
+        pytorch_sizing,
+        "device_memory_budget",
+        lambda *args, **kwargs: pytorch_sizing.DeviceMemoryBudget(
+            free_bytes=1 << 30,
+            total_bytes=1 << 30,
+            reserve_bytes=0,
+            worker_entitlement_bytes=1,
+            process_bytes=0,
+            available_bytes=1,
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="forbidden"):
+        pytorch_sizing.check_training_batch_fits(
+            128, FakeCUDA(), model=None)
+
+
 def test_check_training_batch_fits_does_not_force_unsafe_floor(monkeypatch):
     from mhcflurry import pytorch_sizing
 

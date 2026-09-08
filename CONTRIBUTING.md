@@ -20,3 +20,18 @@ A few other guidelines:
  * Please adhere to our [code of conduct](https://github.com/openvax/mhcflurry/blob/master/code-of-conduct.md).
 
 Working on your first Pull Request? One resource that may be helpful is [How to Contribute to an Open Source Project on GitHub](https://egghead.io/series/how-to-contribute-to-an-open-source-project-on-github).
+
+## Development checks
+
+Run the same checks as CI before opening a pull request:
+
+```shell
+./lint.sh
+python -m pytest test/
+```
+
+CI uses Ruff 0.16.0 and the checked-in `.ruff.toml`. The selected rules focus
+on syntax, undefined names, mutable defaults, unsafe loop closures, environment
+default types, and stale suppressions. Formatting and broad modernization are
+kept out of the release gate so they can be reviewed separately from scientific
+or prediction-affecting changes.

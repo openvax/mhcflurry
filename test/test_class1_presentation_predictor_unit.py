@@ -17,7 +17,7 @@ import numpy
 import pandas
 import pytest
 import torch
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import average_precision_score, roc_auc_score
 
 import mhcflurry.class1_presentation_predictor as presentation_module
 import mhcflurry.cli.train_presentation_models_command as train_presentation
@@ -184,6 +184,12 @@ def test_fit_from_scores_trains_expected_variants():
     }
 
 
+def test_new_presentation_models_use_published_logistic_recipe():
+    model = Class1PresentationPredictor().get_model()
+    assert model.solver == "lbfgs"
+    assert model.max_iter == 100
+
+
 def test_percentile_calibration_preserves_compressed_score_ranking():
     """Low presentation scores must not collapse into one percentile bin."""
     rng = numpy.random.default_rng(42)
@@ -209,6 +215,125 @@ def test_percentile_calibration_rejects_constant_scores():
     predictor = Class1PresentationPredictor()
     with pytest.raises(ValueError, match="constant score distribution"):
         predictor.calibrate_percentile_ranks(numpy.ones(100))
+
+
+def test_percentile_calibration_preserves_independent_upper_tail_ranking():
+    """Uniform quantiles merge the rare high-score region that matters for AP."""
+    # Calibration is an independent, label-free reference distribution.
+    calibration = (numpy.arange(1000000) + 0.5) / 1000000
+    rng = numpy.random.default_rng(402)
+    scores = rng.uniform(0.999902, 0.999998, 4000)
+    probability = 1.0 / (1.0 + numpy.exp(-(scores - 0.99995) * 100000))
+    hits = rng.random(scores.size) < probability
+
+    previous = Class1PresentationPredictor()
+    previous.calibrate_percentile_ranks(
+        calibration, bins=numpy.quantile(
+            calibration, numpy.linspace(0, 1, 10001)))
+    predictor = Class1PresentationPredictor()
+    predictor.calibrate_percentile_ranks(calibration)
+
+    raw_ap = average_precision_score(hits, scores)
+    previous_percentiles = previous.percentile_ranks(scores)
+    percentiles = predictor.percentile_ranks(scores)
+    assert numpy.unique(previous_percentiles).size == 1
+    assert raw_ap - average_precision_score(hits, -previous_percentiles) > 0.3
+    assert abs(raw_ap - average_precision_score(hits, -percentiles)) < 0.003
+    assert numpy.unique(percentiles).size > 90
+
+
+@pytest.mark.parametrize("num_bins", [1, 10, 100, 1000, 10000])
+def test_presentation_bins_retain_base_grid_and_bound_tail_budget(num_bins):
+    scores = numpy.linspace(0, 1, 100000)
+    previous = numpy.quantile(scores, numpy.linspace(0, 1, num_bins + 1))
+    edges = presentation_module.presentation_percent_rank_bins(scores, num_bins)
+    assert numpy.isin(previous, edges).all()
+    assert len(edges) <= num_bins + min(num_bins, 1000) + 1
+    assert numpy.isfinite(edges).all()
+    assert (numpy.diff(edges) > 0).all()
+    assert edges[0] == scores[0]
+    assert edges[-1] == scores[-1]
+    if num_bins > 1:
+        extra = edges[~numpy.isin(edges, previous)]
+        assert len(extra) > 0
+        assert (extra >= numpy.quantile(scores, 0.99)).all()
+        # More resolution near the maximum, not merely more uniform bins.
+        assert (edges > 0.999).sum() > (previous > 0.999).sum()
+
+
+@pytest.mark.parametrize("size", [2, 10, 100, 10000])
+def test_presentation_bins_small_calibration_sets(size):
+    scores = numpy.linspace(0, 1, size)
+    expected = numpy.quantile(scores, numpy.linspace(0, 1, size + 1))
+    numpy.testing.assert_array_equal(
+        presentation_module.presentation_percent_rank_bins(scores), expected)
+
+
+def test_presentation_bins_handle_repeated_and_nonfinite_scores():
+    scores = numpy.repeat([0.0, 0.1, 0.2, 0.99, 1.0], 3000)
+    with_nonfinite = numpy.r_[scores, numpy.nan, numpy.inf, -numpy.inf]
+    edges = presentation_module.presentation_percent_rank_bins(with_nonfinite)
+    numpy.testing.assert_array_equal(
+        edges, presentation_module.presentation_percent_rank_bins(scores))
+    assert numpy.isfinite(edges).all()
+    assert (numpy.diff(edges) > 0).all()
+    predictor = Class1PresentationPredictor()
+    predictor.calibrate_percentile_ranks(with_nonfinite)
+    probes = numpy.r_[-numpy.inf, numpy.linspace(0, 1, 1001), numpy.inf]
+    percentiles = predictor.percentile_ranks(probes)
+    assert (numpy.diff(percentiles) <= 0).all()
+    assert ((percentiles >= 0) & (percentiles <= 100)).all()
+    assert percentiles[0] == 100
+    assert percentiles[-1] == 0
+    assert numpy.isnan(predictor.percentile_ranks([numpy.nan])[0])
+
+
+@pytest.mark.parametrize("scores", [[], [numpy.nan, numpy.inf, -numpy.inf]])
+def test_presentation_bins_reject_empty_finite_distribution(scores):
+    with pytest.raises(ValueError, match="without scores"):
+        presentation_module.presentation_percent_rank_bins(scores)
+
+
+@pytest.mark.parametrize("num_bins", [0, -1])
+def test_presentation_bins_reject_nonpositive_budget(num_bins):
+    with pytest.raises(ValueError, match="at least 1"):
+        presentation_module.presentation_percent_rank_bins([0.0, 1.0], num_bins)
+
+
+@pytest.mark.parametrize("bins", [None, 20, [0.0, 0.5, 0.9, 1.0]])
+def test_presentation_calibration_round_trip_preserves_saved_transform(
+        tmp_path, monkeypatch, bins):
+    scores = numpy.linspace(0, 1, 20000)
+    predictor = Class1PresentationPredictor(
+        weights_dataframe=pandas.DataFrame({
+            "intercept": [-1.0], "affinity_score": [1.0],
+            "processing_score": [1.0]}, index=["without_flanks"]))
+    predictor.calibrate_percentile_ranks(scores, bins=bins)
+    predictor.save(
+        str(tmp_path), write_affinity_predictor=False,
+        write_processing_predictor=False, write_info=False)
+
+    def unexpected_recalibration(*args, **kwargs):
+        raise AssertionError("Loading must not rebuild an existing calibration")
+
+    monkeypatch.setattr(
+        presentation_module, "presentation_percent_rank_bins",
+        unexpected_recalibration)
+    monkeypatch.setattr(
+        presentation_module.Class1AffinityPredictor, "load",
+        lambda *args, **kwargs: None)
+    loaded = Class1PresentationPredictor.load(str(tmp_path))
+    probes = numpy.random.default_rng(402).uniform(-0.01, 1.01, 10000)
+    numpy.testing.assert_allclose(
+        loaded.percentile_ranks(probes), predictor.percentile_ranks(probes),
+        rtol=0, atol=1e-12)
+    if bins is not None:
+        expected = presentation_module.PercentRankTransform()
+        expected.fit(scores, bins=bins)
+        numpy.testing.assert_array_equal(
+            predictor.percent_rank_transform.bin_edges, expected.bin_edges)
+        numpy.testing.assert_array_equal(
+            predictor.percent_rank_transform.cdf, expected.cdf)
 
 
 def test_save_write_metadata_false_skips_metadata(tmp_path):

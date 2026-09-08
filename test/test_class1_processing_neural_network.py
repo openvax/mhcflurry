@@ -152,6 +152,7 @@ def test_neural_network_input():
         },
     ]
 
+
     for (i, d) in enumerate(tests):
         encoding = FlankingEncoding(
             peptides=[d['peptide']],
@@ -188,6 +189,162 @@ def test_neural_network_input():
     encoding.clear_tensor_cache()
     tensor_results3 = model.network_input_tensors(encoding, device="cpu")
     assert tensor_results3["sequence"] is not tensor_results["sequence"]
+
+
+def _boundary_network(peptide_context=2, context_dropout=0.0):
+    model = Class1ProcessingNeuralNetwork(
+        peptide_max_length=15,
+        n_flank_length=5,
+        c_flank_length=5,
+        flanking_averages=False,
+        convolutional_filters=8,
+        convolutional_kernel_size=3,
+        post_convolutional_dense_layer_sizes=[],
+        dropout_rate=0.0,
+        cleavage_boundary_flank_length=5,
+        cleavage_boundary_peptide_length=peptide_context,
+        cleavage_boundary_hidden_size=4,
+        cleavage_boundary_context_dropout=context_dropout,
+    )
+    network = model.make_network(
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
+    )
+    return model, network
+
+
+def _boundary_windows(model, network, peptide, n_flank, c_flank):
+    inputs = model.network_input_tensors(
+        FlankingEncoding([peptide], [n_flank], [c_flank]), device="cpu")
+    sequence = torch.nn.functional.embedding(
+        inputs["sequence"].long(), network.sequence_embedding_table)
+    return network._extract_boundary_windows(
+        sequence, inputs["peptide_length"])
+
+
+@pytest.mark.parametrize("peptide_context,expected_n,expected_c", [
+    (2, "FGHIKSI", "KLLMNPQ"),
+    (5, "FGHIKSIINF", "NFEKLLMNPQ"),
+    (10, "FGHIKSIINFEKLXX", "XXSIINFEKLLMNPQ"),
+    (15, "FGHIKSIINFEKLXXXXXXX", "XXXXXXXSIINFEKLLMNPQ"),
+])
+def test_cleavage_boundary_windows_cross_both_sides(
+        peptide_context, expected_n, expected_c):
+    model, network = _boundary_network(peptide_context=peptide_context)
+    n_window, c_window = _boundary_windows(
+        model, network, "SIINFEKL", "ACDEFGHIK", "LMNPQRST")
+
+    assert decode_matrix(n_window.detach().numpy()) == [expected_n]
+    assert decode_matrix(c_window.detach().numpy()) == [expected_c]
+
+
+def test_oversized_boundary_windows_predict_mixed_peptide_lengths():
+    model, network = _boundary_network(peptide_context=15)
+    model._network = network
+    result = model.predict(
+        peptides=["SIINFEKL", "SIINFEKLSIINFEK"],
+        n_flanks=["FGHIK", ""], c_flanks=["LMNPQ", ""], batch_size=2)
+    assert result.shape == (2,)
+    assert numpy.isfinite(result).all()
+
+
+def test_cleavage_boundary_missing_context_uses_unknown_token():
+    model, network = _boundary_network(peptide_context=2)
+    n_window, c_window = _boundary_windows(
+        model, network, "SIINFEKL", "", "")
+
+    assert decode_matrix(n_window.detach().numpy()) == ["XXXXXSI"]
+    assert decode_matrix(c_window.detach().numpy()) == ["KLXXXXX"]
+
+
+def test_cleavage_boundary_context_dropout_preserves_peptide_side():
+    model, network = _boundary_network(
+        peptide_context=2, context_dropout=1.0)
+    n_window, c_window = _boundary_windows(
+        model, network, "SIINFEKL", "FGHIK", "LMNPQ")
+    network.train()
+    n_window, c_window = network._apply_context_dropout(n_window, c_window)
+
+    assert decode_matrix(n_window.detach().numpy()) == ["XXXXXSI"]
+    assert decode_matrix(c_window.detach().numpy()) == ["KLXXXXX"]
+
+
+def test_cleavage_boundary_starts_as_peptide_only_model():
+    model, network = _boundary_network(peptide_context=2)
+    model._network = network
+    network.eval()
+    scores = model.predict(
+        peptides=["SIINFEKL", "SIINFEKL"],
+        n_flanks=["AAAAA", "RRRRR"],
+        c_flanks=["CCCCC", "YYYYY"],
+        batch_size=2,
+    )
+
+    numpy.testing.assert_allclose(scores[0], scores[1], rtol=0, atol=1e-7)
+    numpy.testing.assert_array_equal(
+        network.output_layer.weight.detach().numpy()[0, -2:], [0, 0])
+
+
+def test_cleavage_boundary_base_is_exact_no_flank_function():
+    boundary_model, boundary = _boundary_network(peptide_context=2)
+    no_flank_model = Class1ProcessingNeuralNetwork(
+        peptide_max_length=15,
+        n_flank_length=0,
+        c_flank_length=0,
+        flanking_averages=False,
+        convolutional_filters=8,
+        convolutional_kernel_size=3,
+        post_convolutional_dense_layer_sizes=[],
+        dropout_rate=0.0,
+    )
+    no_flank = no_flank_model.make_network(
+        **no_flank_model.network_hyperparameter_defaults.subselect(
+            no_flank_model.hyperparameters)
+    )
+    no_flank.conv1.load_state_dict(boundary.conv1.state_dict())
+    no_flank.n_flank_post_convs.load_state_dict(
+        boundary.n_flank_post_convs.state_dict())
+    no_flank.c_flank_post_convs.load_state_dict(
+        boundary.c_flank_post_convs.state_dict())
+    with torch.no_grad():
+        no_flank.output_layer.weight.copy_(
+            boundary.output_layer.weight[:, :4])
+        no_flank.output_layer.bias.copy_(boundary.output_layer.bias)
+
+    flanking = FlankingEncoding(
+        ["SIINFEKL", "GILGFVFTL"],
+        ["FGHIK", "AAAAA"],
+        ["LMNPQ", "CCCCC"],
+    )
+    boundary_inputs = boundary_model.network_input_tensors(
+        flanking, device="cpu")
+    no_flank_inputs = no_flank_model.network_input_tensors(
+        flanking, device="cpu")
+    boundary.eval()
+    no_flank.eval()
+    torch.testing.assert_close(
+        boundary(boundary_inputs), no_flank(no_flank_inputs))
+
+
+def test_cleavage_boundary_weight_roundtrip():
+    model, network = _boundary_network(
+        peptide_context=5, context_dropout=0.25)
+    inputs = model.network_input_tensors(
+        FlankingEncoding(
+            ["SIINFEKL", "GILGFVFTL"],
+            ["FGHIK", "AAAAA"],
+            ["LMNPQ", "CCCCC"],
+        ),
+        device="cpu",
+    )
+    network.eval()
+    observed = network(inputs)
+
+    clone = model.make_network(
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
+    )
+    clone.set_weights_list(network.get_weights_list(), auto_convert_keras=False)
+    clone.eval()
+    torch.testing.assert_close(observed, clone(inputs))
 
 
 def test_fit_uses_eager_network_for_validation_by_default(monkeypatch):
@@ -321,6 +478,95 @@ def test_fit_uses_effective_validation_batch_size(monkeypatch):
     assert validation_batch_sizes == [8, 2]
 
 
+@pytest.mark.parametrize("mask", [[False, True, False, True], [False] * 4])
+def test_explicit_validation_mask_survives_input_shuffle(monkeypatch, mask):
+    import mhcflurry.class1_processing_neural_network as module
+    inputs_seen = []
+    original = Class1ProcessingModel.forward
+
+    def recording_forward(self, inputs):
+        if not self.training:
+            inputs_seen.append(inputs["sequence"].detach().cpu().numpy())
+        return original(self, inputs)
+
+    monkeypatch.setattr(Class1ProcessingModel, "forward", recording_forward)
+    monkeypatch.setattr(module, "maybe_compile_network", lambda network, device: network)
+    model = Class1ProcessingNeuralNetwork(
+        max_epochs=1, validation_split=0.75, early_stopping=False,
+        minibatch_size=4, validation_batch_size=4, peptide_max_length=9,
+        n_flank_length=2, c_flank_length=2, convolutional_filters=4,
+        convolutional_kernel_size=3, post_convolutional_dense_layer_sizes=[])
+    sequences = FlankingEncoding(
+        peptides=["SIINFEKL", "SIINFEKA", "SIINFEKY", "SIINFEKF"],
+        n_flanks=["AA"] * 4, c_flanks=["CC"] * 4)
+    encoded = model.network_input(sequences)["sequence"]
+    permutation = numpy.array([3, 0, 1, 2])
+    model.fit(sequences, [1, 0, 1, 0], validation_mask=mask,
+              shuffle_permutation=permutation, verbose=-1)
+    info = model.fit_info[-1]
+    assert info["validation_policy"] == "explicit-mask"
+    assert info["validation_rows"] == sum(mask)
+    assert info["training_rows"] == 4 - sum(mask)
+    if any(mask):
+        expected = encoded[permutation][numpy.array(mask)[permutation]]
+        numpy.testing.assert_array_equal(numpy.concatenate(inputs_seen), expected)
+    else:
+        assert not inputs_seen
+
+
+@pytest.mark.parametrize("mask", [[True] * 4, [0, 1, 0, 1], [True, False]])
+def test_invalid_explicit_validation_masks_rejected(mask):
+    model = Class1ProcessingNeuralNetwork(max_epochs=1)
+    sequences = FlankingEncoding(["SIINFEKL"] * 4, ["AA"] * 4, ["CC"] * 4)
+    with pytest.raises(ValueError, match="validation_mask"):
+        model.fit(sequences, [1, 0, 1, 0], validation_mask=mask, verbose=-1)
+
+
+def test_processing_fit_can_restore_best_validation_checkpoint(monkeypatch):
+    import mhcflurry.class1_processing_neural_network as processing_module
+
+    calls = []
+
+    def zero_checkpoint(module):
+        calls.append(True)
+        return {
+            name: torch.zeros_like(value, device="cpu")
+            for name, value in module.state_dict().items()
+        }
+
+    monkeypatch.setattr(
+        processing_module, "copy_module_state_dict_to_cpu", zero_checkpoint)
+    model = Class1ProcessingNeuralNetwork(
+        max_epochs=2,
+        validation_split=0.5,
+        early_stopping=False,
+        restore_best_weights=True,
+        minibatch_size=2,
+        peptide_max_length=9,
+        n_flank_length=4,
+        c_flank_length=4,
+        convolutional_filters=4,
+        convolutional_kernel_size=3,
+        post_convolutional_dense_layer_sizes=[],
+    )
+    model.fit(
+        sequences=FlankingEncoding(
+            peptides=["SIINFEKL"] * 4,
+            n_flanks=["AAAA"] * 4,
+            c_flanks=["FFFF"] * 4,
+        ),
+        targets=numpy.array([0, 1, 0, 1], dtype=numpy.float32),
+        verbose=-1,
+        progress_print_interval=None,
+    )
+
+    assert calls
+    assert model.fit_info[-1]["restored_best_weights"] is True
+    assert model.fit_info[-1]["best_epoch"] is not None
+    for value in model.network().state_dict().values():
+        assert torch.count_nonzero(value) == 0
+
+
 def test_fit_does_not_force_full_gc_each_epoch(monkeypatch):
     """Worker-level model cleanup owns GC; fit must not collect per epoch."""
     import mhcflurry.class1_processing_neural_network as processing_module
@@ -409,11 +655,31 @@ def test_processing_predict_auto_batch_uses_worker_env(monkeypatch):
     monkeypatch.setenv("MHCFLURRY_MAX_WORKERS_PER_GPU", "4")
     monkeypatch.setattr(pytorch_sizing, "resolve_prediction_batch_size", fake_resolve)
 
+    def fake_calibrate(
+            batch_size, device, network, inputs, num_workers_per_gpu=1,
+            total_rows=None, **_kwargs):
+        captured.update({
+            "calibration_batch_size": batch_size,
+            "calibration_device": device.type,
+            "calibration_workers_per_gpu": num_workers_per_gpu,
+            "calibration_total_rows": total_rows,
+            "calibration_sequence_shape": tuple(inputs["sequence"].shape),
+            "calibration_kernel_size": tuple(network.conv1.kernel_size),
+        })
+        return batch_size
+
+    monkeypatch.setattr(
+        pytorch_sizing,
+        "calibrate_prediction_batch_size",
+        fake_calibrate,
+    )
+
     model = Class1ProcessingNeuralNetwork(
         peptide_max_length=12,
         n_flank_length=2,
         c_flank_length=2,
         convolutional_filters=8,
+        convolutional_kernel_size=5,
     )
     model._network = model.make_network(
         **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
@@ -428,6 +694,12 @@ def test_processing_predict_auto_batch_uses_worker_env(monkeypatch):
 
     assert len(predictions) == len(peptides)
     assert captured["num_workers_per_gpu"] == 4
+    assert captured["calibration_batch_size"] == 2
+    assert captured["calibration_device"] == "cpu"
+    assert captured["calibration_workers_per_gpu"] == 4
+    assert captured["calibration_total_rows"] == 3
+    assert captured["calibration_sequence_shape"] == (3, 16)
+    assert captured["calibration_kernel_size"] == (5,)
 
 
 def test_processing_predict_auto_batch_retries_device_oom(monkeypatch):
@@ -470,6 +742,45 @@ def test_processing_predict_auto_batch_retries_device_oom(monkeypatch):
     )
     assert len(predictions) == len(peptides)
     assert model._network.raised
+
+
+def test_processing_predict_auto_batch_retries_deferred_device_oom(monkeypatch):
+    """A deferred accelerator OOM is synchronized inside the retry loop."""
+    from mhcflurry import pytorch_sizing
+
+    synchronize_calls = []
+
+    def oom_once(_device):
+        synchronize_calls.append(True)
+        if len(synchronize_calls) == 1:
+            raise RuntimeError("CUDA out of memory in deferred test kernel")
+
+    monkeypatch.setattr(
+        pytorch_sizing,
+        "resolve_prediction_batch_size",
+        lambda *args, **kwargs: 2,
+    )
+    monkeypatch.setattr(pytorch_sizing, "synchronize_device", oom_once)
+
+    model = Class1ProcessingNeuralNetwork(
+        peptide_max_length=12,
+        n_flank_length=2,
+        c_flank_length=2,
+        convolutional_filters=8,
+    )
+    model._network = model.make_network(
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters)
+    )
+    peptides = ["SIINFEKL", "GILGFVFTL", "NLVPMVATV"]
+    predictions = model.predict(
+        peptides=peptides,
+        n_flanks=["AA"] * len(peptides),
+        c_flanks=["GG"] * len(peptides),
+        batch_size="auto",
+    )
+
+    assert len(predictions) == len(peptides)
+    assert len(synchronize_calls) == 2
 
 
 def test_processing_validation_is_batched(monkeypatch):
@@ -593,6 +904,62 @@ def test_small():
         dropout_rate=0.0,
         convolutional_kernel_l1_l2=[0.0, 0.0],
         learning_rate=0.01)
+
+
+@pytest.mark.parametrize("normalization", ["batch", "layer"])
+def test_processing_normalization_roundtrip(normalization):
+    """Normalization is shape-safe and serialized in the PyTorch weight order."""
+    kwargs = dict(
+        sequence_dims=(9, 21),
+        n_flank_length=0,
+        c_flank_length=0,
+        peptide_max_length=9,
+        flanking_averages=False,
+        convolutional_filters=4,
+        convolutional_kernel_size=3,
+        convolutional_activation="tanh",
+        convolutional_kernel_l1_l2=(0.0, 0.0),
+        dropout_rate=0.0,
+        post_convolutional_dense_layer_sizes=[2],
+        normalization=normalization,
+    )
+    model = Class1ProcessingModel(**kwargs)
+    model.eval()
+    inputs = {
+        "sequence": torch.randn(3, 9, 21),
+        "peptide_length": torch.full((3, 1), 9),
+    }
+    observed = model(inputs)
+    assert observed.shape == (3,)
+    assert torch.isfinite(observed).all()
+
+    clone = Class1ProcessingModel(**kwargs)
+    clone.set_weights_list(model.get_weights_list(), auto_convert_keras=False)
+    clone.eval()
+    torch.testing.assert_close(observed, clone(inputs))
+
+
+@pytest.mark.parametrize("activation", ["relu", "silu", "swish", "gelu"])
+def test_processing_modern_activations(activation):
+    model = Class1ProcessingModel(
+        sequence_dims=(9, 21),
+        n_flank_length=0,
+        c_flank_length=0,
+        peptide_max_length=9,
+        flanking_averages=False,
+        convolutional_filters=4,
+        convolutional_kernel_size=3,
+        convolutional_activation=activation,
+        convolutional_kernel_l1_l2=(0.0, 0.0),
+        dropout_rate=0.0,
+        post_convolutional_dense_layer_sizes=[2],
+    )
+    observed = model({
+        "sequence": torch.randn(3, 9, 21),
+        "peptide_length": torch.full((3, 1), 9),
+    })
+    assert observed.shape == (3,)
+    assert torch.isfinite(observed).all()
 
 
 @pytest.mark.slow
@@ -735,7 +1102,7 @@ def make_indexing_dataset_factory(first, last):
 
 
 def train_basic_network(
-        num, do_assertions=True, is_hit=None, dataset_factory=None,
+        num, do_assertions=True, is_hit=None, dataset_factory=None, seed=1,
         **hyperparameters):
     """Train a processing network and check performance."""
     use_hyperparameters = {
@@ -800,6 +1167,7 @@ def train_basic_network(
             n_flanks=train_df.n_flank.values,
             c_flanks=train_df.c_flank.values),
         targets=train_df.hit.values,
+        seed=seed,
         verbose=0)
 
     print(network.network())

@@ -32,6 +32,16 @@ Automatic GPU packing has no default fixed worker cap. Explicit CLI values and
 explicit per-workload memory estimates remain authoritative; the planner logs
 the facts and limits used for each decision.
 
+Affinity and processing trainers validate an automatic GPU plan with a bounded
+single-worker resource probe before starting the production pool. The probe uses
+the real resident fold and validation path and measures whole-process CUDA usage;
+it is a resource-safety step even when `torch.compile` is disabled. Runtime auto
+batches use a fixed per-worker share of launch-time free device capacity, so
+their size does not depend on which co-resident worker initialized first.
+Automatic CUDA processing batches are additionally capped by a successful
+real-model forward probe; the planner does not extrapolate across unobserved
+convolution workspace shapes.
+
 If a workload still runs out of memory, first keep the batch and worker settings
 on `auto`. If you need to intervene, reduce `--max-workers-per-gpu` or use a
 smaller explicit batch. Pinning values can improve repeatability on a known

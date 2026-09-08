@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import ast
 import glob
+import hashlib
 import json
 import os
 import shutil
@@ -70,6 +71,7 @@ from ..parallelism import (
 )
 from ..pytorch_sizing import default_prediction_batch_is_auto
 from ..pseudosequences import LEGACY_ALLELE_SEQUENCES_FILENAME
+from ..release_holdout import canonical_allele_mapping, load_excluded_samples
 from ..workload_planning import (
     WORKLOAD_AFFINITY_INFERENCE,
     WORKLOAD_PROCESSING_INFERENCE,
@@ -194,6 +196,23 @@ def register_subparser(parser):
                     % (role, letter.upper())
                 ),
             )
+        parser.add_argument(
+            "--%s-affinity-predictions" % letter,
+            help=(
+                "Reuse a saved, row-identical affinity prediction table for "
+                "side %s instead of rerunning that predictor. The table's "
+                "cohort identity is verified before scores are accepted."
+                % letter.upper()
+            ),
+        )
+        parser.add_argument(
+            "--%s-affinity-prediction-column" % letter,
+            default="%s_pred" % letter,
+            help=(
+                "Prediction column in --%s-affinity-predictions. "
+                "Default: %%(default)s" % letter
+            ),
+        )
     parser.add_argument(
         "--out", required=True,
         help="Output directory. Subdirs per component are created here.",
@@ -215,13 +234,45 @@ def register_subparser(parser):
         ),
     )
     parser.add_argument(
+        "--release-holdout-dir",
+        help=(
+            "Release holdout manifest directory. When specified, affinity, "
+            "processing, and presentation benchmarks are restricted to their "
+            "frozen evaluation sample manifests."
+        ),
+    )
+    parser.add_argument(
         "--limit-files", type=positive_int_arg, default=None,
         help="Smoke-test: only read first N benchmark files.",
     )
     parser.add_argument(
-        "--affinity-source", choices=["mixmhcpred", "netmhcpan4", "both"],
+        "--affinity-source",
+        choices=["mixmhcpred", "netmhcpan4", "no_additional_ms", "both"],
         default="mixmhcpred",
-        help="Which monoallelic benchmark source to use for affinity eval.",
+        help=(
+            "Which monoallelic benchmark source to use for affinity eval. "
+            "The no_additional_ms source is train-excluded for the matching "
+            "models_class1_pan_variants/models.no_additional_ms predictor."
+        ),
+    )
+    parser.add_argument(
+        "--affinity-training-overlap-policy",
+        choices=["exclude", "audit"],
+        default="exclude",
+        help=(
+            "For frozen release affinity evaluation, either exclude the union "
+            "of both predictors' recorded training pMHCs or audit/report that "
+            "overlap without changing the score set."
+        ),
+    )
+    parser.add_argument(
+        "--skip-affinity-predictions",
+        action="store_true",
+        help=(
+            "Do not persist the row-level affinity/predictions.csv.bz2 "
+            "artifact. Aggregate metrics, overlap audits, and per-allele/"
+            "per-length tables are unchanged."
+        ),
     )
     parser.add_argument(
         "--processing-modes",
@@ -232,12 +283,22 @@ def register_subparser(parser):
         ),
     )
     parser.add_argument(
+        "--processing-negative-policy", choices=("matched", "random-diagnostic"),
+        default="matched", help="Processing headline cohort. Unmatched random decoys are diagnostic only.")
+    parser.add_argument(
         "--presentation-modes",
         default=",".join(PRESENTATION_MODES),
         help=(
             "Comma-separated subset of {with_flanks, without_flanks} for "
             "the presentation component."
         ),
+    )
+    parser.add_argument(
+        "--presentation-score-kinds",
+        default=",".join(PRESENTATION_SCORE_KINDS),
+        help=("Comma-separated subset of {presentation_score, presentation_percentile}. "
+              "Default evaluates and requires both. Use presentation_score explicitly "
+              "for an uncalibrated research combiner; this does not validate release percentiles."),
     )
     add_prediction_parallelism_args(parser)
     parser.add_argument(
@@ -320,6 +381,11 @@ def _validate_comparison_output_location(args):
             value = getattr(args, "%s_%s_dir" % (letter, role))
             if value:
                 inputs.append(("--%s-%s-dir" % (letter, role), value))
+        predictions = getattr(
+            args, "%s_affinity_predictions" % letter, None)
+        if predictions:
+            inputs.append((
+                "--%s-affinity-predictions" % letter, predictions))
     for option, value in inputs:
         path = os.path.realpath(value)
         try:
@@ -651,6 +717,14 @@ def _processing_model_dirs(side_a, side_b, requested_modes):
 
 def _validate_component_configuration(args, components, side_a, side_b):
     """Validate component-specific options before output cleanup begins."""
+    if "affinity" in components:
+        for letter in ("a", "b"):
+            path = getattr(
+                args, "%s_affinity_predictions" % letter, None)
+            if path and not os.path.isfile(path):
+                raise ValueError(
+                    "--%s-affinity-predictions is not a file: %s" %
+                    (letter, path))
     if "processing" in components:
         modes = _requested_modes(
             args.processing_modes, PROCESSING_MODES, "--processing-modes")
@@ -697,7 +771,7 @@ def _metrics(y_true, y_score):
     )
 
 
-def _require_binary_comparison_rows(df, context):
+def _require_binary_comparison_rows(df, context, require_both_classes=True):
     """Require at least one positive and one negative evaluation row."""
     if "hit" not in df:
         raise ValueError("%s is missing the hit column" % context)
@@ -711,7 +785,7 @@ def _require_binary_comparison_rows(df, context):
     n_rows = int(len(hits))
     n_pos = int((hits == 1).sum())
     n_neg = int((hits == 0).sum())
-    if n_rows == 0 or n_pos == 0 or n_neg == 0:
+    if require_both_classes and (n_rows == 0 or n_pos == 0 or n_neg == 0):
         raise ValueError(
             "%s has no valid binary comparison set after shared-row "
             "filtering (rows=%d, positives=%d, negatives=%d)" % (
@@ -1024,7 +1098,37 @@ def _read_supported_alleles(predictor_dir):
     return result
 
 
-def _load_affinity_benchmark(data_dir, source, limit_files):
+def _read_holdout_benchmark_files(files, samples, context):
+    """Validate all input rows, retaining only heldout rows in bounded chunks.
+
+    File and row order are unchanged. A chunk need not contain both classes;
+    the assembled comparison is checked again by its component evaluator.
+    """
+    frames = []
+    empty = None
+    loaded = retained = 0
+    for index, path in enumerate(files):
+        with pandas.read_csv(path, chunksize=100000) as reader:
+            for frame in reader:
+                _require_complete_benchmark_rows(
+                    frame, ("peptide", "sample_id", "hla", "hit"), context)
+                _require_binary_comparison_rows(frame, context, require_both_classes=False)
+                loaded += len(frame)
+                frame["source_file"] = os.path.basename(path)
+                selected = frame.loc[frame.sample_id.astype(str).isin(samples)].copy()
+                retained += len(selected)
+                if len(selected):
+                    frames.append(selected)
+                elif empty is None:
+                    empty = selected
+        _stamp("  scanned %d/%d files: %d rows, retained %d holdout rows" % (
+            index + 1, len(files), loaded, retained))
+    if frames:
+        return pandas.concat(frames, ignore_index=True)
+    return empty if empty is not None else pandas.DataFrame()
+
+
+def _load_affinity_benchmark(data_dir, source, limit_files, samples=None):
     if source == "both":
         patterns = ["mixmhcpred", "netmhcpan4"]
     else:
@@ -1040,6 +1144,8 @@ def _load_affinity_benchmark(data_dir, source, limit_files):
     _stamp("affinity benchmark: %d files" % len(files))
     if not files:
         raise SystemExit("No affinity benchmark files in %s" % data_dir)
+    if samples is not None:
+        return _read_holdout_benchmark_files(files, samples, "Affinity benchmark")
     dfs = []
     for i, f in enumerate(files):
         df = pandas.read_csv(f)
@@ -1050,14 +1156,195 @@ def _load_affinity_benchmark(data_dir, source, limit_files):
     return pandas.concat(dfs, ignore_index=True)
 
 
+def _affinity_training_data_path(predictor_dir):
+    """Return recorded training rows for an affinity predictor, if present."""
+    for filename in ("train_data.csv.bz2", "train_data.csv"):
+        path = os.path.join(predictor_dir, filename)
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def _exclude_affinity_training_overlap(
+        test, side_a, side_b, policy="exclude"):
+    """Audit, and optionally drop, side A/B training pMHC overlap."""
+    if policy not in ("exclude", "audit"):
+        raise ValueError("Unknown affinity training-overlap policy: %s" % policy)
+    benchmark_index = pandas.MultiIndex.from_frame(test[["hla", "peptide"]])
+    union_mask = numpy.zeros(len(test), dtype=bool)
+    report = {
+        "policy": policy,
+        "policy_description": (
+            "drop union of side A and side B affinity training pMHCs"
+            if policy == "exclude"
+            else "audit side A and side B affinity training pMHCs only"
+        ),
+        "rows_before": int(len(test)),
+        "hits_before": int(test.hit.sum()),
+        "sides": {},
+    }
+    for side in (side_a, side_b):
+        predictor_dir = side["paths"]["affinity"]
+        training_path = _affinity_training_data_path(predictor_dir)
+        if training_path is None:
+            raise ValueError(
+                "Release affinity comparison cannot audit training overlap "
+                "for %s: missing train_data.csv[.bz2] in %s" % (
+                    side["label"], predictor_dir)
+            )
+        training = pandas.read_csv(
+            training_path, usecols=["allele", "peptide"])
+        allele_map = canonical_allele_mapping(training.allele)
+        training["allele"] = training.allele.astype(str).map(allele_map)
+        training = training.loc[training.allele.notna()]
+        training_index = pandas.MultiIndex.from_frame(
+            training[["allele", "peptide"]]).unique()
+        overlap_mask = benchmark_index.isin(training_index)
+        union_mask |= overlap_mask
+        report["sides"][side["letter"]] = {
+            "label": side["label"],
+            "predictor_dir": predictor_dir,
+            "training_data": training_path,
+            "training_rows": int(len(training)),
+            "training_unique_pmhcs": int(len(training_index)),
+            "overlap_rows": int(overlap_mask.sum()),
+            "overlap_hits": int(test.hit.loc[overlap_mask].sum()),
+            "overlap_unique_pmhcs": int(
+                benchmark_index[overlap_mask].nunique()),
+        }
+    retained_mask = ~union_mask if policy == "exclude" else numpy.ones(
+        len(test), dtype=bool)
+    report.update({
+        "exclusion_applied": policy == "exclude",
+        "union_overlap_rows": int(union_mask.sum()),
+        "union_overlap_hits": int(test.hit.loc[union_mask].sum()),
+        "union_overlap_unique_pmhcs": int(
+            benchmark_index[union_mask].nunique()),
+        "rows_after": int(retained_mask.sum()),
+        "hits_after": int(test.hit.loc[retained_mask].sum()),
+    })
+    _stamp(
+        "  release training-overlap %s: %d rows / %d hits overlap; "
+        "%d rows / %d hits scored" % (
+            policy,
+            report["union_overlap_rows"],
+            report["union_overlap_hits"],
+            report["rows_after"],
+            report["hits_after"],
+        )
+    )
+    return test.loc[retained_mask].copy(), report
+
+
+def _filter_release_holdout_samples(frame, args, component):
+    """Restrict a benchmark to its frozen release-evaluation samples."""
+    if not args.release_holdout_dir:
+        return frame
+    filenames = {
+        "affinity": "affinity_samples.csv",
+        "processing": "processing_samples.csv",
+        "presentation": "presentation_samples.csv",
+    }
+    path = os.path.join(args.release_holdout_dir, filenames[component])
+    samples = load_excluded_samples(path)
+    sample_ids = frame.sample_id.astype(str)
+    result = frame.loc[sample_ids.isin(samples)].copy()
+    if result.empty:
+        raise ValueError(
+            "Release holdout selected no %s benchmark rows using %s" % (
+                component, path))
+    _stamp(
+        "  release holdout %s: %d rows, %d samples" % (
+            component, len(result), result.sample_id.nunique()))
+    if getattr(args, "limit_files", None):
+        selected_files = result.source_file.drop_duplicates().iloc[
+            :args.limit_files
+        ]
+        result = result.loc[result.source_file.isin(selected_files)].copy()
+        _stamp(
+            "  release holdout %s file limit: %d files, %d rows" % (
+                component,
+                len(selected_files),
+                len(result),
+            )
+        )
+    return result
+
+
+def _load_presentation_benchmark_for_component(data_dir, args, component):
+    """Load, holdout-filter, then file-limit a presentation benchmark."""
+    initial_file_limit = None if args.release_holdout_dir else args.limit_files
+    row_filter = None
+    options = {}
+    if args.release_holdout_dir:
+        row_filter = partial(
+            _filter_release_holdout_samples,
+            args=args,
+            component=component,
+        )
+        options["samples"] = load_excluded_samples(os.path.join(
+            args.release_holdout_dir, component + "_samples.csv"))
+    return _load_presentation_benchmark(
+        data_dir,
+        initial_file_limit,
+        row_filter=row_filter,
+        **options,
+    )
+
+
+def _sha256_file(path, chunk_size=1024 * 1024):
+    digest = hashlib.sha256()
+    with open(path, "rb") as fd:
+        for chunk in iter(lambda: fd.read(chunk_size), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _load_reused_affinity_predictions(
+        path, prediction_column, expected_identity, label):
+    """Load saved predictions after proving their cohort is identical."""
+    path = os.path.abspath(path)
+    if not os.path.isfile(path):
+        raise ValueError(
+            "Saved affinity predictions for %s do not exist: %s" %
+            (label, path))
+    required = ["source_file", "hla", "peptide", "hit", prediction_column]
+    try:
+        saved = pandas.read_csv(path, usecols=required)
+    except ValueError as error:
+        raise ValueError(
+            "Saved affinity predictions for %s lack a required column: %s" %
+            (label, error)) from error
+    identity = _affinity_benchmark_identity(saved)
+    if identity != expected_identity:
+        raise ValueError(
+            "Saved affinity predictions for %s use different benchmark rows: "
+            "%s versus %s" % (label, identity, expected_identity))
+    values = pandas.to_numeric(
+        saved[prediction_column], errors="coerce").to_numpy()
+    return values, {
+        "mode": "reused",
+        "path": path,
+        "prediction_column": prediction_column,
+        "sha256": _sha256_file(path),
+        "benchmark_identity": identity,
+    }
+
+
 def _run_affinity(side_a, side_b, args):
     component_dir = os.path.join(args.out, "affinity")
     os.makedirs(component_dir, exist_ok=True)
     affinity_args = _parallelism_args_for_component(args, "affinity")
 
     data_dir = args.data_dir or _default_data_evaluation_dir()
+    initial_file_limit = None if args.release_holdout_dir else args.limit_files
+    load_options = {}
+    if args.release_holdout_dir:
+        load_options["samples"] = load_excluded_samples(os.path.join(
+            args.release_holdout_dir, "affinity_samples.csv"))
     test = _load_affinity_benchmark(
-        data_dir, args.affinity_source, args.limit_files)
+        data_dir, args.affinity_source, initial_file_limit, **load_options)
+    test = _filter_release_holdout_samples(test, args, "affinity")
     _require_complete_benchmark_rows(
         test, ("peptide", "hla", "hit"), "Affinity benchmark")
     try:
@@ -1087,24 +1374,57 @@ def _run_affinity(side_a, side_b, args):
     test = test[(test.peptide_len >= 8) & (test.peptide_len <= 15)].copy()
     test["hit"] = pandas.to_numeric(test["hit"], errors="coerce")
     _require_binary_comparison_rows(test, "Affinity benchmark")
+    training_overlap = None
+    if args.release_holdout_dir:
+        test, training_overlap = _exclude_affinity_training_overlap(
+            test,
+            side_a,
+            side_b,
+            policy=args.affinity_training_overlap_policy,
+        )
+        _require_binary_comparison_rows(
+            test, "Train-excluded release affinity benchmark")
+        with open(
+                os.path.join(component_dir, "training_overlap.json"),
+                "w") as fd:
+            json.dump(training_overlap, fd, indent=2, sort_keys=True)
+    benchmark_identity = _affinity_benchmark_identity(test)
     _stamp("  evaluable rows: %d" % len(test))
 
     comparison_model_bytes = max(
         model_artifact_size_bytes(side_a["paths"]["affinity"]) or 0,
         model_artifact_size_bytes(side_b["paths"]["affinity"]) or 0,
     ) or None
-    _stamp("predicting side A affinity...")
-    test["a_pred"] = _parallel_affinity_predict(
-        affinity_args, side_a["paths"]["affinity"],
-        test.peptide.values, test.hla.values,
-        model_bytes=comparison_model_bytes,
-    )
-    _stamp("predicting side B affinity...")
-    test["b_pred"] = _parallel_affinity_predict(
-        affinity_args, side_b["paths"]["affinity"],
-        test.peptide.values, test.hla.values,
-        model_bytes=comparison_model_bytes,
-    )
+    prediction_sources = {}
+    for letter, side in (("a", side_a), ("b", side_b)):
+        saved_path = getattr(
+            args, "%s_affinity_predictions" % letter, None)
+        if saved_path:
+            _stamp("reusing side %s affinity predictions..." % letter.upper())
+            predictions, source = _load_reused_affinity_predictions(
+                saved_path,
+                getattr(
+                    args,
+                    "%s_affinity_prediction_column" % letter,
+                    "%s_pred" % letter,
+                ),
+                benchmark_identity,
+                side["label"],
+            )
+        else:
+            _stamp("predicting side %s affinity..." % letter.upper())
+            predictions = _parallel_affinity_predict(
+                affinity_args, side["paths"]["affinity"],
+                test.peptide.values, test.hla.values,
+                model_bytes=comparison_model_bytes,
+            )
+            source = {
+                "mode": "computed",
+                "predictor_dir": side["paths"]["affinity"],
+                "benchmark_identity": benchmark_identity,
+            }
+        test["%s_pred" % letter] = predictions
+        prediction_sources[letter] = source
     _require_valid_affinity_predictions(
         test,
         labels=(side_a["label"], side_b["label"]),
@@ -1115,9 +1435,15 @@ def _run_affinity(side_a, side_b, args):
         ))
     test["a_score"] = -numpy.log10(numpy.clip(test.a_pred, 1e-3, 1e8))
     test["b_score"] = -numpy.log10(numpy.clip(test.b_pred, 1e-3, 1e8))
-    test.to_csv(
-        os.path.join(component_dir, "predictions.csv.bz2"), index=False)
-    _stamp("  wrote predictions.csv.bz2 (%d rows)" % len(test))
+    if args.skip_affinity_predictions:
+        _stamp(
+            "  skipped predictions.csv.bz2 (%d rows; "
+            "--skip-affinity-predictions)" % len(test)
+        )
+    else:
+        test.to_csv(
+            os.path.join(component_dir, "predictions.csv.bz2"), index=False)
+        _stamp("  wrote predictions.csv.bz2 (%d rows)" % len(test))
 
     per_allele = _affinity_per_allele(test)
     per_allele.to_csv(
@@ -1134,10 +1460,48 @@ def _run_affinity(side_a, side_b, args):
         )
 
     summary = _affinity_summary(test, per_allele, per_length)
+    summary["benchmark_identity"] = benchmark_identity
+    summary["prediction_sources"] = prediction_sources
+    if training_overlap is not None:
+        summary["training_overlap"] = training_overlap
     with open(os.path.join(component_dir, "summary.json"), "w") as fd:
         json.dump(summary, fd, indent=2, sort_keys=True)
     _stamp("  wrote summary.json")
     return summary
+
+
+def _affinity_benchmark_identity(test):
+    """Return a stable within-version identity for scored affinity rows.
+
+    This is intentionally calculated after allele intersection, peptide-length
+    filtering, frozen-holdout selection, and training-overlap exclusion. It
+    lets a factorial evaluator prove that every candidate/public comparison
+    used the same rows instead of inferring comparability from row counts.
+    """
+    columns = [
+        column
+        for column in ("source_file", "hla", "peptide", "hit")
+        if column in test
+    ]
+    if columns != ["source_file", "hla", "peptide", "hit"]:
+        raise ValueError(
+            "Affinity benchmark identity requires columns: "
+            "source_file, hla, peptide, hit")
+    row_hashes = pandas.util.hash_pandas_object(
+        test[columns], index=False, categorize=True,
+    ).to_numpy(dtype="<u8", copy=False)
+    digest = hashlib.sha256()
+    digest.update(b"mhcflurry-affinity-benchmark-identity-v1\0")
+    digest.update("\0".join(columns).encode("utf-8"))
+    digest.update(b"\0")
+    digest.update(row_hashes.tobytes())
+    return {
+        "algorithm": "pandas-row-hash-sha256-v1",
+        "columns": columns,
+        "ordered_rows": True,
+        "row_count": int(len(test)),
+        "sha256": digest.hexdigest(),
+    }
 
 
 def _affinity_per_allele(test):
@@ -1338,9 +1702,27 @@ def _run_processing(side_a, side_b, args):
 
     component_dir = os.path.join(args.out, "processing")
     os.makedirs(component_dir, exist_ok=True)
+    # Invalidate a prior completion marker before attempting a rerun. A failed
+    # prediction must not leave old tables labelled as this matched evaluation.
+    cohort_path = os.path.join(component_dir, "cohort.json")
+    policy = getattr(args, "processing_negative_policy", "matched")
+    with open(cohort_path, "w") as fd:
+        json.dump({"policy": "incomplete", "requested_policy": policy,
+                   "processing_release_eligible": False}, fd, indent=2)
     processing_args = _parallelism_args_for_component(args, "processing")
     data_dir = args.data_dir or _default_data_evaluation_dir()
-    benchmark = _load_presentation_benchmark(data_dir, args.limit_files)
+    benchmark = _load_presentation_benchmark_for_component(
+        data_dir, args, "processing")
+    assignments = None
+    cohort_info = {"policy": policy, "processing_release_eligible": policy == "matched"}
+    if policy == "matched":
+        from .processing_affinity_control import _attach_affinity
+        from ..processing_matching import make_affinity_controlled_risk_sets
+        benchmark, affinity_sources = _attach_affinity(benchmark, data_dir)
+        assignments, diagnostics = make_affinity_controlled_risk_sets(benchmark)
+        cohort_info.update(diagnostics=diagnostics, affinity_sources=affinity_sources,
+                           affinity_reference="frozen cached production affinity")
+        assignments.to_csv(os.path.join(component_dir, "matching_assignments.csv.bz2"), index=False)
     summaries = {}
     summary_rows = []
     for mode in requested_modes:
@@ -1366,6 +1748,17 @@ def _run_processing(side_a, side_b, args):
             mode=mode,
             labels=(side_a["label"], side_b["label"]),
         )
+
+        # The complete unique-row cohort remains available for external joins;
+        # primary metrics and plots consume only the fixed matched risk sets.
+        scored.insert(0, "source_row", numpy.arange(len(scored)))
+        scored.to_csv(os.path.join(component_dir, "heldout_predictions_%s.csv.bz2" % mode), index=False)
+        if assignments is not None:
+            values = scored[["a_processing_score", "b_processing_score"]].iloc[
+                assignments.source_row].reset_index(drop=True)
+            scored = assignments.copy()
+            scored[values.columns] = values
+        scored["processing_negative_policy"] = policy
 
         pred_path = os.path.join(
             component_dir, "predictions_%s.csv.bz2" % mode)
@@ -1400,6 +1793,7 @@ def _run_processing(side_a, side_b, args):
             )
         summary = _presentation_mode_summary(
             shared_scored, per_sample, per_length, mode, "processing_score")
+        summary["processing_negative_policy"] = policy
         summaries[mode] = {"processing_score": summary}
         summary_rows.append(_presentation_summary_row(summary))
 
@@ -1407,10 +1801,14 @@ def _run_processing(side_a, side_b, args):
         json.dump(summaries, fd, indent=2, sort_keys=True)
     summary_table = pandas.DataFrame(
         summary_rows, columns=_component_summary_table_columns())
+    summary_table["processing_negative_policy"] = policy
     summary_table.to_csv(
         os.path.join(component_dir, "summary_table.csv"), index=False)
+    with open(cohort_path, "w") as fd:
+        json.dump(cohort_info, fd, indent=2, sort_keys=True)
     _stamp("  wrote processing summary.json + summary_table.csv")
     return {
+        "negative_policy": policy,
         "modes": [row["mode"] for row in summary_rows],
         "summaries": summaries,
     }
@@ -1513,7 +1911,7 @@ def _parallel_presentation_predict(
     )
 
 
-def _load_presentation_benchmark(data_dir, limit_files):
+def _load_presentation_benchmark(data_dir, limit_files, row_filter=None, samples=None):
     files = sorted(glob.glob(os.path.join(
         data_dir,
         "benchmark.multiallelic.train_excluded.*.csv.bz2",
@@ -1525,14 +1923,17 @@ def _load_presentation_benchmark(data_dir, limit_files):
             "No presentation benchmark files in %s "
             "(benchmark.multiallelic.train_excluded.*.csv.bz2)" % data_dir)
     _stamp("presentation benchmark: %d files" % len(files))
-    dfs = []
-    for i, path in enumerate(files):
-        df = pandas.read_csv(path)
-        df["source_file"] = os.path.basename(path)
-        dfs.append(df)
-        if (i + 1) % 25 == 0:
-            _stamp("  loaded %d/%d" % (i + 1, len(files)))
-    result = pandas.concat(dfs, ignore_index=True)
+    if samples is not None:
+        result = _read_holdout_benchmark_files(files, samples, "Presentation benchmark")
+    else:
+        dfs = []
+        for i, path in enumerate(files):
+            df = pandas.read_csv(path)
+            df["source_file"] = os.path.basename(path)
+            dfs.append(df)
+            if (i + 1) % 25 == 0:
+                _stamp("  loaded %d/%d" % (i + 1, len(files)))
+        result = pandas.concat(dfs, ignore_index=True)
     required = {"peptide", "sample_id", "hla", "hit"}
     missing = sorted(required - set(result.columns))
     if missing:
@@ -1545,7 +1946,19 @@ def _load_presentation_benchmark(data_dir, limit_files):
     result = result.copy()
     result["hit"] = pandas.to_numeric(result["hit"], errors="coerce")
     _require_binary_comparison_rows(result, "Presentation benchmark")
-    result["hla"] = result["hla"].map(_normalize_benchmark_genotype)
+    if row_filter is not None:
+        # Genotype normalization dominates runtime for the full benchmark.
+        # Release evaluation only needs its frozen samples, so select those
+        # rows after whole-input integrity checks but before parsing genotypes.
+        result = row_filter(result)
+    # A release benchmark has millions of peptide rows but only a handful of
+    # distinct sample genotypes. Parse each distinct genotype once, then map
+    # the canonical value back without changing row order or validation.
+    normalized_genotypes = {
+        value: _normalize_benchmark_genotype(value)
+        for value in pandas.unique(result["hla"])
+    }
+    result["hla"] = result["hla"].map(normalized_genotypes)
     genotype_counts = result.groupby("sample_id", dropna=False).hla.nunique()
     inconsistent_samples = genotype_counts[genotype_counts > 1]
     if not inconsistent_samples.empty:
@@ -1679,11 +2092,11 @@ def _require_valid_affinity_predictions(scored, labels):
         )
 
 
-def _require_finite_presentation_scores(scored, mode, labels):
+def _require_finite_presentation_scores(scored, mode, labels, score_kinds=PRESENTATION_SCORE_KINDS):
     """Fail when either presentation model omits a release benchmark row."""
     failures = []
     for side, label in zip(("a", "b"), labels):
-        for score_kind in PRESENTATION_SCORE_KINDS:
+        for score_kind in score_kinds:
             column = "%s_%s" % (side, score_kind)
             values = pandas.to_numeric(scored[column], errors="coerce").values
             bad = ~numpy.isfinite(values)
@@ -1699,9 +2112,9 @@ def _require_finite_presentation_scores(scored, mode, labels):
     if failures:
         raise ValueError(
             "Presentation comparison mode %s requires every benchmark row to "
-            "have both a presentation score and percentile on both sides. %s. "
+            "have finite requested scores (%s) on both sides. %s. "
             "Check allele support, peptide validity, and percentile "
-            "calibration." % (mode, "; ".join(failures))
+            "calibration." % (mode, ", ".join(score_kinds), "; ".join(failures))
         )
 
 
@@ -1846,8 +2259,11 @@ def _run_presentation(side_a, side_b, args):
     data_dir = args.data_dir or _default_data_evaluation_dir()
     requested_modes = _requested_modes(
         args.presentation_modes, PRESENTATION_MODES, "--presentation-modes")
+    requested_score_kinds = _requested_modes(
+        args.presentation_score_kinds, PRESENTATION_SCORE_KINDS, "--presentation-score-kinds")
 
-    benchmark = _load_presentation_benchmark(data_dir, args.limit_files)
+    benchmark = _load_presentation_benchmark_for_component(
+        data_dir, args, "presentation")
     summaries = {}
     summary_rows = []
     presentation_args = _parallelism_args_for_component(args, "presentation")
@@ -1876,6 +2292,7 @@ def _run_presentation(side_a, side_b, args):
             scored,
             mode=mode,
             labels=(side_a["label"], side_b["label"]),
+            score_kinds=requested_score_kinds,
         )
         pred_path = os.path.join(
             component_dir, "predictions_%s.csv.bz2" % mode)
@@ -1883,7 +2300,7 @@ def _run_presentation(side_a, side_b, args):
         _stamp("  wrote %s" % pred_path)
 
         summaries[mode] = {}
-        for score_kind in PRESENTATION_SCORE_KINDS:
+        for score_kind in requested_score_kinds:
             shared_scored = _shared_score_rows(scored, score_kind)
             _require_binary_comparison_rows(
                 shared_scored,
@@ -1929,6 +2346,7 @@ def _run_presentation(side_a, side_b, args):
     _stamp("  wrote summary.json + summary_table.csv")
     return {
         "modes": requested_modes,
+        "score_kinds": requested_score_kinds,
         "summaries": summaries,
     }
 
@@ -2110,12 +2528,26 @@ def _write_summary_markdown(headline, side_a, side_b, out_dir, components):
                 s["allele_count"]["b_better_roc_auc"],
             )
         )
+        overlap = s.get("training_overlap")
+        if overlap:
+            lines.append(
+                "- training-overlap policy `%s`: %d rows / %d hits overlap; "
+                "%d rows / %d hits scored" % (
+                    overlap["policy"],
+                    overlap["union_overlap_rows"],
+                    overlap["union_overlap_hits"],
+                    overlap["rows_after"],
+                    overlap["hits_after"],
+                )
+            )
         lines.append("- Details: `affinity/per_allele.csv`, `affinity/summary.json`")
         lines.append("")
 
     if "processing" in components:
         s = headline["processing"]
         lines.append("## processing")
+        lines.append("- Negative cohort: `%s` (unmatched cohorts are diagnostic only)." %
+                     s.get("negative_policy", "legacy-unmatched"))
         for mode in s["modes"]:
             msum = s["summaries"][mode]["processing_score"]
             pooled_a = msum["micro_pooled"]["a"]["roc_auc"]
@@ -2134,8 +2566,7 @@ def _write_summary_markdown(headline, side_a, side_b, out_dir, components):
         s = headline["presentation"]
         lines.append("## presentation")
         for mode in s["modes"]:
-            for score_kind in PRESENTATION_SCORE_KINDS:
-                msum = s["summaries"][mode][score_kind]
+            for score_kind, msum in s["summaries"][mode].items():
                 pooled_a = msum["micro_pooled"]["a"]["roc_auc"]
                 pooled_b = msum["micro_pooled"]["b"]["roc_auc"]
                 lines.append(

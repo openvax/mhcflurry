@@ -38,6 +38,51 @@ def load_script(path):
     return module
 
 
+@pytest.mark.parametrize("relative_path", [
+    "scripts/training/release_exact/make_train_data.processing.py",
+    "downloads-generation/models_class1_processing/make_train_data.py",
+])
+def test_processing_generation_matches_and_preserves_scored_pool(relative_path, tmp_path, monkeypatch):
+    import numpy
+    import mhcflurry
+    from mhcflurry.processing_matching import validate_matched_training_data
+    module = load_script(REPO_ROOT / relative_path)
+    args = module.parser.parse_args([
+        "--hits", "unused", "--affinity-predictor", "frozen-public",
+        "--proteome-peptides", "unused", "--ppv-multiplier", "3",
+        "--out", str(tmp_path / "training.csv")])
+    assert args.negative_policy == "matched"
+    args.matching_reference = {"sha256": "a" * 64}
+    directory = tmp_path / "training.csv.matching"
+    directory.mkdir()
+    hits = pandas.DataFrame({"peptide": ["SIINFEKL", "SIINFEKA"],
+                             "sample_id": "s", "allele": "HLA-A*02:01",
+                             "hit_id": [1, 2], "protein_accession": "p1",
+                             "n_flank": "AAAAA", "c_flank": "CCCCC"})
+    pool = pandas.DataFrame({"peptide": [c + "IINFEKL" for c in "CDEFGH"],
+                             "protein_accession": "p1", "n_flank": "AAAAA", "c_flank": "CCCCC"})
+
+    class Predictor:
+        supported_alleles = ["HLA-A*02:01"]
+
+        def canonicalize_allele_name(self, allele):
+            return allele
+
+        def predict(self, peptides, allele):
+            assert allele == "HLA-A*02:01"
+            return numpy.repeat(100.0, len(peptides))
+
+    monkeypatch.setattr(mhcflurry.Class1AffinityPredictor, "load", lambda path: Predictor())
+    result = module.do_process_samples(["s"], seed=42, constant_data={
+        "args": args, "lengths": [8], "all_peptides_by_length": {8: pool},
+        "sample_table": hits.drop_duplicates("sample_id").set_index("sample_id"), "hit_df": hits})
+    validate_matched_training_data(result)
+    assert result.hit.sum() == len(hits)
+    assert len(result) == 4
+    assert len(pandas.read_csv(next(directory.glob("*.candidate_pool.csv.bz2")))) == 8
+    assert len(list(directory.glob("*.matching.json"))) == 1
+
+
 def test_generate_scripts_keep_packaged_proteome_peptide_artifacts():
     """Guard download-generation artifact contracts.
 
@@ -368,15 +413,15 @@ def write_presentation_like_inputs(tmp_path):
     return hits_csv, reference_csv
 
 
-def run_reference_decoy_script(script_path, tmp_path):
+def run_reference_decoy_script(script_path, tmp_path, random_seed=None):
+    tmp_path.mkdir(parents=True, exist_ok=True)
     hits_csv, reference_csv = write_presentation_like_inputs(tmp_path)
     out_csv = tmp_path / "train_data.csv"
     env = os.environ.copy()
     env["PYTHONPATH"] = os.pathsep.join(
         [str(REPO_ROOT)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else [])
     )
-    subprocess.run(
-        [
+    command = [
             sys.executable,
             str(script_path),
             "--hits",
@@ -389,7 +434,11 @@ def run_reference_decoy_script(script_path, tmp_path):
             "MULTIALLELIC",
             "--out",
             str(out_csv),
-        ],
+        ]
+    if random_seed is not None:
+        command.extend(["--random-seed", str(random_seed)])
+    subprocess.run(
+        command,
         env=env,
         check=True,
     )
@@ -410,6 +459,17 @@ def test_release_presentation_train_data_uses_reference_csv_decoys(tmp_path):
         tmp_path,
     )
     assert_reference_decoy_output(result)
+
+
+def test_release_presentation_decoys_are_reproducible_from_seed(tmp_path):
+    script = (
+        REPO_ROOT / "scripts/training/release_exact"
+        / "make_train_data.presentation.py"
+    )
+    first = run_reference_decoy_script(script, tmp_path / "first", 271)
+    second = run_reference_decoy_script(script, tmp_path / "second", 271)
+
+    pandas.testing.assert_frame_equal(first, second)
 
 
 def test_download_presentation_train_data_uses_reference_csv_decoys(tmp_path):

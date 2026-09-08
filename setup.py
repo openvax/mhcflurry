@@ -62,7 +62,7 @@ if __name__ == "__main__":
         "scikit-learn",
         "threadpoolctl",
         "matplotlib",
-        "mhcgnomes>=3.33.0",
+        "mhcgnomes>=3.33.6",
         "numpy>=1.22.4",
         "pyyaml",
         "tqdm",

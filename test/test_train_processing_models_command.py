@@ -29,6 +29,7 @@ import pandas
 
 from mhcflurry.class1_processing_predictor import Class1ProcessingPredictor
 from mhcflurry.common import random_peptides
+from mhcflurry import pytorch_sizing
 from mhcflurry.cli import train_processing_models_command as processing_command
 from mhcflurry.train_processing_models_command import estimate_processing_worker_gb
 
@@ -98,7 +99,9 @@ def make_dataset(num=500):
     return (train_df, test_df)
 
 
-def run_and_check(n_jobs=0, additional_args=[], delete=False):
+def run_and_check(n_jobs=0, additional_args=None, delete=False):
+    if additional_args is None:
+        additional_args = []
     (train_df, test_df) = make_dataset()
 
     models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")
@@ -111,6 +114,7 @@ def run_and_check(n_jobs=0, additional_args=[], delete=False):
     train_df.to_csv(train_filename, index=False)
 
     args = mhcflurry_cli("mhcflurry-class1-train-processing-models") + [
+        "--processing-data-policy", "legacy",  # synthetic non-MHC fixture
         "--data", train_filename,
         "--hyperparameters", hyperparameters_filename,
         "--out-models-dir", models_dir,
@@ -139,6 +143,7 @@ def run_and_check(n_jobs=0, additional_args=[], delete=False):
     models_dir_selected = tempfile.mkdtemp(
         prefix="mhcflurry-test-models-selected")
     args = mhcflurry_cli("mhcflurry-class1-select-processing-models") + [
+        "--processing-data-policy", "legacy",
         "--data", os.path.join(models_dir, "train_data.csv.bz2"),
         "--models-dir", models_dir,
         "--out-models-dir", models_dir_selected,
@@ -249,7 +254,7 @@ def test_release_unused_torch_memory_collects_before_empty_cache(monkeypatch):
     """Boundary cleanup exposes dead tensors before purging CUDA's cache."""
     events = []
     monkeypatch.setattr(
-        processing_command.gc,
+        pytorch_sizing.gc,
         "collect",
         lambda: events.append("gc.collect"),
     )
@@ -267,6 +272,82 @@ def test_release_unused_torch_memory_collects_before_empty_cache(monkeypatch):
     processing_command.release_unused_torch_memory()
 
     assert events == ["gc.collect", "torch.cuda.empty_cache"]
+
+
+def test_release_unused_torch_memory_uses_mps_without_cuda(monkeypatch):
+    """The same task-boundary cleanup supports Apple accelerators."""
+    events = []
+    monkeypatch.setattr(
+        pytorch_sizing.gc,
+        "collect",
+        lambda: events.append("gc.collect"),
+    )
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: True)
+    monkeypatch.setattr(
+        torch.mps,
+        "empty_cache",
+        lambda: events.append("torch.mps.empty_cache"),
+    )
+
+    processing_command.release_unused_torch_memory()
+
+    assert events == ["gc.collect", "torch.mps.empty_cache"]
+
+
+def test_resource_probe_releases_model_between_architectures(monkeypatch):
+    """Processing probes share the same explicit task-boundary cleanup."""
+    created = []
+    cleanup_calls = []
+
+    class FakeNetwork:
+        hyperparameter_defaults = SimpleNamespace(
+            subselect=lambda values: dict(values))
+
+        def __init__(self, **_kwargs):
+            self._network = object()
+            created.append(self)
+
+        def fit(self, **_kwargs):
+            return None
+
+    monkeypatch.setattr(
+        processing_command, "Class1ProcessingNeuralNetwork", FakeNetwork)
+    monkeypatch.setattr(
+        processing_command,
+        "begin_peak_memory_measurement",
+        lambda: object(),
+    )
+    monkeypatch.setattr(
+        processing_command,
+        "end_peak_memory_measurement",
+        lambda _token: {},
+    )
+    monkeypatch.setattr(
+        processing_command,
+        "release_unused_torch_memory",
+        lambda: cleanup_calls.append("cleanup"),
+    )
+    constant_data = {
+        "train_data": pandas.DataFrame({
+            "peptide": ["SIINFEKL"],
+            "n_flank": ["A"],
+            "c_flank": ["C"],
+            "hit": [1],
+        }),
+        "folds_df": pandas.DataFrame({"fold_0": [True]}),
+    }
+    hyperparameters = {
+        "minibatch_size": 1,
+        "validation_split": 0.1,
+    }
+
+    for _ in range(2):
+        processing_command._run_resource_probe(
+            hyperparameters, fold_num=0, constant_data=constant_data)
+
+    assert cleanup_calls == ["cleanup", "cleanup"]
+    assert all(model._network is None for model in created)
 
 
 

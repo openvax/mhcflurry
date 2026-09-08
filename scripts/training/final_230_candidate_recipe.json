@@ -1,0 +1,52 @@
+{
+  "format": 1,
+  "name": "final-2.3.0-candidate",
+  "status": "frozen candidate pending full held-out evaluation",
+  "affinity": {
+    "architectures": 35,
+    "folds": 4,
+    "minibatch_size": 1024,
+    "optimizer": "rmsprop",
+    "optimizer_implementation": "pytorch",
+    "init": "glorot_uniform",
+    "lsuv_target": "pre_activation",
+    "dropout": 0.5,
+    "patience": 20,
+    "primary_checkpoint": "terminal",
+    "retained_checkpoints": ["terminal", "best"]
+  },
+  "processing": {
+    "folds": 4,
+    "minibatch_size": 512,
+    "legacy_architectures_per_variant": 128,
+    "variants": ["with_flanks", "no_flank", "short_flanks"],
+    "with_flanks_recipe": "kaiming-pytorch-adam",
+    "no_flank_recipe": "glorot-keras-adam",
+    "short_flanks_recipe": "glorot-keras-adam",
+    "cleavage_boundary": {
+      "architecture": "large_relu",
+      "flank_context": 5,
+      "peptide_context": 5,
+      "models_per_fold": 1
+    },
+    "presentation_with_flanks_ensemble": {
+      "legacy_short_flanks_models_per_fold": 1,
+      "cleavage_boundary_models_per_fold": 1,
+      "family_weights": [0.5, 0.5]
+    }
+  },
+  "presentation": {
+    "processing_with_flanks": "short_flanks plus radius-5 boundary hybrid",
+    "processing_without_flanks": "selected no_flank ensemble",
+    "component_factorial": [
+      "public affinity plus public processing",
+      "new affinity plus public processing",
+      "public affinity plus new processing",
+      "new affinity plus new processing"
+    ]
+  },
+  "acceptance": {
+    "primary": ["macro AUPRC", "macro PPV@N"],
+    "safeguards": ["micro", "per sample", "per length", "allele", "locus"]
+  }
+}

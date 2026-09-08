@@ -240,6 +240,7 @@ PY
         --out-models-dir "$SIZE_OUT/models.combined" \
         --min-models-per-fold "$MIN_MODELS_PER_FOLD" \
         --max-models-per-fold "$MAX_MODELS_PER_FOLD" \
+        --save-validation-predictions \
         --num-jobs auto \
         --max-tasks-per-worker "$MAX_TASKS_PER_WORKER" \
         --gpus "$GPUS" \
