@@ -131,7 +131,7 @@ def materialize(models_dir, policy, out_models_dir):
         manifest.to_csv(temporary / "manifest.csv", index=False)
 
         removed_stale_metadata = []
-        for name in ("percent_ranks.csv", "optimization_info.json"):
+        for name in ("percent_ranks.csv", "percent_ranks.json", "optimization_info.json"):
             path = temporary / name
             if path.exists():
                 path.unlink()

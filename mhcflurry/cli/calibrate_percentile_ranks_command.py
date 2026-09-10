@@ -28,6 +28,7 @@ import tqdm  # progress bar
 
 from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..class1_presentation_predictor import Class1PresentationPredictor
+from ..class1_processing_predictor import Class1ProcessingPredictor
 from ..common import (
     add_random_seed_arg,
     allele_locus_name,
@@ -76,9 +77,25 @@ WORKER_CONTEXT = {}
 parser = argparse.ArgumentParser(usage=__doc__)
 parser.add_argument(
     "--predictor-kind",
-    choices=("class1_affinity", "class1_presentation"),
+    choices=("class1_affinity", "class1_processing", "class1_presentation"),
     default="class1_affinity",
     help="Type of predictor to calibrate")
+parser.add_argument(
+    "--percentile-method", choices=("compact", "histogram"), default="compact",
+    help="Method for new calibration (default: %(default)s). Loading alone "
+    "never changes saved ranks. Histogram reproduction also requires the "
+    "original reference and bin policy.")
+parser.add_argument(
+    "--max-percentile-knots", type=int, choices=(64, 128), default=128,
+    help="Compact starts at 64; allow 128 only when background validation "
+    "justifies it. This is a ceiling (default: %(default)s), not a fixed size. "
+    "Ignored for histogram calibration.")
+parser.add_argument(
+    "--processing-reference-data",
+    help="Required for processing: independent background CSV with peptide and, "
+    "for a flanked model, n_flank and c_flank columns. No evaluation labels are used. "
+    "Scores and input sequences are saved in percent_rank_reference.npz. "
+    "Requires --num-jobs 0; reference-generation options do not apply.")
 parser.add_argument(
     "--models-dir",
     metavar="DIR",
@@ -120,7 +137,8 @@ parser.add_argument(
     type=positive_int_arg,
     metavar="N",
     default=int(1e5),
-    help="Number of peptides per length to use to calibrate percent ranks. "
+    help="For affinity/presentation, number of generated peptides per length "
+    "to use to calibrate percent ranks. Processing uses --processing-reference-data. "
     "Default: %(default)s.")
 parser.add_argument(
     "--num-genotypes",
@@ -197,11 +215,11 @@ parser.add_argument(
          "calibration fast path: precompute peptide-side activations "
          "per network and batch "
          "--gpu-allele-batch-size alleles into a single forward through "
-         "the merge + main dense path. Same output as the default path "
-         "(bit-identical on CUDA, ~1e-6 log-IC50 drift on MPS due to "
-         "missing fp64 support), typically 5-30x faster on CUDA for the "
-         "full pan-allele universe. Ignored when running a presentation "
-         "predictor or serial/cluster mode.")
+         "the merge + main dense path. Uses the same ensemble aggregation "
+         "and percentile method as the ordinary path; floating-point batching "
+         "can change predictions and selected knots slightly, so saved curves "
+         "are not guaranteed bit-identical. Applies to affinity in serial, "
+         "local-pool, and cluster modes; ignored for processing/presentation.")
 parser.add_argument(
     "--gpu-allele-batch-size",
     type=_batch_size_arg,
@@ -257,6 +275,18 @@ def run(argv=sys.argv[1:]):
     # sampling below both run in this process). Inference in workers is
     # deterministic, so global seeding here makes calibration reproducible.
     configure_random_seed(args.random_seed, name="calibrate-percentile-ranks")
+
+    if args.predictor_kind == "class1_processing":
+        if args.only_missing_percent_ranks or args.motif_summary:
+            parser.error("Processing calibration does not support --only-missing or --motif-summary")
+        if not args.processing_reference_data:
+            parser.error("Processing calibration requires --processing-reference-data")
+        if args.num_jobs != 0 or args.cluster_parallelism:
+            parser.error("Processing reference calibration currently requires --num-jobs 0")
+        configure_pytorch(backend=getattr(args, "backend", "auto") or "auto")
+        return run_class1_processing_predictor(args)
+    if args.processing_reference_data:
+        parser.error("--processing-reference-data requires --predictor-kind class1_processing")
 
     # Resolve --max-workers-per-gpu='auto' to an int now, before any
     # downstream consumer reads it (model_kwargs below + pool creation).
@@ -432,6 +462,31 @@ def run_class1_affinity_percent_rank_status(args):
     percent_rank_status_df(predictor, alleles).to_csv(sys.stdout, index=False)
 
 
+def run_class1_processing_predictor(args):
+    """Calibrate processing against explicit background contexts, not invented flanks."""
+    predictor = Class1ProcessingPredictor.load(args.models_dir)
+    frame = pandas.read_csv(args.processing_reference_data, keep_default_na=False)
+    required = ["peptide"]
+    if predictor.sequence_lengths["n_flank"] or predictor.sequence_lengths["c_flank"]:
+        required.extend(["n_flank", "c_flank"])
+    if not set(required).issubset(frame):
+        raise ValueError("Processing reference requires columns: %s" % ", ".join(required))
+    scores = predictor.predict(
+        frame.peptide.values,
+        n_flanks=frame.n_flank.values if "n_flank" in frame else None,
+        c_flanks=frame.c_flank.values if "c_flank" in frame else None,
+        batch_size=args.prediction_batch_size)
+    predictor.calibrate_percentile_ranks(
+        scores, method=args.percentile_method, max_knots=args.max_percentile_knots,
+        groups=frame.peptide.values)
+    predictor.save(args.models_dir, model_names_to_write=[], write_metadata=False)
+    numpy.savez_compressed(
+        os.path.join(args.models_dir, "percent_rank_reference.npz"), scores=scores,
+        **{column: frame[column].to_numpy(dtype=str)
+           for column in ("peptide", "n_flank", "c_flank") if column in frame})
+    write_generate_sh(args.models_dir)
+
+
 def run_class1_presentation_predictor(args, peptides):
     predictor = Class1PresentationPredictor.load(args.models_dir)
 
@@ -554,7 +609,10 @@ def run_class1_presentation_predictor(args, peptides):
     print("Generated %d presentation scores." % len(scores))
 
     print("Calibrating ranks")
-    predictor.calibrate_percentile_ranks(scores)
+    predictor.calibrate_percentile_ranks(
+        scores, method=getattr(args, "percentile_method", "compact"),
+        max_knots=getattr(args, "max_percentile_knots", 128),
+        groups=numpy.tile(numpy.asarray(peptides), len(scores) // len(peptides)))
     print("Done. Saving.")
 
     predictor.save(
@@ -672,6 +730,8 @@ def run_class1_affinity_predictor(args, peptides):
         model_kwargs['num_workers_per_gpu'] = num_workers_per_gpu_from_args(args)
     num_workers_per_gpu = num_workers_per_gpu_from_args(args)
     WORKER_CONTEXT["args"] = {
+        'method': getattr(args, 'percentile_method', 'compact'),
+        'max_knots': getattr(args, 'max_percentile_knots', 128),
         'motif_summary': args.motif_summary,
         'summary_top_peptide_fractions': args.summary_top_peptide_fraction,
         'verbose': args.verbosity > 0,
@@ -798,6 +858,8 @@ def do_class1_affinity_calibrate_percentile_ranks(
                 gpu_allele_batch_size=gpu_allele_batch_size,
                 gpu_peptide_batch_size=gpu_peptide_batch_size,
                 num_workers_per_gpu=num_workers_per_gpu,
+                method=args.get('method'),
+                max_knots=args.get('max_knots', 128),
             )
         ]
 
@@ -822,7 +884,8 @@ def class1_affinity_calibrate_percentile_ranks_fast(
         verbose=False,
         gpu_allele_batch_size="auto",
         gpu_peptide_batch_size="auto",
-        num_workers_per_gpu=1):
+        num_workers_per_gpu=1,
+        method=None, max_knots=128):
     """Worker-side fast-path wrapper for the GPU-batched calibration path.
 
     Returns the same ``(transforms_dict, summary_results)`` tuple the
@@ -840,6 +903,7 @@ def class1_affinity_calibrate_percentile_ranks_fast(
         peptide_batch_size=gpu_peptide_batch_size,
         num_workers_per_gpu=num_workers_per_gpu,
         verbose=verbose,
+        method=method, max_knots=max_knots,
     )
     if verbose:
         print(
@@ -863,7 +927,8 @@ def class1_affinity_calibrate_percentile_ranks(
         motif_summary=False,
         summary_top_peptide_fractions=None,
         verbose=False,
-        model_kwargs=None):
+        model_kwargs=None,
+        method=None, max_knots=128):
     if summary_top_peptide_fractions is None:
         summary_top_peptide_fractions = [0.001]
     if model_kwargs is None:
@@ -878,7 +943,8 @@ def class1_affinity_calibrate_percentile_ranks(
         motif_summary=motif_summary,
         summary_top_peptide_fractions=summary_top_peptide_fractions,
         verbose=verbose,
-        model_kwargs=model_kwargs)
+        model_kwargs=model_kwargs,
+        method=method, max_knots=max_knots)
     if verbose:
         print("Done calibrating", allele, "in", time.time() - start, "sec")
     transforms = {

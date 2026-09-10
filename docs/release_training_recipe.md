@@ -118,12 +118,26 @@ retry. This changes partitioning, not the prediction formula. Presentation
 feature chunking likewise avoids materializing large peptide-by-genotype
 tables while preserving the minimum-affinity and tie-order semantics.
 
-Presentation percentile calibration uses adaptive score-quantile bins instead
-of uniform bins over `[0, 1]`. This is a deliberate correctness fix: uniform
-bins collapse compressed logistic scores and can destroy rank resolution. It
-changes presentation percentile outputs, but not raw affinity, processing, or
-presentation scores. Affinity percentile bins retain their published
-log-spaced IC50 definition.
+New percentile calibration uses the shared compact method for affinity,
+processing, and presentation: start with 64 knots and allow 128 only when
+label-free background validation improves beyond the documented tolerance.
+Affinity uses log(IC50) coordinates and lower-tail ranks; processing and
+presentation use logit(score) coordinates and upper-tail ranks. See
+{doc}`shared_percent_rank_transforms` for the functional form and exact rule.
+
+Existing public calibrations still load through the historical histogram
+implementation without conversion. Explicit histogram recalibration remains
+available (fixed log-spaced IC50 edges for affinity; tail-adaptive quantile
+edges for presentation). Choosing that method alone does not reproduce an
+older table unless its reference and bin policy also match.
+
+Recalibration can change percentile outputs, not raw affinity, processing, or
+presentation scores. The release shell workflow calibrates affinity and
+presentation; standalone processing calibration is a separate explicit command
+requiring an independent background with the intended flank policy. It is not
+automatically performed when the presentation predictor saves its components.
+Preserve the original calibration recipe and compare a separately recalibrated
+candidate against the untouched public baseline.
 
 ## Decoy semantics
 

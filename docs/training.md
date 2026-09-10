@@ -155,3 +155,8 @@ Run `mhcflurry eval compare-models` against a public baseline and inspect the
 summary metrics and plots. Prediction-affecting changes need held-out evidence,
 not only a successful unit-test run. See {doc}`evaluation` for the evaluation
 workflow.
+
+Refit calibration after changing an ensemble's members or weights. The release
+workflow handles affinity and presentation; standalone processing calibration
+is explicit. See {doc}`shared_percent_rank_transforms` for reference requirements
+and preserving previous calibrations for comparisons.

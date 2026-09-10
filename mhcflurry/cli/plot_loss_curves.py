@@ -37,10 +37,10 @@ Produces (in ``--out``):
   - ``loss_curves_by_model.png`` — per-model train+val curves. Non-
     selected models in gray (if ``--unselected-dir`` is provided),
     selected in color.
-  - ``loss_curves_by_arch.png`` — curves colored by layer_sizes.
+  - ``loss_curves_by_arch.png`` — curves colored by architecture identity.
   - ``per_fold_summary.png`` — one panel per fold showing val_loss
     convergence of selected vs non-selected.
-  - ``summary.csv`` — tabular summary of final val_loss per model.
+  - ``summary.csv`` — final-epoch losses and explicit checkpoint metadata.
 """
 
 from __future__ import annotations
@@ -77,6 +77,43 @@ def _parse_config_json(raw):
         return ast.literal_eval(raw)
 
 
+def _architecture_metadata(hp):
+    """Describe affinity dense networks and processing CNNs without conflation."""
+    if "convolutional_kernel_size" not in hp:
+        sizes = tuple(hp.get("layer_sizes", []))
+        return {"model_type": "affinity", "architecture": str(sizes),
+                "architecture_key": "affinity:" + str(sizes),
+                "l1": hp.get("dense_layer_l1_regularization"), "l2": None}
+    fields = (
+        "amino_acid_encoding", "peptide_max_length", "n_flank_length",
+        "c_flank_length", "flanking_averages", "convolutional_filters",
+        "convolutional_kernel_size", "convolutional_padding_mode",
+        "convolutional_activation", "convolutional_kernel_l1_l2", "dropout_rate",
+        "post_convolutional_dense_layer_sizes", "normalization",
+        "cleavage_boundary_flank_length", "cleavage_boundary_peptide_length",
+        "cleavage_boundary_hidden_size", "cleavage_boundary_context_dropout",
+    )
+    architecture = "CNN k%s/f%s, flanks %s/%s" % (
+        hp["convolutional_kernel_size"], hp.get("convolutional_filters", "?"),
+        hp.get("n_flank_length", "?"), hp.get("c_flank_length", "?"))
+    if hp.get("cleavage_boundary_flank_length", 0):
+        architecture += ", boundary %sx%s/h%s" % (
+            hp["cleavage_boundary_flank_length"],
+            hp.get("cleavage_boundary_peptide_length", "?"),
+            hp.get("cleavage_boundary_hidden_size", "?"))
+    regularization = hp.get("convolutional_kernel_l1_l2") or [None, None]
+    return {"model_type": "processing", "architecture": architecture,
+            "architecture_key": "processing:" + json.dumps(
+                {name: hp.get(name) for name in fields}, sort_keys=True),
+            "l1": regularization[0], "l2": regularization[1]}
+
+
+def _epoch_label(models):
+    """Label observed fit history, without assuming pretraining exists."""
+    return ("Epoch (fit calls concatenated)"
+            if any(len(m["phase_curves"]) > 1 for m in models) else "Epoch")
+
+
 def _load_manifest_curves(manifest_path):
     """Load a manifest.csv and pull per-model fit_info curves.
 
@@ -94,7 +131,7 @@ def _load_manifest_curves(manifest_path):
         model_row = {
             "model_name": r.model_name,
             "layer_sizes": tuple(hp.get("layer_sizes", [])),
-            "l1": hp.get("dense_layer_l1_regularization"),
+            **_architecture_metadata(hp),
             "fold": None,
             "arch_num": None,
             "replicate": None,
@@ -121,6 +158,14 @@ def _load_manifest_curves(manifest_path):
                 "final_val_loss": (
                     float(val_losses[-1]) if val_losses else float("nan")
                 ),
+                "best_epoch": fit_rec.get("best_epoch"),
+                "best_val_loss": fit_rec.get("best_val_loss"),
+                "restored_best_weights": fit_rec.get("restored_best_weights"),
+                "checkpoint_policy": (
+                    fit_rec["restored_checkpoint_policy"] if "restored_checkpoint_policy" in fit_rec else
+                    "best" if fit_rec.get("restored_best_weights") is True else
+                    "terminal" if fit_rec.get("restored_best_weights") is False else
+                    "unknown"),
             })
         rows.append(model_row)
     return rows
@@ -158,14 +203,13 @@ def _plot_all_curves(selected_keys, all_models, out_path, title_suffix=""):
             color = cmap(selected_color_idx % 10)
             alpha = 0.9
             lw = 1.4
-            label = f"{m['layer_sizes']} f{m['fold']}"
+            label = f"{m['architecture']} f{m['fold']}"
             selected_color_idx += 1
         else:
             color = "#666666"
             alpha = 0.12
             lw = 0.7
-        # Concatenate pretrain + finetune curves with a vertical
-        # line at the handoff so phase transitions are visible.
+        # Plot all fit epochs even if inference restored an earlier checkpoint.
         loss_curve = []
         val_curve = []
         for ph in m["phase_curves"]:
@@ -184,14 +228,14 @@ def _plot_all_curves(selected_keys, all_models, out_path, title_suffix=""):
             )
 
     axes[0].set_title("Train loss")
-    axes[0].set_xlabel("epoch (pretrain + finetune concat)")
+    axes[0].set_xlabel(_epoch_label(all_models))
     axes[0].set_ylabel("loss")
     axes[0].set_yscale("log")
     axes[1].set_title("Val loss")
-    axes[1].set_xlabel("epoch (pretrain + finetune concat)")
+    axes[1].set_xlabel(_epoch_label(all_models))
     axes[1].set_ylabel("val loss")
     axes[1].set_yscale("log")
-    if selected_color_idx <= 12:
+    if 0 < selected_color_idx <= 12:
         # Only show legend when it won't swallow the plot. With >12
         # selected models the legend is more noise than signal.
         axes[1].legend(loc="upper right", fontsize=7, ncol=2)
@@ -200,31 +244,24 @@ def _plot_all_curves(selected_keys, all_models, out_path, title_suffix=""):
         f"{title_suffix}".strip(),
         fontsize=12,
     )
-    fig.tight_layout()
+    fig.text(0.5, 0.01, "Full epoch history; final epoch may differ from inference checkpoint (see summary.csv).",
+             ha="center", fontsize=9)
+    fig.tight_layout(rect=(0, 0.04, 1, 1))
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
 
 
 def _plot_by_arch(all_models, out_path):
-    """Color curves by layer_sizes — groups see how different archs
+    """Color curves by architecture — groups see how different archs
     behave during training, independent of selection outcome."""
     import matplotlib.pyplot as plt
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
     arch_groups = defaultdict(list)
     for m in all_models:
-        arch_groups[m["layer_sizes"]].append(m)
+        arch_groups[m["architecture_key"]].append(m)
 
-    # Consistent color per arch; stable ordering by total params
-    def arch_size(ls):
-        # Rough param estimate for ordering — 1092 input × layer_sizes
-        if not ls:
-            return 0
-        total = 1092 * ls[0]
-        for a, b in zip(ls, ls[1:]):
-            total += a * b
-        return total
-    sorted_archs = sorted(arch_groups.keys(), key=arch_size)
+    sorted_archs = sorted(arch_groups)
     cmap = plt.get_cmap("viridis")
     for i, arch in enumerate(sorted_archs):
         color = cmap(i / max(len(sorted_archs) - 1, 1))
@@ -234,7 +271,7 @@ def _plot_by_arch(all_models, out_path):
             for ph in m["phase_curves"]:
                 loss_curve.extend(ph["loss"])
                 val_curve.extend(ph["val_loss"])
-            label = str(arch) if j == 0 else None
+            label = ("%d: %s" % (i + 1, m["architecture"])) if j == 0 else None
             if len(loss_curve):
                 axes[0].plot(
                     numpy.arange(1, len(loss_curve) + 1), loss_curve,
@@ -247,12 +284,12 @@ def _plot_by_arch(all_models, out_path):
                 )
 
     axes[0].set_title("Train loss by arch")
-    axes[0].set_xlabel("epoch")
+    axes[0].set_xlabel(_epoch_label(all_models))
     axes[0].set_ylabel("loss")
     axes[0].set_yscale("log")
     axes[0].legend(loc="upper right", fontsize=7)
     axes[1].set_title("Val loss by arch")
-    axes[1].set_xlabel("epoch")
+    axes[1].set_xlabel(_epoch_label(all_models))
     axes[1].set_ylabel("val loss")
     axes[1].set_yscale("log")
     fig.tight_layout()
@@ -292,7 +329,7 @@ def _plot_per_fold(selected_keys, all_models, out_path):
                 color=color, alpha=alpha, lw=lw,
             )
         ax.set_title(f"Fold {fold}")
-        ax.set_xlabel("epoch")
+        ax.set_xlabel(_epoch_label(fold_models))
         ax.set_yscale("log")
     axes[0].set_ylabel("val loss")
     fig.suptitle(
@@ -371,7 +408,11 @@ def run(args):
             rows.append({
                 "model_name": m["model_name"],
                 "layer_sizes": str(m["layer_sizes"]),
+                "model_type": m["model_type"],
+                "architecture": m["architecture"],
+                "architecture_key": m["architecture_key"],
                 "l1": m["l1"],
+                "l2": m["l2"],
                 "fold": m["fold"],
                 "replicate": m["replicate"],
                 "selected": _selection_key(m) in selected_keys,
@@ -381,6 +422,10 @@ def run(args):
                     float(ph["loss"][-1]) if ph["loss"] else float("nan")
                 ),
                 "final_val_loss": ph["final_val_loss"],
+                "best_epoch": ph["best_epoch"],
+                "best_val_loss": ph["best_val_loss"],
+                "restored_best_weights": ph["restored_best_weights"],
+                "checkpoint_policy": ph["checkpoint_policy"],
             })
     summary_df = pandas.DataFrame(rows)
     summary_df.to_csv(

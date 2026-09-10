@@ -29,6 +29,10 @@ import sys
 
 WORKFLOW_SCRIPT = Path("scripts/release/retrain_evaluate_deploy.sh")
 TRAINING_SCRIPTS = {
+    "benchmark-processing-sampler": Path("scripts/training/benchmark_processing_sampler.py"),
+    "benchmark-processing-preparation": Path("scripts/training/benchmark_processing_preparation.py"),
+    "processing-kernel-sweep": Path("scripts/training/run_processing_kernel_sweep.py"),
+    "processing-hyperparameter-sweep": Path("scripts/training/run_processing_kernel_sweep.py"),
     "processing-data": Path("scripts/training/release_exact/make_train_data.processing.py"),
     "exact-public-processing": Path("scripts/training/run_exact_public_processing.py"),
     "audit-training-data": Path("scripts/training/audit_training_data_identity.py"),
@@ -46,6 +50,14 @@ def make_parser(prog="mhcflurry train"):
         ),
     )
     sub = parser.add_subparsers(dest="train_subcommand")
+    sub.add_parser("benchmark-processing-preparation", add_help=False,
+                   help="Benchmark numeric preparation and verify matching/prediction parity")
+    sub.add_parser("benchmark-processing-sampler", add_help=False,
+                   help="Benchmark numeric-position versus reservoir candidate sampling.")
+    sub.add_parser("processing-kernel-sweep", add_help=False,
+                   help="Run the paired, matched-data processing kernel-width sweep.")
+    sub.add_parser("processing-hyperparameter-sweep", add_help=False,
+                   help="Run a paired processing width or optimizer/initialization/batch design.")
     sub.add_parser("processing-data", add_help=False,
                    help="Generate affinity/length-matched processing training data.")
     sub.add_parser("validate-processing-data", add_help=False,
@@ -112,7 +124,8 @@ def _format_help(prog):
             "plot-loss-curves,snapshot-experiment,"
             "materialize-affinity-checkpoint,compose-processing-ensemble,"
             "audit-training-data,exact-public-processing,processing-data,"
-            "validate-processing-data} ..." %
+            "validate-processing-data,processing-kernel-sweep,processing-hyperparameter-sweep,benchmark-processing-sampler,"
+            "benchmark-processing-preparation} ..." %
             prog
         ),
         "",
@@ -130,6 +143,10 @@ def _format_help(prog):
         "  audit-training-data Audit exact row identity and multiplicities.",
         "  exact-public-processing Replay exact public processing/presentation data.",
         "  processing-data      Generate matched processing training data.",
+        "  processing-kernel-sweep Train/evaluate the paired 48-network width sweep.",
+        "  processing-hyperparameter-sweep Run a paired width or training-recipe design.",
+        "  benchmark-processing-sampler Compare candidate sampling implementations.",
+        "  benchmark-processing-preparation Check numeric, matching and prediction parity/timings.",
         "  validate-processing-data Verify cached matching assignments and metadata.",
         "",
         "Examples:",

@@ -55,6 +55,11 @@ from ..common import normalize_sequence_resolved_allele_name
 
 
 EVALUATION_SCRIPTS = {
+    "processing-confirmation-analysis": Path("scripts/training/analyze_processing_confirmation.py"),
+    "processing-fold-ensembles": Path("scripts/training/evaluate_processing_fold_ensembles.py"),
+    "processing-recipe-analysis": Path("scripts/training/analyze_processing_recipe.py"),
+    "presentation-percentiles": Path("scripts/training/compare_presentation_percentiles.py"),
+    "processing-ensemble-subsets": Path("scripts/training/evaluate_processing_subsets.py"),
     "processing-flank-ablation": Path("scripts/training/processing_flank_ablation.py"),
     "saved-candidate": Path("scripts/training/evaluate_saved_candidate.py"),
     "collate-figures": Path("scripts/training/collate_experiment_figures.py"),
@@ -107,6 +112,10 @@ def make_parser(prog="mhcflurry eval"):
         add_help=False,
     )
     for name, help_text in (
+            ("processing-confirmation-analysis", "Compare paired ranking checkpoints and export a gated processing candidate recipe."),
+            ("processing-fold-ensembles", "Score specified ensembles within shared held-out folds using cached predictions."),
+            ("processing-recipe-analysis", "Map paired processing recipe effects from saved development metrics."),
+            ("presentation-percentiles", "Compare compact percentile curves using cached scores."),
             ("processing-flank-ablation", "Test real, masked and shuffled flanks with fixed weights."),
             ("saved-candidate", "Evaluate saved full ensembles without retraining."),
             ("collate-figures", "Combine annotated experiment figures into a PDF."),
@@ -114,6 +123,8 @@ def make_parser(prog="mhcflurry eval"):
              "Estimate paired sample uncertainty from saved metric tables."),
             ("processing-ensemble",
              "Score a fixed ensemble from saved processing predictions."),
+            ("processing-ensemble-subsets",
+             "Evaluate all fixed-size subsets without held-out selection."),
             ("presentation-affinity-ensemble",
              "Evaluate public/new affinity mixtures from saved predictions."),
             ("release-experiment-figures",
@@ -208,7 +219,11 @@ def format_help(prog="mhcflurry eval"):
         "  processing-affinity-control",
         "                          Score affinity-controlled processing risk sets.",
         "  processing-ensemble     Score an ensemble from saved predictions.",
+        "  presentation-percentiles  Compare compact calibration curves and ranking metrics.",
+        "  processing-ensemble-subsets  Evaluate every fixed-size ensemble subset.",
         "  paired-sample-metrics   Bootstrap matched per-sample metric differences.",
+        "  processing-recipe-analysis  Map paired processing hyperparameter effects.",
+        "  processing-fold-ensembles  Compare cached ensembles within shared held-out folds.",
         "  collate-figures         Combine annotated experiment figures into a PDF.",
         "  presentation-affinity-ensemble",
         "                          Evaluate saved public/new affinity mixtures.",

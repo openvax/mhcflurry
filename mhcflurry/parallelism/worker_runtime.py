@@ -242,7 +242,7 @@ def call_wrapped_kwargs(function, kwargs):
     -------
     object
 
-    result of calling function(**kwargs)
+    Result of calling ``function(**kwargs)``.
 
     """
     return call_wrapped(function, **kwargs)

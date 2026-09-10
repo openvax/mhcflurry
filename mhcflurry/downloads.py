@@ -224,7 +224,7 @@ def get_path(download_name, filename='', test_exists=True, release=None):
     Get the local path to a file in a MHCflurry download
 
     Parameters
-    -----------
+    ----------
     download_name : string
 
     filename : string
@@ -238,7 +238,7 @@ def get_path(download_name, filename='', test_exists=True, release=None):
         Requested release; defaults to the configured current release.
 
     Returns
-    -----------
+    -------
     string giving local absolute path
     """
     assert '/' not in download_name, "Invalid download: %s" % download_name

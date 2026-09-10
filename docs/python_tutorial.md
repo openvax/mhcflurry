@@ -139,7 +139,6 @@ automatically included in the processing and presentation predictions.
 See the documentation for {class}`~mhcflurry.Class1PresentationPredictor` for other
 useful methods.
 
-
 ## Lower level interfaces
 
 The {class}`~mhcflurry.Class1PresentationPredictor` delegates to a
@@ -175,3 +174,7 @@ antigen processing prediction, and there is a low-level
 {class}`~mhcflurry.Class1ProcessingNeuralNetwork` with a {meth}`~mhcflurry.Class1ProcessingNeuralNetwork.fit` method.
 
 See the API documentation of these classes for details.
+
+When interpreting percentile outputs, lower means stronger and loading a
+model preserves its saved calibration. For custom calibration or standalone
+processing percentiles, see {doc}`shared_percent_rank_transforms`.

@@ -22,6 +22,30 @@ def _module():
     return module
 
 
+def test_kernel_sweep_has_six_paired_widths_and_fixed_controls():
+    conditions = _module().build_kernel_conditions()
+    assert len(conditions) == 12
+    assert sum(axes["network_count"] for _, _, axes in conditions) == 48
+    families = {}
+    for name, grid, axes in conditions:
+        config = dict(grid[0])
+        width = config.pop("convolutional_kernel_size")
+        assert width == axes["kernel_width"]
+        assert axes["fold_count"] == 4
+        assert config["convolutional_padding_mode"] == "unknown"
+        assert config["restore_best_weights"] is True
+        assert config["minibatch_size"] == 512
+        assert config["convolutional_filters"] == 512
+        assert config["optimizer_implementation"] == "keras"
+        assert config["convolutional_activation"] == "relu"
+        assert config["dropout_rate"] == 0.5
+        families.setdefault(axes["family"], []).append((width, config))
+    assert set(families) == {"legacy_5aa", "boundary_5x5"}
+    for records in families.values():
+        assert [width for width, _ in records] == [5, 7, 9, 11, 13, 15]
+        assert all(config == records[0][1] for _, config in records)
+
+
 def test_cleavage_boundary_design_is_paired_and_minimal(tmp_path):
     module = _module()
     conditions = module.build_conditions()

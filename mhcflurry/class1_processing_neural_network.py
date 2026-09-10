@@ -67,7 +67,8 @@ class Class1ProcessingModel(nn.Module):
             cleavage_boundary_flank_length=0,
             cleavage_boundary_peptide_length=0,
             cleavage_boundary_hidden_size=32,
-            cleavage_boundary_context_dropout=0.0):
+            cleavage_boundary_context_dropout=0.0,
+            convolutional_padding_mode="zeros"):
         super(Class1ProcessingModel, self).__init__()
 
         self.n_flank_length = n_flank_length
@@ -154,11 +155,18 @@ class Class1ProcessingModel(nn.Module):
                 self.cleavage_boundary_hidden_size, 1)
 
         # Main convolutional layer
+        if convolutional_padding_mode not in {"zeros", "unknown"}:
+            raise ValueError("convolutional_padding_mode must be zeros or unknown")
+        self.convolutional_padding_mode = convolutional_padding_mode
+        self.convolutional_context_padding = (
+            (convolutional_kernel_size - 1) // 2,
+            convolutional_kernel_size // 2,
+        )
         self.conv1 = nn.Conv1d(
             in_channels=in_channels,
             out_channels=convolutional_filters,
             kernel_size=convolutional_kernel_size,
-            padding='same'
+            padding='same' if convolutional_padding_mode == "zeros" else 0,
         )
 
         # Activation function
@@ -297,6 +305,7 @@ class Class1ProcessingModel(nn.Module):
             ]
             sequence = self._peptide_only_sequence(sequence, peptide_length)
 
+        sequence = self._pad_convolution_context(sequence)
         # Transpose for Conv1d: (batch, channels, seq_len)
         x = sequence.permute(0, 2, 1)
 
@@ -339,6 +348,23 @@ class Class1ProcessingModel(nn.Module):
         # Final output
         output = torch.sigmoid(self.output_layer(combined))
         return output.squeeze(-1)
+
+    def _pad_convolution_context(self, sequence):
+        """Pad unavailable context with X without shifting output coordinates.
+
+        Zero padding remains the default for compatibility with saved models.
+        Known flanks must already be placed next to the actual peptide by the
+        encoder; this method only extends the encoded sequence at its ends.
+        """
+        if self.convolutional_padding_mode == "zeros":
+            return sequence
+        left, right = self.convolutional_context_padding
+        unknown = self._unknown_embedding(sequence).view(1, 1, -1)
+        return torch.cat([
+            unknown.expand(sequence.size(0), left, -1),
+            sequence,
+            unknown.expand(sequence.size(0), right, -1),
+        ], dim=1)
 
     def _unknown_embedding(self, sequence):
         """Return the configured vector representation of the X token."""
@@ -584,13 +610,13 @@ class Class1ProcessingModel(nn.Module):
         avg_value = (x_shifted * mask_expanded).mean(dim=1) - 1
         return avg_value
 
-    def get_weights_list(self):
-        """Get weights as a list of numpy arrays."""
+    def get_weights_list(self, state_dict=None):
+        """Copy weights in NPZ order, optionally from a retained module state."""
         weights = []
-        for name, param in self.named_parameters():
-            weights.append(param.detach().cpu().numpy())
-        for name, buffer in self._named_persistent_buffers():
-            weights.append(buffer.detach().cpu().numpy())
+        for name, value in list(self.named_parameters()) + list(self._named_persistent_buffers()):
+            if state_dict is not None:
+                value = state_dict[name]
+            weights.append(value.detach().cpu().numpy().copy())
         return weights
 
     def _named_persistent_buffers(self):
@@ -756,6 +782,7 @@ class Class1ProcessingNeuralNetwork(object):
         flanking_averages=False,
         convolutional_filters=16,
         convolutional_kernel_size=8,
+        convolutional_padding_mode="zeros",
         convolutional_activation="tanh",
         convolutional_kernel_l1_l2=[0.0001, 0.0001],
         dropout_rate=0.5,
@@ -778,6 +805,8 @@ class Class1ProcessingNeuralNetwork(object):
         early_stopping=True,
         minibatch_size=512,
         validation_batch_size=None,
+        initialization_method="none",
+        initialization_batch_size=512,
     )
     """
     Hyperparameters for neural network training.
@@ -787,6 +816,9 @@ class Class1ProcessingNeuralNetwork(object):
         patience=30,
         min_delta=0.0,
         restore_best_weights=False,
+        save_all_checkpoints=False,
+        monitor_validation_ranking=False,
+        checkpoint_metric="val_loss",
     )
     """
     Hyperparameters for early stopping.
@@ -829,6 +861,7 @@ class Class1ProcessingNeuralNetwork(object):
         self.network_json = None
         self.network_weights = None
         self.fit_info = []
+        self.checkpoint_weights = {}
 
     @property
     def sequence_lengths(self):
@@ -929,6 +962,7 @@ class Class1ProcessingNeuralNetwork(object):
         progress_print_interval=5.0,
         seed=None,
         validation_mask=None,
+        sample_ids=None,
     ):
         """
         Fit the neural network.
@@ -944,6 +978,11 @@ class Class1ProcessingNeuralNetwork(object):
         validation_mask : array of bool, optional
             Explicit per-row validation membership, overriding validation_split.
             Used by matched processing training to keep complete samples together.
+        sample_ids : array of str, optional
+            Required for monitor_validation_ranking or checkpoint_metric=
+            'val_macro_ap'. Samples must not cross the explicit training and
+            stopping-validation mask. AP selects the earliest best-ranking
+            epoch; early-stopping patience remains based on validation loss.
         shuffle_permutation : list of int
             Permutation (integer list) of same length as peptides and affinities
             If None, then a random permutation will be generated.
@@ -970,6 +1009,23 @@ class Class1ProcessingNeuralNetwork(object):
         """
         device = self.get_device()
         configure_matmul_precision(device)
+        checkpoint_metric = self.hyperparameters["checkpoint_metric"]
+        if checkpoint_metric not in ("val_loss", "val_macro_ap"):
+            raise ValueError("checkpoint_metric must be val_loss or val_macro_ap")
+        ranking_enabled = (self.hyperparameters["monitor_validation_ranking"]
+                           or checkpoint_metric == "val_macro_ap")
+        if ranking_enabled:
+            from .processing_ranking import SampleRankingMonitor
+            # Check before shuffling: split identity and row order are explicit.
+            samples = numpy.asarray(sample_ids, dtype=object)
+            mask = numpy.asarray(validation_mask)
+            if (samples.shape != (len(targets),) or mask.dtype != bool
+                    or mask.shape != samples.shape or not mask.any() or mask.all()):
+                raise ValueError("Ranking monitoring requires sample_ids and a nonempty explicit validation_mask")
+            if not all(isinstance(value, str) and value for value in samples):
+                raise ValueError("Ranking monitoring requires nonempty string sample IDs")
+            if set(samples[mask]) & set(samples[~mask]):
+                raise ValueError("Ranking validation samples overlap training samples")
 
         # One seed controls every stochastic step in this fit. Seed numpy's
         # and torch's global RNGs up front so weight init, the example
@@ -1000,6 +1056,8 @@ class Class1ProcessingNeuralNetwork(object):
             x_dict[key] = x_dict[key][shuffle_permutation]
 
         fit_info = collections.defaultdict(list)
+        # A refit must never expose states from an earlier training trajectory.
+        self.checkpoint_weights = {}
 
         if self._network is None:
             self._network = self.make_network(
@@ -1047,6 +1105,15 @@ class Class1ProcessingNeuralNetwork(object):
             fit_info["validation_policy"] = "explicit-mask"
         fit_info["training_rows"] = n_train
         fit_info["validation_rows"] = n_val
+        ranking_monitor = None
+        if ranking_enabled:
+            # Undo the fit shuffle within validation for stable PPV tie breaks.
+            ranking_order = numpy.argsort(numpy.asarray(shuffle_permutation)[val_rows], kind="stable")
+            ranking_samples = samples[numpy.asarray(shuffle_permutation)[val_rows]][ranking_order]
+            ranking_monitor = SampleRankingMonitor(targets[val_rows][ranking_order], ranking_samples)
+            fit_info["ranking_validation_samples"] = ranking_monitor.sample_ids
+            fit_info["ranking_validation_input_rows"] = numpy.asarray(shuffle_permutation)[val_rows][ranking_order].tolist()
+            fit_info["ranking_tie_policy"] = "earliest epoch for equal AP; stable original input row for PPV"
 
         # Hoist all per-batch H2D copies to a single up-front device
         # transfer. The processing dataset is small (peptide flanks for
@@ -1069,10 +1136,39 @@ class Class1ProcessingNeuralNetwork(object):
         train_indices_dev = torch.as_tensor(train_rows, device=device, dtype=torch.long)
         val_indices_dev = torch.as_tensor(val_rows, device=device, dtype=torch.long)
 
+        from .processing_initialization import initialize_processing_network
+        initialization_method = self.hyperparameters["initialization_method"]
+        if initialization_method == "none":
+            report = initialize_processing_network(eager_network, {}, "none")
+            fit_info["initialization"] = dict(report, applied=False)
+        elif self.fit_info:
+            fit_info["initialization"] = {"method": initialization_method,
+                                          "applied": False, "reason": "existing_fit"}
+        else:
+            calibration_size = min(n_train, int(self.hyperparameters["initialization_batch_size"]))
+            if calibration_size < 1:
+                raise ValueError("initialization_batch_size must be positive")
+            calibration_rows = train_indices_dev[:calibration_size]
+            calibration_inputs = {
+                "sequence": seq_dev.index_select(0, calibration_rows),
+                "peptide_length": length_dev.index_select(0, calibration_rows)}
+            report = initialize_processing_network(
+                eager_network, calibration_inputs, initialization_method)
+            report["applied"] = initialization_method != "none"
+            if report["applied"]:
+                report["calibration_fit_input_rows"] = numpy.asarray(shuffle_permutation)[
+                    train_rows[:calibration_size]].tolist()
+            fit_info["initialization"] = report
+
         last_progress_print = None
         min_val_loss_iteration = None
         min_val_loss = None
         best_state_dict = None
+        best_ap_state_dict = None
+        best_ap = None
+        best_ap_epoch = None
+        optimizer_steps = 0
+        stop_reason = "max_epochs"
         start = time.time()
 
         for epoch in range(self.hyperparameters["max_epochs"]):
@@ -1114,6 +1210,7 @@ class Class1ProcessingNeuralNetwork(object):
                     loss = loss + regularization_penalty
                 loss.backward()
                 optimizer.step()
+                optimizer_steps += 1
                 train_loss_sum = train_loss_sum + loss.detach()
                 train_loss_count += 1
 
@@ -1145,6 +1242,7 @@ class Class1ProcessingNeuralNetwork(object):
                 with torch.inference_mode():
                     val_loss_sum = torch.zeros((), device=device)
                     val_loss_count = 0
+                    ranking_predictions = []
                     for batch_start in range(0, n_val, val_batch_size):
                         batch_idx = val_indices_dev[
                             batch_start:batch_start + val_batch_size
@@ -1158,6 +1256,8 @@ class Class1ProcessingNeuralNetwork(object):
                             "peptide_length": val_length,
                         }
                         val_predictions = validation_network(val_inputs)
+                        if ranking_monitor is not None:
+                            ranking_predictions.append(val_predictions.detach())
                         val_loss = loss_fn(val_predictions, val_targets)
                         if weights_dev is not None:
                             val_loss = val_loss * weights_dev.index_select(
@@ -1180,6 +1280,15 @@ class Class1ProcessingNeuralNetwork(object):
                         val_loss = val_loss + regularization_penalty
                     val_loss = val_loss.item()
                 fit_info["val_loss"].append(val_loss)
+                if ranking_monitor is not None:
+                    ranking = ranking_monitor(torch.cat(ranking_predictions).cpu().numpy()[ranking_order])
+                    for key, value in ranking.items():
+                        fit_info[key].append(value)
+                    if best_ap is None or ranking["val_macro_ap"] > best_ap:
+                        best_ap, best_ap_epoch = ranking["val_macro_ap"], epoch
+                        if (self.hyperparameters["save_all_checkpoints"] or
+                                (self.hyperparameters["restore_best_weights"] and checkpoint_metric == "val_macro_ap")):
+                            best_ap_state_dict = copy_module_state_dict_to_cpu(eager_network)
 
             # Progress printing
             if progress_print_interval is not None and (
@@ -1210,7 +1319,8 @@ class Class1ProcessingNeuralNetwork(object):
                 ):
                     min_val_loss = val_loss
                     min_val_loss_iteration = epoch
-                    if self.hyperparameters["restore_best_weights"]:
+                    if (self.hyperparameters["restore_best_weights"] or
+                            self.hyperparameters["save_all_checkpoints"]):
                         best_state_dict = copy_module_state_dict_to_cpu(
                             eager_network)
 
@@ -1239,22 +1349,45 @@ class Class1ProcessingNeuralNetwork(object):
                                     )
                                 ).strip()
                             )
+                        stop_reason = "early_stopping"
+                        fit_info["optimizer_steps"].append(optimizer_steps)
+                        fit_info["epoch_seconds"].append(time.time() - epoch_start)
                         break
 
+            fit_info["optimizer_steps"].append(optimizer_steps)
+            fit_info["epoch_seconds"].append(time.time() - epoch_start)
             if progress_callback:
                 progress_callback()
 
+        if self.hyperparameters["save_all_checkpoints"]:
+            self.checkpoint_weights["terminal"] = eager_network.get_weights_list()
+            if best_state_dict is not None:
+                self.checkpoint_weights["best"] = eager_network.get_weights_list(best_state_dict)
+            if best_ap_state_dict is not None:
+                self.checkpoint_weights["best_ap"] = eager_network.get_weights_list(best_ap_state_dict)
+        restored_state = best_ap_state_dict if checkpoint_metric == "val_macro_ap" else best_state_dict
         restored_best_weights = bool(
             self.hyperparameters["restore_best_weights"]
-            and best_state_dict is not None
+            and restored_state is not None
         )
         if restored_best_weights:
-            eager_network.load_state_dict(best_state_dict)
+            eager_network.load_state_dict(restored_state)
         fit_info["best_epoch"] = (
             min_val_loss_iteration + 1
             if min_val_loss_iteration is not None else None)
         fit_info["best_val_loss"] = min_val_loss
         fit_info["restored_best_weights"] = restored_best_weights
+        fit_info["restored_checkpoint_policy"] = (
+            ("best_ap" if checkpoint_metric == "val_macro_ap" else "best")
+            if restored_best_weights else "terminal")
+        if ranking_enabled:
+            fit_info["best_macro_ap"] = best_ap
+            fit_info["best_ranking_epoch"] = best_ap_epoch + 1 if best_ap_epoch is not None else None
+            fit_info["checkpoint_metric"] = checkpoint_metric
+            fit_info["stopping_metric"] = "val_loss"
+        fit_info["stop_reason"] = stop_reason
+        fit_info["stop_epoch"] = len(fit_info["loss"])
+        fit_info["retained_checkpoints"] = sorted(self.checkpoint_weights)
         fit_info["time"] = time.time() - start
         fit_info["num_points"] = len(sequences.dataframe)
         self.fit_info.append(dict(fit_info))
@@ -1573,6 +1706,7 @@ class Class1ProcessingNeuralNetwork(object):
         flanking_averages,
         convolutional_filters,
         convolutional_kernel_size,
+        convolutional_padding_mode,
         convolutional_activation,
         convolutional_kernel_l1_l2,
         dropout_rate,
@@ -1602,6 +1736,7 @@ class Class1ProcessingNeuralNetwork(object):
             flanking_averages=flanking_averages,
             convolutional_filters=convolutional_filters,
             convolutional_kernel_size=convolutional_kernel_size,
+            convolutional_padding_mode=convolutional_padding_mode,
             convolutional_activation=convolutional_activation,
             convolutional_kernel_l1_l2=convolutional_kernel_l1_l2,
             dropout_rate=dropout_rate,
@@ -1663,6 +1798,8 @@ class Class1ProcessingNeuralNetwork(object):
         result = dict(self.__dict__)
         del result["_network"]
         result["network_weights"] = None
+        # Checkpoints are sidecars, never JSON arrays in every manifest row.
+        result["checkpoint_weights"] = {}
         return result
 
     @classmethod

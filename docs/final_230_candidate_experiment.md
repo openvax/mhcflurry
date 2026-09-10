@@ -116,6 +116,30 @@ valid completed affinity/no-flank/short-flank fits and evaluate them; do not
 describe this run as a clean implementation of the entire frozen recipe. Any
 15-aa correction must use a separate model directory and explicit provenance.
 
+## Candidate v2 (2026-09-10): confirmed 5-aa ranking recipe
+
+`MHCFLURRY_RELEASE_RECIPE=final-2.3.0-candidate-v2` keeps every v1 decision
+except the presentation 5-aa legacy branch. Instead of selecting one network
+per fold from the 128-architecture Glorot/Keras-Adam `short_flanks` grid, it
+trains the single confirmed ranking candidate `legacy_5aa__rmsprop_pytorch__k13`
+(native RMSprop, Glorot, width 13, L1/L2 zero, batch 512, inner-best-AP
+checkpoints with loss-based patience; see the
+[processing campaign](processing_hyperparameter_campaign.md)) once per fold.
+The boundary radius-5 family, the no-flank grid, the affinity recipe, the
+presentation combiner and calibration are unchanged. The decision set is
+`scripts/training/final_230_candidate_v2_recipe.json`.
+
+The preset trains `no_flank` and `short_flanks` only, because the 15-aa
+`with_flanks` grid is not a presentation input. Set
+`FINAL_230_V2_PROCESSING_VARIANTS="with_flanks no_flank short_flanks"` (and
+matching `PROCESSING_VARIANTS`/`PROCESSING_MODES` in the launch environment)
+to add it back in a resumed run before releasing the full processing
+download. Launch exactly as below with the v2 recipe name, workflow id
+`final-2.3.0-candidate-v2`, `PROCESSING_VARIANTS="no_flank short_flanks"`
+and `PROCESSING_MODES=no_flank,short_flanks`. The acceptance gate for this
+candidate was recorded before training in
+`output/final-230-candidate-v2/SPEC.md`.
+
 ## Reusable launch and collection commands
 
 Launch the frozen recipe from a clean commit. The launcher rejects a commit

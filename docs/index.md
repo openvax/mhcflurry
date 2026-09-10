@@ -51,6 +51,7 @@ evaluation
 commandline_tools
 configuration
 api
+shared_percent_rank_transforms
 ```
 
 ```{toctree}
@@ -67,6 +68,9 @@ release_neural_hyperparameter_audit
 release_2_3_training_experiments
 affinity_dual_checkpoint_workflow
 processing_cleavage_boundary_experiment
+processing_kernel_sweep
+processing_hyperparameter_campaign
+processing_preparation_acceleration
 presentation_component_factorial_experiment
 presentation_affinity_orthogonality_diagnostic
 presentation_affinity_ensemble_followup

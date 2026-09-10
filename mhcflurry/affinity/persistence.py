@@ -22,14 +22,13 @@ from os import makedirs, mkdir
 from os.path import abspath, commonpath, dirname, exists, join, realpath, relpath
 from socket import gethostname
 
-import numpy
 import pandas
 from mhcgnomes import parse, parse_gene_class
 
 from ..class1_neural_network import Class1NeuralNetwork
 from ..common import load_weights, normalize_allele_name, save_weights
 from ..downloads import get_default_class1_models_dir
-from ..percent_rank_transform import PercentRankTransform
+from ..percentile_calibration import load_percent_rank_transforms, save_percent_rank_transforms
 from ..pseudosequences import (
     LEGACY_ALLELE_SEQUENCES_FILENAME,
     pseudosequence_filename_candidates,
@@ -114,7 +113,7 @@ def save_predictor(predictor, models_dir, model_names_to_write=None, write_metad
         Only write the weights for the specified models. Useful for
         incremental updates during training. Passing an explicit empty
         list writes no model artifacts; this is used by calibration-only
-        updates that should replace ``percent_ranks.csv`` without touching
+        updates that replace percentile calibration (CSV or JSON) without touching
         the manifest, weights, model provenance, allele sequences, or
         optimization metadata. Explicit ``metadata_dataframes`` are still
         written when ``write_metadata`` is true.
@@ -236,26 +235,7 @@ def save_predictor(predictor, models_dir, model_names_to_write=None, write_metad
             metadata_df_path = join(models_dir, "%s.csv.bz2" % name)
             df.to_csv(metadata_df_path, index=False, compression="bz2")
 
-    if predictor.allele_to_percent_rank_transform:
-        percent_ranks_df = None
-        for (allele, transform) in predictor.allele_to_percent_rank_transform.items():
-            series = transform.to_series()
-            if percent_ranks_df is None:
-                percent_ranks_df = {}
-                percent_ranks_df_index = series.index
-            numpy.testing.assert_array_almost_equal(
-                series.index.values,
-                percent_ranks_df_index.values)
-            percent_ranks_df[allele] = series.values
-        percent_ranks_df = pandas.DataFrame(
-            percent_ranks_df,
-            index=percent_ranks_df_index)
-        percent_ranks_path = join(models_dir, "percent_ranks.csv")
-        percent_ranks_df.to_csv(
-            percent_ranks_path,
-            index=True,
-            index_label="bin")
-        logging.info("Wrote: %s", percent_ranks_path)
+    save_percent_rank_transforms(models_dir, predictor.allele_to_percent_rank_transform)
 
     if write_model_artifacts and predictor.optimization_info:
         # If the model being saved was optimized, we need to save that
@@ -440,16 +420,11 @@ def load_predictor(
 
     # ----- Load percent ranks -----
     allele_to_percent_rank_transform = {}
-    percent_ranks_path = join(models_dir, "percent_ranks.csv")
-    if exists(percent_ranks_path):
-        percent_ranks_df = pandas.read_csv(percent_ranks_path, index_col=0)
-        for allele in percent_ranks_df.columns:
-            canonical = to_canonical(allele)
-            if (canonical in allele_to_percent_rank_transform and
-                    allele != canonical):
-                continue
-            allele_to_percent_rank_transform[canonical] = (
-                PercentRankTransform.from_series(percent_ranks_df[allele]))
+    for allele, transform in load_percent_rank_transforms(models_dir).items():
+        canonical = to_canonical(allele)
+        if canonical in allele_to_percent_rank_transform and allele != canonical:
+            continue
+        allele_to_percent_rank_transform[canonical] = transform
 
     logging.info(
         "Loaded %d class1 pan allele predictors, %d allele sequences, "

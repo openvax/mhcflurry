@@ -7,8 +7,10 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import sys
+import time
 
 import numpy
 import pandas
@@ -64,8 +66,10 @@ def verify_public_inputs(processing, presentation, holdout):
 class Driver:
     """Log resumable command stages without hiding a failing subprocess."""
 
-    def __init__(self, out):
+    def __init__(self, out, deadline=None):
         self.out = out
+        configured = os.environ.get("MHCFLURRY_EXPERIMENT_DEADLINE_EPOCH")
+        self.deadline = float(configured) if deadline is None and configured else deadline
 
     def run(self, stage, command):
         command = list(map(str, command))
@@ -80,9 +84,40 @@ class Driver:
         log_path = self.out / "logs" / (stage + ".log")
         log_path.parent.mkdir(exist_ok=True)
         print("Starting", stage, command, flush=True)
+        remaining = self.deadline - time.time() if self.deadline is not None else None
+        if remaining is not None and remaining <= 0:
+            raise TimeoutError("Experiment budget deadline reached before: " + stage)
+        # Nested maintained commands inherit the outer command's process group.
+        # Only its owner creates/kills that group, so no orphan GPU worker survives
+        # an outer deadline. Ordinary non-budgeted commands keep legacy behavior.
+        group_owner = (remaining is not None and os.name == "posix" and
+                       not os.environ.get("MHCFLURRY_BUDGET_PROCESS_GROUP"))
+        child_env = os.environ.copy()
+        if group_owner:
+            child_env["MHCFLURRY_BUDGET_PROCESS_GROUP"] = "1"
         with log_path.open("a") as log:
-            process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
-            status = process.wait()
+            process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT,
+                                       start_new_session=group_owner, env=child_env)
+            try:
+                status = process.wait(timeout=remaining) if remaining is not None else process.wait()
+            except subprocess.TimeoutExpired:
+                try:
+                    if group_owner:
+                        os.killpg(process.pid, signal.SIGTERM)
+                    else:
+                        process.terminate()
+                except ProcessLookupError:
+                    pass
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    if group_owner:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    else:
+                        process.kill()
+                    process.wait(timeout=5)
+                status = 124
+                event["budget_deadline_exceeded"] = True
         event.update(exit_code=status, finished_at=utc_now())
         write_json(self.out / "commands" / (stage + ".json"), event)
         if status:
@@ -90,14 +125,15 @@ class Driver:
         write_json(marker, event)
 
 
-def cached_scores(out, name, data, input_hash, model_dir, calculate):
+def cached_scores(out, name, data, input_hash, model_dir, calculate,
+                  ordering="original archived presentation table order"):
     """Bind every cached vector to both its row ordering and model files."""
     cache = out / "component_scores"
     cache.mkdir(exist_ok=True)
     path = cache / (name + ".npy")
     metadata_path = cache / (name + ".json")
     identity = {"input_sha256": input_hash, "rows": len(data),
-                "ordering": "original archived presentation table order",
+                "ordering": ordering,
                 "predictor": fingerprint_directory(model_dir)}
     if metadata_path.exists() and path.exists():
         metadata = json.loads(metadata_path.read_text())

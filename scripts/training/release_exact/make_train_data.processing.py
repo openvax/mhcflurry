@@ -23,7 +23,11 @@ import pandas
 import tqdm
 from mhcflurry.processing_matching import (
     add_processing_matching_args, initialize_matching_artifacts,
-    prepare_processing_training_sample, validate_matched_training_data)
+    validate_matched_training_data)
+from mhcflurry.processing_preparation import (
+    add_processing_preparation_args, sample_preparation_steps, ScoredValues)
+from mhcflurry.scoring_pipeline import scoring_pipeline
+from mhcflurry.numeric_proteome import ProcessingProteome, ProteinWindows, NumericCandidatePool
 from mhcgnomes import parse
 
 from mhcflurry.common import (
@@ -119,6 +123,7 @@ def predictor_allele_for_processing(affinity_predictor, allele):
 
 parser = argparse.ArgumentParser(usage=__doc__)
 add_processing_matching_args(parser)
+add_processing_preparation_args(parser)
 
 parser.add_argument(
     "--hits",
@@ -195,9 +200,6 @@ def do_process_samples(samples, seed=None, constant_data=None):
     if constant_data is None:
         constant_data = WORKER_CONTEXT
 
-    if seed is not None:
-        numpy.random.seed(int(seed) % (2 ** 32))
-
     args = constant_data['args']
     lengths = constant_data['lengths']
     all_peptides_by_length = constant_data.get('all_peptides_by_length')
@@ -210,70 +212,82 @@ def do_process_samples(samples, seed=None, constant_data=None):
         hit_df.sample_id.isin(samples)
     ]
 
-    affinity_predictor = mhcflurry.Class1AffinityPredictor.load(
-        args.affinity_predictor)
-    print("Loaded", affinity_predictor)
+    def get_predictor():
+        cached = constant_data.get("processing_affinity_predictor")
+        if cached is None:
+            cached = (args.affinity_predictor,
+                      mhcflurry.Class1AffinityPredictor.load(args.affinity_predictor))
+            constant_data["processing_affinity_predictor"] = cached
+            print("Loaded worker affinity predictor", cached[1], flush=True)
+        if cached[0] != args.affinity_predictor:
+            raise ValueError("Worker affinity predictor changed between samples")
+        return cached[1]
 
-    predictor_alleles = {
-        allele: predictor_allele_for_processing(affinity_predictor, allele)
-        for allele in hit_df.allele.unique()
-    }
+    numeric = args.negative_policy == "matched" and all_peptides_by_length is None
+    if numeric and "processing_proteome" not in constant_data:
+        constant_data["processing_proteome"] = ProcessingProteome(proteome_sequences)
+    proteome = constant_data.get("processing_proteome")
 
-    result_df = []
-    for sample_id, sub_hit_df in tqdm.tqdm(
-            hit_df.groupby("sample_id"), total=hit_df.sample_id.nunique()):
-
-        sub_hit_df = sub_hit_df.copy()
-        sub_hit_df["hit"] = 1
+    def build_sample(sample_id, sub_hit_df):
+        # A distinct generator scope owns each sample's callbacks and RNG.
+        sub_hit_df = sub_hit_df.copy().assign(hit=1)
+        sub_hit_df = sub_hit_df[[c for c in columns_to_keep if c != "affinity_prediction"]]
         sample_peptides = sub_hit_df.peptide.unique()
         sample_accessions = sub_hit_df.protein_accession.unique()
+        sample_seed = constant_data.get("sample_seeds", {}).get(sample_id, seed)
+        rng = numpy.random.RandomState(None if sample_seed is None else int(sample_seed) % (2 ** 32))
 
-        decoys_df = []
-        for length in lengths:
-            num_decoys = int(
-                len(sub_hit_df) * args.ppv_multiplier / len(lengths))
+        def draw_candidates(length, excluded, count, draw_rng):
+            if numeric:
+                return proteome.sample(sample_accessions, length, count, excluded, draw_rng)
             if all_peptides_by_length is None:
                 selected_decoys = sample_peptide_frame_for_accessions(
                     sample_accessions,
                     proteome_sequences,
                     lengths=[length],
                     flanking_length=flanking_length,
-                    exclude_peptides=sample_peptides,
-                    n=num_decoys,
+                    exclude_peptides=excluded,
+                    n=count,
+                    sampling_method="reservoir",
                 )
             else:
                 universe = all_peptides_by_length[length]
                 possible_universe = universe.loc[
-                    (~universe.peptide.isin(sample_peptides)) &
+                    (~universe.peptide.isin(excluded)) &
                     (universe.protein_accession.isin(sample_accessions))
                 ]
-                selected_decoys = possible_universe.sample(n=num_decoys)
-            decoys_df.append(
-                selected_decoys[[
-                    "protein_accession", "peptide", "n_flank", "c_flank"
-                ]].drop_duplicates("peptide"))
+                if args.negative_policy == "matched":
+                    count = min(count, len(possible_universe))
+                selected_decoys = possible_universe.sample(n=count,
+                    random_state=draw_rng if args.negative_policy == "matched" else None)
+            return selected_decoys[["protein_accession", "peptide", "n_flank", "c_flank"]].drop_duplicates("peptide")
 
-        merged_df = pandas.concat(
-            [sub_hit_df] + decoys_df, ignore_index=True, sort=False)
+        def initial_pool():
+            if args.negative_policy != "matched" and sample_seed is not None:
+                numpy.random.seed(int(sample_seed) % (2 ** 32))
+            count = int(len(sub_hit_df) * args.ppv_multiplier / len(lengths))
+            parts = [draw_candidates(length, sample_peptides, count, rng) for length in lengths]
+            if numeric:
+                return NumericCandidatePool(sub_hit_df, ProteinWindows.concatenate(parts), sample_id, flanking_length)
+            frames = [sub_hit_df] + parts
+            merged = pandas.concat(frames, ignore_index=True, sort=False)
+            merged["sample_id"] = sample_id
+            return merged[[column for column in columns_to_keep if column != "affinity_prediction"]]
 
-        training_allele = sample_table.loc[sample_id].allele
-        predictor_allele = predictor_alleles[training_allele]
-        prediction_col = "%s affinity" % predictor_allele
-        predictions_df = pandas.DataFrame(
-            index=merged_df.peptide.unique(),
-            columns=[prediction_col])
+        def additional(length, excluded, round_seed):
+            part = draw_candidates(length, excluded, args.expansion_candidates_per_length,
+                                   numpy.random.RandomState(int(round_seed) % (2 ** 32)))
+            if numeric:
+                return NumericCandidatePool(sub_hit_df.iloc[:0], part, sample_id, flanking_length)
+            return part.assign(sample_id=sample_id, hit=0)
 
-        predictions_df[prediction_col] = affinity_predictor.predict(
-            predictions_df.index,
-            allele=predictor_allele)
-
-        merged_df["affinity_prediction"] = merged_df.peptide.map(
-            predictions_df[prediction_col])
         if args.negative_policy == "matched":
-            merged_df["sample_id"] = sample_id
-            selected_df = prepare_processing_training_sample(
-                merged_df[columns_to_keep], args, args.matching_reference)
+            selected_df = yield from sample_preparation_steps(
+                args, sample_id, sub_hit_df, sample_seed, initial_pool, additional)
         else:
+            merged_df = initial_pool()
+            response = yield merged_df.peptide
+            merged_df["affinity_prediction"] = response.values
             merged_df = merged_df.sort_values("affinity_prediction", ascending=True)
             num_to_take = int(len(sub_hit_df) * args.hit_multiplier_to_take)
             selected_df = merged_df.head(num_to_take)[
@@ -281,13 +295,32 @@ def do_process_samples(samples, seed=None, constant_data=None):
             ].sample(frac=1.0).copy()
         selected_df["hit"] = selected_df["hit"].fillna(0)
         selected_df["sample_id"] = sample_id
-        result_df.append(selected_df)
-
         print(
             "Processed sample",
             sample_id,
             "with hit and decoys:\n",
             selected_df.hit.value_counts())
+        return selected_df
+
+    def score(sample_id, request):
+        started = time.monotonic()
+        predictor = get_predictor()
+        resolved = predictor_allele_for_processing(predictor, sample_table.loc[sample_id].allele)
+        if isinstance(request, NumericCandidatePool):
+            models = predictor.class1_pan_allele_models or predictor.allele_to_allele_specific_models[resolved]
+            peptides = request.prediction_input(models[0].get_device())
+            values = predictor.predict_numeric(peptides, allele=resolved)
+        else:
+            unique = pandas.Index(request).unique()
+            by_peptide = pandas.Series(predictor.predict(unique, allele=resolved), index=unique)
+            values = by_peptide.reindex(request).to_numpy()
+        return ScoredValues(values, time.monotonic() - started)
+
+    workflows = ((sample_id, build_sample(sample_id, group))
+                 for sample_id, group in hit_df.groupby("sample_id", sort=False))
+    depth = args.preparation_pipeline_depth if args.negative_policy == "matched" else 1
+    results = dict(scoring_pipeline(workflows, score, max_in_flight=depth, cpu_workers=min(depth, 2)))
+    result_df = [results[sample_id] for sample_id in hit_df.sample_id.unique()]
 
     result_df = pandas.concat(result_df, ignore_index=True, sort=False)
     return result_df
@@ -419,6 +452,7 @@ def run():
 
     print("Selecting decoys.")
 
+    WORKER_CONTEXT.clear()
     WORKER_CONTEXT['args'] = args
     WORKER_CONTEXT['lengths'] = [8, 9, 10, 11]
     WORKER_CONTEXT['all_peptides_by_length'] = all_peptides_by_length
@@ -431,12 +465,15 @@ def run():
     start = time.time()
 
     sample_order = list(hit_df.sample_id.unique())
+    WORKER_CONTEXT["sample_seeds"] = {sample: derive_seed(master_seed, "sample", sample) for sample in sample_order}
+    # Each pool task owns enough samples to overlap stages, while limiting the
+    # granularity of process recycling and work distribution across GPUs.
+    chunk_size = 4 * args.preparation_pipeline_depth if args.negative_policy == "matched" else 1
     tasks = [
         {
-            "samples": [sample],
-            "seed": derive_seed(master_seed, "sample", sample),
+            "samples": sample_order[start:start + chunk_size],
         }
-        for sample in sample_order
+        for start in range(0, len(sample_order), chunk_size)
     ]
 
     if serial_run:

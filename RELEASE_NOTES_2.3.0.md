@@ -57,6 +57,21 @@ model-validation record stays distinct from the package changelog.
   difficulty. The working hypothesis is that a stronger affinity predictor
   selects higher-quality, harder processing negatives; final acceptance still
   reports processing metrics on the strictly held-out evaluation set.
+- Unify percentile calibration across predictors, preserving historical
+  mappings on load. New compact calibrations require updated software;
+  see the [calibration reference](docs/shared_percent_rank_transforms.md).
+- Add opt-in inner-sample ranking monitoring for processing fits
+  (`monitor_validation_ranking`, `checkpoint_metric=val_macro_ap`) that
+  retains independent best-loss, best-AP and terminal states on one training
+  trajectory, plus the `ranking-confirmation` sweep design and
+  `mhcflurry eval processing-confirmation-analysis`. The complete 24-fit
+  panel promoted RMSprop/PyTorch width 13 with inner-best-AP weights as the
+  named development candidate
+  (`confirmed_processing_candidate_hyperparameters`); the retained-state
+  choice was the largest effect. This is development selection on four paired
+  folds, not a release, ensemble or presentation result; public downloads and
+  defaults are unchanged. See the
+  [processing campaign](docs/processing_hyperparameter_campaign.md).
 
 ## rc19
 
@@ -206,15 +221,18 @@ compatibility controls from later held-out departures in
 Every CLI command that involves randomness — `mhcflurry-class1-train-pan-allele-models`,
 `-train-allele-specific-models`, `-train-processing-models`,
 `-select-allele-specific-models`, and `mhcflurry-calibrate-percentile-ranks` —
-now takes a single `--random-seed` that controls **all** of its randomness:
+now takes a `--random-seed` that controls generation/training randomness:
 fold/held-out assignment, weight initialization, example/batch shuffles,
 random-negative sampling, random peptide universes, and genotype sampling.
 The master seed is logged and, for the two-phase pan-allele/processing
 pipelines, persisted into `training_init_info.pkl` so it survives an
 `--only-initialize` / `--continue-incomplete` split.
 
-**The default is `42`, not entropy** — so a run reproduces bit-for-bit out of
-the box (same data, folds, replicates, hyperparameters → identical models).
+**The default is `42`, not entropy**. Reproducible reruns also require the same
+data, folds, replicates, hyperparameters, numerical environment, and
+deterministic operations; a seed alone is not a cross-platform bit-identity
+guarantee. Compact percentile knot selection separately uses fixed seed 403
+for its grouped background-validation split, recorded with each curve.
 This is a change from 2.2.x, where each fit drew independent OS entropy and
 runs were not reproducible. Pass `--random-seed N` for a different, still
 reproducible run. Ensemble members and per-fit work stay decorrelated (each
@@ -429,11 +447,13 @@ End-to-end presentation regresses less than the processing-only ranking:
 | with flanks | -0.10% | -0.20% | -4.55% | -5.75% | -3.54% | -3.76% |
 | without flanks | -0.29% | -0.38% | -4.92% | -5.76% | -3.01% | -3.93% |
 
-The corrected presentation-percentile calculation agrees closely with raw
-score AUROC (candidate micro AUROC 0.898903 vs 0.898975 with flanks, and
-0.892751 vs 0.892767 without flanks) but has lower candidate micro AUPRC
+In this historical, pre-compact calibration run, presentation percentiles
+agreed closely with raw score AUROC (candidate micro AUROC 0.898903 vs 0.898975
+with flanks, and 0.892751 vs 0.892767 without flanks) but had lower candidate micro AUPRC
 (0.262658 vs 0.287274, and 0.244795 vs 0.265738). Raw presentation score
-therefore remains the preferred ranking output.
+was therefore the preferred ranking output for these artifacts. These numbers
+do not describe the later compact mapping; its separately archived comparison
+is documented in [presentation calibration](docs/presentation_percentile_calibration.md).
 
 One plausible interpretation, established before the final run, is that the
 stronger affinity model selects higher-quality decoys and consequently makes

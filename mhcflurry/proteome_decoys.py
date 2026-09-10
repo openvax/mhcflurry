@@ -138,12 +138,26 @@ def sample_peptide_frame_for_accessions(
         flanking_length=15,
         exclude_peptides=(),
         n=1,
-        valid_amino_acids=None):
-    """Uniformly sample peptide/flank records without materializing candidates."""
+        valid_amino_acids=None,
+        sampling_method="positions",
+        allow_smaller=False):
+    """Sample windows without replacement; build flanks only for retained rows.
+
+    Position sampling preserves the eligible population, not the historical
+    reservoir's RNG sequence. Use ``sampling_method='reservoir'`` for replay.
+    ``allow_smaller`` returns the complete eligible population on exhaustion.
+    """
     if n < 0:
         raise ValueError("n must be non-negative")
     if n == 0:
         return pandas.DataFrame(columns=PROTEOME_PEPTIDE_COLUMNS)
+
+    if sampling_method == "positions":
+        return _sample_numeric_positions(
+            accessions, sequences_by_accession, lengths, flanking_length,
+            exclude_peptides, n, valid_amino_acids, allow_smaller)
+    if sampling_method != "reservoir":
+        raise ValueError("Unknown peptide sampling method: " + sampling_method)
 
     exclude_peptides = set(exclude_peptides)
     reservoir = []
@@ -165,13 +179,64 @@ def sample_peptide_frame_for_accessions(
             if replace_index < n:
                 reservoir[replace_index] = record
 
-    if seen < n:
+    if seen < n and not allow_smaller:
         raise ValueError(
             "Cannot take a larger sample than population when "
             "'replace=False' (requested %d, population %d)" % (n, seen))
     return pandas.DataFrame.from_records(
         reservoir,
         columns=PROTEOME_PEPTIDE_COLUMNS)
+
+
+def _sample_numeric_positions(accessions, sequences, lengths, flank_length,
+                              excluded, n, valid_amino_acids, allow_smaller):
+    """Draw from the same valid window population as the reference iterator."""
+    lengths = sorted(lengths)
+    if not lengths or lengths[0] <= 0:
+        raise ValueError("Peptide lengths must be positive")
+    alphabet = set(valid_amino_acids or COMMON_AMINO_ACIDS)
+    excluded = set(excluded)
+    segments = []
+    counts = []
+    for accession in unique_in_order(accessions):
+        sequence = sequences[accession]
+        invalid = numpy.fromiter((c not in alphabet for c in sequence), dtype="int8")
+        prefix = numpy.concatenate(([0], numpy.cumsum(invalid)))
+        for length in lengths:
+            # Preserve the iterator's exclusive minimum-length terminal bound.
+            count = max(0, min(len(sequence) - lengths[0], len(sequence) - length + 1))
+            starts = numpy.arange(count)
+            starts = starts[(prefix[starts + length] - prefix[starts]) == 0]
+            if len(starts):
+                segments.append((accession, sequence, length, starts))
+                counts.append(len(starts))
+    ends = numpy.cumsum(counts, dtype="int64")
+    total = int(ends[-1]) if len(ends) else 0
+    # Only numeric indices are shuffled. No peptide/flank tuples are created
+    # for the unsampled population. Rejecting excluded peptides from a random
+    # permutation is uniform sampling of the remaining eligible windows.
+    positions = numpy.random.permutation(total)
+    rows = []
+    for offset in range(0, total, 65536):
+        chunk = positions[offset:offset + 65536]
+        segment_indices = numpy.searchsorted(ends, chunk, side="right")
+        for index, segment_index in zip(chunk, segment_indices):
+            accession, sequence, length, starts = segments[segment_index]
+            base = int(ends[segment_index - 1]) if segment_index else 0
+            start = int(starts[index - base])
+            peptide = sequence[start:start + length]
+            if peptide in excluded:
+                continue
+            end = start + length
+            rows.append((accession, peptide,
+                         sequence[max(0, start - flank_length):start].rjust(flank_length, "X"),
+                         sequence[end:end + flank_length].ljust(flank_length, "X"), start))
+            if len(rows) == n:
+                return pandas.DataFrame.from_records(rows, columns=PROTEOME_PEPTIDE_COLUMNS)
+    if not allow_smaller:
+        raise ValueError("Cannot take a larger sample than population when 'replace=False' "
+                         "(requested %d, population %d)" % (n, len(rows)))
+    return pandas.DataFrame.from_records(rows, columns=PROTEOME_PEPTIDE_COLUMNS)
 
 
 def peptides_by_length_from_frame(peptide_df):

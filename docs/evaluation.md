@@ -40,6 +40,10 @@ model artifacts; explicitly requested processing modes must exist on both sides.
 The metrics directory is the reusable contract between evaluation and plotting.
 Keep it when iterating on figure style or assembling a review packet.
 
+Report raw-score and percentile metrics separately, recording the calibration
+method and background. Preserve public baselines unchanged; see
+{doc}`shared_percent_rank_transforms` for controlled recalibration comparisons.
+
 Affinity comparison summaries include a `benchmark_identity` hash calculated
 after holdout selection, allele intersection, peptide-length filtering, and
 training-overlap exclusion. A saved prediction column can be reused without
@@ -73,6 +77,34 @@ top-level file under `<out>/plots` or live outside the plot tree, but it cannot
 be placed inside the paper-figure, affinity, processing, presentation, or
 diagnostic-paper subdirectories. Commands reject overlapping output paths
 before clearing or rendering anything.
+
+## Count-matched processing ensembles
+
+To compare a four-network candidate with an eight-network public ensemble,
+evaluate all four-of-eight public subsets rather than choosing a subset using
+release-holdout performance:
+
+```shell
+mhcflurry eval processing-ensemble-subsets \
+    --input results/matched/matched_predictions.csv.bz2 \
+    --models-dir /path/to/public/models.selected.short_flanks \
+    --subset-size 4 --reference-score public_5aa \
+    --comparison-score new_legacy_cnn --comparison-score new_boundary_5x5 \
+    --out results/public_four_network_subsets
+```
+
+This source-checkout command requires strict length/affinity-matched risk
+sets, caches each network's predictions, verifies reconstruction against the
+named full-ensemble score, and preserves all subset scores and memberships.
+It reports median, range and quartiles across the complete subset set. This
+spread measures ensemble composition sensitivity; it is not a confidence
+interval or a validation-based model selection procedure. Matching network
+count does not match the historical training or architecture-search budget.
+
+Use a fresh output directory. `--member-cache-dir` can reuse an earlier run's
+predictions after checking input, model and execution identities. Cross-device
+score tolerances must be explicitly justified and recorded; do not increase
+`--verification-atol` to hide changed weights or a misaligned prediction table.
 
 ## Paper-style figures
 

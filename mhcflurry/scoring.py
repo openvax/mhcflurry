@@ -31,7 +31,7 @@ def make_scores(
     Calculate AUC, F1, and Kendall Tau scores.
 
     Parameters
-    -----------
+    ----------
     ic50_y : float list
         true IC50s (i.e. affinities)
 
@@ -45,7 +45,7 @@ def make_scores(
     max_ic50 : float [optional]
 
     Returns
-    -----------
+    -------
     dict with entries "auc", "f1", "tau"
     """
 

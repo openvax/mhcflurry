@@ -2456,32 +2456,32 @@ class Class1NeuralNetwork(object):
         """Whether fixed peptide vectors are looked up in torch forward."""
         return _peptide_uses_torch_encoding(self.hyperparameters)
 
-    def peptides_to_network_input(self, peptides):
+    def peptides_to_network_input(self, peptides, device=None):
         """
         Encode peptides to the fixed-length encoding expected by the neural
         network (which depends on the architecture).
 
-        When ``peptide_amino_acid_encoding_torch`` is enabled, the returned
-        array is (N, L) int8 amino-acid indices and the network widens it to
-        the configured fixed vector encoding on the active torch device.
-        Otherwise the returned array is the traditional (N, L, V) numpy
-        vector encoding.
+        Return (N, L) int8 amino-acid indices; the network looks up fixed
+        vectors on device. NumericSequences inputs return a Torch tensor
+        directly, while string inputs retain the existing NumPy path.
 
         Parameters
         ----------
-        peptides : EncodableSequences or list of string
+        peptides : EncodableSequences, NumericSequences or list of string
+        device : torch.device or str, optional
+            Device for NumericSequences alignment; string encoding stays on CPU.
 
         Returns
         -------
-        numpy.array
+        numpy.ndarray or torch.Tensor
         """
-        encoder = EncodableSequences.create(peptides)
         encoded = peptide_sequences_to_network_input(
-            encoder,
+            peptides,
             peptide_encoding=self.hyperparameters["peptide_encoding"],
             peptide_amino_acid_encoding_torch=(
                 self.hyperparameters.get("peptide_amino_acid_encoding_torch")
             ),
+            device=device,
         )
         assert len(encoded) == len(peptides)
         return encoded
@@ -4127,7 +4127,7 @@ class Class1NeuralNetwork(object):
         device = self.get_device()
         configure_matmul_precision(device)
 
-        x_dict = {"peptide": self.peptides_to_network_input(peptides)}
+        x_dict = {"peptide": self.peptides_to_network_input(peptides, device=device)}
 
         if allele_encoding is not None:
             (
@@ -4159,6 +4159,8 @@ class Class1NeuralNetwork(object):
         peptide_is_indices = _peptide_uses_torch_encoding(self.hyperparameters)
 
         def prediction_tensor(batch_array):
+            if isinstance(batch_array, torch.Tensor):
+                return batch_array.to(device)
             batch_array = numpy.asarray(batch_array)
             if not batch_array.flags.writeable:
                 batch_array = batch_array.copy()

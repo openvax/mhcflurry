@@ -25,6 +25,7 @@ DEFAULT_WINDOWS = {
     "extended_5x5": 5,
 }
 CONTEXT_DROPOUT = 0.25
+KERNEL_WIDTHS = (5, 7, 9, 11, 13, 15)
 MANIFEST_FIELDS = (
     "condition", "architecture", "model_kind", "window",
     "baseline_5aa_condition", "baseline_no_flank_condition",
@@ -198,6 +199,32 @@ def write_conditions(
         writer.writeheader()
         writer.writerows(records)
     return manifest
+
+
+def build_kernel_conditions():
+    """Return the fixed 48-fit paired width experiment, without mixed ensembles."""
+    bases = build_conditions(
+        architectures=("large_relu",), peptide_context_lengths=(5,))
+    result = []
+    for width in KERNEL_WIDTHS:
+        for _, grid, axes in bases:
+            if axes["model_kind"] == "legacy_no_flank":
+                continue
+            grid = deepcopy(grid)
+            grid[0].update(
+                convolutional_kernel_size=width,
+                convolutional_padding_mode="unknown",
+                restore_best_weights=True,
+            )
+            family = ("legacy_5aa" if axes["model_kind"] == "legacy_5aa"
+                      else "boundary_5x5")
+            result.append(("%s__k%02d" % (family, width), grid, {
+                "family": family, "kernel_width": width,
+                "fold_count": 4, "network_count": 4,
+                "convolutional_padding_mode": "unknown",
+                "checkpoint_policy": "best",
+            }))
+    return result
 
 
 def main(argv=None):

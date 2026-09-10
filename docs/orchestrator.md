@@ -112,8 +112,13 @@ paths remain intentionally smaller.
 |---|---|---|---|---|
 | **affinity (pan-allele)** | streaming DataLoader + compact torch-index peptide batches | device-resident tensors + worker-local RN pool | filter ✓; pool/cache n/a (no fit) | filter ✓; pool/cache n/a |
 | **affinity (allele-specific)** | n/a | device-resident tensors + worker-local RN pool | filter ✓ | shares calibrate command |
-| **processing** | n/a | local+cluster worker pool | local+cluster worker pool | n/a (allele-independent) |
+| **processing** | n/a | local+cluster worker pool | local+cluster worker pool | explicit background contexts; serial command |
 | **presentation** | n/a | parallel auto-sized feature generation + deterministic fit | n/a | filter ✓ (shares calibrate command) |
+
+All three percentile calibration paths use the shared compact/histogram
+implementations. Processing is allele-independent but still supports its own
+score-to-percentile calibration; it currently requires explicit background
+contexts and `--num-jobs 0`. See {doc}`shared_percent_rank_transforms`.
 
 ## Auto-tuned parallelism knobs
 

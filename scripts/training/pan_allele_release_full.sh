@@ -117,21 +117,36 @@ PROCESSING_WITH_FLANKS_INIT="${PROCESSING_WITH_FLANKS_INIT:-glorot_uniform}"
 PROCESSING_VARIANTS="${PROCESSING_VARIANTS:-with_flanks no_flank short_flanks}"
 PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS="${PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS:-0}"
 PRESENTATION_PROCESSING_WITH_FLANKS_KIND="${PRESENTATION_PROCESSING_WITH_FLANKS_KIND:-short_flanks}"
+PROCESSING_SHORT_FLANKS_HYPERPARAMETERS="${PROCESSING_SHORT_FLANKS_HYPERPARAMETERS:-grid}"
 RELEASE_RANDOM_SEED="${RELEASE_RANDOM_SEED:-42}"
 case "${MHCFLURRY_RELEASE_RECIPE:-}" in
     '') ;;
     final-2.3.0-candidate) apply_final_230_candidate_recipe ;;
+    final-2.3.0-candidate-v2) apply_final_230_candidate_v2_recipe ;;
     *)
         echo "Unknown MHCFLURRY_RELEASE_RECIPE: $MHCFLURRY_RELEASE_RECIPE" >&2
         exit 2
         ;;
 esac
+case "$PROCESSING_SHORT_FLANKS_HYPERPARAMETERS" in
+    grid|confirmed-ranking-candidate) ;;
+    *)
+        echo "PROCESSING_SHORT_FLANKS_HYPERPARAMETERS must be grid or confirmed-ranking-candidate." >&2
+        exit 2
+        ;;
+esac
 
 mkdir -p "$BASE_OUT/config"
-if [ "${MHCFLURRY_RELEASE_RECIPE:-}" = final-2.3.0-candidate ]; then
-    cp "$SCRIPT_DIR/final_230_candidate_recipe.json" \
-        "$BASE_OUT/config/final_architecture_decision.json"
-fi
+case "${MHCFLURRY_RELEASE_RECIPE:-}" in
+    final-2.3.0-candidate)
+        cp "$SCRIPT_DIR/final_230_candidate_recipe.json" \
+            "$BASE_OUT/config/final_architecture_decision.json"
+        ;;
+    final-2.3.0-candidate-v2)
+        cp "$SCRIPT_DIR/final_230_candidate_v2_recipe.json" \
+            "$BASE_OUT/config/final_architecture_decision.json"
+        ;;
+esac
 
 processing_variant_enabled() {
     case " $PROCESSING_VARIANTS " in
@@ -392,10 +407,20 @@ for kind in $PROCESSING_VARIANTS; do
             --init "$PROCESSING_WITH_FLANKS_INIT"
         )
     fi
-    mhcflurry class1-generate-training-hyperparameters processing-variant \
-        hyperparameters.base.yaml "$kind" \
-        "${PROCESSING_VARIANT_HYPERPARAMETER_ARGS[@]}" \
-        > "hyperparameters.$kind.yaml"
+    if [[ "$kind" == "short_flanks" && \
+            "$PROCESSING_SHORT_FLANKS_HYPERPARAMETERS" == "confirmed-ranking-candidate" ]]; then
+        # The named 2026-09-10 confirmation winner; see
+        # docs/processing_hyperparameter_campaign.md. Matched training data
+        # supplies the sample-disjoint inner stopping split its ranking
+        # checkpoint requires.
+        python "$SCRIPT_DIR/generate_processing_recipe.py" --confirmed-candidate \
+            > "hyperparameters.$kind.yaml"
+    else
+        mhcflurry class1-generate-training-hyperparameters processing-variant \
+            hyperparameters.base.yaml "$kind" \
+            "${PROCESSING_VARIANT_HYPERPARAMETER_ARGS[@]}" \
+            > "hyperparameters.$kind.yaml"
+    fi
     ARCH_COUNT=$(python -c \
         "import yaml; print(len(yaml.safe_load(open('hyperparameters.$kind.yaml'))))")
     echo "processing.$kind: using $ARCH_COUNT architectures"

@@ -41,6 +41,11 @@ def test_snapshot_experiment_exports_reconstructable_tables(tmp_path):
         "epoch_train_time": [4.0, 3.5],
         "effective_minibatch_size": 256,
         "time": 12.5,
+        "ranking_validation_input_rows": list(range(50)),
+        "ranking_validation_samples": ["a", "b", "c"],
+        "retained_checkpoints": ["best", "best_ap", "terminal"],
+        "saved_checkpoint_policies": ["best", "terminal"],
+        "val_macro_ap": [0.6, 0.7],
     }
     config = {
         "hyperparameters": {
@@ -143,6 +148,9 @@ def test_snapshot_experiment_exports_reconstructable_tables(tmp_path):
     assert history.loss.tolist() == [0.4, 0.2]
     assert history.val_loss.tolist() == [0.5, 0.3]
     assert history.epoch_train_time.tolist() == [4.0, 3.5]
+    assert history.val_macro_ap.tolist() == [0.6, 0.7]
+    assert "ranking_validation_input_rows" not in history
+    assert "retained_checkpoints" not in history
     assert history.fold.tolist() == [2, 2]
 
     models_table = pandas.read_csv(destination / "data" / "models.csv")

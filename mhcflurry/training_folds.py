@@ -3,6 +3,18 @@
 import pandas
 
 
+def read_processing_training_data(path):
+    """Read frozen processing data without numeric drift across CSV rewrites.
+
+    The round-trip parser preserves the binary float represented by the saved
+    decimal, including matching-reference scores that are not model inputs.
+    Sample identifiers stay strings, including purely numeric identifiers.
+    """
+    return pandas.read_csv(
+        path, float_precision="round_trip", dtype={
+            "sample_id": str, "matching_affinity_reference_sha256": str})
+
+
 def extract_training_folds(data, num_folds, reuse=False):
     """Return data without fold columns and optionally validated stored folds."""
     # Remove malformed legacy merge suffixes as well when regenerating folds;

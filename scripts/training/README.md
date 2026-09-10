@@ -67,6 +67,11 @@ Larger timeout overrides may still be used with backends that support them.
 The exact candidate decision set is also stored in
 `final_230_candidate_recipe.json`; completed outputs copy it to
 `config/final_architecture_decision.json` for plotting and provenance.
+`MHCFLURRY_RELEASE_RECIPE=final-2.3.0-candidate-v2` swaps the 5-aa legacy
+grid for the confirmed single ranking candidate
+(`final_230_candidate_v2_recipe.json`; `generate_processing_recipe.py
+--confirmed-candidate` emits its hyperparameters) and trains only the
+presentation processing inputs; see `docs/final_230_candidate_experiment.md`.
 
 Set `MHCFLURRY_REMOTE_WORKFLOW=affinity-ablations` or
 `MHCFLURRY_REMOTE_WORKFLOW=processing-ablations` to run the corresponding
@@ -119,9 +124,49 @@ paper figures, saved-prediction tables, and external predictors.
   columns into one reusable held-out prediction table and paper-figure suite.
 - **`mhcflurry train compose-processing-ensemble`** builds a fixed processing
   ensemble while hashing every source predictor.
+- **`mhcflurry train processing-kernel-sweep`** trains widths 5/7/9/11/13/15
+  for legacy 5-aa and boundary 5x5 families (48 fits, four shared folds).
+  Requires verified matched training negatives, restores best checkpoints,
+  uses explicit X context padding and preserves per-fold/per-member predictions.
+  See `docs/processing_kernel_sweep.md`; the bounded single-A100 launcher is
+  `launch_processing_kernel_sweep_modal.py` (`runplz modal --detach`).
+- **`mhcflurry train processing-hyperparameter-sweep --design training-recipe`**
+  runs the 64-fit optimizer/initialization/batch factorial with explicit
+  processing LSUV, independent best/terminal checkpoints, paired frozen folds
+  and per-member state predictions. Use `--evaluation none` for development
+  screening. Width recovery imports complete conditions without resampling.
+  See `docs/processing_hyperparameter_campaign.md` for recovery, budget controls
+  and the distinction between screening and compact-ensemble selection.
+- **`mhcflurry train processing-hyperparameter-sweep --design ranking-confirmation`**
+  runs the six-condition, 24-fit width/optimizer/checkpoint panel with
+  sample-disjoint inner ranking monitoring and retained best/best-AP/terminal
+  states. **`mhcflurry eval processing-confirmation-analysis`** applies the
+  recorded paired gate to a collected snapshot and exports the candidate
+  recipe; `generate_processing_recipe.confirmed_processing_candidate_hyperparameters()`
+  names the promoted 2026-09-10 result, which is not a release recipe.
+- **`mhcflurry train processing-data`** now supports `--resume` and
+  `--resume-matching-dir`: verify cached inputs/scores and expand only unmatched
+  peptide-length pools, with unchanged affinity calipers and bounded rounds.
+  Per-round score hashes, seeds, timings and final matched rows are durable.
+  `--preparation-pipeline-depth 3` (default) overlaps bounded CPU preparation and
+  atomic writes around caller-owned inference; use depth 1 as the serial control.
+  Protein-reference inputs stay numeric through device-side gathering and
+  scoring. Strings are materialized when exporting artifacts. Independent sample
+  seeds preserve draws across pipeline depths.
+- **`mhcflurry train benchmark-processing-preparation`** checks exact numeric
+  sampling/export and matching parity, records timing repetitions and source/input
+  hashes, and optionally checks real ensemble predictions with
+  `--affinity-predictor`. See `docs/processing_preparation_acceleration.md`.
+- **`mhcflurry train benchmark-processing-sampler`** compares the numeric-position
+  and historical reservoir samplers on a reproducible synthetic CPU workload.
 - **`mhcflurry eval processing-ensemble`** and
   **`mhcflurry eval presentation-affinity-ensemble`** score preserved
   prediction tables without rerunning inference.
+- **`mhcflurry eval processing-ensemble-subsets`** caches individual network
+  scores on strict matched risk sets and evaluates every fixed-size subset.
+  It verifies reconstruction of the full cached ensemble, preserves subset
+  membership and predictions, and reports composition sensitivity without
+  selecting a subset on held-out metrics.
 - **`mhcflurry eval release-experiment-figures`** regenerates the release
   training figures from archived experiment inputs.
 - **`mhcflurry train plot-loss-curves`** renders per-architecture loss curves

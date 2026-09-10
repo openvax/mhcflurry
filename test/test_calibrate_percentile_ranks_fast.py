@@ -280,7 +280,8 @@ def test_calibrate_fast_optimized_merged_matches_unoptimized_fast():
 
 @pytest.mark.slow
 @pytest.mark.integration
-def test_calibrate_fast_parity_with_legacy_path():
+@pytest.mark.parametrize("method", ["histogram", "compact"])
+def test_calibrate_fast_parity_with_legacy_path(method):
     predictor = _load_downloaded_pan_allele()
     alleles = _pick_alleles(predictor, 4)
     peptides = random_peptides(2000, length=9)
@@ -296,6 +297,7 @@ def test_calibrate_fast_parity_with_legacy_path():
         peptides=peptides,
         alleles=alleles,
         motif_summary=False,
+        method=method,
     )
 
     # Run fast path. Pin to CPU so legacy (CPU/float64) and fast paths
@@ -306,6 +308,7 @@ def test_calibrate_fast_parity_with_legacy_path():
         peptides=peptides,
         alleles=alleles,
         motif_summary=False,
+        method=method,
         allele_batch_size=2,  # exercise the batching boundary
         peptide_batch_size=500,
         device=torch.device("cpu"),
@@ -314,6 +317,15 @@ def test_calibrate_fast_parity_with_legacy_path():
     for allele in alleles:
         a = legacy.allele_to_percent_rank_transform[allele]
         b = predictor.allele_to_percent_rank_transform[allele]
+        if method == "compact":
+            # Compare mapped scores, not knot locations: tiny inference
+            # differences may change the greedy selection of adjacent knots.
+            probes = numpy.geomspace(10, 10000, 100)
+            numpy.testing.assert_allclose(
+                a.transform(probes), b.transform(probes), rtol=0, atol=.1)
+            assert a.selection["selected_knots"] in (64, 128)
+            assert b.selection["selected_knots"] in (64, 128)
+            continue
         # CDFs should match to within one peptide's contribution. The fast
         # path preserves the legacy semantics, but it uses torch kernels for
         # the batched schedule; a prediction that lands numerically on a bin

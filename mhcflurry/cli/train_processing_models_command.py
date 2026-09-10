@@ -387,7 +387,8 @@ def initialize_training(args):
         pprint.pprint(hyperparameters_lst)
     print("Length of hyperparameters list: %d" % (len(hyperparameters_lst)))
 
-    df = pandas.read_csv(args.data)
+    from mhcflurry.training_folds import read_processing_training_data
+    df = read_processing_training_data(args.data)
     validate_matched_training_data(df, getattr(args, "processing_data_policy", "matched"))
     print("Loaded training data: %s" % (str(df.shape)))
     df = df.loc[
@@ -600,7 +601,7 @@ def train_models(args):
 
     print("*" * 30)
     training_time = time.time() - start
-    print("Trained affinity predictor with %d networks in %0.2f min." % (
+    print("Trained processing predictor with %d networks in %0.2f min." % (
         len(predictor.models), training_time / 60.0))
     print("*" * 30)
 
@@ -634,6 +635,8 @@ def _run_compile_warmup(hyperparameters, fold_num, constant_data):
     hp["max_epochs"] = 1
     hp["validation_split"] = 0.0
     hp["early_stopping"] = False
+    hp["monitor_validation_ranking"] = False
+    hp["checkpoint_metric"] = "val_loss"
 
     print(
         "compile_warmup_only (processing): convolutional_filters=%s "
@@ -684,6 +687,8 @@ def _run_resource_probe(hyperparameters, fold_num, constant_data):
         dict(hyperparameters))
     hp["max_epochs"] = 1
     hp["early_stopping"] = False
+    hp["monitor_validation_ranking"] = False
+    hp["checkpoint_metric"] = "val_loss"
     print(
         "resource_probe_only (processing): convolutional_filters=%s "
         "post_dense=%s minibatch=%d rows=%d validation_split=%s" % (
@@ -763,6 +768,10 @@ def train_model(
     train_data = df.loc[folds_df["fold_%d" % fold_num]].copy()
 
     test_data = df.loc[~folds_df["fold_%d" % fold_num]].copy()
+    if (hyperparameters.get("monitor_validation_ranking") or
+            hyperparameters.get("checkpoint_metric") == "val_macro_ap"):
+        if set(train_data.sample_id) & set(test_data.sample_id):
+            raise ValueError("Outer evaluation samples overlap processing training samples")
 
     print("Training on %d points (%d points held-out)." % (
         len(train_data), len(test_data)))
@@ -806,6 +815,7 @@ def train_model(
             c_flanks=train_data.c_flank.values),
         targets=train_data.hit.values,
         validation_mask=validation_mask,
+        sample_ids=train_data.sample_id.to_numpy(),
         progress_preamble=progress_preamble,
         progress_print_interval=progress_print_interval,
         seed=work_item_seed,

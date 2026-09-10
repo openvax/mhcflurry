@@ -30,6 +30,8 @@ from .class1_neural_network import Class1NeuralNetwork
 from .class1_processing_predictor import Class1ProcessingPredictor
 from .class1_processing_neural_network import Class1ProcessingNeuralNetwork
 from .class1_presentation_predictor import Class1PresentationPredictor
+from .histogram_percent_rank_transform import HistogramPercentRankTransform
+from .compact_percent_rank_transform import CompactPercentRankTransform
 
 from .version import __version__
 
@@ -40,4 +42,6 @@ __all__ = [
     "Class1ProcessingPredictor",
     "Class1ProcessingNeuralNetwork",
     "Class1PresentationPredictor",
+    "HistogramPercentRankTransform",
+    "CompactPercentRankTransform",
 ]

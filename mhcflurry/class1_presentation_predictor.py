@@ -37,7 +37,9 @@ from .pytorch_sizing import (
 from .encodable_sequences import EncodableSequences
 from .regression_target import from_ic50
 from .downloads import get_default_class1_presentation_models_dir
-from .percent_rank_transform import PercentRankTransform
+from .percentile_calibration import (
+    calibration_method, fit_percent_rank_transform,
+    load_percent_rank_transforms, save_percent_rank_transforms)
 
 
 MAX_ALLELES_PER_SAMPLE = 6
@@ -1313,20 +1315,9 @@ class Class1PresentationPredictor(object):
             self.weights_dataframe.to_csv(join(models_dir, "weights.csv"))
 
         if write_percent_ranks:
-            # Percent ranks
-            if self.percent_rank_transform:
-                series = self.percent_rank_transform.to_series()
-                percent_ranks_df = pandas.DataFrame(index=series.index)
-                numpy.testing.assert_array_almost_equal(
-                    series.index.values,
-                    percent_ranks_df.index.values)
-                percent_ranks_df["presentation_score"] = series.values
-                percent_ranks_path = join(models_dir, "percent_ranks.csv")
-                percent_ranks_df.to_csv(
-                    percent_ranks_path,
-                    index=True,
-                    index_label="bin")
-                logging.info("Wrote: %s", percent_ranks_path)
+            save_percent_rank_transforms(models_dir, {
+                "presentation_score": self.percent_rank_transform
+            } if self.percent_rank_transform is not None else {})
 
         if write_info:
             # Write "info.txt"
@@ -1401,12 +1392,7 @@ class Class1PresentationPredictor(object):
             index_col=0)
 
         # Load percent ranks if available
-        percent_rank_transform = None
-        percent_ranks_path = join(models_dir, "percent_ranks.csv")
-        if exists(percent_ranks_path):
-            percent_ranks_df = pandas.read_csv(percent_ranks_path, index_col=0)
-            percent_rank_transform = PercentRankTransform.from_series(
-                percent_ranks_df["presentation_score"])
+        percent_rank_transform = load_percent_rank_transforms(models_dir).get("presentation_score")
 
         provenance_string = None
         try:
@@ -1441,10 +1427,14 @@ class Class1PresentationPredictor(object):
         Parameters
         ----------
         presentation_scores : sequence of float
+            Raw presentation scores, not peptide sequences.
+        throw : bool, default True
+            Raise when calibration is absent. False warns and returns NaNs.
 
         Returns
         -------
         numpy.array of float
+            Upper-tail percentiles from 0 to 100; lower means stronger.
         """
 
         if self.percent_rank_transform is None:
@@ -1454,11 +1444,10 @@ class Class1PresentationPredictor(object):
             warnings.warn(msg)
             return numpy.ones(len(presentation_scores)) * numpy.nan
 
-        # We subtract from 100 so that strong binders have low percentile ranks,
-        # making them comparable to affinity percentile ranks.
-        return 100 - self.percent_rank_transform.transform(presentation_scores)
+        return self.percent_rank_transform.transform(presentation_scores, survival=True)
 
-    def calibrate_percentile_ranks(self, scores, bins=None):
+    def calibrate_percentile_ranks(self, scores, bins=None, *, method=None,
+                                   max_knots=128, groups=None):
         """
         Compute the cumulative distribution of scores, to enable taking
         quantiles of this distribution later.
@@ -1470,13 +1459,21 @@ class Class1PresentationPredictor(object):
         bins : object
             Anything that can be passed to numpy.histogram's "bins" argument
             can be used here, i.e. either an integer or a sequence giving bin
-            edges. By default, data-adaptive quantile bins preserve compressed
-            probability ranges, with additional log-spaced quantiles in the
-            top 1% to reduce ties among the strongest predictions. Existing
-            saved transforms are unaffected until explicitly recalibrated.
+            edges. Explicit bins select the historical histogram method.
+        method : {"compact", "histogram"}, optional
+            Defaults to compact unless bins are specified. Loading a saved
+            predictor never recalibrates it.
+        max_knots : {64, 128}, default 128
+            Upper bound, not a starting size. Compact starts with 64; 128
+            requires a background-validation improvement beyond the tolerance.
+            Ignored for histogram calibration.
+        groups : sequence, optional
+            Background peptide identities to keep together during validation.
         """
-        if bins is None:
+        method = calibration_method(method, bins)
+        if method == "histogram" and bins is None:
             bins = presentation_percent_rank_bins(scores)
 
-        self.percent_rank_transform = PercentRankTransform()
-        self.percent_rank_transform.fit(scores, bins=bins)
+        self.percent_rank_transform = fit_percent_rank_transform(
+            scores, method=method, bins=bins, score_transform="logit",
+            survival=True, max_knots=max_knots, groups=groups)

@@ -408,14 +408,14 @@ def free_device_memory_bytes(device):
     """Best-effort free-memory query. Returns a conservative value when
     the device doesn't expose a direct free-memory API.
 
-    CUDA: ``torch.cuda.mem_get_info`` (exposed free + reserved tracking).
-    MPS: Apple's ``recommended_max_memory`` on unified memory,
-        minus whatever the MPS driver has already handed us. Cap by
-        ``psutil`` available RAM when present so other apps aren't
-        evicted. Falls back to 4 GB if neither API is reachable.
-    CPU / unknown: 2 GB conservative budget (the helper short-circuits
-        for CPU anyway, but keep a sensible value in case callers pass
-        a foreign device).
+    - CUDA: ``torch.cuda.mem_get_info`` (exposed free + reserved tracking).
+    - MPS: Apple's ``recommended_max_memory`` on unified memory,
+      minus whatever the MPS driver has already handed us. Cap by
+      ``psutil`` available RAM when present so other apps aren't
+      evicted. Falls back to 4 GB if neither API is reachable.
+    - CPU / unknown: 2 GB conservative budget (the helper short-circuits
+      for CPU anyway, but keep a sensible value in case callers pass
+      a foreign device).
     """
     import torch
     if device.type == "cuda":

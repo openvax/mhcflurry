@@ -278,7 +278,7 @@ def test_presentation_bins_handle_repeated_and_nonfinite_scores():
     assert numpy.isfinite(edges).all()
     assert (numpy.diff(edges) > 0).all()
     predictor = Class1PresentationPredictor()
-    predictor.calibrate_percentile_ranks(with_nonfinite)
+    predictor.calibrate_percentile_ranks(with_nonfinite, method="histogram")
     probes = numpy.r_[-numpy.inf, numpy.linspace(0, 1, 1001), numpy.inf]
     percentiles = predictor.percentile_ranks(probes)
     assert (numpy.diff(percentiles) <= 0).all()
@@ -323,12 +323,13 @@ def test_presentation_calibration_round_trip_preserves_saved_transform(
         presentation_module.Class1AffinityPredictor, "load",
         lambda *args, **kwargs: None)
     loaded = Class1PresentationPredictor.load(str(tmp_path))
-    probes = numpy.random.default_rng(402).uniform(-0.01, 1.01, 10000)
+    probes = numpy.random.default_rng(402).uniform(0, 1, 10000)
     numpy.testing.assert_allclose(
         loaded.percentile_ranks(probes), predictor.percentile_ranks(probes),
         rtol=0, atol=1e-12)
     if bins is not None:
-        expected = presentation_module.PercentRankTransform()
+        from mhcflurry import HistogramPercentRankTransform
+        expected = HistogramPercentRankTransform()
         expected.fit(scores, bins=bins)
         numpy.testing.assert_array_equal(
             predictor.percent_rank_transform.bin_edges, expected.bin_edges)

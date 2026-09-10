@@ -13,6 +13,7 @@
 import json
 
 import pandas
+import pytest
 
 from mhcflurry.cli import main as cli_main
 from mhcflurry.cli import plot_loss_curves
@@ -127,3 +128,69 @@ def test_train_plot_loss_curves_cli_marks_renamed_selection(
     assert status == 0
     summary = pandas.read_csv(out_dir / "summary.csv")
     assert summary.selected.tolist() == [True]
+
+
+def test_processing_architecture_identity_and_checkpoint_summary(monkeypatch, tmp_path):
+    models = tmp_path / "models"
+    models.mkdir()
+    rows = []
+    for width, boundary in ((11, 0), (13, 0), (13, 5)):
+        config = {
+            "hyperparameters": {"convolutional_kernel_size": width,
+                                "convolutional_filters": 512,
+                                "n_flank_length": 5, "c_flank_length": 5,
+                                "cleavage_boundary_flank_length": boundary,
+                                "cleavage_boundary_peptide_length": boundary,
+                                "convolutional_kernel_l1_l2": [0.000001, 0.000002]},
+            "fit_info": [{"loss": [0.5, 0.4, 0.3], "val_loss": [0.5, 0.4, 0.6],
+                          "best_epoch": 2, "best_val_loss": 0.4,
+                          "restored_best_weights": True,
+                          "training_info": {"fold_num": 0}}],
+        }
+        rows.append({"model_name": "k%d-boundary%d" % (width, boundary), "config_json": json.dumps(config)})
+    pandas.DataFrame(rows).to_csv(models / "manifest.csv", index=False)
+    loaded = plot_loss_curves._load_manifest_curves(models / "manifest.csv")
+    assert len({row["architecture_key"] for row in loaded}) == 3
+    assert all(row["model_type"] == "processing" for row in loaded)
+    assert "boundary 5x5" in loaded[-1]["architecture"]
+    assert plot_loss_curves._epoch_label(loaded) == "Epoch"
+    assert all(row["l1"] == 0.000001 and row["l2"] == 0.000002 for row in loaded)
+    monkeypatch.setattr(plot_loss_curves, "_matplotlib_available", lambda: False)
+    out = tmp_path / "plots"
+    assert plot_loss_curves.run_argv(["--selected-dir", str(models), "--out", str(out)]) == 0
+    summary = pandas.read_csv(out / "summary.csv")
+    assert summary.final_val_loss.tolist() == [0.6] * 3
+    assert summary.best_val_loss.tolist() == [0.4] * 3
+    assert summary.checkpoint_policy.tolist() == ["best"] * 3
+
+
+def test_historical_checkpoint_policy_not_inferred(tmp_path):
+    path = tmp_path / "manifest.csv"
+    write_manifest(path, "old", fold=0, architecture=0, work_item="old")
+    model = plot_loss_curves._load_manifest_curves(path)[0]
+    assert model["phase_curves"][0]["checkpoint_policy"] == "unknown"
+    assert model["architecture"] == "(32,)"
+    model["phase_curves"].append(model["phase_curves"][0])
+    assert plot_loss_curves._epoch_label([model]) == "Epoch (fit calls concatenated)"
+
+
+def test_processing_plot_labels_show_real_architectures(monkeypatch, tmp_path):
+    pytest.importorskip("matplotlib")
+    import matplotlib
+    matplotlib.use("Agg")
+    from matplotlib import pyplot
+    saved = []
+    original_close = pyplot.close
+    monkeypatch.setattr(pyplot, "close", lambda fig=None: saved.append(fig) if hasattr(fig, "axes") else None)
+    base = {"model_name": "processing", "work_item_name": None, "fold": 0,
+            "arch_num": 0, "replicate": 0, "layer_sizes": (),
+            **plot_loss_curves._architecture_metadata({"convolutional_kernel_size": 13, "convolutional_filters": 512}),
+            "phase_curves": [{"loss": [0.5, 0.4], "val_loss": [0.6, 0.5]}]}
+    keys = {plot_loss_curves._selection_key(base)}
+    plot_loss_curves._plot_all_curves(keys, [base], tmp_path / "all.png")
+    assert all(axis.get_xlabel() == "Epoch" for axis in saved[-1].axes)
+    assert "CNN k13/f512" in saved[-1].axes[1].get_legend().get_texts()[0].get_text()
+    plot_loss_curves._plot_by_arch([base], tmp_path / "arch.png")
+    assert "CNN k13/f512" in saved[-1].axes[0].get_legend().get_texts()[0].get_text()
+    for fig in saved:
+        original_close(fig)

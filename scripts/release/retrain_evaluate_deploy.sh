@@ -22,7 +22,7 @@ Usage:
       --run-dir /path/to/release-run \
       --release 2.3.0 \
       [--backend local|brev-existing|brev-provision|ssh] \
-      [--release-profile full|final-2.3.0-candidate|fast-8xa100|minimal-processing|fast-minimal] \
+      [--release-profile full|final-2.3.0-candidate|final-2.3.0-candidate-v2|fast-8xa100|minimal-processing|fast-minimal] \
       [--random-seed 42] \
       [--minibatch-size 128] \
       [--affinity-minibatch-size 128] \
@@ -106,6 +106,13 @@ Release profiles:
                       cleavage-boundary family blended 50/50 with selected
                       5-aa models for presentation. All affinity fits retain
                       both terminal and best checkpoints.
+  final-2.3.0-candidate-v2
+                      final-2.3.0-candidate with the 5-aa legacy grid replaced
+                      by the confirmed single ranking candidate (native
+                      RMSprop, width 13, inner-best-AP checkpoints); trains
+                      only the presentation processing inputs (no_flank,
+                      short_flanks) unless FINAL_230_V2_PROCESSING_VARIANTS
+                      adds the 15-aa grid back.
   fast-8xa100         For throughput runs on 8xA100 / 80 GB machines. When
                       provisioning Brev and no provider/type was explicitly
                       set, request the Denvr 8xA100 80 GB shape. Worker
@@ -430,6 +437,9 @@ apply_release_profile() {
         final-2.3.0-candidate)
             apply_final_230_candidate_recipe
             ;;
+        final-2.3.0-candidate-v2)
+            apply_final_230_candidate_v2_recipe
+            ;;
         fast-8xa100)
             apply_fast_gpu_profile
             ;;
@@ -441,7 +451,7 @@ apply_release_profile() {
             apply_minimal_processing_profile
             ;;
         *)
-            die "--release-profile must be one of: full, final-2.3.0-candidate, fast-8xa100, minimal-processing, fast-minimal"
+            die "--release-profile must be one of: full, final-2.3.0-candidate, final-2.3.0-candidate-v2, fast-8xa100, minimal-processing, fast-minimal"
             ;;
     esac
 }

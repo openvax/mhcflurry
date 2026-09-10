@@ -77,6 +77,12 @@ default is `42`, covering data splits and shuffles, initial weights, random
 negatives, allele sampling, and calibration peptides. Ensemble members derive
 distinct sub-seeds from that master seed.
 
+Compact percentile knot selection has a separate, fixed seed of **403** for
+its grouped 80/20 background split. `--random-seed` controls background peptide
+and genotype generation, not that selection seed. The selected knot budget,
+reference hash, and available validation diagnostics are saved with the curve;
+see {doc}`shared_percent_rank_transforms`.
+
 The direct Python training APIs use `seed=None` by default, preserving their
 historical stochastic behavior unless the caller opts in.
 

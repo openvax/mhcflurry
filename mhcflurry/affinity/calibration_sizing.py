@@ -348,7 +348,7 @@ def auto_size_calibration_batches(
     the per-worker budget instead of being sized as if the pinned axis were
     also auto (which would underestimate peak VRAM).
 
-    Models the per-worker VRAM peak as:
+    Models the per-worker VRAM peak as::
 
         peak = cuda_overhead
              + cache_bytes                # peptide-stage cache,
@@ -359,9 +359,10 @@ def auto_size_calibration_batches(
                                           # peak_bytes_per_row``
              + small_state                # log-IC50 acc, ic50_unique,
                                           # motif state (~1 GB)
-        with explicit free-memory headroom plus a safety factor on
-        CUDA/runtime scratch allocations to absorb fragmentation that
-        ``mem_get_info`` can't see.
+
+    This includes explicit free-memory headroom plus a safety factor on
+    CUDA/runtime scratch allocations to absorb fragmentation that
+    ``mem_get_info`` can't see.
 
     ``peak_bytes_per_row`` is calibrated for the cartesian fast path.
     For a merged ensemble it uses one sub-network's hidden activation

@@ -347,6 +347,77 @@ def test_cleavage_boundary_weight_roundtrip():
     torch.testing.assert_close(observed, clone(inputs))
 
 
+@pytest.mark.parametrize("width", [5, 7, 9, 11, 13, 15])
+@pytest.mark.parametrize("boundary", [False, True])
+@pytest.mark.parametrize("length", [8, 9, 10, 11, 15])
+@pytest.mark.parametrize("flanks", [("FGHIK", "LMNPQ"), ("IK", "LM"), ("", "")])
+def test_processing_unknown_padding_actual_convolution_windows(width, boundary, length, flanks):
+    """Inspect the windows actually reaching Conv1d, not just the encoder."""
+    peptide = "SIINFEKLGILGFVF"[:length]
+    model = Class1ProcessingNeuralNetwork(
+        n_flank_length=5, c_flank_length=5, convolutional_filters=4,
+        convolutional_kernel_size=width, convolutional_padding_mode="unknown",
+        dropout_rate=0, cleavage_boundary_flank_length=5 if boundary else 0,
+        cleavage_boundary_peptide_length=5 if boundary else 0)
+    network = model.make_network(
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters))
+    inputs = model.network_input_tensors(
+        FlankingEncoding([peptide], [flanks[0]], [flanks[1]]), device="cpu")
+    captured = []
+    hook = network.conv1.register_forward_pre_hook(
+        lambda module, args: captured.append(args[0].detach().clone()))
+    network.eval()
+    with torch.no_grad():
+        prediction = network(inputs)
+    hook.remove()
+    assert torch.isfinite(prediction).all()
+    encoded = decode_matrix(captured[0].permute(0, 2, 1).numpy())[0]
+    radius = width // 2
+    if boundary:
+        expected = peptide.ljust(15, "X")
+        peptide_start = 0
+    else:
+        expected = (flanks[0].rjust(5, "X") + peptide +
+                    flanks[1].ljust(5, "X")).ljust(25, "X")
+        peptide_start = 5
+    assert encoded == "X" * radius + expected + "X" * radius
+    # Full output retains the coordinates consumed by peptide-end pooling.
+    assert network.conv1(captured[0]).shape[-1] == len(expected)
+    for center in (peptide_start, peptide_start + length - 1):
+        observed = encoded[center:center + width]
+        oracle = "".join(expected[i] if 0 <= i < len(expected) else "X"
+                         for i in range(center - radius, center + radius + 1))
+        assert observed == oracle
+
+
+@pytest.mark.parametrize("width", [1, 5, 8, 15])
+def test_processing_padding_roundtrip_and_legacy_default(width):
+    """Opt-in padding survives config/weight loading; absent config means zeros."""
+    from mhcflurry import Class1ProcessingPredictor
+    import tempfile
+
+    old = Class1ProcessingNeuralNetwork(
+        convolutional_kernel_size=width, convolutional_filters=4, dropout_rate=0)
+    assert old.hyperparameters["convolutional_padding_mode"] == "zeros"
+    old_network = old.make_network(
+        **old.network_hyperparameter_defaults.subselect(old.hyperparameters))
+    assert old_network.conv1.padding == "same"
+    sequence = torch.randn(2, 15, 21)
+    assert old_network._pad_convolution_context(sequence) is sequence
+    model = Class1ProcessingNeuralNetwork(
+        convolutional_kernel_size=width, convolutional_filters=4, dropout_rate=0,
+        convolutional_padding_mode="unknown")
+    model._network = model.make_network(
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters))
+    scores = model.predict(["SIINFEKL"], ["FGHIK"], ["LMNPQ"])
+    with tempfile.TemporaryDirectory() as directory:
+        Class1ProcessingPredictor([model]).save(directory)
+        clone = Class1ProcessingPredictor.load(directory)
+        assert clone.models[0].hyperparameters["convolutional_padding_mode"] == "unknown"
+        numpy.testing.assert_allclose(
+            scores, clone.predict(["SIINFEKL"], ["FGHIK"], ["LMNPQ"]), atol=1e-7)
+
+
 def test_fit_uses_eager_network_for_validation_by_default(monkeypatch):
     """Avoid torch.compile recompiles from train/eval grad-mode changes."""
     import mhcflurry.class1_processing_neural_network as processing_module

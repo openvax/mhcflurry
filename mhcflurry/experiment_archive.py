@@ -187,9 +187,14 @@ def export_training_tables(source_dir, out_dir):
                 series = {
                     key: value
                     for key, value in fit_info.items()
-                    if isinstance(value, list)
+                    if isinstance(value, list) and (
+                        key in ("loss", "val_loss", "optimizer_steps")
+                        or key.startswith("epoch_") or key.startswith("val_macro_"))
                 }
-                epoch_count = max((len(value) for value in series.values()), default=0)
+                # Sample/row identity and retained-state names are list-valued
+                # metadata too, not epoch series. Preserve them in fit_info_json
+                # without inventing thousands of epochs from validation IDs.
+                epoch_count = len(fit_info.get("loss", []))
                 for epoch_index in range(epoch_count):
                     row = {**identity, "epoch": epoch_index + 1}
                     for key, values in series.items():

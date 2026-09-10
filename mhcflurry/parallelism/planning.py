@@ -417,8 +417,8 @@ def auto_dataloader_num_workers(
     A return of ``0`` means in-process batching (no prefetch children),
     which is correct for serial runs and very tight CPU configs.
 
-    Inputs
-    ------
+    Parameters
+    ----------
     num_fit_workers : int
         Total fit() worker processes that will share the box. Equal to
         ``num_gpus * max_workers_per_gpu`` for the canonical GPU run, or
@@ -433,8 +433,8 @@ def auto_dataloader_num_workers(
         ``MHCFLURRY_AUTO_DATALOADER_HARD_CAP``); beyond this, process/queue
         overhead reduced measured throughput.
 
-    Heuristic
-    ---------
+    Notes
+    -----
     1. **Serial / no GPU work**: if ``num_fit_workers <= 0``, return 0.
        The caller will run fit() in-process; spawning children would buy
        nothing and cost a process-fork.
@@ -454,8 +454,8 @@ def auto_dataloader_num_workers(
        is 1 because in-process batching on a multi-GPU box almost always
        starves the GPU.
 
-    Edge cases
-    ----------
+    **Edge cases**
+
     * ``num_fit_workers > vcpus`` → ``cpu_per_fit = 0``, ``cpu_cap = 0``,
       result 0. The main fit-workers themselves are oversubscribed; adding
       DL children would make it worse.
@@ -463,8 +463,8 @@ def auto_dataloader_num_workers(
       to in-process batching to preserve correctness over throughput.
     * ``hard_cap`` env override of ``0`` → forces in-process for diagnostics.
 
-    Cross-checks (see test_orchestrator_helpers.py)
-    -----------------------------------------------
+    **Cross-checks (see test_orchestrator_helpers.py)**
+
     * 8×A100-80GB Verda (176v / 16 fit / 400G) → 4
     * 8×A100-40GB (176v / 8 fit / 400G) → 4
     * 8×L40S (96v / 16 fit / 200G) → 3
@@ -592,8 +592,8 @@ def auto_random_negative_pool_epochs(
     Returns an int >= 1. ``1`` means fresh random negatives every epoch.
     ``> 1`` amortizes random-negative generation + encoding across N epochs.
 
-    Inputs
-    ------
+    Parameters
+    ----------
     num_random_negatives : int
         Number of random-negative peptides per epoch (the planner's
         ``get_total_count()``). The size of one pool-epoch in the cycle.
@@ -622,19 +622,18 @@ def auto_random_negative_pool_epochs(
         Maximum pool epochs. Default 10 (expert-overridable); larger pools
         add startup/memory cost after generation overhead is already amortized.
 
-    Heuristic
-    ---------
+    Notes
+    -----
     Total available bytes for RN pools across the box is usable host memory
     after the shared reserve and fit-worker base RSS. An explicit
     ``safety_fraction`` replaces that calculation.
-    Per-worker budget:
-        ``available / max(num_workers, 1)``
-    Pool epochs that fit:
-        ``per_worker_budget / per_pool_epoch_per_worker_bytes``
-    Clamp to ``[1, hard_cap]``.
+    Per-worker budget is ``available / max(num_workers, 1)``. The number of
+    pool epochs that fit is
+    ``per_worker_budget / per_pool_epoch_per_worker_bytes``, clamped to
+    ``[1, hard_cap]``.
 
-    Cross-checks
-    ------------
+    **Cross-checks**
+
     * 8×A100-80GB Verda shares the same reserve and worker-RSS estimate as
       the outer process planner, then stops at the throughput cap.
     * Single A100 80G Lambda uses the shared host reserve minus the two

@@ -140,7 +140,8 @@ def run(argv=sys.argv[1:]):
         },
     )
 
-    df = pandas.read_csv(args.data)
+    from mhcflurry.training_folds import read_processing_training_data
+    df = read_processing_training_data(args.data)
     from ..processing_matching import validate_matched_training_data
     validate_matched_training_data(df, args.processing_data_policy)
     print("Loaded data: %s" % (str(df.shape)))

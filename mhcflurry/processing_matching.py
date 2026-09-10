@@ -14,6 +14,17 @@ from .common import positive_int_arg, positive_float_arg
 MATCHING_POLICY = "sample-length-affinity-v1"
 
 
+class IncompleteProcessingMatches(ValueError):
+    """A valid scored pool lacks enough negatives for the listed hit rows."""
+
+    def __init__(self, message, failures):
+        super().__init__(message)
+        self.failures = failures
+
+    def __reduce__(self):
+        return type(self), (str(self), self.failures)
+
+
 def add_processing_matching_args(parser):
     """Shared processing-data CLI policy; legacy filtering is opt-in."""
     parser.add_argument("--negative-policy", choices=("matched", "legacy-top-binders"), default="matched")
@@ -31,9 +42,8 @@ def initialize_matching_artifacts(args):
         raise ValueError("Processing matching caliper may not exceed 0.25 log10 units")
     reference = affinity_reference_fingerprint(args.affinity_predictor)
     directory = Path(str(args.out) + ".matching")
-    if directory.exists() or Path(args.out).exists():
+    if (directory.exists() or Path(args.out).exists()) and not getattr(args, "resume", False):
         raise ValueError("Use fresh processing data output; preserve prior matching artifacts")
-    directory.mkdir(parents=True)
     sources = [args.hits, args.proteome_peptides or args.proteome_reference_csv]
     if getattr(args, "exclude_samples_file", None):
         sources.append(args.exclude_samples_file)
@@ -43,8 +53,49 @@ def initialize_matching_artifacts(args):
                   "candidate_pool_multiplier": args.ppv_multiplier,
                   "seed": getattr(args, "random_seed", None),
                   "inputs": {str(Path(p).resolve()): sha256_file(p) for p in sources}}
-    (directory / "experiment.json").write_text(json.dumps(provenance, indent=2) + "\n")
+    policy_path = directory / "experiment.json"
+    if getattr(args, "resume", False):
+        if not policy_path.is_file():
+            raise ValueError("Cannot resume without saved matching provenance")
+        saved = json.loads(policy_path.read_text())
+        validate_preparation_provenance(saved, provenance)
+        if not getattr(args, "resume_matching_dir", None):
+            args.resume_matching_dir = saved.get("reused_matching_artifacts", {}).get("path")
+    prior = getattr(args, "resume_matching_dir", None)
+    if prior:
+        prior_path = Path(prior) / "experiment.json"
+        validate_preparation_provenance(json.loads(prior_path.read_text()), provenance)
+        provenance["reused_matching_artifacts"] = {
+            "path": str(Path(prior).resolve()), "experiment_sha256": sha256_file(prior_path)}
+        if getattr(args, "resume", False) and saved.get("reused_matching_artifacts", {}).get(
+                "experiment_sha256") != sha256_file(prior_path):
+            raise ValueError("Changed processing preparation cache provenance")
+    directory.mkdir(parents=True, exist_ok=True)
+    if not policy_path.exists():
+        provenance.update(schema_version=2, sampler="numeric-positions-v1")
+        if hasattr(args, "preparation_pipeline_depth"):
+            provenance.update(preparation_pipeline_depth=args.preparation_pipeline_depth,
+                candidate_representation="protein-indices-v1" if args.proteome_reference_csv else "dataframe",
+                matching_implementation="batched-stable-local-v1")
+        policy_path.write_text(json.dumps(provenance, indent=2) + "\n")
     return reference
+
+
+def validate_preparation_provenance(saved, current):
+    """Allow relocated caches only when scientific inputs and policy agree."""
+    for key in ("policy", "decoys_per_hit", "max_log10_affinity_distance",
+                "candidate_pool_multiplier", "seed"):
+        if saved.get(key) != current.get(key):
+            raise ValueError("Changed processing preparation input: " + key)
+    if saved["affinity_reference"]["sha256"] != current["affinity_reference"]["sha256"]:
+        raise ValueError("Changed processing preparation affinity reference")
+    def normalized_inputs(value):
+        pairs = [(Path(path).name, digest) for path, digest in value["inputs"].items()]
+        if len({name for name, _ in pairs}) != len(pairs):
+            raise ValueError("Ambiguous preparation input basenames")
+        return sorted(pairs)
+    if normalized_inputs(saved) != normalized_inputs(current):
+        raise ValueError("Changed processing preparation input files")
 
 
 def prepare_processing_training_sample(frame, args, reference):
@@ -117,6 +168,142 @@ def _nearest(pool, target, count, excluded=(), max_distance=None):
     return selected
 
 
+def nearest_affinity_batch(pool, targets, count, excluded=None,
+                           max_distance=None, chunk_size=4096):
+    """Match many targets to one sorted pool, with scalar-compatible ties.
+
+    Parameters
+    ----------
+    pool : tuple of numpy.ndarray
+        Original row indices and ascending float64 affinities (stable order).
+    targets : array-like
+        Target log10 affinities.
+    count : int
+        Maximum matches per target.
+    excluded : numpy.ndarray, optional
+        Per-target excluded row indices, padded with -1.
+    max_distance : float, optional
+        Inclusive affinity caliper.
+    chunk_size : int
+        Maximum targets per temporary search matrix.
+
+    Returns
+    -------
+    numpy.ndarray
+        Original row indices, shape (len(targets), count), padded with -1.
+        Ties use the historical local search window, not a global tie order.
+    """
+    indices, values = pool
+    targets = numpy.asarray(targets, dtype="float64")
+    return _nearest_windows(indices, values, targets, count, excluded, max_distance,
+        chunk_size, numpy.searchsorted(values, targets),
+        numpy.zeros(len(targets), dtype="int64"), numpy.full(len(targets), len(indices)))
+
+
+def _nearest_windows(indices, values, targets, count, excluded, max_distance,
+                     chunk_size, positions, lower_bounds, upper_bounds):
+    """Shared bounded window selection for single or packed sorted pools."""
+    if count < 0 or chunk_size < 1:
+        raise ValueError("Invalid nearest-affinity batch size")
+    result = numpy.full((len(targets), count), -1, dtype="int64")
+    if not count or not len(indices):
+        return result
+    excluded = (numpy.empty((len(targets), 0), dtype="int64") if excluded is None
+                else numpy.asarray(excluded, dtype="int64"))
+    if excluded.ndim != 2 or len(excluded) != len(targets):
+        raise ValueError("Exclusions must have one row per target")
+    radius = numpy.minimum(upper_bounds - lower_bounds, numpy.maximum(
+        count * 3, count + (excluded >= 0).sum(axis=1)))
+    # Bound temporary memory even for unusually large requested risk sets.
+    width = 2 * int(radius.max()) if len(radius) else 0
+    chunk_size = min(chunk_size, max(1, 1_000_000 // max(1, width)))
+    for start in range(0, len(targets), chunk_size):
+        end = min(len(targets), start + chunk_size)
+        target = targets[start:end]
+        position = positions[start:end]
+        offsets = numpy.arange(-int(radius[start:end].max()), int(radius[start:end].max()))
+        locations = position[:, None] + offsets
+        valid = ((locations >= lower_bounds[start:end, None]) & (locations < upper_bounds[start:end, None]) &
+                 (offsets >= -radius[start:end, None]) & (offsets < radius[start:end, None]))
+        safe = locations.clip(0, len(indices) - 1)
+        candidates = indices[safe]
+        distance = numpy.abs(values[safe].astype("float64", copy=False) - target[:, None])
+        sort_dtype = numpy.result_type(values.dtype, 0.0)
+        sort_distance = (distance if sort_dtype == numpy.dtype("float64") else
+                         numpy.abs(values[safe] - target.astype(sort_dtype)[:, None]))
+        if max_distance is not None:
+            valid &= distance <= max_distance
+        for column in excluded[start:end].T:
+            valid &= candidates != column[:, None]
+        order = numpy.argsort(numpy.where(valid, sort_distance, numpy.inf), axis=1, kind="stable")[:, :count]
+        selected = numpy.take_along_axis(candidates, order, axis=1)
+        selected_valid = numpy.take_along_axis(valid, order, axis=1)
+        result[start:end, :selected.shape[1]] = numpy.where(selected_valid, selected, -1)
+        # Preserve the reference's exceptional full-pool fallback. A failed
+        # caliper lookup cannot find anything further away outside the window.
+        for local in numpy.flatnonzero((result[start:end] >= 0).sum(axis=1) < count):
+            begin, finish = lower_bounds[start + local], upper_bounds[start + local]
+            lower = max(begin, int(position[local] - radius[start + local]))
+            upper = min(finish, int(position[local] + radius[start + local]))
+            outside = ([abs(values[lower - 1] - target[local])] if lower > begin else [])
+            if upper < finish:
+                outside.append(abs(values[upper] - target[local]))
+            if not outside or (max_distance is not None and min(outside) > max_distance):
+                continue
+            omitted = excluded[start + local]
+            selected = _nearest((indices[begin:finish], values[begin:finish]), target[local], count,
+                                omitted[omitted >= 0], max_distance)
+            result[start + local, :len(selected)] = selected
+    return result
+
+
+class SortedAffinityPools:
+    """One stable numeric index for many sample/length[/protein] pools."""
+
+    def __init__(self, frame, negative_indices, columns):
+        codes = frame.groupby(columns, sort=False, dropna=False).ngroup().to_numpy()
+        self.codes = codes.astype("int64")
+        indices = numpy.asarray(negative_indices, dtype="int64")
+        missing = frame[columns].isna().any(axis=1)
+        if missing.any():
+            # Preserve the old tuple-key behavior even for missing identities:
+            # pandas string NaN, object None and pd.NA need not compare alike.
+            # Only this exceptional path uses scalar row/key lookup.
+            legacy_keys = {key: int(self.codes[group.index[0]])
+                for key, group in frame.loc[indices].groupby(
+                    columns, sort=False, dropna=False)}
+            for row_index, row in frame.loc[missing & frame.hit.eq(1)].iterrows():
+                self.codes[row_index] = legacy_keys.get(tuple(row[c] for c in columns), -1)
+        indices = indices[self.codes[indices] >= 0]
+        values = frame.log10_affinity.to_numpy()
+        order = numpy.lexsort((values[indices], self.codes[indices]))
+        self.indices = indices[order]
+        self.values = values[self.indices]
+        group_ids = self.codes[self.indices]
+        counts = numpy.bincount(group_ids, minlength=max(0, int(self.codes.max()) + 1))
+        self.ends = numpy.cumsum(counts)
+        self.starts = self.ends - counts
+        self.keys = numpy.empty(len(indices), dtype=[("group", "int64"), ("value", "float64")])
+        self.keys["group"] = group_ids
+        self.keys["value"] = self.values
+
+    def nearest(self, hit_indices, targets, count, excluded=None, max_distance=None):
+        """Batched lookup across all groups; -1 denotes a missing match."""
+        groups = self.codes[hit_indices]
+        valid = groups >= 0
+        result = numpy.full((len(groups), count), -1, dtype="int64")
+        if not valid.any() or not len(self.indices):
+            return result
+        groups = groups[valid]
+        targets = numpy.asarray(targets, dtype="float64")[valid]
+        queries = numpy.empty(len(targets), dtype=self.keys.dtype)
+        queries["group"], queries["value"] = groups, targets
+        result[valid] = _nearest_windows(self.indices, self.values, targets, count,
+            None if excluded is None else excluded[valid], max_distance, 4096,
+            numpy.searchsorted(self.keys, queries), self.starts[groups], self.ends[groups])
+        return result
+
+
 def make_affinity_controlled_risk_sets(
         frame, decoys_per_hit=10, same_protein_caliper=0.25,
         max_distance=0.25):
@@ -139,82 +326,49 @@ def make_affinity_controlled_risk_sets(
             not numpy.isfinite(same_protein_caliper) or same_protein_caliper < 0):
         raise ValueError("same_protein_caliper must be finite and nonnegative")
     negatives = frame.index[frame.hit == 0].to_numpy(dtype="int64")
-    global_pools = {}
-    protein_pools = {}
     # One sequence per sample is one decoy, even if it maps to many proteins.
-    positive_keys = pandas.MultiIndex.from_frame(
-        frame.loc[frame.hit == 1, ["sample_id", "peptide"]])
-    negative_frame = frame.loc[negatives].drop_duplicates(["sample_id", "peptide"])
-    if pandas.MultiIndex.from_frame(negative_frame[["sample_id", "peptide"]]).isin(positive_keys).any():
+    # Factorize unsorted identities once. Building two MultiIndexes sorted
+    # hundreds of thousands of peptide strings just to check set membership.
+    identities = frame.groupby(["sample_id", "peptide"], sort=False).ngroup().to_numpy(dtype="int64")
+    if numpy.isin(identities[negatives], identities[frame.hit == 1]).any():
         raise ValueError("An observed peptide is also labelled as a negative in its sample")
-    for key, group in negative_frame.groupby(
-            ["sample_id", "peptide_len"], sort=False):
-        global_pools[key] = _sorted_pool(frame, group.index)
-    for key, group in negative_frame.groupby(
-            ["sample_id", "peptide_len", "protein_accession"],
-            sort=False, dropna=False):
-        protein_pools[key] = _sorted_pool(frame, group.index)
+    _, first = numpy.unique(identities[negatives], return_index=True)
+    negative_frame = frame.loc[negatives[numpy.sort(first)]]
+    global_pools = SortedAffinityPools(frame, negative_frame.index, ["sample_id", "peptide_len"])
+    protein_pools = SortedAffinityPools(frame, negative_frame.index, ["sample_id", "peptide_len", "protein_accession"])
 
-    row_indices = []
-    risk_ids = []
-    match_ranks = []
-    same_protein = []
-    distances = []
+    hit_indices = frame.index[frame.hit == 1].to_numpy()
+    hits = frame.loc[hit_indices].reset_index(drop=True)
+    targets = hits.log10_affinity.to_numpy(dtype="float64")
+    protein_distance = (min(max_distance, same_protein_caliper)
+                        if same_protein_caliper is not None else max_distance)
+    selected = protein_pools.nearest(hit_indices, targets, decoys_per_hit, max_distance=protein_distance)
+    same_counts = (selected >= 0).sum(axis=1)
     fallback_count = 0
-    incomplete = 0
-    failures = []
-    for risk_id, (hit_index, hit) in enumerate(
-            frame.loc[frame.hit == 1].iterrows()):
-        target = float(hit.log10_affinity)
-        protein_key = (
-            hit.sample_id, hit.peptide_len, hit.protein_accession)
-        selected = _nearest(
-            protein_pools.get(protein_key, (numpy.array([], dtype="int64"),
-                                            numpy.array([], dtype="float64"))),
-            target,
-            decoys_per_hit,
-            max_distance=min(max_distance, same_protein_caliper) if same_protein_caliper is not None else max_distance,
-        )
-        selected_same_protein = [True] * len(selected)
-        if len(selected) < decoys_per_hit:
-            needed = decoys_per_hit - len(selected)
-            fallback = _nearest(
-                global_pools.get((hit.sample_id, hit.peptide_len), (numpy.array([], dtype="int64"), numpy.array([]))),
-                target,
-                needed,
-                excluded=selected,
-                max_distance=max_distance,
-            )
-            fallback_count += len(fallback)
-            selected.extend(fallback)
-            selected_same_protein.extend([False] * len(fallback))
-        if len(selected) != decoys_per_hit:
-            incomplete += 1
-            if len(failures) < 5:
-                failures.append({"sample_id": str(hit.sample_id), "peptide": hit.peptide,
-                                 "available": len(selected), "log10_affinity": target})
+    for needed in numpy.unique(decoys_per_hit - same_counts):
+        if not needed:
             continue
-
-        row_indices.append(int(hit_index))
-        risk_ids.append(risk_id)
-        match_ranks.append(0)
-        same_protein.append(True)
-        distances.append(0.0)
-        for rank, (index, is_same) in enumerate(
-                zip(selected, selected_same_protein), 1):
-            row_indices.append(index)
-            risk_ids.append(risk_id)
-            match_ranks.append(rank)
-            same_protein.append(is_same)
-            distances.append(abs(
-                float(frame.at[index, "log10_affinity"]) - target))
-
-    if incomplete:
-        raise ValueError(
+        rows = numpy.flatnonzero(decoys_per_hit - same_counts == needed)
+        fallback = global_pools.nearest(hit_indices[rows], targets[rows], int(needed),
+                                        excluded=selected[rows], max_distance=max_distance)
+        selected[rows[:, None], same_counts[rows, None] + numpy.arange(needed)] = fallback
+        fallback_count += int((fallback >= 0).sum())
+    counts = (selected >= 0).sum(axis=1)
+    unresolved = numpy.flatnonzero(counts != decoys_per_hit)
+    if len(unresolved):
+        failures = [{"sample_id": str(hits.at[i, "sample_id"]), "peptide": hits.at[i, "peptide"],
+                     "available": int(counts[i]), "log10_affinity": float(targets[i]),
+                     "peptide_length": int(hits.at[i, "peptide_len"])} for i in unresolved]
+        raise IncompleteProcessingMatches(
             "%d hits could not be assigned %d affinity/length-matched decoys "
             "within %.3g log10 units. Expand the scored candidate pool; "
             "no hits were silently dropped and no unmatched fallback was used. Examples: %s" % (
-                incomplete, decoys_per_hit, max_distance, failures))
+                len(unresolved), decoys_per_hit, max_distance, failures[:5]), failures)
+    row_indices = numpy.column_stack([hit_indices, selected]).ravel()
+    risk_ids = numpy.repeat(numpy.arange(len(hits)), decoys_per_hit + 1)
+    match_ranks = numpy.tile(numpy.arange(decoys_per_hit + 1), len(hits))
+    same_protein = (numpy.arange(decoys_per_hit + 1)[None, :] <= same_counts[:, None]).ravel()
+    distances = numpy.abs(frame.log10_affinity.to_numpy()[row_indices] - targets[risk_ids])
     result = frame.loc[row_indices].copy().reset_index().rename(
         columns={"index": "source_row"})
     result["risk_set_id"] = numpy.asarray(risk_ids, dtype="int64")

@@ -123,6 +123,7 @@ def test_train_help_runs(capsys):
     assert "pan-allele-release" in captured
     assert "plot-loss-curves" in captured
     assert "snapshot-experiment" in captured
+    assert "benchmark-processing-preparation" in captured
     assert "Deployment is opt-in" in captured
 
 
@@ -1124,6 +1125,30 @@ def test_release_workflow_defaults_to_validated_published_recipe(tmp_path, monke
     assert "PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS" in full_workflow
 
 
+def test_final_230_candidate_v2_profile_uses_confirmed_short_flanks(tmp_path):
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/release/retrain_evaluate_deploy.sh",
+            "--run-dir", str(tmp_path / "candidate"),
+            "--release", "2.3.0",
+            "--backend", "local",
+            "--release-profile", "final-2.3.0-candidate-v2",
+            "--skip-train",
+            "--skip-eval",
+            "--skip-plots",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    output = result.stdout + result.stderr
+    assert "Profile:       final-2.3.0-candidate-v2" in output
+    assert "Batch sizes:   affinity=1024 processing=512" in output
+    assert "optimizer=pytorch; lsuv=pre_activation; init=glorot_uniform" in output
+
+
 def test_final_230_candidate_profile_freezes_decision_set(tmp_path):
     result = subprocess.run(
         [
@@ -1696,8 +1721,12 @@ def test_eval_paper_figures_render_help_runs(capsys):
 
 @pytest.mark.parametrize("subcommand", [
     "processing-ensemble",
+    "processing-ensemble-subsets",
     "presentation-affinity-ensemble",
     "release-experiment-figures",
+    "processing-recipe-analysis",
+    "processing-confirmation-analysis",
+    "processing-fold-ensembles",
 ])
 def test_eval_experiment_script_commands_delegate(
         monkeypatch, tmp_path, subcommand):
@@ -2899,6 +2928,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(
         "AFFINITY_LSUV_TARGET": "pre_activation",
         "AFFINITY_INIT": "he_uniform",
         "PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS": "5",
+        "PROCESSING_SHORT_FLANKS_HYPERPARAMETERS": "confirmed-ranking-candidate",
         "MKL_THREADING_LAYER": "TBB",
     })
     assert env["AFFINITY_MINIBATCH_SIZE"] == "512"
@@ -2933,6 +2963,8 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     assert env["NUM_JOBS"] == "6"
     assert env["AFFINITY_ABLATION_CONDITIONS"] == "pytorch_rmsprop_batch128"
     assert env["AFFINITY_ABLATION_BASELINE_DIR"] == "/remote/baseline"
+    assert env["PROCESSING_SHORT_FLANKS_HYPERPARAMETERS"] == "confirmed-ranking-candidate"
+    assert module.remote_training_env({})["PROCESSING_SHORT_FLANKS_HYPERPARAMETERS"] == "grid"
     assert env["AFFINITY_OPTIMIZER_IMPLEMENTATION"] == "pytorch"
     assert env["AFFINITY_LSUV_TARGET"] == "pre_activation"
     assert env["AFFINITY_INIT"] == "he_uniform"

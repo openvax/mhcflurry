@@ -408,6 +408,9 @@ def remote_training_env(environ=os.environ):
         "PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS": environ.get(
             "PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS", "0"
         ),
+        "PROCESSING_SHORT_FLANKS_HYPERPARAMETERS": environ.get(
+            "PROCESSING_SHORT_FLANKS_HYPERPARAMETERS", "grid"
+        ),
         "PROCESSING_HELD_OUT_SAMPLES": environ.get(
             "PROCESSING_HELD_OUT_SAMPLES", "10"
         ),
