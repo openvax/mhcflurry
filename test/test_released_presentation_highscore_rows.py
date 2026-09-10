@@ -21,6 +21,7 @@ and are stored under test/data/.
 import os
 import warnings
 
+import mhcgnomes
 import numpy as np
 import pandas as pd
 
@@ -53,8 +54,14 @@ def teardown_module():
 
 def _load_expected():
     data_dir = os.path.join(os.path.dirname(__file__), "data")
-    return pd.read_csv(
+    expected = pd.read_csv(
         os.path.join(data_dir, EXPECTED_CSV), keep_default_na=False)
+    # Historical TF output uses allele spellings that can differ from current
+    # canonical names (for example, DLA-88*01:01 versus DLA-88*001:01).
+    for column in ["allele"] + STRING_COLUMNS:
+        expected[column] = expected[column].map(
+            lambda value: mhcgnomes.parse(value).to_string())
+    return expected
 
 
 def _atol_for_output(column):
