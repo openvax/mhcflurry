@@ -150,6 +150,32 @@ runner such as `mhctools` and join its output into the canonical benchmark
 table. Missing optional inputs are listed in `missing_inputs.md`; they are not
 silently replaced with synthetic panels.
 
+## External predictor comparison
+
+`mhcflurry eval presentation-external-predictors` compares saved compare-models
+scores with the NetMHCpan 4.0 BA, NetMHCpan 4.0 EL and MixMHCpred columns
+distributed in `data_evaluation`. It runs no predictor:
+
+```shell
+mhcflurry eval presentation-external-predictors \
+    --comparison-dir results/new_run/eval_comparison \
+    --data-dir "$(mhcflurry-downloads path data_evaluation)" \
+    --cohort multiallelic \
+    --a-label "MHCflurry 2.3.0 candidate" --b-label "MHCflurry 2.2" \
+    --out results/new_run/external_comparison
+```
+
+Rows join by benchmark source file and row identity, with genotypes
+canonicalized as compare-models saves them; any unmatched row fails the command. `multiallelic` uses the saved presentation scores with
+and without flanks; `monoallelic` uses saved affinity predictions (pass
+`--skip-joined-table` for that large cohort). Metrics use the compare-models
+definitions. Each predictor is scored on the rows it covers and each paired
+comparison on rows both predictors score, so MHCflurry-only comparisons match
+compare-models exactly; `coverage.csv` counts unscored rows. Paired intervals resample whole samples (10000 draws, seed 42 by
+default) and are exploratory. Outputs include per-sample, macro and pooled
+metrics, paired differences, a joined score table, `external_comparison.pdf`
+with PNG pages, `summary.md` and a provenance manifest.
+
 ## Release and remote runs
 
 `mhcflurry train pan-allele-release` runs comparison and diagnostic plotting on

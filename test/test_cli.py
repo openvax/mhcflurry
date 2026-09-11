@@ -1726,6 +1726,7 @@ def test_eval_paper_figures_render_help_runs(capsys):
     "release-experiment-figures",
     "processing-recipe-analysis",
     "processing-confirmation-analysis",
+    "presentation-external-predictors",
     "processing-fold-ensembles",
 ])
 def test_eval_experiment_script_commands_delegate(
