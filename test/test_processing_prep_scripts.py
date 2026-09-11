@@ -630,3 +630,15 @@ def test_data_evaluation_benchmark_uses_reference_csv_decoys(tmp_path):
         tmp_path,
     )
     assert_reference_decoy_output(result)
+
+
+def test_release_data_scripts_pin_historical_decoy_sampler():
+    import ast
+    for name in ("make_train_data.processing.py", "make_train_data.presentation.py"):
+        tree = ast.parse((REPO_ROOT / "scripts/training/release_exact" / name).read_text())
+        calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                 and getattr(node.func, "id", None) == "sample_peptide_frame_for_accessions"]
+        assert calls, name
+        for call in calls:
+            methods = [kw.value.value for kw in call.keywords if kw.arg == "sampling_method"]
+            assert methods == ["reservoir"], name

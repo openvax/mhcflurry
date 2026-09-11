@@ -109,10 +109,8 @@ Release profiles:
   final-2.3.0-candidate-v2
                       final-2.3.0-candidate with the 5-aa legacy grid replaced
                       by the confirmed single ranking candidate (native
-                      RMSprop, width 13, inner-best-AP checkpoints); trains
-                      only the presentation processing inputs (no_flank,
-                      short_flanks) unless FINAL_230_V2_PROCESSING_VARIANTS
-                      adds the 15-aa grid back.
+                      RMSprop, width 13, inner-best-AP checkpoints). All
+                      other decisions and processing variants are unchanged.
   fast-8xa100         For throughput runs on 8xA100 / 80 GB machines. When
                       provisioning Brev and no provider/type was explicitly
                       set, request the Denvr 8xA100 80 GB shape. Worker

@@ -19,12 +19,9 @@ apply_final_230_candidate_recipe() {
 apply_final_230_candidate_v2_recipe() {
     # v1 plus the 2026-09-10 confirmed 5-aa ranking candidate: one legacy
     # architecture (native RMSprop, width 13, inner-best-AP checkpoints) per
-    # fold instead of the 128-architecture Glorot/Keras-Adam grid. The 15-aa
-    # grid is not a presentation input; it is deferred unless
-    # FINAL_230_V2_PROCESSING_VARIANTS adds it back for a release build.
+    # fold instead of the 128-architecture Glorot/Keras-Adam grid. Every other
+    # v1 decision, including all three processing variants, is unchanged.
     apply_final_230_candidate_recipe
     MHCFLURRY_RELEASE_RECIPE=final-2.3.0-candidate-v2
     PROCESSING_SHORT_FLANKS_HYPERPARAMETERS=confirmed-ranking-candidate
-    PROCESSING_VARIANTS="${FINAL_230_V2_PROCESSING_VARIANTS:-no_flank short_flanks}"
-    PROCESSING_MODES="${PROCESSING_VARIANTS// /,}"
 }

@@ -70,8 +70,8 @@ The exact candidate decision set is also stored in
 `MHCFLURRY_RELEASE_RECIPE=final-2.3.0-candidate-v2` swaps the 5-aa legacy
 grid for the confirmed single ranking candidate
 (`final_230_candidate_v2_recipe.json`; `generate_processing_recipe.py
---confirmed-candidate` emits its hyperparameters) and trains only the
-presentation processing inputs; see `docs/final_230_candidate_experiment.md`.
+--confirmed-candidate` emits its hyperparameters); everything else follows
+v1. See `docs/final_230_candidate_experiment.md`.
 
 Set `MHCFLURRY_REMOTE_WORKFLOW=affinity-ablations` or
 `MHCFLURRY_REMOTE_WORKFLOW=processing-ablations` to run the corresponding

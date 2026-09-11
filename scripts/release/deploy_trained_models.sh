@@ -266,7 +266,8 @@ require_dir "$AFFINITY_MODELS"
 require_file "$AFFINITY_MODELS/manifest.csv"
 require_one_file "affinity percent ranks" \
     "$AFFINITY_MODELS/percent_ranks.csv" \
-    "$AFFINITY_MODELS/percent_ranks.csv.bz2"
+    "$AFFINITY_MODELS/percent_ranks.csv.bz2" \
+    "$AFFINITY_MODELS/percent_ranks.json"
 
 PROCESSING_ARCHIVE_DIRS=()
 for kind in $PROCESSING_VARIANTS; do
@@ -280,7 +281,8 @@ require_dir "$PRESENTATION_MODELS"
 require_file "$PRESENTATION_MODELS/weights.csv"
 require_one_file "presentation percent ranks" \
     "$PRESENTATION_MODELS/percent_ranks.csv" \
-    "$PRESENTATION_MODELS/percent_ranks.csv.bz2"
+    "$PRESENTATION_MODELS/percent_ranks.csv.bz2" \
+    "$PRESENTATION_MODELS/percent_ranks.json"
 
 note "Release:          $RELEASE"
 note "GitHub release:   $GITHUB_RELEASE"

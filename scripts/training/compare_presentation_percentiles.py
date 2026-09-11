@@ -24,6 +24,9 @@ from mhcflurry.percent_rank_transform import PercentRankTransform
 CUTOFFS = np.array([.001, .003, .01, .03, .1, .3, 1., 3., 10., 30., 50., 90.])
 SELECTION_CUTOFFS = [.03, .1, .3, 1., 3., 10.]
 METRICS = ["auprc", "auroc", "ppv_expected_random_ties"]
+# Resolve from this checkout (scripts/training/ is two levels below the root), not the cwd.
+COMPACT_TRANSFORM_SOURCE = (
+    Path(__file__).resolve().parents[2] / "mhcflurry" / "compact_percent_rank_transform.py")
 
 
 def sha256(path):
@@ -192,8 +195,8 @@ def fit_command(args):
                       reference_rows=len(reference), reference_peptides=len(peptides),
                       reference_hashes={str(path): sha256(path) for path in [peptide_path] + paths},
                       elapsed_seconds=time.perf_counter() - started,
-                      source_hashes={str(path): sha256(path) for path in [Path(__file__), Path(
-                          "mhcflurry/compact_percent_rank_transform.py")]},
+                      source_hashes={str(path): sha256(path)
+                                     for path in [Path(__file__), COMPACT_TRANSFORM_SOURCE]},
                       notes="Peptide-grouped split; no presentation labels used. Uniform-AA cached "
                       "reference differs from original release calibration policy.")
     for name in ("parameters.json", "provenance.json"):

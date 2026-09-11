@@ -87,6 +87,32 @@ def test_incomplete_panel_cannot_promote(tmp_path, analysis_module):
     assert result["status"] == "incomplete" and result["candidate_condition"] is None
 
 
+@pytest.mark.parametrize("written", ["checkpoint_per_sample.csv", "checkpoint_micro_by_fold.csv"])
+def test_half_written_condition_is_pending(tmp_path, analysis_module, written):
+    records = fixture_experiment(tmp_path)
+    name = records[-1]["condition"]
+    assert name != analysis_module.BASELINE
+    for filename in ("checkpoint_per_sample.csv", "checkpoint_micro_by_fold.csv"):
+        if filename != written:
+            (tmp_path / name / filename).unlink()
+    design, samples, micro, pending, inputs = analysis_module.collect_metrics(tmp_path)
+    assert pending == [name]
+    assert name not in set(samples.condition) | set(micro.condition)
+    assert tmp_path / name / written not in inputs
+    result = analysis_module.compare_and_choose(design, samples, micro, pending, 100)[-1]
+    assert result["status"] == "incomplete" and result["candidate_condition"] is None
+
+
+def test_pending_baseline_fails_closed(tmp_path, analysis_module):
+    fixture_experiment(tmp_path)
+    for filename in ("checkpoint_per_sample.csv", "checkpoint_micro_by_fold.csv"):
+        (tmp_path / analysis_module.BASELINE / filename).unlink()
+    out = tmp_path / "analysis"
+    with pytest.raises(ValueError, match="Baseline condition is not complete: " + analysis_module.BASELINE):
+        analysis_module.main(["--experiment", str(tmp_path), "--out", str(out), "--replicates", "100"])
+    assert not out.exists()
+
+
 def test_micro_regression_disqualifies_ap_leader(tmp_path, analysis_module):
     fixture_experiment(tmp_path)
     design, samples, micro, pending, _ = analysis_module.collect_metrics(tmp_path)

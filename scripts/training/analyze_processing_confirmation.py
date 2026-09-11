@@ -38,7 +38,7 @@ def collect_metrics(experiment):
         name = record["condition"]
         path = experiment / name / "checkpoint_per_sample.csv"
         micro_path = experiment / name / "checkpoint_micro_by_fold.csv"
-        if not path.exists() and not micro_path.exists():
+        if not path.exists() or not micro_path.exists():
             pending.append(name)
             continue
         frame = pandas.read_csv(path, dtype={"sample_id": str})
@@ -75,6 +75,8 @@ def collect_metrics(experiment):
 
 def compare_and_choose(design, samples, micro, pending, replicates=10000, seed=42):
     """Apply the declared macro/micro gate; incomplete screens cannot promote."""
+    if not samples.condition.eq(BASELINE).any():
+        raise ValueError("Baseline condition is not complete: " + BASELINE)
     means = samples.groupby(["condition", "checkpoint_policy", "sample_id"])[METRICS].mean()
     summary = means.groupby(["condition", "checkpoint_policy"]).mean().reset_index()
     baseline = means.loc[(BASELINE, "best")].sort_index()

@@ -201,6 +201,19 @@ def _run_training_script(subcommand, argv):
     ], env=env)
 
 
+def _require_explicit_design(argv, prog):
+    """Stop the generic sweep alias from inheriting the kernel-width default."""
+    parser = argparse.ArgumentParser(
+        prog=prog, usage="%(prog)s --design DESIGN [options]", add_help=False)
+    parser.add_argument("-h", "--help", action="store_true")
+    parser.add_argument("--design")
+    known, _ = parser.parse_known_args(argv)
+    if not known.help and known.design is None:
+        parser.error(
+            "--design is required; see --help for designs, or use "
+            "processing-kernel-sweep for the kernel-width sweep")
+
+
 def _print_pan_allele_release_help(script, prog):
     result = subprocess.run(
         ["bash", str(script), "--help"],
@@ -254,6 +267,8 @@ def run_argv(argv, prog="mhcflurry train"):
         from . import materialize_affinity_checkpoint
         return materialize_affinity_checkpoint.run_argv(
             argv[1:], prog="%s materialize-affinity-checkpoint" % prog)
+    if argv[0] == "processing-hyperparameter-sweep":
+        _require_explicit_design(argv[1:], "%s %s" % (prog, argv[0]))
     if argv[0] in TRAINING_SCRIPTS:
         return _run_training_script(argv[0], argv[1:])
     make_parser(prog).parse_args(argv)

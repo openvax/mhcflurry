@@ -82,19 +82,19 @@ def test_confirmed_candidate_yaml_emitter_matches_named_recipe(recipe_modules):
 
 def test_final_230_candidate_v2_preset_uses_confirmed_short_flanks():
     repo = Path(__file__).resolve().parents[1]
-    script = "source scripts/training/release_recipes.sh; apply_final_230_candidate_v2_recipe; " \
-             "echo \"$MHCFLURRY_RELEASE_RECIPE|$PROCESSING_SHORT_FLANKS_HYPERPARAMETERS|$PROCESSING_VARIANTS|" \
-             "$PROCESSING_MODES|$AFFINITY_MINIBATCH_SIZE|$PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS\""
+    script = ("source scripts/training/release_recipes.sh; apply_final_230_candidate_v2_recipe; "
+              'echo "$MHCFLURRY_RELEASE_RECIPE|$PROCESSING_SHORT_FLANKS_HYPERPARAMETERS|$PROCESSING_VARIANTS|'
+              '$PROCESSING_MODES|$AFFINITY_MINIBATCH_SIZE|$PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS"')
     result = subprocess.run(["bash", "-c", script], cwd=repo, capture_output=True, text=True, check=True)
-    assert result.stdout.strip() == "final-2.3.0-candidate-v2|confirmed-ranking-candidate|no_flank short_flanks|" \
-                                    "no_flank,short_flanks|1024|5"
-    override = subprocess.run(["bash", "-c", script], cwd=repo, capture_output=True, text=True, check=True,
-                              env={"PATH": "/usr/bin:/bin", "FINAL_230_V2_PROCESSING_VARIANTS": "with_flanks no_flank short_flanks"})
-    assert override.stdout.strip().split("|")[2:4] == ["with_flanks no_flank short_flanks", "with_flanks,no_flank,short_flanks"]
+    assert result.stdout.strip() == ("final-2.3.0-candidate-v2|confirmed-ranking-candidate|"
+                                     "with_flanks no_flank short_flanks|with_flanks,no_flank,short_flanks|1024|5")
     decision = json.loads((repo / "scripts/training/final_230_candidate_v2_recipe.json").read_text())
+    v1 = json.loads((repo / "scripts/training/final_230_candidate_recipe.json").read_text())
     assert decision["name"] == "final-2.3.0-candidate-v2"
-    assert decision["processing"]["legacy_architectures_per_variant"]["short_flanks"] == 1
-    assert decision["affinity"] == json.loads((repo / "scripts/training/final_230_candidate_recipe.json").read_text())["affinity"]
+    assert decision["processing"]["legacy_architectures_per_variant"] == {
+        "with_flanks": 128, "no_flank": 128, "short_flanks": 1}
+    assert decision["processing"]["variants"] == v1["processing"]["variants"]
+    assert decision["affinity"] == v1["affinity"] and decision["presentation"] == v1["presentation"]
     workflow = (repo / "scripts/training/pan_allele_release_full.sh").read_text()
     assert "final_230_candidate_v2_recipe.json" in workflow and "--confirmed-candidate" in workflow
 

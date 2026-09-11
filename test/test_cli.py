@@ -2832,7 +2832,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     assert module.MIN_DISK is None
     assert module.OUTPUT_VOLUMES == {"/out": "test-output-volume"}
     assert module.FUNCTION_TIMEOUT_SECONDS == 86400
-    assert "runplz==4.2.2" in pip_packages
+    assert "runplz==4.4.2" in pip_packages
     assert module.remote_training_env({})["TRAINING_MINIBATCH_SIZE"] == "128"
     env = module.remote_training_env({"TRAINING_MINIBATCH_SIZE": "2048"})
     assert env["TRAINING_MINIBATCH_SIZE"] == "2048"

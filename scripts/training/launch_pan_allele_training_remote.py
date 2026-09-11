@@ -462,8 +462,9 @@ image = (
     .pip_install("pypdf")
     # The bootstrap re-imports this launcher inside the remote image, so its
     # runplz runtime must understand every decorator argument used above.
-    # 4.2.2 is the first pin used here with the complete Modal volume contract.
-    .pip_install("runplz==4.2.2")
+    # 4.4.2 matches the other maintained Modal launchers and supports the
+    # detached submission and result-receipt contract used by long runs.
+    .pip_install("runplz==4.4.2")
     .pip_install_local_dir(".", editable=True)
 )
 

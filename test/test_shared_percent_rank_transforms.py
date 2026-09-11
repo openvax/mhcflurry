@@ -220,3 +220,40 @@ def test_atomic_calibration_write_failure_preserves_previous(tmp_path, monkeypat
         save_percent_rank_transforms(tmp_path, {"score": CompactPercentRankTransform().fit([.1, .2])})
     assert (tmp_path / "percent_ranks.csv").read_bytes() == before
     assert not list(tmp_path.glob(".percent-ranks-*"))
+
+
+def test_reused_group_codes_match_per_fit_grouping():
+    import json
+    from mhcflurry.percentile_calibration import factorize_calibration_groups
+    rng = np.random.default_rng(1)
+    peptides = np.array(["P%d" % i for i in rng.integers(0, 3000, size=6000)])
+    values = np.exp(rng.normal(8, 2, size=len(peptides)))
+    codes = factorize_calibration_groups(peptides)
+    per_fit = fit_percent_rank_transform(values, score_transform="log", groups=peptides)
+    reused = fit_percent_rank_transform(values, score_transform="log", group_codes=codes)
+    assert "validation_count" in per_fit.selection
+    assert json.dumps(per_fit.to_dict(), sort_keys=True) == json.dumps(reused.to_dict(), sort_keys=True)
+    with pytest.raises(ValueError, match="not both"):
+        fit_percent_rank_transform(values, groups=peptides, group_codes=codes)
+    with pytest.raises(ValueError, match="align"):
+        fit_percent_rank_transform(values[:10], score_transform="log", group_codes=codes)
+
+
+def test_empty_save_preserves_calibration_with_umask_permissions(tmp_path):
+    import os
+    import stat
+    save_percent_rank_transforms(tmp_path, {"score": CompactPercentRankTransform().fit([.1, .2, .7])})
+    path = tmp_path / "percent_ranks.json"
+    before = path.read_bytes()
+    save_percent_rank_transforms(tmp_path, {})
+    assert path.read_bytes() == before
+    umask = os.umask(0)
+    os.umask(umask)
+    assert stat.S_IMODE(path.stat().st_mode) == 0o666 & ~umask
+
+
+def test_load_rejects_interrupted_dual_format_calibration(tmp_path):
+    save_percent_rank_transforms(tmp_path, {"score": HistogramPercentRankTransform().fit([.1, .2, .5], 3)})
+    (tmp_path / "percent_ranks.json").write_text("{}")
+    with pytest.raises(ValueError, match="Both percent_ranks.json and percent_ranks.csv"):
+        load_percent_rank_transforms(tmp_path)

@@ -268,6 +268,9 @@ def run():
                     flanking_length=flanking_length,
                     exclude_peptides=exclude_peptides,
                     n=num_decoys,
+                    # Same seed, same decoys as historical releases and the
+                    # processing script; the position sampler draws differently.
+                    sampling_method="reservoir",
                 )
             else:
                 universe = all_peptides_by_length[length]

@@ -41,7 +41,8 @@ from .common import (
 )
 from .encodable_sequences import EncodableSequences
 from .histogram_percent_rank_transform import HistogramPercentRankTransform
-from .percentile_calibration import calibration_method, fit_percent_rank_transform
+from .percentile_calibration import (
+    calibration_method, factorize_calibration_groups, fit_percent_rank_transform)
 from .regression_target import to_ic50
 from .version import __version__
 from .ensemble_centrality import CENTRALITY_MEASURES
@@ -1848,6 +1849,10 @@ class Class1AffinityPredictor(object):
         else:
             frequency_matrices = None
             length_distributions = None
+        # One peptide grouping serves every allele's compact fit.
+        group_codes = None
+        if calibration_method(method, bins) == "compact":
+            group_codes = factorize_calibration_groups(encoded_peptides.sequences)
         for allele in alleles:
             start = time.time()
             predictions = self.predict(
@@ -1863,7 +1868,7 @@ class Class1AffinityPredictor(object):
                         len(encoded_peptides.sequences) / elapsed))
             transform = fit_percent_rank_transform(
                 predictions, method=method, bins=bins, score_transform="log",
-                max_knots=max_knots, groups=encoded_peptides.sequences)
+                max_knots=max_knots, group_codes=group_codes)
             self.allele_to_percent_rank_transform[allele] = transform
 
             if frequency_matrices is not None:
@@ -2305,6 +2310,9 @@ class Class1AffinityPredictor(object):
         else:
             motif_state = None
 
+        # One peptide grouping serves every allele's compact fit in this call.
+        group_codes = (factorize_calibration_groups(encoded_peptides.sequences)
+                       if method == "compact" else None)
         for abatch_start in range(0, n_alleles, allele_batch_size):
             abatch_end = min(abatch_start + allele_batch_size, n_alleles)
             a_size = abatch_end - abatch_start
@@ -2374,7 +2382,7 @@ class Class1AffinityPredictor(object):
                 # the final ensemble scores, without repeating neural inference.
                 transforms = [fit_percent_rank_transform(
                     row, method="compact", score_transform="log", max_knots=max_knots,
-                    groups=encoded_peptides.sequences) for row in ic50_device.cpu().numpy()]
+                    group_codes=group_codes) for row in ic50_device.cpu().numpy()]
             for local_i, allele in enumerate(batch_alleles):
                 self.allele_to_percent_rank_transform[allele] = transforms[local_i]
             if motif_summary:

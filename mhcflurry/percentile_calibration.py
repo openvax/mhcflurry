@@ -24,9 +24,20 @@ def calibration_method(method, bins):
     return method
 
 
+def factorize_calibration_groups(groups):
+    """Return ``(inverse, group_count)`` codes reusable across aligned fits.
+
+    Calibrating many alleles against one peptide reference repeats the same
+    grouping. Factorize it once and pass the result as ``group_codes``; the
+    fitted transforms are identical to passing ``groups`` each time.
+    """
+    unique, inverse = np.unique(np.asarray(groups), return_inverse=True)
+    return inverse.reshape(-1), len(unique)
+
+
 def fit_percent_rank_transform(values, *, method=None, bins=None,
                                score_transform="logit", survival=False,
-                               max_knots=128, groups=None):
+                               max_knots=128, groups=None, group_codes=None):
     """Fit a histogram or a label-free, validation-selected compact curve.
 
     Compact fitting starts with 64 knots. A deterministic 80/20 background
@@ -58,6 +69,9 @@ def fit_percent_rank_transform(values, *, method=None, bins=None,
         Aligned identities that must not cross the selection split. If absent,
         each row is a separate group. Selection uses fixed seed 403, requires
         at least 1,000 groups and two cutoffs with ten expected observations.
+    group_codes : tuple of (array of int, int), optional
+        Precomputed ``factorize_calibration_groups(groups)`` for the same
+        aligned reference rows. Mutually exclusive with ``groups``.
 
     Returns
     -------
@@ -73,9 +87,16 @@ def fit_percent_rank_transform(values, *, method=None, bins=None,
     if max_knots not in (64, 128):
         raise ValueError("max_knots must be 64 or 128")
     values = np.asarray(values, dtype=float)
+    if groups is not None and group_codes is not None:
+        raise ValueError("Pass calibration groups or group_codes, not both")
     # Validate even references too small for a split.
     model = CompactPercentRankTransform(score_transform).fit(values, 64)
-    if groups is None:
+    if group_codes is not None:
+        inverse, group_count = group_codes
+        inverse = np.asarray(inverse)
+        if inverse.shape != values.shape:
+            raise ValueError("Calibration groups must align with reference scores")
+    elif groups is None:
         inverse = np.arange(len(values))
         group_count = len(values)
     else:
@@ -128,15 +149,15 @@ def save_percent_rank_transforms(models_dir, transforms):
     CSV is retained when all histograms share an edge grid. JSON is authoritative
     for compact, mixed, or differing-grid collections. Remove the old
     alternate calibration only after its replacement is successfully written.
-    An empty collection removes both calibration files. Neural-network files
+    An empty collection leaves existing calibration files untouched, as
+    historical saves did, so an uncalibrated or incremental save cannot erase
+    a calibration. Files get ordinary umask permissions. Neural-network files
     are never touched. This does not make the entire model-directory save a
     transaction across multiple files.
     """
     directory = Path(models_dir)
     csv_path, json_path = directory / "percent_ranks.csv", directory / "percent_ranks.json"
     if not transforms:
-        csv_path.unlink(missing_ok=True)
-        json_path.unlink(missing_ok=True)
         return
     histogram_only = bool(transforms) and all(
         isinstance(t, HistogramPercentRankTransform) for t in transforms.values())
@@ -147,7 +168,12 @@ def save_percent_rank_transforms(models_dir, transforms):
         for s in series.values())
     target, alternate = (csv_path, json_path) if same_edges else (json_path, csv_path)
     fd, temp = tempfile.mkstemp(prefix=".percent-ranks-", dir=directory)
+    # mkstemp creates owner-only files and os.replace keeps that mode; saved
+    # calibrations must stay readable like the weights beside them.
+    umask = os.umask(0)
+    os.umask(umask)
     try:
+        os.chmod(temp, 0o666 & ~umask)
         with os.fdopen(fd, "w") as stream:
             if same_edges:
                 pd.DataFrame(series).to_csv(stream, index=True, index_label="bin")
@@ -166,6 +192,13 @@ def save_percent_rank_transforms(models_dir, transforms):
 def load_percent_rank_transforms(models_dir):
     """Read new calibrations or historical CSV without refitting either."""
     directory = Path(models_dir)
+    if (directory / "percent_ranks.json").exists() and (directory / "percent_ranks.csv").exists():
+        # save_percent_rank_transforms removes the alternate format after the
+        # replacement; both existing means that save was interrupted.
+        raise ValueError(
+            "Both percent_ranks.json and percent_ranks.csv exist in %s; an "
+            "interrupted calibration save left a stale file. Remove it or "
+            "recalibrate." % directory)
     if (directory / "percent_ranks.json").exists():
         with (directory / "percent_ranks.json").open() as stream:
             payload = json.load(stream)

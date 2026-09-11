@@ -102,3 +102,20 @@ def test_fit_calibration_excludes_validation_rows_and_survives_save(tmp_path):
     loaded = Class1ProcessingPredictor.load(str(tmp_path))
     assert loaded.models[0].fit_info[-1]["initialization"] == info
     numpy.testing.assert_allclose(model.predict_encoded(inputs), loaded.models[0].predict_encoded(inputs))
+
+
+def test_fit_does_not_reinitialize_a_network_built_before_fit():
+    model = Class1ProcessingNeuralNetwork(
+        initialization_method="lsuv_pre", initialization_batch_size=3,
+        convolutional_filters=8, convolutional_kernel_size=3,
+        convolutional_activation="relu", n_flank_length=2, c_flank_length=2,
+        max_epochs=1, minibatch_size=2)
+    model._network = model.make_network(
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters))
+    inputs = FlankingEncoding(["SIINFEKL", "GILGFVFTL", "NLVPMVATV", "AAAAAAAA"] * 2,
+                             ["AR"] * 8, ["DC"] * 8)
+    mask = numpy.array([True, False, True, False, True, False, True, False])
+    model.fit(inputs, [1, 0] * 4, validation_mask=mask, seed=42,
+              verbose=-1, progress_print_interval=None)
+    assert model.fit_info[-1]["initialization"] == {
+        "method": "lsuv_pre", "applied": False, "reason": "existing_network"}

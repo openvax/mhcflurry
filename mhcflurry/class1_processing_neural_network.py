@@ -1059,7 +1059,10 @@ class Class1ProcessingNeuralNetwork(object):
         # A refit must never expose states from an earlier training trajectory.
         self.checkpoint_weights = {}
 
-        if self._network is None:
+        # Initialization may overwrite only a network created by this call,
+        # never weights built, restored or trained before it.
+        created_network = self._network is None
+        if created_network:
             self._network = self.make_network(
                 **self.network_hyperparameter_defaults.subselect(self.hyperparameters)
             )
@@ -1141,9 +1144,10 @@ class Class1ProcessingNeuralNetwork(object):
         if initialization_method == "none":
             report = initialize_processing_network(eager_network, {}, "none")
             fit_info["initialization"] = dict(report, applied=False)
-        elif self.fit_info:
-            fit_info["initialization"] = {"method": initialization_method,
-                                          "applied": False, "reason": "existing_fit"}
+        elif self.fit_info or not created_network:
+            fit_info["initialization"] = {
+                "method": initialization_method, "applied": False,
+                "reason": "existing_fit" if self.fit_info else "existing_network"}
         else:
             calibration_size = min(n_train, int(self.hyperparameters["initialization_batch_size"]))
             if calibration_size < 1:

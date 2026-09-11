@@ -52,12 +52,7 @@
       "experiment": "processing-ranking-confirmation-20260909",
       "runplz_run_id": "a8889cc8dfbb4f4390d4ceb153ad81e1",
       "decision_sha256": "5529a81d35defa8939784cabc96f7f077c8918f059a13fee11fb78fafdb29921"
-    },
-    "assessment_variants": [
-      "no_flank",
-      "short_flanks"
-    ],
-    "with_flanks_note": "15-aa grid is not a presentation input; train in a resumed run before release."
+    }
   },
   "presentation": {
     "processing_with_flanks": "short_flanks plus radius-5 boundary hybrid",

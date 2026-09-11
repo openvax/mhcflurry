@@ -28,7 +28,7 @@ model-validation record stays distinct from the package changelog.
   switches with paired frozen-holdout ablations before the full retrain.
 - Require runplz 3.24.31 for the release control process and use its updated
   staging/bootstrap behavior. The maintained remote image separately pins
-  runplz 4.2.2 for the Modal persistent-volume contract.
+  runplz 4.4.2 for the Modal persistent-volume and detached-run contract.
 - Establish the published 2.1.x/2.2.x recipe as the compatibility control,
   then permit only held-out, crossed departures. The final affinity candidate
   uses the winning interaction of minibatch 1024, native PyTorch RMSprop, and
