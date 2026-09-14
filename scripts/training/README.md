@@ -57,8 +57,11 @@ RUN_RELEASE_EVAL=1 RUN_RELEASE_PLOTS=1 \
 runplz modal scripts/training/launch_pan_allele_training_remote.py
 ```
 
-This command remains attached until runplz provides supported detached Modal
-collection (pirl-unc/runplz#165). Modal caps one function invocation at 24
+This command stays attached. For a detached launch (`runplz modal ... --detach`),
+replace `RUNPLZ_OUT` with `MHCFLURRY_RELEASE_OUT`: runplz rejects a caller-set
+`RUNPLZ_OUT` in detached mode and assigns a per-run path, while the release must
+write to a stable path to resume. The run's own output directory then holds
+`mhcflurry_release_out.txt`, naming the volume path to collect. Modal caps one function invocation at 24
 hours, so `RUNPLZ_TIMEOUT_SECONDS` must not exceed 86400 there. The Modal volume
 is durable, and processing training resumes from its manifests when the same
 command is launched again from the same clean source commit and output path.

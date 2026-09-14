@@ -132,7 +132,11 @@ presentation combiner and calibration are unchanged. The decision set is
 All three processing variants are trained, so a passing run is a complete
 release download. The 15-aa grid uses the frozen Kaiming/native-Adam recipe,
 which also removes the v1 provenance exception. Launch exactly as below with
-the v2 recipe name and workflow id `final-2.3.0-candidate-v2`. The acceptance gate for this
+the v2 recipe name and workflow id `final-2.3.0-candidate-v2`. For a detached launch
+(`runplz modal ... --detach`), set `MHCFLURRY_RELEASE_OUT` instead of `RUNPLZ_OUT`: detached
+runs reject a caller-set `RUNPLZ_OUT`, and the stable path keeps relaunches resumable.
+`MHCFLURRY_RELEASE_SMOKE=1` with an output path containing `smoke` runs the same
+pipeline at reduced scale first. The acceptance gate for this
 candidate was recorded before training in
 `output/final-230-candidate-v2/SPEC.md`.
 

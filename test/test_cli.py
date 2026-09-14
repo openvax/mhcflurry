@@ -2849,7 +2849,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     assert env["MHCFLURRY_RELEASE_GIT_COMMIT"] == ""
     assert env["MHCFLURRY_RELEASE_VERSION"] == ""
     assert env["MHCFLURRY_RELEASE_RECIPE"] == ""
-    assert env["RUNPLZ_OUT"] == ""
+    assert env["MHCFLURRY_RELEASE_OUT"] == ""
     assert env["MHCFLURRY_REMOTE_WORKFLOW"] == "full"
     assert env["BOUNDARY_RADIUS_ARCHITECTURE"] == "large_relu"
     assert env["BOUNDARY_RADIUS_AFFINITY_CONTROL"] == "none"
@@ -2969,6 +2969,19 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     assert env["PROCESSING_SHORT_FLANKS_HYPERPARAMETERS"] == "confirmed-ranking-candidate"
     assert module.remote_training_env({})["PROCESSING_SHORT_FLANKS_HYPERPARAMETERS"] == "grid"
     assert env["MHCFLURRY_RELEASE_SMOKE"] == "1"
+    # runplz refuses detached Modal runs whose function env has any RUNPLZ_OUT key.
+    assert "RUNPLZ_OUT" not in module.remote_training_env({})
+    detached = module.remote_training_env({"MHCFLURRY_RELEASE_OUT": "/out/runs/v2"})
+    assert "RUNPLZ_OUT" not in detached and detached["MHCFLURRY_RELEASE_OUT"] == "/out/runs/v2"
+    module.validate_smoke_output({"MHCFLURRY_RELEASE_SMOKE": "1",
+                                  "MHCFLURRY_RELEASE_OUT": "/out/runs/v2-smoke",
+                                  "RUNPLZ_OUT": "/out/runplz/0123456789abcdef"})
+    runplz_out = tmp_path / "runplz" / "0123456789abcdef"
+    pointer = module.write_runplz_output_pointer(
+        "/out/runs/v2", {"RUNPLZ_OUT": str(runplz_out)})
+    assert pointer.read_text() == "/out/runs/v2\n"
+    assert module.write_runplz_output_pointer(str(runplz_out), {"RUNPLZ_OUT": str(runplz_out)}) is None
+    assert module.write_runplz_output_pointer("/out/runs/v2", {}) is None
     assert module.remote_training_env({})["MHCFLURRY_RELEASE_SMOKE"] == "0"
     module.validate_smoke_output({"MHCFLURRY_RELEASE_SMOKE": "0", "RUNPLZ_OUT": "/out/runs/release"})
     module.validate_smoke_output({"MHCFLURRY_RELEASE_SMOKE": "1", "RUNPLZ_OUT": "/out/runs/v2-smoke"})

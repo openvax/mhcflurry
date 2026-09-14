@@ -197,11 +197,28 @@ def validate_smoke_output(environ=os.environ):
         return
     if flag != "1":
         raise ValueError("MHCFLURRY_RELEASE_SMOKE must be 0 or 1; got %r" % flag)
-    out = environ.get("RUNPLZ_OUT", "") or environ.get("MHCFLURRY_OUT", "")
+    out = (environ.get("MHCFLURRY_RELEASE_OUT", "") or environ.get("RUNPLZ_OUT", "")
+           or environ.get("MHCFLURRY_OUT", ""))
     if "smoke" not in out:
         raise ValueError(
             "MHCFLURRY_RELEASE_SMOKE=1 requires an output path containing 'smoke'; "
             "got %r" % out)
+
+
+def write_runplz_output_pointer(out, environ=os.environ):
+    """Record the stable release path inside a detached run's own output dir.
+
+    Detached Modal runs collect ``RUNPLZ_OUT`` (``/out/runplz/<run id>``), while
+    the release writes to ``MHCFLURRY_RELEASE_OUT`` so relaunches resume in place.
+    The pointer tells whoever collects the run where the weights actually are.
+    """
+    runplz_out = environ.get("RUNPLZ_OUT", "").strip()
+    if not runplz_out or Path(runplz_out).resolve() == Path(out).resolve():
+        return None
+    pointer = Path(runplz_out) / "mhcflurry_release_out.txt"
+    pointer.parent.mkdir(parents=True, exist_ok=True)
+    pointer.write_text(str(out) + "\n")
+    return pointer
 
 
 def brev_config_from_env(environ=os.environ):
@@ -330,7 +347,7 @@ def remote_training_env(environ=os.environ):
             "MHCFLURRY_RELEASE_RECIPE", ""
         ),
         "MHCFLURRY_RELEASE_SMOKE": environ.get("MHCFLURRY_RELEASE_SMOKE", "0"),
-        "RUNPLZ_OUT": environ.get("RUNPLZ_OUT", ""),
+        "MHCFLURRY_RELEASE_OUT": environ.get("MHCFLURRY_RELEASE_OUT", ""),
         "MHCFLURRY_REMOTE_WORKFLOW": environ.get(
             "MHCFLURRY_REMOTE_WORKFLOW", "full"
         ),
@@ -445,6 +462,11 @@ def remote_training_env(environ=os.environ):
         ),
         "TRAINING_MINIBATCH_SIZE": environ.get("TRAINING_MINIBATCH_SIZE", "128"),
     }
+    # Detached Modal runs reject any RUNPLZ_OUT key, even empty, and assign
+    # their own per-run path; use MHCFLURRY_RELEASE_OUT for a stable, resumable
+    # output path there. Attached launches that set RUNPLZ_OUT keep it.
+    if environ.get("RUNPLZ_OUT", "").strip():
+        env["RUNPLZ_OUT"] = environ["RUNPLZ_OUT"]
     for name in (
         "AFFINITY_MINIBATCH_SIZE",
         "AFFINITY_MAX_WORKERS_PER_GPU",
@@ -510,10 +532,12 @@ def train_release_full():
     # thing on every backend.
     repo = Path(__file__).resolve().parents[2]
     out = Path(
-        os.environ.get("RUNPLZ_OUT")
+        os.environ.get("MHCFLURRY_RELEASE_OUT")
+        or os.environ.get("RUNPLZ_OUT")
         or os.environ.get("MHCFLURRY_OUT")
         or DEFAULT_OUT
     ).resolve()
+    write_runplz_output_pointer(out)
     env = os.environ.copy()
     env.update({"MHCFLURRY_OUT": str(out), "REPO": str(repo)})
     workflow, workflow_script = remote_workflow_script(env)
