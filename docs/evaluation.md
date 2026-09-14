@@ -166,7 +166,12 @@ mhcflurry eval presentation-external-predictors \
 ```
 
 Rows join by benchmark source file and row identity, with genotypes
-canonicalized as compare-models saves them; any unmatched row fails the command. `multiallelic` uses the saved presentation scores with
+canonicalized as compare-models saves them; any unmatched row fails the command.
+`data_evaluation` ships NetMHCpan 4.0 BA/EL and MixMHCpred columns. Pass
+`--external-dir` once per directory of locally generated scores, such as
+NetMHCpan 4.2, whose files may be plain CSV. Read any NetMHCpan 4.1 or 4.2
+result as an optimistic bound: both postdate this holdout's 2019 source study
+and are not train-excluded against it, unlike NetMHCpan 4.0. `multiallelic` uses the saved presentation scores with
 and without flanks; `monoallelic` uses saved affinity predictions (pass
 `--skip-joined-table` for that large cohort). Metrics use the compare-models
 definitions. Each predictor is scored on the rows it covers and each paired

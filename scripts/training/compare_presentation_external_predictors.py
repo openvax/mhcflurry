@@ -31,11 +31,14 @@ METRIC_TITLES = {"roc_auc": "AUROC", "pr_auc": "AUPRC", "ppv_at_n": "PPV@N"}
 EXTERNAL = {
     "netmhcpan4.el": ("NetMHCpan 4.0 EL", True),
     "netmhcpan4.ba": ("NetMHCpan 4.0 BA", False),
+    "netmhcpan4.2.el": ("NetMHCpan 4.2 EL", True),
+    "netmhcpan4.2.ba": ("NetMHCpan 4.2 BA", False),
     "mixmhcpred": ("MixMHCpred", True),
 }
 # Categorical slots validated all-pairs on the light surface; MixMHCpred is muted.
 ROLE_COLORS = {"a": "#2a78d6", "b": "#eb6834", "netmhcpan4.el": "#1baf7a",
-               "netmhcpan4.ba": "#4a3aa7", "mixmhcpred": "#898781"}
+               "netmhcpan4.2.el": "#4a3aa7", "netmhcpan4.ba": "#eda100",
+               "netmhcpan4.2.ba": "#e87ba4", "mixmhcpred": "#898781"}
 SURFACE, INK, SECONDARY, MUTED = "#fcfcfb", "#0b0b0b", "#52514e", "#898781"
 GRID, BASELINE_INK = "#e1e0d9", "#c3c2b7"
 STYLE = {
@@ -122,16 +125,23 @@ def load_saved_scores(comparison_dir, cohort, a_label, b_label):
     return frame, conditions, [path]
 
 
-def external_path(data_dir, cohort, predictor, source_file):
-    """Map a saved benchmark file name to its precomputed predictor file."""
+def external_path(directories, cohort, predictor, source_file):
+    """Find one predictor's file for a saved benchmark file, compressed or not."""
     marker = ".train_excluded."
     if not source_file.startswith("benchmark.%s." % cohort) or marker not in source_file:
         raise ValueError("Unrecognized %s benchmark source file: %s" % (cohort, source_file))
-    return Path(data_dir) / ("benchmark.%s.%s%s%s" % (
-        cohort, predictor, marker, source_file.split(marker, 1)[1]))
+    name = "benchmark.%s.%s%s%s" % (cohort, predictor, marker, source_file.split(marker, 1)[1])
+    names = [name, name[:-len(".bz2")]] if name.endswith(".bz2") else [name]
+    for directory in directories:
+        for candidate in names:
+            path = Path(directory) / candidate
+            if path.is_file():
+                return path
+    raise FileNotFoundError("No %s file for %s in: %s" % (
+        predictor, source_file, ", ".join(str(directory) for directory in directories)))
 
 
-def attach_external(frame, cohort, data_dir, predictors):
+def attach_external(frame, cohort, directories, predictors):
     """Attach precomputed predictor columns by source file and exact row identity.
 
     Saved rows are an ordered subset of each benchmark file, so the k-th saved
@@ -144,9 +154,7 @@ def attach_external(frame, cohort, data_dir, predictors):
     pieces, inputs = [], []
     for source_file, sub in frame.groupby("source_file", sort=True):
         for predictor in predictors:
-            path = external_path(data_dir, cohort, predictor, source_file)
-            if not path.is_file():
-                raise FileNotFoundError("Missing external predictions: %s" % path)
+            path = external_path(directories, cohort, predictor, source_file)
             raw = pandas.read_csv(path, usecols=KEYS + [predictor],
                                   dtype={name: str for name in KEYS if name != "hit"},
                                   low_memory=False)
@@ -221,13 +229,16 @@ def score_conditions(frame, conditions):
 def comparison_pairs(cohort, conditions):
     """Candidate/reference pairs reported with paired intervals."""
     if cohort == "multiallelic":
-        pairs = [("a_with_flanks", "b_with_flanks"), ("a_with_flanks", "netmhcpan4.el"),
-                 ("a_with_flanks", "netmhcpan4.ba"), ("a_with_flanks", "mixmhcpred"),
+        pairs = [("a_with_flanks", "b_with_flanks"),
+                 ("a_with_flanks", "netmhcpan4.2.el"), ("a_with_flanks", "netmhcpan4.el"),
+                 ("a_with_flanks", "netmhcpan4.2.ba"), ("a_with_flanks", "netmhcpan4.ba"),
+                 ("a_with_flanks", "mixmhcpred"),
                  ("a_without_flanks", "b_without_flanks"),
                  ("a_with_flanks_percentile", "b_with_flanks_percentile"),
-                 ("b_with_flanks", "netmhcpan4.el"), ("b_with_flanks", "netmhcpan4.ba")]
+                 ("b_with_flanks", "netmhcpan4.2.el"), ("b_with_flanks", "netmhcpan4.el")]
     else:
-        pairs = [("a_affinity", "b_affinity"), ("a_affinity", "netmhcpan4.ba"),
+        pairs = [("a_affinity", "b_affinity"), ("a_affinity", "netmhcpan4.2.ba"),
+                 ("a_affinity", "netmhcpan4.ba"), ("a_affinity", "netmhcpan4.2.el"),
                  ("a_affinity", "netmhcpan4.el"), ("a_affinity", "mixmhcpred"),
                  ("b_affinity", "netmhcpan4.ba")]
     return [pair for pair in pairs if set(pair) <= set(conditions)]
@@ -359,9 +370,11 @@ def render(out, cohort, conditions, frame, per_sample, summary, paired, differen
     cohort_title = ("%d held-out multiallelic presentation samples" % samples
                     if cohort == "multiallelic" else "%d monoallelic samples" % samples)
     raw = [name for name in conditions if not name.endswith("_percentile")]
-    curve_order = (["a_with_flanks", "b_with_flanks", "netmhcpan4.el", "netmhcpan4.ba", "mixmhcpred"]
-                   if cohort == "multiallelic" else
-                   ["a_affinity", "b_affinity", "netmhcpan4.ba", "netmhcpan4.el", "mixmhcpred"])
+    # Four curves keep the validated all-pairs palette legible when they cross.
+    curve_order = (["a_with_flanks", "b_with_flanks", "netmhcpan4.2.el", "netmhcpan4.el",
+                    "netmhcpan4.ba", "mixmhcpred"] if cohort == "multiallelic" else
+                   ["a_affinity", "b_affinity", "netmhcpan4.2.ba", "netmhcpan4.ba",
+                    "netmhcpan4.el", "mixmhcpred"])
     # Candidate-versus-reference differences are an order of magnitude smaller
     # than external gaps; separate pages keep both legible.
     internal = [pair for pair in pairs if conditions[pair[1]].role in ("a", "b")]
@@ -378,7 +391,7 @@ def render(out, cohort, conditions, frame, per_sample, summary, paired, differen
                 external, conditions, paired, differences,
                 "MHCflurry versus NetMHCpan and MixMHCpred, " + cohort_title)))
         pages.append(("precision_recall", lambda: plot_precision_recall(
-            [name for name in curve_order if name in conditions], conditions, summary, frame,
+            [name for name in curve_order if name in conditions][:4], conditions, summary, frame,
             "Pooled precision-recall, " + cohort_title)))
         for name, make in pages:
             fig = make()
@@ -432,12 +445,24 @@ def write_summary_markdown(out, args, summary, paired, coverage):
     (out / "summary.md").write_text("\n".join(text))
 
 
+def json_argument(value):
+    """Paths, including repeatable path options, are recorded as strings."""
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, (list, tuple)):
+        return [str(item) if isinstance(item, Path) else item for item in value]
+    return value
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog=os.environ.get("MHCFLURRY_CLI_PROG"), description=__doc__)
     parser.add_argument("--comparison-dir", type=Path, required=True,
                         help="compare-models output directory with saved prediction tables.")
     parser.add_argument("--data-dir", type=Path, required=True,
                         help="data_evaluation download containing precomputed predictor files.")
+    parser.add_argument("--external-dir", type=Path, action="append", default=[],
+                        help="Extra directory of predictor files, repeatable. Searched after "
+                        "--data-dir; files may be plain CSV. Use for locally generated scores.")
     parser.add_argument("--cohort", choices=("multiallelic", "monoallelic"), default="multiallelic",
                         help="multiallelic: saved presentation scores; monoallelic: saved affinities.")
     parser.add_argument("--external", default=",".join(EXTERNAL),
@@ -459,7 +484,8 @@ def main(argv=None):
         raise ValueError("Output directory must be new or empty: %s" % args.out)
     frame, conditions, inputs = load_saved_scores(
         args.comparison_dir, args.cohort, args.a_label, args.b_label)
-    frame, external_inputs = attach_external(frame, args.cohort, args.data_dir, predictors)
+    frame, external_inputs = attach_external(
+        frame, args.cohort, [args.data_dir] + list(args.external_dir), predictors)
     for predictor in predictors:
         label, higher_is_better = EXTERNAL[predictor]
         conditions[predictor] = Condition(label, higher_is_better, predictor)
@@ -484,8 +510,7 @@ def main(argv=None):
     write_summary_markdown(args.out, args, summary, paired, coverage)
     shutil.copyfile(__file__, args.out / "analysis_source.py")
     provenance = {
-        "arguments": {key: str(value) if isinstance(value, Path) else value
-                      for key, value in vars(args).items()},
+        "arguments": {key: json_argument(value) for key, value in vars(args).items()},
         "conditions": {name: condition._asdict() for name, condition in conditions.items()},
         "pairs": pairs,
         "method": "compare-models _metrics per sample; each predictor on its scored rows, "
