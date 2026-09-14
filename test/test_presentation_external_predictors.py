@@ -195,7 +195,8 @@ def test_monoallelic_affinity_verifies_saved_external_column(tmp_path, module):
     assert module.main(arguments(data, extra, tmp_path / "comparison", out, "--cohort", "monoallelic",
                                  "--skip-joined-table")) == 0
     summary = pandas.read_csv(out / "summary.csv")
-    assert set(summary.condition) == {"a_affinity", "b_affinity", *PRECOMPUTED, *LOCAL}
+    assert set(summary.condition) == {"a_affinity", "b_affinity", *PRECOMPUTED, *LOCAL,
+                                      "random", "terminal_logistic"}
     assert not (out / "joined_scores.csv.gz").exists()
     bad = saved[columns].copy()
     bad.loc[3, "mixmhcpred"] += 1
@@ -203,3 +204,39 @@ def test_monoallelic_affinity_verifies_saved_external_column(tmp_path, module):
     with pytest.raises(ValueError, match="disagree"):
         module.main(arguments(data, extra, tmp_path / "comparison", tmp_path / "out2",
                               "--cohort", "monoallelic"))
+
+
+def test_reference_baselines_are_scored_without_leaking_labels(tmp_path, module):
+    data, extra, comparison, _ = write_multiallelic(tmp_path)
+    out = tmp_path / "out"
+    assert module.main(arguments(data, extra, comparison, out)) == 0
+    summary = pandas.read_csv(out / "summary.csv").set_index("condition")
+    assert 0.3 < summary.loc["random", "macro_roc_auc"] < 0.7
+    assert "terminal_logistic" in summary.index
+    paired = pandas.read_csv(out / "paired_differences.csv")
+    assert ("a_with_flanks", "terminal_logistic") in set(zip(paired.candidate, paired.reference))
+    frame = pandas.DataFrame({
+        "peptide": ["SIINFEKL", "GILGFVFT", "NLVPMVAT", "AAAAAAAA"] * 30,
+        "hit": [1, 0, 0, 0] * 30,
+        "sample_id": ["A"] * 60 + ["B"] * 60})
+    before = module.leave_one_sample_out_logistic(frame)
+    flipped = frame.copy()
+    flipped.loc[flipped.sample_id == "A", "hit"] = [0, 1, 0, 0] * 15
+    after = module.leave_one_sample_out_logistic(flipped)
+    in_a = (frame.sample_id == "A").to_numpy()
+    numpy.testing.assert_allclose(after[in_a], before[in_a])
+    assert not numpy.allclose(after[~in_a], before[~in_a])
+
+
+def test_terminal_features_encode_both_ends_and_unknown_residues(module):
+    features = module.terminal_residue_features(["ACDEFGHIK", "AC"]).toarray()
+    assert features.shape == (2, 8 * 21) and (features.sum(axis=1) == 8).all()
+    assert features[0, 0 * 21 + 0] == 1 and features[0, 7 * 21 + module.AMINO_ACIDS.index("K")] == 1
+    assert features[1, 2 * 21 + 20] == 1  # short peptide padded with the unknown symbol
+
+
+def test_reference_baselines_can_be_disabled(tmp_path, module):
+    data, extra, comparison, _ = write_multiallelic(tmp_path)
+    out = tmp_path / "out"
+    assert module.main(arguments(data, extra, comparison, out, "--baselines", "none")) == 0
+    assert not {"random", "terminal_logistic"} & set(pandas.read_csv(out / "summary.csv").condition)

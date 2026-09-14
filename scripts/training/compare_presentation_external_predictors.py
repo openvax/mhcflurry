@@ -38,7 +38,11 @@ EXTERNAL = {
 # Categorical slots validated all-pairs on the light surface; MixMHCpred is muted.
 ROLE_COLORS = {"a": "#2a78d6", "b": "#eb6834", "netmhcpan4.el": "#1baf7a",
                "netmhcpan4.2.el": "#4a3aa7", "netmhcpan4.ba": "#eda100",
-               "netmhcpan4.2.ba": "#e87ba4", "mixmhcpred": "#898781"}
+               "netmhcpan4.2.ba": "#e87ba4", "mixmhcpred": "#898781",
+               "baseline": "#008300", "random": "#c3c2b7"}
+AMINO_ACIDS = "ACDEFGHIKLMNPQRSTVWY"
+TERMINAL_RESIDUES = 4
+BASELINES = ("random", "terminal-logistic")
 SURFACE, INK, SECONDARY, MUTED = "#fcfcfb", "#0b0b0b", "#52514e", "#898781"
 GRID, BASELINE_INK = "#e1e0d9", "#c3c2b7"
 STYLE = {
@@ -103,7 +107,7 @@ def load_saved_scores(comparison_dir, cohort, a_label, b_label):
                 or not numpy.array_equal(with_flanks["_identity"], without_flanks["_identity"])
                 or not with_flanks.source_file.equals(without_flanks.source_file)):
             raise ValueError("With- and without-flank predictions must describe identical rows in one order")
-        keep = ["sample_id", "source_file", "hit", "_identity"] + [
+        keep = ["sample_id", "source_file", "hit", "peptide", "_identity"] + [
             name for name in EXTERNAL if name in with_flanks]
         frame = with_flanks[keep].copy()
         for mode, table in tables.items():
@@ -117,7 +121,7 @@ def load_saved_scores(comparison_dir, cohort, a_label, b_label):
         return frame, conditions, list(paths.values())
     path = comparison_dir / "affinity" / "predictions.csv.bz2"
     table = read_predictions(path, ["a_pred", "b_pred"])
-    frame = table[["sample_id", "source_file", "hit", "_identity"] + [
+    frame = table[["sample_id", "source_file", "hit", "peptide", "_identity"] + [
         name for name in EXTERNAL if name in table]].copy()
     for side, label in (("a", a_label), ("b", b_label)):
         frame[side + "_affinity"] = table[side + "_pred"].to_numpy(dtype=float)
@@ -226,13 +230,56 @@ def score_conditions(frame, conditions):
     return pandas.concat(per_sample, ignore_index=True), pandas.DataFrame(summary), coverage
 
 
+def terminal_residue_features(peptides):
+    """One-hot the first and last four residues; other symbols share one slot."""
+    import scipy.sparse
+    series = pandas.Series(peptides, dtype=object).fillna("").astype(str).str.upper()
+    lookup = numpy.full(256, len(AMINO_ACIDS), dtype=numpy.int64)
+    for index, residue in enumerate(AMINO_ACIDS):
+        lookup[ord(residue)] = index
+    width, alphabet = TERMINAL_RESIDUES, len(AMINO_ACIDS) + 1
+    blocks = []
+    for part in (series.str[:width].str.ljust(width, "X"),
+                 series.str[-width:].str.rjust(width, "X")):
+        raw = numpy.frombuffer("".join(part).encode("ascii", "replace"), dtype=numpy.uint8)
+        blocks.append(lookup[raw].reshape(len(series), width))
+    columns = numpy.hstack(blocks) + numpy.arange(2 * width) * alphabet
+    rows = numpy.repeat(numpy.arange(len(series)), 2 * width)
+    return scipy.sparse.csr_matrix(
+        (numpy.ones(rows.size, dtype=numpy.float32), (rows, columns.ravel())),
+        shape=(len(series), 2 * width * alphabet))
+
+
+def leave_one_sample_out_logistic(frame):
+    """Score each sample with a logistic regression fitted on every other sample.
+
+    Features are the one-hot first and last four residues only, with no MHC or
+    flank input, so this measures how much generic peptide-terminus
+    composition separates hits from decoys. A sample's own labels never reach
+    its scores.
+    """
+    from sklearn.linear_model import LogisticRegression
+    features = terminal_residue_features(frame.peptide.to_numpy())
+    hits = frame.hit.to_numpy()
+    samples = frame.sample_id.to_numpy()
+    scores = numpy.full(len(frame), numpy.nan)
+    for sample in numpy.unique(samples):
+        test, train = numpy.flatnonzero(samples == sample), numpy.flatnonzero(samples != sample)
+        if len(numpy.unique(hits[train])) < 2:
+            raise ValueError("Leave-one-sample-out baseline needs hits and decoys outside %s" % sample)
+        model = LogisticRegression(C=1.0, max_iter=1000)
+        model.fit(features[train], hits[train])
+        scores[test] = model.decision_function(features[test])
+    return scores
+
+
 def comparison_pairs(cohort, conditions):
     """Candidate/reference pairs reported with paired intervals."""
     if cohort == "multiallelic":
         pairs = [("a_with_flanks", "b_with_flanks"),
                  ("a_with_flanks", "netmhcpan4.2.el"), ("a_with_flanks", "netmhcpan4.el"),
                  ("a_with_flanks", "netmhcpan4.2.ba"), ("a_with_flanks", "netmhcpan4.ba"),
-                 ("a_with_flanks", "mixmhcpred"),
+                 ("a_with_flanks", "mixmhcpred"), ("a_with_flanks", "terminal_logistic"),
                  ("a_without_flanks", "b_without_flanks"),
                  ("a_with_flanks_percentile", "b_with_flanks_percentile"),
                  ("b_with_flanks", "netmhcpan4.2.el"), ("b_with_flanks", "netmhcpan4.el")]
@@ -240,7 +287,7 @@ def comparison_pairs(cohort, conditions):
         pairs = [("a_affinity", "b_affinity"), ("a_affinity", "netmhcpan4.2.ba"),
                  ("a_affinity", "netmhcpan4.ba"), ("a_affinity", "netmhcpan4.2.el"),
                  ("a_affinity", "netmhcpan4.el"), ("a_affinity", "mixmhcpred"),
-                 ("b_affinity", "netmhcpan4.ba")]
+                 ("a_affinity", "terminal_logistic"), ("b_affinity", "netmhcpan4.ba")]
     return [pair for pair in pairs if set(pair) <= set(conditions)]
 
 
@@ -467,6 +514,9 @@ def main(argv=None):
                         help="multiallelic: saved presentation scores; monoallelic: saved affinities.")
     parser.add_argument("--external", default=",".join(EXTERNAL),
                         help="Comma-separated precomputed predictors (default: %(default)s).")
+    parser.add_argument("--baselines", default=",".join(BASELINES),
+                        help="Reference baselines: random, terminal-logistic, or none "
+                        "(default: %(default)s).")
     parser.add_argument("--a-label", default="MHCflurry candidate")
     parser.add_argument("--b-label", default="MHCflurry 2.2")
     parser.add_argument("--replicates", type=int, default=10000)
@@ -478,6 +528,10 @@ def main(argv=None):
     predictors = [name.strip() for name in args.external.split(",") if name.strip()]
     if not predictors or set(predictors) - set(EXTERNAL):
         raise ValueError("--external must name predictors from: %s" % ", ".join(EXTERNAL))
+    baselines = [] if args.baselines.strip().lower() == "none" else [
+        name.strip() for name in args.baselines.split(",") if name.strip()]
+    if set(baselines) - set(BASELINES):
+        raise ValueError("--baselines must name: %s, or none" % ", ".join(BASELINES))
     if args.replicates < 100:
         raise ValueError("Use at least 100 bootstrap draws")
     if args.out.exists() and any(args.out.iterdir()):
@@ -489,6 +543,13 @@ def main(argv=None):
     for predictor in predictors:
         label, higher_is_better = EXTERNAL[predictor]
         conditions[predictor] = Condition(label, higher_is_better, predictor)
+    if "random" in baselines:
+        frame["random"] = numpy.random.default_rng(args.seed).random(len(frame))
+        conditions["random"] = Condition("Random scores", True, "random")
+    if "terminal-logistic" in baselines:
+        frame["terminal_logistic"] = leave_one_sample_out_logistic(frame)
+        conditions["terminal_logistic"] = Condition(
+            "Terminal 4-residue logistic regression, no MHC", True, "baseline")
     per_sample, summary, coverage = score_conditions(frame, conditions)
     pairs = comparison_pairs(args.cohort, conditions)
     paired, differences, draws = paired_comparisons(
@@ -516,6 +577,11 @@ def main(argv=None):
         "method": "compare-models _metrics per sample; each predictor on its scored rows, "
                   "each pair on rows both score; paired sample percentile bootstrap of "
                   "equal-sample macro means",
+        "baselines": {
+            "random": "uniform scores from numpy default_rng(seed)",
+            "terminal-logistic": "one-hot first and last four residues (21 symbols each), "
+                                 "sklearn LogisticRegression(C=1), fitted leave-one-sample-out; "
+                                 "no MHC or flank input"},
         "inputs": [{"path": str(Path(path).resolve()), "sha256": sha256_file(path)}
                    for path in inputs + external_inputs],
     }

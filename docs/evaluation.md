@@ -177,7 +177,11 @@ and without flanks; `monoallelic` uses saved affinity predictions (pass
 definitions. Each predictor is scored on the rows it covers and each paired
 comparison on rows both predictors score, so MHCflurry-only comparisons match
 compare-models exactly; `coverage.csv` counts unscored rows. Paired intervals resample whole samples (10000 draws, seed 42 by
-default) and are exploratory. Outputs include per-sample, macro and pooled
+default) and are exploratory. Two reference baselines are
+included by default: seeded random scores, and a logistic regression on the
+one-hot first and last four residues with no MHC or flank input, fitted
+leave-one-sample-out so no sample's labels reach its own scores. Pass
+`--baselines none` to skip them. Outputs include per-sample, macro and pooled
 metrics, paired differences, a joined score table, `external_comparison.pdf`
 with PNG pages, `summary.md` and a provenance manifest.
 
