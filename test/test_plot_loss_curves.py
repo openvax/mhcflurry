@@ -194,3 +194,16 @@ def test_processing_plot_labels_show_real_architectures(monkeypatch, tmp_path):
     assert "CNN k13/f512" in saved[-1].axes[0].get_legend().get_texts()[0].get_text()
     for fig in saved:
         original_close(fig)
+
+
+@pytest.mark.parametrize("value", [0.0001, [0.0001], [0.0, 1e-6, 1e-6], "0.0001", None, []])
+def test_architecture_metadata_tolerates_malformed_regularization(value):
+    metadata = plot_loss_curves._architecture_metadata(
+        {"convolutional_kernel_size": 11, "convolutional_kernel_l1_l2": value})
+    assert metadata["l1"] is None and metadata["l2"] is None
+
+
+def test_architecture_metadata_reports_a_well_formed_regularization_pair():
+    metadata = plot_loss_curves._architecture_metadata(
+        {"convolutional_kernel_size": 11, "convolutional_kernel_l1_l2": [0.0, 1e-6]})
+    assert metadata["l1"] == 0.0 and metadata["l2"] == 1e-6

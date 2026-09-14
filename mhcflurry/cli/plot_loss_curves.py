@@ -101,7 +101,11 @@ def _architecture_metadata(hp):
             hp["cleavage_boundary_flank_length"],
             hp.get("cleavage_boundary_peptide_length", "?"),
             hp.get("cleavage_boundary_hidden_size", "?"))
-    regularization = hp.get("convolutional_kernel_l1_l2") or [None, None]
+    # Label a malformed or scalar entry blank rather than aborting the
+    # plotting stage, which a sweep runs after training has finished.
+    regularization = hp.get("convolutional_kernel_l1_l2")
+    if not isinstance(regularization, (list, tuple)) or len(regularization) != 2:
+        regularization = [None, None]
     return {"model_type": "processing", "architecture": architecture,
             "architecture_key": "processing:" + json.dumps(
                 {name: hp.get(name) for name in fields}, sort_keys=True),

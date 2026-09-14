@@ -11,7 +11,7 @@
 # limitations under the License.
 
 from os.path import join, exists, abspath, basename
-from os import mkdir
+from os import mkdir, remove
 from socket import gethostname
 from getpass import getuser
 
@@ -35,6 +35,26 @@ from .common import save_weights, load_weights, NumpyJSONEncoder
 from .percentile_calibration import (
     calibration_method, fit_percent_rank_transform,
     load_percent_rank_transforms, save_percent_rank_transforms)
+
+
+def _remove_owned_checkpoint(models_dir, filename):
+    """Delete a retained-checkpoint sidecar written by this predictor.
+
+    Parameters
+    ----------
+    models_dir : string
+        Directory whose contents the predictor owns.
+    filename : string or None
+        Manifest reference being cleared. Anything that is not a bare filename
+        inside ``models_dir`` is left alone, as are already-absent files.
+    """
+    if not isinstance(filename, str) or not filename:
+        return
+    if basename(filename) != filename:
+        return
+    path = join(models_dir, filename)
+    if exists(path):
+        remove(path)
 
 
 class Class1ProcessingPredictor(object):
@@ -408,12 +428,29 @@ class Class1ProcessingPredictor(object):
         ----------
         models_dir : string
             Path to directory. It will be created if it doesn't exist.
+
+        model_names_to_write : list of string, optional
+            Only write the weights for the specified models. Useful for
+            incremental updates during training. Passing an explicit empty
+            list writes no model artifacts; this is used by calibration-only
+            updates that replace percentile calibration without touching the
+            manifest, weights, or retained checkpoints.
+
+        write_metadata : boolean, optional
+            Whether to write optional metadata
+
+        write_percent_ranks : boolean, optional
+            Whether to write the percentile calibration
         """
         self.check_consistency()
 
         if model_names_to_write is None:
             # Write all models
             model_names_to_write = self.manifest_df.model_name.values
+            write_model_artifacts = True
+        else:
+            model_names_to_write = list(model_names_to_write)
+            write_model_artifacts = len(model_names_to_write) > 0
 
         if not exists(models_dir):
             mkdir(models_dir)
@@ -433,27 +470,35 @@ class Class1ProcessingPredictor(object):
             logging.info("Wrote: %s", weights_path)
             for policy in ("terminal", "best", "best_ap"):
                 column = "checkpoint_%s_weights" % policy
+                previous = None
                 if column in self.manifest_df.columns:
+                    previous = self.manifest_df.at[row.name, column]
                     self.manifest_df.at[row.name, column] = None
                 weights = getattr(row.model, "checkpoint_weights", {}).get(policy)
+                filename = None
                 if weights is not None:
                     filename = "weights_%s.%s.npz" % (row.model_name, policy)
                     save_weights(weights, join(models_dir, filename))
                     if column not in self.manifest_df.columns:
                         self.manifest_df[column] = None
                     self.manifest_df.at[row.name, column] = filename
+                # A dropped policy must not leave its sidecar on disk, where
+                # it would reach release tarballs and directory fingerprints.
+                if previous != filename:
+                    _remove_owned_checkpoint(models_dir, previous)
         sub_manifest_df["config_json"] = updated_network_config_jsons
         self.manifest_df.loc[
             sub_manifest_df.index,
             "config_json"
         ] = updated_network_config_jsons
 
-        write_manifest_df = self.manifest_df[[
-            c for c in self.manifest_df.columns if c != "model"
-        ]]
-        manifest_path = join(models_dir, "manifest.csv")
-        write_manifest_df.to_csv(manifest_path, index=False)
-        logging.info("Wrote: %s", manifest_path)
+        if write_model_artifacts:
+            write_manifest_df = self.manifest_df[[
+                c for c in self.manifest_df.columns if c != "model"
+            ]]
+            manifest_path = join(models_dir, "manifest.csv")
+            write_manifest_df.to_csv(manifest_path, index=False)
+            logging.info("Wrote: %s", manifest_path)
 
         if write_percent_ranks:
             save_percent_rank_transforms(models_dir, {

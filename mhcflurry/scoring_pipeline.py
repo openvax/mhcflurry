@@ -73,8 +73,10 @@ def scoring_pipeline(workflows, score, max_in_flight=3, cpu_workers=2):
                 done, value = future.result()
                 if done:
                     del active[key]
-                    fill()
+                    # Hand off the finished result before refilling: a failure
+                    # pulling the next workflow must not discard a computed one.
                     yield key, value
+                    fill()
                 else:
                     prediction = score(key, value)
                     pending[executor.submit(_advance, active[key], prediction)] = key

@@ -1374,3 +1374,66 @@ def test_prediction_range():
     # Predictions should be between 0 and 1 (sigmoid output)
     assert predictions.min() >= 0
     assert predictions.max() <= 1
+
+
+def _processing_model_with_network():
+    """Build a tiny processing network without paying for a fit."""
+    model = Class1ProcessingNeuralNetwork(
+        convolutional_filters=4, convolutional_kernel_size=3,
+        n_flank_length=2, c_flank_length=2, dropout_rate=0)
+    model._network = model.make_network(
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters))
+    return model
+
+
+def test_dropped_processing_checkpoints_delete_their_sidecars(tmp_path):
+    """Clearing a retained checkpoint reference also removes the file it named."""
+    from mhcflurry import Class1ProcessingPredictor
+
+    model = _processing_model_with_network()
+    model.checkpoint_weights = {
+        "terminal": model.get_weights(), "best": model.get_weights()}
+    predictor = Class1ProcessingPredictor([model])
+    predictor.save(str(tmp_path))
+    assert len(list(tmp_path.glob("*.terminal.npz"))) == 1
+    assert len(list(tmp_path.glob("*.best.npz"))) == 1
+
+    # Re-saving with the same policies retained keeps the sidecars.
+    predictor.save(str(tmp_path))
+    assert len(list(tmp_path.glob("*.terminal.npz"))) == 1
+    assert len(list(tmp_path.glob("*.best.npz"))) == 1
+
+    # A refit that retained nothing must leave nothing behind.
+    loaded = Class1ProcessingPredictor.load(str(tmp_path))
+    loaded.models[0].checkpoint_weights = {}
+    loaded.save(str(tmp_path))
+    assert not list(tmp_path.glob("*.terminal.npz"))
+    assert not list(tmp_path.glob("*.best.npz"))
+    reloaded = Class1ProcessingPredictor.load(str(tmp_path))
+    assert reloaded.models[0].checkpoint_weights == {}
+
+
+def test_calibration_only_processing_save_leaves_manifest_alone(tmp_path):
+    """An explicit empty model list persists calibration and nothing else."""
+    from mhcflurry import Class1ProcessingPredictor
+
+    predictor = Class1ProcessingPredictor([_processing_model_with_network()])
+    predictor.save(str(tmp_path))
+    manifest_path = tmp_path / "manifest.csv"
+    original = manifest_path.read_bytes()
+
+    loaded = Class1ProcessingPredictor.load(str(tmp_path))
+    loaded.calibrate_percentile_ranks(numpy.linspace(0.01, 0.99, 500))
+    manifest_path.write_bytes(b"sentinel")
+    loaded.save(str(tmp_path), model_names_to_write=[], write_metadata=False)
+    assert manifest_path.read_bytes() == b"sentinel"
+    assert list(tmp_path.glob("percent_ranks.*"))
+
+    manifest_path.write_bytes(original)
+    assert Class1ProcessingPredictor.load(
+        str(tmp_path)).percent_rank_transform is not None
+
+    # Saving models still rewrites the manifest.
+    manifest_path.write_bytes(b"sentinel")
+    loaded.save(str(tmp_path))
+    assert manifest_path.read_bytes() != b"sentinel"

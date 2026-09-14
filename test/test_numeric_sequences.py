@@ -5,6 +5,7 @@ import pytest
 import torch
 
 from mhcflurry.encodable_sequences import EncodableSequences, EncodingError
+from mhcflurry.amino_acid import AMINO_ACID_INDEX
 from mhcflurry.numeric_sequences import NumericSequences
 from mhcflurry.numeric_proteome import ProcessingProteome, ProteinWindows, NumericCandidatePool
 from mhcflurry.proteome_decoys import sample_peptide_frame_for_accessions
@@ -169,3 +170,13 @@ def test_actual_affinity_ensemble_numeric_predictions_match_string_path(family, 
     with pytest.raises(ValueError):
         predictor.predict_numeric(numeric, "HLA-A*03:01")
     assert predictor.predict_numeric(NumericSequences.from_strings([]), allele).shape == (0,)
+
+
+def test_decode_alphabet_covers_exactly_the_valid_index_range():
+    """The decode table is sized by index range, not by the case-folded key count."""
+    letters = "ACDEFGHIKLMNPQRSTVWYX"
+    assert NumericSequences.from_strings([letters]).to_strings().tolist() == [letters]
+    corrupted = NumericSequences.from_strings(["ACDEFGHI"])
+    corrupted.indices[0, 0] = len(AMINO_ACID_INDEX) - 1
+    with pytest.raises(IndexError):
+        corrupted.to_strings()

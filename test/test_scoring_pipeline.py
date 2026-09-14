@@ -115,3 +115,20 @@ def test_invalid_capacity_and_duplicate_keys_fail():
 
     with pytest.raises(ValueError, match="Duplicate"):
         list(scoring_pipeline([(1, workflow()), (1, workflow())], lambda *a: 1))
+
+
+def test_finished_result_is_yielded_before_refilling():
+    """A failure pulling the next workflow must not discard a computed result."""
+    def workflow(value):
+        return value
+        yield  # pragma: no cover - only makes this a generator
+
+    def items():
+        yield "a", workflow(1)
+        yield "a", workflow(2)
+
+    results = []
+    with pytest.raises(ValueError, match="Duplicate"):
+        for item in scoring_pipeline(items(), lambda key, value: value, max_in_flight=1):
+            results.append(item)
+    assert results == [("a", 1)]

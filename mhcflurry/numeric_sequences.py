@@ -75,7 +75,7 @@ class NumericSequences:
 
     def to_strings(self):
         """Materialize strings for export or diagnostics, never for scoring."""
-        alphabet = numpy.empty(len(AMINO_ACID_INDEX), dtype="S1")
+        alphabet = numpy.full(UNKNOWN_INDEX + 1, b"X", dtype="S1")
         for letter, index in AMINO_ACID_INDEX.items():
             alphabet[index] = letter.upper().encode("ascii")
         rows = alphabet[self.indices.cpu().numpy()]
