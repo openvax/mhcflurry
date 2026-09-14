@@ -338,7 +338,7 @@ fi
 mhcflurry class1-reassign-mass-spec-training-data \
     "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
     --set-measurement-value 100 \
-    "${RELEASE_HOLDOUT_ARGS[@]}" \
+    ${RELEASE_HOLDOUT_ARGS[@]+"${RELEASE_HOLDOUT_ARGS[@]}"} \
     --out-csv "$(pwd)/train_data.csv"
 bzip2 -f "$(pwd)/train_data.csv"
 TRAINING_DATA="$(pwd)/train_data.csv.bz2"
@@ -415,7 +415,7 @@ do
         --save-all-checkpoints \
         --worker-log-dir "$MHCFLURRY_OUT" \
         "${PARALLELISM_ARGS[@]}" \
-        "${CONTINUE_ARGS[@]}"
+        ${CONTINUE_ARGS[@]+"${CONTINUE_ARGS[@]}"}
 done
 log_release_event phase_info "training_complete beginning_model_selection"
 
@@ -529,8 +529,8 @@ else
             --a-label new \
             --b public \
             --data-dir "$DATA_EVAL_DIR" \
-            "${COMPARE_HOLDOUT_ARGS[@]}" \
-            "${AFFINITY_EVAL_LIMIT_ARGS[@]}" \
+            ${COMPARE_HOLDOUT_ARGS[@]+"${COMPARE_HOLDOUT_ARGS[@]}"} \
+            ${AFFINITY_EVAL_LIMIT_ARGS[@]+"${AFFINITY_EVAL_LIMIT_ARGS[@]}"} \
             --include affinity \
             --out "$EVAL_OUT"
 fi

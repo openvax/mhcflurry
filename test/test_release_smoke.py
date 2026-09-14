@@ -94,3 +94,56 @@ def test_processing_data_is_reused_on_relaunch_only_after_validation():
     assert guard < generate
     between = full[guard:generate]
     assert "Reusing validated processing training data" in between and "\nelse\n" in between
+
+
+def bash_block(text, start, end="fi\n"):
+    """One top-level shell block from the release script, verbatim."""
+    begin = text.index(start)
+    stop = text.index("\n" + end, begin) + 1 + len(end)
+    return text[begin:stop]
+
+
+def run_block(block, cwd, prelude=""):
+    script = "set -euo pipefail\n" + prelude + block
+    return subprocess.run(["bash", "-c", script], cwd=cwd, capture_output=True,
+                          text=True, check=True).stdout
+
+
+def test_annotated_hits_are_reused_so_relaunch_keeps_the_recorded_hash(tmp_path):
+    block = bash_block(SCRIPTS[0].read_text(), 'if [ -s "$(pwd)/hits_with_tpm.csv.bz2" ]')
+    prelude = ('python() { echo "ANNOTATED"; }\n'
+               'compress_csv_bzip2() { echo "COMPRESSED"; }\n'
+               'mhcflurry-downloads() { echo /stub; }\n')
+    assert "ANNOTATED" in run_block(block, tmp_path, prelude)
+    subprocess.run(["bzip2", "-c"], input=b"sample_id,peptide\nS,SIINFEKL\n",
+                   stdout=(tmp_path / "hits_with_tpm.csv.bz2").open("wb"), check=True)
+    reused = run_block(block, tmp_path, prelude)
+    assert "Reusing annotated hits" in reused and "ANNOTATED" not in reused
+    (tmp_path / "hits_with_tpm.csv.bz2").write_bytes(b"truncated garbage")
+    assert "ANNOTATED" in run_block(block, tmp_path, prelude)
+
+
+def test_matched_preparation_resumes_from_saved_pools_and_clears_empty_artifacts(tmp_path):
+    block = bash_block(SCRIPTS[0].read_text(), "PROCESSING_DATA_RESUME_ARGS=()", "    fi\n")
+    report = 'echo "args=${PROCESSING_DATA_RESUME_ARGS[*]:-none}"\n'
+    assert "args=none" in run_block(block + report, tmp_path)
+    matching = tmp_path / "train_data.csv.matching"
+    matching.mkdir()
+    assert "args=none" in run_block(block + report, tmp_path)
+    assert not matching.exists()  # nothing scored yet, so nothing is preserved
+    matching.mkdir()
+    (matching / "experiment.json").write_text("{}")
+    (matching / "abc.candidate_pool.csv.bz2").write_bytes(b"pool")
+    assert "args=--resume" in run_block(block + report, tmp_path)
+    assert (matching / "abc.candidate_pool.csv.bz2").is_file()
+
+
+@pytest.mark.parametrize("script", SCRIPTS)
+def test_optional_argument_arrays_expand_when_empty_under_nounset(script):
+    """`set -u` with an empty array aborts on bash 3.2 without the +alternate form."""
+    text = script.read_text()
+    for name in re.findall(r"^\s*([A-Z_]+)=\(\)\s*$", text, flags=re.MULTILINE):
+        safe = '${%s[@]+"${%s[@]}"}' % (name, name)
+        assert text.count('"${%s[@]}"' % name) == text.count(safe), name
+        if safe in text:
+            run_block('%s=()\nprintf "arg=%%s\\n" %s\n' % (name, safe), script.parent)

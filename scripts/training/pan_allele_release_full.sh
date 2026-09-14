@@ -379,11 +379,20 @@ mhcflurry-downloads fetch data_mass_spec_annotated data_references
 cp "$REPO/downloads-generation/models_class1_processing/annotate_hits_with_expression.py" .
 cp "$RECIPE_DIR/make_train_data.processing.py" .
 
-python annotate_hits_with_expression.py \
-    --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
-    --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
-    --out "$(pwd)/hits_with_tpm.csv"
-compress_csv_bzip2 "$(pwd)/hits_with_tpm.csv"
+# Matched preparation records the hash of this file, so a relaunch after the
+# function time cap must present the same bytes to resume its scored pools.
+# Parallel bzip2 output can depend on the worker count, so reuse the readable
+# table this run already wrote instead of recompressing it.
+if [ -s "$(pwd)/hits_with_tpm.csv.bz2" ] && \
+        bzip2 -t "$(pwd)/hits_with_tpm.csv.bz2" 2>/dev/null; then
+    echo "Reusing annotated hits: $(pwd)/hits_with_tpm.csv.bz2"
+else
+    python annotate_hits_with_expression.py \
+        --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
+        --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
+        --out "$(pwd)/hits_with_tpm.csv"
+    compress_csv_bzip2 "$(pwd)/hits_with_tpm.csv"
+fi
 
 # Freeze the matching reference independently of the new affinity candidate.
 if [ -z "${PROCESSING_AFFINITY_REFERENCE:-}" ]; then
@@ -406,7 +415,21 @@ if [ -s "$(pwd)/train_data.csv.bz2" ] && \
         mhcflurry train validate-processing-data --data "$(pwd)/train_data.csv.bz2"; then
     echo "Reusing validated processing training data: $(pwd)/train_data.csv.bz2"
 else
+    # Preparation preserves its scored candidate pools under
+    # train_data.csv.matching and refuses to overwrite them. A relaunch resumes
+    # from them: completed samples are reused and provenance hashes are checked.
+    PROCESSING_DATA_RESUME_ARGS=()
+    if [ -f "$(pwd)/train_data.csv.matching/experiment.json" ]; then
+        echo "Resuming matched processing preparation from saved candidate pools"
+        PROCESSING_DATA_RESUME_ARGS=(--resume)
+    elif [ -d "$(pwd)/train_data.csv.matching" ]; then
+        # An interrupted launch can leave the directory without provenance, and
+        # then there is nothing to resume from. rmdir refuses to discard scored
+        # pools: it only removes the directory when it is empty.
+        rmdir "$(pwd)/train_data.csv.matching"
+    fi
     mhcflurry train processing-data \
+        ${PROCESSING_DATA_RESUME_ARGS[@]+"${PROCESSING_DATA_RESUME_ARGS[@]}"} \
         --hits "$(pwd)/hits_with_tpm.csv.bz2" \
         --affinity-predictor "$PROCESSING_AFFINITY_REFERENCE" \
         --proteome-reference-csv "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \

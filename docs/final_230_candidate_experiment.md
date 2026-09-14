@@ -161,6 +161,10 @@ runplz modal scripts/training/launch_pan_allele_training_remote.py
 Modal limits a single function invocation to 24 hours. If this complete run
 does not finish within that window, rerun the identical command: the persistent
 volume and `--continue-incomplete` manifests resume completed processing fits.
+Processing data preparation resumes too. The relaunch reuses this run's
+annotated hits table, so the hash matched preparation recorded still matches,
+reuses a validated `train_data.csv.bz2` when one exists, and otherwise passes
+`--resume` so completed samples and scored candidate pools are not rescored.
 
 After collection, archive the immutable experiment record with the semantic
 command (use the commit recorded by the remote run):
