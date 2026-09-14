@@ -232,15 +232,21 @@ def sample_preparation_steps(args, sample, hits, seed, initial_pool, additional_
                     "Processing candidate expansion budget exhausted: " + str(error), error.failures) from error
             parts = []
             seeds = {}
+            # One exclusion set serves every length: the pool is fixed for the
+            # whole round, so rebuilding it per length only repeats the work.
+            scored_peptides = set(pool.peptide)
             for length in lengths:
                 round_seed = derive_seed(seed, "processing-expansion-v1", next_round, length)
                 seeds[str(length)] = round_seed
-                parts.append(additional_candidates(length, set(pool.peptide), round_seed))
+                parts.append(additional_candidates(length, scored_peptides, round_seed))
             if isinstance(parts[0], NumericCandidatePool):
                 from .numeric_proteome import ProteinWindows
                 if any(not part.hits.empty for part in parts):
                     raise ValueError("Expansion may not add observed hits")
                 windows = ProteinWindows.concatenate([part.windows for part in parts])
+                # Not redundant with the exclusion set above: samplers are
+                # caller-supplied, so committed peptides are rejected here
+                # numerically instead of trusting the callback to honor it.
                 known = sequence_keys(NumericSequences.from_strings(pool.peptide, MAX_PROCESSING_LENGTH).indices.numpy())
                 windows = windows.take(numpy.flatnonzero(~numpy.isin(windows.keys, known)))
                 unscored = NumericCandidatePool(parts[0].hits, windows, sample, parts[0].flank_length)

@@ -248,6 +248,131 @@ def test_numeric_sampler_is_seeded_and_does_not_call_string_iterator(monkeypatch
     assert not first.duplicated(["protein_accession", "start_position", "peptide"]).any()
 
 
+def window_population(frame):
+    """The eligible (accession, start, length) windows a peptide frame covers."""
+    return {(row.protein_accession, int(row.start_position), len(row.peptide))
+            for row in frame.itertuples()}
+
+
+@pytest.mark.parametrize("lengths", [[8], [9], [8, 9], [8, 9, 10, 11]])
+def test_both_candidate_helpers_match_the_reservoir_window_population(lengths):
+    """Enumerate every eligible window for both samplers against the reservoir.
+
+    The historical reservoir (``iter_protein_peptide_records``) drops only the
+    C-terminal *minimum*-length-mer, so its eligible set depends on the minimum
+    length of the requesting call. ``sample_peptide_frame_for_accessions`` is
+    pinned against the reservoir for the same length set; ``ProcessingProteome``
+    exposes a single-length API, so it is pinned against ``lengths=[length]``,
+    which is how make_train_data.processing.py draws both its initial pool and
+    its expansion rounds. Protein lengths cover L == the requested length (an
+    empty population), L one longer, and beyond.
+    """
+    from mhcflurry.numeric_proteome import ProcessingProteome
+    alphabet = "ACDEFGHIKLMNPQRSTVWY"
+    for size in range(min(lengths), min(lengths) + 5):
+        sequences = {"p": alphabet[:size]}
+        positions = window_population(sample_peptide_frame_for_accessions(
+            sequences, sequences, lengths, 0, (), n=10 ** 6, allow_smaller=True))
+        assert positions == window_population(make_peptide_frame_for_accessions(
+            sequences, sequences, lengths, 0)), (size, lengths)
+        index = ProcessingProteome(sequences)
+        for length in lengths:
+            per_length = window_population(index.sample(
+                ["p"], length, 10 ** 6, [], numpy.random.RandomState(0)).to_frame(0))
+            assert per_length == window_population(make_peptide_frame_for_accessions(
+                sequences, sequences, [length], 0)), (size, length)
+
+
+def test_multi_length_position_call_keeps_longer_terminal_windows():
+    """Pin the one documented divergence between the two candidate helpers.
+
+    A multi-length ``positions`` call keeps each longer length's C-terminal
+    window, because the window the reservoir drops is the *minimum*-length one.
+    The per-length numeric sampler drops it because for its own call the
+    requested length is the minimum. Both therefore reproduce the reservoir for
+    the call shape they are given, and production only ever draws one length
+    per call, so no window is reachable by one path and not the other.
+    """
+    from mhcflurry.numeric_proteome import ProcessingProteome
+    sequences = {"p": "ACDEFGHIKLMNPQRSTVWY"[:12]}
+    multi = window_population(sample_peptide_frame_for_accessions(
+        sequences, sequences, [8, 9], 0, (), n=10 ** 6, allow_smaller=True))
+    index = ProcessingProteome(sequences)
+    per_length = set()
+    for length in (8, 9):
+        per_length |= window_population(index.sample(
+            ["p"], length, 10 ** 6, [], numpy.random.RandomState(0)).to_frame(0))
+    assert multi - per_length == {("p", 3, 9)}
+    assert per_length - multi == set()
+
+
+def test_expansion_draw_sequence_is_pinned_for_a_fixed_seed(tmp_path):
+    """Pin the exact fixed-seed expansion draws, their order, and the result.
+
+    Guards the per-round exclusion set in ``sample_preparation_steps``: every
+    length in a round must still see the whole committed pool, and the drawn
+    windows and peptides must stay identical for a given seed.
+    """
+    from mhcflurry.numeric_proteome import (
+        ProcessingProteome, ProteinWindows, NumericCandidatePool)
+    setup = numpy.random.RandomState(20260913)
+    alphabet = list("ACDEFGHIKLMNPQRSTVWY")
+    sequences = {"p%d" % i: "".join(setup.choice(alphabet, size=160)) for i in range(4)}
+    proteome = ProcessingProteome(sequences)
+    accessions = ["p0", "p1", "p2", "p3"]
+    hits = pandas.DataFrame({
+        "sample_id": "s", "hit": 1, "protein_accession": "p0",
+        "peptide": [sequences["p0"][10:18], sequences["p0"][30:39]],
+        "n_flank": "NNNNN", "c_flank": "CCCCC"})
+    args = SimpleNamespace(out=str(tmp_path / "train.csv"),
+        matching_reference={"sha256": "a" * 64}, decoys_per_hit=1,
+        max_affinity_distance=.25, max_expansion_rounds=4,
+        expansion_candidates_per_length=12, resume_matching_dir=None)
+    (tmp_path / "train.csv.matching").mkdir(parents=True)
+    draws, requests = [], []
+
+    def initial_pool():
+        parts = [proteome.sample(accessions, length, 3, set(hits.peptide),
+                                 numpy.random.RandomState(4242)) for length in (8, 9)]
+        return NumericCandidatePool(hits, ProteinWindows.concatenate(parts), "s", 5)
+
+    def additional_candidates(length, excluded, round_seed):
+        # Each length must see the complete committed pool, not a subset of it.
+        assert excluded == set(requests[0])
+        windows = proteome.sample(accessions, length, 12, excluded,
+                                  numpy.random.RandomState(int(round_seed) % (2 ** 32)))
+        draws.append([[int(p), int(s), int(w)] for p, s, w
+                      in zip(windows.proteins, windows.starts, windows.lengths)])
+        return NumericCandidatePool(hits.iloc[:0], windows, "s", 5)
+
+    def score(request):
+        peptides = request.prediction_input("cpu").to_strings().tolist()
+        requests.append(peptides)
+        # Initial decoys land outside the caliper; expansion decoys match.
+        return numpy.array([100.0 if p in set(hits.peptide)
+                            else (10000.0 if len(requests) == 1 else 100.0)
+                            for p in peptides])
+
+    result = prepare_sample(args, "s", hits, 4242, initial_pool,
+                            additional_candidates, score)
+    assert draws == [
+        [[2, 71, 8], [1, 47, 8], [0, 147, 8], [0, 9, 8], [2, 24, 8], [0, 143, 8],
+         [2, 70, 8], [3, 100, 8], [3, 139, 8], [3, 111, 8], [3, 61, 8], [3, 38, 8]],
+        [[1, 138, 9], [2, 134, 9], [3, 118, 9], [0, 97, 9], [1, 27, 9], [0, 125, 9],
+         [1, 30, 9], [0, 76, 9], [2, 83, 9], [3, 71, 9], [2, 42, 9], [2, 44, 9]]]
+    assert requests == [
+        ["MEFSAPTH", "PYPWELVWL", "WDVSNLKD", "EHKELLGY", "LGYYDHKA", "TSVYSTYWL",
+         "IDVENMREQ", "CLQRHDSPF"],
+        ["VIPKCDFF", "QCPNVAHR", "CPFILRTM", "IMEFSAPT", "TKEPDERI", "CLVYCPFI",
+         "AVIPKCDF", "TYSGPMVS", "CTYANYFV", "IGWMCQDI", "LTLQHLEE", "MIHSSWSV",
+         "VHHREHVDH", "RPNKTKSPF", "ITQCYQDDR", "CGWDVSNLK", "GASGRFTSV",
+         "MSTQQYFYS", "GRFTSVYST", "ANCFWDIHH", "HEERPRPNH", "SDEPCQREA",
+         "DNCWIDAWW", "CWIDAWWVM"]]
+    validate_matched_training_data(result)
+    assert result.peptide.tolist() == [
+        "MEFSAPTH", "CPFILRTM", "PYPWELVWL", "CGWDVSNLK"]
+
+
 def test_matching_provenance_rejects_changed_inputs():
     identity = dict(policy="policy", decoys_per_hit=1, max_log10_affinity_distance=.25,
                     candidate_pool_multiplier=100, seed=42, affinity_reference={"sha256": "a"},
