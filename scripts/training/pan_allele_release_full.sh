@@ -128,6 +128,18 @@ case "${MHCFLURRY_RELEASE_RECIPE:-}" in
         exit 2
         ;;
 esac
+# Smoke mode shrinks scale only; every stage and code path still runs. Its
+# outputs are never release artifacts: the launcher requires a smoke path.
+SMOKE_HELPER="$SCRIPT_DIR/release_smoke.py"
+PRESENTATION_CALIBRATION_PEPTIDES_PER_LENGTH="${PRESENTATION_CALIBRATION_PEPTIDES_PER_LENGTH:-10000}"
+PRESENTATION_CALIBRATION_GENOTYPES="${PRESENTATION_CALIBRATION_GENOTYPES:-50}"
+if [ "${MHCFLURRY_RELEASE_SMOKE:-0}" = "1" ]; then
+    PRESENTATION_SAMPLE_FRACTION=0.01
+    PRESENTATION_CALIBRATION_PEPTIDES_PER_LENGTH=500
+    PRESENTATION_CALIBRATION_GENOTYPES=5
+    SMOKE_PROCESSING_SAMPLES="${SMOKE_PROCESSING_SAMPLES:-20}"
+    echo "MHCFLURRY_RELEASE_SMOKE=1: reduced-scale run, not a release artifact." >&2
+fi
 case "$PROCESSING_SHORT_FLANKS_HYPERPARAMETERS" in
     grid|confirmed-ranking-candidate) ;;
     *)
@@ -378,17 +390,34 @@ if [ -z "${PROCESSING_AFFINITY_REFERENCE:-}" ]; then
     mhcflurry-downloads fetch models_class1_pan
 fi
 PROCESSING_AFFINITY_REFERENCE="${PROCESSING_AFFINITY_REFERENCE:-$(mhcflurry-downloads path models_class1_pan)/models.combined}"
-mhcflurry train processing-data \
-    --hits "$(pwd)/hits_with_tpm.csv.bz2" \
-    --affinity-predictor "$PROCESSING_AFFINITY_REFERENCE" \
-    --proteome-reference-csv "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \
-    --ppv-multiplier 100 \
-    --negative-policy matched --decoys-per-hit 1 --max-affinity-distance 0.25 \
-    --exclude-samples-file "$RELEASE_HOLDOUT_DIR/processing_samples.csv" \
-    --random-seed "$RELEASE_RANDOM_SEED" \
-    --out "$(pwd)/train_data.csv" \
-    "${COMMON_PARALLELISM_ARGS[@]}"
-compress_csv_bzip2 "$(pwd)/train_data.csv"
+PROCESSING_EXCLUDE_SAMPLES="$RELEASE_HOLDOUT_DIR/processing_samples.csv"
+if [ "${MHCFLURRY_RELEASE_SMOKE:-0}" = "1" ]; then
+    python "$SMOKE_HELPER" sample-exclusions \
+        --hits "$(pwd)/hits_with_tpm.csv.bz2" \
+        --holdout "$RELEASE_HOLDOUT_DIR/processing_samples.csv" \
+        --keep "$SMOKE_PROCESSING_SAMPLES" --seed "$RELEASE_RANDOM_SEED" \
+        --out "$(pwd)/smoke_excluded_samples.csv"
+    PROCESSING_EXCLUDE_SAMPLES="$(pwd)/smoke_excluded_samples.csv"
+fi
+# A relaunch after the function time cap reuses a table that passes the
+# maintained validator, so variants trained before and after the relaunch share
+# one negative set. Output directories are per-run, so a table here is this run's.
+if [ -s "$(pwd)/train_data.csv.bz2" ] && \
+        mhcflurry train validate-processing-data --data "$(pwd)/train_data.csv.bz2"; then
+    echo "Reusing validated processing training data: $(pwd)/train_data.csv.bz2"
+else
+    mhcflurry train processing-data \
+        --hits "$(pwd)/hits_with_tpm.csv.bz2" \
+        --affinity-predictor "$PROCESSING_AFFINITY_REFERENCE" \
+        --proteome-reference-csv "$(mhcflurry-downloads path data_references)/uniprot_proteins.csv.bz2" \
+        --ppv-multiplier 100 \
+        --negative-policy matched --decoys-per-hit 1 --max-affinity-distance 0.25 \
+        --exclude-samples-file "$PROCESSING_EXCLUDE_SAMPLES" \
+        --random-seed "$RELEASE_RANDOM_SEED" \
+        --out "$(pwd)/train_data.csv" \
+        "${COMMON_PARALLELISM_ARGS[@]}"
+    compress_csv_bzip2 "$(pwd)/train_data.csv"
+fi
 
 mhcflurry class1-generate-training-hyperparameters processing-base \
     --minibatch-size "$PROCESSING_MINIBATCH_SIZE" \
@@ -420,6 +449,9 @@ for kind in $PROCESSING_VARIANTS; do
             hyperparameters.base.yaml "$kind" \
             "${PROCESSING_VARIANT_HYPERPARAMETER_ARGS[@]}" \
             > "hyperparameters.$kind.yaml"
+    fi
+    if [ "${MHCFLURRY_RELEASE_SMOKE:-0}" = "1" ]; then
+        python "$SMOKE_HELPER" cap-hyperparameters "hyperparameters.$kind.yaml" --max-architectures 2 --max-epochs 2
     fi
     ARCH_COUNT=$(python -c \
         "import yaml; print(len(yaml.safe_load(open('hyperparameters.$kind.yaml'))))")
@@ -477,6 +509,9 @@ print(record["condition"])
 PY
 )
     BOUNDARY_HYPERPARAMETERS="$BOUNDARY_ROOT/conditions/$BOUNDARY_CONDITION.yaml"
+    if [ "${MHCFLURRY_RELEASE_SMOKE:-0}" = "1" ]; then
+        python "$SMOKE_HELPER" cap-hyperparameters "$BOUNDARY_HYPERPARAMETERS" --max-architectures 1 --max-epochs 2
+    fi
     python - "$BOUNDARY_HYPERPARAMETERS" "$BOUNDARY_RADIUS" <<'PY'
 import sys
 import yaml
@@ -586,9 +621,9 @@ mhcflurry-calibrate-percentile-ranks \
     --match-amino-acid-distribution-data "$AFFINITY_PREDICTOR/train_data.csv.bz2" \
     --alleles-file "$AFFINITY_PREDICTOR/train_data.csv.bz2" \
     --predictor-kind class1_presentation \
-    --num-peptides-per-length 10000 \
+    --num-peptides-per-length "$PRESENTATION_CALIBRATION_PEPTIDES_PER_LENGTH" \
     --alleles-per-genotype 1 \
-    --num-genotypes 50 \
+    --num-genotypes "$PRESENTATION_CALIBRATION_GENOTYPES" \
     --prediction-batch-size "$PRESENTATION_CALIBRATION_PREDICTION_BATCH_SIZE" \
     --random-seed "$RELEASE_RANDOM_SEED" \
     --verbosity 1 \

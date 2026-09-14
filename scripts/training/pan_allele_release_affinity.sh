@@ -347,6 +347,13 @@ TRAINING_DATA="$(pwd)/train_data.csv.bz2"
 CURRENT_PHASE="hyperparameters"
 TRAINING_MINIBATCH_SIZE="${TRAINING_MINIBATCH_SIZE:-128}"
 AFFINITY_MINIBATCH_SIZE="${AFFINITY_MINIBATCH_SIZE:-$TRAINING_MINIBATCH_SIZE}"
+# Smoke mode shrinks scale only; every stage and code path still runs.
+SMOKE_HELPER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/release_smoke.py"
+AFFINITY_EVAL_LIMIT_ARGS=()
+if [ "${MHCFLURRY_RELEASE_SMOKE:-0}" = "1" ]; then
+    CALIBRATE_PEPTIDES_PER_LENGTH="${CALIBRATE_PEPTIDES_PER_LENGTH:-1000}"
+    AFFINITY_EVAL_LIMIT_ARGS=(--limit-files "${EVAL_MAX_BENCHMARK_FILES:-2}")
+fi
 AFFINITY_OPTIMIZER_IMPLEMENTATION="${AFFINITY_OPTIMIZER_IMPLEMENTATION:-keras}"
 AFFINITY_LSUV_TARGET="${AFFINITY_LSUV_TARGET:-post_activation}"
 AFFINITY_INIT="${AFFINITY_INIT:-glorot_uniform}"
@@ -370,6 +377,9 @@ fi
 # ``apply_dataloader_num_workers_to_work_items``). One source of truth →
 # saved component-model configs reflect the value the orchestrator
 # actually chose for the run, not whatever the YAML happened to say.
+if [ "${MHCFLURRY_RELEASE_SMOKE:-0}" = "1" ]; then
+    python "$SMOKE_HELPER" cap-hyperparameters hyperparameters.yaml --max-architectures 2 --max-epochs 2
+fi
 ARCH_COUNT=$(python -c "import yaml; print(len(yaml.safe_load(open('hyperparameters.yaml'))))")
 echo "Architectures in sweep: $ARCH_COUNT"
 
@@ -520,6 +530,7 @@ else
             --b public \
             --data-dir "$DATA_EVAL_DIR" \
             "${COMPARE_HOLDOUT_ARGS[@]}" \
+            "${AFFINITY_EVAL_LIMIT_ARGS[@]}" \
             --include affinity \
             --out "$EVAL_OUT"
 fi

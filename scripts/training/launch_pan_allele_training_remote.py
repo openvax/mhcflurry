@@ -190,6 +190,20 @@ def validate_local_release_source(repo, environ=os.environ):
             "commit them before running:\n%s" % status)
 
 
+def validate_smoke_output(environ=os.environ):
+    """Keep reduced-scale smoke runs out of release output paths."""
+    flag = environ.get("MHCFLURRY_RELEASE_SMOKE", "0").strip()
+    if flag in ("", "0"):
+        return
+    if flag != "1":
+        raise ValueError("MHCFLURRY_RELEASE_SMOKE must be 0 or 1; got %r" % flag)
+    out = environ.get("RUNPLZ_OUT", "") or environ.get("MHCFLURRY_OUT", "")
+    if "smoke" not in out:
+        raise ValueError(
+            "MHCFLURRY_RELEASE_SMOKE=1 requires an output path containing 'smoke'; "
+            "got %r" % out)
+
+
 def brev_config_from_env(environ=os.environ):
     return BrevConfig(
         auto_create_instances=env_bool(
@@ -315,6 +329,7 @@ def remote_training_env(environ=os.environ):
         "MHCFLURRY_RELEASE_RECIPE": environ.get(
             "MHCFLURRY_RELEASE_RECIPE", ""
         ),
+        "MHCFLURRY_RELEASE_SMOKE": environ.get("MHCFLURRY_RELEASE_SMOKE", "0"),
         "RUNPLZ_OUT": environ.get("RUNPLZ_OUT", ""),
         "MHCFLURRY_REMOTE_WORKFLOW": environ.get(
             "MHCFLURRY_REMOTE_WORKFLOW", "full"
@@ -488,6 +503,7 @@ app = App(
 )
 def train_release_full():
     """Run the selected maintained release or ablation workflow."""
+    validate_smoke_output()
     # Bootstrap working directories differ by backend (Brev historically
     # starts in the repository, while Modal starts at ``/``). Resolve from
     # this staged launcher so every relative workflow path means the same
@@ -787,5 +803,6 @@ def run_release_plots(repo, out, env):
 
 @app.local_entrypoint()
 def main():
+    validate_smoke_output()
     validate_local_release_source(Path.cwd())
     train_release_full.remote()

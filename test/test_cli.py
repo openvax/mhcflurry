@@ -1120,7 +1120,8 @@ def test_release_workflow_defaults_to_validated_published_recipe(tmp_path, monke
         "scripts/training/pan_allele_release_full.sh").read_text()
     assert '--exclude-pmid 31844290 31495665 31154438' in full_workflow
     assert '--sample-fraction "$PRESENTATION_SAMPLE_FRACTION"' in full_workflow
-    assert "--num-peptides-per-length 10000" in full_workflow
+    assert "PRESENTATION_CALIBRATION_PEPTIDES_PER_LENGTH:-10000" in full_workflow
+    assert '--num-peptides-per-length "$PRESENTATION_CALIBRATION_PEPTIDES_PER_LENGTH"' in full_workflow
     assert "--continue-incomplete" in full_workflow
     assert "PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS" in full_workflow
 
@@ -2930,6 +2931,7 @@ def test_remote_launcher_preserves_shared_minibatch_override(
         "AFFINITY_INIT": "he_uniform",
         "PROCESSING_SHORT_FLANK_BOUNDARY_RADIUS": "5",
         "PROCESSING_SHORT_FLANKS_HYPERPARAMETERS": "confirmed-ranking-candidate",
+        "MHCFLURRY_RELEASE_SMOKE": "1",
         "MKL_THREADING_LAYER": "TBB",
     })
     assert env["AFFINITY_MINIBATCH_SIZE"] == "512"
@@ -2966,6 +2968,12 @@ def test_remote_launcher_preserves_shared_minibatch_override(
     assert env["AFFINITY_ABLATION_BASELINE_DIR"] == "/remote/baseline"
     assert env["PROCESSING_SHORT_FLANKS_HYPERPARAMETERS"] == "confirmed-ranking-candidate"
     assert module.remote_training_env({})["PROCESSING_SHORT_FLANKS_HYPERPARAMETERS"] == "grid"
+    assert env["MHCFLURRY_RELEASE_SMOKE"] == "1"
+    assert module.remote_training_env({})["MHCFLURRY_RELEASE_SMOKE"] == "0"
+    module.validate_smoke_output({"MHCFLURRY_RELEASE_SMOKE": "0", "RUNPLZ_OUT": "/out/runs/release"})
+    module.validate_smoke_output({"MHCFLURRY_RELEASE_SMOKE": "1", "RUNPLZ_OUT": "/out/runs/v2-smoke"})
+    with pytest.raises(ValueError, match="smoke"):
+        module.validate_smoke_output({"MHCFLURRY_RELEASE_SMOKE": "1", "RUNPLZ_OUT": "/out/runs/final"})
     assert env["AFFINITY_OPTIMIZER_IMPLEMENTATION"] == "pytorch"
     assert env["AFFINITY_LSUV_TARGET"] == "pre_activation"
     assert env["AFFINITY_INIT"] == "he_uniform"
