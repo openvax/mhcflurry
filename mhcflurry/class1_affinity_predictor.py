@@ -987,7 +987,19 @@ class Class1AffinityPredictor(object):
             )
             if calibrated_allele is not None:
                 transform = self.allele_to_percent_rank_transform[calibrated_allele]
-                return transform.transform(affinities)
+                try:
+                    return transform.transform(affinities)
+                except ValueError as error:
+                    # Compact curves reject non-positive or infinite affinities
+                    # where histogram bins clamped them. Honor the documented
+                    # throw contract instead of raising from inside a batch.
+                    message = (
+                        "Percentile ranks for %s require positive finite nM "
+                        "affinities or NaN: %s" % (calibrated_allele, error))
+                    if throw:
+                        raise ValueError(message) from error
+                    warnings.warn(message)
+                    return numpy.full(len(affinities), numpy.nan, dtype="float64")
 
             allele_repr = allele + (
                 "" if allele == normalized_allele
@@ -1851,7 +1863,7 @@ class Class1AffinityPredictor(object):
             length_distributions = None
         # One peptide grouping serves every allele's compact fit.
         group_codes = None
-        if calibration_method(method, bins) == "compact":
+        if method == "compact":
             group_codes = factorize_calibration_groups(encoded_peptides.sequences)
         for allele in alleles:
             start = time.time()
@@ -2287,7 +2299,9 @@ class Class1AffinityPredictor(object):
         calibration_float_dtype = (
             torch.float32 if device.type == "mps" else torch.float64
         )
-        bins_tensor = torch.as_tensor(
+        # Only the histogram fit reads these edges; compact mode would upload
+        # a thousand unused values to the device on every call.
+        bins_tensor = None if method != "histogram" else torch.as_tensor(
             bin_edges_array, dtype=calibration_float_dtype, device=device,
         )
 

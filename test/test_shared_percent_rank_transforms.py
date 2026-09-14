@@ -252,8 +252,34 @@ def test_empty_save_preserves_calibration_with_umask_permissions(tmp_path):
     assert stat.S_IMODE(path.stat().st_mode) == 0o666 & ~umask
 
 
-def test_load_rejects_interrupted_dual_format_calibration(tmp_path):
-    save_percent_rank_transforms(tmp_path, {"score": HistogramPercentRankTransform().fit([.1, .2, .5], 3)})
-    (tmp_path / "percent_ranks.json").write_text("{}")
-    with pytest.raises(ValueError, match="Both percent_ranks.json and percent_ranks.csv"):
-        load_percent_rank_transforms(tmp_path)
+def test_interrupted_dual_format_calibration_loads_the_newer_file(tmp_path):
+    import os
+    import shutil
+    import time
+    histogram = tmp_path / "histogram"
+    histogram.mkdir()
+    save_percent_rank_transforms(histogram, {"score": HistogramPercentRankTransform().fit([.1, .2, .5], 3)})
+    save_percent_rank_transforms(tmp_path, {"score": CompactPercentRankTransform().fit([.1, .2, .7])})
+    assert (tmp_path / "percent_ranks.json").exists() and not (tmp_path / "percent_ranks.csv").exists()
+    # An interrupted save leaves the replaced target beside the older format.
+    shutil.copyfile(histogram / "percent_ranks.csv", tmp_path / "percent_ranks.csv")
+    stale = time.time() - 60
+    os.utime(tmp_path / "percent_ranks.csv", (stale, stale))
+    with pytest.warns(UserWarning, match="interrupted calibration save"):
+        loaded = load_percent_rank_transforms(tmp_path)
+    assert type(loaded["score"]) is CompactPercentRankTransform
+    os.utime(tmp_path / "percent_ranks.csv", None)
+    with pytest.warns(UserWarning, match="interrupted calibration save"):
+        loaded = load_percent_rank_transforms(tmp_path)
+    assert type(loaded["score"]) is HistogramPercentRankTransform
+
+
+def test_percentile_ranks_honor_throw_for_unsupported_affinities(monkeypatch):
+    predictor = Class1AffinityPredictor()
+    monkeypatch.setattr(predictor, "predict", lambda *args, **kwargs: np.geomspace(1, 50000, 1000))
+    predictor.calibrate_percentile_ranks(peptides=["SIINFEKL"] * 1000, alleles=["HLA-A*02:01"])
+    with pytest.warns(UserWarning, match="positive finite"):
+        ranks = predictor.percentile_ranks([0.0, float("inf")], allele="HLA-A*02:01", throw=False)
+    assert np.isnan(ranks).all()
+    with pytest.raises(ValueError, match="positive finite"):
+        predictor.percentile_ranks([0.0], allele="HLA-A*02:01")

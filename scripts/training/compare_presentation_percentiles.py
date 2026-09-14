@@ -112,7 +112,7 @@ def fit_methods(reference, budgets):
         model.fit(reference, bins=bins)
         methods[name] = model
     for budget in budgets:
-        methods["compact_%d" % budget] = CompactPresentationPercentiles.fit(reference, budget)
+        methods["compact_%d" % budget] = CompactPresentationPercentiles.from_scores(reference, budget)
     return methods
 
 

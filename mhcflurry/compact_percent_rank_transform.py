@@ -253,8 +253,14 @@ class CompactPresentationPercentiles(CompactPercentRankTransform):
     """
 
     @classmethod
-    def fit(cls, scores, num_knots=64):
-        return CompactPercentRankTransform.fit(cls(), scores, num_knots)
+    def from_scores(cls, scores, num_knots=64):
+        """Fit a new adapter instance.
+
+        ``fit`` stays the base class's instance method, which refits the
+        receiver in place; overriding it with a constructor would silently
+        discard in-place refits such as the knot-budget selection.
+        """
+        return cls().fit(scores, num_knots)
 
     def transform(self, scores, survival=True):
         return super().transform(scores, survival=survival)

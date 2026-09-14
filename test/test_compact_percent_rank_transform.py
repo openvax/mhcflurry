@@ -27,7 +27,7 @@ def experiment_module():
 def test_budget_monotonicity_extrapolation_and_roundtrip(budget):
     rng = np.random.default_rng(15)
     reference = expit(rng.normal(-5, 2, 10000))
-    model = CompactPresentationPercentiles.fit(reference, budget)
+    model = CompactPresentationPercentiles.from_scores(reference, budget)
     assert 2 <= len(model.x) <= budget
     assert np.all(model.tail_slopes < 0)
     assert_allclose(model.reference_bounds, [reference.min(), reference.max()])
@@ -42,13 +42,13 @@ def test_budget_monotonicity_extrapolation_and_roundtrip(budget):
 
 
 def test_duplicates_use_weighted_midrank_survival():
-    model = CompactPresentationPercentiles.fit([.1, .1, .2, .9], 20)
+    model = CompactPresentationPercentiles.from_scores([.1, .1, .2, .9], 20)
     assert_allclose(model.transform([.1, .2, .9]), [75, 37.5, 12.5])
     assert len(model.x) == 3
 
 
 def test_two_distinct_scores_and_nan_endpoints():
-    model = CompactPresentationPercentiles.fit([0, 1], 128)
+    model = CompactPresentationPercentiles.from_scores([0, 1], 128)
     result = model.transform([0, .25, .75, 1, np.nan])
     assert_allclose(result[[0, 3]], [75, 25])
     assert np.all(np.diff(result[:4]) < 0)
@@ -62,17 +62,17 @@ def test_two_distinct_scores_and_nan_endpoints():
                                     [-.1, .1], [.1, 1.1], [[.1, .2]]])
 def test_invalid_reference_is_rejected(scores):
     with pytest.raises(ValueError):
-        CompactPresentationPercentiles.fit(scores)
+        CompactPresentationPercentiles.from_scores(scores)
 
 
 @pytest.mark.parametrize("budget", [0, 1, -3, 3.5, True])
 def test_invalid_budget_is_rejected(budget):
     with pytest.raises(ValueError, match="budget"):
-        CompactPresentationPercentiles.fit([.1, .2, .5], budget)
+        CompactPresentationPercentiles.from_scores([.1, .2, .5], budget)
 
 
 def test_invalid_serialized_models_are_rejected():
-    original = CompactPresentationPercentiles.fit([.1, .2, .5]).to_dict()
+    original = CompactPresentationPercentiles.from_scores([.1, .2, .5]).to_dict()
     for key, value in [("format", "v999"), ("tail_slopes", [0, -1]),
                        ("y", [0, 0, 0]), ("x", [1, 1, 2]),
                        ("reference_bounds", [.2, .5])]:
@@ -95,7 +95,7 @@ def test_greedy_knots_are_deterministic_and_preserve_endpoints():
 def test_independent_rare_tail_ranking_is_preserved():
     rng = np.random.default_rng(402)
     reference = expit(rng.normal(-6, 1.3, 100000))
-    model = CompactPresentationPercentiles.fit(reference, 64)
+    model = CompactPresentationPercentiles.from_scores(reference, 64)
     # Independent evaluation scores in and above the reference's sparse tail.
     raw = expit(rng.normal(0, 1.5, 6000))
     labels = rng.random(len(raw)) < expit((probability_logits(raw) - .2) * 2)
@@ -156,3 +156,10 @@ def test_saved_step_and_compact_methods_roundtrip(tmp_path):
     for name in methods:
         assert_array_equal(module.percentiles(methods[name], scores),
                            module.percentiles(loaded[name], scores))
+
+
+def test_adapter_fit_refits_the_receiver_in_place():
+    model = CompactPresentationPercentiles.from_scores([.1, .2, .3, .4, .5], 64)
+    same = model.fit([index / 2000 for index in range(1, 2000)], 128)
+    assert same is model
+    assert len(model.x) > 5

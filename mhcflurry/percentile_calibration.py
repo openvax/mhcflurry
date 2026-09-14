@@ -3,7 +3,8 @@
 import json
 import hashlib
 import os
-import tempfile
+import uuid
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -167,14 +168,13 @@ def save_percent_rank_transforms(models_dir, transforms):
         np.array_equal(s.index, next(iter(series.values())).index, equal_nan=True)
         for s in series.values())
     target, alternate = (csv_path, json_path) if same_edges else (json_path, csv_path)
-    fd, temp = tempfile.mkstemp(prefix=".percent-ranks-", dir=directory)
-    # mkstemp creates owner-only files and os.replace keeps that mode; saved
-    # calibrations must stay readable like the weights beside them.
-    umask = os.umask(0)
-    os.umask(umask)
+    # Let the kernel apply this process's umask. mkstemp would force
+    # owner-only mode, and reading the umask to undo that would race other
+    # threads, since the umask is process-global. os.replace keeps the mode.
+    temp = directory / (".percent-ranks-%d-%s" % (os.getpid(), uuid.uuid4().hex))
+    descriptor = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
     try:
-        os.chmod(temp, 0o666 & ~umask)
-        with os.fdopen(fd, "w") as stream:
+        with os.fdopen(descriptor, "w") as stream:
             if same_edges:
                 pd.DataFrame(series).to_csv(stream, index=True, index_label="bin")
             else:
@@ -186,21 +186,25 @@ def save_percent_rank_transforms(models_dir, transforms):
         os.replace(temp, target)
         alternate.unlink(missing_ok=True)
     finally:
-        Path(temp).unlink(missing_ok=True)
+        temp.unlink(missing_ok=True)
 
 
 def load_percent_rank_transforms(models_dir):
     """Read new calibrations or historical CSV without refitting either."""
     directory = Path(models_dir)
-    if (directory / "percent_ranks.json").exists() and (directory / "percent_ranks.csv").exists():
-        # save_percent_rank_transforms removes the alternate format after the
-        # replacement; both existing means that save was interrupted.
-        raise ValueError(
-            "Both percent_ranks.json and percent_ranks.csv exist in %s; an "
-            "interrupted calibration save left a stale file. Remove it or "
-            "recalibrate." % directory)
-    if (directory / "percent_ranks.json").exists():
-        with (directory / "percent_ranks.json").open() as stream:
+    json_path, csv_path = directory / "percent_ranks.json", directory / "percent_ranks.csv"
+    use_json = json_path.exists()
+    if json_path.exists() and csv_path.exists():
+        # A save replaces its target and only then removes the alternate format,
+        # so both existing means it was interrupted. Load the newer file and
+        # warn: refusing would make the whole predictor directory unreadable.
+        use_json = json_path.stat().st_mtime >= csv_path.stat().st_mtime
+        warnings.warn(
+            "Both percent_ranks.json and percent_ranks.csv exist in %s; an interrupted "
+            "calibration save left %s behind. Loading the newer file; remove the stale "
+            "one or recalibrate." % (directory, (csv_path if use_json else json_path).name))
+    if use_json:
+        with json_path.open() as stream:
             payload = json.load(stream)
         if payload.get("format") != "mhcflurry-percent-ranks-v1":
             raise ValueError("Unsupported percentile collection format")
