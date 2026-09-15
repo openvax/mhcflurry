@@ -189,6 +189,13 @@ def assign_folds(df, num_folds, held_out_samples, seed=None):
 
     result_df = pandas.DataFrame(index=df.index)
     sample_names = pandas.Series(df.sample_id.unique())
+    # Every fold holds out this many samples and trains on the rest, and
+    # matched early stopping needs at least two training samples.
+    if len(sample_names) < held_out_samples + 2:
+        raise ValueError(
+            "--held-out-samples %d needs at least %d training samples; the "
+            "data has %d. Reduce --held-out-samples or train on more samples."
+            % (held_out_samples, held_out_samples + 2, len(sample_names)))
 
     for fold in range(num_folds):
         samples_to_exclude = sample_names.sample(n=held_out_samples)

@@ -18,6 +18,17 @@ import yaml
 SMOKE_PRETRAIN_STEPS_PER_EPOCH = 16
 
 
+def load_canonicalize_allele():
+    """The processing data command's own allele resolver, loaded by path."""
+    import importlib.util
+
+    script = Path(__file__).resolve().parent / "release_exact" / "make_train_data.processing.py"
+    spec = importlib.util.spec_from_file_location("make_train_data_processing", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.canonicalize_processing_allele
+
+
 def cap_hyperparameters(items, max_architectures, max_epochs):
     """Keep the first architectures and cap every training and pretraining epoch count."""
     if not isinstance(items, list) or not items:
@@ -45,17 +56,53 @@ def cap_hyperparameters(items, max_architectures, max_epochs):
     return capped
 
 
+COMMON_AMINO_ACIDS = "ACDEFGHIKLMNPQRSTVWY"
+
+
+def eligible_processing_hits(frame, canonicalize=None):
+    """Keep only hits that processing training itself would keep.
+
+    Mirrors make_train_data.processing.py: class I, 8-11mers of common amino
+    acids with a protein, monoallelic, and a sequence-resolved HLA-A/B/C
+    allele. Selecting smoke samples from the raw hit table instead silently
+    dropped most of them, leaving too few samples to assign folds.
+    """
+    keep = (
+        (frame.mhc_class.astype(str) == "I") &
+        frame.peptide.astype(str).str.len().between(8, 11) &
+        ~frame.protein_ensembl.isnull() &
+        frame.peptide.astype(str).str.match("^[%s]+$" % COMMON_AMINO_ACIDS) &
+        (frame.format.astype(str) == "MONOALLELIC")
+    )
+    frame = frame.loc[keep]
+    if canonicalize is None:
+        return frame
+
+    def resolved(name):
+        try:
+            return canonicalize(name) is not None
+        except ValueError:
+            # Serotypes and one-field groups are fatal in the real command, so
+            # a smoke sample must never depend on one.
+            return False
+
+    allowed = {name for name in frame.hla.astype(str).unique() if resolved(name)}
+    return frame.loc[frame.hla.astype(str).isin(allowed)]
+
+
 def smoke_sample_exclusions(hit_samples, holdout_samples, keep, seed, min_hits=200):
     """Exclude the holdout plus every training sample except a seeded subset.
 
     Candidates need at least min_hits hits so matched decoy generation and the
-    processing fold assignment have enough rows. Returns (excluded, kept).
+    processing fold assignment have enough rows. Pass hit_samples from
+    eligible_processing_hits, so a kept sample survives to training.
+    Returns (excluded, kept).
     """
     counts = pandas.Series(hit_samples).astype(str).value_counts()
     holdout = set(pandas.Series(holdout_samples).astype(str))
     candidates = sorted(set(counts.index[counts >= min_hits]) - holdout)
     if len(candidates) < keep:
-        raise ValueError("Only %d training samples have at least %d hits; need %d"
+        raise ValueError("Only %d eligible training samples have at least %d hits; need %d"
                          % (len(candidates), min_hits, keep))
     kept = sorted(numpy.random.default_rng(seed).choice(candidates, size=keep, replace=False))
     excluded = sorted(holdout | (set(counts.index) - set(kept)))
@@ -83,10 +130,18 @@ def main(argv=None):
         path.write_text(yaml.safe_dump(items, sort_keys=True))
         print("smoke: %s capped to %d architecture(s), max_epochs %d" % (path, len(items), args.max_epochs))
     else:
-        hits = pandas.read_csv(args.hits, usecols=["sample_id"])
+        columns = ["sample_id", "mhc_class", "peptide", "protein_ensembl",
+                   "format", "hla"]
+        hits = pandas.read_csv(args.hits, usecols=columns)
         holdout = pandas.read_csv(args.holdout, usecols=["sample_id"])
+        eligible = eligible_processing_hits(hits, load_canonicalize_allele())
+        print("smoke: %d of %d hit samples are eligible for processing training"
+              % (eligible.sample_id.nunique(), hits.sample_id.nunique()))
         excluded, kept = smoke_sample_exclusions(
-            hits.sample_id, holdout.sample_id, args.keep, args.seed, args.min_hits)
+            eligible.sample_id, holdout.sample_id, args.keep, args.seed, args.min_hits)
+        # Excluding every ineligible sample as well keeps the file explicit
+        # about what this run trains on.
+        excluded = sorted(set(excluded) | (set(hits.sample_id.astype(str)) - set(kept)))
         pandas.DataFrame({"sample_id": excluded}).to_csv(args.out, index=False)
         print("smoke: keeping %d processing samples: %s" % (len(kept), " ".join(kept)))
     return 0

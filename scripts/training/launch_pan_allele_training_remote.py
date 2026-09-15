@@ -347,6 +347,8 @@ def remote_training_env(environ=os.environ):
             "MHCFLURRY_RELEASE_RECIPE", ""
         ),
         "MHCFLURRY_RELEASE_SMOKE": environ.get("MHCFLURRY_RELEASE_SMOKE", "0"),
+        "MHCFLURRY_RELEASE_DATA_VINTAGE": environ.get(
+            "MHCFLURRY_RELEASE_DATA_VINTAGE", ""),
         "MHCFLURRY_RELEASE_OUT": environ.get("MHCFLURRY_RELEASE_OUT", ""),
         "MHCFLURRY_REMOTE_WORKFLOW": environ.get(
             "MHCFLURRY_REMOTE_WORKFLOW", "full"

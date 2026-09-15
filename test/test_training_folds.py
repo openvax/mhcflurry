@@ -70,3 +70,20 @@ def test_processing_initialization_reuses_folds_without_suffixes(tmp_path, monke
     saved = pandas.read_csv(out / "train_data.csv.bz2")
     pandas.testing.assert_frame_equal(saved[["fold_0", "fold_1"]], data[["fold_0", "fold_1"]])
     assert not any(name.endswith(("_x", "_y")) for name in saved)
+
+
+def test_fold_assignment_rejects_more_held_out_samples_than_it_has():
+    """The smoke run died inside numpy.random.choice; say what is wrong instead."""
+    from mhcflurry.cli.train_processing_models_command import assign_folds
+
+    frame = pandas.DataFrame({
+        "sample_id": ["s%d" % (row // 4) for row in range(32)],
+        "hit": [row % 2 for row in range(32)]})
+    assert frame.sample_id.nunique() == 8
+    with pytest.raises(ValueError, match="needs at least 12 training samples"):
+        assign_folds(frame, num_folds=4, held_out_samples=10, seed=42)
+    assigned = assign_folds(frame, num_folds=4, held_out_samples=4, seed=42)
+    assert list(assigned.columns) == ["fold_%d" % fold for fold in range(4)]
+    for fold in range(4):
+        trained = frame.sample_id[assigned["fold_%d" % fold]].nunique()
+        assert trained == 4

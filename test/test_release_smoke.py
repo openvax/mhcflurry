@@ -55,7 +55,11 @@ def test_sample_exclusions_keep_a_seeded_subset_and_always_exclude_holdout(smoke
     assert smoke.smoke_sample_exclusions(hits, ["held"], keep=20, seed=42) == (excluded, kept)
     with pytest.raises(ValueError, match="need 31"):
         smoke.smoke_sample_exclusions(hits, ["held"], keep=31, seed=42)
-    pandas.DataFrame({"sample_id": hits}).to_csv(tmp_path / "hits.csv", index=False)
+    # The CLI reads the eligibility columns too, so write a full hit table.
+    pandas.DataFrame({
+        "sample_id": hits, "mhc_class": "I", "peptide": "SIINFEKL",
+        "protein_ensembl": "ENSP1", "format": "MONOALLELIC",
+        "hla": "HLA-A*02:01"}).to_csv(tmp_path / "hits.csv", index=False)
     pandas.DataFrame({"sample_id": ["held"]}).to_csv(tmp_path / "holdout.csv", index=False)
     out = tmp_path / "excluded.csv"
     assert smoke.main(["sample-exclusions", "--hits", str(tmp_path / "hits.csv"), "--holdout",
@@ -147,3 +151,80 @@ def test_optional_argument_arrays_expand_when_empty_under_nounset(script):
         assert text.count('"${%s[@]}"' % name) == text.count(safe), name
         if safe in text:
             run_block('%s=()\nprintf "arg=%%s\\n" %s\n' % (name, safe), script.parent)
+
+
+def test_data_vintage_selects_a_download_label_and_rejects_other_values(tmp_path):
+    """Only the release pipeline's two vintages are accepted, and only one exports."""
+    block = bash_block(SCRIPTS[0].read_text(),
+                       'MHCFLURRY_RELEASE_DATA_VINTAGE="${MHCFLURRY_RELEASE_DATA_VINTAGE:-current}"',
+                       "esac\n")
+    report = 'echo "label=${MHCFLURRY_DOWNLOADS_CURRENT_RELEASE:-unset}"\n'
+    assert "label=unset" in run_block(block + report, tmp_path)
+    assert "label=unset" in run_block(
+        block + report, tmp_path, 'MHCFLURRY_RELEASE_DATA_VINTAGE=current\n')
+    assert "label=2.0.0" in run_block(
+        block + report, tmp_path, 'MHCFLURRY_RELEASE_DATA_VINTAGE=public-2020\n')
+    rejected = subprocess.run(
+        ["bash", "-c", "set -euo pipefail\nMHCFLURRY_RELEASE_DATA_VINTAGE=2019\n" + block],
+        cwd=tmp_path, capture_output=True, text=True)
+    assert rejected.returncode == 2 and "must be current or public-2020" in rejected.stderr
+
+
+def test_data_vintage_is_recorded_before_any_training():
+    """The run keeps the resolved training inputs, hashed, next to its config."""
+    full = SCRIPTS[0].read_text()
+    record = full.index("config/data_vintage.json")
+    for later in ("=== STAGE 1: AFFINITY", "release-holdout build"):
+        assert record < full.index(later), later
+    assert "curated_training_data" in full and "annotated_ms" in full
+
+
+def ineligible_and_eligible_hits():
+    """One eligible sample plus one row of every reason the real command drops."""
+    rows = [
+        # sample_id, mhc_class, peptide, protein_ensembl, format, hla
+        ("keep", "I", "SIINFEKL", "ENSP1", "MONOALLELIC", "HLA-A*02:01"),
+        ("class_ii", "II", "SIINFEKL", "ENSP1", "MONOALLELIC", "HLA-A*02:01"),
+        ("too_long", "I", "SIINFEKLSIIN", "ENSP1", "MONOALLELIC", "HLA-A*02:01"),
+        ("no_protein", "I", "SIINFEKL", None, "MONOALLELIC", "HLA-A*02:01"),
+        ("odd_residue", "I", "SIINFEKX", "ENSP1", "MONOALLELIC", "HLA-A*02:01"),
+        ("multiallelic", "I", "SIINFEKL", "ENSP1", "MULTIALLELIC", "HLA-A*02:01"),
+        ("not_abc", "I", "SIINFEKL", "ENSP1", "MONOALLELIC", "HLA-E*01:01"),
+        ("serotype", "I", "SIINFEKL", "ENSP1", "MONOALLELIC", "A2"),
+    ]
+    return pandas.DataFrame(rows, columns=[
+        "sample_id", "mhc_class", "peptide", "protein_ensembl", "format", "hla"])
+
+
+def test_eligible_hits_mirror_the_processing_commands_own_filters(smoke):
+    """Smoke samples must survive to training; picking from raw hits did not."""
+    frame = ineligible_and_eligible_hits()
+    canonicalize = smoke.load_canonicalize_allele()
+    eligible = smoke.eligible_processing_hits(frame, canonicalize)
+    assert sorted(eligible.sample_id.unique()) == ["keep"]
+    # A serotype is fatal in the real command, so it must not be selectable.
+    with pytest.raises(ValueError):
+        canonicalize("A2")
+
+
+def test_sample_exclusions_keep_only_samples_that_reach_training(smoke, tmp_path):
+    frame = pandas.concat([ineligible_and_eligible_hits()] * 250, ignore_index=True)
+    extra = frame.loc[frame.sample_id == "keep"].copy()
+    for name in ("keep2", "keep3", "holdout_sample"):
+        extra["sample_id"] = name
+        frame = pandas.concat([frame, extra], ignore_index=True)
+    eligible = smoke.eligible_processing_hits(frame, smoke.load_canonicalize_allele())
+    excluded, kept = smoke.smoke_sample_exclusions(
+        eligible.sample_id, ["holdout_sample"], keep=2, seed=42, min_hits=200)
+    assert len(kept) == 2 and "holdout_sample" not in kept
+    assert set(kept) <= {"keep", "keep2", "keep3"}
+    assert "holdout_sample" in excluded and "class_ii" not in kept
+
+
+def test_smoke_reduces_the_processing_held_out_sample_count(tmp_path):
+    """Holding out ten of twenty samples is what broke the first smoke run."""
+    block = bash_block(SCRIPTS[0].read_text(),
+                       'if [ "${MHCFLURRY_RELEASE_SMOKE:-0}" = "1" ]; then\n    PRESENTATION_SAMPLE_FRACTION=0.01')
+    report = ('echo "kept=$SMOKE_PROCESSING_SAMPLES held_out=$PROCESSING_HELD_OUT_SAMPLES"\n')
+    out = run_block(block + report, tmp_path, 'MHCFLURRY_RELEASE_SMOKE=1\n')
+    assert "kept=20 held_out=4" in out

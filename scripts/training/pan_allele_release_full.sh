@@ -76,6 +76,23 @@ export MHCFLURRY_MATMUL_PRECISION="${MHCFLURRY_MATMUL_PRECISION:-highest}"
 # training must fail rather than silently shrink its effective minibatch.
 export MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK="${MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK:-1}"
 
+# Training-data vintage. "current" keeps the 2.2.0 download label: October
+# 2023 curated affinity data and the 2023 pseudosequence table. "public-2020"
+# selects the 2.0.0 label, the June 2020 data behind the public 2.1.5 and 2.2
+# weights. Mass spec hits are the same December 2019 annotations under both
+# labels, and every other download URL is identical, so this changes the
+# affinity training rows and the allele sequence table and nothing else.
+MHCFLURRY_RELEASE_DATA_VINTAGE="${MHCFLURRY_RELEASE_DATA_VINTAGE:-current}"
+case "$MHCFLURRY_RELEASE_DATA_VINTAGE" in
+    current) ;;
+    public-2020) export MHCFLURRY_DOWNLOADS_CURRENT_RELEASE=2.0.0 ;;
+    *)
+        echo "MHCFLURRY_RELEASE_DATA_VINTAGE must be current or public-2020." >&2
+        exit 2
+        ;;
+esac
+echo "training-data vintage: $MHCFLURRY_RELEASE_DATA_VINTAGE (download label ${MHCFLURRY_DOWNLOADS_CURRENT_RELEASE:-default})"
+
 BASE_OUT="$MHCFLURRY_OUT"
 mkdir -p "$BASE_OUT/affinity" "$BASE_OUT/processing" "$BASE_OUT/presentation"
 
@@ -84,6 +101,30 @@ mkdir -p "$BASE_OUT/affinity" "$BASE_OUT/processing" "$BASE_OUT/presentation"
 # these generated manifests remove the candidate-training pMHC intersection
 # and select the independent multiallelic source-study holdout.
 mhcflurry-downloads fetch data_evaluation data_curated data_mass_spec_annotated
+mkdir -p "$BASE_OUT/config"
+python - "$BASE_OUT/config/data_vintage.json" \
+        "$MHCFLURRY_RELEASE_DATA_VINTAGE" \
+        "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
+        "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
+        "$(mhcflurry-downloads path allele_sequences)" <<'PYVINTAGE'
+import hashlib, json, os, sys
+out, vintage, curated, mass_spec, allele_dir = sys.argv[1:6]
+def digest(path):
+    hasher = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+record = {"vintage": vintage,
+          "downloads_label": os.environ.get("MHCFLURRY_DOWNLOADS_CURRENT_RELEASE", "default"),
+          "curated_training_data": {"path": curated, "sha256": digest(curated)},
+          "annotated_ms": {"path": mass_spec, "sha256": digest(mass_spec)},
+          "allele_sequences_dir": allele_dir}
+with open(out, "w") as handle:
+    json.dump(record, handle, indent=2)
+    handle.write("\n")
+print("recorded data vintage:", json.dumps(record["curated_training_data"]))
+PYVINTAGE
 RELEASE_HOLDOUT_DIR="$BASE_OUT/release_holdout"
 mhcflurry train release-holdout build \
     --data-dir "$(mhcflurry-downloads path data_evaluation)" \
@@ -138,6 +179,9 @@ if [ "${MHCFLURRY_RELEASE_SMOKE:-0}" = "1" ]; then
     PRESENTATION_CALIBRATION_PEPTIDES_PER_LENGTH=500
     PRESENTATION_CALIBRATION_GENOTYPES=5
     SMOKE_PROCESSING_SAMPLES="${SMOKE_PROCESSING_SAMPLES:-20}"
+    # Folds hold out samples from the reduced pool, so the release value of 10
+    # would leave too few training samples for the matched inner stopping split.
+    PROCESSING_HELD_OUT_SAMPLES=4
     echo "MHCFLURRY_RELEASE_SMOKE=1: reduced-scale run, not a release artifact." >&2
 fi
 case "$PROCESSING_SHORT_FLANKS_HYPERPARAMETERS" in
