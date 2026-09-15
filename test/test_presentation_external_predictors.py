@@ -13,7 +13,7 @@ from mhcflurry.cli.compare_models import _metrics
 
 KEYS = ["protein_accession", "peptide", "sample_id", "n_flank", "c_flank", "hit", "hla"]
 PRECOMPUTED = ("netmhcpan4.el", "netmhcpan4.ba", "mixmhcpred")
-LOCAL = ("netmhcpan4.2.el", "netmhcpan4.2.ba")
+LOCAL = ("netmhcpan4.1.el", "netmhcpan4.1.ba", "netmhcpan4.2.el", "netmhcpan4.2.ba")
 
 
 @pytest.fixture
@@ -35,9 +35,10 @@ def benchmark_rows(sample, seed, n=300, n_hits=30):
         "protein_accession": "P1", "peptide": peptides, "sample_id": sample,
         "n_flank": "NA", "c_flank": "AC", "hit": hit,
         "hla": "HLA-B*07:02 HLA-A*02:01 HLA-A*02:01"})
-    for name, weight in (("netmhcpan4.el", 0.3), ("mixmhcpred", 0.2), ("netmhcpan4.2.el", 0.35)):
+    for name, weight in (("netmhcpan4.el", 0.3), ("mixmhcpred", 0.2),
+                         ("netmhcpan4.1.el", 0.32), ("netmhcpan4.2.el", 0.35)):
         frame[name] = numpy.round(weight * hit + rng.uniform(0, 1, n), 6)
-    for name in ("netmhcpan4.ba", "netmhcpan4.2.ba"):
+    for name in ("netmhcpan4.ba", "netmhcpan4.1.ba", "netmhcpan4.2.ba"):
         frame[name] = numpy.round(numpy.where(
             hit == 1, rng.uniform(5, 800, n), rng.uniform(50, 50000, n)), 3)
     return frame

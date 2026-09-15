@@ -31,15 +31,26 @@ METRIC_TITLES = {"roc_auc": "AUROC", "pr_auc": "AUPRC", "ppv_at_n": "PPV@N"}
 EXTERNAL = {
     "netmhcpan4.el": ("NetMHCpan 4.0 EL", True),
     "netmhcpan4.ba": ("NetMHCpan 4.0 BA", False),
+    "netmhcpan4.1.el": ("NetMHCpan 4.1 EL", True),
+    "netmhcpan4.1.ba": ("NetMHCpan 4.1 BA", False),
     "netmhcpan4.2.el": ("NetMHCpan 4.2 EL", True),
     "netmhcpan4.2.ba": ("NetMHCpan 4.2 BA", False),
     "mixmhcpred": ("MixMHCpred", True),
 }
-# Categorical slots validated all-pairs on the light surface; MixMHCpred is muted.
-ROLE_COLORS = {"a": "#2a78d6", "b": "#eb6834", "netmhcpan4.el": "#1baf7a",
-               "netmhcpan4.2.el": "#4a3aa7", "netmhcpan4.ba": "#eda100",
-               "netmhcpan4.2.ba": "#e87ba4", "mixmhcpred": "#898781",
-               "baseline": "#008300", "random": "#c3c2b7"}
+# Color carries the predictor family; version is an ordinal step within it, so
+# three NetMHCpan versions do not spend three unrelated hues. Both ramps pass
+# the ordinal checks (monotone lightness, >=0.06 steps, one hue, light end
+# clear of the surface). Five families cannot all separate under deuteranopia
+# in one chart, so the eluted-ligand and binding-affinity ramps belong to
+# separate facets; MixMHCpred and the reference series stay deliberately muted
+# and always carry direct labels.
+ROLE_COLORS = {"a": "#2a78d6", "b": "#eb6834",
+               "netmhcpan4.el": "#34c191", "netmhcpan4.1.el": "#199a6d",
+               "netmhcpan4.2.el": "#0c6b4b",
+               "netmhcpan4.ba": "#a79ee2", "netmhcpan4.1.ba": "#6d5dc6",
+               "netmhcpan4.2.ba": "#42328f",
+               "mixmhcpred": "#898781", "baseline": "#5c5b55",
+               "random": "#c3c2b7"}
 AMINO_ACIDS = "ACDEFGHIKLMNPQRSTVWY"
 TERMINAL_RESIDUES = 4
 BASELINES = ("random", "terminal-logistic")
