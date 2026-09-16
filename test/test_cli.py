@@ -373,8 +373,8 @@ def test_deploy_packages_only_requested_processing_variants(tmp_path):
         "bash",
         "scripts/release/deploy_trained_models.sh",
         "--run-dir", str(run_dir),
-        "--release", "2.3.0",
-        "--github-release", "2.3.0",
+        "--release", __version__,
+        "--github-release", __version__,
         "--repo", ".",
         "--allow-dirty-repo",
         "--dry-run",
@@ -429,8 +429,8 @@ def test_deploy_creates_draft_noninteractively_with_release_notes(tmp_path):
         [
             "bash", "scripts/release/deploy_trained_models.sh",
             "--run-dir", str(run_dir),
-            "--release", "2.3.0",
-            "--github-release", "2.3.0",
+            "--release", __version__,
+            "--github-release", __version__,
             "--repo", ".",
             "--assets-dir", str(assets_dir),
             "--date", "20260825",
@@ -446,24 +446,24 @@ def test_deploy_creates_draft_noninteractively_with_release_notes(tmp_path):
     calls = gh_log.read_text().splitlines()
     create = next(line for line in calls if line.startswith("release create "))
     assert "--notes-file " in create
-    assert "RELEASE_NOTES_2.3.0.md" in create
-    assert create.startswith("release create 2.3.0 --draft --title ")
-    assert any(line.startswith("release upload 2.3.0 ") for line in calls)
+    assert "RELEASE_NOTES_%s.md" % __version__ in create
+    assert create.startswith("release create %s --draft --title " % __version__)
+    assert any(line.startswith("release upload %s " % __version__) for line in calls)
 
 
 def test_deploy_rejects_artifacts_from_a_different_commit(tmp_path):
     run_dir = tmp_path / "release-run"
     _write_minimal_deployable_run(run_dir)
     (run_dir / "affinity/models.combined/info.txt").write_text(
-        "package\tmhcflurry 2.3.0rc14\n"
-        "git commit\tdeadbeef\n"
+        "package\tmhcflurry %s\n"
+        "git commit\tdeadbeef\n" % __version__
     )
 
     result = subprocess.run(
         [
             "bash", "scripts/release/deploy_trained_models.sh",
             "--run-dir", str(run_dir),
-            "--release", "2.3.0",
+            "--release", __version__,
             "--repo", ".",
             "--allow-dirty-repo",
             "--dry-run",
@@ -1236,7 +1236,7 @@ def test_release_workflow_validates_selected_runplz_interpreter(tmp_path):
             "bash",
             "scripts/release/retrain_evaluate_deploy.sh",
             "--run-dir", str(tmp_path / "release-run"),
-            "--release", "2.3.0",
+            "--release", __version__,
             "--backend", "brev-existing",
             "--brev-instance", "missing-test-instance",
             "--no-sync-remote-output",
@@ -1321,7 +1321,7 @@ def test_brev_postprocess_archive_includes_release_holdout(tmp_path):
             "bash",
             "scripts/release/retrain_evaluate_deploy.sh",
             "--run-dir", str(run_dir),
-            "--release", "2.3.0",
+            "--release", __version__,
             "--backend", "brev-existing",
             "--brev-instance", "missing-test-instance",
             "--skip-train",

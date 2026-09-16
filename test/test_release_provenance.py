@@ -14,6 +14,7 @@ import importlib.util
 import hashlib
 import json
 import pathlib
+import re
 import subprocess
 
 import pytest
@@ -23,6 +24,7 @@ from mhcflurry.version import __version__ as PACKAGE_VERSION
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 SCRIPT = REPO / "scripts" / "release" / "validate_release_provenance.py"
+RELEASE_VERSION = re.match(r"\d+\.\d+\.\d+", PACKAGE_VERSION).group()
 
 
 def load_module():
@@ -95,7 +97,7 @@ def test_collect_provenance_accepts_matching_release_candidate(tmp_path):
     result = module.collect_provenance(
         repo=REPO,
         run_dir=tmp_path,
-        release="2.3.0",
+        release=RELEASE_VERSION,
         workflow_id="run-123",
         processing_variants=["with_flanks"],
         require_artifacts=True,
@@ -103,7 +105,7 @@ def test_collect_provenance_accepts_matching_release_candidate(tmp_path):
         expected_artifact_workflow_id="run-123",
     )
 
-    assert result["release_base_version"] == "2.3.0"
+    assert result["release_base_version"] == RELEASE_VERSION
     assert result["source"]["package_version"] == PACKAGE_VERSION
     assert result["workflow_id"] == "run-123"
     assert {
@@ -113,14 +115,16 @@ def test_collect_provenance_accepts_matching_release_candidate(tmp_path):
 
 def test_collect_provenance_rejects_mislabeled_model(tmp_path):
     module = load_module()
-    write_model_info(tmp_path, "2.3.1")
+    other_version = "999.0.0" if RELEASE_VERSION != "999.0.0" else "998.0.0"
+    write_model_info(tmp_path, other_version)
     write_holdout_proof(tmp_path)
 
-    with pytest.raises(ValueError, match="2.3.1, not release 2.3.0"):
+    with pytest.raises(ValueError, match=re.escape(
+            "%s, not release %s" % (other_version, RELEASE_VERSION))):
         module.collect_provenance(
             repo=REPO,
             run_dir=tmp_path,
-            release="2.3.0",
+            release=RELEASE_VERSION,
             processing_variants=["with_flanks"],
             require_artifacts=True,
             allow_dirty_repo=True,
@@ -135,7 +139,7 @@ def test_collect_provenance_rejects_missing_model_info(tmp_path):
         module.collect_provenance(
             repo=REPO,
             run_dir=tmp_path,
-            release="2.3.0",
+            release=RELEASE_VERSION,
             processing_variants=["with_flanks"],
             require_artifacts=True,
             allow_dirty_repo=True,
@@ -166,7 +170,7 @@ def test_collect_provenance_rejects_model_from_another_commit(tmp_path):
         module.collect_provenance(
             repo=REPO,
             run_dir=tmp_path,
-            release="2.3.0",
+            release=RELEASE_VERSION,
             workflow_id="run-123",
             processing_variants=["with_flanks"],
             require_artifacts=True,
@@ -188,7 +192,7 @@ def test_collect_provenance_records_separate_postprocess_source(tmp_path):
     result = module.collect_provenance(
         repo=REPO,
         run_dir=tmp_path,
-        release="2.3.0",
+        release=RELEASE_VERSION,
         workflow_id="evaluation-run",
         processing_variants=["with_flanks"],
         require_artifacts=True,
@@ -217,7 +221,7 @@ def test_cli_records_separate_postprocess_source(tmp_path, capsys):
     assert module.main([
         "--repo", str(REPO),
         "--run-dir", str(tmp_path),
-        "--release", "2.3.0",
+        "--release", RELEASE_VERSION,
         "--workflow-id", "evaluation-run",
         "--processing-variants", "with_flanks",
         "--require-artifacts",
@@ -251,7 +255,7 @@ def test_collect_provenance_rejects_inconsistent_artifact_commits(tmp_path):
         module.collect_provenance(
             repo=REPO,
             run_dir=tmp_path,
-            release="2.3.0",
+            release=RELEASE_VERSION,
             workflow_id="evaluation-run",
             processing_variants=["with_flanks"],
             require_artifacts=True,
@@ -268,7 +272,7 @@ def test_collect_provenance_allows_later_evaluation_workflow(tmp_path):
     result = module.collect_provenance(
         repo=REPO,
         run_dir=tmp_path,
-        release="2.3.0",
+        release=RELEASE_VERSION,
         workflow_id="evaluation-run",
         processing_variants=["with_flanks"],
         require_artifacts=True,
@@ -290,7 +294,7 @@ def test_collect_artifact_provenance_without_git_checkout(tmp_path):
 
     result = module.collect_artifact_provenance(
         run_dir=tmp_path,
-        release="2.3.0",
+        release=RELEASE_VERSION,
         processing_variants=["with_flanks"],
         require_artifacts=True,
         expected_artifact_git_commit="remote-commit",
@@ -309,7 +313,7 @@ def test_artifact_only_cli_requires_expected_identity(tmp_path):
         module.main([
             "--artifact-only",
             "--run-dir", str(tmp_path),
-            "--release", "2.3.0",
+            "--release", RELEASE_VERSION,
             "--require-artifacts",
         ])
 
@@ -322,7 +326,7 @@ def test_collect_provenance_requires_holdout_proof(tmp_path):
         module.collect_provenance(
             repo=REPO,
             run_dir=tmp_path,
-            release="2.3.0",
+            release=RELEASE_VERSION,
             processing_variants=["with_flanks"],
             require_artifacts=True,
             allow_dirty_repo=True,
@@ -338,7 +342,7 @@ def test_collect_provenance_rejects_holdout_overlap(tmp_path):
         module.collect_provenance(
             repo=REPO,
             run_dir=tmp_path,
-            release="2.3.0",
+            release=RELEASE_VERSION,
             processing_variants=["with_flanks"],
             require_artifacts=True,
             allow_dirty_repo=True,
