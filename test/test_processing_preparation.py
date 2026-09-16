@@ -68,6 +68,26 @@ def test_expansion_only_scores_new_unresolved_length_and_resumes(tmp_path):
     assert len(record["sha256"]) == 64
 
 
+def test_expansion_supplies_distinct_negatives_for_competing_hits(tmp_path):
+    args, _, _ = inputs(tmp_path)
+    hits = pandas.DataFrame(dict(sample_id="s", peptide=["A" * 8, "C" * 8],
+        protein_accession="p", n_flank="NN", c_flank="CC", hit=1))
+    pool = pandas.concat([hits, hits.iloc[:1].assign(peptide="D" * 8, hit=0)], ignore_index=True)
+    draws = []
+
+    def expand(length, excluded, seed):
+        draws.append(length)
+        assert {"A" * 8, "C" * 8, "D" * 8} <= excluded
+        return hits.iloc[:1].assign(peptide="E" * 8, hit=0)
+
+    result = prepare_sample(args, "s", hits, 42, lambda: pool, expand,
+                            lambda peptides: numpy.full(len(peptides), 100.0))
+    assert draws == [8]
+    assert set(result.loc[result.hit.eq(0), "peptide"]) == {"D" * 8, "E" * 8}
+    cached = prepare_sample(args, "s", hits, 42, no_call, no_call, no_call)
+    pandas.testing.assert_frame_equal(result, cached, check_dtype=False)
+
+
 @pytest.mark.parametrize("interrupt_expansion", [False, True])
 def test_numeric_expansion_filters_committed_peptides_and_resumes(tmp_path, interrupt_expansion):
     from mhcflurry.numeric_proteome import ProcessingProteome, ProteinWindows, NumericCandidatePool
@@ -370,7 +390,7 @@ def test_expansion_draw_sequence_is_pinned_for_a_fixed_seed(tmp_path):
          "DNCWIDAWW", "CWIDAWWVM"]]
     validate_matched_training_data(result)
     assert result.peptide.tolist() == [
-        "MEFSAPTH", "CPFILRTM", "PYPWELVWL", "CGWDVSNLK"]
+        "MEFSAPTH", "CPFILRTM", "PYPWELVWL", "ANCFWDIHH"]
 
 
 def test_matching_provenance_rejects_changed_inputs():

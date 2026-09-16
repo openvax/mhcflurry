@@ -218,7 +218,8 @@ def sample_preparation_steps(args, sample, hits, seed, initial_pool, additional_
         started = time.monotonic()
         try:
             result, diagnostics = matched_training_data(pool, args.matching_reference,
-                decoys_per_hit=args.decoys_per_hit, max_distance=args.max_affinity_distance)
+                decoys_per_hit=args.decoys_per_hit, max_distance=args.max_affinity_distance,
+                random_seed=getattr(args, "random_seed", seed))
         except IncompleteProcessingMatches as error:
             failed_at = time.monotonic()
             next_round = len(store.rounds)

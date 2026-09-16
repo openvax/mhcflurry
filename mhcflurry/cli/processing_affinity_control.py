@@ -17,6 +17,7 @@ import numpy
 import pandas
 
 from .compare_models import _metrics
+from ..common import add_random_seed_arg
 from ..experiment_archive import sha256_file
 from ..processing_matching import (
     MATCHING_POLICY, make_affinity_controlled_risk_sets,
@@ -59,6 +60,7 @@ def make_parser(prog="mhcflurry eval processing-affinity-control"):
     )
     parser.add_argument("--out", required=True)
     parser.add_argument("--decoys-per-hit", type=int, default=10)
+    add_random_seed_arg(parser)
     parser.add_argument(
         "--same-protein-caliper", type=float, default=0.25,
         help=(
@@ -193,6 +195,8 @@ def _extend_existing(existing_dir, new_cohort, new_sources):
     if not numpy.array_equal(numpy.sort(source_rows[matched.hit == 1]), expected_hits):
         raise ValueError("Existing matching omitted or repeated held-out hits")
     diagnostics = dict(configuration.get("diagnostics", {}))
+    if diagnostics.get("policy") != MATCHING_POLICY:
+        raise ValueError("Existing assignments use an older matching policy; regenerate the cohort")
     validate_matching_assignments(
         matched, AFFINITY_COLUMN, diagnostics["decoys_per_hit"])
     diagnostics.update(policy=MATCHING_POLICY, max_log10_affinity_distance=0.25)
@@ -356,22 +360,22 @@ def run(args):
             attached,
             decoys_per_hit=args.decoys_per_hit,
             same_protein_caliper=args.same_protein_caliper,
+            random_seed=args.random_seed,
         )
     score_columns = [source["name"] for source in score_sources]
     metrics = score_risk_sets(matched, score_columns)
     summary, comparisons = summarize_metrics(metrics, args.baseline)
 
     # Preserve the complete, ordered held-out cohort as the canonical join
-    # surface for external predictors. The matched table below intentionally
-    # repeats decoys across hit-centered risk sets and therefore cannot serve
-    # that purpose on its own.
+    # surface for external predictors. The matched table selects only a subset
+    # of the negatives and therefore cannot serve that purpose on its own.
     attached.to_csv(out / "heldout_predictions.csv.bz2", index=False)
     matched.to_csv(out / "matched_predictions.csv.bz2", index=False)
     metrics.to_csv(out / "metrics.csv", index=False)
     summary.to_csv(out / "summary.csv", index=False)
     comparisons.to_csv(out / "comparisons.csv", index=False)
     configuration = {
-        "design": "processing-affinity-controlled-risk-sets-v1",
+        "design": "processing-affinity-controlled-risk-sets-v2",
         "score_sources": score_sources,
         "affinity_sources": affinity_sources,
         "baseline": args.baseline,
