@@ -4,10 +4,10 @@
 Compare-models prediction tables are joined row for row with the NetMHCpan 4.0
 BA, NetMHCpan 4.0 EL and MixMHCpred columns distributed in data_evaluation.
 Per-sample, macro and pooled (micro) AUROC, AUPRC and PPV@N use the
-compare-models metric code. Each predictor is scored on the rows it covers;
-each paired comparison uses rows both predictors score, so MHCflurry-only
-comparisons reproduce compare-models exactly. Paired intervals resample whole
-samples. No predictor is run here.
+compare-models metric code. By default each predictor uses its covered rows
+and each pair uses rows both score. With --coverage common every metric and
+figure uses the same intersection of covered rows. Paired intervals resample
+whole samples. No predictor is run here.
 """
 
 import argparse
@@ -485,15 +485,21 @@ def write_summary_markdown(out, args, summary, paired, coverage):
     unscored = ["%s %d" % (labels[column[:-len("_unscored")]], int(coverage[column].sum()))
                 for column in coverage.columns
                 if column.endswith("_unscored") and coverage[column].sum()]
+    coverage_description = (
+        "Every predictor, paired comparison and figure uses the same %d rows "
+        "(%d rows excluded from every predictor)." % (
+            int(summary.rows.iloc[0]), int(coverage.common_excluded.sum()))
+        if args.coverage == "common" else
+        "Each predictor is scored on the rows it covers and each paired "
+        "comparison on rows both predictors score.")
     text = [
         "# External predictor comparison (%s)" % args.cohort, "",
-        "%d samples, %d benchmark rows. Each predictor is scored on the rows it covers "
-        "and each paired comparison on rows both predictors score (rows without a "
-        "score: %s). Macro metrics average samples; micro metrics pool rows. Intervals "
+        "%d samples, %d original benchmark rows. %s Rows without a score before "
+        "filtering: %s. Macro metrics average samples; micro metrics pool rows. Intervals "
         "are paired sample bootstraps (%d draws, seed %d): exploratory, conditional on "
         "the trained models, and uncorrected for multiple comparisons." % (
             int(summary.samples.iloc[0]), int(coverage.rows.sum()),
-            ", ".join(unscored) or "none", args.replicates, args.seed), "",
+            coverage_description, ", ".join(unscored) or "none", args.replicates, args.seed), "",
         "## Metrics", "",
         markdown(summary, ["label", "rows", "macro_roc_auc", "macro_pr_auc", "macro_ppv_at_n",
                            "micro_roc_auc", "micro_pr_auc", "micro_ppv_at_n"],

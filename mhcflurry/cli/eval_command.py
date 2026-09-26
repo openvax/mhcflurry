@@ -222,6 +222,8 @@ def format_help(prog="mhcflurry eval"):
         "  processing-flank-ablation  Test fixed weights with perturbed external flanks.",
         "  processing-affinity-control",
         "                          Score affinity-controlled processing risk sets.",
+        "  prepare-processing-cohort",
+        "                          Expand and freeze a shared matched evaluation set.",
         "  processing-ensemble     Score an ensemble from saved predictions.",
         "  presentation-percentiles  Compare compact calibration curves and ranking metrics.",
         "  presentation-external-predictors",
