@@ -1,5 +1,8 @@
 """Scientific matching invariants and an independent feasibility oracle."""
 
+import json
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -7,8 +10,23 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import maximum_bipartite_matching
 
 from mhcflurry.processing_matching import (
-    IncompleteProcessingMatches, make_affinity_controlled_risk_sets,
+    IncompleteProcessingMatches, _random_unique_assignments, make_affinity_controlled_risk_sets,
     matched_training_data, validate_matched_training_data)
+
+
+def test_dense_repair_preserves_released_assignments_and_rng_state():
+    # Frozen outputs from 2c0736d61, including 28 augmenting-path repairs.
+    # A faster traversal must not change any seeded scientific assignment.
+    fixture = json.loads((Path(__file__).parent / "data" /
+                          "processing_matching_seeded_replay.json").read_text())
+    for case in fixture["cases"]:
+        rng = np.random.default_rng(case["seed"])
+        result = _random_unique_assignments(
+            np.array(case["targets"]), np.array(case["proteins"], dtype=object),
+            np.array(case["values"]), np.array(case["negative_proteins"], dtype=object),
+            case["count"], case["caliper"], case["protein_caliper"], rng)
+        np.testing.assert_array_equal(result, case["expected"])
+        np.testing.assert_array_equal(rng.integers(0, 2**32, size=8), case["next_random"])
 
 
 def pool(hits, negatives, proteins=None):

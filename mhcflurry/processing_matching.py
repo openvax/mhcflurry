@@ -170,11 +170,19 @@ def _random_unique_assignments(targets, proteins, values, negative_proteins,
         # Every occupied negative leads to its owning slot. Parent edges
         # recover the alternating path when we reach a free negative.
         parents = {root: None}
+        visited = numpy.zeros(len(assigned), dtype=bool)
+        visited[root] = True
         queue = [root]
         for slot in queue:
             candidates, preferred = eligible(slot)
             order = numpy.concatenate((rng.permutation(candidates[preferred]),
                                        rng.permutation(candidates[~preferred])))
+            # Each occupied negative has a distinct owning slot. Once that
+            # slot is queued, revisiting its edge cannot extend the search.
+            # Filter after permutation to preserve RNG consumption and the
+            # exact original path order for every seed.
+            owners = owner[order]
+            order = order[(owners < 0) | ~visited[owners]]
             for negative in order:
                 other = int(owner[negative])
                 if other < 0:
@@ -187,6 +195,7 @@ def _random_unique_assignments(targets, proteins, values, negative_proteins,
                         slot, negative = parent
                 elif other not in parents:
                     parents[other] = (slot, int(negative))
+                    visited[other] = True
                     queue.append(other)
         return False
 
