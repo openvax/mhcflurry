@@ -4,7 +4,7 @@ on:
   push:
     branches: ["master"]
   pull_request:
-    branches: ["master"]
+    branches: ["master", "release-2.3.0-final-weights"]
 
 jobs:
   build:
