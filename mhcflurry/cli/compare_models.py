@@ -286,6 +286,9 @@ def register_subparser(parser):
         "--processing-negative-policy", choices=("matched", "random-diagnostic"),
         default="matched", help="Processing headline cohort. Unmatched random decoys are diagnostic only.")
     parser.add_argument(
+        "--processing-matched-cohort",
+        help="Frozen expanded 10:1 cohort directory from eval prepare-processing-cohort.")
+    parser.add_argument(
         "--presentation-modes",
         default=",".join(PRESENTATION_MODES),
         help=(
@@ -1715,7 +1718,18 @@ def _run_processing(side_a, side_b, args):
         data_dir, args, "processing")
     assignments = None
     cohort_info = {"policy": policy, "processing_release_eligible": policy == "matched"}
-    if policy == "matched":
+    prepared_cohort = getattr(args, "processing_matched_cohort", None)
+    if prepared_cohort:
+        if policy != "matched":
+            raise ValueError("A prepared processing cohort requires the matched policy")
+        from ..processing_evaluation import load_processing_cohort
+        benchmark, metadata = load_processing_cohort(prepared_cohort, benchmark)
+        assignments = benchmark.copy()
+        assignments["source_row"] = numpy.arange(len(benchmark))
+        cohort_info.update(prepared_cohort=metadata,
+                           affinity_reference=metadata["affinity_reference"])
+        assignments.to_csv(os.path.join(component_dir, "matching_assignments.csv.bz2"), index=False)
+    elif policy == "matched":
         from .processing_affinity_control import _attach_affinity
         from ..processing_matching import make_affinity_controlled_risk_sets
         benchmark, affinity_sources = _attach_affinity(benchmark, data_dir)

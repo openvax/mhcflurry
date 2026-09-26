@@ -100,15 +100,17 @@ mkdir -p "$BASE_OUT/affinity" "$BASE_OUT/processing" "$BASE_OUT/presentation"
 # data_evaluation bundle is train-excluded relative to the old public models;
 # these generated manifests remove the candidate-training pMHC intersection
 # and select the independent multiallelic source-study holdout.
-mhcflurry-downloads fetch data_evaluation data_curated data_mass_spec_annotated
+mhcflurry-downloads fetch data_evaluation data_curated data_mass_spec_annotated allele_sequences
 mkdir -p "$BASE_OUT/config"
+VINTAGE_ALLELE_DIR="$(mhcflurry-downloads path allele_sequences)"
+VINTAGE_ALLELE_CSV="$(mhcflurry pseudosequences path --directory "$VINTAGE_ALLELE_DIR" --length 39 --fallback-legacy)"
 python - "$BASE_OUT/config/data_vintage.json" \
         "$MHCFLURRY_RELEASE_DATA_VINTAGE" \
         "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
         "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
-        "$(mhcflurry-downloads path allele_sequences)" <<'PYVINTAGE'
+        "$VINTAGE_ALLELE_DIR" "$VINTAGE_ALLELE_CSV" <<'PYVINTAGE'
 import hashlib, json, os, sys
-out, vintage, curated, mass_spec, allele_dir = sys.argv[1:6]
+out, vintage, curated, mass_spec, allele_dir, allele_csv = sys.argv[1:7]
 def digest(path):
     hasher = hashlib.sha256()
     with open(path, "rb") as handle:
@@ -119,7 +121,8 @@ record = {"vintage": vintage,
           "downloads_label": os.environ.get("MHCFLURRY_DOWNLOADS_CURRENT_RELEASE", "default"),
           "curated_training_data": {"path": curated, "sha256": digest(curated)},
           "annotated_ms": {"path": mass_spec, "sha256": digest(mass_spec)},
-          "allele_sequences_dir": allele_dir}
+          "allele_sequences_dir": allele_dir,
+          "allele_sequences": {"path": allele_csv, "sha256": digest(allele_csv)}}
 with open(out, "w") as handle:
     json.dump(record, handle, indent=2)
     handle.write("\n")

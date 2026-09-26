@@ -55,6 +55,7 @@ from ..common import normalize_sequence_resolved_allele_name
 
 
 EVALUATION_SCRIPTS = {
+    "prepare-processing-cohort": Path("scripts/training/prepare_processing_evaluation.py"),
     "processing-confirmation-analysis": Path("scripts/training/analyze_processing_confirmation.py"),
     "processing-fold-ensembles": Path("scripts/training/evaluate_processing_fold_ensembles.py"),
     "processing-recipe-analysis": Path("scripts/training/analyze_processing_recipe.py"),
@@ -113,6 +114,7 @@ def make_parser(prog="mhcflurry eval"):
         add_help=False,
     )
     for name, help_text in (
+            ("prepare-processing-cohort", "Expand and freeze unique 10:1 processing evaluation negatives."),
             ("processing-confirmation-analysis", "Compare paired ranking checkpoints and export a gated processing candidate recipe."),
             ("processing-fold-ensembles", "Score specified ensembles within shared held-out folds using cached predictions."),
             ("processing-recipe-analysis", "Map paired processing recipe effects from saved development metrics."),
