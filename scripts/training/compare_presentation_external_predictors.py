@@ -4,10 +4,10 @@
 Compare-models prediction tables are joined row for row with the NetMHCpan 4.0
 BA, NetMHCpan 4.0 EL and MixMHCpred columns distributed in data_evaluation.
 Per-sample, macro and pooled (micro) AUROC, AUPRC and PPV@N use the
-compare-models metric code. Each predictor is scored on the rows it covers;
-each paired comparison uses rows both predictors score, so MHCflurry-only
-comparisons reproduce compare-models exactly. Paired intervals resample whole
-samples. No predictor is run here.
+compare-models metric code. By default each predictor uses its covered rows
+and each pair uses rows both score. With --coverage common every metric and
+figure uses the same intersection of covered rows. Paired intervals resample
+whole samples. No predictor is run here.
 """
 
 import argparse
@@ -241,6 +241,16 @@ def score_conditions(frame, conditions):
     return pandas.concat(per_sample, ignore_index=True), pandas.DataFrame(summary), coverage
 
 
+def common_coverage(frame, conditions):
+    """Retain identical scored rows for every model, preserving every sample."""
+    mask = numpy.logical_and.reduce([
+        condition_scores(frame, name, condition)[0] for name, condition in conditions.items()])
+    result = frame.loc[mask].copy()
+    if set(result.sample_id) != set(frame.sample_id):
+        raise ValueError("Common coverage would drop an entire evaluation sample")
+    return result
+
+
 def terminal_residue_features(peptides):
     """One-hot the first and last four residues; other symbols share one slot."""
     import scipy.sparse
@@ -286,19 +296,17 @@ def leave_one_sample_out_logistic(frame):
 
 def comparison_pairs(cohort, conditions):
     """Candidate/reference pairs reported with paired intervals."""
+    candidate, reference = (("a_with_flanks", "b_with_flanks")
+                            if cohort == "multiallelic" else ("a_affinity", "b_affinity"))
+    pairs = [(candidate, reference)]
+    # Derive external pairs from the supported registry, including every
+    # requested version and both score types. Availability is filtered below.
+    pairs.extend((candidate, name) for name in EXTERNAL)
+    pairs.append((candidate, "terminal_logistic"))
     if cohort == "multiallelic":
-        pairs = [("a_with_flanks", "b_with_flanks"),
-                 ("a_with_flanks", "netmhcpan4.2.el"), ("a_with_flanks", "netmhcpan4.el"),
-                 ("a_with_flanks", "netmhcpan4.2.ba"), ("a_with_flanks", "netmhcpan4.ba"),
-                 ("a_with_flanks", "mixmhcpred"), ("a_with_flanks", "terminal_logistic"),
-                 ("a_without_flanks", "b_without_flanks"),
-                 ("a_with_flanks_percentile", "b_with_flanks_percentile"),
-                 ("b_with_flanks", "netmhcpan4.2.el"), ("b_with_flanks", "netmhcpan4.el")]
-    else:
-        pairs = [("a_affinity", "b_affinity"), ("a_affinity", "netmhcpan4.2.ba"),
-                 ("a_affinity", "netmhcpan4.ba"), ("a_affinity", "netmhcpan4.2.el"),
-                 ("a_affinity", "netmhcpan4.el"), ("a_affinity", "mixmhcpred"),
-                 ("a_affinity", "terminal_logistic"), ("b_affinity", "netmhcpan4.ba")]
+        pairs.extend([("a_without_flanks", "b_without_flanks"),
+                      ("a_with_flanks_percentile", "b_with_flanks_percentile")])
+    pairs.extend((reference, name) for name in EXTERNAL)
     return [pair for pair in pairs if set(pair) <= set(conditions)]
 
 
@@ -428,11 +436,9 @@ def render(out, cohort, conditions, frame, per_sample, summary, paired, differen
     cohort_title = ("%d held-out multiallelic presentation samples" % samples
                     if cohort == "multiallelic" else "%d monoallelic samples" % samples)
     raw = [name for name in conditions if not name.endswith("_percentile")]
-    # Four curves keep the validated all-pairs palette legible when they cross.
-    curve_order = (["a_with_flanks", "b_with_flanks", "netmhcpan4.2.el", "netmhcpan4.el",
-                    "netmhcpan4.ba", "mixmhcpred"] if cohort == "multiallelic" else
-                   ["a_affinity", "b_affinity", "netmhcpan4.2.ba", "netmhcpan4.ba",
-                    "netmhcpan4.el", "mixmhcpred"])
+    curve_order = (["a_with_flanks", "b_with_flanks"] if cohort == "multiallelic"
+                   else ["a_affinity", "b_affinity"])
+    curve_order += [name for name in EXTERNAL if name in conditions]
     # Candidate-versus-reference differences are an order of magnitude smaller
     # than external gaps; separate pages keep both legible.
     internal = [pair for pair in pairs if conditions[pair[1]].role in ("a", "b")]
@@ -449,7 +455,7 @@ def render(out, cohort, conditions, frame, per_sample, summary, paired, differen
                 external, conditions, paired, differences,
                 "MHCflurry versus NetMHCpan and MixMHCpred, " + cohort_title)))
         pages.append(("precision_recall", lambda: plot_precision_recall(
-            [name for name in curve_order if name in conditions][:4], conditions, summary, frame,
+            [name for name in curve_order if name in conditions], conditions, summary, frame,
             "Pooled precision-recall, " + cohort_title)))
         for name, make in pages:
             fig = make()
@@ -479,15 +485,21 @@ def write_summary_markdown(out, args, summary, paired, coverage):
     unscored = ["%s %d" % (labels[column[:-len("_unscored")]], int(coverage[column].sum()))
                 for column in coverage.columns
                 if column.endswith("_unscored") and coverage[column].sum()]
+    coverage_description = (
+        "Every predictor, paired comparison and figure uses the same %d rows "
+        "(%d rows excluded from every predictor)." % (
+            int(summary.rows.iloc[0]), int(coverage.common_excluded.sum()))
+        if args.coverage == "common" else
+        "Each predictor is scored on the rows it covers and each paired "
+        "comparison on rows both predictors score.")
     text = [
         "# External predictor comparison (%s)" % args.cohort, "",
-        "%d samples, %d benchmark rows. Each predictor is scored on the rows it covers "
-        "and each paired comparison on rows both predictors score (rows without a "
-        "score: %s). Macro metrics average samples; micro metrics pool rows. Intervals "
+        "%d samples, %d original benchmark rows. %s Rows without a score before "
+        "filtering: %s. Macro metrics average samples; micro metrics pool rows. Intervals "
         "are paired sample bootstraps (%d draws, seed %d): exploratory, conditional on "
         "the trained models, and uncorrected for multiple comparisons." % (
             int(summary.samples.iloc[0]), int(coverage.rows.sum()),
-            ", ".join(unscored) or "none", args.replicates, args.seed), "",
+            coverage_description, ", ".join(unscored) or "none", args.replicates, args.seed), "",
         "## Metrics", "",
         markdown(summary, ["label", "rows", "macro_roc_auc", "macro_pr_auc", "macro_ppv_at_n",
                            "micro_roc_auc", "micro_pr_auc", "micro_ppv_at_n"],
@@ -532,6 +544,8 @@ def main(argv=None):
     parser.add_argument("--b-label", default="MHCflurry 2.2")
     parser.add_argument("--replicates", type=int, default=10000)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--coverage", choices=("available", "common"), default="available",
+                        help="Use each predictor's covered rows, or identical rows for every metric and figure.")
     parser.add_argument("--skip-joined-table", action="store_true",
                         help="Do not write joined_scores.csv.gz (large monoallelic cohorts).")
     parser.add_argument("--out", type=Path, required=True, help="New or empty output directory.")
@@ -561,7 +575,20 @@ def main(argv=None):
         frame["terminal_logistic"] = leave_one_sample_out_logistic(frame)
         conditions["terminal_logistic"] = Condition(
             "Terminal 4-residue logistic regression, no MHC", True, "baseline")
+    original_rows, original_hits = len(frame), int(frame.hit.sum())
+    original_coverage = None
+    if args.coverage == "common":
+        common = common_coverage(frame, conditions)
+        original_coverage = pandas.DataFrame({
+            "sample_id": frame.sample_id, "rows": 1,
+            "common_excluded": ~frame.index.isin(common.index),
+            **{name + "_unscored": ~condition_scores(frame, name, condition)[0]
+               for name, condition in conditions.items()},
+        }).groupby("sample_id", sort=True).sum().reset_index()
+        frame = common
     per_sample, summary, coverage = score_conditions(frame, conditions)
+    if original_coverage is not None:
+        coverage = original_coverage
     pairs = comparison_pairs(args.cohort, conditions)
     paired, differences, draws = paired_comparisons(
         frame, conditions, per_sample, pairs, args.replicates, args.seed)
@@ -585,9 +612,14 @@ def main(argv=None):
         "arguments": {key: json_argument(value) for key, value in vars(args).items()},
         "conditions": {name: condition._asdict() for name, condition in conditions.items()},
         "pairs": pairs,
-        "method": "compare-models _metrics per sample; each predictor on its scored rows, "
-                  "each pair on rows both score; paired sample percentile bootstrap of "
-                  "equal-sample macro means",
+        "coverage": {"policy": args.coverage, "original_rows": original_rows,
+                     "original_hits": original_hits, "scored_rows": len(frame),
+                     "scored_hits": int(frame.hit.sum()),
+                     "excluded_rows": original_rows - len(frame)},
+        "method": ("compare-models _metrics per sample; " + (
+            "all predictors and pairs on identical common rows; " if args.coverage == "common" else
+            "each predictor on its scored rows, each pair on rows both score; ") +
+            "paired sample percentile bootstrap of equal-sample macro means"),
         "baselines": {
             "random": "uniform scores from numpy default_rng(seed)",
             "terminal-logistic": "one-hot first and last four residues (21 symbols each), "

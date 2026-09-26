@@ -256,6 +256,7 @@ def remote_training_env(environ=os.environ):
         "EVAL_MAX_BENCHMARK_FILES": environ.get(
             "EVAL_MAX_BENCHMARK_FILES", ""
         ),
+        "PROCESSING_EVALUATION_COHORT": environ.get("PROCESSING_EVALUATION_COHORT", ""),
         "COMPARE_BASELINE": environ.get("COMPARE_BASELINE", "public:2.2.0"),
         "COMPARE_BASELINE_LABEL": environ.get(
             "COMPARE_BASELINE_LABEL", "MHCflurry 2.2"
@@ -728,6 +729,8 @@ def run_release_evaluation(repo, out, env):
         "--torch-compile", compare_torch_compile_value(env),
         "--matmul-precision", compare_matmul_precision_value(env),
     ]
+    if env.get("PROCESSING_EVALUATION_COHORT", "").strip():
+        compare_args.extend(["--processing-matched-cohort", env["PROCESSING_EVALUATION_COHORT"]])
     compare_gpus = env.get("COMPARE_GPUS", "auto")
     if compare_gpus.strip().lower() != "auto":
         compare_args.extend(["--gpus", compare_gpus])

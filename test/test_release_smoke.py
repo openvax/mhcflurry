@@ -1,9 +1,13 @@
 """Release smoke mode shrinks scale without changing stages, and only when asked."""
 
 import importlib.util
+import hashlib
+import json
 from pathlib import Path
 import re
+import shlex
 import subprocess
+import sys
 
 import pandas
 import pytest
@@ -177,6 +181,37 @@ def test_data_vintage_is_recorded_before_any_training():
     for later in ("=== STAGE 1: AFFINITY", "release-holdout build"):
         assert record < full.index(later), later
     assert "curated_training_data" in full and "annotated_ms" in full
+
+
+def test_fresh_cache_vintage_records_actual_allele_csv(tmp_path):
+    full = SCRIPTS[0].read_text()
+    start = full.index("mhcflurry-downloads fetch data_evaluation data_curated data_mass_spec_annotated")
+    stop = full.index("\nPYVINTAGE", start) + len("\nPYVINTAGE\n")
+    (tmp_path / "curated_training_data.csv.bz2").write_bytes(b"curated")
+    (tmp_path / "annotated_ms.csv.bz2").write_bytes(b"mass spec")
+    prelude = '''BASE_OUT="$PWD"
+MHCFLURRY_RELEASE_DATA_VINTAGE=current
+mhcflurry-downloads() {
+    if [ "$1" = fetch ]; then
+        for item in "$@"; do
+            if [ "$item" = allele_sequences ]; then
+                echo 'allele,sequence' > "$PWD/allele.csv"
+            fi
+        done
+    else
+        if [ "$2" = allele_sequences ]; then test -s "$PWD/allele.csv" || return 1; fi
+        echo "$PWD"
+    fi
+}
+mhcflurry() { echo "$PWD/allele.csv"; }
+'''
+    prelude += "python() { " + shlex.quote(sys.executable) + ' "$@"; }\n'
+    run_block(full[start:stop], tmp_path, prelude)
+    record = json.loads((tmp_path / "config/data_vintage.json").read_text())
+    assert record["allele_sequences_dir"] == str(tmp_path)
+    assert record["allele_sequences"] == {
+        "path": str(tmp_path / "allele.csv"),
+        "sha256": hashlib.sha256(b"allele,sequence\n").hexdigest()}
 
 
 def ineligible_and_eligible_hits():

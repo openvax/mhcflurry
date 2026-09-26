@@ -26,6 +26,28 @@ def module():
     return loaded
 
 
+@pytest.mark.parametrize("cohort,candidate,reference", [
+    ("monoallelic", "a_affinity", "b_affinity"),
+    ("multiallelic", "a_with_flanks", "b_with_flanks")])
+def test_every_external_version_gets_paired_intervals(module, cohort, candidate, reference):
+    conditions = dict.fromkeys([candidate, reference] + list(PRECOMPUTED + LOCAL))
+    pairs = module.comparison_pairs(cohort, conditions)
+    assert {(candidate, name) for name in PRECOMPUTED + LOCAL} <= set(pairs)
+    assert {(reference, name) for name in PRECOMPUTED + LOCAL} <= set(pairs)
+    assert len(pairs) == len(set(pairs))
+
+
+def test_common_coverage_uses_one_row_set_and_never_drops_a_sample(module):
+    frame = pandas.DataFrame({"sample_id": ["a", "a", "b"],
+                              "first": [1., 2., 3.], "second": [numpy.nan, 2., 3.]})
+    conditions = {name: module.Condition(name, True, name) for name in ("first", "second")}
+    result = module.common_coverage(frame, conditions)
+    assert result.index.tolist() == [1, 2]
+    frame.loc[2, "second"] = numpy.nan
+    with pytest.raises(ValueError, match="entire evaluation sample"):
+        module.common_coverage(frame, conditions)
+
+
 def benchmark_rows(sample, seed, n=300, n_hits=30):
     rng = numpy.random.default_rng(seed)
     hit = numpy.r_[numpy.ones(n_hits, dtype=int), numpy.zeros(n - n_hits, dtype=int)]
@@ -153,6 +175,21 @@ def test_unmatched_saved_row_fails(tmp_path, module):
     data, extra, comparison, _ = write_multiallelic(tmp_path, drop_external_row=True)
     with pytest.raises(ValueError, match="lack a matching netmhcpan4.el row"):
         module.main(arguments(data, extra, comparison, tmp_path / "out"))
+
+
+def test_common_coverage_cli_reports_identical_denominators(tmp_path, module):
+    data, extra, comparison, saved = write_multiallelic(tmp_path)
+    out = tmp_path / "out"
+    assert module.main(arguments(data, extra, comparison, out,
+                                 "--coverage", "common", "--baselines", "none")) == 0
+    summary = pandas.read_csv(out / "summary.csv")
+    assert summary.rows.nunique() == 1 and summary.hits.nunique() == 1
+    assert summary.rows.iloc[0] == len(saved) - 2
+    provenance = json.loads((out / "provenance.json").read_text())
+    assert provenance["coverage"]["excluded_rows"] == 2
+    coverage = pandas.read_csv(out / "coverage.csv")
+    assert coverage.common_excluded.sum() == coverage["netmhcpan4.el_unscored"].sum() == 2
+    assert pandas.read_csv(out / "paired_differences.csv").rows_excluded.eq(0).all()
 
 
 def test_missing_external_file_names_the_searched_directories(tmp_path, module):

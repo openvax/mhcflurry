@@ -31,6 +31,44 @@ model artifacts; explicitly requested processing modes must exist on both sides.
 
 ## Outputs
 
+For processing pools that cannot supply ten distinct negatives per hit, expand
+and freeze a single cohort before comparing models:
+
+```shell
+mhcflurry eval prepare-processing-cohort \
+    --data-dir DATA_EVALUATION \
+    --release-holdout-dir results/new_run/release_holdout \
+    --affinity-predictor PUBLIC_MODELS_CLASS1_PAN/models.combined \
+    --proteome-reference-csv HUMAN_PROTEOME.csv.bz2 \
+    --out results/processing_cohort
+
+mhcflurry eval compare-models \
+    --a results/new_run --b public:2.2.0 \
+    --include processing --data-dir DATA_EVALUATION \
+    --release-holdout-dir results/new_run/release_holdout \
+    --processing-matched-cohort results/processing_cohort \
+    --out results/new_run/processing_comparison
+```
+
+The preparation command retains every held-out hit and the original cached
+public affinities, samples additional candidates only for unresolved lengths,
+and scores them with the frozen reference. It first checks that this reference
+reproduces 256 spread-out cached predictions per sample within 0.0001 log10
+units. Input, model and output checksums, the checked rows, seeds, scored rounds
+and unique assignments are saved. `--resume` reuses verified rounds; insufficient
+capacity remains an error. This processing-only expansion does not alter the
+presentation benchmark. The remote launcher accepts the resulting directory
+through `PROCESSING_EVALUATION_COHORT`.
+
+For external comparisons, pass `--coverage common` to
+`mhcflurry eval presentation-external-predictors`. Every table, paired interval
+and figure then uses identical rows across all requested models. The coverage
+table retains original missing-score counts and common exclusions; provenance
+records original and scored hit/row counts. Every sample must remain represented
+with both classes. The default `available` mode preserves per-model coverage
+and pairwise intersections for diagnostic use. All requested NetMHCpan versions,
+both BA and EL, receive paired comparisons.
+
 | Stage | Command | Main outputs |
 |---|---|---|
 | Metrics | `eval compare-models` | Component CSV/JSON files, `release_summary.csv`, and `release_summary.md` |
