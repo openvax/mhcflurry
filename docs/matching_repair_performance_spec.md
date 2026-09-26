@@ -7,3 +7,8 @@ Retain random-number consumption, BFS order, assignments and matching policy.
 Verify golden seeded replay and subsequent RNG state, existing independent
 maximum-matching tests, and an empirical timed replay of the saved real pool.
 No affinity scores, calipers, hit identities or trained weights change.
+
+The regression fixture freezes 24 cases from commit `2c0736d61`, including
+28 repair calls. It checks both assignments and the next eight RNG outputs.
+The 159-test matching suite also retains the independent maximum-matching
+oracle; exact seeded replay complements that feasibility check.
