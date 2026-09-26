@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from functools import lru_cache
 from pathlib import Path
 
 import numpy
@@ -149,32 +150,50 @@ def _random_unique_assignments(targets, proteins, values, negative_proteins,
             cursor += 1
     if (feasible < 0).any():
         return feasible
+    missing_proteins = pandas.isna(proteins)
+    protein_codes = pandas.factorize(numpy.concatenate((proteins, negative_proteins)), sort=False)[0]
+    proteins, negative_proteins = protein_codes[:len(proteins)], protein_codes[len(proteins):]
     owner = numpy.full(len(values), -1, dtype="int64")
     assigned = numpy.full(len(targets) * count, -1, dtype="int64")
 
-    def eligible(slot, free_only=False):
-        hit = slot // count
+    @lru_cache(maxsize=128)
+    def neighborhood(hit):
+        # Slots for one hit share fixed neighborhoods. Bound the cache rather
+        # than materializing the complete hit-by-negative graph.
         candidates = numpy.arange(lower[hit], upper[hit])
         # Search bounds can round at an inclusive caliper boundary. Check
         # the actual subtraction too, as the saved-assignment validator does.
         candidates = candidates[numpy.abs(values[candidates] - targets[hit]) <= caliper]
-        if free_only:
-            candidates = candidates[owner[candidates] < 0]
         preferred = ((negative_proteins[candidates] == proteins[hit]) &
                      (numpy.abs(values[candidates] - targets[hit]) <= protein_caliper))
-        if pandas.isna(proteins[hit]):
+        if missing_proteins[hit]:
             preferred[:] = False
+        return candidates, preferred
+
+    def eligible(slot, free_only=False):
+        candidates, preferred = neighborhood(slot // count)
+        if free_only:
+            free = owner[candidates] < 0
+            return candidates[free], preferred[free]
         return candidates, preferred
 
     def repair(root):
         # Every occupied negative leads to its owning slot. Parent edges
         # recover the alternating path when we reach a free negative.
         parents = {root: None}
+        visited = numpy.zeros(len(assigned), dtype=bool)
+        visited[root] = True
         queue = [root]
         for slot in queue:
             candidates, preferred = eligible(slot)
             order = numpy.concatenate((rng.permutation(candidates[preferred]),
                                        rng.permutation(candidates[~preferred])))
+            # Each occupied negative has a distinct owning slot. Once that
+            # slot is queued, revisiting its edge cannot extend the search.
+            # Filter after permutation to preserve RNG consumption and the
+            # exact original path order for every seed.
+            owners = owner[order]
+            order = order[(owners < 0) | ~visited[owners]]
             for negative in order:
                 other = int(owner[negative])
                 if other < 0:
@@ -187,6 +206,7 @@ def _random_unique_assignments(targets, proteins, values, negative_proteins,
                         slot, negative = parent
                 elif other not in parents:
                     parents[other] = (slot, int(negative))
+                    visited[other] = True
                     queue.append(other)
         return False
 
