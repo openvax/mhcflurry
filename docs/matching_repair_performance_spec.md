@@ -12,3 +12,9 @@ The regression fixture freezes 24 cases from commit `2c0736d61`, including
 28 repair calls. It checks both assignments and the next eight RNG outputs.
 The 159-test matching suite also retains the independent maximum-matching
 oracle; exact seeded replay complements that feasibility check.
+
+A native profile after vectorizing edge visits showed repeated object-string
+comparisons and neighborhood materialization. Factorize protein identities
+once and use a bounded 128-hit neighborhood cache. Missing-protein semantics,
+free-candidate masks and all permutation calls remain unchanged. The cache
+has a fixed entry bound rather than retaining the full bipartite graph.
