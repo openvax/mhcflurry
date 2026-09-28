@@ -32,54 +32,20 @@ Affinity, processing, and presentation stages write persistent GPU telemetry.
 Worker packing defaults to workload-aware `auto`; pin a count only for a measured
 machine-specific benchmark.
 
-For a direct runplz debugging session:
+## Reproduce the 2.3.0 weights
 
-```shell
-RUNPLZ_BREV_AUTO_CREATE=0 runplz brev \
-    --outputs-dir /path/to/output \
-    --instance existing-brev-instance \
-    scripts/training/launch_pan_allele_training_remote.py
-```
+Use the frozen `final-2.3.0-candidate-v2` recipe identifier. It selects the
+released settings; the identifier is retained for reproducibility and does not
+indicate the package release status. See the
+[recipe](../../docs/release_training_recipe.md) for data and component settings
+and the [launch guide](../../docs/final_230_candidate_experiment.md) for local and
+Modal execution, resumption and artifact collection. The original v1 preset is
+retained for reproducing earlier experiments and is not the 2.3.0 weight recipe.
 
-The same maintained launcher runs on Modal. For the frozen 2.3.0 candidate,
-use a persistent volume and the shared recipe preset so interruption and
-backend choice do not change the architecture decision set:
-
-```shell
-MHCFLURRY_RELEASE_RECIPE=final-2.3.0-candidate \
-RUNPLZ_OUTPUT_VOLUME=mhcflurry-230-final-weights \
-RUNPLZ_OUT=/out/runs/final-2.3.0-candidate \
-RUNPLZ_TIMEOUT_SECONDS=86400 \
-MHCFLURRY_RELEASE_VERSION=2.3.0 \
-MHCFLURRY_RELEASE_GIT_COMMIT="$(git rev-parse HEAD)" \
-MHCFLURRY_RELEASE_WORKFLOW_ID=final-2.3.0-candidate \
-RUN_RELEASE_EVAL=1 RUN_RELEASE_PLOTS=1 \
-runplz modal scripts/training/launch_pan_allele_training_remote.py
-```
-
-This command stays attached. For a detached launch (`runplz modal ... --detach`),
-replace `RUNPLZ_OUT` with `MHCFLURRY_RELEASE_OUT`: runplz rejects a caller-set
-`RUNPLZ_OUT` in detached mode and assigns a per-run path, while the release must
-write to a stable path to resume. The run's own output directory then holds
-`mhcflurry_release_out.txt`, naming the volume path to collect. Modal caps one function invocation at 24
-hours, so `RUNPLZ_TIMEOUT_SECONDS` must not exceed 86400 there. The Modal volume
-is durable, and processing training resumes from its manifests when the same
-command is launched again from the same clean source commit and output path.
-Larger timeout overrides may still be used with backends that support them.
-
-The exact candidate decision set is also stored in
-`final_230_candidate_recipe.json`; completed outputs copy it to
-`config/final_architecture_decision.json` for plotting and provenance.
-`MHCFLURRY_RELEASE_RECIPE=final-2.3.0-candidate-v2` swaps the 5-aa legacy
-grid for the confirmed single ranking candidate
-(`final_230_candidate_v2_recipe.json`; `generate_processing_recipe.py
---confirmed-candidate` emits its hyperparameters); everything else follows
-v1. See `docs/final_230_candidate_experiment.md`.
-
-Set `MHCFLURRY_REMOTE_WORKFLOW=affinity-ablations` or
-`MHCFLURRY_REMOTE_WORKFLOW=processing-ablations` to run the corresponding
-committed parity panel through the same image and transport. The default is
-`full`.
+For transport debugging, `launch_pan_allele_training_remote.py` accepts
+`MHCFLURRY_REMOTE_WORKFLOW=full` (default), `affinity-ablations` or
+`processing-ablations`. Use a persistent remote output directory and preserve
+the recorded source commit and generated configuration.
 
 ## Training data and hyperparameters
 
@@ -95,8 +61,6 @@ committed parity panel through the same image and transport. The default is
 - **`mhcflurry class1-reassign-mass-spec-training-data`** reruns the maintained
   mass-spec affinity remapping step. Its file under `release_exact/` is a
   compatibility shim.
-- **`release_exact/additional_alleles.txt`** is an archived input from an older
-  recipe and is not read by the current release stages.
 
 ## Evaluation
 
@@ -146,7 +110,7 @@ paper figures, saved-prediction tables, and external predictors.
   states. **`mhcflurry eval processing-confirmation-analysis`** applies the
   recorded paired gate to a collected snapshot and exports the candidate
   recipe; `generate_processing_recipe.confirmed_processing_candidate_hyperparameters()`
-  names the promoted 2026-09-10 result, which is not a release recipe.
+  defines the short-flank settings included in the frozen 2.3.0 v2 recipe.
 - **`mhcflurry train processing-data`** now supports `--resume` and
   `--resume-matching-dir`: verify cached inputs/scores and expand only unmatched
   peptide-length pools, with unchanged affinity calipers and bounded rounds.

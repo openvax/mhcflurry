@@ -1,6 +1,6 @@
 # Processing kernel-width experiment
 
-## Specification (2026-09-07)
+## Workflow
 
 Train six widths (5, 7, 9, 11, 13, 15) in each of two unmixed families:
 the legacy 5-aa-flank CNN and a peptide-only CNN with separate 5-outside/
@@ -75,51 +75,21 @@ folds within sample before averaging samples, not independent-fold significance.
 Padding issue: [#404](https://github.com/openvax/mhcflurry/issues/404).
 The zero-padding behavior follows the [PyTorch Conv1d API](https://docs.pytorch.org/docs/2.14/generated/torch.nn.Conv1d.html).
 
-## Preparation recovery specification (2026-09-07)
+## Resume preparation
 
-The initial run stopped after 27 samples: four KESKIN_A3303 8-mer hits had
-no sampled negative inside the unchanged 0.25-log10-affinity caliper. Retain
-that run and all its candidate scores. Recovery must:
+Use `mhcflurry train processing-data --resume` for the same output or
+`--resume-matching-dir PRIOR/train_data.csv.matching` for a new output. Resume
+verifies input/reference hashes, seed and matching policy. Completed samples
+are reconstructed from saved outputs; only unresolved peptide-length pools
+expand. Matching keeps the original affinity caliper and never silently drops
+hits. Exhausting the bounded expansion raises an error.
 
-1. Accept an explicit prior matching-artifacts directory, verifying the input
-   and frozen affinity-reference hashes, seed and matching policy. Reconstruct
-   successful old samples from their saved scores without GPU prediction.
-   New runs save checksummed matched outputs and immutable per-round scored
-   pools, with atomic completion markers. Resume rejects changed/corrupt inputs.
-2. Expose incomplete matching as a typed error with all unresolved hits. Expand
-   only their peptide-length pools, with deterministic per-sample/round/length
-   seeds, excluding all observed and previously scored sequences. Score only
-   additions. Bound expansion rounds and candidate counts; exhaustion remains
-   an explicit error, never hit dropping or relaxed matching.
-3. Sample numeric protein positions before creating peptide/flank strings.
-   Preserve the existing candidate population, including terminal-window
-   conventions, amino-acid validity, exclusion and no-replacement semantics.
-   RNG draws change and are versioned; explicit historical sampling remains
-   available for legacy replay. Construct flank strings only for retained rows.
-4. Load the affinity ensemble once per worker. Save elapsed sampling, scoring,
-   matching and artifact-I/O timings separately. Test serial/worker seed
-   independence, cache corruption, interrupted runs, expansion and exact
-   sampler population equivalence before recovery on Modal.
+Each round records score hashes, deterministic seeds, unresolved hits and
+sampling/scoring/write timings. Older pools without per-round hashes are marked
+on import; their source hashes and observed-row identities are still checked.
+For the Modal launcher, `PROCESSING_KERNEL_RESUME_MATCHING_DIR` names a read-only
+prior directory under `/out`; the resumed experiment writes a new run directory.
 
-No processing architecture or matching acceptance threshold changes in this
-repair. The same final matched table is frozen for every sweep condition.
-
-Recovery uses the maintained data command with either `--resume` for the same
-output or `--resume-matching-dir PRIOR/train_data.csv.matching` for a new output.
-The default bound is eight additional rounds of up to 100,000 sampled positions
-per unresolved length. Exhaustion remains a hard error. Each round records its
-sample/length seed, candidate score hash, unresolved hits and sampling/scoring/
-write timings. Successful samples get checksummed matched tables and completion
-markers. Old pools without per-round hashes are explicitly marked as such on
-import; their source hashes and observed-row identities are recorded and checked.
-
-For the Modal launcher, set `PROCESSING_KERNEL_RESUME_MATCHING_DIR` to the prior
-directory's path under `/out`. It is read-only; recovery writes a new run directory.
-The previous failure used
-`/out/runplz/48c85d3639284d25bd1720e3e1d6f515/processing.shared/train_data.csv.matching`.
-
-`mhcflurry train benchmark-processing-sampler --out benchmark.json` reproduces a
-synthetic CPU timing comparison without training models. The September 7 local
-run (1,000 proteins of length 1,000; 25,000 eight-mer draws) measured 1.99 seconds
-for reservoir sampling and 0.091 seconds for position sampling (21.9x). This is
-a sampling microbenchmark, not a measured end-to-end preparation speedup.
+`mhcflurry train benchmark-processing-sampler --out benchmark.json` measures the
+numeric-position and reservoir samplers on a synthetic CPU workload. A sampling
+microbenchmark does not establish an end-to-end preparation speedup.

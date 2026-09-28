@@ -9,6 +9,7 @@ Use the public command rather than invoking the orchestration shell script
 directly:
 
 ```shell
+MHCFLURRY_RELEASE_RECIPE=final-2.3.0-candidate-v2 \
 mhcflurry train pan-allele-release \
     --run-dir /path/to/release-run \
     --release 2.3.0 \
@@ -93,8 +94,11 @@ needs every candidate model and training intermediate table.
 ## Release profiles and performance
 
 `--release-profile full` is the default. It trains the complete processing set:
-`with_flanks`, `no_flank`, and `short_flanks`. Presentation uses the published
-`short_flanks` predictor (5 aa on each side) by default.
+`with_flanks`, `no_flank`, and `short_flanks`. The frozen 2.3.0 v2 recipe uses an eight-network short-flank/boundary hybrid
+for presentation. The independently trained `with_flanks` predictor uses
+15-residue flanks and is a diagnostic component, not that hybrid. Without an
+explicit recipe preset, the generic workflow uses its own documented defaults;
+it does not reproduce the released weight recipe.
 
 Optional profiles are:
 
@@ -145,7 +149,7 @@ scripts/release/deploy_trained_models.sh \
     --run-dir /path/to/release-run \
     --release 2.3.0 \
     --github-release 2.3.0 \
-    --mode dry-run
+    --mode package-only
 ```
 
 The script writes archives, `SHA256SUMS`, and a `downloads.yml` snippet under
@@ -159,3 +163,22 @@ Direct deployment packages `no_flank` and `with_flanks` by default. Include
 `short_flanks` only when it belongs to the current release. The end-to-end
 workflow forwards its exact trained variant set, so stale directories from an
 older run are never packaged merely because they exist.
+
+
+`--mode dry-run` only validates and prints the plan. `--mode package-only`
+builds local archives for loading and prediction checks. Exports include only
+manifest-selected network weights and remove checkpoint-only manifest paths;
+original training directories remain unchanged. Training tables and calibration
+are retained, with manifest digests in `inference_export.json`.
+
+When distributing already-trained weights from a different source version, pass
+`--training-package-version` with their exact recorded version and
+`--allow-artifact-source-mismatch`. The output `provenance.json` records both
+training and packaging identities. Never rewrite model `info.txt` to pretend
+that a stable packaging checkout trained the weights.
+
+The generated downloads snippet contains the model entries only. When adding a
+release to `mhcflurry/downloads.yml`, also retain the data and historical-model
+bundles needed by supported commands. Publish the GitHub release only after its
+code CI, archives, checksums and download metadata have been verified; the
+publication event triggers the package upload to PyPI.

@@ -40,6 +40,7 @@ def _write_json_calibrated_run(run_dir):
                 __version__, commit))
     for relative in model_dirs[:3]:
         (run_dir / relative / "manifest.csv").write_text("model_name\nmodel\n")
+        (run_dir / relative / "weights_model.npz").write_bytes(b"selected test weights")
     (run_dir / "presentation/models/weights.csv").write_text("model_name\nmodel\n")
     for relative in CALIBRATED_DIRS:
         (run_dir / relative / "percent_ranks.json").write_text(COMPACT_PERCENT_RANKS)
@@ -105,3 +106,42 @@ def test_deploy_still_requires_a_percent_rank_calibration(tmp_path, calibrated_d
     assert result.returncode != 0
     assert str(run_dir.resolve() / calibrated_dir / "percent_ranks.json") in result.stderr
     assert "tar -C" not in result.stdout + result.stderr
+
+
+def test_export_selected_weights_without_checkpoint_sidecars(tmp_path):
+    import importlib.util
+    import pandas
+
+    spec = importlib.util.spec_from_file_location(
+        "export_inference_models", REPO_ROOT / "scripts/release/export_inference_models.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    source = tmp_path / "source"
+    source.mkdir()
+    manifest = pandas.DataFrame({
+        "model_name": ["selected"], "config_json": ["x" * 200000],
+        "checkpoint_best_weights": ["checkpoints/best.npz"],
+    })
+    manifest.to_csv(source / "manifest.csv", index=False)
+    (source / "weights_selected.npz").write_bytes(b"selected")
+    (source / "weights_orphan.npz").write_bytes(b"orphan")
+    (source / "checkpoints").mkdir()
+    (source / "checkpoints/best.npz").write_bytes(b"best")
+    (source / "train_data.csv").write_text("peptide\nSIINFEKL\n")
+    before = _sha256(source / "manifest.csv")
+    dest = tmp_path / "export"
+    module.export_models(source, dest)
+    assert _sha256(source / "manifest.csv") == before
+    assert (dest / "weights_selected.npz").read_bytes() == b"selected"
+    assert not (dest / "weights_orphan.npz").exists()
+    assert not (dest / "checkpoints").exists()
+    assert (dest / "train_data.csv").read_bytes() == (source / "train_data.csv").read_bytes()
+    pandas.testing.assert_frame_equal(
+        pandas.read_csv(dest / "manifest.csv"), manifest.drop(columns="checkpoint_best_weights"))
+    assert json.loads((dest / "inference_export.json").read_text())["manifests"][0]["source_sha256"] == before
+    with pytest.raises(ValueError, match="already exists"):
+        module.export_models(source, dest)
+    (source / "weights_selected.npz").unlink()
+    with pytest.raises(ValueError, match="Missing selected weights"):
+        module.export_models(source, tmp_path / "missing")
+    assert not (tmp_path / "missing").exists()

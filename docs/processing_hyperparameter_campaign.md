@@ -1,6 +1,6 @@
 # Processing hyperparameter campaign
 
-The first campaign allocation compares processing-specific recipes; it does
+The maintained sweep compares processing-specific recipes; it does
 not assume that affinity's winning optimizer transfers. All new fits use a
 frozen affinity/length-matched table and preserve fold and reference identities.
 Development results and the repeatedly inspected release benchmark are distinct.
@@ -69,8 +69,8 @@ with the frozen table, absolute deadline and timeout at most four hours.
 This mode skips both the width and full recipe factorials. It is incompatible
 with `PROCESSING_RECIPE_AFTER_WIDTHS=1`. Training tables and independent
 checkpoint files survive completed conditions; the budget is never extended
-by retries. The final candidate still requires compact selection and a separate
-presentation gate, regardless of development improvements.
+by retries. New experiments require compact selection and a separate full-presentation
+evaluation before release, regardless of development improvements.
 
 Analyze collected condition-level checkpoint tables with
 `mhcflurry eval processing-confirmation-analysis --experiment RUN_DIR --out NEW_DIR`.

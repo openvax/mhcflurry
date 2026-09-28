@@ -1,150 +1,76 @@
-# Release training recipe compatibility
+# Release training recipe
 
-The MHCflurry 2.3 release work uses the published 2.1.x/2.2.x scientific
-configuration as its compatibility baseline. The 2.1.x and 2.2.x public model
-downloads use the same affinity, processing, and presentation generation
-recipes.
+The 2.3.0 weights use the `final-2.3.0-candidate-v2` recipe identifier and the
+`current` data vintage: the curated 2023 affinity snapshot plus the configured
+mass-spectrometry sources. The identifier is fixed for reproducibility; its
+name does not describe the software's release status. The machine-readable
+settings are in `scripts/training/final_230_candidate_v2_recipe.json`.
 
-**Processing data policy update (2026-09-07):** the settings below describe
-historical compatibility experiments, not authorization to reuse their
-unmatched training tables. Future processing training and primary evaluation
-require sample/length/affinity-matched negatives. See {doc}`training` and
-{doc}`saved_candidate_evaluation`. Existing weights remain legacy-trained;
-their performance does not establish the outcome of the new training recipe.
+## Components
 
-The first paired audit supported no training-hyperparameter exception. A
-rejected full candidate trained with a Class I pan-allele affinity
-minibatch of 1024 outperformed an older public ensemble, but that comparison
-changed many settings and could not attribute the improvement to batch size. A
-direct latest-code comparison with restored Keras optimizer equations on the
-frozen release holdout instead favored 128. Prediction-affecting recipe changes
-were reverted at that stage.
+| Component | Release configuration |
+|---|---|
+| Affinity | 35 architectures × 4 folds; minibatch 1024; native PyTorch RMSprop; Glorot initialization; pre-activation LSUV; dropout 0.5; patience 20; terminal weights for selection. |
+| Processing without flanks | 128 architectures × 4 folds; minibatch 512; Glorot initialization and Keras-equation Adam; selected ensemble. |
+| Short-flank processing | One kernel-13 architecture × 4 folds; five residues on each side; native RMSprop; Glorot initialization; best inner-validation AP checkpoints. |
+| Boundary processing | One large-ReLU architecture × 4 folds; five flank residues and five peptide residues at each cleavage boundary; Glorot initialization, Keras-equation Adam and terminal checkpoints. |
+| Presentation with flanks | Equal mixture of the four short-flank and four boundary networks, combined with affinity by the fitted logistic model. |
+| Presentation without flanks | Selected no-flank processing ensemble, combined with affinity by its separately fitted logistic model. |
+| Long-flank processing | Separate 15-residue-flank diagnostic grid; it is not the processing ensemble embedded in the presentation predictor. |
 
-A later crossed frontier supplied the missing interaction evidence: native
-PyTorch RMSprop, pre-activation LSUV, and minibatch 1024 together led all eight
-conditions on the common frozen affinity cohort. That three-way combination is
-the frozen final-candidate exception; it does not imply that minibatch 1024 or
-pre-activation LSUV is better under the Keras optimizer control. The exact
-current decision set is `scripts/training/final_230_candidate_recipe.json` and
-is described in {doc}`final_230_candidate_experiment`.
+Training checkpoints and model-selection records remain in the training run.
+An inference download needs the selected weights, model manifests, allele
+sequences, fitted presentation coefficients and calibration. Training data and
+provenance are retained for overlap audits; unused alternative checkpoints are
+not part of the inference model.
 
-The processing initializer/optimizer panel reached the same compatibility
-decision for the 5-aa presentation input. Kaiming initialization, native
-PyTorch Adam, and their coupled use showed flank-dependent gains at 0 or 15 aa,
-but all three alternatives reduced AUPRC and PPV@N for 5-aa models. The final
-candidate therefore retains Glorot initialization with zero biases and
-Keras-compatible Adam for 5-aa and no-flank models, while the independently
-trained 15-aa compatibility grid uses the tested Kaiming/native combination.
-The complete crossed table is in
-{doc}`release_neural_hyperparameter_audit`.
+## Data and evaluation
 
-The layer-by-layer comparison, framework-equation audit, discrepancy register,
-and controlled experiment plan are in
-{doc}`release_neural_hyperparameter_audit`.
+Affinity uses measured affinities and the configured mass-spec reassignment.
+Its synthetic negatives are random amino-acid peptides. Processing training
+uses protein-derived negatives matched within sample, length and affinity
+constraints. Presentation training uses protein-derived negatives in its own
+training table. These training samplers do not define a comparison's test set.
 
-## Exact release settings
+A model comparison must freeze one positive/negative row set, score every
+comparator on it, and exclude training overlap identically for every model.
+Sample/source disjointness and peptide disjointness are separate checks;
+missing lineage cannot be treated as proof of separation. The maintained
+release holdout manifests are an input exclusion mechanism, not a guarantee
+that an arbitrary public comparator has never seen the same data.
 
-| Stage | Setting | Published 2.1.x | Compatibility control | Status |
-|---|---|---:|---:|---|
-| Affinity | minibatch | 128 | 128 | Restored after paired frozen-holdout comparison |
-| Affinity | maximum epochs | 5000 | 5000 | Restored |
-| Affinity | early-stop `min_delta` | 0 | 0 | Restored |
-| Affinity | validation interval | every epoch | every epoch | Restored |
-| Affinity | random-negative pool | fresh each epoch | fresh each epoch | Explicitly pinned to 1 |
-| Affinity | LSUV variance target | post-activation Dense output | post-activation Dense output | Restored and explicit |
-| Affinity | RMSprop equations | Keras | Keras | Restored and explicit; PyTorch selectable for ablation |
-| Affinity calibration | peptides per length | 100,000 | 100,000 | Restored |
-| Processing | minibatch | 512 | 512 | Restored |
-| Processing | held-out samples per fold | 10 | 10 | Restored |
-| Processing | initializer | Glorot uniform, zero bias | Glorot uniform, zero bias | Restored and explicit; former Kaiming behavior selectable for ablation |
-| Processing | Adam equations | Keras | Keras | Restored and explicit; PyTorch selectable for ablation |
-| Processing | decoy candidates retained | 2 per hit | 2 per hit | Unchanged |
-| Presentation | decoys per hit | 2 | 2 | Restored |
-| Presentation | training-row sample fraction | 0.1 | 0.1 | Restored |
-| Presentation | excluded PMIDs | 31844290, 31495665, 31154438 | Same three studies | Restored; PMID 31154438 is the frozen sample holdout |
-| Presentation | with-flanks processing input | `short_flanks` | `short_flanks` | Restored; 5 aa on each side |
-| Presentation | logistic solver | L-BFGS, 100 iterations | L-BFGS, 100 iterations | Restored |
-| Presentation calibration | peptides per length | 10,000 | 10,000 | Restored |
+Report end-to-end presentation, affinity-only ranking and processing-only
+ranking separately. Never average their AP values. For multi-patient results,
+report per-patient metrics and paired patient-bootstrap intervals. See
+{doc}`evaluation` for score orientation, common-row joins and output formats.
 
-The affinity architecture grid, processing architecture grid, loss functions,
-optimizers, learning rates, dropout, regularization, early-stop patience,
-peptide lengths, affinity-random-negative distribution, fold counts, and model
-selection minima/maxima otherwise match the published recipe.
+## Calibration and compatibility
 
-The final candidate applies the crossed affinity exception above, the tested
-15-aa processing recipe, and the radius-5 cleavage-boundary family; those later
-decisions do not rewrite this compatibility-control table.
+Raw affinity is in nM, lower is stronger. Processing and presentation scores
+range from zero to one, higher is stronger. Percentile ranks range from zero
+to 100, lower is stronger; they are background ranks, not calibrated biological
+probabilities.
 
-## Execution changes that remain
+New calibrations use the shared compact method: 64 knots, increasing to 128
+only when independent, label-free background validation justifies it.
+Affinity uses log(IC50); processing and presentation use logit(score).
+Existing public histogram calibrations load without refitting or conversion.
+See {doc}`shared_percent_rank_transforms` for the exact rules and compatibility.
 
-The maintained implementation differs from the historical implementation in
-ways that do not intentionally change the scientific objective:
+The release workflow calibrates affinity and presentation. Standalone
+processing calibration is a separate command with an explicit background and
+flank policy. Evaluating raw scores does not validate a percentile API: check
+both saved score representations before publishing weights.
 
-- PyTorch replaces TensorFlow/Keras, and fixed BLOSUM62 expansion is performed
-  by a frozen on-device embedding rather than host numpy code.
-- Keras-compatible RMSprop and Adam update equations, including epsilon
-  placement, are explicit and equation-tested. The native PyTorch equations
-  remain selectable through ``optimizer_implementation`` for controlled
-  experiments, but are not the compatibility default.
-- Affinity LSUV measures post-activation variance as the historical Keras
-  implementation did. ``data_dependent_initialization_target`` records this
-  choice and permits a pre-activation ablation.
-- Processing Glorot initializers and zero biases are explicit. The rejected
-  port's Kaiming/fan-in behavior remains selectable as
-  ``kaiming_uniform_fan_in`` for an ablation.
-- Validation splits use Keras' exact boundary calculation: training rows are
-  ``floor(N * (1 - validation_split))`` and the tail is validation.
-- A fixed master seed and derived per-fit seeds replace entropy-derived random
-  state. Exact peptide identities and trained weights consequently need not
-  reproduce historical TensorFlow runs even when distributions match.
-- Proteome decoys are sampled lazily from the same candidate universe instead
-  of materializing the full peptide table. This preserves the sampling
-  distribution while changing the seeded identity stream.
-- Worker counts, prediction batches, feature chunks, and calibration work
-  chunks may be autosized. They are execution controls, not model
-  hyperparameters. The release workflow fails instead of silently shrinking a
-  configured training minibatch.
-- Release training and evaluation default to eager execution and `highest`
-  float32 matmul precision. `torch.compile` and reduced matmul precision remain
-  opt-in because their effects on a newly trained trajectory have not been
-  isolated empirically.
-- Allele names and genotypes are normalized with the maintained sequence-aware
-  code, and the frozen release holdout is excluded before training.
+## Reproduce a run
 
-## Inference and calibration behavior
+Use the maintained release entry point and explicit recipe/data settings;
+see the [release workflow](https://github.com/openvax/mhcflurry/tree/master/scripts/release)
+and {doc}`final_230_candidate_experiment` for launch and collection commands.
+Freeze the source commit, seed, data hashes and complete settings before
+training. Preserve the resulting `release_provenance.json`, holdout manifests,
+training tables, selection records and comparison outputs.
 
-Runtime prediction batch sizes now default to capacity-aware `auto` with OOM
-retry. This changes partitioning, not the prediction formula. Presentation
-feature chunking likewise avoids materializing large peptide-by-genotype
-tables while preserving the minimum-affinity and tie-order semantics.
-
-New percentile calibration uses the shared compact method for affinity,
-processing, and presentation: start with 64 knots and allow 128 only when
-label-free background validation improves beyond the documented tolerance.
-Affinity uses log(IC50) coordinates and lower-tail ranks; processing and
-presentation use logit(score) coordinates and upper-tail ranks. See
-{doc}`shared_percent_rank_transforms` for the functional form and exact rule.
-
-Existing public calibrations still load through the historical histogram
-implementation without conversion. Explicit histogram recalibration remains
-available (fixed log-spaced IC50 edges for affinity; tail-adaptive quantile
-edges for presentation). Choosing that method alone does not reproduce an
-older table unless its reference and bin policy also match.
-
-Recalibration can change percentile outputs, not raw affinity, processing, or
-presentation scores. The release shell workflow calibrates affinity and
-presentation; standalone processing calibration is a separate explicit command
-requiring an independent background with the intended flank policy. It is not
-automatically performed when the presentation predictor saves its components.
-Preserve the original calibration recipe and compare a separately recalibrated
-candidate against the untouched public baseline.
-
-## Decoy semantics
-
-Affinity training generates random amino-acid peptides as synthetic negatives.
-Processing and presentation use unobserved peptides sampled from proteins in
-the reference proteome. Presentation therefore does not use the affinity-style
-synthetic amino-acid negative generator. A stronger affinity predictor can
-change which processing decoys are selected, but it does not by itself explain
-a presentation regression: the presentation combiner must still be evaluated
-end to end on the frozen holdout.
+Worker counts and prediction chunks may be autosized. Training minibatches
+are scientific settings and must not be silently reduced to fit a device.
+The release path uses eager execution and highest float32 matmul precision.

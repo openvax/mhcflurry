@@ -1,6 +1,6 @@
 # Processing preparation acceleration
 
-## Specification (2026-09-08)
+## Workflow
 
 Optimize the maintained `mhcflurry train processing-data` path without changing
 the scientific matching policy or interrupting the existing frozen Modal run.

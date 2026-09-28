@@ -2344,8 +2344,6 @@ class Class1NeuralNetwork(object):
         else:
             # Store weights for later application
             self.network_weights = weights
-            # Store flag for auto-conversion
-            self._auto_convert_keras_weights = auto_convert_keras
 
     @staticmethod
     def _copy_weights_list(weights):
@@ -2696,7 +2694,12 @@ class Class1NeuralNetwork(object):
             validation_x_dict["allele"] = validation_allele_input
         encode_y_kwargs = {}
         if validation_inequalities is not None:
-            encode_y_kwargs["inequalities"] = validation_inequalities
+            # from_ic50 is decreasing: concentration bounds reverse direction.
+            encode_y_kwargs["inequalities"] = (
+                pandas.Series(validation_inequalities)
+                .map({"=": "=", ">": "<", "<": ">"})
+                .values
+            )
         if validation_output_indices is not None:
             encode_y_kwargs["output_indices"] = validation_output_indices
 

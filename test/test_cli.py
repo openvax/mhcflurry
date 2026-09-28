@@ -323,6 +323,8 @@ def _write_minimal_deployable_run(run_dir):
     )
     for relative in model_directories:
         (run_dir / relative / "info.txt").write_text(info)
+        if relative != "presentation/models":
+            (run_dir / relative / "weights_model.npz").write_bytes(b"selected test weights")
     (run_dir / "affinity/models.combined/manifest.csv").write_text(
         "model_name\nmodel\n")
     (run_dir / "affinity/models.combined/percent_ranks.csv").write_text(

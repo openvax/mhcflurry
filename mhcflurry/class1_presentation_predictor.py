@@ -270,24 +270,23 @@ class Class1PresentationPredictor(object):
         size of num peptides *  num samples:
 
         >>> predictor = Class1PresentationPredictor.load()
-        >>> predictor.predict_affinity(
+        >>> predictions = predictor.predict_affinity(
         ...    peptides=["SIINFEKL", "PEPTIDE"],
         ...    alleles={
         ...        "sample1": ["A0201", "A0301", "B0702"],
         ...        "sample2": ["A0101", "C0202"],
         ...    },
         ...    verbose=0)
-            peptide  peptide_num sample_name   affinity best_allele  affinity_percentile
-        0  SIINFEKL            0     sample1  11927.161       A0201                6.296
-        1   PEPTIDE            1     sample1  32507.082       A0201               71.249
-        2  SIINFEKL            0     sample2   2725.593       C0202                6.662
-        3   PEPTIDE            1     sample2  28304.336       C0202               54.652
+        >>> list(zip(predictions.sample_name, predictions.peptide))
+        [('sample1', 'SIINFEKL'), ('sample1', 'PEPTIDE'), ('sample2', 'SIINFEKL'), ('sample2', 'PEPTIDE')]
+        >>> bool((predictions.affinity > 0).all())
+        True
 
         In contrast, here we specify sample_names, so peptide is evaluated for
         binding the alleles in the corresponding sample, for a result size equal
         to the number of peptides:
 
-        >>> predictor.predict_affinity(
+        >>> predictions = predictor.predict_affinity(
         ...    peptides=["SIINFEKL", "PEPTIDE"],
         ...    alleles={
         ...        "sample1": ["A0201", "A0301", "B0702"],
@@ -295,9 +294,10 @@ class Class1PresentationPredictor(object):
         ...    },
         ...    sample_names=["sample2", "sample1"],
         ...    verbose=0)
-            peptide  peptide_num sample_name   affinity best_allele  affinity_percentile
-        0  SIINFEKL            0     sample2   2725.592       C0202                6.662
-        1   PEPTIDE            1     sample1  32507.078       A0201               71.249
+        >>> list(zip(predictions.sample_name, predictions.peptide))
+        [('sample2', 'SIINFEKL'), ('sample1', 'PEPTIDE')]
+        >>> bool((predictions.affinity > 0).all())
+        True
 
         Parameters
         ----------
@@ -792,7 +792,7 @@ class Class1PresentationPredictor(object):
         Example:
 
         >>> predictor = Class1PresentationPredictor.load()
-        >>> predictor.predict(
+        >>> predictions = predictor.predict(
         ...    peptides=["SIINFEKL", "PEPTIDE"],
         ...    n_flanks=["NNN", "SNS"],
         ...    c_flanks=["CCC", "CNC"],
@@ -801,11 +801,10 @@ class Class1PresentationPredictor(object):
         ...        "sample2": ["A0101", "C0202"],
         ...    },
         ...    verbose=0)
-            peptide n_flank c_flank  peptide_num sample_name   affinity best_allele  processing_score  presentation_score  presentation_percentile
-        0  SIINFEKL     NNN     CCC            0     sample1  11927.161       A0201             0.838               0.145                    2.282
-        1   PEPTIDE     SNS     CNC            1     sample1  32507.082       A0201             0.025               0.003                  100.000
-        2  SIINFEKL     NNN     CCC            0     sample2   2725.593       C0202             0.838               0.416                    1.017
-        3   PEPTIDE     SNS     CNC            1     sample2  28304.338       C0202             0.025               0.003                   99.287
+        >>> list(zip(predictions.sample_name, predictions.peptide))
+        [('sample1', 'SIINFEKL'), ('sample1', 'PEPTIDE'), ('sample2', 'SIINFEKL'), ('sample2', 'PEPTIDE')]
+        >>> bool(predictions.presentation_score.between(0, 1).all())
+        True
 
         You can also specify sample_names, in which case peptide is evaluated
         for binding the alleles in the corresponding sample only. See
@@ -1047,7 +1046,7 @@ class Class1PresentationPredictor(object):
         Example:
 
         >>> predictor = Class1PresentationPredictor.load()
-        >>> predictor.predict_sequences(
+        >>> predictions = predictor.predict_sequences(
         ...    sequences={
         ...        'protein1': "MDSKGSSQKGSRLLLLLVVSNLL",
         ...        'protein2': "SSLPTPEDKEQAQQTHH",
@@ -1060,17 +1059,10 @@ class Class1PresentationPredictor(object):
         ...    comparison_quantity="affinity",
         ...    filter_value=500,
         ...    verbose=0)
-          sequence_name  pos     peptide n_flank c_flank sample_name  affinity best_allele  affinity_percentile  processing_score  presentation_score  presentation_percentile
-        0      protein1   14   LLLVVSNLL   GSRLL             sample1    57.180       A0201                0.398             0.233               0.754                    0.351
-        1      protein1   13   LLLLVVSNL   KGSRL       L     sample1    57.339       A0201                0.398             0.031               0.586                    0.643
-        2      protein1    5   SSQKGSRLL   MDSKG   LLLVV     sample2   110.779       C0202                0.782             0.061               0.456                    0.920
-        3      protein1    6   SQKGSRLLL   DSKGS   LLVVS     sample2   254.480       C0202                1.735             0.102               0.303                    1.356
-        4      protein1   13  LLLLVVSNLL   KGSRL             sample1   260.390       A0201                1.012             0.158               0.345                    1.215
-        5      protein1   12  LLLLLVVSNL   QKGSR       L     sample1   308.150       A0201                1.094             0.015               0.206                    1.802
-        6      protein2    0   SSLPTPEDK           EQAQQ     sample2   410.354       C0202                2.398             0.003               0.158                    2.155
-        7      protein1    5    SSQKGSRL   MDSKG   LLLLV     sample2   444.321       C0202                2.512             0.026               0.159                    2.138
-        8      protein2    0   SSLPTPEDK           EQAQQ     sample1   459.296       A0301                0.971             0.003               0.144                    2.292
-        9      protein1    4   GSSQKGSRL    MDSK   LLLLV     sample2   469.052       C0202                2.595             0.014               0.146                    2.261
+        >>> bool((predictions.affinity < 500).all())
+        True
+        >>> {"sequence_name", "pos", "peptide", "affinity"}.issubset(predictions.columns)
+        True
 
         Parameters
         ----------

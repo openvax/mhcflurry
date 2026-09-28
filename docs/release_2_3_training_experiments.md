@@ -1,9 +1,10 @@
 # Reproducible retraining of MHCflurry: framework semantics, optimization, and antigen context
 
-> **Living manuscript draft (2026-09-03).** The controlled affinity frontier is
-> complete. External-baseline rendering, terminal artifact retrieval, and
-> end-to-end presentation validation remain in progress; the affinity result
-> reported here will not become a release claim until those gates pass.
+> **Controlled development experiments.** These results explain recipe choices;
+> they are not the evaluation of the final released ensemble. Use
+> {doc}`release_training_recipe` for the final settings and the 2.3.0 release
+> comparison assets for its common-cohort results. Historical model labels and
+> source identifiers below describe the actual experiments.
 
 ## Abstract
 
@@ -137,7 +138,7 @@ predictions, derived metrics, and terminal status. Figures 1–3 are regenerated
 directly by
 [`render_release_experiment_paper_figures.py`](../scripts/training/render_release_experiment_paper_figures.py);
 the command writes a SHA256 manifest for every source and output file. The
-terminal affinity snapshot will provide Figure 4 without manual transcription.
+terminal affinity snapshot supplies the source values for Figure 4.
 
 ## Results
 
@@ -218,7 +219,7 @@ RMSprop with post-activation LSUV at minibatch 1024 achieved smaller gains
 (3.05% macro AUPRC and 8.04% micro AUPRC). The frontier instead identifies a
 specific three-way interaction among optimizer equations, the LSUV tensor, and
 minibatch size. The native/pre-LSUV/minibatch-1024 recipe is therefore the
-leading affinity release candidate, subject to external-baseline figures and
+affinity configuration selected for further full-ensemble evaluation, subject to
 end-to-end presentation validation.
 
 ![Affinity frontier compared with public MHCflurry 2.2](figures/release_2_3_training_experiments/affinity_frontier_vs_public.svg)
@@ -274,18 +275,15 @@ Activation findings are presently narrower. Affinity has directly tested tanh
 only, whereas the processing representatives use tanh in the small network and
 ReLU in the large network. Neither comparison identifies an activation effect
 independent of architecture. Claims about tanh, initialization, normalization,
-or checkpoint restoration will remain architecture- and task-specific until
-the matched activation screen completes.
+or checkpoint restoration remain architecture- and task-specific.
 
 ## Limitations
 
 The processing development benchmark has been queried repeatedly during model
 selection and is not an untouched confirmatory test. Several experiments use
-two representative architectures rather than the full release grid. The
-external affinity comparisons and the selected affinity/processing models must
-still pass end-to-end presentation validation. We will distinguish exploratory,
-development, and confirmatory evidence in the final manuscript and release
-notes.
+two representative architectures rather than the full release grid. These development experiments do not establish the quality of the final
+end-to-end presentation model. Its independent comparison is documented in
+{doc}`release_model_evaluation`.
 
 ## Data and code availability
 
@@ -295,11 +293,8 @@ The current paper-figure sources are the archived affinity runs
 `release-2.3.0-processing-ablations-33010036e-run3`. The terminal affinity
 frontier was trained from commit `ac812c1cdabc6e84d515213fa1ba59341f9ca83b`;
 the combined renderer is commit
-`0b88690040feb9f5e46826fdb6dad91146b2654a`. A final artifact table with
-snapshot paths and SHA256 digests will be added after retrieval.
+`0b88690040feb9f5e46826fdb6dad91146b2654a`. The figures on this page refer to these development runs.
 
 The immutable raw terminal-frontier snapshot is
 `20260903T111035Z-affinity-frontier-raw-ac812c1cdabc`. Its 394 copied artifacts
-and source archive were verified byte-for-byte after local retrieval. A second
-snapshot will add the model weights, convergence tables, corrected external
-join, and combined figures.
+and source archive were verified byte-for-byte after local retrieval. This historical snapshot is distinct from the final 2.3.0 release artifacts.

@@ -1,7 +1,7 @@
 {
   "format": 1,
   "name": "final-2.3.0-candidate",
-  "status": "frozen candidate pending full held-out evaluation",
+  "status": "historical v1 recipe; retained for reproduction",
   "affinity": {
     "architectures": 35,
     "folds": 4,
@@ -13,13 +13,20 @@
     "dropout": 0.5,
     "patience": 20,
     "primary_checkpoint": "terminal",
-    "retained_checkpoints": ["terminal", "best"]
+    "retained_checkpoints": [
+      "terminal",
+      "best"
+    ]
   },
   "processing": {
     "folds": 4,
     "minibatch_size": 512,
     "legacy_architectures_per_variant": 128,
-    "variants": ["with_flanks", "no_flank", "short_flanks"],
+    "variants": [
+      "with_flanks",
+      "no_flank",
+      "short_flanks"
+    ],
     "with_flanks_recipe": "kaiming-pytorch-adam",
     "no_flank_recipe": "glorot-keras-adam",
     "short_flanks_recipe": "glorot-keras-adam",
@@ -32,7 +39,10 @@
     "presentation_with_flanks_ensemble": {
       "legacy_short_flanks_models_per_fold": 1,
       "cleavage_boundary_models_per_fold": 1,
-      "family_weights": [0.5, 0.5]
+      "family_weights": [
+        0.5,
+        0.5
+      ]
     }
   },
   "presentation": {
@@ -46,7 +56,16 @@
     ]
   },
   "acceptance": {
-    "primary": ["macro AUPRC", "macro PPV@N"],
-    "safeguards": ["micro", "per sample", "per length", "allele", "locus"]
+    "primary": [
+      "macro AUPRC",
+      "macro PPV@N"
+    ],
+    "safeguards": [
+      "micro",
+      "per sample",
+      "per length",
+      "allele",
+      "locus"
+    ]
   }
 }

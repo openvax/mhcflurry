@@ -1055,20 +1055,6 @@ class Class1AffinityPredictor(object):
                 sub_df.affinity, allele=allele, throw=throw)
         return df.result.values
 
-    def model_source_description(self):
-        """Return a compact human-readable description of this predictor."""
-        pieces = []
-        models_dir = self.models_dir_for_diagnostics()
-        if models_dir:
-            pieces.append("models_dir=%s" % models_dir)
-        if self.provenance_string:
-            pieces.append(self.provenance_string)
-        pieces.append("%d model(s)" % len(self.neural_networks))
-        pieces.append(
-            "%d percent-rank calibration(s)" % (
-                len(self.allele_to_percent_rank_transform)))
-        return "; ".join(pieces)
-
     def models_dir_for_diagnostics(self):
         """Return explicit or inferred models dir for user-facing messages."""
         if self.models_dir:

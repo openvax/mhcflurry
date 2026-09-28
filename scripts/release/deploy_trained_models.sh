@@ -24,13 +24,14 @@ Usage:
       --github-release 2.3.0 \
       [--processing-variants "no_flank with_flanks [short_flanks]"] \
       [--repo /path/to/mhcflurry] [--allow-dirty-repo] \
-      [--allow-artifact-source-mismatch] \
+      [--allow-artifact-source-mismatch] [--training-package-version VERSION] \
       [--date YYYYMMDD] \
       [--assets-dir /path/to/assets] \
-      [--dry-run | --draft | --publish | --mode MODE]
+      [--dry-run | --package-only | --draft | --publish | --mode MODE]
 
 Modes:
   --dry-run   Validate paths and print planned assets. This is the default.
+  --package-only  Build and checksum assets locally without uploading.
   --draft     Build assets and upload them to a draft GitHub release, creating
               the draft if needed.
   --publish   Build assets and upload them to an existing GitHub release. This
@@ -110,6 +111,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="${REPO:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 ALLOW_DIRTY_REPO=0
 ALLOW_ARTIFACT_SOURCE_MISMATCH=0
+TRAINING_PACKAGE_VERSION=
 ASSET_DATE=$(date -u +%Y%m%d)
 MODE=dry-run
 PROCESSING_VARIANTS="no_flank with_flanks"
@@ -152,6 +154,14 @@ while [ $# -gt 0 ]; do
             ALLOW_ARTIFACT_SOURCE_MISMATCH=1
             shift
             ;;
+        --training-package-version)
+            TRAINING_PACKAGE_VERSION=$2
+            shift 2
+            ;;
+        --package-only)
+            MODE=package-only
+            shift
+            ;;
         --dry-run)
             MODE=dry-run
             shift
@@ -166,11 +176,11 @@ while [ $# -gt 0 ]; do
             ;;
         --mode)
             case "$2" in
-                dry-run|draft|publish)
+                dry-run|package-only|draft|publish)
                     MODE=$2
                     ;;
                 *)
-                    die "--mode must be one of: dry-run, draft, publish"
+                    die "--mode must be one of: dry-run, package-only, draft, publish"
                     ;;
             esac
             shift 2
@@ -242,7 +252,7 @@ RELEASE_NOTES_FILE="$REPO/RELEASE_NOTES_${RELEASE}.md"
 
 require_command tar
 require_command python3
-if [ "$MODE" != "dry-run" ]; then
+if [ "$MODE" = "draft" ] || [ "$MODE" = "publish" ]; then
     require_command gh
 fi
 
@@ -260,7 +270,11 @@ fi
 if [ "$ALLOW_ARTIFACT_SOURCE_MISMATCH" = "1" ]; then
     PROVENANCE_ARGS+=(--allow-artifact-source-mismatch)
 fi
-"${PROVENANCE_ARGS[@]}" >/dev/null
+if [ -n "$TRAINING_PACKAGE_VERSION" ]; then
+    PROVENANCE_ARGS+=(--training-package-version "$TRAINING_PACKAGE_VERSION")
+fi
+# Keep validation before any archive construction.
+PROVENANCE_JSON=$("${PROVENANCE_ARGS[@]}")
 
 require_dir "$AFFINITY_MODELS"
 require_file "$AFFINITY_MODELS/manifest.csv"
@@ -299,6 +313,7 @@ note "  $PRESENTATION_ASSET"
 if [ "$MODE" = "dry-run" ]; then
     note ""
     note "Dry run only. Commands that would run:"
+    note "Selected inference copies are staged before the tar commands below."
     quote_cmd mkdir -p "$ASSETS_DIR"
     quote_cmd tar -C "$AFFINITY_DIR" -cjf "$ASSETS_DIR/$PAN_ASSET" models.combined
     quote_cmd tar -C "$PROCESSING_DIR" -cjf "$ASSETS_DIR/$PROCESSING_ASSET" \
@@ -314,6 +329,18 @@ if [ "$MODE" = "dry-run" ]; then
 fi
 
 mkdir -p "$ASSETS_DIR"
+printf '%s\n' "$PROVENANCE_JSON" > "$ASSETS_DIR/provenance.json"
+STAGING_DIR=$(mktemp -d "${TMPDIR:-/tmp}/mhcflurry-export.XXXXXX")
+trap 'rm -rf "$STAGING_DIR"' EXIT
+python3 "$SCRIPT_DIR/export_inference_models.py" "$AFFINITY_MODELS" "$STAGING_DIR/affinity/models.combined"
+python3 "$SCRIPT_DIR/export_inference_models.py" "$PRESENTATION_MODELS" "$STAGING_DIR/presentation/models"
+for kind in $PROCESSING_VARIANTS; do
+    python3 "$SCRIPT_DIR/export_inference_models.py" \
+        "$PROCESSING_DIR/models.selected.$kind" "$STAGING_DIR/processing/models.selected.$kind"
+done
+AFFINITY_DIR="$STAGING_DIR/affinity"
+PROCESSING_DIR="$STAGING_DIR/processing"
+PRESENTATION_DIR="$STAGING_DIR/presentation"
 tar -C "$AFFINITY_DIR" -cjf "$ASSETS_DIR/$PAN_ASSET" models.combined
 tar -C "$PROCESSING_DIR" -cjf "$ASSETS_DIR/$PROCESSING_ASSET" \
     "${PROCESSING_ARCHIVE_DIRS[@]}"
@@ -342,7 +369,10 @@ cat > "$ASSETS_DIR/$SNIPPET_FILE" <<EOF
         default: true
 EOF
 
-if [ "$MODE" = "draft" ]; then
+if [ "$MODE" = "package-only" ]; then
+    note "Built local release assets in $ASSETS_DIR"
+    exit 0
+elif [ "$MODE" = "draft" ]; then
     if ! gh release view "$GITHUB_RELEASE" >/dev/null 2>&1; then
         RELEASE_NOTES_ARGS=(--notes "")
         if [ -f "$RELEASE_NOTES_FILE" ]; then
@@ -363,6 +393,7 @@ gh release upload "$GITHUB_RELEASE" \
     "$ASSETS_DIR/$PROCESSING_ASSET" \
     "$ASSETS_DIR/$PRESENTATION_ASSET" \
     "$ASSETS_DIR/$SHA_FILE" \
+    "$ASSETS_DIR/provenance.json" \
     --clobber
 
 note ""

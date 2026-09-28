@@ -347,3 +347,23 @@ def test_collect_provenance_rejects_holdout_overlap(tmp_path):
             require_artifacts=True,
             allow_dirty_repo=True,
         )
+
+
+def test_packaging_preserves_explicit_original_training_version(tmp_path):
+    module = load_module()
+    trained_version = "2.3.1rc3"
+    write_model_info(tmp_path, trained_version)
+    write_holdout_proof(tmp_path)
+    kwargs = dict(
+        repo=REPO, run_dir=tmp_path, release=RELEASE_VERSION,
+        processing_variants=["with_flanks"], require_artifacts=True,
+        allow_dirty_repo=True)
+    with pytest.raises(ValueError, match="not release"):
+        module.collect_provenance(**kwargs)
+    result = module.collect_provenance(
+        **kwargs, training_package_version=trained_version)
+    assert result["release"] == RELEASE_VERSION
+    assert result["artifacts"]["affinity"]["package_version"] == trained_version
+    assert result["expected_training_package_version"] == trained_version
+    with pytest.raises(ValueError, match="does not match explicit"):
+        module.collect_provenance(**kwargs, training_package_version="2.3.1rc2")

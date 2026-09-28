@@ -4,7 +4,7 @@ on:
   push:
     branches: ["master"]
   pull_request:
-    branches: ["master"]
+    branches: ["master", "release-2.3.0-final-weights"]
   workflow_dispatch:
 
 concurrency:
@@ -17,6 +17,9 @@ jobs:
     permissions:
       contents: read
     env:
+      # PRs must build before their new model assets are public. Published docs
+      # use the package's current release; historical fixtures exercise PR examples.
+      MHCFLURRY_DOWNLOADS_CURRENT_RELEASE: ${{ github.event_name == 'pull_request' && '2.2.0' || '' }}
       MHCFLURRY_DATA_DIR: ${{ github.workspace }}/.mhcflurry-data
 
     steps:

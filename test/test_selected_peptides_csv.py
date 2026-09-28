@@ -29,7 +29,8 @@ from mhcflurry.testing_utils import startup, cleanup
 
 
 DATA_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)),
+    os.path.dirname(__file__),
+    "data",
     "selected-peptides.csv",
 )
 

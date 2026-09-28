@@ -265,7 +265,7 @@ def collect_provenance(
         repo, run_dir, release, workflow_id="", processing_variants=(),
         require_artifacts=False, allow_dirty_repo=False,
         expected_artifact_workflow_id="",
-        allow_artifact_source_mismatch=False):
+        allow_artifact_source_mismatch=False, training_package_version=""):
     """Validate release identity and return serializable provenance."""
     repo = pathlib.Path(repo).resolve()
     run_dir = pathlib.Path(run_dir).resolve()
@@ -285,7 +285,7 @@ def collect_provenance(
     source_commit = git_output(repo, "rev-parse", "HEAD")
     artifact_provenance = collect_artifact_provenance(
         run_dir=run_dir,
-        release=release,
+        release=training_package_version or release,
         processing_variants=processing_variants,
         require_artifacts=require_artifacts,
         expected_artifact_git_commit=(
@@ -294,6 +294,11 @@ def collect_provenance(
             else ""),
         expected_artifact_workflow_id=expected_artifact_workflow_id,
     )
+    if training_package_version:
+        for role, item in artifact_provenance.items():
+            if item["package_version"] != training_package_version:
+                raise ValueError("%s training version %s does not match explicit %s" % (
+                    role, item["package_version"], training_package_version))
     artifact_commits = {
         item["git_commit"] for item in artifact_provenance.values()
         if item["git_commit"]
@@ -317,6 +322,7 @@ def collect_provenance(
         "recorded_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "release": release,
         "release_base_version": release_base,
+        "expected_training_package_version": training_package_version or None,
         "source": {
             "package_version": source_version,
             "git_commit": source_commit,
@@ -335,6 +341,9 @@ def make_parser():
     parser.add_argument("--run-dir", required=True)
     parser.add_argument("--release", required=True)
     parser.add_argument("--workflow-id", default="")
+    parser.add_argument(
+        "--training-package-version", default="",
+        help="Require this exact original training version when packaging previously trained weights.")
     parser.add_argument("--artifact-only", action="store_true")
     parser.add_argument("--expected-artifact-git-commit", default="")
     parser.add_argument("--expected-artifact-workflow-id", default="")
@@ -361,6 +370,8 @@ def main(argv=None):
     args = make_parser().parse_args(argv)
     try:
         if args.artifact_only:
+            if args.training_package_version:
+                raise ValueError("Use --release for artifact-only version validation")
             if args.repo:
                 raise ValueError(
                     "--repo is not used with --artifact-only; omit it")
@@ -415,6 +426,7 @@ def main(argv=None):
                     args.expected_artifact_workflow_id),
                 allow_artifact_source_mismatch=(
                     args.allow_artifact_source_mismatch),
+                training_package_version=args.training_package_version,
             )
     except (OSError, RuntimeError, ValueError) as error:
         raise SystemExit("ERROR: %s" % error) from error

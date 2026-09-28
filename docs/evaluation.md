@@ -199,7 +199,7 @@ mhcflurry eval presentation-external-predictors \
     --comparison-dir results/new_run/eval_comparison \
     --data-dir "$(mhcflurry-downloads path data_evaluation)" \
     --cohort multiallelic \
-    --a-label "MHCflurry 2.3.0 candidate" --b-label "MHCflurry 2.2" \
+    --a-label "MHCflurry 2.3.0" --b-label "MHCflurry 2.2" \
     --out results/new_run/external_comparison
 ```
 

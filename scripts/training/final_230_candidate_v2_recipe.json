@@ -1,7 +1,7 @@
 {
   "format": 1,
   "name": "final-2.3.0-candidate-v2",
-  "status": "frozen candidate v2 pending full held-out evaluation",
+  "status": "frozen recipe used for the 2.3.0 weights",
   "affinity": {
     "architectures": 35,
     "folds": 4,
