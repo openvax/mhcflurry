@@ -17,6 +17,12 @@ mhcflurry downloads info models_class1_presentation
 releases containing that bundle and groups entries with the same archive URLs.
 For example, catalogues `2.2.0` and `2.0.0` point to the same presentation archive.
 `list` groups prediction models, legacy models, experiments, and supporting data.
+The first table shows the latest weights, distinct older archive versions and
+installed catalogue directories for affinity, processing and presentation.
+Aliases sharing the same archive are grouped in the availability columns;
+`releases DOWNLOAD` lists every valid identifier. Historical resources appear
+below the main predictors. Terminal output uses restrained color; redirected
+output and `NO_COLOR=1` remain plain.
 Use `--kind data` for data only, or `--release 2.2.0` to inspect an older catalogue.
 `info DOWNLOAD` adds descriptions, archive locations, and fetch/use commands.
 All three commands support `--json` and read the installed package's catalogue
@@ -85,8 +91,10 @@ mhcflurry downloads path models_class1_presentation --release 2.3.0
 mhcflurry downloads url models_class1_presentation --release 2.3.0
 ```
 
-`info` starts with the resolved download directory and default predictor paths.
-The environment variables below them are **optional overrides**: `unset` means
+`info` starts with model availability, followed by historical resources and
+resolved configuration. Use `mhcflurry downloads --verbose info` for all default
+predictor paths and environment variables. The variables are **optional
+overrides**: `unset` means
 the default is in use, not that the local path is missing. On macOS the default
 root is `~/Library/Application Support/mhcflurry/4/`; each weight release has
 its own subdirectory. The `4` is the cache-layout version, not a model version.

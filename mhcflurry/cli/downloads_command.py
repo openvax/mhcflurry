@@ -37,7 +37,10 @@ import os
 from shlex import quote
 import errno
 import tarfile
+import textwrap
+from itertools import zip_longest
 from shutil import copyfileobj
+from shutil import get_terminal_size
 from tempfile import NamedTemporaryFile
 from tqdm import tqdm
 
@@ -66,7 +69,7 @@ from ..downloads import (
     get_path,
     ENVIRONMENT_VARIABLES)
 from ..version import __version__
-from .help import HelpArgumentParser
+from .help import HelpArgumentParser, color_enabled
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
@@ -369,16 +372,110 @@ def _find_download(release, name):
         % (name, release, release, name))
 
 
+def _style(text, code):
+    if not code or not color_enabled(sys.stdout):
+        return text
+    return "\033[%sm%s\033[0m" % (code, text)
+
+
+def _heading(text):
+    print("\n" + _style(text, "1;36"))
+
+
+def _status_color(text):
+    if text in ("—", "NO"):
+        return "2"
+    if text in ("unknown", "differs") or "?" in text or "!" in text:
+        return "33"
+    return "32"
+
+
+def _print_table(headers, rows, colors=None, wrap_columns=()):
+    """Align plain cell widths before adding optional terminal color."""
+    if not rows:
+        return
+    widths = [max(len(row[i]) for row in [headers, *rows])
+              for i in range(len(headers))]
+    available = max(60, min(120, get_terminal_size().columns))
+    for column in wrap_columns:
+        excess = sum(widths) + 2 * (len(widths) - 1) - available
+        if excess > 0:
+            widths[column] = max(len(headers[column]), 16, widths[column] - excess)
+    print(_style("  ".join(value.ljust(width) for value, width in
+                           zip(headers, widths)).rstrip(), "1;36"))
+    for row in rows:
+        cells = [textwrap.wrap(value, width, break_long_words=False,
+                               break_on_hyphens=False) or [""]
+                 for value, width in zip(row, widths)]
+        for line in zip_longest(*cells, fillvalue=""):
+            output = []
+            for i, (value, width) in enumerate(zip(line, widths)):
+                color = (colors or {}).get(i)
+                code = color(row[i]) if callable(color) else color
+                cell = value if i == len(widths) - 1 else value.ljust(width)
+                output.append(_style(cell, code))
+            print("  ".join(output).rstrip())
+
+
+def _model_versions(name, releases):
+    """Describe distinct archive sources and installed catalogue directories."""
+    versions = get_bundle_versions(name)
+    installed = []
+    custom = get_current_release() is None
+    custom_status = None
+    for version in versions:
+        for release in version['releases']:
+            if release not in releases:
+                releases[release] = get_release_downloads(release)
+            info = releases[release][name]
+            if not info['downloaded']:
+                continue
+            marker = ("" if info['up_to_date'] is True else
+                      "?" if info['up_to_date'] is None else "!")
+            if custom:
+                custom_status = marker
+                if not marker:
+                    return (versions[0]['releases'][0],
+                            ', '.join(v['releases'][0] for v in versions[1:]) or '—',
+                            'custom: ' + release)
+            else:
+                installed.append(release + marker)
+    if custom and custom_status is not None:
+        installed = ['custom' + custom_status]
+    return (versions[0]['releases'][0],
+            ', '.join(v['releases'][0] for v in versions[1:]) or '—',
+            ', '.join(installed) or '—')
+
+
 def _print_downloads(records):
-    groups = dict.fromkeys(record["group"] for record in records)
-    for group in groups:
-        print("\n" + group)
-        for record in records:
-            if record["group"] == group:
-                print("  %s  [%s]" % (record["name"], record["status"]))
-                print("    " + record["description"])
-    print("\nInstalled means the directory exists. Source match compares recorded URLs,")
-    print("not file integrity. Inspect a bundle: mhcflurry downloads info DOWNLOAD")
+    primary = [record for record in records if record['group'] == 'Prediction models']
+    historical = [record for record in records if record['group'] != 'Prediction models']
+    if primary:
+        _heading('Prediction models — latest weights and available versions')
+        releases = {}
+        rows = [(record['name'] + (' (affinity)' if record['name'] == 'models_class1_pan' else ''),
+                 *_model_versions(record['name'], releases))
+                for record in primary]
+        _print_table(('MODEL', 'LATEST', 'OTHER VERSIONS', 'INSTALLED'), rows,
+                     colors={1: '36', 3: _status_color}, wrap_columns=(2, 3))
+        print("Shared archive aliases are grouped under one version; 'releases NAME' lists all.")
+        if any('?' in row[3] or '!' in row[3] for row in rows):
+            print('Installed: ? unknown source; ! recorded source differs from that catalogue.')
+    for group, kind in (('Historical models', 'models'), ('Supporting data', 'data')):
+        items = [record for record in historical if record['kind'] == kind]
+        if not items:
+            continue
+        _heading(group)
+        rows = []
+        for record in items:
+            source = ('—' if not record['downloaded'] else
+                      'unknown' if record['source_matches'] is None else
+                      'matches' if record['source_matches'] else 'differs')
+            rows.append((record['name'], yes_no(record['downloaded']), source))
+        _print_table(('DOWNLOAD', 'LOCAL', 'SOURCE'), rows,
+                     colors={1: _status_color, 2: _status_color})
+    print("\nLocal status checks directories and recorded source URLs, not file integrity.")
+    print("Details: mhcflurry downloads info NAME | Versions: mhcflurry downloads releases NAME")
 
 
 def list_subcommand(args):
@@ -389,9 +486,8 @@ def list_subcommand(args):
         print(json.dumps(dict(release=release, downloads=records), indent=2))
         return
     print("Download release %s (code %s)" % (release, __version__))
-    print("Directory: " + os.path.abspath(get_downloads_dir(release)))
     _print_downloads(records)
-    print("Other versions: mhcflurry downloads releases [DOWNLOAD]")
+    print("\nCatalogue directory: " + os.path.abspath(get_downloads_dir(release)))
 
 
 def releases_subcommand(args):
@@ -415,7 +511,7 @@ def releases_subcommand(args):
         print(json.dumps(result, indent=2))
         return
     print("Download releases (separate from code %s)" % __version__)
-    print("%-10s %-18s %s" % ("RELEASE", "FORMAT", "PREDICTORS / NOTES"))
+    rows = []
     for record in records:
         types = [label for bundle, label in (
             ('models_class1_presentation', 'presentation'),
@@ -428,12 +524,14 @@ def releases_subcommand(args):
             types.append('default')
         if record['configured']:
             types.append('configured')
-        print("%-10s %-18s %s" % (
+        rows.append((
             record['release'], 'compatible' if record['compatible'] else 'incompatible',
             ', '.join(types)))
+    _print_table(('RELEASE', 'FORMAT', 'PREDICTORS / NOTES'), rows,
+                 colors={0: '36'}, wrap_columns=(2,))
     print("\nFormat compatibility is catalogue metadata, not a test of every archive.")
     if name:
-        print("\n%s: archive sources (shared URLs grouped)" % name)
+        _heading("%s: archive sources (shared URLs grouped)" % name)
         for version in versions:
             print("  " + ', '.join(version['releases']))
             for url in version['urls']:
@@ -457,7 +555,7 @@ def info_subcommand(args):
         if args.json:
             print(json.dumps(record, indent=2))
             return
-        print(record['name'] + " — " + release)
+        print(_style(record['name'] + " — " + release, '1;36'))
         print(record['description'])
         print("Status: " + record['status'])
         print("Directory: " + record['path'])
@@ -468,7 +566,7 @@ def info_subcommand(args):
         elif record['name'] == 'models_class1_pan':
             print("Predict: mhcflurry predict INPUT.csv --affinity-only --models " +
                   quote(os.path.join(record['path'], 'models.combined')))
-        print("\nVersions / archive sources (shared URLs grouped)")
+        _heading("Versions / archive sources (shared URLs grouped)")
         for version in record['versions']:
             print("  " + ', '.join(version['releases']))
             for url in version['urls']:
@@ -493,19 +591,28 @@ def info_subcommand(args):
     if args.json:
         print(json.dumps(config, indent=2))
         return
-    print("Resolved configuration")
+    print("Download catalogue %s (code %s)" % (release, __version__))
+    _print_downloads(config['downloads'])
+    _heading("Resolved configuration")
     print("  Code version:       " + __version__)
     print("  Default weights:    " + config['default_release'])
     print("  Active catalogue:   " + (get_current_release() or 'custom unversioned directory'))
     print("  Browsing catalogue: " + release)
     print("  Downloads directory: " + config['downloads_dir'])
-    print("\nDefault prediction paths (before --models / --model-release)")
-    for kind, item in config['default_model_paths'].items():
-        print("  %s: %s [%s]" % (kind, item['path'], 'exists' if item['exists'] else 'not installed'))
-    print("\nEnvironment variables (optional overrides)")
-    for key, value in config['environment_overrides'].items():
-        print("  %s: %s" % (key, quote(value) if value else 'unset; using defaults'))
-    _print_downloads(config['downloads'])
+    if args.verbose:
+        _heading("Default prediction paths (before --models / --model-release)")
+        for kind, item in config['default_model_paths'].items():
+            print("  %s: %s [%s]" % (kind, item['path'], 'exists' if item['exists'] else 'not installed'))
+    overrides = {key: value for key, value in config['environment_overrides'].items()
+                 if value or args.verbose}
+    if overrides:
+        _heading("Environment variables (optional overrides)")
+        for key, value in overrides.items():
+            print("  %s: %s" % (key, quote(value) if value else 'unset; using defaults'))
+    else:
+        print("  Environment overrides: none")
+    if not args.verbose:
+        print("\nFull paths and overrides: mhcflurry downloads --verbose info")
 
 
 def path_subcommand(args):
