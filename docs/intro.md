@@ -19,10 +19,10 @@ detected automatically.
 
 ## Install MHCflurry
 
-Install MHCflurry with:
+Install the latest stable MHCflurry 2.3 patch release with:
 
 ```shell
-pip install --upgrade "mhcflurry==2.3.2"
+pip install --upgrade "mhcflurry>=2.3,<2.4"
 ```
 
 Download the pretrained presentation models:
@@ -100,7 +100,7 @@ You can install into a conda environment and then use pip normally:
 ```shell
 conda create -q -n mhcflurry-env python=3.10
 conda activate mhcflurry-env
-pip install "mhcflurry==2.3.2"
+pip install --upgrade "mhcflurry>=2.3,<2.4"
 mhcflurry downloads fetch models_class1_presentation
 ```
 
