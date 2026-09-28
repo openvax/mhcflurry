@@ -11,45 +11,23 @@
 # limitations under the License.
 
 """
-Run MHCflurry predictor on specified peptides.
+Predict binding affinity, antigen processing and presentation for peptides.
 
-By default, the presentation predictor is used, and predictions for
-MHC I binding affinity, antigen processing, and the composite presentation score
-are returned. If you just want binding affinity predictions, pass
---affinity-only.
+Provide a CSV or use --alleles and --peptides. Use --affinity-only for binding
+affinity alone. Results go to stdout unless --out is given.
 
 Examples:
+  mhcflurry predict INPUT.csv --out RESULT.csv
+  mhcflurry predict --alleles HLA-A0201 --peptides SIINFEKL DENDREKLLL
+  mhcflurry predict --alleles 'HLA-A*02:01;HLA-A*03:01' --peptides SIINFEKL
 
-Write a CSV file containing the contents of INPUT.csv plus additional columns
-giving MHCflurry predictions:
-
-$ mhcflurry predict INPUT.csv --out RESULT.csv
-
-The input CSV file is expected to contain columns "allele", "peptide", and,
-optionally, "n_flank", and "c_flank". An allele cell may contain one allele
-or a comma-, semicolon-, or whitespace-separated sample genotype. For
-multi-allele cells, the output row reports the strongest binding allele.
-
-If `--out` is not specified, results are written to stdout.
-
-You can also run on alleles and peptides specified on the commandline, in
-which case predictions are written for *all combinations* of alleles and
-peptides:
-
-$ mhcflurry predict --alleles HLA-A0201 H-2Kb --peptides SIINFEKL DENDREKLLL
-
-Instead of individual alleles (in a CSV or on the command line), you can also
-give a comma- or semicolon-separated sample genotype. In this case,
-the tightest binding affinity across the alleles for the sample will be
-returned. For example:
-
-$ mhcflurry predict --peptides SIINFEKL --alleles 'HLA-A*02:01;HLA-A*03:01'
-
-will report the tightest predicted affinity across the two alleles for each
-peptide.
+CSV columns: allele, peptide; optionally n_flank and c_flank. Input columns
+are preserved in the output. Separate --alleles arguments are independent
+queries, each scored against every peptide. Delimit alleles within a CSV cell
+or quoted argument with commas, semicolons or spaces to score one genotype;
+its row reports the strongest binding allele.
 """
 import sys
-import argparse
 import itertools
 import logging
 import os
@@ -57,6 +35,7 @@ import re
 
 import pandas
 
+from .help import HelpArgumentParser
 from ..downloads import get_default_class1_presentation_models_dir
 from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..class1_presentation_predictor import Class1PresentationPredictor
@@ -76,35 +55,11 @@ from ..workload_planning import (
 from ..version import __version__
 
 
-parser = argparse.ArgumentParser(
+parser = HelpArgumentParser(
+    usage="%(prog)s [OPTIONS] [INPUT.csv]",
     description=__doc__,
-    formatter_class=argparse.RawDescriptionHelpFormatter,
     add_help=False)
 
-
-helper_args = parser.add_argument_group(title="Help")
-helper_args.add_argument(
-    "-h", "--help",
-    action="help",
-    help="Show this help message and exit"
-)
-helper_args.add_argument(
-    "--list-supported-alleles",
-    action="store_true",
-    default=False,
-    help="Prints the list of supported alleles and exits"
-)
-helper_args.add_argument(
-    "--list-supported-peptide-lengths",
-    action="store_true",
-    default=False,
-    help="Prints the list of supported peptide lengths and exits"
-)
-helper_args.add_argument(
-    "--version",
-    action="version",
-    version="mhcflurry %s" % __version__,
-)
 
 input_args = parser.add_argument_group(title="Input (required)")
 input_args.add_argument(
@@ -201,6 +156,30 @@ model_args.add_argument(
     help="Do not use flanking sequence information even when available")
 
 add_prediction_parallelism_args(parser)
+
+helper_args = parser.add_argument_group(title="Help")
+helper_args.add_argument(
+    "-h", "--help",
+    action="help",
+    help="Show this help message and exit"
+)
+helper_args.add_argument(
+    "--list-supported-alleles",
+    action="store_true",
+    default=False,
+    help="Prints the list of supported alleles and exits"
+)
+helper_args.add_argument(
+    "--list-supported-peptide-lengths",
+    action="store_true",
+    default=False,
+    help="Prints the list of supported peptide lengths and exits"
+)
+helper_args.add_argument(
+    "--version",
+    action="version",
+    version="mhcflurry %s" % __version__,
+)
 
 
 _PREDICTOR_CACHE = {}

@@ -351,7 +351,9 @@ def test_collect_provenance_rejects_holdout_overlap(tmp_path):
 
 def test_packaging_preserves_explicit_original_training_version(tmp_path):
     module = load_module()
-    trained_version = "2.3.1rc3"
+    # Keep this fixture outside the release family as package versions advance.
+    other_major = int(RELEASE_VERSION.split(".")[0]) + 1
+    trained_version = f"{other_major}.0.0rc3"
     write_model_info(tmp_path, trained_version)
     write_holdout_proof(tmp_path)
     kwargs = dict(
@@ -366,4 +368,5 @@ def test_packaging_preserves_explicit_original_training_version(tmp_path):
     assert result["artifacts"]["affinity"]["package_version"] == trained_version
     assert result["expected_training_package_version"] == trained_version
     with pytest.raises(ValueError, match="does not match explicit"):
-        module.collect_provenance(**kwargs, training_package_version="2.3.1rc2")
+        module.collect_provenance(
+            **kwargs, training_package_version=f"{other_major}.0.0rc2")
