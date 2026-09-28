@@ -18,31 +18,49 @@ import runpy
 from pathlib import Path
 
 import setuptools
+from packaging.requirements import Requirement
+from packaging.version import Version
 
 from mhcflurry.version import __version__
 
 
-def test_install_guidance_targets_current_stable_release():
+def test_install_guidance_targets_current_stable_series():
     repo_dir = Path(__file__).resolve().parents[1]
     prerelease = re.compile(r"\b\d+\.\d+\.\d+(?:a|b|rc)\d+\b")
-    stable_series = re.compile(r"\blatest stable \d+\.\d+(?:\.\w+)?\b", re.I)
+    version = Version(__version__)
+    series = '%d.%d' % (version.major, version.minor)
+
+    def check_installation(text):
+        requirements = re.findall(r'%?pip install --upgrade "(mhcflurry[^\"]+)"', text)
+        assert requirements
+        for requirement in requirements:
+            specifier = Requirement(requirement).specifier
+            assert specifier.contains(version, prereleases=False)
+            assert specifier.contains('%s.%d' % (series, version.micro + 1), prereleases=False)
+            assert not specifier.contains('%d.%d.0' % (version.major, version.minor + 1))
+            if version.minor:
+                assert not specifier.contains('%d.%d.0' % (version.major, version.minor - 1))
+        # Check the introduction too: a correct command can still sit beneath
+        # prose advertising a different patch, as happened in README/Colab.
+        for line in text.splitlines():
+            if 'install' in line.lower():
+                advertised = re.search(r'\bMHCflurry (\d+(?:\.\d+)*)', line)
+                if advertised:
+                    assert advertised.group(1) == series
+        assert '--pre ' not in text
+        assert not prerelease.search(text)
 
     for relative_path in ("README.md", "docs/intro.md"):
         text = (repo_dir / relative_path).read_text()
-        assert 'pip install --upgrade "mhcflurry==%s"' % __version__ in text
-        assert "--pre " not in text
-        assert not prerelease.search(text), relative_path
-        assert not stable_series.search(text), relative_path
+        check_installation(text)
 
     notebook = json.loads(
         (repo_dir / "notebooks/mhcflurry-colab.ipynb").read_text())
     setup_cell = next(
         cell for cell in notebook["cells"] if cell["cell_type"] == "code")
     source = "".join(setup_cell["source"])
-    assert f'%pip install --upgrade "mhcflurry=={__version__}"' in source
-    assert "--pre " not in source
+    check_installation('\n'.join(''.join(cell['source']) for cell in notebook['cells']))
     assert "mhcflurry-downloads --quiet fetch models_class1_presentation" in source
-    assert not prerelease.search(source)
 
 
 def test_setup_packages_cli_subpackage(monkeypatch):

@@ -1,6 +1,9 @@
 """Discovery and explicit release selection must agree about paths and sources."""
 import csv
+import io
 import json
+import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -66,11 +69,82 @@ def test_info_resolves_defaults_and_source_status(versioned_cache, capsys):
     record_source(target, '2.2.0')
     downloads_command.run(['info', BUNDLE, '--json'])
     assert json.loads(capsys.readouterr().out)['source_matches'] is False
-    downloads_command.run(['info'])
+    downloads_command.run(['--verbose', 'info'])
     text = capsys.readouterr().out
     assert text.index('Resolved configuration') < text.index('Environment variables')
     assert 'optional overrides' in text
     assert 'not file integrity' in text
+
+
+def test_info_puts_weight_versions_before_history_and_configuration(versioned_cache, capsys):
+    record_source(versioned_cache / '2.3.0' / BUNDLE, '2.3.0')
+    record_source(versioned_cache / '2.2.0' / BUNDLE, '2.2.0')
+    downloads_command.run(['info'])
+    text = capsys.readouterr().out
+    assert text.index('LATEST') < text.index('Historical models')
+    assert text.index('Historical models') < text.index('Resolved configuration')
+    assert 'OTHER VERSIONS' in text and 'INSTALLED' in text
+    assert 'Full presentation predictor, including' not in text
+    assert 'Default prediction paths' not in text
+    assert 'mhcflurry downloads --verbose info' in text
+    row = next(line for line in text.splitlines() if line.startswith(BUNDLE + ' '))
+    assert row.index('2.3.0') < row.index('2.2.0')
+    # The actual installed catalogue directories remain selectable, including
+    # aliases; availability groups shared archive URLs only once.
+    cache = {}
+    latest, other, installed = downloads_command._model_versions(BUNDLE, cache)
+    assert latest == '2.3.0'
+    assert other == '2.2.0, 1.7.0, 1.6.0'
+    assert installed == '2.3.0, 2.2.0'
+
+
+def test_model_table_marks_unverified_sources_and_custom_roots(tmp_path, monkeypatch):
+    monkeypatch.setattr(downloads, '_CURRENT_RELEASE', None)
+    monkeypatch.setattr(downloads, '_DOWNLOADS_DIR', str(tmp_path))
+    path = tmp_path / BUNDLE
+    path.mkdir()
+    assert downloads_command._model_versions(BUNDLE, {})[2] == 'custom?'
+    record_source(path, '2.2.0')
+    assert downloads_command._model_versions(BUNDLE, {})[2] == 'custom: 2.2.0'
+    (path / 'DOWNLOAD_INFO.csv').write_text('url\nhttps://example.org/custom-models\n')
+    assert downloads_command._model_versions(BUNDLE, {})[2] == 'custom!'
+
+
+@pytest.mark.parametrize('environment', [{}, {'NO_COLOR': '1'}, {'TERM': 'dumb'}])
+def test_table_color_preserves_alignment_and_plain_output(monkeypatch, environment):
+    class Terminal(io.StringIO):
+        def isatty(self):
+            return True
+
+    monkeypatch.delenv('NO_COLOR', raising=False)
+    monkeypatch.setenv('TERM', 'xterm-256color')
+    monkeypatch.setenv('COLUMNS', '80')
+    for key, value in environment.items():
+        monkeypatch.setenv(key, value)
+    plain = io.StringIO()
+    terminal = Terminal()
+    rows = [(BUNDLE, '2.3.0', '2.2.0, 1.7.0, 1.6.0', '2.3.0, 2.2.0'),
+            ('models_class1_pan', '2.3.0', '2.2.0, 1.7.0', '—')]
+    for stream in (plain, terminal):
+        monkeypatch.setattr(sys, 'stdout', stream)
+        downloads_command._print_table(
+            ('MODEL', 'LATEST', 'OTHER VERSIONS', 'INSTALLED'), rows,
+            colors={1: '36', 3: downloads_command._status_color}, wrap_columns=(2, 3))
+    assert '\x1b[' not in plain.getvalue()
+    assert ('\x1b[' in terminal.getvalue()) == (not environment)
+    assert re.sub(r'\x1b\[[0-9;]*m', '', terminal.getvalue()) == plain.getvalue()
+    assert max(map(len, plain.getvalue().splitlines())) <= 80
+
+
+def test_json_remains_uncolored_on_a_terminal(monkeypatch, capsys):
+    monkeypatch.setattr(sys.stdout, 'isatty', lambda: True)
+    monkeypatch.delenv('NO_COLOR', raising=False)
+    monkeypatch.setenv('TERM', 'xterm-256color')
+    downloads_command.run(['info', '--json'])
+    text = capsys.readouterr().out
+    assert '\x1b[' not in text
+    result = json.loads(text)
+    assert 'default_model_paths' in result and 'environment_overrides' in result
 
 
 def test_releases_filter_and_compatibility(capsys):

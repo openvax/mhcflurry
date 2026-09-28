@@ -22,12 +22,17 @@ import sys
 _OPTION = re.compile(r"(?<![\w-])(--[a-zA-Z][\w-]*|-[a-zA-Z])\b")
 
 
+def color_enabled(stream):
+    """Return whether the destination supports optional terminal styling."""
+    return bool(
+        getattr(stream, "isatty", lambda: False)()
+        and not os.environ.get("NO_COLOR")
+        and os.environ.get("TERM") != "dumb")
+
+
 def style_help(text, stream):
     """Style headings and flags only when writing to a color-capable terminal."""
-    if (
-            not getattr(stream, "isatty", lambda: False)()
-            or os.environ.get("NO_COLOR")
-            or os.environ.get("TERM") == "dumb"):
+    if not color_enabled(stream):
         return text
 
     lines = []
