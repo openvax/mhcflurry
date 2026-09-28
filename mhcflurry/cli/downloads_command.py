@@ -458,6 +458,8 @@ def _print_downloads(records):
                 for record in primary]
         _print_table(('MODEL', 'LATEST', 'OTHER VERSIONS', 'INSTALLED'), rows,
                      colors={1: '36', 3: _status_color}, wrap_columns=(2, 3))
+        if any(record['name'] == 'models_class1_presentation' for record in primary):
+            print('The presentation bundle includes its own affinity and processing models.')
         print("Shared archive aliases are grouped under one version; 'releases NAME' lists all.")
         if any('?' in row[3] or '!' in row[3] for row in rows):
             print('Installed: ? unknown source; ! recorded source differs from that catalogue.')
