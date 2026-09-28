@@ -11,40 +11,28 @@
 # limitations under the License.
 
 """
-Scan protein sequences using the MHCflurry presentation predictor.
+Scan proteins for peptide presentation using a CSV, FASTA or --sequences.
 
-By default, sub-sequences (peptides) with affinity percentile ranks less than
-2.0 are returned. You can also specify --results-all to return predictions for
-all peptides, or adjust the filter threshold(s) using the --threshold-* options.
+With --alleles, return peptides with affinity percentile ranks below 2.0 by
+default. Use --results-all for every peptide or --threshold-* to change the
+filters. Without --alleles, predict processing only. Results go to stdout
+unless --out is given.
 
 Examples:
+  mhcflurry predict-scan proteins.fasta --alleles HLA-A0201 --out hits.csv
+  mhcflurry predict-scan proteins.csv --alleles 'HLA-A*02:01;HLA-A*03:01'
+  mhcflurry predict-scan --sequences SIINFEKLGGGNLVPMVATV --alleles HLA-A0201
 
-Scan a set of sequences in a FASTA file for binders to any alleles in a MHC I
-genotype:
-
-$ mhcflurry predict-scan test/data/example.fasta --alleles 'HLA-A*02:01;HLA-A*03:01'
-
-Instead of a FASTA, you can also pass a CSV that has "sequence_id" and "sequence"
-columns.
-
-You can also specify multiple MHC I genotypes to scan as space-separated
-arguments to the --alleles option:
-
-$ mhcflurry predict-scan example.fasta --alleles 'A0201;A0301' 'B0702;B0801'
-
-If `--out` is not specified, results are written to standard out.
-
-You can also specify sequences on the commandline:
-
-mhcflurry predict-scan --sequences MGYINVFAFPFTIYSLLLCRMNSRNYIAQVDVVNFNLT --alleles HLA-A*02:01
-
+CSV columns: sequence_id, sequence. Each --alleles argument is one sample;
+delimit alleles within a quoted argument with commas or semicolons to give
+a sample genotype.
 """
 import sys
-import argparse
 import collections
 
 import pandas
 
+from .help import HelpArgumentParser
 from ..downloads import get_default_class1_presentation_models_dir
 from ..class1_presentation_predictor import Class1PresentationPredictor
 from ..fasta import read_fasta_to_dataframe
@@ -64,35 +52,11 @@ from ..workload_planning import (
 from ..version import __version__
 
 
-parser = argparse.ArgumentParser(
+parser = HelpArgumentParser(
+    usage="%(prog)s [OPTIONS] [INPUT]",
     description=__doc__,
-    formatter_class=argparse.RawDescriptionHelpFormatter,
     add_help=False)
 
-
-helper_args = parser.add_argument_group(title="Help")
-helper_args.add_argument(
-    "-h", "--help",
-    action="help",
-    help="Show this help message and exit"
-)
-helper_args.add_argument(
-    "--list-supported-alleles",
-    action="store_true",
-    default=False,
-    help="Print the list of supported alleles and exit"
-)
-helper_args.add_argument(
-    "--list-supported-peptide-lengths",
-    action="store_true",
-    default=False,
-    help="Print the list of supported peptide lengths and exit"
-)
-helper_args.add_argument(
-    "--version",
-    action="version",
-    version="mhcflurry %s" % __version__,
-)
 
 input_args = parser.add_argument_group(title="Input options")
 input_args.add_argument(
@@ -201,6 +165,30 @@ model_args.add_argument(
     help="Do not use flanking sequence information in predictions")
 
 add_prediction_parallelism_args(parser)
+
+helper_args = parser.add_argument_group(title="Help")
+helper_args.add_argument(
+    "-h", "--help",
+    action="help",
+    help="Show this help message and exit"
+)
+helper_args.add_argument(
+    "--list-supported-alleles",
+    action="store_true",
+    default=False,
+    help="Print the list of supported alleles and exit"
+)
+helper_args.add_argument(
+    "--list-supported-peptide-lengths",
+    action="store_true",
+    default=False,
+    help="Print the list of supported peptide lengths and exit"
+)
+helper_args.add_argument(
+    "--version",
+    action="version",
+    version="mhcflurry %s" % __version__,
+)
 
 
 _PREDICTOR_CACHE = {}

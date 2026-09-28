@@ -38,6 +38,7 @@ import importlib
 import sys
 
 from ..version import __version__
+from .help import style_help
 
 
 # Every subcommand is ``(module_path, entry_attr, one-line help)``. The
@@ -283,10 +284,10 @@ def main(argv=None):
         # exit 0 so the screen can be piped into ``less`` and so
         # tab-completion shells that probe ``mhcflurry`` don't see a
         # spurious error.
-        print(format_help())
+        print(style_help(format_help(), sys.stdout))
         return 0
     if argv[0] in ("-h", "--help"):
-        print(format_help())
+        print(style_help(format_help(), sys.stdout))
         return 0
     if argv[0] in ("-V", "--version"):
         print("mhcflurry %s" % __version__)
