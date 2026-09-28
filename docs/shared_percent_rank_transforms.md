@@ -108,7 +108,7 @@ The compact transform's `selection` dictionary records the selected budget,
 actual knot count, reason, seed, reference count/hash, and—when comparison is
 possible—validation counts, split-mask hash, cutoffs, errors, and tolerance.
 The fixed selection seed is separate from the CLI `--random-seed` (default 42),
-which governs generation of calibration peptides and genotypes.
+which governs generation of calibration peptides and MHC allele sets.
 
 ## Python examples
 
@@ -181,7 +181,7 @@ should use the generic class and specify `survival=True` where appropriate.
 The command writes **in place**. Point it at a separately preserved candidate
 copy, not a public baseline or the only copy of an earlier calibration.
 These are command templates; retain the original release's reference policy,
-sample count, amino-acid distribution, seed, and genotype sampling for a
+sample count, amino-acid distribution, seed, and MHC allele set sampling for a
 controlled recalibration. Omitted affinity/presentation reference-generation
 options use CLI defaults, which need not match a release's recipe.
 

@@ -16,20 +16,22 @@ Manage local downloaded data.
 
 import logging
 import yaml
-from os.path import join, exists, dirname
+from os.path import join, exists, dirname, abspath
 from os import environ
 from shlex import quote
 from importlib.resources import files
 from collections import OrderedDict
 from appdirs import user_data_dir
 
-import pandas
+import csv
 
 ENVIRONMENT_VARIABLES = [
     "MHCFLURRY_DATA_DIR",
     "MHCFLURRY_DOWNLOADS_CURRENT_RELEASE",
     "MHCFLURRY_DOWNLOADS_DIR",
-    "MHCFLURRY_DEFAULT_CLASS1_MODELS"
+    "MHCFLURRY_DEFAULT_CLASS1_MODELS",
+    "MHCFLURRY_DEFAULT_CLASS1_PRESENTATION_MODELS_DIR",
+    "MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS_DIR",
 ]
 
 _DOWNLOADS_DIR = None
@@ -71,6 +73,79 @@ def get_downloads_metadata():
     return _METADATA
 
 
+def resolve_release(release=None):
+    """Validate a catalogue identifier, defaulting to the configured release."""
+    metadata = get_downloads_metadata()
+    release = release or get_current_release() or metadata['current-release']
+    if release not in metadata['releases']:
+        raise ValueError(
+            "Unknown download release %r. Run 'mhcflurry downloads releases' "
+            "for valid identifiers (these are separate from package versions)."
+            % release)
+    return release
+
+
+def get_download_urls(metadata):
+    """Return ordered archive URLs, including every part of split downloads."""
+    return [metadata['url']] if 'url' in metadata else metadata['part_urls']
+
+
+def get_bundle_description(name):
+    """Return the purpose and category of a named download."""
+    try:
+        return get_downloads_metadata()['bundles'][name]
+    except KeyError:
+        raise ValueError(
+            "Unknown download %r. Run 'mhcflurry downloads list'." % name) from None
+
+
+def get_bundle_versions(name):
+    """Group catalogue entries for one bundle by identical archive URLs.
+
+    URL equality identifies shared sources, not verified content equality.
+    """
+    get_bundle_description(name)
+    versions = OrderedDict()
+    for release, info in get_downloads_metadata()['releases'].items():
+        for download in info['downloads']:
+            if download['name'] == name:
+                urls = tuple(get_download_urls(download))
+                versions.setdefault(urls, []).append(release)
+    return [dict(releases=releases, urls=list(urls))
+            for urls, releases in versions.items()]
+
+
+def get_model_release_dir(release):
+    """Resolve explicitly selected presentation weights without model imports.
+
+    Explicit selection overrides default-model environment variables. Custom,
+    unversioned download roots must record matching source URLs so a release
+    selector cannot silently load a different set of weights.
+    """
+    release = resolve_release(release)
+    metadata = get_downloads_metadata()
+    if (metadata['releases'][release]['compatibility-version'] !=
+            metadata['current-compatibility-version']):
+        raise ValueError("Download release %s uses an incompatible model format." % release)
+    name = 'models_class1_presentation'
+    available = get_release_downloads(release)
+    if name not in available:
+        raise ValueError(
+            "Release %s has no presentation bundle. Run 'mhcflurry downloads "
+            "releases models_class1_presentation'. For other predictors, use --models DIR."
+            % release)
+    info = available[name]
+    path = get_path(name, 'models', release=release)
+    if info['up_to_date'] is False or (
+            get_current_release() is None and info['up_to_date'] is not True):
+        raise ValueError(
+            "Cannot confirm that %s contains release %s: recorded source URLs "
+            "are missing or different. Use a versioned MHCFLURRY_DATA_DIR, "
+            "or select your local weights explicitly with --models DIR."
+            % (quote(path), release))
+    return abspath(path)
+
+
 def get_default_class1_models_dir(test_exists=True):
     """
     Return the absolute path to the default class1 models dir.
@@ -81,7 +156,7 @@ def get_default_class1_models_dir(test_exists=True):
     downloads dir.
 
     If environment variable MHCFLURRY_DEFAULT_CLASS1_MODELS is NOT set,
-    then return the path to downloaded models in the "models_class1" download.
+    then return the pan-allele affinity path in the "models_class1_pan" download.
 
     Parameters
     ----------
@@ -108,7 +183,7 @@ def get_default_class1_presentation_models_dir(test_exists=True):
 
     See `get_default_class1_models_dir`.
 
-    If environment variable MHCFLURRY_DEFAULT_CLASS1_PRESENTATION_MODELS is set
+    If environment variable MHCFLURRY_DEFAULT_CLASS1_PRESENTATION_MODELS_DIR is set
     to an absolute path, return that path. If it's set to a relative path (does
     not start with /) then return that path taken to be relative to the mhcflurry
     downloads dir.
@@ -140,7 +215,7 @@ def get_default_class1_processing_models_dir(test_exists=True):
 
     See `get_default_class1_models_dir`.
 
-    If environment variable MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS is set
+    If environment variable MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS_DIR is set
     to an absolute path, return that path. If it's set to a relative path (does
     not start with /) then return that path taken to be relative to the mhcflurry
     downloads dir.
@@ -193,14 +268,17 @@ def get_release_downloads(release):
     downloads = (
         get_downloads_metadata()
         ['releases']
-        [release]
+        [resolve_release(release)]
         ['downloads'])
 
     def up_to_date(dir, urls):
         try:
-            df = pandas.read_csv(join(dir, "DOWNLOAD_INFO.csv"))
-            return list(df.url) == list(urls)
-        except IOError:
+            with open(join(dir, "DOWNLOAD_INFO.csv"), newline="") as fd:
+                reader = csv.DictReader(fd)
+                if not reader.fieldnames or "url" not in reader.fieldnames:
+                    return None
+                return [row["url"] for row in reader] == list(urls)
+        except (OSError, csv.Error, UnicodeError):
             return None
 
     return OrderedDict(
@@ -208,7 +286,7 @@ def get_release_downloads(release):
             'downloaded': exists(join(get_downloads_dir(release), download["name"])),
             'up_to_date': up_to_date(
                 join(get_downloads_dir(release), download["name"]),
-                [download['url']] if 'url' in download else download['part_urls']),
+                get_download_urls(download)),
             'metadata': download,
         }) for download in downloads
     )
@@ -246,9 +324,10 @@ def get_path(download_name, filename='', test_exists=True, release=None):
     if test_exists and not exists(path):
         raise RuntimeError(
             "Missing MHCflurry downloadable file: %s. "
-            "To download this data, run:\n\tmhcflurry-downloads fetch %s\n"
+            "To download this data, run:\n\tmhcflurry downloads fetch %s%s\n"
             "in a shell."
-            % (quote(path), download_name))
+            % (quote(path), download_name,
+               " --release " + quote(release) if release else ""))
     return path
 
 
@@ -268,9 +347,10 @@ def configure():
             _CURRENT_RELEASE = metadata['current-release']
 
         current_release_compatability = (
-            metadata["releases"][_CURRENT_RELEASE]["compatibility-version"])
+            metadata["releases"].get(_CURRENT_RELEASE, {}).get("compatibility-version"))
         current_compatability = metadata["current-compatibility-version"]
-        if current_release_compatability != current_compatability:
+        if (current_release_compatability is not None and
+                current_release_compatability != current_compatability):
             logging.warning(
                 "The specified downloads are not compatible with this version "
                 "of the MHCflurry codebase. Downloads: release %s, "

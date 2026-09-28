@@ -26,15 +26,37 @@ directory. Use `info` to list available bundles and `path` to locate one:
 :nostderr:
 ```
 
+See {doc}`model_downloads` to browse releases and select historical weights
+with `--model-release`.
+
 ## Predict peptides
 
-`mhcflurry predict` scores individual peptides with the downloaded models:
+`mhcflurry predict` scores peptides with their MHC alleles and N/C source-protein
+flanks. The example CSV contains windows from `example.fasta`:
 
-```{command-output} mhcflurry predict --alleles HLA-A0201 HLA-A0301 --peptides SIINFEKL SIINFEKD SIINFEKQ --out /tmp/predictions.csv
+```{literalinclude} /example-peptides.csv
+:language: text
+```
+
+Flanks are used by default when both columns are provided:
+
+```{command-output} mhcflurry predict example-peptides.csv --out /tmp/predictions.csv
 :nostderr:
 ```
 
 ```{command-output} cat /tmp/predictions.csv
+```
+
+To compare the same rows without flanks:
+
+```shell
+mhcflurry predict example-peptides.csv --no-flanking --out predictions-no-flanks.csv
+```
+
+When context is unavailable, omit the flank columns or supply peptide arguments:
+
+```shell
+mhcflurry predict --alleles HLA-A0201 HLA-A0301 --peptides SIINFEKL SIINFEKD --out predictions.csv
 ```
 
 | Output | Interpretation |
@@ -55,24 +77,24 @@ with `NaN` predictions instead.
 
 (allele-input-semantics)=
 
-### Alleles, genotypes, and samples
+### MHC alleles and samples
 
 MHCflurry treats each allele argument or CSV cell as one query. Delimiters
-inside a query (`;`, `,`, or whitespace) combine alleles into one genotype;
+inside a query (`;`, `,`, or whitespace) combine alleles into one MHC allele set;
 separate command-line arguments remain separate queries.
 
 | Input | Meaning |
 |---|---|
 | `--alleles A0201 A0301 --peptides P1 P2` | Four independent allele–peptide rows. |
-| `--alleles 'A0201;A0301' --peptides P1 P2` | Two genotype–peptide rows; `best_allele` identifies the stronger allele. |
+| `--alleles 'A0201;A0301' --peptides P1 P2` | Two MHC allele set–peptide rows; `best_allele` identifies the stronger allele. |
 | CSV rows `P1,A0201` and `P1,A0301` | Two independent rows. |
-| CSV row `P1,A0201;A0301` | One genotype row with the strongest allele reported. |
+| CSV row `P1,A0201;A0301` | One MHC allele set row with the strongest allele reported. |
 
 `mhcflurry predict-scan` uses the same rule: each `--alleles` argument names
 one sample. A quoted comma-separated panel is scored as one group and reports
 the best allele across that group; separate arguments keep per-allele or
-per-genotype results. A large population panel is therefore not the same thing
-as one person's genotype.
+per-sample results. A large population panel is therefore not the same thing
+as one person's MHC allele set.
 
 For CSV prediction, optional `n_flank` and `c_flank` columns provide source
 protein context for cleavage prediction. See the

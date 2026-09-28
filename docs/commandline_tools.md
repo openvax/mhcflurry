@@ -4,7 +4,7 @@ This page lists every command and option. If you are new to MHCflurry or are
 choosing a workflow, start with the {ref}`tutorial <commandline_tutorial>` and
 return here to look up specific arguments.
 
-MHCflurry 2.3.0 provides a unified `mhcflurry` command while retaining the
+MHCflurry provides a unified `mhcflurry` command while retaining the
 historical `mhcflurry-*` names. Both forms use the same implementation. See
 {doc}`configuration` for the naming convention, {doc}`evaluation` for the
 evaluation workflow, and the generated argument reference below for every
@@ -12,50 +12,11 @@ option.
 
 Prediction help uses a compact usage line, spaced options and terminal colors.
 Redirected help stays plain text; set `NO_COLOR=1` to disable colors in a terminal.
-Run `mhcflurry downloads info` to inspect available bundles and the active cache,
-or `mhcflurry downloads path models_class1_presentation` for a fetched bundle's
-directory. Model bundles are versioned separately from the Python package.
-`downloads info` lists the active catalogue, not every version of each bundle.
-For the historical catalogue, run:
-
-```shell
-MHCFLURRY_DOWNLOADS_CURRENT_RELEASE=2.2.0 mhcflurry downloads info
-```
-
-The public 2.1.5, 2.2.0 and 2.2.1 packages used the same 2020 model archives,
-registered under catalogue `2.2.0`. Catalogue `2.3.0` selects the newly trained
-weights. Older GitHub tags such as `pre-2.0` in download URLs identify where
-an archive was uploaded; they do not imply that the active package is a prerelease.
-
-| Bundle name | Purpose |
-| --- | --- |
-| `models_class1_presentation` | Full presentation predictor, including affinity, processing and their combiner. The default for prediction. |
-| `models_class1_pan` | Selected pan-allele binding-affinity ensemble. |
-| `models_class1_processing` | Standalone antigen-processing ensembles. |
-| `models_class1` | Legacy 2018 allele-specific affinity models; not the current general-purpose class-I predictor. |
-| `*_unselected` | Candidate networks before ensemble selection. |
-| `*_variants`, `*_with_mass_spec`, `*_no_mass_spec`, `*_minimal` | Historical experimental configurations, training variants or small subsets. |
-| `data_*`, `allele_sequences`, `analysis_predictor_info` | Data and supporting resources rather than model weights. |
-
-The presentation bundle contains its own affinity and processing components.
-The standalone bundles can therefore show `NO` under `DOWNLOADED?` while
-presentation prediction is fully installed.
-
-To compare the current and historical public weights on one input CSV:
-
-```shell
-mhcflurry downloads fetch --release 2.3.0 models_class1_presentation
-mhcflurry downloads fetch --release 2.2.0 models_class1_presentation
-MHCFLURRY_DOWNLOADS_CURRENT_RELEASE=2.3.0 mhcflurry predict eval.csv --no-flanking --out new.csv
-MHCFLURRY_DOWNLOADS_CURRENT_RELEASE=2.2.0 mhcflurry predict eval.csv --no-flanking --out old.csv
-```
-
-This compares weight bundles using the installed code. To select an arbitrary
-presentation predictor, pass `--models /path/to/models_class1_presentation/models`.
-Use the same input rows for both runs. Omit `--no-flanking` from both commands to
-compare with native flanks supplied in the CSV. Reproducing a historical package's
-behavior also requires that package in a separate environment; see
-{doc}`release_model_evaluation` for the completed stable-version comparison.
+Browse and select weight releases with `mhcflurry downloads releases`,
+`mhcflurry downloads list`, and `mhcflurry predict --model-release RELEASE`.
+See {doc}`model_downloads` for bundle descriptions, local paths, and a worked
+comparison with historical weights. Use {doc}`shared_percent_rank_transforms`
+for compact percentile calibration.
 
 ## Prediction and data
 

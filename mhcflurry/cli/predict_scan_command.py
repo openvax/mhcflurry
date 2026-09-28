@@ -25,30 +25,14 @@ Examples:
 
 CSV columns: sequence_id, sequence. Each --alleles argument is one sample;
 delimit alleles within a quoted argument with commas or semicolons to give
-a sample genotype.
+a sample MHC allele set.
 """
 import sys
 import collections
 
-import pandas
-
 from .help import HelpArgumentParser
-from ..downloads import get_default_class1_presentation_models_dir
-from ..class1_presentation_predictor import Class1PresentationPredictor
-from ..fasta import read_fasta_to_dataframe
-from ..parallelism import (
-    add_prediction_parallelism_args,
-    chunk_ranges_for_local_parallelism,
-    num_workers_per_gpu_from_args,
-    worker_pool_with_gpu_assignments_from_args,
-)
-from ..pytorch_sizing import default_prediction_batch_is_auto
-from ..workload_planning import (
-    WORKLOAD_PRESENTATION_INFERENCE,
-    WORKLOAD_PROCESSING_INFERENCE,
-    model_artifact_size_bytes,
-    path_size_bytes,
-)
+from ..downloads import get_default_class1_presentation_models_dir, get_model_release_dir
+from ..parallelism import add_prediction_parallelism_args
 from ..version import __version__
 
 
@@ -74,7 +58,7 @@ input_args.add_argument(
     "--alleles",
     metavar="ALLELE",
     nargs="+",
-    help="Sample allele or genotype queries. Each argument is one sample; "
+    help="Sample MHC allele or allele-set queries. Each argument is one sample; "
     "delimit alleles within a sample with ',' or ';'.")
 input_args.add_argument(
     "--sequences",
@@ -151,13 +135,20 @@ output_args.add_argument(
     help="Do not include affinity percentile rank")
 
 model_args = parser.add_argument_group(title="Model options")
-model_args.add_argument(
+model_selection = model_args.add_mutually_exclusive_group()
+model_selection.add_argument(
     "--models",
     metavar="DIR",
     default=None,
     help="Directory containing presentation models. "
     "Default: %s" % get_default_class1_presentation_models_dir(
         test_exists=False))
+model_selection.add_argument(
+    "--model-release",
+    metavar="RELEASE",
+    help="Use the presentation weights from a download release, overriding model "
+    "path defaults. List choices: mhcflurry downloads releases models_class1_presentation.")
+
 model_args.add_argument(
     "--no-flanking",
     action="store_true",
@@ -195,6 +186,8 @@ _PREDICTOR_CACHE = {}
 
 
 def _load_predictor_for_command(models_dir):
+    from ..class1_presentation_predictor import Class1PresentationPredictor
+
     if models_dir not in _PREDICTOR_CACHE:
         _PREDICTOR_CACHE[models_dir] = Class1PresentationPredictor.load(
             models_dir)
@@ -254,6 +247,28 @@ def run(argv=sys.argv[1:]):
 
     args = parser.parse_args(argv)
 
+    try:
+        selected_models_dir = (
+            get_model_release_dir(args.model_release) if args.model_release else None)
+    except (ValueError, RuntimeError) as error:
+        parser.error(str(error))
+
+    import pandas
+    from ..parallelism import (
+        chunk_ranges_for_local_parallelism,
+        num_workers_per_gpu_from_args,
+        worker_pool_with_gpu_assignments_from_args,
+    )
+    from ..pytorch_sizing import default_prediction_batch_is_auto
+    from ..workload_planning import (
+        WORKLOAD_PRESENTATION_INFERENCE,
+        WORKLOAD_PROCESSING_INFERENCE,
+        model_artifact_size_bytes,
+        path_size_bytes,
+    )
+    from ..class1_presentation_predictor import Class1PresentationPredictor
+    from ..fasta import read_fasta_to_dataframe
+
     # It's hard to pass a tab in a shell, so we correct a common error:
     if args.output_delimiter == "\\t":
         args.output_delimiter = "\t"
@@ -275,7 +290,7 @@ def run(argv=sys.argv[1:]):
             file=sys.stderr)
         args.threshold_affinity_percentile = default_thresholds["affinity_percentile"]
 
-    models_dir = args.models
+    models_dir = args.models or selected_models_dir
     if models_dir is None:
         # The reason we set the default here instead of in the argument parser
         # is that we want to test_exists at this point, so the user gets a

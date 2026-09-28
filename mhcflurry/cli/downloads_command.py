@@ -31,7 +31,7 @@ Summarize available and fetched downloads:
     $ mhcflurry-downloads info
 """
 import sys
-import argparse
+import json
 import logging
 import os
 from shlex import quote
@@ -42,7 +42,7 @@ from tempfile import NamedTemporaryFile
 from tqdm import tqdm
 
 import posixpath
-import pandas
+import csv
 
 try:
     from urllib.request import urlretrieve
@@ -53,17 +53,36 @@ except ImportError:
 
 from ..downloads import (
     get_current_release,
-    get_current_release_downloads,
+    get_downloads_metadata,
+    get_bundle_description,
+    get_bundle_versions,
+    get_download_urls,
+    resolve_release,
     get_release_downloads,
     get_downloads_dir,
+    get_default_class1_models_dir,
+    get_default_class1_presentation_models_dir,
+    get_default_class1_processing_models_dir,
     get_path,
     ENVIRONMENT_VARIABLES)
+from ..version import __version__
+from .help import HelpArgumentParser
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
-parser = argparse.ArgumentParser(
-    description=__doc__,
-    formatter_class=argparse.RawDescriptionHelpFormatter)
+parser = HelpArgumentParser(
+    description="""Browse, download and locate released weights and supporting data.
+
+Start here:
+  mhcflurry downloads releases models_class1_presentation
+  mhcflurry downloads list --kind models
+  mhcflurry downloads info models_class1_presentation
+  mhcflurry downloads fetch models_class1_presentation --release 2.2.0
+  mhcflurry predict INPUT.csv --model-release 2.2.0
+
+Download releases are catalogue versions, separate from the installed code.
+Browsing uses the catalogue shipped with this package; no network is required.
+""")
 
 parser.add_argument(
     "--quiet",
@@ -101,6 +120,16 @@ parser_fetch.add_argument(
     help="Don't download files, get them from DIR")
 
 parser_info = subparsers.add_parser('info')
+parser_info.add_argument('download_name', nargs='?', metavar='DOWNLOAD')
+parser_info.add_argument('--json', action='store_true', help='Print machine-readable JSON')
+
+parser_list = subparsers.add_parser('list', help='Browse models and supporting data')
+parser_list.add_argument('--kind', choices=('all', 'models', 'data'), default='all')
+parser_list.add_argument('--json', action='store_true', help='Print machine-readable JSON')
+
+parser_releases = subparsers.add_parser('releases', help='List valid catalogue releases')
+parser_releases.add_argument('download_name', nargs='?', metavar='DOWNLOAD')
+parser_releases.add_argument('--json', action='store_true', help='Print machine-readable JSON')
 
 parser_path = subparsers.add_parser('path')
 parser_path.add_argument(
@@ -110,26 +139,31 @@ parser_path.add_argument(
 
 parser_url = subparsers.add_parser('url')
 parser_url.add_argument(
-    "download_name",
-    nargs="?",
-    default='')
+    "download_name")
+
+for subparser in (parser_info, parser_list, parser_path, parser_url):
+    subparser.add_argument('--release', metavar='RELEASE',
+                          help='Catalogue release (default: configured release)')
 
 
 def run(argv=sys.argv[1:]):
     args = parser.parse_args(argv)
-    if not args.quiet:
-        logging.basicConfig(level="INFO")
-    if args.verbose:
-        logging.basicConfig(level="DEBUG")
+    logging.basicConfig(level=(logging.DEBUG if args.verbose else
+                               logging.WARNING if args.quiet else logging.INFO))
 
     command_functions = {
         "fetch": fetch_subcommand,
         "info": info_subcommand,
+        "list": list_subcommand,
+        "releases": releases_subcommand,
         "path": path_subcommand,
         "url": url_subcommand,
         None: lambda args: parser.print_help(),
     }
-    command_functions[args.subparser_name](args)
+    try:
+        command_functions[args.subparser_name](args)
+    except (ValueError, RuntimeError) as error:
+        parser.error(str(error))
 
 
 def mkdir_p(path):
@@ -261,7 +295,8 @@ def fetch_subcommand(args):
                         url,
                         temp.name if len(urls) == 1 else None,
                         reporthook=TqdmUpTo(
-                            unit='B', unit_scale=True, miniters=1).update_to)
+                            unit='B', unit_scale=True, miniters=1,
+                            disable=args.quiet).update_to)
                     qprint("Downloaded to: %s" % quote(downloaded_path))
 
                 if downloaded_path != temp.name:
@@ -286,13 +321,15 @@ def fetch_subcommand(args):
             result_dir = get_path(item, test_exists=False, release=args.release)
             os.mkdir(result_dir)
 
-            for member in tqdm(members, desc='Extracting'):
+            for member in tqdm(members, desc='Extracting', disable=args.quiet):
                 tar.extractall(path=result_dir, members=[member])
             tar.close()
 
             # Save URLs that were used for this download.
-            pandas.DataFrame({"url": urls}).to_csv(
-                os.path.join(result_dir, "DOWNLOAD_INFO.csv"), index=False)
+            with open(os.path.join(result_dir, "DOWNLOAD_INFO.csv"), "w", newline="") as fd:
+                writer = csv.writer(fd)
+                writer.writerow(["url"])
+                writer.writerows([url] for url in urls)
             qprint("Extracted %d files to: %s" % (
                 len(names), quote(result_dir)))
         finally:
@@ -300,73 +337,188 @@ def fetch_subcommand(args):
                 os.remove(temp.name)
 
 
+def _download_records(release, kind="all"):
+    records = []
+    for name, info in get_release_downloads(release).items():
+        description = get_bundle_description(name)
+        if kind != "all" and description["kind"] != kind:
+            continue
+        status = (
+            "not installed" if not info["downloaded"] else
+            "installed; source unknown" if info["up_to_date"] is None else
+            "installed; source matches" if info["up_to_date"] else
+            "installed; source differs")
+        records.append(dict(
+            name=name, release=release, **description,
+            status=status, downloaded=info["downloaded"],
+            source_matches=info["up_to_date"],
+            path=os.path.abspath(get_path(name, test_exists=False, release=release)),
+            urls=get_download_urls(info["metadata"]),
+            default=info["metadata"].get("default", False)))
+    return records
+
+
+def _find_download(release, name):
+    records = _download_records(release)
+    for record in records:
+        if record["name"] == name:
+            return record
+    raise ValueError(
+        "Download %r is not in release %s. Run 'mhcflurry downloads list "
+        "--release %s' or 'mhcflurry downloads releases %s'."
+        % (name, release, release, name))
+
+
+def _print_downloads(records):
+    groups = dict.fromkeys(record["group"] for record in records)
+    for group in groups:
+        print("\n" + group)
+        for record in records:
+            if record["group"] == group:
+                print("  %s  [%s]" % (record["name"], record["status"]))
+                print("    " + record["description"])
+    print("\nInstalled means the directory exists. Source match compares recorded URLs,")
+    print("not file integrity. Inspect a bundle: mhcflurry downloads info DOWNLOAD")
+
+
+def list_subcommand(args):
+    """Show a readable catalogue or machine-readable bundle records."""
+    release = resolve_release(args.release)
+    records = _download_records(release, args.kind)
+    if args.json:
+        print(json.dumps(dict(release=release, downloads=records), indent=2))
+        return
+    print("Download release %s (code %s)" % (release, __version__))
+    print("Directory: " + os.path.abspath(get_downloads_dir(release)))
+    _print_downloads(records)
+    print("Other versions: mhcflurry downloads releases [DOWNLOAD]")
+
+
+def releases_subcommand(args):
+    """List catalogue IDs and group identical sources for an optional bundle."""
+    metadata = get_downloads_metadata()
+    name = args.download_name
+    versions = get_bundle_versions(name) if name else []
+    records = []
+    for release, info in metadata['releases'].items():
+        names = [item['name'] for item in info['downloads']]
+        if name and name not in names:
+            continue
+        records.append(dict(
+            release=release, default=release == metadata['current-release'],
+            configured=release == get_current_release(),
+            compatible=info['compatibility-version'] == metadata['current-compatibility-version'],
+            models=[item for item in names if get_bundle_description(item)['kind'] == 'models']))
+    result = dict(code_version=__version__, default_release=metadata['current-release'],
+                  releases=records, download=name, versions=versions)
+    if args.json:
+        print(json.dumps(result, indent=2))
+        return
+    print("Download releases (separate from code %s)" % __version__)
+    print("%-10s %-18s %s" % ("RELEASE", "FORMAT", "PREDICTORS / NOTES"))
+    for record in records:
+        types = [label for bundle, label in (
+            ('models_class1_presentation', 'presentation'),
+            ('models_class1_pan', 'pan-affinity'),
+            ('models_class1_processing', 'processing'),
+            ('models_class1', 'legacy affinity')) if bundle in record['models']]
+        if not types:
+            types = ['legacy affinity']
+        if record['default']:
+            types.append('default')
+        if record['configured']:
+            types.append('configured')
+        print("%-10s %-18s %s" % (
+            record['release'], 'compatible' if record['compatible'] else 'incompatible',
+            ', '.join(types)))
+    print("\nFormat compatibility is catalogue metadata, not a test of every archive.")
+    if name:
+        print("\n%s: archive sources (shared URLs grouped)" % name)
+        for version in versions:
+            print("  " + ', '.join(version['releases']))
+            for url in version['urls']:
+                print("    " + url)
+    else:
+        print("Filter by bundle: mhcflurry downloads releases models_class1_presentation")
+    print("Code 2.1.5, 2.2.0 and 2.2.1 used the 2020 weights in catalogue 2.2.0.")
+    print("Archive storage tags such as pre-2.0 are historical locations, not code requirements.")
+
+
 def info_subcommand(args):
-    print("Environment variables")
-    for variable in ENVIRONMENT_VARIABLES:
-        value = os.environ.get(variable)
-        if value:
-            print('  %-35s = %s' % (variable, quote(value)))
-        else:
-            print("  %-35s [unset or empty]" % variable)
+    """Show resolved configuration or a bundle's purpose, sources and usage."""
+    release = resolve_release(args.release)
+    if args.download_name:
+        record = _find_download(release, args.download_name)
+        record['versions'] = get_bundle_versions(record['name'])
+        fetch = "mhcflurry downloads fetch %s --release %s" % (record['name'], release)
+        record['fetch_command'] = fetch
+        if record['name'] == 'models_class1_presentation':
+            record['predict_command'] = 'mhcflurry predict INPUT.csv --model-release ' + release
+        if args.json:
+            print(json.dumps(record, indent=2))
+            return
+        print(record['name'] + " — " + release)
+        print(record['description'])
+        print("Status: " + record['status'])
+        print("Directory: " + record['path'])
+        print("\nFetch: " + fetch)
+        print("Locate: mhcflurry downloads path %s --release %s" % (record['name'], release))
+        if 'predict_command' in record:
+            print("Predict: " + record['predict_command'])
+        elif record['name'] == 'models_class1_pan':
+            print("Predict: mhcflurry predict INPUT.csv --affinity-only --models " +
+                  quote(os.path.join(record['path'], 'models.combined')))
+        print("\nVersions / archive sources (shared URLs grouped)")
+        for version in record['versions']:
+            print("  " + ', '.join(version['releases']))
+            for url in version['urls']:
+                print("    " + url)
+        print("\nSource match compares recorded URLs, not file integrity.")
+        return
 
-    print("")
-    print("Configuration")
-
-    def exists_string(path):
-        return (
-            "exists" if os.path.exists(path) else "does not exist")
-
-    items = [
-        ("current release", get_current_release(), ""),
-        ("downloads dir",
-            get_downloads_dir(),
-            "[%s]" % exists_string(get_downloads_dir())),
-    ]
-    for (key, value, extra) in items:
-        print("  %-35s = %-20s %s" % (key, quote(value), extra))
-
-    print("")
-
-    downloads = get_current_release_downloads()
-
-    format_string = "%-40s  %-12s  %-12s  %-20s "
-    print(format_string % ("DOWNLOAD NAME", "DOWNLOADED?", "UP TO DATE?", "URL"))
-
-    for (item, info) in downloads.items():
-        urls = (
-            [info['metadata']["url"]]
-            if "url" in info['metadata']
-            else info['metadata']["part_urls"])
-        url_description = urls[0]
-        if len(urls) > 1:
-            url_description += " + %d more parts" % (len(urls) - 1)
-
-        print(format_string % (
-            item,
-            yes_no(info['downloaded']),
-            "" if not info['downloaded'] else (
-                "UNKNOWN" if info['up_to_date'] is None
-                else yes_no(info['up_to_date'])
-            ),
-            url_description))
+    defaults = dict(
+        presentation=get_default_class1_presentation_models_dir(test_exists=False),
+        affinity=get_default_class1_models_dir(test_exists=False),
+        processing=get_default_class1_processing_models_dir(test_exists=False))
+    config = dict(
+        code_version=__version__,
+        default_release=get_downloads_metadata()['current-release'],
+        configured_release=get_current_release(),
+        catalogue_release=release,
+        downloads_dir=os.path.abspath(get_downloads_dir(release)),
+        default_model_paths={key: dict(path=os.path.abspath(value), exists=os.path.exists(value))
+                             for key, value in defaults.items()},
+        environment_overrides={key: os.environ.get(key) or None for key in ENVIRONMENT_VARIABLES},
+        downloads=_download_records(release))
+    if args.json:
+        print(json.dumps(config, indent=2))
+        return
+    print("Resolved configuration")
+    print("  Code version:       " + __version__)
+    print("  Default weights:    " + config['default_release'])
+    print("  Active catalogue:   " + (get_current_release() or 'custom unversioned directory'))
+    print("  Browsing catalogue: " + release)
+    print("  Downloads directory: " + config['downloads_dir'])
+    print("\nDefault prediction paths (before --models / --model-release)")
+    for kind, item in config['default_model_paths'].items():
+        print("  %s: %s [%s]" % (kind, item['path'], 'exists' if item['exists'] else 'not installed'))
+    print("\nEnvironment variables (optional overrides)")
+    for key, value in config['environment_overrides'].items():
+        print("  %s: %s" % (key, quote(value) if value else 'unset; using defaults'))
+    _print_downloads(config['downloads'])
 
 
 def path_subcommand(args):
-    """
-    Print the local path to a download
-    """
-    print(get_path(args.download_name))
+    """Print a bundle directory or the download root for the selected release."""
+    release = resolve_release(args.release)
+    if args.download_name:
+        _find_download(release, args.download_name)
+        print(get_path(args.download_name, release=release))
+    else:
+        print(get_downloads_dir(release))
 
 
 def url_subcommand(args):
-    """
-    Print the URL(s) for a download
-    """
-    downloads = get_current_release_downloads()
-    download = downloads[args.download_name]["metadata"]
-    urls = []
-    if download.get("url"):
-        urls.append(download["url"])
-    if download.get("part_urls"):
-        urls.extend(download["part_urls"])
-    print("\n".join(urls))
+    """Print every archive URL for a bundle in the selected release."""
+    release = resolve_release(args.release)
+    print("\n".join(_find_download(release, args.download_name)['urls']))

@@ -117,7 +117,3 @@ string across three repetitions: no CPU inference speedup. Numeric representatio
 defers export cost and enables device gathering; it does not eliminate the cost
 of saving sequence strings. These timings were taken on a shared development
 machine while regression checks were running.
-
-Tracking: [#403](https://github.com/openvax/mhcflurry/issues/403), draft PR
-[#362](https://github.com/openvax/mhcflurry/pull/362). The already-running Modal
-kernel sweep retains its frozen source and is not restarted for these changes.

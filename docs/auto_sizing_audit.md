@@ -58,5 +58,4 @@ Host worker, DataLoader and random-negative pool estimates include conservative
 throughput heuristics. They do not establish identical runtime peaks on all
 hardware. Explicit user concurrency remains authoritative; release workflows
 reject unexpected training minibatch reductions because those can alter the
-trained model. Further planner consolidation is tracked in
-[issue #363](https://github.com/openvax/mhcflurry/issues/363).
+trained model.

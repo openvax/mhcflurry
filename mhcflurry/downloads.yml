@@ -990,3 +990,134 @@ releases:
       - name: data_combined_iedb_kim2014
         url: http://github.com/openvax/mhcflurry/releases/download/0.0.8/data_combined_iedb_kim2014.tar.bz2
         default: true
+
+# Bundle purposes are independent of catalogue releases and archive storage tags.
+bundles:
+  models_class1_presentation:
+    kind: models
+    group: Prediction models
+    description: Full presentation predictor, including affinity and processing components.
+  models_class1_pan:
+    kind: models
+    group: Prediction models
+    description: Selected pan-allele binding-affinity ensemble; no presentation combiner.
+  models_class1_processing:
+    kind: models
+    group: Prediction models
+    description: Standalone antigen-processing ensembles with and without N/C flanks.
+  models_class1_pan_unselected:
+    kind: models
+    group: Historical experiments
+    description: Pan-allele affinity candidates before ensemble selection.
+  models_class1_pan_variants:
+    kind: models
+    group: Historical experiments
+    description: Alternative pan-allele affinity architectures and training variants.
+  models_class1_pan_refined:
+    kind: models
+    group: Historical experiments
+    description: Historical refined pan-allele affinity models.
+  models_class1_processing_variants:
+    kind: models
+    group: Historical experiments
+    description: Alternative antigen-processing training variants.
+  models_class1:
+    kind: models
+    group: Legacy allele-specific models
+    description: Legacy allele-specific affinity ensemble; not the modern presentation bundle.
+  models_class1_selected_no_mass_spec:
+    kind: models
+    group: Legacy allele-specific models
+    description: Selected allele-specific affinity models trained without mass-spec data.
+  models_class1_no_mass_spec:
+    kind: models
+    group: Legacy allele-specific models
+    description: Historical allele-specific affinity models without mass-spec training data.
+  models_class1_trained_with_mass_spec:
+    kind: models
+    group: Legacy allele-specific models
+    description: Allele-specific affinity models trained with mass-spec data.
+  models_class1_unselected:
+    kind: models
+    group: Legacy allele-specific models
+    description: Allele-specific affinity candidates before ensemble selection.
+  models_class1_unselected_with_mass_spec:
+    kind: models
+    group: Legacy allele-specific models
+    description: Unselected allele-specific candidates trained with mass-spec data.
+  models_class1_minimal:
+    kind: models
+    group: Legacy allele-specific models
+    description: Small historical allele-specific affinity ensemble.
+  models_class1_experiments1:
+    kind: models
+    group: Historical experiments
+    description: Early experimental allele-specific models.
+  models_class1_allele_specific_ensemble:
+    kind: models
+    group: Legacy allele-specific models
+    description: Early allele-specific ensemble in an obsolete serialization format.
+  models_class1_allele_specific_single:
+    kind: models
+    group: Legacy allele-specific models
+    description: Early single allele-specific models in an obsolete serialization format.
+  data_evaluation:
+    kind: data
+    group: Evaluation and analysis data
+    description: Historical evaluation datasets; not the stable release comparison report.
+  data_predictions:
+    kind: data
+    group: Evaluation and analysis data
+    description: Precomputed predictions for historical evaluation datasets.
+  analysis_predictor_info:
+    kind: data
+    group: Evaluation and analysis data
+    description: Historical predictor analysis and summaries.
+  cross_validation_class1:
+    kind: data
+    group: Evaluation and analysis data
+    description: Historical class I cross-validation results.
+  data_mass_spec_benchmark:
+    kind: data
+    group: Evaluation and analysis data
+    description: Historical mass-spectrometry benchmark data.
+  random_peptide_predictions:
+    kind: data
+    group: Evaluation and analysis data
+    description: Precomputed random-peptide predictions for background analyses.
+  data_mass_spec_annotated:
+    kind: data
+    group: Training and reference data
+    description: Annotated mass-spectrometry peptides and source-sequence context.
+  data_references:
+    kind: data
+    group: Training and reference data
+    description: Reference protein sequences and supporting resources.
+  data_iedb:
+    kind: data
+    group: Training and reference data
+    description: IEDB data snapshot; see the archive name for the snapshot date.
+  data_systemhcatlas:
+    kind: data
+    group: Training and reference data
+    description: SystemHC Atlas mass-spectrometry source data.
+  allele_sequences:
+    kind: data
+    group: Training and reference data
+    description: MHC allele sequences used by pan-allele predictors and training.
+  data_published:
+    kind: data
+    group: Training and reference data
+    description: Published experimental datasets used in data preparation.
+  data_curated:
+    kind: data
+    group: Training and reference data
+    description: Curated training data; see the archive name for the snapshot date.
+  data_combined_iedb_kim2014:
+    kind: data
+    group: Training and reference data
+    description: Historical combined IEDB and Kim et al. 2014 affinity data.
+  data_kim2014:
+    kind: data
+    group: Training and reference data
+    description: Kim et al. 2014 affinity dataset.

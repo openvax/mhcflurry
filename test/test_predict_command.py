@@ -17,6 +17,7 @@ import tempfile
 import os
 
 import pandas
+from mhcflurry import parallelism, pytorch_sizing
 
 import torch
 
@@ -180,7 +181,7 @@ def test_default_auto_workers_are_resolved_before_prediction_kwargs(
         lambda models_dir: (FakePredictor(), True),
     )
     original_worker_pool = (
-        predict_command.worker_pool_with_gpu_assignments_from_args)
+        parallelism.worker_pool_with_gpu_assignments_from_args)
 
     def capture_worker_pool(
             args, workload_name, workload_hints, start_method=None):
@@ -193,12 +194,12 @@ def test_default_auto_workers_are_resolved_before_prediction_kwargs(
         )
 
     monkeypatch.setattr(
-        predict_command,
+        parallelism,
         "worker_pool_with_gpu_assignments_from_args",
         capture_worker_pool,
     )
     monkeypatch.setattr(
-        predict_command, "default_prediction_batch_is_auto", lambda: False)
+        pytorch_sizing, "default_prediction_batch_is_auto", lambda: False)
 
     predict_command.run([
         "--models", str(models_dir),

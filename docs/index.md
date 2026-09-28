@@ -18,6 +18,9 @@ specific option after you know which workflow you need.
 - {doc}`training` explains custom model fitting and release-style retraining.
 - {doc}`evaluation` compares trained models and builds diagnostic or
   publication-style figures.
+- {doc}`model_downloads` covers available weights, older releases, and model selection.
+- {doc}`release_model_evaluation` compares the released weights on identical rows.
+- {doc}`shared_percent_rank_transforms` explains compact percentile calibration.
 - {doc}`configuration` explains automatic hardware planning, expert overrides,
   and reproducibility.
 - {doc}`commandline_tools` and {doc}`api` are the complete references.
@@ -41,6 +44,9 @@ python_tutorial
 
 training
 evaluation
+model_downloads
+release_model_evaluation
+release_model_evaluation_details
 ```
 
 ```{toctree}
@@ -64,7 +70,6 @@ development
 orchestrator
 auto_sizing_audit
 release_training_recipe
-release_model_evaluation
 release_neural_hyperparameter_audit
 affinity_dual_checkpoint_workflow
 processing_cleavage_boundary_experiment
