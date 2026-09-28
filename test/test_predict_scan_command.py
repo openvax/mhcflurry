@@ -490,3 +490,17 @@ def test_parallel_output_tie_break_is_deterministic():
                 assert peptide[i] <= peptide[i + 1], (
                     f"tie not sorted by peptide at row {i}: "
                     f"{peptide[i]!r} > {peptide[i + 1]!r}")
+
+
+def test_stdout_contains_only_parseable_csv(capsys):
+    import io
+
+    predict_scan_command.run([
+        "--sequences", "MGYINVFAFPFTIYSLLLCRMNSRNYIAQVDVVNFNLT",
+        "--alleles", "HLA-A*02:01", "--threshold-affinity", "50000"])
+    output = capsys.readouterr()
+    frame = pandas.read_csv(io.StringIO(output.out))
+    assert len(frame) > 0
+    assert frame.affinity.notna().all()
+    assert "Predicting" not in output.out
+    assert "Predicting affinities." in output.err

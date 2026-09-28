@@ -18,18 +18,17 @@ import logging
 import time
 from functools import partial
 from getpass import getuser
-from os import mkdir
-from os.path import abspath, exists, join
+from os import makedirs, mkdir
+from os.path import abspath, commonpath, dirname, exists, join, realpath, relpath
 from socket import gethostname
 
-import numpy
 import pandas
 from mhcgnomes import parse, parse_gene_class
 
 from ..class1_neural_network import Class1NeuralNetwork
 from ..common import load_weights, normalize_allele_name, save_weights
 from ..downloads import get_default_class1_models_dir
-from ..percent_rank_transform import PercentRankTransform
+from ..percentile_calibration import load_percent_rank_transforms, save_percent_rank_transforms
 from ..pseudosequences import (
     LEGACY_ALLELE_SEQUENCES_FILENAME,
     pseudosequence_filename_candidates,
@@ -45,6 +44,12 @@ from ..model_provenance import add_release_provenance
 # ontology property and, if appropriate, the historical alias. Do not infer
 # pseudogene status from a ``PS`` substring.
 _LEGACY_NON_PREDICTOR_PSEUDOSEQUENCE_KEYS = frozenset({"Caja-PS*02:01"})
+_CHECKPOINT_POLICIES = ("terminal", "best")
+
+
+def _checkpoint_manifest_column(policy):
+    """Return the manifest column containing a checkpoint's relative path."""
+    return "checkpoint_%s_weights" % policy
 
 
 def _parse_mhc_name(raw_name, only_class1):
@@ -108,7 +113,7 @@ def save_predictor(predictor, models_dir, model_names_to_write=None, write_metad
         Only write the weights for the specified models. Useful for
         incremental updates during training. Passing an explicit empty
         list writes no model artifacts; this is used by calibration-only
-        updates that should replace ``percent_ranks.csv`` without touching
+        updates that replace percentile calibration (CSV or JSON) without touching
         the manifest, weights, model provenance, allele sequences, or
         optimization metadata. Explicit ``metadata_dataframes`` are still
         written when ``write_metadata`` is true.
@@ -145,6 +150,30 @@ def save_predictor(predictor, models_dir, model_names_to_write=None, write_metad
             weights_path = predictor.weights_path(models_dir, row.model_name)
             save_weights(row.model.get_weights(), weights_path)
             logging.info("Wrote: %s", weights_path)
+
+            # A refit may discard one or both previously retained policies.
+            # Never leave references to sidecars from the previous fit.
+            for policy in ("terminal", "best"):
+                column = _checkpoint_manifest_column(policy)
+                if column in predictor.manifest_df.columns:
+                    predictor.manifest_df.at[row.name, column] = None
+            for policy in row.model.available_checkpoint_policies():
+                checkpoint_path = predictor.checkpoint_weights_path(
+                    models_dir, row.model_name, policy)
+                makedirs(dirname(checkpoint_path), exist_ok=True)
+                checkpoint_weights = row.model.get_checkpoint_weights(policy)
+                save_weights(checkpoint_weights, checkpoint_path)
+                column = _checkpoint_manifest_column(policy)
+                if column not in predictor.manifest_df.columns:
+                    predictor.manifest_df[column] = None
+                predictor.manifest_df.at[row.name, column] = relpath(
+                    checkpoint_path, models_dir)
+                row.model.set_checkpoint_weights_loader(
+                    policy,
+                    partial(load_weights, abspath(checkpoint_path)),
+                    weight_path=abspath(checkpoint_path),
+                )
+                logging.info("Wrote: %s", checkpoint_path)
         sub_manifest_df["config_json"] = updated_network_config_jsons
         predictor.manifest_df.loc[
             sub_manifest_df.index,
@@ -206,26 +235,7 @@ def save_predictor(predictor, models_dir, model_names_to_write=None, write_metad
             metadata_df_path = join(models_dir, "%s.csv.bz2" % name)
             df.to_csv(metadata_df_path, index=False, compression="bz2")
 
-    if predictor.allele_to_percent_rank_transform:
-        percent_ranks_df = None
-        for (allele, transform) in predictor.allele_to_percent_rank_transform.items():
-            series = transform.to_series()
-            if percent_ranks_df is None:
-                percent_ranks_df = {}
-                percent_ranks_df_index = series.index
-            numpy.testing.assert_array_almost_equal(
-                series.index.values,
-                percent_ranks_df_index.values)
-            percent_ranks_df[allele] = series.values
-        percent_ranks_df = pandas.DataFrame(
-            percent_ranks_df,
-            index=percent_ranks_df_index)
-        percent_ranks_path = join(models_dir, "percent_ranks.csv")
-        percent_ranks_df.to_csv(
-            percent_ranks_path,
-            index=True,
-            index_label="bin")
-        logging.info("Wrote: %s", percent_ranks_path)
+    save_percent_rank_transforms(models_dir, predictor.allele_to_percent_rank_transform)
 
     if write_model_artifacts and predictor.optimization_info:
         # If the model being saved was optimized, we need to save that
@@ -377,6 +387,28 @@ def load_predictor(
             config,
             weights_loader=partial(load_weights, abspath(weights_filename)),
             weight_paths=abspath(weights_filename))
+        for policy in _CHECKPOINT_POLICIES:
+            column = _checkpoint_manifest_column(policy)
+            if column not in manifest_df.columns or pandas.isna(row.get(column)):
+                continue
+            relative_checkpoint_path = str(row[column])
+            checkpoint_path = realpath(join(
+                models_dir, relative_checkpoint_path))
+            models_dir_absolute = realpath(models_dir)
+            if commonpath((checkpoint_path, models_dir_absolute)) != (
+                    models_dir_absolute):
+                raise ValueError(
+                    "Checkpoint path escapes predictor directory: %s" %
+                    relative_checkpoint_path)
+            if not exists(checkpoint_path):
+                raise IOError(
+                    "Missing retained %s checkpoint for %s: %s" % (
+                        policy, row.model_name, checkpoint_path))
+            model.set_checkpoint_weights_loader(
+                policy,
+                partial(load_weights, checkpoint_path),
+                weight_path=checkpoint_path,
+            )
         if row.allele == "pan-class1":
             class1_pan_allele_models.append(model)
         else:
@@ -388,16 +420,11 @@ def load_predictor(
 
     # ----- Load percent ranks -----
     allele_to_percent_rank_transform = {}
-    percent_ranks_path = join(models_dir, "percent_ranks.csv")
-    if exists(percent_ranks_path):
-        percent_ranks_df = pandas.read_csv(percent_ranks_path, index_col=0)
-        for allele in percent_ranks_df.columns:
-            canonical = to_canonical(allele)
-            if (canonical in allele_to_percent_rank_transform and
-                    allele != canonical):
-                continue
-            allele_to_percent_rank_transform[canonical] = (
-                PercentRankTransform.from_series(percent_ranks_df[allele]))
+    for allele, transform in load_percent_rank_transforms(models_dir).items():
+        canonical = to_canonical(allele)
+        if canonical in allele_to_percent_rank_transform and allele != canonical:
+            continue
+        allele_to_percent_rank_transform[canonical] = transform
 
     logging.info(
         "Loaded %d class1 pan allele predictors, %d allele sequences, "

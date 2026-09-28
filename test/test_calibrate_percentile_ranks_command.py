@@ -44,7 +44,9 @@ def setup_module():
     cleanup()
 
 
-def run_and_check(n_jobs=0, delete=True, additional_args=[]):
+def run_and_check(n_jobs=0, delete=True, additional_args=None):
+    if additional_args is None:
+        additional_args = []
     source_models_dir = get_path("models_class1_pan", "models.combined")
     dest_models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")
 

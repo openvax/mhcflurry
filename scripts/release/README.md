@@ -3,12 +3,18 @@
 Maintainer tools for retraining, evaluating, synchronizing, packaging, and
 publishing model artifacts. Prediction users do not need these scripts.
 
+Run these workflows from a clean source checkout containing `scripts/`, with
+MHCflurry and the chosen backend dependencies installed. A wheel-only
+installation provides prediction and low-level training commands, but not these
+repository orchestration scripts.
+
 ## End-to-end workflow
 
 Use the public command rather than invoking the orchestration shell script
 directly:
 
 ```shell
+MHCFLURRY_RELEASE_RECIPE=final-2.3.0-candidate-v2 \
 mhcflurry train pan-allele-release \
     --run-dir /path/to/release-run \
     --release 2.3.0 \
@@ -17,11 +23,17 @@ mhcflurry train pan-allele-release \
 
 The workflow runs these stages in order:
 
-1. Train affinity, processing, and presentation models.
-2. Compare the new models with a configured public release or run directory.
-3. Render diagnostic plots and a combined PDF.
-4. Copy remote artifacts back when using a remote backend.
-5. Optionally package or deploy model archives.
+1. Build and persist the pMHC and sample manifests for the frozen release
+   holdout (all monoallelic samples for affinity; PMID 31154438 for processing
+   and presentation).
+2. Train affinity outside the benchmark pMHC intersection and presentation
+   outside the complete multiallelic holdout samples.
+3. Validate zero holdout overlap in the final training artifacts.
+4. Compare the new models with a configured public release or run directory,
+   restricted to the frozen component-specific evaluation samples.
+5. Render diagnostic plots and a combined PDF.
+6. Copy remote artifacts back when using a remote backend.
+7. Optionally package or deploy model archives.
 
 Each stage has a `--skip-*` option for controlled resumption. Logs and
 `status.tsv` are written under `<run-dir>/workflow_logs/`. Deployment is off by
@@ -87,8 +99,11 @@ needs every candidate model and training intermediate table.
 ## Release profiles and performance
 
 `--release-profile full` is the default. It trains the complete processing set:
-`with_flanks`, `no_flank`, and `short_flanks`. Presentation uses the true
-`with_flanks` predictor by default.
+`with_flanks`, `no_flank`, and `short_flanks`. The frozen 2.3.0 v2 recipe uses an eight-network short-flank/boundary hybrid
+for presentation. The independently trained `with_flanks` predictor uses
+15-residue flanks and is a diagnostic component, not that hybrid. Without an
+explicit recipe preset, the generic workflow uses its own documented defaults;
+it does not reproduce the released weight recipe.
 
 Optional profiles are:
 
@@ -97,9 +112,9 @@ Optional profiles are:
 - `minimal-processing`: omits `short_flanks` from both training and evaluation.
 - `fast-minimal`: combines those two choices.
 
-The shared training minibatch defaults to 1024. Use
-`--affinity-minibatch-size` or `--processing-minibatch-size` only when a model
-family needs a different value.
+Affinity minibatch defaults to the held-out-validated value 1024. Processing
+retains the published minibatch 512. Use `--affinity-minibatch-size` or
+`--processing-minibatch-size` only for a deliberate experiment.
 
 Affinity worker packing defaults to `--affinity-max-workers-per-gpu auto`. The
 training command estimates the complete per-worker working set from the model,
@@ -110,9 +125,10 @@ a known machine; explicit values bypass automatic packing decisions.
 
 Evaluation covers affinity, processing, and presentation. The workflow writes
 component metrics, `release_summary.csv`, `release_summary.md`, individual
-plots, and `plots/model_comparison_figures.pdf`. Its default baseline is
-`public:2.0.0`; use `--compare-baseline public` for the currently configured
-public release or provide another run directory/version.
+plots, and `plots/model_comparison_figures.pdf`. Its default baseline is the
+explicit pre-2.3 public release, `public:2.2.0`; use `--compare-baseline public`
+to follow the currently configured release or provide another run
+directory/version.
 
 On Brev, comparison and diagnostic plotting run on the GPU instance before
 synchronization. This avoids repeating release-scale inference on a laptop.
@@ -138,7 +154,7 @@ scripts/release/deploy_trained_models.sh \
     --run-dir /path/to/release-run \
     --release 2.3.0 \
     --github-release 2.3.0 \
-    --mode dry-run
+    --mode package-only
 ```
 
 The script writes archives, `SHA256SUMS`, and a `downloads.yml` snippet under
@@ -152,3 +168,22 @@ Direct deployment packages `no_flank` and `with_flanks` by default. Include
 `short_flanks` only when it belongs to the current release. The end-to-end
 workflow forwards its exact trained variant set, so stale directories from an
 older run are never packaged merely because they exist.
+
+
+`--mode dry-run` only validates and prints the plan. `--mode package-only`
+builds local archives for loading and prediction checks. Exports include only
+manifest-selected network weights and remove checkpoint-only manifest paths;
+original training directories remain unchanged. Training tables and calibration
+are retained, with manifest digests in `inference_export.json`.
+
+When distributing already-trained weights from a different source version, pass
+`--training-package-version` with their exact recorded version and
+`--allow-artifact-source-mismatch`. The output `provenance.json` records both
+training and packaging identities. Never rewrite model `info.txt` to pretend
+that a stable packaging checkout trained the weights.
+
+The generated downloads snippet contains the model entries only. When adding a
+release to `mhcflurry/downloads.yml`, also retain the data and historical-model
+bundles needed by supported commands. Publish the GitHub release only after its
+code CI, archives, checksums and download metadata have been verified; the
+publication event triggers the package upload to PyPI.

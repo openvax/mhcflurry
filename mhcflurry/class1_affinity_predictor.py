@@ -40,7 +40,9 @@ from .common import (
     AlleleKeyResolver,
 )
 from .encodable_sequences import EncodableSequences
-from .percent_rank_transform import PercentRankTransform
+from .histogram_percent_rank_transform import HistogramPercentRankTransform
+from .percentile_calibration import (
+    calibration_method, factorize_calibration_groups, fit_percent_rank_transform)
 from .regression_target import to_ic50
 from .version import __version__
 from .ensemble_centrality import CENTRALITY_MEASURES
@@ -53,7 +55,7 @@ from .affinity import calibration_sizing, model_selection, persistence
 DEFAULT_CENTRALITY_MEASURE = "mean"
 
 # Any value > 0 will result in attempting to optimize models after loading.
-OPTIMIZATION_LEVEL = int(environ.get("MHCFLURRY_OPTIMIZATION_LEVEL", 1))
+OPTIMIZATION_LEVEL = int(environ.get("MHCFLURRY_OPTIMIZATION_LEVEL", "1"))
 
 
 class Class1AffinityPredictor(object):
@@ -63,8 +65,8 @@ class Class1AffinityPredictor(object):
     This class manages low-level `Class1NeuralNetwork` instances, each of which
     wraps a single PyTorch network. The purpose of `Class1AffinityPredictor` is to
     implement ensembles, handling of multiple alleles, and predictor loading and
-    saving. It also provides a place to keep track of metadata like prediction
-    histograms for percentile rank calibration.
+    saving. It also keeps per-allele percentile calibration transforms:
+    compact curves for new calibration, or historical histogram mappings.
     """
     def __init__(
             self,
@@ -96,8 +98,9 @@ class Class1AffinityPredictor(object):
             Class1AffinityPredictor. Otherwise this dataframe will be generated
             automatically based on the supplied models.
 
-        allele_to_percent_rank_transform : dict of string -> `PercentRankTransform`, optional
-            `PercentRankTransform` instances to use for each allele
+        allele_to_percent_rank_transform : dict of string -> transform, optional
+            HistogramPercentRankTransform or CompactPercentRankTransform for
+            each allele. Loading preserves the stored calibration method.
 
         metadata_dataframes : dict of string -> pandas.DataFrame, optional
             Optional additional dataframes to write to the models dir when
@@ -214,6 +217,44 @@ class Class1AffinityPredictor(object):
         return result
 
     @classmethod
+    def _allele_to_sequence_for_merge(cls, predictors):
+        """Return a safe pseudosequence mapping for a predictor merge."""
+        pan_predictors = [
+            predictor for predictor in predictors
+            if predictor.class1_pan_allele_models
+        ]
+        if not pan_predictors:
+            for predictor in predictors:
+                if predictor.allele_to_sequence is not None:
+                    return dict(predictor.allele_to_sequence)
+            return None
+
+        expected = dict(pan_predictors[0].allele_to_sequence)
+        for (index, predictor) in enumerate(pan_predictors[1:], start=1):
+            observed = dict(predictor.allele_to_sequence)
+            if observed == expected:
+                continue
+            expected_keys = set(expected)
+            observed_keys = set(observed)
+            conflicting = sorted(
+                allele for allele in expected_keys & observed_keys
+                if expected[allele] != observed[allele]
+            )
+            missing = sorted(expected_keys - observed_keys)
+            extra = sorted(observed_keys - expected_keys)
+            raise ValueError(
+                "Cannot merge pan-allele predictors with incompatible "
+                "allele_to_sequence mappings. Pan predictor %d differs from "
+                "the first: conflicting=%s, missing=%s, extra=%s" % (
+                    index,
+                    conflicting[:5],
+                    missing[:5],
+                    extra[:5],
+                )
+            )
+        return expected
+
+    @classmethod
     def merge(cls, predictors):
         """
         Merge the ensembles of two or more `Class1AffinityPredictor` instances.
@@ -236,7 +277,7 @@ class Class1AffinityPredictor(object):
 
         allele_to_allele_specific_models = collections.defaultdict(list)
         class1_pan_allele_models = []
-        allele_to_sequence = predictors[0].allele_to_sequence
+        allele_to_sequence = cls._allele_to_sequence_for_merge(predictors)
 
         for predictor in predictors:
             for (allele, networks) in (
@@ -264,6 +305,9 @@ class Class1AffinityPredictor(object):
         -------
         list of string : names of newly added models
         """
+        others = list(others)
+        allele_to_sequence = self._allele_to_sequence_for_merge(
+            [self] + others)
         new_model_names = []
         original_manifest = self.manifest_df
         new_manifest_rows = []
@@ -298,6 +342,7 @@ class Class1AffinityPredictor(object):
                     current_models.append(model)
                     new_model_names.append(model_name)
 
+        self.allele_to_sequence = allele_to_sequence
         self._manifest_df = pandas.concat(
             [original_manifest] + new_manifest_rows,
             ignore_index=True)
@@ -453,7 +498,7 @@ class Class1AffinityPredictor(object):
             Only write the weights for the specified models. Useful for
             incremental updates during training. Passing an explicit empty
             list writes no model artifacts; this is used by calibration-only
-            updates that should replace ``percent_ranks.csv`` without touching
+            updates that replace percentile calibration (CSV or JSON) without touching
             the manifest, weights, model provenance, allele sequences, or
             optimization metadata. Explicit ``metadata_dataframes`` are still
             written when ``write_metadata`` is true.
@@ -527,7 +572,7 @@ class Class1AffinityPredictor(object):
         The optimization is performed in-place, mutating the instance.
 
         Returns
-        ----------
+        -------
         bool
             Whether optimization was performed
 
@@ -592,6 +637,18 @@ class Class1AffinityPredictor(object):
         string
         """
         return join(models_dir, "weights_%s.npz" % model_name)
+
+    @staticmethod
+    def checkpoint_weights_path(models_dir, model_name, policy):
+        """Generate the path to a retained training-checkpoint weight file."""
+        if policy not in ("terminal", "best"):
+            raise ValueError("Unknown checkpoint policy: %s" % policy)
+        return join(
+            models_dir,
+            "checkpoints",
+            policy,
+            "weights_%s.npz" % model_name,
+        )
 
     @property
     def master_allele_encoding(self):
@@ -781,7 +838,8 @@ class Class1AffinityPredictor(object):
             models_dir_for_save=None,
             verbose=1,
             progress_preamble="",
-            progress_print_interval=5.0):
+            progress_print_interval=5.0,
+            seed=None):
         """
         Fit one or more pan-allele predictors using a single neural network
         architecture.
@@ -820,6 +878,12 @@ class Class1AffinityPredictor(object):
         progress_print_interval : float
             How often (in seconds) to print progress. Set to None to disable.
 
+        seed : int, optional
+            Base seed for these fits. When given, each ensemble member gets a
+            distinct sub-seed derived from it, so members are decorrelated but
+            the whole call is reproducible. When None, each
+            `Class1NeuralNetwork.fit` is left entropy-seeded as before.
+
         Returns
         -------
         list of `Class1NeuralNetwork`
@@ -835,12 +899,14 @@ class Class1AffinityPredictor(object):
         for i in range(n_models):
             logging.info("Training model %d / %d", i + 1, n_models)
             model = Class1NeuralNetwork(**architecture_hyperparameters)
+            fit_seed = None if seed is None else derive_seed(seed, i)
             model.fit(
                 encodable_peptides,
                 affinities,
                 inequalities=inequalities,
                 allele_encoding=allele_encoding,
                 verbose=verbose,
+                seed=fit_seed,
                 progress_preamble=progress_preamble,
                 progress_print_interval=progress_print_interval)
 
@@ -921,7 +987,19 @@ class Class1AffinityPredictor(object):
             )
             if calibrated_allele is not None:
                 transform = self.allele_to_percent_rank_transform[calibrated_allele]
-                return transform.transform(affinities)
+                try:
+                    return transform.transform(affinities)
+                except ValueError as error:
+                    # Compact curves reject non-positive or infinite affinities
+                    # where histogram bins clamped them. Honor the documented
+                    # throw contract instead of raising from inside a batch.
+                    message = (
+                        "Percentile ranks for %s require positive finite nM "
+                        "affinities or NaN: %s" % (calibrated_allele, error))
+                    if throw:
+                        raise ValueError(message) from error
+                    warnings.warn(message)
+                    return numpy.full(len(affinities), numpy.nan, dtype="float64")
 
             allele_repr = allele + (
                 "" if allele == normalized_allele
@@ -977,20 +1055,6 @@ class Class1AffinityPredictor(object):
                 sub_df.affinity, allele=allele, throw=throw)
         return df.result.values
 
-    def model_source_description(self):
-        """Return a compact human-readable description of this predictor."""
-        pieces = []
-        models_dir = self.models_dir_for_diagnostics()
-        if models_dir:
-            pieces.append("models_dir=%s" % models_dir)
-        if self.provenance_string:
-            pieces.append(self.provenance_string)
-        pieces.append("%d model(s)" % len(self.neural_networks))
-        pieces.append(
-            "%d percent-rank calibration(s)" % (
-                len(self.allele_to_percent_rank_transform)))
-        return "; ".join(pieces)
-
     def models_dir_for_diagnostics(self):
         """Return explicit or inferred models dir for user-facing messages."""
         if self.models_dir:
@@ -1038,7 +1102,7 @@ class Class1AffinityPredictor(object):
             allele=None,
             throw=True,
             centrality_measure=DEFAULT_CENTRALITY_MEASURE,
-            model_kwargs={}):
+            model_kwargs=None):
         """
         Predict nM binding affinities.
 
@@ -1068,6 +1132,8 @@ class Class1AffinityPredictor(object):
         -------
         numpy.array of predictions
         """
+        if model_kwargs is None:
+            model_kwargs = {}
         df = self.predict_to_dataframe(
             peptides=peptides,
             alleles=alleles,
@@ -1079,6 +1145,64 @@ class Class1AffinityPredictor(object):
             model_kwargs=model_kwargs,
         )
         return df.prediction.values
+
+    def predict_numeric(self, peptides, allele,
+                        centrality_measure=DEFAULT_CENTRALITY_MEASURE, model_kwargs=None):
+        """Score numeric peptides for one allele without materializing strings.
+
+        Parameters
+        ----------
+        peptides : NumericSequences
+            Unaligned integer residues and actual lengths, on CPU or device.
+        allele : str
+            One sequence-resolved allele for all rows. Unsupported alleles,
+            lengths and noncanonical residues raise, as with ``predict(throw=True)``.
+        centrality_measure : str or callable
+            The same log-affinity ensemble aggregation used by ``predict``.
+        model_kwargs : dict, optional
+            Network prediction options, including batch size.
+
+        Returns
+        -------
+        numpy.ndarray
+            Float64 ensemble affinities in input order (nM).
+        """
+        from .numeric_sequences import NumericSequences, UNKNOWN_INDEX
+        if not isinstance(peptides, NumericSequences):
+            raise TypeError("predict_numeric requires NumericSequences")
+        canonical = self._canonicalize_prediction_alleles([allele], throw=True)[0]
+        if not len(peptides):
+            return numpy.empty(0, dtype="float64")
+        minimum, maximum = self.supported_peptide_lengths
+        if ((peptides.lengths < minimum) | (peptides.lengths > maximum)).any():
+            raise ValueError("Numeric peptide lengths outside supported range")
+        import torch
+        active = torch.arange(peptides.indices.shape[1], device=peptides.indices.device)[None, :] < peptides.lengths[:, None]
+        if (active & (peptides.indices == UNKNOWN_INDEX)).any():
+            raise ValueError("Numeric peptides have nonstandard amino acids")
+        kwargs = model_kwargs or {}
+        predictions = []
+        if self.class1_pan_allele_models:
+            if canonical not in self.allele_to_sequence:
+                raise ValueError("No sequences for allele: " + str(canonical))
+            encoding = AlleleEncoding([canonical] * len(peptides), borrow_from=self.master_allele_encoding).compact()
+            for model in self.class1_pan_allele_models:
+                predictions.append(model.predict(peptides, allele_encoding=encoding,
+                    output_index=None if self.optimization_info.get("pan_models_merged") else 0, **kwargs))
+        if self.allele_to_allele_specific_models:
+            models = self.allele_to_allele_specific_models.get(canonical)
+            if not models:
+                raise ValueError("No single-allele models for allele: " + str(canonical))
+            predictions.extend(model.predict(peptides, **kwargs) for model in models)
+        if not predictions:
+            raise ValueError("No affinity models available")
+        matrix = numpy.concatenate([numpy.asarray(value).reshape(len(peptides), -1) for value in predictions], axis=1)
+        logs = numpy.log(matrix.astype("float64"))
+        centrality = centrality_measure if callable(centrality_measure) else CENTRALITY_MEASURES[centrality_measure]
+        valid = (~numpy.isnan(logs)).any(axis=1)
+        result = numpy.full(len(peptides), numpy.nan, dtype="float64")
+        result[valid] = numpy.exp(centrality(logs[valid]))
+        return result
 
     def predict_cartesian_pan_allele(
             self,
@@ -1332,7 +1456,7 @@ class Class1AffinityPredictor(object):
             include_percentile_ranks=True,
             include_confidence_intervals=True,
             centrality_measure=DEFAULT_CENTRALITY_MEASURE,
-            model_kwargs={}):
+            model_kwargs=None):
         """
         Predict nM binding affinities. Gives more detailed output than `predict`
         method, including 5-95% prediction intervals.
@@ -1371,6 +1495,8 @@ class Class1AffinityPredictor(object):
         -------
         `pandas.DataFrame` of predictions
         """
+        if model_kwargs is None:
+            model_kwargs = {}
         if isinstance(peptides, str):
             raise TypeError("peptides must be a list or array, not a string")
         if isinstance(alleles, str):
@@ -1640,9 +1766,10 @@ class Class1AffinityPredictor(object):
             alleles=None,
             bins=None,
             motif_summary=False,
-            summary_top_peptide_fractions=[0.001],
+            summary_top_peptide_fractions=None,
             verbose=False,
-            model_kwargs={}):
+            model_kwargs=None,
+            *, method=None, max_knots=128):
         """
         Compute the cumulative distribution of ic50 values for a set of alleles
         over a large universe of random peptides, to enable taking quantiles
@@ -1662,7 +1789,10 @@ class Class1AffinityPredictor(object):
         bins : object
             Anything that can be passed to numpy.histogram's "bins" argument
             can be used here, i.e. either an integer or a sequence giving bin
-            edges. This is in ic50 space.
+            edges in IC50 space. Explicit bins select histogram calibration
+            unless a conflicting method is supplied. With no bins or method,
+            the default is compact; method="histogram" with no bins uses
+            the historical fixed log-spaced IC50 grid.
         motif_summary : bool
             If True, the length distribution and per-position amino acid
             frequencies are also calculated for the top x fraction of tightest-
@@ -1674,16 +1804,27 @@ class Class1AffinityPredictor(object):
             Whether to print status updates to stdout
         model_kwargs : dict
             Additional low-level Class1NeuralNetwork.predict() kwargs.
+        method : {"compact", "histogram"}, optional
+            Compact by default; explicit bins select the historical histogram.
+        max_knots : {64, 128}, default 128
+            Upper bound, not the starting size. Compact starts with 64 and
+            permits 128 only when background
+            validation demonstrates an improvement beyond the tolerance.
 
         Returns
-        ----------
+        -------
         dict of string -> pandas.DataFrame
 
         If motif_summary is True, this will have keys  "frequency_matrices" and
         "length_distributions". Otherwise it will be empty.
 
         """
-        if bins is None:
+        if summary_top_peptide_fractions is None:
+            summary_top_peptide_fractions = [0.001]
+        if model_kwargs is None:
+            model_kwargs = {}
+        method = calibration_method(method, bins)
+        if method == "histogram" and bins is None:
             bins = to_ic50(numpy.linspace(1, 0, 1000))
 
         if alleles is None:
@@ -1706,6 +1847,10 @@ class Class1AffinityPredictor(object):
         else:
             frequency_matrices = None
             length_distributions = None
+        # One peptide grouping serves every allele's compact fit.
+        group_codes = None
+        if method == "compact":
+            group_codes = factorize_calibration_groups(encoded_peptides.sequences)
         for allele in alleles:
             start = time.time()
             predictions = self.predict(
@@ -1719,8 +1864,9 @@ class Class1AffinityPredictor(object):
                         allele,
                         elapsed,
                         len(encoded_peptides.sequences) / elapsed))
-            transform = PercentRankTransform()
-            transform.fit(predictions, bins=bins)
+            transform = fit_percent_rank_transform(
+                predictions, method=method, bins=bins, score_transform="log",
+                max_knots=max_knots, group_codes=group_codes)
             self.allele_to_percent_rank_transform[allele] = transform
 
             if frequency_matrices is not None:
@@ -1799,7 +1945,8 @@ class Class1AffinityPredictor(object):
             peptide_batch_size="auto",
             num_workers_per_gpu=1,
             device=None,
-            verbose=False):
+            verbose=False,
+            *, method=None, max_knots=128):
         """GPU-hoisted calibration for many alleles sharing a peptide set.
 
         Drop-in replacement for the bulk of ``calibrate_percentile_ranks``
@@ -1821,13 +1968,13 @@ class Class1AffinityPredictor(object):
            ``allele_batch_size * peptide_batch_size``, sized so it fits
            comfortably in an A100's 80 GB.
 
-        Semantics-preserving w.r.t. ``calibrate_percentile_ranks``: same
-        peptides → same per-network IC50 predictions (numerically equivalent,
-        ≤1e-12, when the network is deterministic — batched vs per-allele
-        matmul scheduling can differ in the last ULPs) → same geometric-mean
-        ensemble aggregation → same ``PercentRankTransform.fit`` per allele.
-        Only the schedule of Python dispatch and GPU kernel launches
-        changes.
+        Uses the same geometric-mean ensemble aggregation and percentile
+        method as ``calibrate_percentile_ranks``. The batched floating-point
+        schedule can change raw predictions slightly and, in turn, adaptive
+        knot locations. Saved curves are not guaranteed bit-identical.
+        Neural inference remains batched on-device for both methods; histogram
+        fitting is also batched on-device, whereas compact fitting operates on
+        the final ensemble scores on CPU without repeating neural inference.
 
         Caching note: this method memoizes the peptide-stage activations on
         the predictor instance across calls.
@@ -1844,8 +1991,8 @@ class Class1AffinityPredictor(object):
         peptides : sequence of string or EncodableSequences
         alleles : sequence of string — already-normalized allele names
             (canonicalization is the caller's responsibility for speed).
-        bins : sequence of bin edges in IC50 space (default: 999 log-spaced
-            IC50 bins, matching ``calibrate_percentile_ranks``). Scalar
+        bins : sequence of bin edges in IC50 space (histogram only; default for
+            that method is 999 log-spaced IC50 bins). Scalar
             integer ``numpy.histogram`` bin counts are rejected in this fast
             path because they imply data-dependent edges per allele, while
             the batched GPU histogram uses one explicit edge vector for the
@@ -1862,6 +2009,11 @@ class Class1AffinityPredictor(object):
         peptide_batch_size : int — peptide chunk size on device.
         device : str or torch.device — defaults to CUDA if available.
         verbose : bool — per-batch timing to stdout.
+        method : {"compact", "histogram"}, optional
+            Compact by default; explicit bins select the historical histogram.
+        max_knots : {64, 128}, default 128
+            Validation-selected compact upper bound, not a starting size;
+            64 is retained unless 128 improves beyond the tolerance.
 
         Returns
         -------
@@ -1874,7 +2026,6 @@ class Class1AffinityPredictor(object):
         from .encodable_sequences import EncodableSequences
         from .allele_encoding import AlleleEncoding
         from .regression_target import to_ic50
-        from .percent_rank_transform import PercentRankTransform
 
         if not self.class1_pan_allele_models:
             raise ValueError(
@@ -1882,6 +2033,7 @@ class Class1AffinityPredictor(object):
                 "this predictor has no pan-allele models."
             )
 
+        method = calibration_method(method, bins)
         if bins is None:
             bins = to_ic50(numpy.linspace(1, 0, 1000))
         bin_edges_array = numpy.asarray(bins)
@@ -1965,7 +2117,7 @@ class Class1AffinityPredictor(object):
         # list rather than (count, first, last) — the latter would
         # silently reuse a stale cache for two distinct peptide sets that
         # share count/first/last (rare but real, and the failure mode is
-        # wrong PercentRankTransforms with no error). It intentionally
+        # incorrect percentile calibration with no error). It intentionally
         # omits ``peptide_batch_size``: that size only controls how the
         # cache tensor is filled, not its contents or shape.
         #
@@ -2133,7 +2285,9 @@ class Class1AffinityPredictor(object):
         calibration_float_dtype = (
             torch.float32 if device.type == "mps" else torch.float64
         )
-        bins_tensor = torch.as_tensor(
+        # Only the histogram fit reads these edges; compact mode would upload
+        # a thousand unused values to the device on every call.
+        bins_tensor = None if method != "histogram" else torch.as_tensor(
             bin_edges_array, dtype=calibration_float_dtype, device=device,
         )
 
@@ -2156,6 +2310,9 @@ class Class1AffinityPredictor(object):
         else:
             motif_state = None
 
+        # One peptide grouping serves every allele's compact fit in this call.
+        group_codes = (factorize_calibration_groups(encoded_peptides.sequences)
+                       if method == "compact" else None)
         for abatch_start in range(0, n_alleles, allele_batch_size):
             abatch_end = min(abatch_start + allele_batch_size, n_alleles)
             a_size = abatch_end - abatch_start
@@ -2215,14 +2372,17 @@ class Class1AffinityPredictor(object):
                 raise ValueError("No ensemble members were evaluated")
             log_mean = log_ic50_sum / float(ensemble_member_count)
             ic50_device = torch.exp(log_mean)  # (a_size, n_peptides) on device
-            # Batched torch fit replaces the per-allele numpy.histogram
-            # loop that dominated calibrate wall time. One bucketize +
-            # one scatter_add covers all 30 alleles in the chunk; the
-            # final per-allele cdf is materialized as numpy only at
-            # storage time so the persistent format is unchanged.
-            transforms = PercentRankTransform.fit_batch_torch(
-                ic50_device, bins_tensor,
-            )
+            # Histogram mode keeps its batched device-side fit and historical
+            # grid. Compact mode fits small curves from the final ensemble
+            # scores, then persists knots rather than histogram CDF arrays.
+            if method == "histogram":
+                transforms = HistogramPercentRankTransform.fit_batch_torch(ic50_device, bins_tensor)
+            else:
+                # Keep batched inference on-device; fit small saved curves from
+                # the final ensemble scores, without repeating neural inference.
+                transforms = [fit_percent_rank_transform(
+                    row, method="compact", score_transform="log", max_knots=max_knots,
+                    group_codes=group_codes) for row in ic50_device.cpu().numpy()]
             for local_i, allele in enumerate(batch_alleles):
                 self.allele_to_percent_rank_transform[allele] = transforms[local_i]
             if motif_summary:
@@ -2232,7 +2392,7 @@ class Class1AffinityPredictor(object):
                 # final per-row schema at chunk-end. This replaces the
                 # per-allele DataFrame.drop_duplicates().groupby().nsmallest()
                 # block that dominated calibrate wall time after the
-                # PercentRankTransform.fit GPU port.
+                # HistogramPercentRankTransform.fit GPU port.
                 chunk_freq, chunk_ld = motif_summary_chunk_gpu(
                     ic50_device,
                     motif_state,

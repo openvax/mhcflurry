@@ -32,6 +32,16 @@ Automatic GPU packing has no default fixed worker cap. Explicit CLI values and
 explicit per-workload memory estimates remain authoritative; the planner logs
 the facts and limits used for each decision.
 
+Affinity and processing trainers validate an automatic GPU plan with a bounded
+single-worker resource probe before starting the production pool. The probe uses
+the real resident fold and validation path and measures whole-process CUDA usage;
+it is a resource-safety step even when `torch.compile` is disabled. Runtime auto
+batches use a fixed per-worker share of launch-time free device capacity, so
+their size does not depend on which co-resident worker initialized first.
+Automatic CUDA processing batches are additionally capped by a successful
+real-model forward probe; the planner does not extrapolate across unobserved
+convolution workspace shapes.
+
 If a workload still runs out of memory, first keep the batch and worker settings
 on `auto`. If you need to intervene, reduce `--max-workers-per-gpu` or use a
 smaller explicit batch. Pinning values can improve repeatability on a known
@@ -66,6 +76,12 @@ Training and calibration commands accept `--random-seed`. The command-line
 default is `42`, covering data splits and shuffles, initial weights, random
 negatives, allele sampling, and calibration peptides. Ensemble members derive
 distinct sub-seeds from that master seed.
+
+Compact percentile knot selection has a separate, fixed seed of **403** for
+its grouped 80/20 background split. `--random-seed` controls background peptide
+and genotype generation, not that selection seed. The selected knot budget,
+reference hash, and available validation diagnostics are saved with the curve;
+see {doc}`shared_percent_rank_transforms`.
 
 The direct Python training APIs use `seed=None` by default, preserving their
 historical stochastic behavior unless the caller opts in.

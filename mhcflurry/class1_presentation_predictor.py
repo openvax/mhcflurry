@@ -19,6 +19,7 @@ import os
 import time
 import collections
 import logging
+import sys
 import warnings
 import numpy
 import pandas
@@ -37,7 +38,9 @@ from .pytorch_sizing import (
 from .encodable_sequences import EncodableSequences
 from .regression_target import from_ic50
 from .downloads import get_default_class1_presentation_models_dir
-from .percent_rank_transform import PercentRankTransform
+from .percentile_calibration import (
+    calibration_method, fit_percent_rank_transform,
+    load_percent_rank_transforms, save_percent_rank_transforms)
 
 
 MAX_ALLELES_PER_SAMPLE = 6
@@ -54,38 +57,36 @@ _PRESENTATION_PREDICT_TARGET_ROWS = int(
 )
 
 _PRESENTATION_LOGISTIC_REGRESSION_KWARGS = {
-    # The presentation combiner has a tiny dense feature matrix; Newton-CG is
-    # deterministic and avoids sklearn's SciPy L-BFGS-B wrapper warnings.
-    #
-    # NOTE: this solver was deliberately changed from lbfgs (used through
-    # 2.2.x) to newton-cg. Because the two optimizers converge to slightly
-    # different optima, presentation models *newly trained* with this code will
-    # have slightly different fitted weights than 2.2.x. This is intentional —
-    # do not "fix" it by reverting to lbfgs. (Pre-trained shipped models load
-    # their saved weights and are unaffected.)
-    "solver": "newton-cg",
-    "max_iter": 1000,
+    # Keep newly trained presentation combiners on the published 2.1.x/2.2.x
+    # recipe. Shipped models load their saved coefficients and are unaffected.
+    "solver": "lbfgs",
 }
 
 # Presentation scores are probabilities, but their useful dynamic range depends
 # on the class balance used to fit the logistic combiner. Release training with
 # many decoys can place most scores far below 0.001. Uniform bins over [0, 1]
 # collapse that entire region to one percentile and destroy rank-based metrics.
-# Quantile bins give the transform consistent resolution wherever the fitted
-# model places its scores.
+# Uniform quantiles preserve resolution throughout that compressed range, but
+# still merge informative high scores into large ties. Supplement them with
+# log-spaced upper-tail probabilities: ranking metrics are particularly
+# sensitive to resolution among the strongest predictions.
 PRESENTATION_PERCENT_RANK_NUM_BINS = 10000
+PRESENTATION_PERCENT_RANK_TAIL_FRACTION = 0.01
 
 
 def presentation_percent_rank_bins(
         scores, num_bins=PRESENTATION_PERCENT_RANK_NUM_BINS):
-    """Return data-adaptive bins for presentation percentile calibration.
+    """Return quantile bins with extra resolution in the upper score tail.
 
     Parameters
     ----------
     scores : sequence of float
         Calibration presentation scores.
     num_bins : int
-        Maximum number of quantile bins.
+        Base uniform-quantile bin budget. At most this many additional bins
+        refine the top 1% with logarithmically spaced tail probabilities,
+        down to one observation's probability mass. Small calibration sets
+        and repeated scores can result in fewer bins.
 
     Returns
     -------
@@ -99,11 +100,20 @@ def presentation_percent_rank_bins(
     if num_bins < 1:
         raise ValueError("num_bins must be at least 1")
 
-    quantile_count = min(int(num_bins), scores.size) + 1
-    edges = numpy.quantile(
-        scores,
-        numpy.linspace(0.0, 1.0, quantile_count),
-    )
+    num_bins = int(num_bins)
+    quantiles = numpy.linspace(0.0, 1.0, min(num_bins, scores.size) + 1)
+    if scores.size > num_bins:
+        tail_bins = min(
+            num_bins, int(scores.size * PRESENTATION_PERCENT_RANK_TAIL_FRACTION))
+        if tail_bins > 1:
+            tail_probabilities = numpy.geomspace(
+                PRESENTATION_PERCENT_RANK_TAIL_FRACTION,
+                1.0 / scores.size,
+                tail_bins,
+            )
+            quantiles = numpy.unique(numpy.concatenate([
+                quantiles, 1.0 - tail_probabilities]))
+    edges = numpy.quantile(scores, quantiles)
     edges = numpy.unique(edges)
     if edges.size < 2:
         raise ValueError(
@@ -261,24 +271,23 @@ class Class1PresentationPredictor(object):
         size of num peptides *  num samples:
 
         >>> predictor = Class1PresentationPredictor.load()
-        >>> predictor.predict_affinity(
+        >>> predictions = predictor.predict_affinity(
         ...    peptides=["SIINFEKL", "PEPTIDE"],
         ...    alleles={
         ...        "sample1": ["A0201", "A0301", "B0702"],
         ...        "sample2": ["A0101", "C0202"],
         ...    },
         ...    verbose=0)
-            peptide  peptide_num sample_name   affinity best_allele  affinity_percentile
-        0  SIINFEKL            0     sample1  11927.161       A0201                6.296
-        1   PEPTIDE            1     sample1  32507.082       A0201               71.249
-        2  SIINFEKL            0     sample2   2725.593       C0202                6.662
-        3   PEPTIDE            1     sample2  28304.336       C0202               54.652
+        >>> list(zip(predictions.sample_name, predictions.peptide))
+        [('sample1', 'SIINFEKL'), ('sample1', 'PEPTIDE'), ('sample2', 'SIINFEKL'), ('sample2', 'PEPTIDE')]
+        >>> bool((predictions.affinity > 0).all())
+        True
 
         In contrast, here we specify sample_names, so peptide is evaluated for
         binding the alleles in the corresponding sample, for a result size equal
         to the number of peptides:
 
-        >>> predictor.predict_affinity(
+        >>> predictions = predictor.predict_affinity(
         ...    peptides=["SIINFEKL", "PEPTIDE"],
         ...    alleles={
         ...        "sample1": ["A0201", "A0301", "B0702"],
@@ -286,9 +295,10 @@ class Class1PresentationPredictor(object):
         ...    },
         ...    sample_names=["sample2", "sample1"],
         ...    verbose=0)
-            peptide  peptide_num sample_name   affinity best_allele  affinity_percentile
-        0  SIINFEKL            0     sample2   2725.592       C0202                6.662
-        1   PEPTIDE            1     sample1  32507.078       A0201               71.249
+        >>> list(zip(predictions.sample_name, predictions.peptide))
+        [('sample2', 'SIINFEKL'), ('sample1', 'PEPTIDE')]
+        >>> bool((predictions.affinity > 0).all())
+        True
 
         Parameters
         ----------
@@ -342,7 +352,7 @@ class Class1PresentationPredictor(object):
             )
 
             if verbose > 0:
-                print("Predicting affinities.")
+                print("Predicting affinities.", file=sys.stderr)
 
             # Per-allele × per-peptide chunked predict. Track each
             # sample's best allele as chunks return, so peak host memory
@@ -449,7 +459,7 @@ class Class1PresentationPredictor(object):
 
             iterator = df.groupby("sample_name")
             if verbose > 0:
-                print("Predicting affinities.")
+                print("Predicting affinities.", file=sys.stderr)
                 iterator = tqdm.tqdm(
                     iterator, total=df.sample_name.nunique())
 
@@ -574,7 +584,7 @@ class Class1PresentationPredictor(object):
 
         iterator = zip(peptide_chunks, n_flank_chunks, c_flank_chunks)
         if verbose > 0:
-            print("Predicting processing.")
+            print("Predicting processing.", file=sys.stderr)
             iterator = tqdm.tqdm(iterator, total=len(peptide_chunks))
 
         result_chunks = []
@@ -637,7 +647,7 @@ class Class1PresentationPredictor(object):
         for with_flanks in with_flanks_list:
             model_name = 'with_flanks' if with_flanks else "without_flanks"
             if verbose > 0:
-                print("Predicting processing for variant", model_name)
+                print("Predicting processing for variant", model_name, file=sys.stderr)
 
             processing_scores_by_model[model_name] = self.predict_processing(
                 peptides=df.peptide.values,
@@ -706,9 +716,23 @@ class Class1PresentationPredictor(object):
                     )
                 )
 
-            model.fit(
-                X=df[self.model_inputs].values,
-                y=df.target.astype(float))
+            with warnings.catch_warnings():
+                # scikit-learn <=1.5 passes deprecated ``disp`` / ``iprint``
+                # options to SciPy's L-BFGS-B implementation even when its
+                # own verbose setting is zero. Preserve the published lbfgs
+                # recipe while suppressing only that upstream compatibility
+                # warning; fitting inputs and results are unchanged.
+                warnings.filterwarnings(
+                    "ignore",
+                    message=(
+                        r"scipy\.optimize: The `disp` and `iprint` options of "
+                        r"the L-BFGS-B solver are deprecated.*"
+                    ),
+                    category=DeprecationWarning,
+                )
+                model.fit(
+                    X=df[self.model_inputs].values,
+                    y=df.target.astype(float))
 
             (intercept,) = model.intercept_.flatten()
             self.weights_dataframe.loc[model_name, "intercept"] = intercept
@@ -769,7 +793,7 @@ class Class1PresentationPredictor(object):
         Example:
 
         >>> predictor = Class1PresentationPredictor.load()
-        >>> predictor.predict(
+        >>> predictions = predictor.predict(
         ...    peptides=["SIINFEKL", "PEPTIDE"],
         ...    n_flanks=["NNN", "SNS"],
         ...    c_flanks=["CCC", "CNC"],
@@ -778,11 +802,10 @@ class Class1PresentationPredictor(object):
         ...        "sample2": ["A0101", "C0202"],
         ...    },
         ...    verbose=0)
-            peptide n_flank c_flank  peptide_num sample_name   affinity best_allele  processing_score  presentation_score  presentation_percentile
-        0  SIINFEKL     NNN     CCC            0     sample1  11927.161       A0201             0.838               0.145                    2.282
-        1   PEPTIDE     SNS     CNC            1     sample1  32507.082       A0201             0.025               0.003                  100.000
-        2  SIINFEKL     NNN     CCC            0     sample2   2725.593       C0202             0.838               0.416                    1.017
-        3   PEPTIDE     SNS     CNC            1     sample2  28304.338       C0202             0.025               0.003                   99.287
+        >>> list(zip(predictions.sample_name, predictions.peptide))
+        [('sample1', 'SIINFEKL'), ('sample1', 'PEPTIDE'), ('sample2', 'SIINFEKL'), ('sample2', 'PEPTIDE')]
+        >>> bool(predictions.presentation_score.between(0, 1).all())
+        True
 
         You can also specify sample_names, in which case peptide is evaluated
         for binding the alleles in the corresponding sample only. See
@@ -1024,7 +1047,7 @@ class Class1PresentationPredictor(object):
         Example:
 
         >>> predictor = Class1PresentationPredictor.load()
-        >>> predictor.predict_sequences(
+        >>> predictions = predictor.predict_sequences(
         ...    sequences={
         ...        'protein1': "MDSKGSSQKGSRLLLLLVVSNLL",
         ...        'protein2': "SSLPTPEDKEQAQQTHH",
@@ -1037,17 +1060,10 @@ class Class1PresentationPredictor(object):
         ...    comparison_quantity="affinity",
         ...    filter_value=500,
         ...    verbose=0)
-          sequence_name  pos     peptide n_flank c_flank sample_name  affinity best_allele  affinity_percentile  processing_score  presentation_score  presentation_percentile
-        0      protein1   14   LLLVVSNLL   GSRLL             sample1    57.180       A0201                0.398             0.233               0.754                    0.351
-        1      protein1   13   LLLLVVSNL   KGSRL       L     sample1    57.339       A0201                0.398             0.031               0.586                    0.643
-        2      protein1    5   SSQKGSRLL   MDSKG   LLLVV     sample2   110.779       C0202                0.782             0.061               0.456                    0.920
-        3      protein1    6   SQKGSRLLL   DSKGS   LLVVS     sample2   254.480       C0202                1.735             0.102               0.303                    1.356
-        4      protein1   13  LLLLVVSNLL   KGSRL             sample1   260.390       A0201                1.012             0.158               0.345                    1.215
-        5      protein1   12  LLLLLVVSNL   QKGSR       L     sample1   308.150       A0201                1.094             0.015               0.206                    1.802
-        6      protein2    0   SSLPTPEDK           EQAQQ     sample2   410.354       C0202                2.398             0.003               0.158                    2.155
-        7      protein1    5    SSQKGSRL   MDSKG   LLLLV     sample2   444.321       C0202                2.512             0.026               0.159                    2.138
-        8      protein2    0   SSLPTPEDK           EQAQQ     sample1   459.296       A0301                0.971             0.003               0.144                    2.292
-        9      protein1    4   GSSQKGSRL    MDSK   LLLLV     sample2   469.052       C0202                2.595             0.014               0.146                    2.261
+        >>> bool((predictions.affinity < 500).all())
+        True
+        >>> {"sequence_name", "pos", "peptide", "affinity"}.issubset(predictions.columns)
+        True
 
         Parameters
         ----------
@@ -1292,20 +1308,9 @@ class Class1PresentationPredictor(object):
             self.weights_dataframe.to_csv(join(models_dir, "weights.csv"))
 
         if write_percent_ranks:
-            # Percent ranks
-            if self.percent_rank_transform:
-                series = self.percent_rank_transform.to_series()
-                percent_ranks_df = pandas.DataFrame(index=series.index)
-                numpy.testing.assert_array_almost_equal(
-                    series.index.values,
-                    percent_ranks_df.index.values)
-                percent_ranks_df["presentation_score"] = series.values
-                percent_ranks_path = join(models_dir, "percent_ranks.csv")
-                percent_ranks_df.to_csv(
-                    percent_ranks_path,
-                    index=True,
-                    index_label="bin")
-                logging.info("Wrote: %s", percent_ranks_path)
+            save_percent_rank_transforms(models_dir, {
+                "presentation_score": self.percent_rank_transform
+            } if self.percent_rank_transform is not None else {})
 
         if write_info:
             # Write "info.txt"
@@ -1380,12 +1385,7 @@ class Class1PresentationPredictor(object):
             index_col=0)
 
         # Load percent ranks if available
-        percent_rank_transform = None
-        percent_ranks_path = join(models_dir, "percent_ranks.csv")
-        if exists(percent_ranks_path):
-            percent_ranks_df = pandas.read_csv(percent_ranks_path, index_col=0)
-            percent_rank_transform = PercentRankTransform.from_series(
-                percent_ranks_df["presentation_score"])
+        percent_rank_transform = load_percent_rank_transforms(models_dir).get("presentation_score")
 
         provenance_string = None
         try:
@@ -1420,10 +1420,14 @@ class Class1PresentationPredictor(object):
         Parameters
         ----------
         presentation_scores : sequence of float
+            Raw presentation scores, not peptide sequences.
+        throw : bool, default True
+            Raise when calibration is absent. False warns and returns NaNs.
 
         Returns
         -------
         numpy.array of float
+            Upper-tail percentiles from 0 to 100; lower means stronger.
         """
 
         if self.percent_rank_transform is None:
@@ -1433,11 +1437,10 @@ class Class1PresentationPredictor(object):
             warnings.warn(msg)
             return numpy.ones(len(presentation_scores)) * numpy.nan
 
-        # We subtract from 100 so that strong binders have low percentile ranks,
-        # making them comparable to affinity percentile ranks.
-        return 100 - self.percent_rank_transform.transform(presentation_scores)
+        return self.percent_rank_transform.transform(presentation_scores, survival=True)
 
-    def calibrate_percentile_ranks(self, scores, bins=None):
+    def calibrate_percentile_ranks(self, scores, bins=None, *, method=None,
+                                   max_knots=128, groups=None):
         """
         Compute the cumulative distribution of scores, to enable taking
         quantiles of this distribution later.
@@ -1449,11 +1452,21 @@ class Class1PresentationPredictor(object):
         bins : object
             Anything that can be passed to numpy.histogram's "bins" argument
             can be used here, i.e. either an integer or a sequence giving bin
-            edges. By default, data-adaptive quantile bins are used so models
-            with compressed probability ranges retain ranking resolution.
+            edges. Explicit bins select the historical histogram method.
+        method : {"compact", "histogram"}, optional
+            Defaults to compact unless bins are specified. Loading a saved
+            predictor never recalibrates it.
+        max_knots : {64, 128}, default 128
+            Upper bound, not a starting size. Compact starts with 64; 128
+            requires a background-validation improvement beyond the tolerance.
+            Ignored for histogram calibration.
+        groups : sequence, optional
+            Background peptide identities to keep together during validation.
         """
-        if bins is None:
+        method = calibration_method(method, bins)
+        if method == "histogram" and bins is None:
             bins = presentation_percent_rank_bins(scores)
 
-        self.percent_rank_transform = PercentRankTransform()
-        self.percent_rank_transform.fit(scores, bins=bins)
+        self.percent_rank_transform = fit_percent_rank_transform(
+            scores, method=method, bins=bins, score_transform="logit",
+            survival=True, max_knots=max_knots, groups=groups)

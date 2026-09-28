@@ -11,7 +11,10 @@
 # limitations under the License.
 
 import importlib.util
+import hashlib
+import json
 import pathlib
+import re
 import subprocess
 
 import pytest
@@ -21,6 +24,7 @@ from mhcflurry.version import __version__ as PACKAGE_VERSION
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 SCRIPT = REPO / "scripts" / "release" / "validate_release_provenance.py"
+RELEASE_VERSION = re.match(r"\d+\.\d+\.\d+", PACKAGE_VERSION).group()
 
 
 def load_module():
@@ -51,14 +55,49 @@ def write_model_info(run_dir, version, commit=None, workflow_id="run-123"):
         )
 
 
+def sha256(path):
+    digest = hashlib.sha256()
+    digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def write_holdout_proof(run_dir, overlap=0):
+    holdout_dir = run_dir / "release_holdout"
+    holdout_dir.mkdir(parents=True, exist_ok=True)
+    records = {}
+    for filename in (
+            "affinity_pmhcs.csv",
+            "affinity_samples.csv",
+            "processing_samples.csv",
+            "presentation_samples.csv"):
+        path = holdout_dir / filename
+        path.write_text("value\n")
+        records[filename] = {"rows": 0, "sha256": sha256(path)}
+    policy_path = holdout_dir / "policy.json"
+    policy_path.write_text(json.dumps({
+        "schema_version": 1,
+        "evaluation_hit_counts": {"monoallelic": 1, "multiallelic": 1},
+        "holdout_files": records,
+    }))
+    (holdout_dir / "validation.json").write_text(json.dumps({
+        "schema_version": 1,
+        "policy_sha256": sha256(policy_path),
+        "holdout_files": records,
+        "affinity_overlap_rows": overlap,
+        "processing_overlap_rows": 0,
+        "presentation_overlap_rows": 0,
+    }))
+
+
 def test_collect_provenance_accepts_matching_release_candidate(tmp_path):
     module = load_module()
     write_model_info(tmp_path, PACKAGE_VERSION)
+    write_holdout_proof(tmp_path)
 
     result = module.collect_provenance(
         repo=REPO,
         run_dir=tmp_path,
-        release="2.3.0",
+        release=RELEASE_VERSION,
         workflow_id="run-123",
         processing_variants=["with_flanks"],
         require_artifacts=True,
@@ -66,7 +105,7 @@ def test_collect_provenance_accepts_matching_release_candidate(tmp_path):
         expected_artifact_workflow_id="run-123",
     )
 
-    assert result["release_base_version"] == "2.3.0"
+    assert result["release_base_version"] == RELEASE_VERSION
     assert result["source"]["package_version"] == PACKAGE_VERSION
     assert result["workflow_id"] == "run-123"
     assert {
@@ -76,13 +115,16 @@ def test_collect_provenance_accepts_matching_release_candidate(tmp_path):
 
 def test_collect_provenance_rejects_mislabeled_model(tmp_path):
     module = load_module()
-    write_model_info(tmp_path, "2.3.1")
+    other_version = "999.0.0" if RELEASE_VERSION != "999.0.0" else "998.0.0"
+    write_model_info(tmp_path, other_version)
+    write_holdout_proof(tmp_path)
 
-    with pytest.raises(ValueError, match="2.3.1, not release 2.3.0"):
+    with pytest.raises(ValueError, match=re.escape(
+            "%s, not release %s" % (other_version, RELEASE_VERSION))):
         module.collect_provenance(
             repo=REPO,
             run_dir=tmp_path,
-            release="2.3.0",
+            release=RELEASE_VERSION,
             processing_variants=["with_flanks"],
             require_artifacts=True,
             allow_dirty_repo=True,
@@ -97,7 +139,7 @@ def test_collect_provenance_rejects_missing_model_info(tmp_path):
         module.collect_provenance(
             repo=REPO,
             run_dir=tmp_path,
-            release="2.3.0",
+            release=RELEASE_VERSION,
             processing_variants=["with_flanks"],
             require_artifacts=True,
             allow_dirty_repo=True,
@@ -122,12 +164,13 @@ def test_artifact_paths_reject_invalid_processing_variants(
 def test_collect_provenance_rejects_model_from_another_commit(tmp_path):
     module = load_module()
     write_model_info(tmp_path, PACKAGE_VERSION, commit="deadbeef")
+    write_holdout_proof(tmp_path)
 
     with pytest.raises(ValueError, match="does not match source commit"):
         module.collect_provenance(
             repo=REPO,
             run_dir=tmp_path,
-            release="2.3.0",
+            release=RELEASE_VERSION,
             workflow_id="run-123",
             processing_variants=["with_flanks"],
             require_artifacts=True,
@@ -136,14 +179,100 @@ def test_collect_provenance_rejects_model_from_another_commit(tmp_path):
         )
 
 
-def test_collect_provenance_allows_later_evaluation_workflow(tmp_path):
+def test_collect_provenance_records_separate_postprocess_source(tmp_path):
     module = load_module()
-    write_model_info(tmp_path, PACKAGE_VERSION, workflow_id="training-run")
+    write_model_info(
+        tmp_path,
+        PACKAGE_VERSION,
+        commit="training-commit",
+        workflow_id="training-run",
+    )
+    write_holdout_proof(tmp_path)
 
     result = module.collect_provenance(
         repo=REPO,
         run_dir=tmp_path,
-        release="2.3.0",
+        release=RELEASE_VERSION,
+        workflow_id="evaluation-run",
+        processing_variants=["with_flanks"],
+        require_artifacts=True,
+        allow_dirty_repo=True,
+        allow_artifact_source_mismatch=True,
+    )
+
+    assert result["artifact_training"] == {
+        "git_commit": "training-commit",
+        "workflow_id": "training-run",
+        "matches_evaluation_source": False,
+    }
+    assert result["source"]["git_commit"] != "training-commit"
+
+
+def test_cli_records_separate_postprocess_source(tmp_path, capsys):
+    module = load_module()
+    write_model_info(
+        tmp_path,
+        PACKAGE_VERSION,
+        commit="training-commit",
+        workflow_id="training-run",
+    )
+    write_holdout_proof(tmp_path)
+
+    assert module.main([
+        "--repo", str(REPO),
+        "--run-dir", str(tmp_path),
+        "--release", RELEASE_VERSION,
+        "--workflow-id", "evaluation-run",
+        "--processing-variants", "with_flanks",
+        "--require-artifacts",
+        "--allow-dirty-repo",
+        "--allow-artifact-source-mismatch",
+    ]) == 0
+
+    result = json.loads(capsys.readouterr().out)
+    assert result["artifact_training"]["git_commit"] == "training-commit"
+    assert result["artifact_training"]["matches_evaluation_source"] is False
+
+
+def test_collect_provenance_rejects_inconsistent_artifact_commits(tmp_path):
+    module = load_module()
+    write_model_info(
+        tmp_path,
+        PACKAGE_VERSION,
+        commit="training-commit",
+        workflow_id="training-run",
+    )
+    affinity_info = tmp_path / "affinity" / "models.combined" / "info.txt"
+    affinity_info.write_text(
+        affinity_info.read_text().replace(
+            "git commit\ttraining-commit",
+            "git commit\tanother-commit",
+        )
+    )
+    write_holdout_proof(tmp_path)
+
+    with pytest.raises(ValueError, match="do not agree on git commit"):
+        module.collect_provenance(
+            repo=REPO,
+            run_dir=tmp_path,
+            release=RELEASE_VERSION,
+            workflow_id="evaluation-run",
+            processing_variants=["with_flanks"],
+            require_artifacts=True,
+            allow_dirty_repo=True,
+            allow_artifact_source_mismatch=True,
+        )
+
+
+def test_collect_provenance_allows_later_evaluation_workflow(tmp_path):
+    module = load_module()
+    write_model_info(tmp_path, PACKAGE_VERSION, workflow_id="training-run")
+    write_holdout_proof(tmp_path)
+
+    result = module.collect_provenance(
+        repo=REPO,
+        run_dir=tmp_path,
+        release=RELEASE_VERSION,
         workflow_id="evaluation-run",
         processing_variants=["with_flanks"],
         require_artifacts=True,
@@ -165,7 +294,7 @@ def test_collect_artifact_provenance_without_git_checkout(tmp_path):
 
     result = module.collect_artifact_provenance(
         run_dir=tmp_path,
-        release="2.3.0",
+        release=RELEASE_VERSION,
         processing_variants=["with_flanks"],
         require_artifacts=True,
         expected_artifact_git_commit="remote-commit",
@@ -178,11 +307,63 @@ def test_collect_artifact_provenance_without_git_checkout(tmp_path):
 def test_artifact_only_cli_requires_expected_identity(tmp_path):
     module = load_module()
     write_model_info(tmp_path, PACKAGE_VERSION)
+    write_holdout_proof(tmp_path)
 
     with pytest.raises(SystemExit, match="expected-artifact-git-commit"):
         module.main([
             "--artifact-only",
             "--run-dir", str(tmp_path),
-            "--release", "2.3.0",
+            "--release", RELEASE_VERSION,
             "--require-artifacts",
         ])
+
+
+def test_collect_provenance_requires_holdout_proof(tmp_path):
+    module = load_module()
+    write_model_info(tmp_path, PACKAGE_VERSION)
+
+    with pytest.raises(ValueError, match="Missing required release holdout"):
+        module.collect_provenance(
+            repo=REPO,
+            run_dir=tmp_path,
+            release=RELEASE_VERSION,
+            processing_variants=["with_flanks"],
+            require_artifacts=True,
+            allow_dirty_repo=True,
+        )
+
+
+def test_collect_provenance_rejects_holdout_overlap(tmp_path):
+    module = load_module()
+    write_model_info(tmp_path, PACKAGE_VERSION)
+    write_holdout_proof(tmp_path, overlap=1)
+
+    with pytest.raises(ValueError, match="contains overlap"):
+        module.collect_provenance(
+            repo=REPO,
+            run_dir=tmp_path,
+            release=RELEASE_VERSION,
+            processing_variants=["with_flanks"],
+            require_artifacts=True,
+            allow_dirty_repo=True,
+        )
+
+
+def test_packaging_preserves_explicit_original_training_version(tmp_path):
+    module = load_module()
+    trained_version = "2.3.1rc3"
+    write_model_info(tmp_path, trained_version)
+    write_holdout_proof(tmp_path)
+    kwargs = dict(
+        repo=REPO, run_dir=tmp_path, release=RELEASE_VERSION,
+        processing_variants=["with_flanks"], require_artifacts=True,
+        allow_dirty_repo=True)
+    with pytest.raises(ValueError, match="not release"):
+        module.collect_provenance(**kwargs)
+    result = module.collect_provenance(
+        **kwargs, training_package_version=trained_version)
+    assert result["release"] == RELEASE_VERSION
+    assert result["artifacts"]["affinity"]["package_version"] == trained_version
+    assert result["expected_training_package_version"] == trained_version
+    with pytest.raises(ValueError, match="does not match explicit"):
+        module.collect_provenance(**kwargs, training_package_version="2.3.1rc2")

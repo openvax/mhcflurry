@@ -19,15 +19,18 @@ from pathlib import Path
 
 import setuptools
 
+from mhcflurry.version import __version__
 
-def test_install_guidance_is_not_pinned_to_a_release():
+
+def test_install_guidance_targets_current_stable_release():
     repo_dir = Path(__file__).resolve().parents[1]
     prerelease = re.compile(r"\b\d+\.\d+\.\d+(?:a|b|rc)\d+\b")
     stable_series = re.compile(r"\blatest stable \d+\.\d+(?:\.\w+)?\b", re.I)
 
     for relative_path in ("README.md", "docs/intro.md"):
         text = (repo_dir / relative_path).read_text()
-        assert "pip install --upgrade --pre mhcflurry" in text
+        assert 'pip install --upgrade "mhcflurry==%s"' % __version__ in text
+        assert "--pre " not in text
         assert not prerelease.search(text), relative_path
         assert not stable_series.search(text), relative_path
 
@@ -36,7 +39,8 @@ def test_install_guidance_is_not_pinned_to_a_release():
     setup_cell = next(
         cell for cell in notebook["cells"] if cell["cell_type"] == "code")
     source = "".join(setup_cell["source"])
-    assert "%pip install --upgrade --pre mhcflurry" in source
+    assert f'%pip install --upgrade "mhcflurry=={__version__}"' in source
+    assert "--pre " not in source
     assert "mhcflurry-downloads --quiet fetch models_class1_presentation" in source
     assert not prerelease.search(source)
 

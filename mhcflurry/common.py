@@ -770,7 +770,7 @@ def random_peptides(num, length=9, distribution=None, rng=None):
         None the global state is used, preserving legacy call-site semantics.
 
     Returns
-    ----------
+    -------
     list of string
 
     """
@@ -845,7 +845,7 @@ def load_weights(filename):
     filename : string
 
     Returns
-    ----------
+    -------
     list of array
     """
     with numpy.load(filename) as loaded:

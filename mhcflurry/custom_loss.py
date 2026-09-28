@@ -64,6 +64,7 @@ class Loss(object):
     be custom or baked into PyTorch.
 
     Each subclass or instance should define these properties/methods:
+
     - name : string
     - loss : callable
         This is the PyTorch loss function

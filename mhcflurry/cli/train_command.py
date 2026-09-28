@@ -21,12 +21,24 @@ stable ``mhcflurry`` entry point.
 """
 
 import argparse
+import os
 from pathlib import Path
 import subprocess
 import sys
 
 
 WORKFLOW_SCRIPT = Path("scripts/release/retrain_evaluate_deploy.sh")
+TRAINING_SCRIPTS = {
+    "benchmark-processing-sampler": Path("scripts/training/benchmark_processing_sampler.py"),
+    "benchmark-processing-preparation": Path("scripts/training/benchmark_processing_preparation.py"),
+    "processing-kernel-sweep": Path("scripts/training/run_processing_kernel_sweep.py"),
+    "processing-hyperparameter-sweep": Path("scripts/training/run_processing_kernel_sweep.py"),
+    "processing-data": Path("scripts/training/release_exact/make_train_data.processing.py"),
+    "exact-public-processing": Path("scripts/training/run_exact_public_processing.py"),
+    "audit-training-data": Path("scripts/training/audit_training_data_identity.py"),
+    "compose-processing-ensemble": Path(
+        "scripts/training/compose_processing_ensemble.py"),
+}
 
 
 def make_parser(prog="mhcflurry train"):
@@ -38,6 +50,22 @@ def make_parser(prog="mhcflurry train"):
         ),
     )
     sub = parser.add_subparsers(dest="train_subcommand")
+    sub.add_parser("benchmark-processing-preparation", add_help=False,
+                   help="Benchmark numeric preparation and verify matching/prediction parity")
+    sub.add_parser("benchmark-processing-sampler", add_help=False,
+                   help="Benchmark numeric-position versus reservoir candidate sampling.")
+    sub.add_parser("processing-kernel-sweep", add_help=False,
+                   help="Run the paired, matched-data processing kernel-width sweep.")
+    sub.add_parser("processing-hyperparameter-sweep", add_help=False,
+                   help="Run a paired processing width or optimizer/initialization/batch design.")
+    sub.add_parser("processing-data", add_help=False,
+                   help="Generate affinity/length-matched processing training data.")
+    sub.add_parser("validate-processing-data", add_help=False,
+                   help="Verify cached matched processing data before reuse.")
+    sub.add_parser("exact-public-processing", add_help=False,
+                   help="Replay the frozen processing candidate on exact public rows/folds.")
+    sub.add_parser("audit-training-data", add_help=False,
+                   help="Audit exact training row identity between two tables.")
     pan = sub.add_parser(
         "pan-allele-release",
         add_help=False,
@@ -56,21 +84,80 @@ def make_parser(prog="mhcflurry train"):
         nargs=argparse.REMAINDER,
         help="Arguments forwarded to scripts/release/retrain_evaluate_deploy.sh.",
     )
+    holdout = sub.add_parser(
+        "release-holdout",
+        add_help=False,
+        help="Build or validate the frozen release evaluation holdout.",
+    )
+    holdout.add_argument("holdout_args", nargs=argparse.REMAINDER)
+    loss_curves = sub.add_parser(
+        "plot-loss-curves",
+        add_help=False,
+        help="Plot training loss curves and highlight selected models.",
+    )
+    loss_curves.add_argument("plot_args", nargs=argparse.REMAINDER)
+    snapshot = sub.add_parser(
+        "snapshot-experiment",
+        add_help=False,
+        help="Archive reproducible experiment metadata and plotting tables.",
+    )
+    snapshot.add_argument("snapshot_args", nargs=argparse.REMAINDER)
+    checkpoints = sub.add_parser(
+        "materialize-affinity-checkpoint",
+        add_help=False,
+        help="Create a predictor from retained terminal or best checkpoints.",
+    )
+    checkpoints.add_argument("checkpoint_args", nargs=argparse.REMAINDER)
+    compose = sub.add_parser(
+        "compose-processing-ensemble",
+        add_help=False,
+        help="Combine complete processing predictors with recorded provenance.",
+    )
+    compose.add_argument("compose_args", nargs=argparse.REMAINDER)
     return parser
 
 
 def _format_help(prog):
     return "\n".join([
-        "usage: %s {pan-allele-release} ..." % prog,
+        (
+            "usage: %s {pan-allele-release,release-holdout,"
+            "plot-loss-curves,snapshot-experiment,"
+            "materialize-affinity-checkpoint,compose-processing-ensemble,"
+            "audit-training-data,exact-public-processing,processing-data,"
+            "validate-processing-data,processing-kernel-sweep,processing-hyperparameter-sweep,benchmark-processing-sampler,"
+            "benchmark-processing-preparation} ..." %
+            prog
+        ),
         "",
         "Training workflows.",
         "",
         "Subcommands:",
         "  pan-allele-release  Train/evaluate/plot release weights from one entry point.",
+        "  release-holdout     Build/validate frozen evaluation exclusions.",
+        "  plot-loss-curves    Plot candidate losses and selected models.",
+        "  snapshot-experiment Archive hashes, provenance, metrics, and epoch tables.",
+        "  materialize-affinity-checkpoint",
+        "                      Select retained terminal or best affinity weights.",
+        "  compose-processing-ensemble",
+        "                      Build a provenance-recorded processing ensemble.",
+        "  audit-training-data Audit exact row identity and multiplicities.",
+        "  exact-public-processing Replay exact public processing/presentation data.",
+        "  processing-data      Generate matched processing training data.",
+        "  processing-kernel-sweep Train/evaluate the paired 48-network width sweep.",
+        "  processing-hyperparameter-sweep Run a paired width or training-recipe design.",
+        "  benchmark-processing-sampler Compare candidate sampling implementations.",
+        "  benchmark-processing-preparation Check numeric, matching and prediction parity/timings.",
+        "  validate-processing-data Verify cached matching assignments and metadata.",
         "",
         "Examples:",
         "  %s pan-allele-release --run-dir runs/2.3.0 --release 2.3.0 --backend local" % prog,
         "  %s pan-allele-release --run-dir runs/2.3.0 --release 2.3.0 --backend brev-provision" % prog,
+        "  %s plot-loss-curves --selected-dir models.combined --out plots" % prog,
+        "  %s snapshot-experiment --source-dir results/run --name batch-sweep" % prog,
+        (
+            "  %s materialize-affinity-checkpoint --models-dir models.unselected.combined "
+            "--policy best --out-models-dir models.unselected.best" % prog
+        ),
         "",
         "Deployment is opt-in. Pass --deploy-mode dry-run, draft, or publish "
         "to run the model-artifact deployment step.",
@@ -91,6 +178,40 @@ def _workflow_script_path():
         "or an editable install that includes the scripts/ directory." %
         WORKFLOW_SCRIPT
     )
+
+
+def _training_script_path(subcommand):
+    relative = TRAINING_SCRIPTS[subcommand]
+    repo_root = Path(__file__).resolve().parents[2]
+    for candidate in (repo_root / relative, Path.cwd() / relative):
+        if candidate.exists():
+            return candidate
+    raise SystemExit(
+        "Could not find %s. This command must be run from a source checkout "
+        "or editable install." % relative)
+
+
+def _run_training_script(subcommand, argv):
+    env = os.environ.copy()
+    env["MHCFLURRY_CLI_PROG"] = "mhcflurry train %s" % subcommand
+    return subprocess.call([
+        sys.executable,
+        str(_training_script_path(subcommand)),
+        *argv,
+    ], env=env)
+
+
+def _require_explicit_design(argv, prog):
+    """Stop the generic sweep alias from inheriting the kernel-width default."""
+    parser = argparse.ArgumentParser(
+        prog=prog, usage="%(prog)s --design DESIGN [options]", add_help=False)
+    parser.add_argument("-h", "--help", action="store_true")
+    parser.add_argument("--design")
+    known, _ = parser.parse_known_args(argv)
+    if not known.help and known.design is None:
+        parser.error(
+            "--design is required; see --help for designs, or use "
+            "processing-kernel-sweep for the kernel-width sweep")
 
 
 def _print_pan_allele_release_help(script, prog):
@@ -120,6 +241,36 @@ def run_argv(argv, prog="mhcflurry train"):
     if argv[0] == "pan-allele-release":
         return _run_pan_allele_release(
             argv[1:], "%s pan-allele-release" % prog)
+    if argv[0] == "validate-processing-data":
+        import pandas
+        from ..processing_matching import validate_matched_training_data
+        validation_parser = argparse.ArgumentParser(prog=prog + " validate-processing-data")
+        validation_parser.add_argument("--data", required=True)
+        validation_args = validation_parser.parse_args(argv[1:])
+        frame = pandas.read_csv(validation_args.data)
+        validate_matched_training_data(frame)
+        print("Validated %d matched rows across %d samples" % (len(frame), frame.sample_id.nunique()))
+        return 0
+    if argv[0] == "release-holdout":
+        from mhcflurry import release_holdout
+        return release_holdout.run_argv(
+            argv[1:], prog="%s release-holdout" % prog)
+    if argv[0] == "plot-loss-curves":
+        from . import plot_loss_curves
+        return plot_loss_curves.run_argv(
+            argv[1:], prog="%s plot-loss-curves" % prog)
+    if argv[0] == "snapshot-experiment":
+        from . import experiment_snapshot
+        return experiment_snapshot.run_argv(
+            argv[1:], prog="%s snapshot-experiment" % prog)
+    if argv[0] == "materialize-affinity-checkpoint":
+        from . import materialize_affinity_checkpoint
+        return materialize_affinity_checkpoint.run_argv(
+            argv[1:], prog="%s materialize-affinity-checkpoint" % prog)
+    if argv[0] == "processing-hyperparameter-sweep":
+        _require_explicit_design(argv[1:], "%s %s" % (prog, argv[0]))
+    if argv[0] in TRAINING_SCRIPTS:
+        return _run_training_script(argv[0], argv[1:])
     make_parser(prog).parse_args(argv)
     return 2
 

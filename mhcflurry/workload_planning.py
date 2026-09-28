@@ -164,6 +164,10 @@ class LocalParallelismPlan:
     warmup_host_peak_gb: Optional[float] = None
     cpu_threads_per_worker: Optional[int] = None
     cpu_threads_per_worker_was_auto: bool = True
+    # Append new fields to preserve positional compatibility for callers that
+    # construct this public diagnostic dataclass directly.
+    device_memory_available_gb: Optional[float] = None
+    device_memory_budget_gb: Optional[float] = None
 
     def __str__(self):
         device_worker = (
@@ -176,10 +180,15 @@ class LocalParallelismPlan:
             if self.host_memory_available_gb is not None
             else "unknown"
         )
+        device_budget = (
+            "%.1f GB" % self.device_memory_budget_gb
+            if self.device_memory_budget_gb is not None
+            else "unknown"
+        )
         return (
             "LocalParallelismPlan("
             "workload=%s, backend=%s, jobs=%d, gpus=%d, workers/gpu=%d, "
-            "dataloader_workers=%d, device_worker_gb=%s, "
+            "dataloader_workers=%d, device_worker_gb=%s, device_budget=%s, "
             "host_worker_gb=%.1f, host_available=%s from %s, "
             "warmup_device_peak_gb=%s, warmup_host_peak_gb=%s, "
             "cpu_threads_per_worker=%s [%s])"
@@ -191,6 +200,7 @@ class LocalParallelismPlan:
                 self.max_workers_per_gpu,
                 self.dataloader_num_workers,
                 device_worker,
+                device_budget,
                 self.host_worker_gb,
                 host_available,
                 self.host_memory_source,
@@ -277,13 +287,18 @@ WORKLOAD_PROFILES = {
     ),
     WORKLOAD_PROCESSING_INFERENCE: WorkloadProfile(
         name=WORKLOAD_PROCESSING_INFERENCE,
-        device_worker_gb=8.0,
+        # Four 8 GB workers fit arithmetically on an A100-40GB after the
+        # shared reserve, but the release processing ensemble can cross that
+        # envelope when four convolution workspaces peak concurrently.  The
+        # 10 GB resident-workload floor was established from the release
+        # holdout failure at the 5-aa condition after ten prior comparisons.
+        device_worker_gb=10.0,
         data_pressure_start_gb=2.0,
         data_pressure_factor=0.03,
         data_pressure_cap_gb=4.0,
         host_worker_gb=4.0,
         host_data_multiplier=0.03,
-        description="Processing predictor inference.",
+        description="Processing predictor inference with convolution peaks.",
     ),
     WORKLOAD_PROCESSING_SELECTION: WorkloadProfile(
         name=WORKLOAD_PROCESSING_SELECTION,
@@ -542,13 +557,13 @@ def available_or_total_memory_gb(memory):
     return memory.get("total_gb")
 
 
-def _workload_env_name(workload_name):
-    return "MHCFLURRY_WORKLOAD_%s_PER_WORKER_GB" % (
-        workload_name.upper().replace("-", "_"),
-    )
+def normalize_workload_hints(hints=None, **extra_hints):
+    """Merge workload hints, dropping unset additions.
 
-
-def _normalize_hints(hints=None, **extra_hints):
+    Explicit keyword additions replace same-named values from ``hints``. This
+    is the normalization boundary shared by workload estimation and local
+    parallelism planning.
+    """
     values = {}
     if hints:
         values.update(dict(hints))
@@ -578,22 +593,20 @@ def _finite_nonnegative_hint(hints, name):
 
 def estimate_workload_memory(workload_name=WORKLOAD_GENERIC, hints=None):
     """Estimate device and host memory for a workload."""
-    hints = _normalize_hints(hints)
+    hints = normalize_workload_hints(hints)
     profile = get_workload_profile(workload_name)
     notes = []
     data_bytes = _finite_nonnegative_hint(hints, "data_bytes") or 0.0
     model_bytes = _finite_nonnegative_hint(hints, "model_bytes")
     data_gb = data_bytes / GIB
-    explicit_device_worker_gb = False
-
-    workload_env = _workload_env_name(profile.name)
+    workload_env = "MHCFLURRY_WORKLOAD_%s_PER_WORKER_GB" % (
+        profile.name.upper().replace("-", "_"),
+    )
     if os.environ.get(workload_env) not in (None, ""):
         device_worker_gb = env_float(workload_env, 0.0, bounds=(0.0, None))
-        explicit_device_worker_gb = True
         notes.append("env override")
     elif hints.get("per_worker_gb") is not None:
         device_worker_gb = _finite_nonnegative_hint(hints, "per_worker_gb")
-        explicit_device_worker_gb = True
         notes.append("command estimate")
     else:
         device_worker_gb = profile.device_worker_gb
@@ -605,14 +618,17 @@ def estimate_workload_memory(workload_name=WORKLOAD_GENERIC, hints=None):
             DEVICE_RUNTIME_BASE_GB
             + float(model_bytes) / GIB * MODEL_TENSOR_SAFETY_FACTOR
         )
-        if hints.get("elastic_batch") and not explicit_device_worker_gb:
-            # Activations are sized later from live memory. For inference the
-            # launcher only needs parameters plus the CUDA/runtime base.
-            device_worker_gb = artifact_worker_gb
-            notes.append("uncompressed model artifacts")
-        elif device_worker_gb is None or artifact_worker_gb > device_worker_gb:
+        if device_worker_gb is None or artifact_worker_gb > device_worker_gb:
+            # Artifact size is a resident-memory floor, not a replacement for
+            # the workload profile. An elastic batch can shrink transient
+            # activations, but it cannot shrink CUDA contexts, model state, or
+            # the other predictors held by a composite workload. Analytic
+            # command estimates and expert env overrides remain authoritative;
+            # unlike raw artifact size, they describe a complete worker.
             device_worker_gb = artifact_worker_gb
             notes.append("uncompressed model artifact floor")
+        elif hints.get("elastic_batch"):
+            notes.append("elastic batches retain resident workload floor")
 
     data_pressure_gb = 0.0
     if data_bytes and device_worker_gb is not None:
@@ -677,7 +693,8 @@ def host_memory_num_jobs_cap(
     return max(1, int(usable_gb / worker_gb))
 
 
-def _is_auto(value):
+def is_auto_value(value):
+    """Return whether a CLI/programmatic sizing value delegates to auto."""
     return value is None or (isinstance(value, str) and value.lower() == "auto")
 
 
@@ -820,7 +837,10 @@ def plan_local_parallelism(
     exceed estimated capacity, the planner records a warning and still returns
     the explicit value.
     """
-    hints = _normalize_hints(workload_hints, per_worker_gb=per_worker_gb)
+    hints = normalize_workload_hints(
+        workload_hints,
+        per_worker_gb=per_worker_gb,
+    )
     memory_plan = estimate_workload_memory(workload_name, hints)
     memory = system_memory_info_gb()
     warnings = []
@@ -841,7 +861,7 @@ def plan_local_parallelism(
             cli_overrides.append("gpus")
 
     mwpg_raw = getattr(args, "max_workers_per_gpu", None)
-    mwpg_was_auto = _is_auto(mwpg_raw)
+    mwpg_was_auto = is_auto_value(mwpg_raw)
     if mwpg_was_auto:
         max_workers_per_gpu = int(auto_max_workers_per_gpu(
             num_jobs=getattr(args, "num_jobs", 0),
@@ -858,7 +878,7 @@ def plan_local_parallelism(
         if backend in ("auto", "gpu") else 0
     )
     num_jobs_raw = getattr(args, "num_jobs", "auto")
-    num_jobs_was_auto = _is_auto(num_jobs_raw)
+    num_jobs_was_auto = is_auto_value(num_jobs_raw)
     if num_jobs_was_auto:
         num_jobs = capacity
         if cap_auto_num_jobs and num_jobs > 0:
@@ -925,16 +945,21 @@ def plan_local_parallelism(
         if backend in ("auto", "gpu"):
             capacity = int(num_jobs)
 
+    dataloader_fit_workers = max(0, int(num_jobs))
+    if (
+            int(num_jobs) <= 0
+            and gpus > 0
+            and backend in ("auto", "gpu")):
+        # An explicit serial run can still execute one fit on an accelerator.
+        dataloader_fit_workers = 1
     effective_fit_workers = max(1, int(num_jobs))
-    if int(num_jobs) <= 0 and gpus > 0:
-        effective_fit_workers = 1
 
     dl_raw = getattr(args, "dataloader_num_workers", "auto")
-    dl_was_auto = _is_auto(dl_raw)
+    dl_was_auto = is_auto_value(dl_raw)
     if dl_was_auto:
         dataloader_num_workers = int(resolve_dataloader_num_workers(
             dl_raw,
-            num_fit_workers=effective_fit_workers,
+            num_fit_workers=dataloader_fit_workers,
             ram_gb=available_or_total_memory_gb(memory),
         ))
     else:
@@ -987,8 +1012,6 @@ def plan_local_parallelism(
                 # num_jobs=5 on 2 GPUs -> mwpg=3 -> capacity=6 > num_jobs).
                 capacity = int(num_jobs)
             effective_fit_workers = max(1, int(num_jobs))
-            if int(num_jobs) <= 0 and gpus > 0:
-                effective_fit_workers = 1
             host_memory_cap = host_memory_num_jobs_cap(
                 memory,
                 memory_plan["host_worker_gb"],
@@ -1001,7 +1024,7 @@ def plan_local_parallelism(
             )
 
     rn_raw = getattr(args, "random_negative_pool_epochs", "auto")
-    rn_was_auto = _is_auto(rn_raw)
+    rn_was_auto = is_auto_value(rn_raw)
     if rn_was_auto:
         random_negative_pool_epochs = int(auto_random_negative_pool_epochs(
             num_random_negatives=None,

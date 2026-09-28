@@ -58,6 +58,7 @@ def test_model_select_uses_numpy_prediction_matrix():
         models=models,
         min_models=1,
         max_models=3,
+        save_validation_predictions=True,
         constant_data={"data": data})
 
     assert result["selected_indices"] == [1, 0]
@@ -65,3 +66,12 @@ def test_model_select_uses_numpy_prediction_matrix():
     assert summary.loc[0, "selected_in_round"] == 2
     assert summary.loc[1, "selected_in_round"] == 1
     assert pandas.isna(summary.loc[2, "selected_in_round"])
+    predictions = result["validation_predictions"]
+    assert predictions["validation_row_index"].tolist() == list(range(6))
+    assert predictions["fold_num"].tolist() == [0] * 6
+    assert predictions["selected_model_indices"].tolist() == ["1,0"] * 6
+    numpy.testing.assert_allclose(
+        predictions["processing_score"],
+        numpy.mean([models[1].predictions, models[0].predictions], axis=0),
+    )
+    assert "fold_0" not in predictions

@@ -38,7 +38,7 @@ def initialize():
     import random
     import torch
 
-    seed = int(os.environ.get("MHCFLURRY_TEST_SEED", 1))
+    seed = int(os.environ.get("MHCFLURRY_TEST_SEED", "1"))
     if seed == 0:
         # Enable nondeterminism
         seed = int(time.time())

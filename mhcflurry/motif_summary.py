@@ -38,19 +38,22 @@ def prepare_motif_summary_state_gpu(encoded_peptides, device):
     ``drop_duplicates`` + length-bucket + AA-encoding work out of
     the calibrate chunk loop so each chunk is pure tensor math.
 
-    Returns a dict of device-resident tensors:
-        unique_idx_t : (n_unique,) long — first-occurrence indices
-            into the full peptide list. Selecting columns with this
-            from the chunk's ``ic50_device`` reproduces the legacy
-            ``drop_duplicates('peptide')`` semantics (first row wins).
-        length_groups : dict[L] -> (n_at_L,) long indices into the
-            unique-peptide axis for peptides of length L.
-        aa_codes_per_length : dict[L] -> (n_at_L, L) long tensor of
-            amino-acid index codes (matches ``AMINO_ACID_INDEX``,
-            so X = 20 if it ever appears).
-        unique_lengths_t : (n_unique,) long — peptide length per
-            unique peptide; powers the per-allele length distribution.
-        n_unique : int.
+    Returns
+    -------
+    dict
+        Device-resident tensors and their unique-peptide count:
+
+        - ``unique_idx_t``: (n_unique,) long first-occurrence indices into the
+          full peptide list. Selecting columns from ``ic50_device`` reproduces
+          ``drop_duplicates('peptide')`` semantics (first row wins).
+        - ``length_groups``: dict[L] of (n_at_L,) long indices into the unique
+          peptide axis for peptides of length L.
+        - ``aa_codes_per_length``: dict[L] of (n_at_L, L) long tensors of amino
+          acid index codes, matching ``AMINO_ACID_INDEX`` (X = 20).
+        - ``unique_lengths_t``: (n_unique,) long peptide lengths, used for the
+          per-allele length distribution.
+        - ``n_unique``: integer count of unique peptides.
+
     """
     import torch
 

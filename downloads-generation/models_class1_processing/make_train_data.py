@@ -15,20 +15,23 @@ Make training data by selecting decoys, etc.
 """
 import sys
 import argparse
-import os
 import numpy
 import time
 from functools import partial
 
 import pandas
 import tqdm
+from mhcflurry.processing_matching import (
+    add_processing_matching_args, initialize_matching_artifacts,
+    prepare_processing_training_sample, validate_matched_training_data)
 from mhcgnomes import parse
 
-tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
-
 from mhcflurry.common import (
+    add_random_seed_arg,
     allele_locus_name,
     configure_logging,
+    configure_random_seed,
+    derive_seed,
     normalize_allele_name,
     positive_float_arg,
     positive_int_arg,
@@ -48,6 +51,8 @@ from mhcflurry.cluster_parallelism import (
     add_cluster_parallelism_args,
     cluster_results_from_args)
 
+tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
+
 
 # To avoid pickling large matrices to send to child processes when running in
 # parallel, we use this global variable as a place to store data. Data that is
@@ -61,6 +66,7 @@ WORKER_CONTEXT = GLOBAL_DATA
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
+add_processing_matching_args(parser)
 
 parser.add_argument(
     "--hits",
@@ -94,7 +100,7 @@ parser.add_argument(
     type=positive_int_arg,
     metavar="N",
     default=1000,
-    help="Take top 1/N predictions.")
+    help="Candidate decoys per hit before matching (legacy: top-binder pool multiplier).")
 parser.add_argument(
     "--exclude-contig",
     help="Exclude entries annotated to the given contig")
@@ -108,6 +114,7 @@ parser.add_argument(
     nargs="+",
     help="Include only the specified alleles")
 
+add_random_seed_arg(parser)
 add_local_parallelism_args(parser)
 add_cluster_parallelism_args(parser)
 
@@ -149,7 +156,7 @@ def predictor_allele_for_processing(affinity_predictor, allele):
     return predictor_allele
 
 
-def do_process_samples(samples, constant_data=None):
+def do_process_samples(samples, constant_data=None, seed=None):
     import mhcflurry
     import pandas
     import tqdm
@@ -168,6 +175,8 @@ def do_process_samples(samples, constant_data=None):
 
     if constant_data is None:
         constant_data = GLOBAL_DATA
+    if seed is not None:
+        numpy.random.seed(int(seed) % (2 ** 32))
 
     args = constant_data['args']
     lengths = constant_data['lengths']
@@ -240,12 +249,16 @@ def do_process_samples(samples, constant_data=None):
 
         merged_df["affinity_prediction"] = merged_df.peptide.map(
             predictions_df[prediction_col])
-        merged_df = merged_df.sort_values("affinity_prediction", ascending=True)
-
-        num_to_take = int(len(sub_hit_df) * args.hit_multiplier_to_take)
-        selected_df = merged_df.head(num_to_take)[
-                columns_to_keep
-        ].sample(frac=1.0).copy()
+        if args.negative_policy == "matched":
+            merged_df["sample_id"] = sample_id
+            selected_df = prepare_processing_training_sample(
+                merged_df[columns_to_keep], args, args.matching_reference)
+        else:
+            merged_df = merged_df.sort_values("affinity_prediction", ascending=True)
+            num_to_take = int(len(sub_hit_df) * args.hit_multiplier_to_take)
+            selected_df = merged_df.head(num_to_take)[
+                    columns_to_keep
+            ].sample(frac=1.0).copy()
         selected_df["hit"] = selected_df["hit"].fillna(0)
         selected_df["sample_id"] = sample_id
         result_df.append(selected_df)
@@ -264,8 +277,10 @@ def run():
     import mhcflurry
 
     args = parser.parse_args(sys.argv[1:])
+    args.matching_reference = initialize_matching_artifacts(args)
 
     configure_logging()
+    master_seed = configure_random_seed(args.random_seed, name="make-processing-train-data")
     resolve_local_parallelism_args(
         args,
         cap_auto_num_jobs=not args.cluster_parallelism,
@@ -381,14 +396,14 @@ def run():
     worker_pool = None
     start = time.time()
 
-    tasks = [
-        {"samples": [sample]} for sample in hit_df.sample_id.unique()
-    ]
+    sample_order = list(hit_df.sample_id.unique())
+    tasks = [{"samples": [sample], "seed": derive_seed(master_seed, "sample", sample)}
+             for sample in sample_order]
 
     if serial_run:
         # Serial run
         print("Running in serial.")
-        results = [do_process_samples(hit_df.sample_id.unique())]
+        results = [do_process_samples(**task) for task in tasks]
     elif args.cluster_parallelism:
         # Run using separate processes HPC cluster.
         print("Running on cluster.")
@@ -415,7 +430,7 @@ def run():
 
     print("Reading results")
 
-    result_df = []
+    result_by_sample = {}
     try:
         for worker_result in tqdm.tqdm(results, total=len(tasks)):
             for sample_id, selected_df in worker_result.groupby("sample_id"):
@@ -424,7 +439,9 @@ def run():
                     sample_id,
                     "with hit and decoys:\n",
                     selected_df.hit.value_counts())
-            result_df.append(worker_result)
+                if sample_id in result_by_sample:
+                    raise RuntimeError("Duplicate processing result for sample %s" % sample_id)
+                result_by_sample[sample_id] = selected_df
         if worker_pool:
             worker_pool.close()
             worker_pool.join()
@@ -436,7 +453,11 @@ def run():
 
     print("Received all results in %0.2f sec" % (time.time() - start))
 
-    result_df = pandas.concat(result_df, ignore_index=True, sort=False)
+    missing = set(sample_order) - set(result_by_sample)
+    if missing:
+        raise RuntimeError("Missing processing results for samples: %s" % sorted(missing))
+    result_df = pandas.concat([result_by_sample[sample] for sample in sample_order],
+                             ignore_index=True, sort=False)
     result_df["hla"] = result_df.sample_id.map(sample_table.allele)
 
     print(result_df)
@@ -452,6 +473,8 @@ def run():
     print("Hit rates:")
     print(result_df.groupby("sample_id").hit.mean().sort_values())
 
+    validate_matched_training_data(
+        result_df, policy="matched" if args.negative_policy == "matched" else "legacy")
     result_df.to_csv(args.out, index=False)
     print("Wrote: ", args.out)
 

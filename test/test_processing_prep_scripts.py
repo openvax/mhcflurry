@@ -38,6 +38,88 @@ def load_script(path):
     return module
 
 
+def test_preparation_benchmark_alternates_comparison_order():
+    module = load_script(REPO_ROOT / "scripts/training/benchmark_processing_preparation.py")
+    calls = []
+
+    def first():
+        calls.append("first")
+        return "a"
+
+    def second():
+        calls.append("second")
+        return "b"
+
+    results, timings, orders = module.timed_pair(first, second, 2)
+    assert results == ["a", "b"]
+    assert calls == ["first", "second", "second", "first"]
+    assert orders == [[0, 1], [1, 0]]
+    for measured in timings:
+        assert len(measured["seconds"]) == len(measured["cpu_seconds"]) == 2
+
+
+def test_preparation_benchmark_saves_parity_timings_and_refuses_overwrite(tmp_path):
+    import json
+    from mhcflurry.cli import main as cli_main
+    path = tmp_path / "nested" / "benchmark.json"
+    arguments = ["train", "benchmark-processing-preparation", "--out", str(path),
+                 "--proteins", "2", "--protein-length", "30", "--draws", "10", "--repeats", "1"]
+    assert cli_main.main(arguments) == 0
+    result = json.loads(path.read_text())
+    assert result["sampler"]["exact_export_parity"] is True
+    assert len(result["sampler"]["export_strings_seconds"]["seconds"]) == 1
+    assert all(len(digest) == 64 for digest in result["source_hashes"].values())
+    assert any(key.endswith("numeric_sequences.py") for key in result["source_hashes"])
+    before = path.read_bytes()
+    assert cli_main.main(arguments) != 0
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize("relative_path", [
+    "scripts/training/release_exact/make_train_data.processing.py",
+    "downloads-generation/models_class1_processing/make_train_data.py",
+])
+def test_processing_generation_matches_and_preserves_scored_pool(relative_path, tmp_path, monkeypatch):
+    import numpy
+    import mhcflurry
+    from mhcflurry.processing_matching import validate_matched_training_data
+    module = load_script(REPO_ROOT / relative_path)
+    args = module.parser.parse_args([
+        "--hits", "unused", "--affinity-predictor", "frozen-public",
+        "--proteome-peptides", "unused", "--ppv-multiplier", "3",
+        "--out", str(tmp_path / "training.csv")])
+    assert args.negative_policy == "matched"
+    args.matching_reference = {"sha256": "a" * 64}
+    directory = tmp_path / "training.csv.matching"
+    directory.mkdir()
+    hits = pandas.DataFrame({"peptide": ["SIINFEKL", "SIINFEKA"],
+                             "sample_id": "s", "allele": "HLA-A*02:01",
+                             "hit_id": [1, 2], "protein_accession": "p1",
+                             "n_flank": "AAAAA", "c_flank": "CCCCC"})
+    pool = pandas.DataFrame({"peptide": [c + "IINFEKL" for c in "CDEFGH"],
+                             "protein_accession": "p1", "n_flank": "AAAAA", "c_flank": "CCCCC"})
+
+    class Predictor:
+        supported_alleles = ["HLA-A*02:01"]
+
+        def canonicalize_allele_name(self, allele):
+            return allele
+
+        def predict(self, peptides, allele):
+            assert allele == "HLA-A*02:01"
+            return numpy.repeat(100.0, len(peptides))
+
+    monkeypatch.setattr(mhcflurry.Class1AffinityPredictor, "load", lambda path: Predictor())
+    result = module.do_process_samples(["s"], seed=42, constant_data={
+        "args": args, "lengths": [8], "all_peptides_by_length": {8: pool},
+        "sample_table": hits.drop_duplicates("sample_id").set_index("sample_id"), "hit_df": hits})
+    validate_matched_training_data(result)
+    assert result.hit.sum() == len(hits)
+    assert len(result) == 4
+    assert len(pandas.read_csv(next(directory.glob("*.candidate_pool.csv.bz2")))) == 8
+    assert len(list(directory.glob("*.matching.json"))) == 1
+
+
 def test_generate_scripts_keep_packaged_proteome_peptide_artifacts():
     """Guard download-generation artifact contracts.
 
@@ -63,6 +145,111 @@ def test_generate_scripts_keep_packaged_proteome_peptide_artifacts():
     assert "--out proteome_peptides.$subset.csv" in predictions_generate
     assert "bzip2 proteome_peptides.$subset.csv" in predictions_generate
     assert "proteome_peptides.$subset.csv.bz2" in predictions_generate
+
+
+def test_processing_preparation_keeps_predictor_in_worker_and_resumes_without_loading(tmp_path, monkeypatch):
+    import numpy
+    import mhcflurry
+    module = load_script(REPO_ROOT / "scripts/training/release_exact/make_train_data.processing.py")
+    args = module.parser.parse_args([
+        "--hits", "unused", "--affinity-predictor", "reference", "--proteome-peptides", "unused",
+        "--ppv-multiplier", "3", "--out", str(tmp_path / "training.csv")])
+    args.matching_reference = {"sha256": "a" * 64}
+    (tmp_path / "training.csv.matching").mkdir()
+    hits = pandas.DataFrame({"peptide": ["SIINFEKL", "SIINFEKA"] * 2,
+        "sample_id": ["s1", "s1", "s2", "s2"], "allele": "HLA-A*02:01",
+        "hit_id": [1, 2, 3, 4], "protein_accession": "p1", "n_flank": "AAAAA", "c_flank": "CCCCC"})
+    pool = pandas.DataFrame({"peptide": [c + "IINFEKL" for c in "CDEFGH"],
+                             "protein_accession": "p1", "n_flank": "AAAAA", "c_flank": "CCCCC"})
+    loads = []
+    predictions = []
+
+    class Predictor:
+        supported_alleles = ["HLA-A*02:01"]
+
+        def canonicalize_allele_name(self, allele):
+            return allele
+
+        def predict(self, peptides, allele):
+            predictions.append(list(peptides))
+            return numpy.repeat(100.0, len(peptides))
+
+    def load(path):
+        loads.append(path)
+        return Predictor()
+
+    monkeypatch.setattr(mhcflurry.Class1AffinityPredictor, "load", load)
+    context = {"args": args, "lengths": [8], "all_peptides_by_length": {8: pool},
+               "sample_table": hits.drop_duplicates("sample_id").set_index("sample_id"), "hit_df": hits}
+    first = [module.do_process_samples([sample], seed=42, constant_data=context) for sample in ["s1", "s2"]]
+    assert len(loads) == 1
+    assert len(predictions) == 2
+    del context["processing_affinity_predictor"]
+    for index, sample in enumerate(["s1", "s2"]):
+        second = module.do_process_samples([sample], seed=42, constant_data=context)
+        pandas.testing.assert_frame_equal(first[index], second, check_dtype=False)
+    assert len(loads) == 1
+    assert len(predictions) == 2
+
+
+def test_numeric_pipeline_is_schedule_independent_and_resume_skips_scoring(tmp_path, monkeypatch):
+    import threading
+    from types import SimpleNamespace
+    import mhcflurry
+    from mhcflurry.common import derive_seed
+    from mhcflurry.numeric_sequences import NumericSequences
+    from mhcflurry.processing_matching import validate_matched_training_data
+    module = load_script(REPO_ROOT / "scripts/training/release_exact/make_train_data.processing.py")
+    caller = threading.get_ident()
+    calls = []
+
+    class Predictor:
+        supported_alleles = ["HLA-A*02:01"]
+        class1_pan_allele_models = [SimpleNamespace(get_device=lambda: "cpu")]
+
+        def canonicalize_allele_name(self, allele):
+            return allele
+
+        def predict_numeric(self, peptides, allele):
+            assert threading.get_ident() == caller
+            assert isinstance(peptides, NumericSequences)
+            calls.append(len(peptides))
+            return 100 + peptides.indices[:, :2].numpy().sum(axis=1).astype(float)
+
+    loads = []
+
+    def load(path):
+        loads.append(path)
+        return Predictor()
+
+    monkeypatch.setattr(mhcflurry.Class1AffinityPredictor, "load", load)
+    hits = pandas.DataFrame([dict(peptide=p, sample_id=s, hit_id=i * 2 + j,
+        protein_accession="p", n_flank="XXXXX", c_flank="YYYYY")
+        for i, s in enumerate(["s1", "s2", "s3", "s4"])
+        for j, p in enumerate(["ACDEFGHI", "CDEFGHIKL"])])
+    results = []
+    for depth in (1, 3):
+        out = tmp_path / str(depth)
+        out.mkdir()
+        args = module.parser.parse_args([
+            "--hits", "unused", "--affinity-predictor", "reference", "--proteome-reference-csv", "unused",
+            "--ppv-multiplier", "20", "--preparation-pipeline-depth", str(depth), "--out", str(out / "train.csv")])
+        args.matching_reference = {"sha256": "a" * 64}
+        (out / "train.csv.matching").mkdir()
+        context = dict(args=args, lengths=[8, 9, 10, 11], hit_df=hits,
+            proteome_sequences={"p": "ACDEFGHIKLMNPQRSTVWY" * 10}, flanking_length=5,
+            sample_table=hits.drop_duplicates("sample_id").set_index("sample_id").assign(allele="HLA-A*02:01"),
+            sample_seeds={s: derive_seed(42, "sample", s) for s in hits.sample_id.unique()})
+        result = module.do_process_samples(hits.sample_id.unique(), constant_data=context)
+        validate_matched_training_data(result)
+        results.append(result)
+        old_calls = list(calls)
+        del context["processing_affinity_predictor"]
+        resumed = module.do_process_samples(hits.sample_id.unique(), constant_data=context)
+        pandas.testing.assert_frame_equal(result, resumed, check_dtype=False)
+        assert calls == old_calls
+    pandas.testing.assert_frame_equal(*results)
+    assert len(loads) == 2  # One per worker context, no reload for any resumed sample.
 
 
 def test_model_selection_decoys_do_not_require_unused_proteome_peptides():
@@ -368,15 +555,15 @@ def write_presentation_like_inputs(tmp_path):
     return hits_csv, reference_csv
 
 
-def run_reference_decoy_script(script_path, tmp_path):
+def run_reference_decoy_script(script_path, tmp_path, random_seed=None):
+    tmp_path.mkdir(parents=True, exist_ok=True)
     hits_csv, reference_csv = write_presentation_like_inputs(tmp_path)
     out_csv = tmp_path / "train_data.csv"
     env = os.environ.copy()
     env["PYTHONPATH"] = os.pathsep.join(
         [str(REPO_ROOT)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else [])
     )
-    subprocess.run(
-        [
+    command = [
             sys.executable,
             str(script_path),
             "--hits",
@@ -389,7 +576,11 @@ def run_reference_decoy_script(script_path, tmp_path):
             "MULTIALLELIC",
             "--out",
             str(out_csv),
-        ],
+        ]
+    if random_seed is not None:
+        command.extend(["--random-seed", str(random_seed)])
+    subprocess.run(
+        command,
         env=env,
         check=True,
     )
@@ -412,6 +603,17 @@ def test_release_presentation_train_data_uses_reference_csv_decoys(tmp_path):
     assert_reference_decoy_output(result)
 
 
+def test_release_presentation_decoys_are_reproducible_from_seed(tmp_path):
+    script = (
+        REPO_ROOT / "scripts/training/release_exact"
+        / "make_train_data.presentation.py"
+    )
+    first = run_reference_decoy_script(script, tmp_path / "first", 271)
+    second = run_reference_decoy_script(script, tmp_path / "second", 271)
+
+    pandas.testing.assert_frame_equal(first, second)
+
+
 def test_download_presentation_train_data_uses_reference_csv_decoys(tmp_path):
     result = run_reference_decoy_script(
         REPO_ROOT / "downloads-generation/models_class1_presentation"
@@ -428,3 +630,15 @@ def test_data_evaluation_benchmark_uses_reference_csv_decoys(tmp_path):
         tmp_path,
     )
     assert_reference_decoy_output(result)
+
+
+def test_release_data_scripts_pin_historical_decoy_sampler():
+    import ast
+    for name in ("make_train_data.processing.py", "make_train_data.presentation.py"):
+        tree = ast.parse((REPO_ROOT / "scripts/training/release_exact" / name).read_text())
+        calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                 and getattr(node.func, "id", None) == "sample_peptide_frame_for_accessions"]
+        assert calls, name
+        for call in calls:
+            methods = [kw.value.value for kw in call.keywords if kw.arg == "sampling_method"]
+            assert methods == ["reservoir"], name

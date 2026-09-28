@@ -564,3 +564,40 @@ def test_multiple_outputs():
 
     assert len(predictions0) == len(peptides)
     assert len(predictions1) == len(peptides)
+
+
+@pytest.mark.parametrize("inequality,bound", [
+    ("<", 100), (">", 1000), ("=", 100), ("<", 1000), (">", 100),
+])
+def test_streaming_validation_affinity_bounds(monkeypatch, inequality, bound):
+    """Streaming validation must assess bounds in the original nM direction."""
+    import torch
+    from mhcflurry.encodable_sequences import EncodableSequences
+    from mhcflurry.cli.select_pan_allele_models_command import mse
+
+    monkeypatch.setattr(
+        Class1NeuralNetwork, "get_device", staticmethod(lambda: torch.device("cpu")))
+    model = Class1NeuralNetwork(
+        layer_sizes=[4], locally_connected_layers=[], dropout_probability=0,
+        learning_rate=0, optimizer="sgd", data_dependent_initialization_method=None,
+        dense_layer_l1_regularization=0, dense_layer_l2_regularization=0,
+        validation_batch_size=2)
+    model._network = model.make_network(
+        allele_representations=None,
+        **model.network_hyperparameter_defaults.subselect(model.hyperparameters))
+    with torch.no_grad():
+        for parameter in model.network().parameters():
+            parameter.zero_()
+    peptides = EncodableSequences.create(["SIINFEKL", "SIINFEKL"])
+    batch = (
+        {"peptide": model.peptides_to_network_input(peptides)},
+        numpy.array([0.5, 0.5], dtype=numpy.float32))
+    bounds = numpy.array([bound, bound])
+    inequalities = numpy.array([inequality, inequality])
+    model.fit_streaming_batches(
+        generator=iter([batch]), generator_batches_are_encoded=True,
+        validation_peptide_encoding=peptides, validation_affinities=bounds,
+        validation_allele_encoding=None, validation_inequalities=inequalities,
+        steps_per_epoch=1, epochs=1, verbose=0, seed=42)
+    expected = mse(model.predict(peptides), bounds, inequalities)
+    assert model.fit_info[-1]["val_loss"][-1] == pytest.approx(expected, abs=1e-7)

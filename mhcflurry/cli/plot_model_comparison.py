@@ -77,6 +77,8 @@ Plotting layers:
   * Custom saved-prediction score columns need predictor_info.csv metadata with
     predictor and higher_is_better.
 """
+    parser.add_argument("--allow-legacy-processing-plots", action="store_true",
+                        help="Explicitly render unmatched processing diagnostics, labelled as such.")
     parser.add_argument(
         "--input", required=True,
         help="Output directory produced by ``mhcflurry compare-models``.",
@@ -232,6 +234,9 @@ def run(args):
                 "Requested component(s) not present in %s: %s" % (
                     args.input, ", ".join(missing)))
 
+    if "processing" in components and _processing_cohort_policy(args.input) != "matched" and not getattr(args, "allow_legacy_processing_plots", False):
+        raise ValueError("Processing plots require affinity/length-matched evaluation. Re-evaluate "
+                         "or explicitly request --allow-legacy-processing-plots for historical diagnostics.")
     plot_dir = os.path.join(args.input, "plots")
     paper_figures_dir = args.paper_figures_out or os.path.join(
         plot_dir, "paper_figures")
@@ -614,6 +619,14 @@ def _save_per_allele_delta(plt, per_allele, sub_dir, label_a, label_b):
 # ---------------------------------------------------------------------------
 
 
+def _processing_cohort_policy(input_dir):
+    path = os.path.join(input_dir, "processing", "cohort.json")
+    if not os.path.isfile(path):
+        return "legacy-unmatched"
+    with open(path) as fd:
+        return json.load(fd).get("policy", "legacy-unmatched")
+
+
 def _plot_processing(input_dir, plot_dir, labels, max_scatter_points):
     import matplotlib.pyplot as plt
     from sklearn.metrics import (
@@ -628,6 +641,7 @@ def _plot_processing(input_dir, plot_dir, labels, max_scatter_points):
     label_a, label_b = labels["a"], labels["b"]
 
     processing_dir = os.path.join(input_dir, "processing")
+    cohort_label = "affinity/length matched" if _processing_cohort_policy(input_dir) == "matched" else "UNMATCHED diagnostic"
     for mode in PROCESSING_MODES:
         pred_path = os.path.join(
             processing_dir, "predictions_%s.csv.bz2" % mode)
@@ -640,15 +654,15 @@ def _plot_processing(input_dir, plot_dir, labels, max_scatter_points):
         _save_roc(plt, roc_curve, roc_auc_score,
                   y, a_score, b_score, label_a, label_b,
                   os.path.join(sub_dir, "roc_%s.png" % mode),
-                  title="%s processing ROC" % _display_identifier(mode))
+                  title="%s processing ROC (%s)" % (_display_identifier(mode), cohort_label))
         _save_pr(plt, precision_recall_curve, average_precision_score,
                  y, a_score, b_score, label_a, label_b,
                  os.path.join(sub_dir, "pr_%s.png" % mode),
-                 title="%s processing PR" % _display_identifier(mode))
+                 title="%s processing PR (%s)" % (_display_identifier(mode), cohort_label))
         _save_scatter(plt, b_score, a_score, label_b, label_a,
                       os.path.join(sub_dir, "scatter_%s.png" % mode),
-                      title="%s processing: %s vs %s" % (
-                          _display_identifier(mode), label_a, label_b),
+                      title="%s processing (%s): %s vs %s" % (
+                          _display_identifier(mode), cohort_label, label_a, label_b),
                       max_points=max_scatter_points)
 
     summary_table_path = os.path.join(processing_dir, "summary_table.csv")
@@ -657,7 +671,7 @@ def _plot_processing(input_dir, plot_dir, labels, max_scatter_points):
         _safe_plot(
             "processing macro bars",
             _save_macro_bars, plt, summary, sub_dir, label_a, label_b,
-            "Processing")
+            "Processing (%s)" % cohort_label)
     _save_component_paper_plots(
         plt,
         processing_dir,
@@ -667,7 +681,7 @@ def _plot_processing(input_dir, plot_dir, labels, max_scatter_points):
         "processing_score",
         label_a,
         label_b,
-        title_prefix="Processing score",
+        title_prefix="Processing score (%s)" % cohort_label,
     )
 
 
@@ -771,7 +785,9 @@ def _plot_release_summary(input_dir, paper_dir, labels):
     if not required.issubset(summary.columns):
         return
 
-    macro = summary.loc[summary.average == "Macro"].copy()
+    # Processing uses a different matched risk-set prevalence. Its own panels
+    # compare sides on that cohort; do not mix these absolute metrics with PS.
+    macro = summary.loc[(summary.average == "Macro") & (summary.component != "processing")].copy()
     if macro.empty:
         return
 
@@ -780,7 +796,7 @@ def _plot_release_summary(input_dir, paper_dir, labels):
 
     fig, axes = plt.subplots(
         1, len(METRIC_NAMES),
-        figsize=(3.2 * len(METRIC_NAMES), 3.0),
+        figsize=(3.2 * len(METRIC_NAMES), 3.6),
         squeeze=False,
     )
     for ax, metric in zip(axes[0], METRIC_NAMES):
@@ -806,15 +822,23 @@ def _plot_release_summary(input_dir, paper_dir, labels):
         ax.set_ylim(_metric_ylim(metric, rows[["side_a", "side_b"]].values))
         ax.grid(axis="y")
     axes[0][0].set_ylabel("Macro mean")
-    axes[0][-1].legend(frameon=False)
-    fig.suptitle("Model comparison: macro accuracy by component")
-    fig.tight_layout()
+    handles, legend_labels = axes[0][-1].get_legend_handles_labels()
+    fig.suptitle("Model comparison: macro accuracy by component", y=0.98)
+    fig.legend(
+        handles,
+        legend_labels,
+        frameon=False,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.91),
+        ncol=2,
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.80))
     _save_figure(fig, os.path.join(paper_dir, "release_summary_macro.png"))
     plt.close(fig)
 
     fig, axes = plt.subplots(
         1, len(METRIC_NAMES),
-        figsize=(3.2 * len(METRIC_NAMES), 3.0),
+        figsize=(3.2 * len(METRIC_NAMES), 3.6),
         squeeze=False,
     )
     for ax, metric in zip(axes[0], METRIC_NAMES):
@@ -834,10 +858,17 @@ def _plot_release_summary(input_dir, paper_dir, labels):
         ax.set_title(METRIC_DISPLAY_NAMES[metric])
         ax.set_xticks(numpy.arange(len(rows)))
         ax.set_xticklabels(rows.index, rotation=35, ha="right")
-        ax.set_ylabel("%s - %s" % (labels["a"], labels["b"]))
         ax.grid(axis="y")
-    fig.suptitle("Model comparison: macro deltas by component")
-    fig.tight_layout()
+    axes[0][0].set_ylabel("Macro difference")
+    fig.suptitle("Model comparison: macro deltas by component", y=0.98)
+    fig.text(
+        0.5,
+        0.90,
+        "%s − %s" % (labels["a"], labels["b"]),
+        ha="center",
+        va="top",
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.80))
     _save_figure(fig, os.path.join(paper_dir, "release_summary_macro_delta.png"))
     plt.close(fig)
 
@@ -1381,7 +1412,8 @@ def _save_macro_bars(plt, summary, sub_dir, label_a, label_b, title_prefix):
 
 def _save_roc(plt, roc_curve_fn, roc_auc_fn,
               y, a_score, b_score, label_a, label_b, out_path, title):
-    fig, ax = plt.subplots(figsize=(3.2, 3.0))
+    figsize, legend_kwargs = _curve_legend_layout(label_a, label_b)
+    fig, ax = plt.subplots(figsize=figsize)
     y, a_score, b_score = _shared_finite_curve_values(y, a_score, b_score)
     for label, values, color in (
             (label_a, a_score, SIDE_A_COLOR),
@@ -1398,7 +1430,7 @@ def _save_roc(plt, roc_curve_fn, roc_auc_fn,
     ax.set_ylabel("True positive rate")
     ax.set_title(title)
     if ax.get_legend_handles_labels()[0]:
-        ax.legend(frameon=False)
+        ax.legend(frameon=False, **legend_kwargs)
     ax.grid(False)
     fig.tight_layout()
     _save_figure(fig, out_path)
@@ -1407,7 +1439,8 @@ def _save_roc(plt, roc_curve_fn, roc_auc_fn,
 
 def _save_pr(plt, pr_curve_fn, ap_fn,
              y, a_score, b_score, label_a, label_b, out_path, title):
-    fig, ax = plt.subplots(figsize=(3.2, 3.0))
+    figsize, legend_kwargs = _curve_legend_layout(label_a, label_b)
+    fig, ax = plt.subplots(figsize=figsize)
     y, a_score, b_score = _shared_finite_curve_values(y, a_score, b_score)
     for label, values, color in (
             (label_a, a_score, SIDE_A_COLOR),
@@ -1423,11 +1456,23 @@ def _save_pr(plt, pr_curve_fn, ap_fn,
     ax.set_ylabel("Precision")
     ax.set_title(title)
     if ax.get_legend_handles_labels()[0]:
-        ax.legend(frameon=False)
+        ax.legend(frameon=False, **legend_kwargs)
     ax.grid(False)
     fig.tight_layout()
     _save_figure(fig, out_path)
     plt.close(fig)
+
+
+def _curve_legend_layout(*labels):
+    """Keep long comparison labels clear of curve axes and tick labels."""
+    if max((len(str(label)) for label in labels), default=0) <= 32:
+        return (3.2, 3.0), {}
+    return (4.2, 3.6), {
+        "bbox_to_anchor": (0.5, -0.20),
+        "handlelength": 1.5,
+        "loc": "upper center",
+        "fontsize": 8,
+    }
 
 
 def _shared_finite_curve_values(y, a_score, b_score):

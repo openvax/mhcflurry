@@ -25,6 +25,7 @@ import numpy
 import pandas
 
 from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
+from mhcflurry.common import derive_seed
 
 from numpy import testing
 
@@ -63,6 +64,35 @@ def warn_with_traceback(message, category, filename, lineno, file=None, line=Non
 
 
 warnings.showwarning = warn_with_traceback
+
+
+def test_fit_class1_pan_allele_models_derives_member_seeds(monkeypatch):
+    allele = "HLA-A*02:01"
+    allele_to_sequence = pandas.read_csv(
+        get_path("allele_sequences", LEGACY_ALLELE_SEQUENCES_FILENAME),
+        index_col=0,
+    ).sequence.to_dict()
+    observed_seeds = []
+
+    def record_seed(_model, *_args, **kwargs):
+        observed_seeds.append(kwargs["seed"])
+
+    monkeypatch.setattr(Class1NeuralNetwork, "fit", record_seed)
+    predictor = Class1AffinityPredictor(
+        allele_to_sequence={allele: allele_to_sequence[allele]},
+    )
+    predictor.fit_class1_pan_allele_models(
+        n_models=2,
+        architecture_hyperparameters={},
+        alleles=[allele],
+        peptides=["SIINFEKL"],
+        affinities=[50.0],
+        inequalities=["="],
+        seed=17,
+        verbose=0,
+    )
+
+    assert observed_seeds == [derive_seed(17, 0), derive_seed(17, 1)]
 
 
 def test_save_calibration_only_preserves_model_artifacts(tmp_path):
@@ -324,6 +354,38 @@ def test_save_writes_named_pseudosequence_alias(
         "allele": ["HLA-A*02:01"],
         "pseudosequence": [sequence],
     }
+
+
+def test_merge_rejects_incompatible_pan_allele_pseudosequences():
+    first = Class1AffinityPredictor(
+        class1_pan_allele_models=[Class1NeuralNetwork()],
+        allele_to_sequence={"HLA-A*02:01": "SEQUENCE1"},
+    )
+    second = Class1AffinityPredictor(
+        class1_pan_allele_models=[Class1NeuralNetwork()],
+        allele_to_sequence={"HLA-A*02:01": "SEQUENCE2"},
+    )
+
+    with pytest.raises(ValueError, match="incompatible.*HLA-A\\*02:01"):
+        Class1AffinityPredictor.merge([first, second])
+
+
+def test_merge_in_place_rejects_incompatible_pseudosequences_atomically():
+    first_network = Class1NeuralNetwork()
+    first = Class1AffinityPredictor(
+        class1_pan_allele_models=[first_network],
+        allele_to_sequence={"HLA-A*02:01": "SEQUENCE1"},
+    )
+    second = Class1AffinityPredictor(
+        class1_pan_allele_models=[Class1NeuralNetwork()],
+        allele_to_sequence={"HLA-A*02:01": "SEQUENCE2"},
+    )
+
+    with pytest.raises(ValueError, match="incompatible.*HLA-A\\*02:01"):
+        first.merge_in_place([second])
+
+    assert first.class1_pan_allele_models == [first_network]
+    assert first.allele_to_sequence == {"HLA-A*02:01": "SEQUENCE1"}
 
 
 def test_percent_rank_calibrated_allele_direct_equivalent_missing():

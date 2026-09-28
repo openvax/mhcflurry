@@ -6,9 +6,9 @@ Guide for coding agents working in this repo. Read this before touching code.
 
 ## Golden Rules
 
-1. **Never commit to `main`.** Always `git checkout -b <feature-branch>` before editing. Land via PR.
+1. **Never commit to `master` or `main`.** Always `git checkout -b <feature-branch>` before editing. Land via PR.
 2. **Every PR bumps the version.** Even doc-only PRs — at minimum a patch bump in the package's `__init__.py` / `_version.py`.
-3. **"Done" means merged AND released** — never stop at merge. mhcflurry doesn't (yet) have `deploy.sh`; follow the release recipe in `CONTRIBUTING.md` / `NOTES.md` and push the tag so PyPI gets the new version. Skipping release = task not done.
+3. **For an authorized release, "done" means merged AND released.** Follow the package release procedure in `CONTRIBUTING.md` and the model release procedure in `scripts/release/README.md`. Publishing a GitHub release triggers PyPI; pushing a tag alone does not. A review or release-preparation request does not authorize publication.
 4. **File problems as issues, don't silently work around them.** If you hit a bug here or in a sibling openvax/pirl-unc repo, open a GitHub issue on the correct repo and link it from the PR.
 5. **After a PR ships, look for the next block of work.** Read open issues across the relevant openvax repos, group by dependency + urgency. Prefer *foundational* changes that unblock multiple downstream improvements; otherwise chain the smallest independent improvements.
 
@@ -35,7 +35,7 @@ Before telling the user a change is "complete":
 
 ## Code Style
 
-- Python 3.9+
+- Python 3.10+
 - Lint: ruff (concise output)
 - Docstrings: numpy style
 - Bugfixes include a regression test where feasible

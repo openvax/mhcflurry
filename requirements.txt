@@ -5,6 +5,6 @@ appdirs
 scikit-learn
 threadpoolctl
 matplotlib
-mhcgnomes>=3.33.0
+mhcgnomes>=3.33.6
 pyyaml
 tqdm

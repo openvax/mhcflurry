@@ -13,7 +13,7 @@
 """Compatibility wrapper for :mod:`mhcflurry.parallelism`."""
 
 from . import parallelism as _parallelism
-from .parallelism import *  # noqa: F401,F403
+from .parallelism import *  # noqa: F403
 
 
 def __getattr__(name):

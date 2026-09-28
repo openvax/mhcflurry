@@ -10,8 +10,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from os.path import join, exists, abspath
-from os import mkdir
+from os.path import join, exists, abspath, basename
+from os import mkdir, remove
 from socket import gethostname
 from getpass import getuser
 
@@ -20,6 +20,7 @@ import json
 import hashlib
 import logging
 import collections
+import warnings
 
 import numpy
 import pandas
@@ -31,6 +32,29 @@ from .flanking_encoding import FlankingEncoding
 from .downloads import get_default_class1_processing_models_dir
 from .class1_processing_neural_network import Class1ProcessingNeuralNetwork
 from .common import save_weights, load_weights, NumpyJSONEncoder
+from .percentile_calibration import (
+    calibration_method, fit_percent_rank_transform,
+    load_percent_rank_transforms, save_percent_rank_transforms)
+
+
+def _remove_owned_checkpoint(models_dir, filename):
+    """Delete a retained-checkpoint sidecar written by this predictor.
+
+    Parameters
+    ----------
+    models_dir : string
+        Directory whose contents the predictor owns.
+    filename : string or None
+        Manifest reference being cleared. Anything that is not a bare filename
+        inside ``models_dir`` is left alone, as are already-absent files.
+    """
+    if not isinstance(filename, str) or not filename:
+        return
+    if basename(filename) != filename:
+        return
+    path = join(models_dir, filename)
+    if exists(path):
+        remove(path)
 
 
 class Class1ProcessingPredictor(object):
@@ -44,7 +68,8 @@ class Class1ProcessingPredictor(object):
             models,
             manifest_df=None,
             metadata_dataframes=None,
-            provenance_string=None):
+            provenance_string=None,
+            percent_rank_transform=None):
         """
         Instantiate a new Class1ProcessingPredictor
 
@@ -62,12 +87,68 @@ class Class1ProcessingPredictor(object):
             Arbitrary metadata associated with this predictor
         provenance_string : string, optional
             Optional info string to use in __str__.
+        percent_rank_transform : transform, optional
+            HistogramPercentRankTransform or CompactPercentRankTransform
+            fitted to this ensemble's background score distribution.
+            Historical processing predictors may have no calibration.
         """
         self.models = models
         self._manifest_df = manifest_df
         self.metadata_dataframes = (
             dict(metadata_dataframes) if metadata_dataframes else {})
         self.provenance_string = provenance_string
+        self.percent_rank_transform = percent_rank_transform
+
+    def calibrate_percentile_ranks(self, scores, bins=None, *, method=None,
+                                   max_knots=128, groups=None):
+        """Calibrate from explicit background processing scores.
+
+        Parameters
+        ----------
+        scores : sequence of float
+            Independent background scores from the same ensemble and flank
+            policy used at prediction time. Evaluation labels are not used.
+        bins : int or sequence, optional
+            Explicit bins select historical histogram calibration.
+        method : {"compact", "histogram"}, optional
+            Compact unless explicit bins select histogram. Compact plus bins
+            is rejected. Histogram with no bins uses score quantiles.
+        max_knots : {64, 128}, default 128
+            Upper bound, not a starting size; retain 64 unless 128 improves
+            background validation beyond the tolerance. Ignored for histogram.
+        groups : sequence, optional
+            Reference peptide identities, kept together during validation.
+        """
+        method = calibration_method(method, bins)
+        if method == "histogram" and bins is None:
+            bins = numpy.unique(numpy.quantile(scores, numpy.linspace(0, 1, 10001)))
+        self.percent_rank_transform = fit_percent_rank_transform(
+            scores, method=method, bins=bins, score_transform="logit",
+            survival=True, max_knots=max_knots, groups=groups)
+
+    def percentile_ranks(self, processing_scores, throw=True):
+        """Return lower-is-stronger percentiles without changing raw scores.
+
+        Parameters
+        ----------
+        processing_scores : sequence of float
+            Raw processing scores, not peptide sequences.
+        throw : bool, default True
+            Raise when calibration is absent. False warns and returns NaNs.
+
+        Returns
+        -------
+        numpy.ndarray
+            Upper-tail percentiles from 0 to 100. This separate method does
+            not add a percentile column to raw prediction dataframes.
+        """
+        if self.percent_rank_transform is None:
+            message = "No processing predictor percentile rank information"
+            if throw:
+                raise ValueError(message)
+            warnings.warn(message)
+            return numpy.full(len(processing_scores), numpy.nan)
+        return self.percent_rank_transform.transform(processing_scores, survival=True)
 
     @property
     def sequence_lengths(self):
@@ -333,7 +414,8 @@ class Class1ProcessingPredictor(object):
                 len(self.models),
                 str(self.manifest_df)))
 
-    def save(self, models_dir, model_names_to_write=None, write_metadata=True):
+    def save(self, models_dir, model_names_to_write=None, write_metadata=True,
+             write_percent_ranks=True):
         """
         Serialize the predictor to a directory on disk. If the directory does
         not exist it will be created.
@@ -346,12 +428,29 @@ class Class1ProcessingPredictor(object):
         ----------
         models_dir : string
             Path to directory. It will be created if it doesn't exist.
+
+        model_names_to_write : list of string, optional
+            Only write the weights for the specified models. Useful for
+            incremental updates during training. Passing an explicit empty
+            list writes no model artifacts; this is used by calibration-only
+            updates that replace percentile calibration without touching the
+            manifest, weights, or retained checkpoints.
+
+        write_metadata : boolean, optional
+            Whether to write optional metadata
+
+        write_percent_ranks : boolean, optional
+            Whether to write the percentile calibration
         """
         self.check_consistency()
 
         if model_names_to_write is None:
             # Write all models
             model_names_to_write = self.manifest_df.model_name.values
+            write_model_artifacts = True
+        else:
+            model_names_to_write = list(model_names_to_write)
+            write_model_artifacts = len(model_names_to_write) > 0
 
         if not exists(models_dir):
             mkdir(models_dir)
@@ -369,18 +468,42 @@ class Class1ProcessingPredictor(object):
             weights_path = self.weights_path(models_dir, row.model_name)
             save_weights(row.model.get_weights(), weights_path)
             logging.info("Wrote: %s", weights_path)
+            for policy in ("terminal", "best", "best_ap"):
+                column = "checkpoint_%s_weights" % policy
+                previous = None
+                if column in self.manifest_df.columns:
+                    previous = self.manifest_df.at[row.name, column]
+                    self.manifest_df.at[row.name, column] = None
+                weights = getattr(row.model, "checkpoint_weights", {}).get(policy)
+                filename = None
+                if weights is not None:
+                    filename = "weights_%s.%s.npz" % (row.model_name, policy)
+                    save_weights(weights, join(models_dir, filename))
+                    if column not in self.manifest_df.columns:
+                        self.manifest_df[column] = None
+                    self.manifest_df.at[row.name, column] = filename
+                # A dropped policy must not leave its sidecar on disk, where
+                # it would reach release tarballs and directory fingerprints.
+                if previous != filename:
+                    _remove_owned_checkpoint(models_dir, previous)
         sub_manifest_df["config_json"] = updated_network_config_jsons
         self.manifest_df.loc[
             sub_manifest_df.index,
             "config_json"
         ] = updated_network_config_jsons
 
-        write_manifest_df = self.manifest_df[[
-            c for c in self.manifest_df.columns if c != "model"
-        ]]
-        manifest_path = join(models_dir, "manifest.csv")
-        write_manifest_df.to_csv(manifest_path, index=False)
-        logging.info("Wrote: %s", manifest_path)
+        if write_model_artifacts:
+            write_manifest_df = self.manifest_df[[
+                c for c in self.manifest_df.columns if c != "model"
+            ]]
+            manifest_path = join(models_dir, "manifest.csv")
+            write_manifest_df.to_csv(manifest_path, index=False)
+            logging.info("Wrote: %s", manifest_path)
+
+        if write_percent_ranks:
+            save_percent_rank_transforms(models_dir, {
+                "processing_score": self.percent_rank_transform
+            } if self.percent_rank_transform is not None else {})
 
         if write_metadata:
             # Write "info.txt"
@@ -431,6 +554,16 @@ class Class1ProcessingPredictor(object):
             model = Class1ProcessingNeuralNetwork.from_config(
                 config,
                 weights=load_weights(abspath(weights_filename)))
+            for policy in ("terminal", "best", "best_ap"):
+                filename = row.get("checkpoint_%s_weights" % policy)
+                if pandas.isna(filename) or not filename:
+                    continue
+                if not isinstance(filename, str) or basename(filename) != filename:
+                    raise ValueError("Invalid retained processing checkpoint path")
+                path = join(models_dir, filename)
+                if not exists(path):
+                    raise ValueError("Missing retained %s processing checkpoint: %s" % (policy, path))
+                model.checkpoint_weights[policy] = load_weights(abspath(path))
             models.append(model)
 
         manifest_df["model"] = models
@@ -451,7 +584,8 @@ class Class1ProcessingPredictor(object):
         result = cls(
             models=models,
             manifest_df=manifest_df,
-            provenance_string=provenance_string)
+            provenance_string=provenance_string,
+            percent_rank_transform=load_percent_rank_transforms(models_dir).get("processing_score"))
         return result
 
     def __repr__(self):

@@ -13,6 +13,9 @@
 """Unit tests for ``mhcflurry.select_pan_allele_models_command``."""
 import inspect
 
+import numpy
+import pandas
+
 
 def test_fold_col_parser_rejects_pandas_merge_suffixes():
     """Regression: when train_data has been pandas-merged with stale
@@ -52,3 +55,51 @@ def test_train_peptide_hash_computed_before_allele_filter():
         "allele filter narrows df; otherwise hashes mismatch when any "
         "training allele is non-canonicalizable"
     )
+
+
+def test_model_select_can_return_row_level_validation_predictions():
+    from mhcflurry import Class1AffinityPredictor
+    from mhcflurry import select_pan_allele_models_command as mod
+    from mhcflurry.regression_target import to_ic50
+
+    class FakeModel:
+        def predict(self, peptides, alleles):
+            assert len(peptides) == 4
+            assert len(alleles.indices) == 4
+            return numpy.array([50000.0, 10000.0, 100.0, 10.0])
+
+        def clear_allele_representations(self):
+            pass
+
+    data = pandas.DataFrame({
+        "allele": ["HLA-A*02:01"] * 4,
+        "peptide": ["AAAAAAAAA", "AAAAAAAAC", "AAAAAAAAD", "AAAAAAAAE"],
+        "measurement_value": [50000.0, 10000.0, 100.0, 10.0],
+        "measurement_source": ["binding"] * 4,
+        "fold_0": [0] * 4,
+    })
+    predictor = Class1AffinityPredictor(
+        allele_to_sequence={"HLA-A*02:01": "A" * 34})
+
+    result = mod.model_select(
+        fold_num=0,
+        models=[FakeModel()],
+        min_models=1,
+        max_models=1,
+        save_validation_predictions=True,
+        constant_data={"data": data, "input_predictor": predictor},
+    )
+
+    predictions = result["validation_predictions"]
+    assert predictions["validation_row_index"].tolist() == [0, 1, 2, 3]
+    assert predictions["fold_num"].tolist() == [0] * 4
+    assert predictions["selected_model_indices"].tolist() == ["0"] * 4
+    expected_01 = mod.from_ic50(
+        numpy.array([50000.0, 10000.0, 100.0, 10.0]))
+    numpy.testing.assert_allclose(
+        predictions["affinity_prediction_01"], expected_01)
+    numpy.testing.assert_allclose(
+        predictions["affinity_prediction"],
+        to_ic50(expected_01),
+    )
+    assert "fold_0" not in predictions

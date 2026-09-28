@@ -51,6 +51,7 @@ evaluation
 commandline_tools
 configuration
 api
+shared_percent_rank_transforms
 ```
 
 ```{toctree}
@@ -61,5 +62,19 @@ api
 testing
 development
 orchestrator
+auto_sizing_audit
+release_training_recipe
+release_model_evaluation
+release_neural_hyperparameter_audit
+affinity_dual_checkpoint_workflow
+processing_cleavage_boundary_experiment
+processing_kernel_sweep
+processing_hyperparameter_campaign
+processing_preparation_acceleration
+probabilistic_processing_matching
+presentation_percentile_calibration
+final_230_candidate_experiment
+exact_public_data_experiment
+saved_candidate_evaluation
 maintainers
 ```

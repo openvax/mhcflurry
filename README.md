@@ -1,5 +1,4 @@
 [![Build Status](https://github.com/openvax/mhcflurry/actions/workflows/ci.yml/badge.svg)](https://github.com/openvax/mhcflurry/actions/workflows/ci.yml)
-[![Coverage Status](https://coveralls.io/repos/github/openvax/mhcflurry/badge.svg?branch=master)](https://coveralls.io/github/openvax/mhcflurry?branch=master)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openvax/mhcflurry/blob/master/notebooks/mhcflurry-colab.ipynb)
 
 # MHCflurry
@@ -16,15 +15,13 @@ for candidate epitopes, or train models on your own data.
 
 ## Quick start
 
-Install MHCflurry, including prereleases, and download the pretrained
+Install MHCflurry 2.3.0 and download the pretrained
 presentation models:
 
 ```shell
-pip install --upgrade --pre mhcflurry
+pip install --upgrade "mhcflurry==2.3.0"
 mhcflurry downloads fetch models_class1_presentation
 ```
-
-Omit `--pre` to install the latest stable release.
 
 Predict a few peptides:
 

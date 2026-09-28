@@ -136,10 +136,12 @@ def _categorical_kwargs_for_peptide_encoding(peptide_encoding):
 def peptide_sequences_to_network_input(
         peptides,
         peptide_encoding,
-        peptide_amino_acid_encoding_torch=True):
-    """Encode peptide strings to the representation consumed by a network.
+        peptide_amino_acid_encoding_torch=True,
+        device=None):
+    """Encode string or numeric peptides to categorical network inputs.
 
-    This is the central peptide-only string-to-array conversion. Peptides are
+    Numeric inputs align directly into a Torch tensor on ``device``; strings
+    retain the established NumPy representation and encoding cache. Peptides are
     always returned as compact ``(N, L)`` int8 amino-acid indices; the
     fixed-vector lookup then happens through the network's frozen torch
     embedding table. (``peptide_amino_acid_encoding_torch`` is accepted for
@@ -147,6 +149,9 @@ def peptide_sequences_to_network_input(
     """
     if not peptide_amino_acid_encoding_torch:
         _warn_legacy_peptide_vector_encoding(peptide_amino_acid_encoding_torch)
+    from .numeric_sequences import NumericSequences
+    if isinstance(peptides, NumericSequences):
+        return peptides.aligned_tensor(peptide_encoding, device=device)
     encoder = EncodableSequences.create(peptides)
     return (
         encoder.variable_length_to_fixed_length_categorical(

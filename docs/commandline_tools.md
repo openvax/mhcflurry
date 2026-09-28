@@ -31,6 +31,10 @@ option.
 
 ## Calibration
 
+See {doc}`shared_percent_rank_transforms` for examples and background
+requirements. Calibration writes into `--models-dir`; use a copy to preserve
+an existing calibration.
+
 ```{eval-rst}
 .. _ref-mhcflurry-calibrate-percentile-ranks:
 

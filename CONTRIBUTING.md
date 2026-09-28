@@ -20,3 +20,37 @@ A few other guidelines:
  * Please adhere to our [code of conduct](https://github.com/openvax/mhcflurry/blob/master/code-of-conduct.md).
 
 Working on your first Pull Request? One resource that may be helpful is [How to Contribute to an Open Source Project on GitHub](https://egghead.io/series/how-to-contribute-to-an-open-source-project-on-github).
+
+## Development checks
+
+Run the same checks as CI before opening a pull request:
+
+```shell
+./lint.sh
+python -m pytest test/
+```
+
+CI uses Ruff 0.16.0 and the checked-in `.ruff.toml`. The selected rules focus
+on syntax, undefined names, mutable defaults, unsafe loop closures, environment
+default types, and stale suppressions. Formatting and broad modernization are
+kept out of the release gate so they can be reviewed separately from scientific
+or prediction-affecting changes.
+
+## Publish a package release
+
+1. Update `mhcflurry/version.py` and the matching `RELEASE_NOTES_<version>.md`.
+   Verify the version against PyPI, including development builds. Model
+   training versions are provenance and must not be rewritten to match a tag.
+2. Run lint, the complete tests, documentation HTML/doctests and a wheel/source
+   distribution build. Merge the reviewed PR after GitHub CI passes.
+3. Create the release tag on that tested commit and publish a GitHub release
+   with the corresponding release notes. `.github/workflows/release.yml`
+   builds and uploads to PyPI when the release is **published**; pushing a tag
+   alone does not publish a package.
+4. Verify the PyPI version and install the wheel in a clean environment.
+
+Model assets are separate. Follow `scripts/release/README.md` to validate,
+package, checksum and upload them, then update `mhcflurry/downloads.yml` with
+the actual URLs. Validate the downloaded archives and prediction outputs
+before changing the default model release. Publication requires maintainer
+or user authorization; a review request alone does not authorize a release.

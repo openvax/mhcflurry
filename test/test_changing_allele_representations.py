@@ -96,7 +96,8 @@ def test_changing_allele_representations():
         alleles=data1.allele.values,
         peptides=data1.peptide.values,
         affinities=data1.affinity.values,
-        inequalities=data1.inequality.values)
+        inequalities=data1.inequality.values,
+        seed=1)
 
     (value1, value2) = predictor.predict([peptide, peptide], alleles=[allele1, allele2])
     assert value1 < 100, value1
@@ -111,7 +112,6 @@ def test_changing_allele_representations():
         alleles=[allele1, allele2, allele3])
     assert value1 < 100, value1
     assert value2 > 4000, value2
-
 
 
 

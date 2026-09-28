@@ -19,6 +19,9 @@ Maintained operational documentation lives next to the scripts it describes:
 - [Training pipeline](https://github.com/openvax/mhcflurry/tree/master/scripts/training)
 - [Release, synchronization, and deployment](https://github.com/openvax/mhcflurry/tree/master/scripts/release)
 - [Generated model and data bundles](https://github.com/openvax/mhcflurry/tree/master/downloads-generation)
+- {doc}`release_training_recipe` records the scientific settings inherited from
+  the published 2.1.x/2.2.x recipe and every deliberate exception.
+- {doc}`release_neural_hyperparameter_audit` explains framework equations and compatibility choices.
 
 The public release entry point is:
 
@@ -28,9 +31,3 @@ mhcflurry train pan-allele-release --help
 
 It coordinates training, evaluation, plots, remote artifact synchronization,
 and optional deployment. Deployment is never enabled by default.
-
-## Historical material
-
-The 2023 retraining notebook audit is retained as a maintainer record, not as a
-current workflow. Use {doc}`evaluation` and the release guide above for current
-commands and artifact contracts.

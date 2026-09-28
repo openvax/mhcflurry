@@ -31,6 +31,8 @@ base_hyperparameters = dict(
     convolutional_activation="relu",
     patience=20,
     learning_rate=0.001)
+base_hyperparameters["optimizer_implementation"] = "keras"
+base_hyperparameters["init"] = "glorot_uniform"
 
 grid = []
 

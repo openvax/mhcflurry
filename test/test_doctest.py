@@ -28,23 +28,15 @@ os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 from mhcflurry.testing_utils import cleanup, startup
 
-pytest.fixture(autouse=True, scope="module")
-def setup_module():
+@pytest.fixture(autouse=True, scope="module")
+def setup_doctests():
     startup()
     yield
     cleanup()
 
 
 def test_doctests():
-    original_precision = pandas.get_option('display.precision')
-    pandas.set_option('display.precision', 3)
-
-    doctest.testmod(mhcflurry)
-    doctest.testmod(mhcflurry.class1_presentation_predictor)
-
-    # Disabling for now until we figure out how to deal with numerical precision
-    # for predictions.
-    # assert results1.failed == 0, results1.failed
-    # assert results2.failed == 0, results2.failed
-
-    pandas.set_option('display.precision', original_precision)
+    with pandas.option_context("display.precision", 3):
+        for module in (mhcflurry, mhcflurry.class1_presentation_predictor):
+            result = doctest.testmod(module)
+            assert result.failed == 0, result

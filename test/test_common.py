@@ -109,6 +109,10 @@ def test_normalize_allele_name_uses_exact_gene_classification():
 def test_sequence_resolved_allele_and_genotype_normalization():
     assert normalize_sequence_resolved_allele_name("A0201") == "HLA-A*02:01"
     assert normalize_sequence_resolved_allele_name("H-2-Kb") == "H2-K*b"
+    assert (
+        normalize_sequence_resolved_allele_name("DLA-88*01:01")
+        == "DLA-88*001:01"
+    )
     assert normalize_class1_genotype("B0702 A0201 A0201") == (
         "HLA-B*07:02", "HLA-A*02:01")
     for value in ("HLA-A2", "A*02", "HLA-DQA1*01:01", "NONSENSE"):

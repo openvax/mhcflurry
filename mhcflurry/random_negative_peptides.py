@@ -665,8 +665,8 @@ def encoded_length_for_alignment(alignment, max_length):
 def aa_distribution_to_index_weights(distribution, device=None, dtype=None):
     """Convert a letter-indexed AA distribution to a torch index-weight vector.
 
-    Inputs
-    ------
+    Parameters
+    ----------
     distribution : pandas.Series or None
         Letter→probability map (typically the planner's
         ``aa_distribution``). When ``None``, weights are uniform over

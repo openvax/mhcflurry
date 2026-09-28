@@ -87,13 +87,13 @@ class HyperparameterDefaults(object):
         model parameter lists.
 
         Parameters
-        -----------
+        ----------
         The valid kwarg parameters are the entries of this
         HyperparameterDefaults instance. Each parameter must be a list
         giving the values to search across.
 
         Returns
-        -----------
+        -------
         list of dict giving the parameters for each model. The length of the
         list is the product of the lengths of the input lists.
         '''
