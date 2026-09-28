@@ -10,7 +10,7 @@ receive peptide and MHC inputs in both comparisons; their scores are unchanged.
 All rows are evaluated against presentation labels. NetMHCpan BA outputs are
 binding-affinity ranking baselines, not full presentation predictors.
 
-[Download the comparison figures (PDF)](https://github.com/openvax/mhcflurry/releases/download/2.3.0/mhcflurry-2.3.0-model-comparison-v3.pdf).
+[Download the comparison figures (PDF)](https://github.com/openvax/mhcflurry/releases/download/2.3.0/mhcflurry-2.3.0-model-comparison-v4.pdf).
 
 See {doc}`release_model_evaluation` for the overview.
 
@@ -151,7 +151,7 @@ networks. The separately trained long-flank ensemble is a diagnostic and is not
 used in that full predictor. The saved presentation-percentile mapping preserves
 the raw-score AP, PPV@N and AUROC on the complete revised cohort.
 
-[Download the aggregate comparison tables and figures](https://github.com/openvax/mhcflurry/releases/download/2.3.0/model-comparison.20260928-v3.tar.gz).
+[Download the aggregate comparison tables and figures](https://github.com/openvax/mhcflurry/releases/download/2.3.0/model-comparison.20260928-v4.tar.gz).
 The stable-model tables above and the PDF include public 2.1.5/2.2.0/2.2.1,
 NetMHCpan 4.0/4.1/4.2 BA and EL, and MixMHCpred 3.0. The archive includes full-precision aggregate tables, rendering code, and
 a separately labeled prerelease component comparison. It does not include
