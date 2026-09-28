@@ -13,6 +13,9 @@
 
 set -euo pipefail
 
+# Do not add macOS extended attributes or AppleDouble files to model archives.
+export COPYFILE_DISABLE=1
+
 usage() {
     cat <<'EOF'
 Package trained MHCflurry release models and upload them to GitHub.
