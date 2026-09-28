@@ -61,9 +61,8 @@ networks. The separately trained long-flank ensemble is a diagnostic and is not
 used in that full predictor. The saved presentation-percentile mapping preserves
 the raw-score AP, PPV@N and AUROC on the complete revised cohort.
 
-[Download the comparison tables, row-level scores, audits and figures](https://github.com/openvax/mhcflurry/releases/download/2.3.0/model-comparison.20260928.tar.gz).
+[Download the aggregate comparison tables and figures](https://github.com/openvax/mhcflurry/releases/download/2.3.0/model-comparison.20260928.tar.gz).
 The archive includes public 2.1.5/2.2.0/2.2.1, prior full models, NetMHCpan
 4.0/4.1/4.2 BA and EL, and MixMHCpred 3.0, with paired intervals for all
 comparisons. MixMHCpred 2.0.2 is reported only on its supported subset and is not
-mixed into the full-cohort table. Model archive checksums and training/packaging
-provenance accompany the [2.3.0 release](https://github.com/openvax/mhcflurry/releases/tag/2.3.0).
+mixed into the full-cohort table. Model archive checksums accompany the [2.3.0 release](https://github.com/openvax/mhcflurry/releases/tag/2.3.0).

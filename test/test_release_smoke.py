@@ -157,8 +157,9 @@ def test_optional_argument_arrays_expand_when_empty_under_nounset(script):
             run_block('%s=()\nprintf "arg=%%s\\n" %s\n' % (name, safe), script.parent)
 
 
-def test_data_vintage_selects_a_download_label_and_rejects_other_values(tmp_path):
+def test_data_vintage_selects_a_download_label_and_rejects_other_values(tmp_path, monkeypatch):
     """Only the release pipeline's two vintages are accepted, and only one exports."""
+    monkeypatch.delenv("MHCFLURRY_DOWNLOADS_CURRENT_RELEASE", raising=False)
     block = bash_block(SCRIPTS[0].read_text(),
                        'MHCFLURRY_RELEASE_DATA_VINTAGE="${MHCFLURRY_RELEASE_DATA_VINTAGE:-current}"',
                        "esac\n")
@@ -166,6 +167,8 @@ def test_data_vintage_selects_a_download_label_and_rejects_other_values(tmp_path
     assert "label=unset" in run_block(block + report, tmp_path)
     assert "label=unset" in run_block(
         block + report, tmp_path, 'MHCFLURRY_RELEASE_DATA_VINTAGE=current\n')
+    assert "label=custom" in run_block(
+        block + report, tmp_path, 'MHCFLURRY_DOWNLOADS_CURRENT_RELEASE=custom\n')
     assert "label=2.0.0" in run_block(
         block + report, tmp_path, 'MHCFLURRY_RELEASE_DATA_VINTAGE=public-2020\n')
     rejected = subprocess.run(
