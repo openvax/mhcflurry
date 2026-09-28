@@ -1,33 +1,82 @@
 # Evaluation of the 2.3.0 weights
 
-The release's `latest-433-full` evaluation label identifies the final full
-presentation predictor. Results below are equal-patient means on ten patients,
-with 16,400 positives and 164,731 negatives (181,131 total rows). Every model
-receives the same rows and labels; no predictor chooses its own negatives.
+MHCflurry 2.3.0 is evaluated on 16,400 positives and 164,731 negatives from
+ten patients (181,131 rows). Every model receives the same rows and labels;
+no predictor chooses its own negatives. Values are equal-patient means.
 
-## Full presentation
+The main comparison uses peptide, MHC alleles and N/C flanking sequences for
+MHCflurry. A second comparison omits the flanks. NetMHCpan and MixMHCpred
+receive peptide and MHC inputs in both comparisons; their scores are unchanged.
+All rows are evaluated against presentation labels. NetMHCpan BA outputs are
+binding-affinity ranking baselines, not full presentation predictors.
 
-| Input | Model | AP | PPV@N | AUROC |
-|---|---|---:|---:|---:|
-| Peptide and genotype | MHCflurry 2.3.0 | 0.7893 | 0.7373 | 0.9501 |
-| Peptide and genotype | MHCflurry 2.2.1 | 0.7713 | 0.7258 | 0.9409 |
-| Peptide and genotype | NetMHCpan 4.2 EL | 0.7832 | 0.7307 | 0.9455 |
-| Peptide and genotype | MixMHCpred 3.0 | 0.7765 | 0.7281 | 0.9310 |
-| Also native flanks | MHCflurry 2.3.0 | 0.7986 | 0.7450 | 0.9524 |
-| Also native flanks | MHCflurry 2.2.1 | 0.7766 | 0.7297 | 0.9439 |
+[Download the comparison figures (PDF)](https://github.com/openvax/mhcflurry/releases/download/2.3.0/mhcflurry-2.3.0-model-comparison-v3.pdf).
 
-Paired 95% patient-bootstrap intervals for **2.3.0 minus 2.2.1**, using 10,000
-resamples and seed 42:
+## Full presentation: peptide, MHC and N/C flanks
 
-| Input | ΔAP [95% CI] | ΔPPV@N [95% CI] | ΔAUROC [95% CI] |
+MHCflurry uses both N- and C-terminal source-protein context, as it does by
+default when those inputs are supplied. External tools receive no flanks.
+
+```{figure} _static/release-2.3.0/presentation_with_flanks.svg
+:alt: AP, PPV at N and AUROC with patient-bootstrap intervals for MHCflurry 2.3.0, public 2.1.5/2.2.0/2.2.1, NetMHCpan 4.0/4.1/4.2 BA and EL, and MixMHCpred 3.0.
+
+Presentation-label ranking on identical evaluation rows. External tools receive no flanks.
+```
+
+| Model / output | AP | PPV@N | AUROC |
 |---|---:|---:|---:|
-| Peptide and genotype | +0.01797 [0.00488, 0.03004] | +0.01148 [−0.00246, 0.02440] | +0.00921 [0.00758, 0.01085] |
-| Also native flanks | +0.02205 [0.00921, 0.03425] | +0.01528 [0.00354, 0.02586] | +0.00846 [0.00640, 0.01046] |
+| MHCflurry 2.3.0 | 0.7986 | 0.7450 | 0.9524 |
+| MHCflurry 2.1.5 | 0.7766 | 0.7297 | 0.9439 |
+| MHCflurry 2.2.0 | 0.7766 | 0.7297 | 0.9439 |
+| MHCflurry 2.2.1 | 0.7766 | 0.7297 | 0.9439 |
+| NetMHCpan 4.0 BA | 0.6396 | 0.6178 | 0.9157 |
+| NetMHCpan 4.0 EL | 0.6935 | 0.6473 | 0.9243 |
+| NetMHCpan 4.1 BA | 0.6710 | 0.6507 | 0.9256 |
+| NetMHCpan 4.1 EL | 0.7671 | 0.7240 | 0.9417 |
+| NetMHCpan 4.2 BA | 0.6637 | 0.6456 | 0.9260 |
+| NetMHCpan 4.2 EL | 0.7832 | 0.7307 | 0.9455 |
+| MixMHCpred 3.0 | 0.7765 | 0.7281 | 0.9310 |
 
-The no-flank AP and PPV@N differences versus NetMHCpan 4.2 EL and MixMHCpred 3.0
-have intervals including zero. With flanks, AP intervals favor 2.3.0, but those
-external predictors receive no extra flank input. Intervals are not adjusted
-for multiple comparisons. These results do not establish universal superiority.
+
+The paired 95% patient-bootstrap intervals favor 2.3.0 over public 2.2.1
+for all three metrics. AP intervals also
+favor 2.3.0 over NetMHCpan 4.2 EL and MixMHCpred 3.0, while their PPV@N
+intervals include zero. The external predictors receive less input context.
+
+## No-flank comparison: peptide and MHC
+
+MHCflurry is evaluated without flank inputs. The evaluation rows, labels
+and external-tool scores are identical to the main comparison.
+
+```{figure} _static/release-2.3.0/presentation_without_flanks.svg
+:alt: AP, PPV at N and AUROC with patient-bootstrap intervals for MHCflurry 2.3.0, public 2.1.5/2.2.0/2.2.1, NetMHCpan 4.0/4.1/4.2 BA and EL, and MixMHCpred 3.0.
+
+Presentation-label ranking on identical evaluation rows. External tools receive no flanks.
+```
+
+| Model / output | AP | PPV@N | AUROC |
+|---|---:|---:|---:|
+| MHCflurry 2.3.0 | 0.7893 | 0.7373 | 0.9501 |
+| MHCflurry 2.1.5 | 0.7713 | 0.7258 | 0.9409 |
+| MHCflurry 2.2.0 | 0.7713 | 0.7258 | 0.9409 |
+| MHCflurry 2.2.1 | 0.7713 | 0.7258 | 0.9409 |
+| NetMHCpan 4.0 BA | 0.6396 | 0.6178 | 0.9157 |
+| NetMHCpan 4.0 EL | 0.6935 | 0.6473 | 0.9243 |
+| NetMHCpan 4.1 BA | 0.6710 | 0.6507 | 0.9256 |
+| NetMHCpan 4.1 EL | 0.7671 | 0.7240 | 0.9417 |
+| NetMHCpan 4.2 BA | 0.6637 | 0.6456 | 0.9260 |
+| NetMHCpan 4.2 EL | 0.7832 | 0.7307 | 0.9455 |
+| MixMHCpred 3.0 | 0.7765 | 0.7281 | 0.9310 |
+
+
+AP and AUROC intervals favor 2.3.0 over public 2.2.1; the PPV@N interval
+includes zero. AP and PPV@N differences versus NetMHCpan 4.2 EL and MixMHCpred
+3.0 also have intervals including zero. These results do not establish
+universal superiority.
+
+See {doc}`release_model_evaluation_details` for the detailed paired-bootstrap
+tables and component figures. Intervals use 10,000 paired patient resamples
+and are not adjusted for multiple comparisons.
 
 ## Cohort and overlap
 
@@ -61,8 +110,8 @@ networks. The separately trained long-flank ensemble is a diagnostic and is not
 used in that full predictor. The saved presentation-percentile mapping preserves
 the raw-score AP, PPV@N and AUROC on the complete revised cohort.
 
-[Download the aggregate comparison tables and figures](https://github.com/openvax/mhcflurry/releases/download/2.3.0/model-comparison.20260928.tar.gz).
-The archive includes public 2.1.5/2.2.0/2.2.1, prior full models, NetMHCpan
-4.0/4.1/4.2 BA and EL, and MixMHCpred 3.0, with paired intervals for all
-comparisons. MixMHCpred 2.0.2 is reported only on its supported subset and is not
-mixed into the full-cohort table. Model archive checksums accompany the [2.3.0 release](https://github.com/openvax/mhcflurry/releases/tag/2.3.0).
+[Download tables and source data (.tar.gz)](https://github.com/openvax/mhcflurry/releases/download/2.3.0/model-comparison.20260928-v3.tar.gz).
+The stable-model tables above and the PDF include public 2.1.5/2.2.0/2.2.1,
+NetMHCpan 4.0/4.1/4.2 BA and EL, and MixMHCpred 3.0. The archive includes full-precision aggregate tables, rendering code, and
+a separately labeled prerelease component comparison. It does not include
+MixMHCpred 2.0.2, whose incomplete coverage required a different subset. Model archive checksums accompany the [2.3.0 release](https://github.com/openvax/mhcflurry/releases/tag/2.3.0).

@@ -19,7 +19,7 @@ Install MHCflurry 2.3.0 and download the pretrained
 presentation models:
 
 ```shell
-pip install --upgrade "mhcflurry==2.3.1"
+pip install --upgrade "mhcflurry==2.3.2"
 mhcflurry downloads fetch models_class1_presentation
 ```
 

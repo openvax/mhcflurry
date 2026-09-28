@@ -21,11 +21,13 @@ Examples:
   mhcflurry predict --alleles HLA-A0201 --peptides SIINFEKL DENDREKLLL
   mhcflurry predict --alleles 'HLA-A*02:01;HLA-A*03:01' --peptides SIINFEKL
 
-CSV columns: allele, peptide; optionally n_flank and c_flank. Input columns
+CSV columns: allele, peptide, n_flank and c_flank. Available N/C flanks are
+used by default; use --no-flanking to compare without sequence context. Flank
+columns may be omitted when context is unavailable. Input columns
 are preserved in the output. Separate --alleles arguments are independent
 queries, each scored against every peptide. Delimit alleles within a CSV cell
-or quoted argument with commas, semicolons or spaces to score one genotype;
-its row reports the strongest binding allele.
+or quoted argument with commas, semicolons or spaces to score one MHC allele
+set; its row reports the strongest binding allele.
 """
 import sys
 import itertools
@@ -33,25 +35,9 @@ import logging
 import os
 import re
 
-import pandas
-
 from .help import HelpArgumentParser
-from ..downloads import get_default_class1_presentation_models_dir
-from ..class1_affinity_predictor import Class1AffinityPredictor
-from ..class1_presentation_predictor import Class1PresentationPredictor
-from ..parallelism import (
-    add_prediction_parallelism_args,
-    chunk_ranges_for_local_parallelism,
-    num_workers_per_gpu_from_args,
-    worker_pool_with_gpu_assignments_from_args,
-)
-from ..pytorch_sizing import default_prediction_batch_is_auto
-from ..workload_planning import (
-    WORKLOAD_AFFINITY_INFERENCE,
-    WORKLOAD_PRESENTATION_INFERENCE,
-    model_artifact_size_bytes,
-    path_size_bytes,
-)
+from ..downloads import get_default_class1_presentation_models_dir, get_model_release_dir
+from ..parallelism import add_prediction_parallelism_args
 from ..version import __version__
 
 
@@ -71,9 +57,9 @@ input_args.add_argument(
     "--alleles",
     metavar="ALLELE",
     nargs="+",
-    help="Allele or genotype queries (exclusive with an input CSV). "
+    help="MHC allele or allele-set queries (exclusive with an input CSV). "
     "Separate arguments are independent queries; delimit alleles within one "
-    "argument with ';' or ',' to score them as one genotype.")
+    "argument with ';' or ',' to score them as one MHC allele set.")
 input_args.add_argument(
     "--peptides",
     metavar="PEPTIDE",
@@ -85,7 +71,7 @@ input_mod_args.add_argument(
     "--allele-column",
     metavar="NAME",
     default="allele",
-    help="Input column name for allele or delimited-genotype queries. "
+    help="Input column name for MHC allele or delimited allele-set queries. "
     "Default: '%(default)s'")
 input_mod_args.add_argument(
     "--peptide-column",
@@ -136,7 +122,8 @@ output_args.add_argument(
     "to the allele column (i.e. all queries are monoallelic).")
 
 model_args = parser.add_argument_group(title="Model options")
-model_args.add_argument(
+model_selection = model_args.add_mutually_exclusive_group()
+model_selection.add_argument(
     "--models",
     metavar="DIR",
     default=None,
@@ -144,6 +131,12 @@ model_args.add_argument(
     "a presentation predictor can be used. "
     "Default: %s" % get_default_class1_presentation_models_dir(
         test_exists=False))
+model_selection.add_argument(
+    "--model-release",
+    metavar="RELEASE",
+    help="Use the presentation weights from a download release, overriding model "
+    "path defaults. List choices: mhcflurry downloads releases models_class1_presentation.")
+
 model_args.add_argument(
     "--affinity-only",
     action="store_true",
@@ -215,6 +208,9 @@ def _load_predictor_for_command(models_dir):
     tuple
         ``(predictor, affinity_only_models)``.
     """
+    from ..class1_presentation_predictor import Class1PresentationPredictor
+    from ..class1_affinity_predictor import Class1AffinityPredictor
+
     cache_key = os.path.abspath(models_dir)
     if cache_key not in _PREDICTOR_CACHE:
         if os.path.exists(os.path.join(models_dir, "weights.csv")):
@@ -289,11 +285,31 @@ def run(argv=sys.argv[1:]):
 
     args = parser.parse_args(argv)
 
+    try:
+        selected_models_dir = (
+            get_model_release_dir(args.model_release) if args.model_release else None)
+    except (ValueError, RuntimeError) as error:
+        parser.error(str(error))
+
+    import pandas
+    from ..parallelism import (
+        chunk_ranges_for_local_parallelism,
+        num_workers_per_gpu_from_args,
+        worker_pool_with_gpu_assignments_from_args,
+    )
+    from ..pytorch_sizing import default_prediction_batch_is_auto
+    from ..workload_planning import (
+        WORKLOAD_AFFINITY_INFERENCE,
+        WORKLOAD_PRESENTATION_INFERENCE,
+        model_artifact_size_bytes,
+        path_size_bytes,
+    )
+
     # It's hard to pass a tab in a shell, so we correct a common error:
     if args.output_delimiter == "\\t":
         args.output_delimiter = "\t"
 
-    models_dir = args.models
+    models_dir = args.models or selected_models_dir
     if models_dir is None:
         # The reason we set the default here instead of in the argument parser
         # is that we want to test_exists at this point, so the user gets a

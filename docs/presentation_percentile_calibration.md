@@ -61,8 +61,7 @@ are spaced logarithmically in upper-tail probability, down to `1 / N` for `N`
 finite calibration scores. Their count is also capped by the number of
 calibration observations in that tail. Duplicate score edges are removed.
 
-This was the first mitigation for [issue #402](https://github.com/openvax/mhcflurry/issues/402):
-uniform quantiles can place thousands of informative high-scoring evaluation
+Uniform quantiles can place thousands of informative high-scoring evaluation
 peptides in one percentile bin even though their raw scores are distinct.
 Preserving the original broad grid also retains the resolution needed when
 the presentation combiner's score range is compressed near zero.
@@ -71,12 +70,12 @@ This remains available for reproducing the earlier binning experiment.
 Neither method changes network predictions or any existing saved calibration
 merely by loading it. No calibration rule is fitted to evaluation labels.
 
-## Applying the fix
+## Calibrating a predictor
 
 The existing `mhcflurry-calibrate-percentile-ranks` command uses the new default
 automatically for `--predictor-kind class1_presentation` (compact by default;
 `--percentile-method histogram` reproduces the earlier tail-bin method). Re-run the original
-calibration recipe on a separate copy of the candidate predictor, retaining
+calibration recipe on a separate copy of the predictor, retaining
 the same calibration reference policy, random seed, and source provenance.
 For full candidates, that recipe is in
 `scripts/training/pan_allele_release_full.sh` and the saved `GENERATE.sh`.

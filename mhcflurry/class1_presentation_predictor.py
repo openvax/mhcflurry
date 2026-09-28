@@ -305,11 +305,11 @@ class Class1PresentationPredictor(object):
         peptides : list of string
             Peptide sequences
         alleles : dict of string -> list of string
-            Keys are sample names, values are the alleles (genotype) for
+            Keys are sample names, values are the MHC alleles for
             that sample
         sample_names : list of string [same length as peptides]
             Sample names corresponding to each peptide. If None, then
-            predictions are generated for all sample genotypes  across all
+            predictions are generated for all sample MHC allele sets across all
             peptides.
         include_affinity_percentile : bool
             Whether to include affinity percentile ranks
@@ -817,7 +817,7 @@ class Class1PresentationPredictor(object):
             Peptide sequences
         alleles : list of string or dict of string -> list of string
             If you are predicting for a single sample, pass a list of strings
-            (up to 6) indicating the genotype. If you are predicting across
+            indicating the sample MHC allele set. If you are predicting across
             multiple samples, pass a dict where the keys are (arbitrary)
             sample names and the values are the alleles to predict for that
             sample. Set to an empty list or dict to perform processing
@@ -869,7 +869,7 @@ class Class1PresentationPredictor(object):
             if len(alleles) > MAX_ALLELES_PER_SAMPLE:
                 raise ValueError(
                     "When alleles is a list, it must have at most %d elements. "
-                    "These alleles are taken to be a genotype for an "
+                    "These alleles are taken to be an MHC allele set for an "
                     "individual, and the strongest prediction across alleles "
                     "will be taken for each peptide. Note that this differs "
                     "from Class1AffinityPredictor.predict(), where alleles "
@@ -1072,9 +1072,9 @@ class Class1PresentationPredictor(object):
             e.g. protein names), and the values are the amino acid sequences.
         alleles : list of string, list of list of string, or dict of string -> list of string
             MHC I alleles. Can be: (1) a string (a single allele), (2) a list of
-            strings (a single genotype), (3) a list of list of strings
-            (multiple genotypes, where the total number of genotypes must equal
-            the number of sequences), or (4) a dict giving multiple genotypes,
+            strings (a single MHC allele set), (3) a list of list of strings
+            (multiple MHC allele sets, where the number of sets must equal
+            the number of sequences), or (4) a dict giving multiple MHC allele sets,
             which will each be run over the sequences.
         result : string
             Specify 'best' to return the strongest peptide for each sequence,

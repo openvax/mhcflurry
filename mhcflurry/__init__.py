@@ -15,6 +15,7 @@ Class I MHC ligand prediction package
 """
 import os
 import sys
+from importlib import import_module
 
 
 # Must run before importing modules that transitively import numpy/MKL. Some
@@ -25,15 +26,30 @@ import sys
 if sys.platform.startswith("linux"):
     os.environ.setdefault("MKL_THREADING_LAYER", "GNU")
 
-from .class1_affinity_predictor import Class1AffinityPredictor
-from .class1_neural_network import Class1NeuralNetwork
-from .class1_processing_predictor import Class1ProcessingPredictor
-from .class1_processing_neural_network import Class1ProcessingNeuralNetwork
-from .class1_presentation_predictor import Class1PresentationPredictor
-from .histogram_percent_rank_transform import HistogramPercentRankTransform
-from .compact_percent_rank_transform import CompactPercentRankTransform
-
 from .version import __version__
+
+_PUBLIC_CLASSES = {
+    "Class1AffinityPredictor": "class1_affinity_predictor",
+    "Class1NeuralNetwork": "class1_neural_network",
+    "Class1ProcessingPredictor": "class1_processing_predictor",
+    "Class1ProcessingNeuralNetwork": "class1_processing_neural_network",
+    "Class1PresentationPredictor": "class1_presentation_predictor",
+    "HistogramPercentRankTransform": "histogram_percent_rank_transform",
+    "CompactPercentRankTransform": "compact_percent_rank_transform",
+}
+
+
+def __getattr__(name):
+    """Load public classes when requested, keeping CLI discovery lightweight."""
+    if name not in _PUBLIC_CLASSES:
+        raise AttributeError("module %r has no attribute %r" % (__name__, name))
+    value = getattr(import_module("." + _PUBLIC_CLASSES[name], __name__), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__():
+    return sorted(set(globals()) | set(__all__))
 
 __all__ = [
     "__version__",

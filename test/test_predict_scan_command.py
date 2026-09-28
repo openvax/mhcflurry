@@ -14,6 +14,7 @@ import tempfile
 import os
 
 import pandas
+from mhcflurry import parallelism, pytorch_sizing
 import pytest
 from numpy.testing import assert_array_less
 
@@ -288,11 +289,11 @@ def test_parallel_path_does_not_load_predictor_before_pool(monkeypatch):
         "_load_predictor_for_command",
         fail_parent_predictor_load)
     monkeypatch.setattr(
-        predict_scan_command,
+        parallelism,
         "worker_pool_with_gpu_assignments_from_args",
         fake_worker_pool)
     monkeypatch.setattr(
-        predict_scan_command,
+        pytorch_sizing,
         "default_prediction_batch_is_auto",
         lambda: False,
     )
@@ -377,7 +378,7 @@ def test_parallel_affinity_only_output_globally_sorted(monkeypatch):
         "_load_predictor_for_command",
         fail_parent_predictor_load)
     monkeypatch.setattr(
-        predict_scan_command,
+        parallelism,
         "worker_pool_with_gpu_assignments_from_args",
         fake_worker_pool)
 

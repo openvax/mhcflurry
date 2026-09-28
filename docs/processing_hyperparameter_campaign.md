@@ -146,7 +146,6 @@ a separate run after checking input/design identity. Incomplete conditions stay
 in the old run and are reinitialized in the new one. Every copied file is hashed.
 Existing recovery artifacts must match those hashes on resume. A lossless CSV
 parser preserves saved reference scores; strict fold checks are not relaxed.
-This fixes the interruption documented in [#407](https://github.com/openvax/mhcflurry/issues/407).
 
 Every new condition saves epoch losses, optimizer steps, epoch timing, stop
 reason, initialization diagnostics, best/terminal weights, and context-joinable

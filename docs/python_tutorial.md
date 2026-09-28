@@ -33,22 +33,27 @@ predictions:
 
 ```{doctest}
 >>> predictions = predictor.predict(
-...     peptides=["SIINFEKL", "NLVPMVATV"],
+...     peptides=["TPVCPNGPG", "RLLEGMEMI"],
+...     n_flanks=["MSSSS", "MVENK"],
+...     c_flanks=["NCQV", "FGQVI"],
 ...     alleles=["HLA-A0201", "HLA-A0301"],
 ...     verbose=0)
 >>> predictions.peptide.tolist()
-['SIINFEKL', 'NLVPMVATV']
+['TPVCPNGPG', 'RLLEGMEMI']
 >>> bool(predictions.presentation_score.between(0, 1).all())
 True
 ```
 
-Here, the allele list is one MHC I genotype (up to six alleles), and the
-strongest binder across that genotype is reported for each peptide.
+The peptides and flanks above come from `example.fasta`. Omit both
+`n_flanks` and `c_flanks` to compare the same peptides without source context.
+
+Here, the allele list is one MHC class I allele set, and the
+strongest binder across that MHC allele set is reported for each peptide.
 
 | Python input | Meaning |
 |---|---|
-| `alleles=["A0201", "A0301"]` | One genotype; one result per peptide. |
-| `alleles={"sample1": [...], "sample2": [...]}` | Multiple named genotypes; one result per sample and peptide. |
+| `alleles=["A0201", "A0301"]` | One MHC allele set; one result per peptide. |
+| `alleles={"sample1": [...], "sample2": [...]}` | Multiple named MHC allele sets; one result per sample and peptide. |
 | `Class1AffinityPredictor.predict_to_dataframe(allele="A0201", ...)` | Score every peptide against one allele. |
 | `Class1AffinityPredictor.predict_to_dataframe(alleles=[...], ...)` | Pair each peptide with the allele at the same position. |
 
@@ -62,11 +67,11 @@ with methods such as {meth}`~mhcflurry.Class1PresentationPredictor.predict`.
 Invalid, ambiguous, class-II, pseudogene, null, and unsupported allele names
 raise a descriptive `ValueError` by default. For streaming or mixed-quality
 data, pass `throw=False`; affected prediction rows are retained with `NaN`
-scores (or ignored when another valid allele in the genotype supplies the
+scores (or ignored when another valid allele in the MHC allele set supplies the
 sample's best affinity) while valid inputs are still evaluated. The
 command-line equivalent is `mhcflurry predict --no-throw`.
 
-If you have multiple sample genotypes, you can pass a dict, where the
+If you have multiple sample MHC allele sets, you can pass a dict, where the
 keys are arbitrary sample names:
 
 ```{doctest}
@@ -83,32 +88,12 @@ keys are arbitrary sample names:
 
 Here the strongest binder for each sample / peptide pair is returned.
 
-Processing and presentation predictions can use the upstream (N-flank) and
-downstream (C-flank) sequence from the source protein for better cleavage
-context. Pass those sequences with `n_flanks` and `c_flanks`:
-
-```{doctest}
->>> predictions = predictor.predict(
-...     peptides=["KSEYMTSWFY", "NLVPMVATV"],
-...     n_flanks=["NNNNNNN", "SSSSSSSS"],
-...     c_flanks=["CCCCCCCC", "YYYAAAA"],
-...     alleles={
-...        "sample1": ["A0201", "A0301", "B0702", "B4402", "C0201", "C0702"],
-...        "sample2": ["A0101", "A0206", "B5701", "C0202"],
-...     },
-...     verbose=0)
->>> predictions[["n_flank", "c_flank"]].drop_duplicates().to_dict("records")
-[{'n_flank': 'NNNNNNN', 'c_flank': 'CCCCCCCC'}, {'n_flank': 'SSSSSSSS', 'c_flank': 'YYYAAAA'}]
->>> bool(predictions.presentation_score.between(0, 1).all())
-True
-```
-
 ## Scanning protein sequences
 
 The {meth}`~mhcflurry.Class1PresentationPredictor.predict_sequences` method supports
 scanning protein sequences for MHC ligands. Here's an example to identify all
 peptides with a predicted binding affinity of 500 nM or tighter to any allele
-across two sample genotypes and two short peptide sequences.
+across two sample MHC allele sets and two short peptide sequences.
 
 ```{doctest}
 >>> scan = predictor.predict_sequences(

@@ -145,7 +145,7 @@ parser.add_argument(
     type=positive_int_arg,
     metavar="N",
     default=25,
-    help="Used when calibrating a presentation predictor. Number of genotypes"
+    help="Used when calibrating a presentation predictor. Number of MHC allele sets"
     "to sample")
 parser.add_argument(
     "--alleles-per-genotype",
@@ -153,7 +153,7 @@ parser.add_argument(
     metavar="N",
     default=6,
     help="Used when calibrating a presentation predictor. Number of alleles "
-    "per genotype. Use 1 to calibrate for single alleles. Default: %(default)s")
+    "per MHC allele set. Use 1 to calibrate for single alleles. Default: %(default)s")
 parser.add_argument(
     "--motif-summary",
     default=False,
@@ -514,9 +514,9 @@ def run_class1_presentation_predictor(args, peptides):
             genotype = [numpy.random.choice(alleles)]
             genotypes[",".join(genotype)] = genotype
     else:
-        raise ValueError("Alleles per genotype must be 6 or 1")
+        raise ValueError("Alleles per MHC allele set must be 6 or 1")
 
-    print("Sampled genotypes: ", list(genotypes))
+    print("Sampled MHC allele sets: ", list(genotypes))
     print("Num peptides: ", len(peptides))
 
     WORKER_CONTEXT["presentation_models_dir"] = args.models_dir

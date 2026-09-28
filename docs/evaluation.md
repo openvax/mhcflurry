@@ -203,7 +203,7 @@ mhcflurry eval presentation-external-predictors \
     --out results/new_run/external_comparison
 ```
 
-Rows join by benchmark source file and row identity, with genotypes
+Rows join by benchmark source file and row identity, with MHC allele sets
 canonicalized as compare-models saves them; any unmatched row fails the command.
 `data_evaluation` ships NetMHCpan 4.0 BA/EL and MixMHCpred columns. Pass
 `--external-dir` once per directory of locally generated scores, such as
