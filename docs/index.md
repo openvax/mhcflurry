@@ -66,7 +66,6 @@ auto_sizing_audit
 release_training_recipe
 release_model_evaluation
 release_neural_hyperparameter_audit
-release_2_3_training_experiments
 affinity_dual_checkpoint_workflow
 processing_cleavage_boundary_experiment
 processing_kernel_sweep

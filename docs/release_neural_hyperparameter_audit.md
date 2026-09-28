@@ -4,8 +4,8 @@ MHCflurry 2.3.0 uses PyTorch while retaining support for historical model
 weights. Matching a hyperparameter name does not always match the training
 equation across frameworks. This reference describes those distinctions;
 {doc}`release_training_recipe` is the authoritative recipe for the released
-weights. The smaller controlled experiments are described separately in
-{doc}`release_2_3_training_experiments`.
+weights. See {doc}`release_model_evaluation` for the completed comparison of
+the released ensembles on identical evaluation rows.
 
 ## Framework-semantic discrepancies found
 
