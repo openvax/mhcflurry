@@ -33,6 +33,7 @@ paired intervals and component tradeoffs.
 
 ## Prediction and calibration
 
+- Prediction progress is written to stderr so redirected stdout contains valid CSV.
 - The `mhcflurry` command groups prediction, download, training and evaluation
   commands. Existing standalone `mhcflurry-*` entry points remain supported.
 - CPU, CUDA and Apple Silicon execution use PyTorch. Automatic worker and

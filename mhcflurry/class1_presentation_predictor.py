@@ -19,6 +19,7 @@ import os
 import time
 import collections
 import logging
+import sys
 import warnings
 import numpy
 import pandas
@@ -351,7 +352,7 @@ class Class1PresentationPredictor(object):
             )
 
             if verbose > 0:
-                print("Predicting affinities.")
+                print("Predicting affinities.", file=sys.stderr)
 
             # Per-allele × per-peptide chunked predict. Track each
             # sample's best allele as chunks return, so peak host memory
@@ -458,7 +459,7 @@ class Class1PresentationPredictor(object):
 
             iterator = df.groupby("sample_name")
             if verbose > 0:
-                print("Predicting affinities.")
+                print("Predicting affinities.", file=sys.stderr)
                 iterator = tqdm.tqdm(
                     iterator, total=df.sample_name.nunique())
 
@@ -583,7 +584,7 @@ class Class1PresentationPredictor(object):
 
         iterator = zip(peptide_chunks, n_flank_chunks, c_flank_chunks)
         if verbose > 0:
-            print("Predicting processing.")
+            print("Predicting processing.", file=sys.stderr)
             iterator = tqdm.tqdm(iterator, total=len(peptide_chunks))
 
         result_chunks = []
@@ -646,7 +647,7 @@ class Class1PresentationPredictor(object):
         for with_flanks in with_flanks_list:
             model_name = 'with_flanks' if with_flanks else "without_flanks"
             if verbose > 0:
-                print("Predicting processing for variant", model_name)
+                print("Predicting processing for variant", model_name, file=sys.stderr)
 
             processing_scores_by_model[model_name] = self.predict_processing(
                 peptides=df.peptide.values,

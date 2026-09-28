@@ -363,3 +363,19 @@ def test_no_csv():
     assert (
         sub_result1.loc["H-2-Kb"].mhcflurry1_affinity <
         sub_result1.loc["HLA-A0201"].mhcflurry1_affinity)
+
+
+@pytest.mark.parametrize("affinity_only", [False, True])
+def test_stdout_contains_only_parseable_csv(capsys, affinity_only):
+    import io
+
+    args = ["--alleles", "HLA-A0201", "--peptides", "SIINFEKL", "NLVPMVATV"]
+    if affinity_only:
+        args.append("--affinity-only")
+    predict_command.run(args)
+    output = capsys.readouterr()
+    frame = pandas.read_csv(io.StringIO(output.out))
+    assert frame.peptide.tolist() == ["SIINFEKL", "NLVPMVATV"]
+    assert frame.mhcflurry_affinity.notna().all()
+    assert "Predicting" not in output.out
+    assert "Predicting affinities." in output.err
