@@ -3,6 +3,11 @@
 Maintainer tools for retraining, evaluating, synchronizing, packaging, and
 publishing model artifacts. Prediction users do not need these scripts.
 
+Run these workflows from a clean source checkout containing `scripts/`, with
+MHCflurry and the chosen backend dependencies installed. A wheel-only
+installation provides prediction and low-level training commands, but not these
+repository orchestration scripts.
+
 ## End-to-end workflow
 
 Use the public command rather than invoking the orchestration shell script

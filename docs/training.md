@@ -81,6 +81,11 @@ locate it.
 
 ## Pan-allele and release training
 
+The release workflow and the `mhcflurry train` data-preparation/sweep wrappers
+require a source checkout containing `scripts/`. Run them from the checkout root
+or use an editable install of that checkout. The low-level `mhcflurry
+class1-train-*` commands are included in the installed Python package.
+
 ### Processing-specific data policy
 
 New processing training and model selection require affinity/length-matched
