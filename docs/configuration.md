@@ -88,7 +88,7 @@ historical stochastic behavior unless the caller opts in.
 
 ## Unified and historical command names
 
-MHCflurry 2.3.0 groups commands under one `mhcflurry` entry point. For example:
+MHCflurry 2.3 groups commands under one `mhcflurry` entry point. For example:
 
 ```text
 mhcflurry-predict                       = mhcflurry predict

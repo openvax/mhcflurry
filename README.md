@@ -15,11 +15,11 @@ for candidate epitopes, or train models on your own data.
 
 ## Quick start
 
-Install MHCflurry 2.3.0 and download the pretrained
+Install MHCflurry 2.3 and download the pretrained
 presentation models:
 
 ```shell
-pip install --upgrade "mhcflurry==2.3.2"
+pip install --upgrade "mhcflurry>=2.3,<2.4"
 mhcflurry downloads fetch models_class1_presentation
 ```
 
