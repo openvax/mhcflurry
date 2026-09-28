@@ -318,10 +318,10 @@ if [ "$MODE" = "dry-run" ]; then
     note "Dry run only. Commands that would run:"
     note "Selected inference copies are staged before the tar commands below."
     quote_cmd mkdir -p "$ASSETS_DIR"
-    quote_cmd tar -C "$AFFINITY_DIR" -cjf "$ASSETS_DIR/$PAN_ASSET" models.combined
-    quote_cmd tar -C "$PROCESSING_DIR" -cjf "$ASSETS_DIR/$PROCESSING_ASSET" \
+    quote_cmd tar --no-xattrs -C "$AFFINITY_DIR" -cjf "$ASSETS_DIR/$PAN_ASSET" models.combined
+    quote_cmd tar --no-xattrs -C "$PROCESSING_DIR" -cjf "$ASSETS_DIR/$PROCESSING_ASSET" \
         "${PROCESSING_ARCHIVE_DIRS[@]}"
-    quote_cmd tar -C "$PRESENTATION_DIR" -cjf "$ASSETS_DIR/$PRESENTATION_ASSET" models
+    quote_cmd tar --no-xattrs -C "$PRESENTATION_DIR" -cjf "$ASSETS_DIR/$PRESENTATION_ASSET" models
     quote_cmd gh release upload "$GITHUB_RELEASE" \
         "$ASSETS_DIR/$PAN_ASSET" \
         "$ASSETS_DIR/$PROCESSING_ASSET" \
@@ -344,10 +344,10 @@ done
 AFFINITY_DIR="$STAGING_DIR/affinity"
 PROCESSING_DIR="$STAGING_DIR/processing"
 PRESENTATION_DIR="$STAGING_DIR/presentation"
-tar -C "$AFFINITY_DIR" -cjf "$ASSETS_DIR/$PAN_ASSET" models.combined
-tar -C "$PROCESSING_DIR" -cjf "$ASSETS_DIR/$PROCESSING_ASSET" \
+tar --no-xattrs -C "$AFFINITY_DIR" -cjf "$ASSETS_DIR/$PAN_ASSET" models.combined
+tar --no-xattrs -C "$PROCESSING_DIR" -cjf "$ASSETS_DIR/$PROCESSING_ASSET" \
     "${PROCESSING_ARCHIVE_DIRS[@]}"
-tar -C "$PRESENTATION_DIR" -cjf "$ASSETS_DIR/$PRESENTATION_ASSET" models
+tar --no-xattrs -C "$PRESENTATION_DIR" -cjf "$ASSETS_DIR/$PRESENTATION_ASSET" models
 
 (
     cd "$ASSETS_DIR"
