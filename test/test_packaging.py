@@ -12,6 +12,7 @@
 
 """Packaging metadata tests."""
 
+import json
 import re
 import runpy
 from pathlib import Path
@@ -29,6 +30,15 @@ def test_install_guidance_is_not_pinned_to_a_release():
         assert "pip install --upgrade --pre mhcflurry" in text
         assert not prerelease.search(text), relative_path
         assert not stable_series.search(text), relative_path
+
+    notebook = json.loads(
+        (repo_dir / "notebooks/mhcflurry-colab.ipynb").read_text())
+    setup_cell = next(
+        cell for cell in notebook["cells"] if cell["cell_type"] == "code")
+    source = "".join(setup_cell["source"])
+    assert "%pip install --upgrade --pre mhcflurry" in source
+    assert "mhcflurry-downloads --quiet fetch models_class1_presentation" in source
+    assert not prerelease.search(source)
 
 
 def test_setup_packages_cli_subpackage(monkeypatch):
