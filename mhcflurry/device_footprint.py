@@ -25,24 +25,9 @@ job size, so the planner falls back to the static profile default. Estimates are
 deliberately conservative (a safety multiplier + a floor) so we never pack more
 aggressively than the validated baseline.
 
-Sanity anchors (release pan-allele config, live diagnostics from release
-training runs):
-
-  * Affinity TRAINING — pretraining keeps the fold's validation tensors
-    device-resident, but validation is now batched from the live shared-memory
-    budget. The launch-time working set therefore consists of the exact
-    resident encodings plus model/optimizer/runtime state and the configured
-    training minibatch; it no longer bakes an obsolete full-fold validation
-    peak into every worker.
-  * Affinity CALIBRATION — 400k-row rc14 peptide universe, 10-net selected
-    ensemble — the merged fast path measured a ~15 GB cached peptide-stage
-    tensor on A100-40GB. ``estimate_affinity_calibration_device_worker_gb``
-    reproduces the cache plus runtime headroom so worker auto-sizing does not
-    pack multiple calibration caches onto a 40 GB GPU.
-
 The per-row resident formulas track the genuinely-varying terms: full dataset /
 peptide-universe row count, the peptide encoding dims (``max_length`` x feature
-width, which differ by ``vector_encoding_name`` — BLOSUM62=21, the new
+width, which differ by ``vector_encoding_name`` — BLOSUM62=21,
 physchem/atchley/composite encodings differ), network width, ensemble size, and
 batch size.
 """

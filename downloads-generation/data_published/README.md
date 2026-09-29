@@ -11,8 +11,10 @@ To generate this download run:
 This download contains the BD2009, BD2013, and BLIND datasets from
 [Dataset size and composition impact the reliability of performance benchmarks for peptide-MHC binding predictions](http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-15-241).
 
-BD2013 (augmented with more recent data from IEDB) are used to train the production
-MHCflurry models. BD2009 and BLIND are useful for performing validation on held-out data.
+Historical MHCflurry recipes used BD2013 with additional IEDB data for training
+and BD2009/BLIND for validation. Those names alone do not establish independence
+from a current model: audit overlap against every compared model before using
+any of these datasets as a held-out benchmark.
 
 The other published data sets correspond to the publications indicated in GENERATE.sh.
 

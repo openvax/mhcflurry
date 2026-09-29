@@ -92,7 +92,7 @@ Here the strongest binder for each sample / peptide pair is returned.
 
 The {meth}`~mhcflurry.Class1PresentationPredictor.predict_sequences` method supports
 scanning protein sequences for MHC ligands. Here's an example to identify all
-peptides with a predicted binding affinity of 500 nM or tighter to any allele
+8–11mer peptides with a predicted binding affinity at most 500 nM to any allele
 across two sample MHC allele sets and two short peptide sequences.
 
 ```{doctest}
@@ -109,7 +109,7 @@ across two sample MHC allele sets and two short peptide sequences.
 ...    comparison_quantity="affinity",
 ...    filter_value=500,
 ...    verbose=0)
->>> bool(len(scan) > 0 and scan.affinity.lt(500).all())
+>>> bool(len(scan) > 0 and scan.affinity.le(500).all())
 True
 >>> {"sequence_name", "peptide", "best_allele"}.issubset(scan.columns)
 True
@@ -130,9 +130,8 @@ If all you need are binding affinities, you can use this instance directly.
 Here's an example:
 
 ```{doctest}
->>> from mhcflurry import Class1AffinityPredictor
->>> predictor = Class1AffinityPredictor.load()
->>> affinities = predictor.predict_to_dataframe(
+>>> affinity_predictor = predictor.affinity_predictor
+>>> affinities = affinity_predictor.predict_to_dataframe(
 ...     allele="HLA-A0201", peptides=["SIINFEKL", "SIINFEQL"])
 >>> affinities[["peptide", "allele"]].to_dict("records")
 [{'peptide': 'SIINFEKL', 'allele': 'HLA-A*02:01'}, {'peptide': 'SIINFEQL', 'allele': 'HLA-A*02:01'}]
@@ -141,13 +140,18 @@ Here's an example:
 True
 ```
 
+Alternatively, `Class1AffinityPredictor.load()` selects the active release's
+standalone affinity bundle when installed, falling back to the affinity
+component of its presentation bundle. Accessing `predictor.affinity_predictor`
+as above guarantees that both calls use the same loaded affinity ensemble.
+
 The `prediction_low` and `prediction_high` fields give the 5-95 percentile
 predictions across the models in the ensemble. This detailed information is not
 available through the higher-level {class}`~mhcflurry.Class1PresentationPredictor`
 interface.
 
 Under the hood, `Class1AffinityPredictor` itself delegates to an ensemble of
-of {class}`~mhcflurry.Class1NeuralNetwork` instances, which implement the neural network
+{class}`~mhcflurry.Class1NeuralNetwork` instances, which implement the neural network
 models used for prediction. To fit your own affinity prediction models, call
 {meth}`~mhcflurry.Class1NeuralNetwork.fit`.
 

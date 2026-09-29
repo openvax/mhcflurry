@@ -80,6 +80,8 @@ class MSEWithInequalities(nn.Module):
             Predictions, shape (batch,) or (batch, 1)
         y_true : torch.Tensor
             Encoded targets, shape (batch,) or (batch, 1)
+        sample_weights : torch.Tensor or None
+            Optional per-example weights.
 
         Returns
         -------
@@ -173,6 +175,8 @@ class MSEWithInequalitiesAndMultipleOutputs(nn.Module):
             Predictions, shape (batch, num_outputs)
         y_true : torch.Tensor
             Encoded targets, shape (batch,) or (batch, 1)
+        sample_weights : torch.Tensor or None
+            Optional per-example weights.
 
         Returns
         -------
@@ -232,7 +236,8 @@ class MultiallelicMassSpecLoss(nn.Module):
     Loss function for multiallelic mass spectrometry data.
 
     For each (hit, decoy) pair, penalizes when any decoy allele prediction
-    exceeds the best hit allele prediction by more than delta.
+    is greater than the best hit allele prediction minus delta. The squared
+    hinge encourages each hit to exceed every decoy allele by at least delta.
 
     y_true encoding:
       - 1.0: hit (positive)
@@ -265,6 +270,8 @@ class MultiallelicMassSpecLoss(nn.Module):
             Predictions, shape (batch, num_alleles)
         y_true : torch.Tensor
             Labels, shape (batch,) or (batch, 1)
+        sample_weights : torch.Tensor or None
+            Accepted for interface compatibility; ignored by this pairwise loss.
 
         Returns
         -------

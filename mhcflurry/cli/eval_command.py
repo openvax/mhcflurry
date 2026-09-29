@@ -13,9 +13,8 @@
 """Evaluation command namespace.
 
 ``mhcflurry eval`` is the semantic home for model comparison, benchmark score
-generation, and paper-style figures. The first release keeps the existing
-commands as compatibility entry points while making the preferred shape
-available:
+generation, and paper-style figures. Historical top-level commands remain
+available as compatibility entry points:
 
 * ``mhcflurry eval compare-models`` delegates to ``mhcflurry compare-models``.
 * ``mhcflurry eval plot-comparison`` delegates to

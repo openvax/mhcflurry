@@ -95,7 +95,15 @@ names remain supported for existing scripts.
 
 ## Using conda
 
-You can install into a conda environment and then use pip normally:
+The [Bioconda package](https://anaconda.org/bioconda/mhcflurry) has a separate
+release process. Check which versions are available before installing:
+
+```shell
+conda search --override-channels -c conda-forge -c bioconda mhcflurry
+```
+
+For a code version not yet packaged by Bioconda, create a conda environment
+and install from PyPI:
 
 ```shell
 conda create -q -n mhcflurry-env python=3.10

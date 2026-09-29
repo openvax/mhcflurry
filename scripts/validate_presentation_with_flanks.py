@@ -13,11 +13,7 @@
 """Compare trained ensemble vs public mhcflurry on 10 peptides with their
 real source-protein flanks.
 
-Per-user ask (phase-c-single-a100 run): "test the ensemble against the
-public weights for accuracy on our example set of 10 peptides hopefully
-including SLLQHLIGL (find its flanking region in PRAME), and random other
-peptides + flanks and alleles including A0201 and A2402. Summarize rank
-correlation of public mhcflurry with trained ensemble on all outputs."
+This is a small prediction-agreement check, not an accuracy benchmark.
 
 What this script does:
 
@@ -35,7 +31,7 @@ What this script does:
 Run:
     python scripts/validate_presentation_with_flanks.py \\
         --ours /path/to/models.combined/ \\
-        --public $(mhcflurry-downloads path models_class1_presentation)/models/
+        --public "$(mhcflurry downloads path models_class1_presentation)/models/"
 """
 
 from __future__ import annotations

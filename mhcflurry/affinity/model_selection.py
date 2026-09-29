@@ -34,6 +34,12 @@ def model_select(
 
     Parameters
     ----------
+    predictor : Class1AffinityPredictor
+        Predictor containing the candidate models.
+
+    predictor_class : type
+        Predictor class used for candidate and selected ensembles.
+
     score_function : Class1AffinityPredictor -> float function
         Scoring function
 

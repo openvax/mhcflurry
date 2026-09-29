@@ -103,8 +103,12 @@ protein context for cleavage prediction. See the
 
 ## Scanning protein sequences for predicted MHC I ligands
 
-Use `mhcflurry predict-scan` to score every supported peptide window in a
-protein sequence.
+Use `mhcflurry predict-scan` to score peptide windows in a protein sequence.
+The default lengths are 8–11 amino acids; set `--peptide-lengths` to change them.
+By default, the output keeps rows with affinity percentile at most 2. Use
+`--results-all` to return every scored window, or `--threshold-*` to choose a
+different filter. Scanning supplies N/C source-protein flanks automatically;
+use `--no-flanking` for predictions without that context.
 
 We'll generate predictions across `example.fasta`, a FASTA file with two short
 sequences:
@@ -112,11 +116,11 @@ sequences:
 ```{literalinclude} /example.fasta
 ```
 
-This invocation keeps peptides predicted to bind at 100 nM or tighter:
+This invocation keeps peptides with predicted affinity at most 100 nM:
 
 ```shell
 $ mhcflurry predict-scan example.fasta \
-    --alleles HLA-A*02:01 \
+    --alleles 'HLA-A*02:01' \
     --threshold-affinity 100
 ```
 

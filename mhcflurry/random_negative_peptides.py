@@ -362,8 +362,8 @@ class RandomNegativesPool(object):
 
     Seeding is optional. When ``seed`` is None the peptides are drawn
     from the process's numpy global state, matching the pre-pool
-    semantics: workers in a training pool diverge naturally because
-    they are separate processes with independent RNG state. Supplying
+    semantics. Worker initialization is responsible for independent RNG
+    states; separate processes alone do not guarantee them. Supplying
     an explicit seed makes pool contents reproducible — useful for
     debugging and for regression tests.
     """
@@ -395,8 +395,7 @@ class RandomNegativesPool(object):
 
         seed : int, optional
             Seed for the per-cycle RNG. When None, draws go through
-            numpy's global state (or, on the device path, an unseeded
-            ``torch.Generator`` on ``device``).
+            numpy's global state (or torch's global state on the device path).
 
         device : torch.device or str, optional
             When set, the pool builds device-resident int8 tensors via

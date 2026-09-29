@@ -70,11 +70,12 @@ share encoded pools between model fits. This preserves the historical
 behavior where independently trained workers sample independent negative
 peptides.
 
-For the default torch peptide-encoding path, the pool samples amino-acid
+The pool samples amino-acid
 indices directly on the worker's active torch device and writes fixed-length
 int8 rows. The model's embedding layer expands those indices to BLOSUM62 /
-PMBEC / physchem features during the forward pass. Legacy host-vector
-models fall back to the host encoder so their input shape remains unchanged.
+PMBEC / physchem features during the forward pass. Peptides are always index
+encoded; deprecated dense-vector configuration values are accepted with a
+warning and do not restore the removed host-vector path.
 
 ## Parallelism backends
 
@@ -123,9 +124,8 @@ contexts and `--num-jobs 0`. See {doc}`shared_percent_rank_transforms`.
 ## Auto-tuned parallelism knobs
 
 Three knobs auto-derive from the box's hardware so the orchestrator
-keeps working when the recipe lands on a different tier. Every auto
-resolver lives in `mhcflurry.parallelism` and is exercised by
-the unit-test matrix in `test/test_orchestrator_helpers.py`. The
+keeps working when the recipe lands on a different tier. Shared hardware policy lives in `mhcflurry.parallelism`,
+`mhcflurry.workload_planning` and the memory-sizing helpers. The
 production recipes pass `auto` for each; pin a literal int only when
 intentionally re-benchmarking.
 
@@ -173,17 +173,17 @@ optimization problem and therefore the resulting weights.
 
 For the generic 4 GiB fallback, 80 GiB free fits 18 workers and 40 GiB fits 9;
 workload-specific estimates, host RAM, vCPUs, and the number of work items can
-reduce those capacities. CPU-only execution resolves to one device worker.
+reduce those capacities. Automatic CPU/MPS execution runs serially in the parent process; an explicit
+positive `--num-jobs` requests a local process pool.
 
 ### `--dataloader-num-workers auto` → `auto_dataloader_num_workers`
 
 Picks the per-fit-worker DataLoader prefetch child count from box
 capacity. This applies to the pretrain streaming path
 (`fit_streaming_batches`); the affinity `fit()` path is device-resident
-and ignores it. Inputs: total vCPUs, total RAM in GB, the post-cap
+and ignores it. Inputs: detected CPU count, available RAM in GB, the post-cap
 fit-worker count (`--num-jobs` resolved by
-`resolve_local_parallelism_args`), and a hard cap (default 4 — the
-empirical SM-scheduler-style wall, env-overridable via
+`resolve_local_parallelism_args`), and a hard cap (default 4 — env-overridable via
 `MHCFLURRY_AUTO_DATALOADER_HARD_CAP`).
 
 Heuristic:
@@ -231,7 +231,7 @@ once `auto_max_workers_per_gpu` has resolved. Pass an integer to pin it.
 | Model | `--max-workers-per-gpu auto` | `--dataloader-num-workers auto` | Notes |
 |---|---|---|---|
 | Pan-allele affinity | ✓ | ✓ (pretrain only) | Default in release recipe; affinity `fit()` is device-resident |
-| Allele-specific affinity | ✓ | ✓ | Same `Class1NeuralNetwork` codebase; auto already wired |
+| Allele-specific affinity | ✓ | n/a | Its in-memory `fit()` path does not use DataLoader children |
 | Processing | ✓ | n/a | Parallel model fits; the processing network has no DataLoader pretraining path. |
 | Presentation | ✓ | n/a | Parallel feature generation followed by deterministic fitting. |
 
@@ -273,10 +273,10 @@ with a numeric value before any worker sees it.
 `torch.compile` is worker-local: the Python wrapper, graph guards, and
 CUDA module handles cannot be shared across processes. What can be
 shared on one machine is the Inductor/Triton on-disk cache. For local
-Pool training, the orchestrator therefore runs one real work item
-first in a one-worker warmup pool with a larger compile-thread budget,
-saves that result, then restores production compile-thread sizing and
-launches the full worker pool.
+training, a one-worker resource probe runs a bounded epoch for each distinct
+resource configuration before production workers start. When compilation is
+enabled, it also primes that cache. Probe model weights are discarded; they
+do not count as completed training work.
 
 Cluster workers are different: they may land on different nodes, so
 mhcflurry does not try to share Inductor cache across a cluster. Each
@@ -355,9 +355,10 @@ This path is device agnostic: CUDA, MPS, and CPU all execute the same
 torch embedding operation on the active device. It is model semantics,
 not DataLoader behavior.
 
-Disable it only with `peptide_amino_acid_encoding_torch=False`, which
-restores the old path where numpy expands peptide strings into
-`(N, L, V)` vectors before they are moved to the device.
+`peptide_amino_acid_encoding_torch=False` is a deprecated compatibility value:
+it logs a warning and still uses index encoding. The former dense-vector
+peptide path has been removed. The saved fixed-vector encoding determines the
+embedding table; loading old weights preserves that representation.
 
 ### 2. Pretrain DataLoader process parallelism
 
@@ -372,7 +373,8 @@ for the pretrain data pipeline:
 | `0` | build batches in the training worker process |
 | `>0` | spawn that many DataLoader child processes per training worker |
 
-Release recipes set only this knob. On a local 8-GPU run with
+The release CLI resolves this process count separately from model encoding.
+On a local 8-GPU run with
 `NUM_JOBS=16`, `dataloader_num_workers=1` means up to 16 extra
 fit-local DataLoader children while pretrain epochs are active; `2`
 means up to 32. The thread-budget helper accounts for this when sizing
@@ -441,10 +443,3 @@ and adding it would be feature work, not a fix":
   local one-worker cache warmup for affinity and processing trainers.
   Presentation fitting is a separate model family and does not enter
   this central torch-training path.
-
-## Future tightening (not in 2.3.0)
-
-- **Presentation-training orchestration.** Today
-  `train_presentation_models_command` runs single-process; mirror the
-  pan-allele orchestration shape if presentation retraining becomes
-  GPU-bound.

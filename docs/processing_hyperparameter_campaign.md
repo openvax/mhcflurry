@@ -85,7 +85,7 @@ intervals, not corrected for repeated screening or study dependence. A recipe
 export is not a model release or a substitute for presentation validation.
 
 `initialization_method` has explicit `none`, `orthogonal`, `lsuv_pre` and
-`lsuv_post` values. None preserves legacy initialization. Non-default methods
+`lsuv_post` values. `none` preserves the configured kernel initialization. Non-default methods
 apply to fresh fits; continued fitting does not reinitialize a trained network.
 Calibration uses at most `initialization_batch_size` training rows (default
 512), never stopping-validation rows. Their fit-input row indices are saved.
@@ -99,11 +99,11 @@ Dropout is disabled during initialization. Non-convergence fails explicitly
 and restores the pre-initialization parameters. Diagnostics include each layer's
 variance and iteration count. See the [LSUV paper](https://arxiv.org/abs/1511.06422).
 
-## Confirmation result
+## Recorded development result
 
 The complete panel (`processing-ranking-confirmation-20260909`; runplz run
 `a8889cc8dfbb4f4390d4ceb153ad81e1`; source `9778c625`; 24 fits in 65 minutes
-on one A100-40GB, about 1.1 of the 4 authorized GPU-hours) promoted
+on one A100-40GB) promoted
 `legacy_5aa__rmsprop_pytorch__k13` with inner-best-AP weights.
 `confirmed_processing_candidate_hyperparameters()` in
 `scripts/training/generate_processing_recipe.py` names that recipe together
@@ -162,9 +162,8 @@ The runplz Modal launcher accepts `PROCESSING_KERNEL_TRAIN_DATA` and
 on the same single GPU. It requires an absolute
 `MHCFLURRY_EXPERIMENT_DEADLINE_EPOCH`; command descendants are terminated at
 that deadline, without marking the stage complete. Set an absolute deadline
-at most 15.5 hours after submission for the authorized 16-GPU-hour allocation,
-leaving margin for teardown. The per-function timeout cannot exceed 15.5 hours.
-No retries or subsequent allocation may exceed the remaining campaign budget.
+within the allocated compute budget, leaving margin for teardown. The launcher
+caps each function timeout at 15.5 hours; retries must respect the same deadline.
 
 The launcher writes width figures first, then a combined
 `campaign-all-figures.pdf` after the recipe screen. Raw inputs and prediction

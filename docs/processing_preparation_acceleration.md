@@ -1,119 +1,56 @@
-# Processing preparation acceleration
+# Processing data preparation
 
-## Workflow
+`mhcflurry train processing-data` prepares affinity-matched negative peptides
+with bounded CPU/scoring overlap and resumable, checksummed artifacts. The
+matching contract is described in {doc}`probabilistic_processing_matching`.
 
-Optimize the maintained `mhcflurry train processing-data` path without changing
-the scientific matching policy or interrupting the existing frozen Modal run.
+## Execution and saved artifacts
 
-1. Factor a bounded sample pipeline with one scoring owner. CPU stages prepare
-   the next sample and commit/match the previous sample while the caller scores
-   the current sample. Each sample is a resumable coroutine yielding score
-   requests; CPU continuations save immutable rounds before matching or requesting
-   expansion. Bound active samples and CPU workers, propagate errors, drain started
-   writes, and publish completion only after durable artifacts and their hashes.
-   Independent per-sample RNGs make scheduling irrelevant to candidate selection.
-2. Replace per-hit matching loops with grouped, chunked batched nearest-neighbor
-   lookup. Preserve the existing sorted local search window, stable tie order,
-   same-protein priority, global fallback exclusions, caliper inclusivity, failure
-   identities and output row order. Never allocate a hits-by-entire-pool matrix.
-   Keep a scalar oracle in tests and compare randomized/adversarial cases and a
-   saved real scored pool before measuring speed.
-3. Introduce a numeric protein/window representation with an explicit device
-   gather API. Encode each protein once; keep position, length and peptide identity
-   numeric during sampling/deduplication/exclusion and affinity input preparation.
-   Materialize peptide/flank strings for the persisted scored artifacts. Integrate
-   the numeric route with the actual affinity scoring API, not a disconnected GPU
-   demonstration. Preserve historical window bounds and model input encodings;
-   test CPU and available accelerator equivalence, padding, exclusions and seeds.
+Each sample is a resumable workflow. CPU stages sample candidate windows and
+save scored rounds while a single scoring owner per process runs the affinity
+predictor. The default pipeline depth is three; use
+`--preparation-pipeline-depth 1` for serial stages. Sample seeds derive from the
+master seed and sample identity, so scheduling does not change candidate draws.
 
-Verification includes pipeline overlap/backpressure/error/interrupt tests,
-checkpoint resume and corruption regressions, scalar/vector matching parity,
-numeric/string encoding and prediction parity, deterministic end-to-end sample
-preparation, lint, the full test suite, and reproducible benchmark JSON. Saved
-real-data checks distinguish exact matching parity from floating-point prediction
-tolerances. No unmeasured end-to-end speedup or new model-quality claim.
+`ProcessingProteome` encodes proteins once per worker. `ProteinWindows` keeps
+sampled positions and peptide identities numeric; `NumericCandidatePool`
+deduplicates scoring inputs before peptide/flank strings are materialized for
+saved tables. `NumericSequences.aligned_tensor()` and
+`Class1AffinityPredictor.predict_numeric(..., allele=...)` gather and align
+inputs on CPU, MPS or CUDA. This strict, single-allele API uses the existing
+networks and log-affinity ensemble aggregation. Sampling remains on the CPU.
 
-## APIs and execution
+Each scored round is saved before matching or expansion. An insufficient pool
+triggers additional draws for unresolved peptide lengths, within the configured
+round limit. Completion is recorded only after matched outputs and their hashes
+are saved. Errors retain committed rounds; they do not publish a completed sample.
 
-- `scoring_pipeline(workflows, score, max_in_flight=3, cpu_workers=2)` runs CPU
-  coroutine continuations around a single caller-owned scorer. It bounds submitted
-  work as well as worker count. A scored round commits before any matching,
-  expansion or completion; failures cancel queued work and drain running writes.
-- `sample_preparation_steps(...)` is the resumable sample coroutine;
-  `prepare_sample(...)` remains its synchronous adapter. `ScoredValues` carries
-  actual inference duration separately from queue waiting. Round metadata also
-  records string materialization and artifact-writing times.
-- `SortedAffinityPools` packs sample/length/protein groups into stable numeric
-  search indices. The normal path has no per-hit or per-protein Python lookup.
-  Exceptional missing-identity and exhausted-window behavior retains the scalar
-  semantics, including pandas' distinctions among missing-value representations.
-- `ProcessingProteome` encodes proteins once per worker. `ProteinWindows` retains
-  sampled positions and collision-free numeric identities. `NumericCandidatePool`
-  removes duplicate scoring inputs and delays string construction until export.
-- `NumericSequences.aligned_tensor(...)` and
-  `Class1AffinityPredictor.predict_numeric(..., allele=...)` gather/align numeric
-  inputs on CPU, MPS or CUDA and reuse the existing neural networks and log-affinity
-  ensemble aggregation. The numeric API is deliberately single-allele and strict
-  about unsupported lengths/residues, matching preparation's monoallelic contract.
+Use `--resume` for the same output or `--resume-matching-dir PRIOR.matching`
+when creating a new output. Resume checks input/reference hashes, matching policy,
+seed, observed rows and saved scores. It never silently reuses old assignments
+from a different matching policy. The explicit `legacy-top-binders` recipe uses
+the historical serial preparation path.
 
-The maintained `mhcflurry train processing-data` command defaults to pipeline
-depth 3 (two CPU continuations and one scoring owner per process). Set
-`--preparation-pipeline-depth 1` for a serial-stage control. Processes receive
-small sample chunks so preparation can overlap within a worker; each sample's
-seed still derives only from the master seed and sample ID. Chunking/scheduling
-does not change candidate draws or output order. The explicit historical
-`legacy-top-binders` recipe remains serial and uses its old sampler.
-
-Numeric sampling still chooses/filter positions on CPU; device-side gathering,
-alignment and prediction are implemented. This does not claim the entire pipeline
-is CUDA-only. CPU preparation does not own a GPU context. The encoded proteome's
-device copy is created lazily by the sole scoring owner.
-
-## Reproducible measurements
+## Benchmarking
 
 ```bash
 mhcflurry train benchmark-processing-preparation \
   --out benchmark.json --repeats 5 \
-  --scored-pool original.candidate_pool.csv.bz2 \
-  --scored-pool expansion.round-01.csv.bz2 \
-  --baseline-matching-source frozen-source/mhcflurry/processing_matching.py
+  --scored-pool sample.round-00.csv.bz2 \
+  --scored-pool sample.round-01.csv.bz2
 ```
 
-Add `--affinity-predictor /path/to/models.combined` to check actual ensemble
-prediction equivalence and timings. This benchmark fingerprints inputs, reference
-source/weights and implementation files, verifies exact sampling/export and
-matching/diagnostic parity, and reports all timing repetitions. Sampler data are
-synthetic; supplied scored matching pools can be real. Inference timing excludes
-initial loading and device staging after warming both paths. CPU/MPS tests cover
-alignment and ordinary/merged neural ensembles; CUDA tests run when available.
+Supply all rounds needed for a feasible matching pool. Add
+`--affinity-predictor /path/to/models.combined` to compare actual numeric/string
+predictions and timings. Outputs record input and source hashes, runtime versions,
+all timing repetitions and parity checks. Sampling inputs are synthetic; supplied
+scored pools can be real. Inference timings exclude loading and initial staging.
 
-The initial grouped prototype did not improve whole-matcher runtime. Profiling
-identified redundant peptide-string sorting in overlap checks, in addition to
-per-group work. Both were replaced with packed numeric indices. The saved real
-389,641-row A3303 pool then matched in median 0.509 seconds versus 1.906 seconds
-for the frozen reference (five repetitions; 3.74x), with identical 5,790 output
-rows and diagnostics. These are component timings, not a measured full-pipeline
-or A100 throughput gain. Keep the unsuccessful initial benchmark as well.
+`--baseline-matching-source /path/to/processing_matching.py` compares two
+implementations of the **same matching policy** and requires exact assignment and
+diagnostic equality. A nearest-neighbor matcher that reuses negatives is not an
+appropriate parity baseline for the current without-replacement policy.
 
-A later shared-machine rerun reversed the timing result: 22.35 s vectorized
-versus 14.34 s baseline (0.64x), still with exact parity. Both implementations
-were much slower than before, and separate timing blocks could be biased by
-changing load. Thus 3.74x is an observed initial result, not an established
-speedup for the final implementation. The benchmark now alternates comparison
-order and records CPU time as well as wall time; retain both favorable and
-unfavorable runs and measure throughput on the target machine before deployment.
-
-The alternating-order final-source check (four repetitions) measured median
-0.744 s vectorized versus 2.239 s scalar (3.01x); median process CPU time was
-0.518 s versus 1.657 s. Every paired repetition favored the vectorized matcher,
-and assignments/diagnostics were exact. This supports a component gain despite
-the shared-host variability, not a full-pipeline or A100 throughput claim.
-
-Actual public 2.2 pan-allele weights (ten networks, fingerprint
-`82e5950e9570e88f76ea9f42893bbc1f4eee0895ef952db70dedf1fdb0ae7898`)
-produced exactly equal numeric/string predictions for 1,000 synthetic peptides
-at HLA-A*02:01 on CPU. Median warmed inference was 0.680 s numeric and 0.673 s
-string across three repetitions: no CPU inference speedup. Numeric representation
-defers export cost and enables device gathering; it does not eliminate the cost
-of saving sequence strings. These timings were taken on a shared development
-machine while regression checks were running.
+Component timings do not establish an end-to-end preparation speedup or a gain
+in trained-model accuracy. The tests separately cover pipeline backpressure and
+errors, resume integrity, matching invariants, and numeric/string prediction parity.

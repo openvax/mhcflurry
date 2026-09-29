@@ -11,7 +11,7 @@
 # limitations under the License.
 
 """
-Make training data by selecting decoys, etc.
+Build historical evaluation tables with observed peptides and sampled decoys.
 """
 import sys
 import argparse

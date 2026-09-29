@@ -13,7 +13,7 @@
 """
 Scan proteins for peptide presentation using a CSV, FASTA or --sequences.
 
-With --alleles, return peptides with affinity percentile ranks below 2.0 by
+With --alleles, return peptides with affinity percentile ranks at most 2.0 by
 default. Use --results-all for every peptide or --threshold-* to change the
 filters. Without --alleles, predict processing only. Results go to stdout
 unless --out is given.
@@ -99,23 +99,24 @@ results_args.add_argument(
     "--results-all",
     action="store_true",
     default=False,
-    help="Return results for all peptides regardless of affinity, etc.")
+    help="Disable the default affinity-percentile filter. Explicit thresholds still apply.")
 results_args.add_argument(
     "--threshold-presentation-score",
     type=float,
-    help=f"Threshold if filtering by presentation score. Default: > {default_thresholds['presentation_score']}")
+    help="Keep presentation scores >= this value. No default filter on this score.")
 results_args.add_argument(
     "--threshold-processing-score",
     type=float,
-    help=f"Threshold if filtering by processing score. Default: > {default_thresholds['processing_score']}")
+    help="Keep processing scores >= this value. No default filter on this score.")
 results_args.add_argument(
     "--threshold-affinity",
     type=float,
-    help=f"Threshold if filtering by affinity. Default: < {default_thresholds['affinity']}")
+    help="Keep predicted affinities <= this value in nM. No default filter on nM affinity.")
 results_args.add_argument(
     "--threshold-affinity-percentile",
     type=float,
-    help=f"Threshold if filtering by affinity percentile. Default: < {default_thresholds['affinity_percentile']}")
+    help=f"Keep affinity percentiles <= this value. Defaults to {default_thresholds['affinity_percentile']} "
+         "when no thresholds or --results-all are supplied.")
 
 
 output_args = parser.add_argument_group(title="Output options")
@@ -283,7 +284,7 @@ def run(argv=sys.argv[1:]):
     ]
     if not args.results_all and all(x is None for x in threshold_args):
         print(
-            "Filtering by affinity-percentile < %s" % default_thresholds["affinity_percentile"],
+            "Filtering by affinity-percentile <= %s" % default_thresholds["affinity_percentile"],
             file=sys.stderr)
         print(
             "to show all predictions, pass --results-all",

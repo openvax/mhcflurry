@@ -16,10 +16,9 @@ Tight torch-baseline regression guard.
 Unlike the master (Keras/TF) compatibility fixtures — which compare against a
 pre-migration baseline at a loose 1% tolerance that absorbs the TF->torch
 framework switch — this test freezes the predictions of the *released* models as
-computed by the current torch code and asserts an exact (1e-6) match on CPU. Any
+computed by the current torch code and asserts agreement within 1e-6 on CPU. Any
 future change (encoding, loading, a refactor) that perturbs a prediction fails
-loudly here. It also covers the standalone processing predictor, which has no
-other prediction-baseline test.
+loudly here. It also covers the standalone processing predictor.
 
 Regenerate ``test/data/torch_baseline_predictions.json`` only deliberately, when
 a numerics change is intended and reviewed.

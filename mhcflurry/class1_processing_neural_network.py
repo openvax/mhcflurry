@@ -911,7 +911,7 @@ class Class1ProcessingNeuralNetwork(object):
     @staticmethod
     def _regularized_parameters(network):
         """
-        Parameters subject to master-branch convolution kernel regularization.
+        Parameters subject to convolution kernel regularization.
         """
         for name, param in network.named_parameters():
             if not param.requires_grad or not name.endswith("weight"):
@@ -984,7 +984,7 @@ class Class1ProcessingNeuralNetwork(object):
             stopping-validation mask. AP selects the earliest best-ranking
             epoch; early-stopping patience remains based on validation loss.
         shuffle_permutation : list of int
-            Permutation (integer list) of same length as peptides and affinities
+            Permutation of row indices, with the same length as targets.
             If None, then a random permutation will be generated.
         verbose : int
             Verbosity level
@@ -1001,9 +1001,8 @@ class Class1ProcessingNeuralNetwork(object):
             stochastic step downstream flows from this one value: weight
             initialization, the initial example shuffle, and the per-epoch
             training-batch shuffle. When None (the default) the RNGs are
-            left as the worker configured them (entropy-seeded), so
-            training stays stochastic and decorrelated across workers, as
-            it always has been. Mirrors
+            left unchanged. The caller or worker initializer is responsible
+            for setting independent RNG states. Mirrors
             :meth:`mhcflurry.class1_neural_network.Class1NeuralNetwork.fit`'s
             ``seed`` so one value can drive both trainers.
         """
@@ -1400,7 +1399,7 @@ class Class1ProcessingNeuralNetwork(object):
             print("Output weights", self.network().output_layer.weight.data.cpu().numpy())
 
     def _create_optimizer(self, network):
-        """Create an optimizer with the historical Keras update equations."""
+        """Create the configured optimizer using Keras or PyTorch equations."""
         optimizer_name = self.hyperparameters["optimizer"].lower()
         implementation = self.hyperparameters["optimizer_implementation"].lower()
         if implementation not in ("keras", "pytorch"):
@@ -1474,8 +1473,8 @@ class Class1ProcessingNeuralNetwork(object):
             Upstream sequence before each peptide
         c_flanks : list of string
             Downstream sequence after each peptide
-        batch_size : int
-            Prediction batch size.
+        batch_size : int or "auto"
+            Prediction batch size, automatically sized by default.
 
         Returns
         -------

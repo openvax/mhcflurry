@@ -37,6 +37,19 @@ $ python -m pytest -q test/test_train_pan_allele_models_command.py::test_pretrai
 
 ## Full verification
 
+CI pins download catalogue `2.2.0` for historical model/data regression fixtures.
+Prepare the same fixtures before running the full suite locally:
+
+```shell
+export MHCFLURRY_DOWNLOADS_CURRENT_RELEASE=2.2.0
+mhcflurry downloads fetch data_curated data_mass_spec_annotated models_class1 \
+    models_class1_presentation models_class1_processing models_class1_pan allele_sequences
+```
+
+Use a dedicated test shell, or unset the variable afterward to return ordinary
+prediction to the default weights. The 2.3.0 prediction documentation is also
+checked separately against the current presentation bundle.
+
 Before calling a release-branch change complete, run:
 
 ```shell
@@ -52,6 +65,10 @@ $ python -m pytest -q test --durations=25 --durations-min=0.5
 
 On macOS, prefer `python -m pytest` over the generated `pytest` console script
 so PyTorch can see MPS accelerators.
+
+Tests default to CPU; accelerator-specific cases opt in explicitly. Set
+`MHCFLURRY_TEST_ACCELERATORS=mps` (or `gpu` for CUDA) to require that coverage
+instead of skipping it when the device is unavailable.
 
 ## What the full suite covers
 

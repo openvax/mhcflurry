@@ -1,78 +1,45 @@
-# Probabilistic processing matching without replacement
+# Processing negative matching
 
-## Scope and contract
+The maintained processing-data workflow uses seeded random matching without
+replacement (`sample-length-affinity-random-without-replacement-v2`). A negative
+peptide can be selected only once within a sample, including when the same sequence
+maps to multiple proteins. It may be used in another sample with a different MHC.
 
-Replace nearest-neighbor reuse with seeded random matching for newly generated
-processing training and evaluation cohorts. A negative peptide may be selected
-only once within a sample, even when it maps to multiple proteins. The same
-sequence can be used in a different sample, where its allele context differs.
-Keep all hits, sample and peptide-length matching, the hard log10-affinity
-caliper (at most 0.25), and preference for eligible same-protein negatives.
+## Matching contract
 
-Draw uniformly among available eligible negatives in the preferred pool,
-then the remaining sample/length pool. Randomize assignment order using a
-recorded seed. Repair competing assignments through augmenting paths so a
-greedy early draw cannot make a feasible pool appear insufficient. This is
-randomized sequential matching, not a claim of uniform sampling over all
-possible complete matchings. If no complete assignment exists, preserve the
-failure evidence and expand the scored pool through the existing preparation
-workflow; never reuse a negative or widen the caliper to finish.
+Hits and negatives share a sample and peptide length. The absolute difference in
+predicted log10 affinity must not exceed the configured caliper (at most 0.25).
+Eligible negatives from the same source protein are preferred. Matching draws
+uniformly from the currently available eligible preferred pool, then from the
+remaining sample/length pool, with a seeded random assignment order.
 
-Version the matching policy and record the seed, replacement rule, and
-uniqueness diagnostics. Reject old matched caches for new training/resumption
-instead of relabeling them. Existing v2 experiments retain their pinned source,
-assignments, and results. New evaluation cohorts need the new policy too;
-comparators must share saved assignments.
+Augmenting paths repair competing assignments so an early draw cannot make a
+feasible pool appear insufficient. This is randomized sequential matching;
+it does not sample uniformly from all possible complete matchings. If no complete
+assignment exists, preparation saves the failure and expands the scored pool.
+It never reuses negatives, widens the caliper, or drops hits to finish.
+
+Saved metadata identifies the affinity reference, policy, seed, caliper and ratio.
+Resume validates these inputs and rejects assignments from another policy. See
+{doc}`processing_preparation_acceleration` for artifacts and execution.
+
+## Interpretation and evaluation
+
+The original [MHCflurry processing model](https://doi.org/10.1016/j.cels.2020.06.010)
+used strong-binder filtering. Affinity matching instead controls predicted binding
+more locally. Neither procedure guarantees removal of every binding-associated
+signal, nor turns presentation labels into direct measurements of processing.
+
+Training defaults to one matched negative per hit. Processing-specific evaluation
+can use the same matcher at another ratio. The public release presentation
+benchmark has its own frozen negative cohort; this matcher does not redefine it.
+Every comparator in a comparison must receive identical saved rows and labels.
+AP values from different negative policies or ratios are not directly comparable.
 
 ## Validation
 
-- Regression: competing hits cannot reuse a negative, including duplicate
-  source rows/protein mappings; reuse remains legal across samples.
-- Reproducibility and randomness: repeat a seed exactly, vary assignments
-  across seeds, and retain assignments when processing samples separately.
-- Feasibility: test adversarial greedy traps and compare small random graphs
-  with an independent maximum-matching implementation.
-- Invariants: ratios, labels, sample/length, affinity boundaries, and saved
-  metadata/cache checks. Exercise adaptive pool expansion and resumption.
-- Real-data replay: compare old and new assignments from saved scored pools;
-  report uniqueness, calipers, distributions, completion, and runtime. Keep
-  frozen held-out model metrics descriptive; the sampler alone does not
-  establish improved trained-model accuracy.
-- Run Ruff, focused tests, and the full test suite before proposing the PR.
-
-## Presentation features to evaluate separately
-
-Start with categorical peptide length and interactions of length with affinity
-and processing. Test a clipped log-odds transform of the processing probability
-(a representation change, not additional information). A later model can add
-allele-dependent length preferences or multiple per-allele binding scores;
-expression/protein abundance should be an optional sample-aware extension.
-Use training/validation samples for feature selection, regularize the small
-combiner, and preserve the final holdout. No presentation feature or released
-prediction changes are part of the matching fix.
-
-The original MHCflurry processing model uses strong-binder filtering:
-https://pubmed.ncbi.nlm.nih.gov/32711842/. Allele-specific length preferences
-are modeled in NetMHCpan 4.0: https://pmc.ncbi.nlm.nih.gov/articles/PMC5679736/.
-HLAthena integrates transcript abundance and processing:
-https://www.nature.com/articles/s41587-019-0322-9.
-
-## Initial real-data verification (2026-09-16)
-
-Replay of the saved initial scored pools from v2-2020:
-
-| Sample | Hits | Old distinct negatives | Old maximum reuse | Additional assignments needed without replacement |
-| --- | ---: | ---: | ---: | ---: |
-| KESKIN_B1510 | 1,624 | 440 | 152 | 849 |
-| KESKIN_B4901 | 4,037 | 1,913 | 49 | 614 |
-| KESKIN_C0401 | 2,075 | 704 | 148 | 754 |
-
-The new matcher correctly refuses these insufficient pools, preserving all
-hits for adaptive expansion. The exact interval-based capacity check takes
-0.15–0.51 seconds per pool on the local machine. On seeded 100-hit subsets
-of the same pools (all candidate negatives retained), all three produce
-exactly 100 distinct negatives and satisfy the caliper, in 0.14–0.33 seconds.
-Those subsets test the algorithm, not trained-model accuracy. Full-size data
-preparation will need more candidates; no improved model accuracy is claimed.
-Artifacts: `output/probabilistic-matching-20260916/real-data-replay.json` and
-`real-pool-capacity-smoke.json`, including input hashes and diagnostics.
+Regression tests cover uniqueness within samples, reuse across samples, seeded
+reproducibility, caliper boundaries, matching feasibility against independent
+small-graph solutions, metadata validation and adaptive expansion. These checks
+establish the sampler's contract, not improved trained-model accuracy. Changes to
+the training policy require separate held-out component and full-model evaluation.

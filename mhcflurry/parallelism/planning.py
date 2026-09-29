@@ -449,10 +449,8 @@ def auto_dataloader_num_workers(
        ~``_AUTO_DATALOADER_RAM_BASELINE_PER_FIT_GB`` (=2.0) GB.
        ``ram_cap = max(0, (ram_per_fit_gb - 2.0) / 0.5)``.
     5. **Throughput cap**: ``min(cpu_cap, ram_cap, hard_cap)``.
-    6. **Floor**: 0 only when ``cpu_cap == 0`` (i.e. fewer cores than
-       fit-workers — rare, only on tight clusters). Otherwise the floor
-       is 1 because in-process batching on a multi-GPU box almost always
-       starves the GPU.
+    6. **Floor**: return 0 when any CPU, RAM or explicit hard cap is 0.
+       Otherwise the minimum is 1.
 
     **Edge cases**
 
@@ -599,7 +597,7 @@ def auto_random_negative_pool_epochs(
         ``get_total_count()``). The size of one pool-epoch in the cycle.
     peptide_max_length : int
         Longest peptide the encoding allocates space for. With
-        BLOSUM62 + ``peptide_amino_acid_encoding_torch=True`` the
+        the fixed-vector encoding lookup, the
         per-peptide footprint is ``peptide_max_length`` int8 bytes.
     num_workers : int
         Total fit() worker processes that will share the box. Each holds
@@ -621,6 +619,9 @@ def auto_random_negative_pool_epochs(
     hard_cap : int, optional
         Maximum pool epochs. Default 10 (expert-overridable); larger pools
         add startup/memory cost after generation overhead is already amortized.
+
+    base_worker_gb : float, optional
+        Baseline host memory per fit worker, subtracted before sizing pools.
 
     Notes
     -----
@@ -1322,15 +1323,9 @@ def apply_random_negative_pool_epochs_to_work_items(
 def apply_dataloader_num_workers_to_work_items(work_items, num_workers, *, log=None):
     """Inject ``dataloader_num_workers`` into every work item's hyperparameters.
 
-    Generic across train_*_command modules. Affinity commands (pan-allele
-    + allele-specific) build per-work-item hyperparameter dicts that are
-    passed to ``Class1NeuralNetwork``; the resolver writes the integer
-    chosen at orchestrator startup into each. Processing models do not yet
-    consume ``dataloader_num_workers`` (their fit() loop has its own
-    DataLoader plumbing without this hyperparameter); calling this on
-    processing work items is a no-op write — the field is set but
-    ``Class1ProcessingNeuralNetwork`` ignores it. When processing's fit()
-    grows the same prefetch hyperparameter, no change is needed here.
+    Writes the resolved value into affinity work-item hyperparameters. It is
+    consumed by streaming pretraining; in-memory affinity fitting ignores it.
+    Processing models do not use this affinity DataLoader hyperparameter.
 
     Parameters
     ----------

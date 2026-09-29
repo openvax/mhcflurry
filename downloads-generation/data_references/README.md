@@ -1,7 +1,6 @@
-# data_mass_spec_annotated
+# Reference data (historical generator)
 
-On OS X, if you encounter problem installing shellinford, try this:
-
-```
-CXXFLAGS="-stdlib=libc++" CPPFLAGS="-stdlib=libc++" pip install shellinford
-```
+This directory contains the recipe for historical reference-protein archives.
+Prediction users can install the published bundle with
+`mhcflurry downloads fetch data_references`. Inspect its source URLs and snapshot
+with `mhcflurry downloads info data_references`.

@@ -89,7 +89,8 @@ class EncodableSequences(object):
         Parameters
         ----------
         alignment_method : string
-            One of "pad_middle" or "left_pad_right_pad"
+            One of "pad_middle", "left_pad_right_pad",
+            "left_pad_centered_right_pad", "left_pad", or "right_pad"
         left_edge : int, size of fixed-position left side
             Only relevant for pad_middle alignment method
         right_edge : int, size of the fixed-position right side
@@ -106,8 +107,9 @@ class EncodableSequences(object):
         -------
         numpy.array of integers with shape (num sequences, encoded length)
 
-        For pad_middle, the encoded length is max_length. For left_pad_right_pad,
-        it's 3 * max_length.
+        For pad_middle, left_pad and right_pad, the encoded length is max_length.
+        For left_pad_right_pad it is 2 * max_length; for
+        left_pad_centered_right_pad it is 3 * max_length.
         """
 
         cache_key = (
@@ -166,7 +168,8 @@ class EncodableSequences(object):
             suffix to a component to scale its non-X values to [-1, 1],
             for example "PMBEC:minmax+contact:minmax".
         alignment_method : string
-            One of "pad_middle" or "left_pad_right_pad"
+            One of "pad_middle", "left_pad_right_pad",
+            "left_pad_centered_right_pad", "left_pad", or "right_pad"
         left_edge : int
             Size of fixed-position left side.
             Only relevant for pad_middle alignment method
@@ -189,7 +192,8 @@ class EncodableSequences(object):
         where
             - m is the vector encoding length (usually 21).
             - encoded length is max_length if alignment_method is pad_middle;
-              3 * max_length if it's left_pad_right_pad.
+              2 * max_length for left_pad_right_pad and 3 * max_length
+              for left_pad_centered_right_pad; left_pad/right_pad use max_length.
         """
         cache_key = (
             "fixed_length_vector_encoding",
@@ -271,7 +275,8 @@ class EncodableSequences(object):
         ----------
         sequences : list of string
         alignment_method : string
-            One of "pad_middle" or "left_pad_right_pad"
+            One of "pad_middle", "left_pad_right_pad",
+            "left_pad_centered_right_pad", "left_pad", or "right_pad"
         left_edge : int
             Size of fixed-position left side.
             Only relevant for pad_middle alignment method

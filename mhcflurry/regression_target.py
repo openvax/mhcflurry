@@ -20,6 +20,9 @@ def from_ic50(ic50, max_ic50=50000.0):
     Parameters
     ----------
     ic50 : numpy.array of float
+        Affinities in nM; values outside [1, max_ic50] saturate the target.
+    max_ic50 : float, default 50000.0
+        Upper affinity scale in nM (must be greater than 1).
 
     Returns
     -------
@@ -35,11 +38,13 @@ def from_ic50(ic50, max_ic50=50000.0):
 def to_ic50(x, max_ic50=50000.0):
     """
     Convert regression targets in the range [0.0, 1.0] to ic50s in the range
-    [0, 50000.0].
+    [1, max_ic50] nM. Values outside [0, 1] are not clipped.
 
     Parameters
     ----------
     x : numpy.array of float
+    max_ic50 : float, default 50000.0
+        Upper affinity scale in nM (must be greater than 1).
 
     Returns
     -------

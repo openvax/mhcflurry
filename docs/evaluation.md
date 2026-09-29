@@ -198,7 +198,7 @@ distributed in `data_evaluation`. It runs no predictor:
 mhcflurry eval presentation-external-predictors \
     --comparison-dir results/new_run/eval_comparison \
     --data-dir "$(mhcflurry-downloads path data_evaluation)" \
-    --cohort multiallelic \
+    --cohort multiallelic --coverage common \
     --a-label "MHCflurry 2.3.0" --b-label "MHCflurry 2.2" \
     --out results/new_run/external_comparison
 ```
@@ -207,14 +207,15 @@ Rows join by benchmark source file and row identity, with MHC allele sets
 canonicalized as compare-models saves them; any unmatched row fails the command.
 `data_evaluation` ships NetMHCpan 4.0 BA/EL and MixMHCpred columns. Pass
 `--external-dir` once per directory of locally generated scores, such as
-NetMHCpan 4.2, whose files may be plain CSV. Read any NetMHCpan 4.1 or 4.2
-result as an optimistic bound: both postdate this holdout's 2019 source study
-and are not train-excluded against it, unlike NetMHCpan 4.0. `multiallelic` uses the saved presentation scores with
+NetMHCpan 4.1/4.2, whose files may be plain CSV. External training overlap
+is not certified: a tool version or release date alone does not prove that
+these evaluation samples were excluded from its training. `multiallelic` uses the saved presentation scores with
 and without flanks; `monoallelic` uses saved affinity predictions (pass
 `--skip-joined-table` for that large cohort). Metrics use the compare-models
-definitions. Each predictor is scored on the rows it covers and each paired
-comparison on rows both predictors score, so MHCflurry-only comparisons match
-compare-models exactly; `coverage.csv` counts unscored rows. Paired intervals resample whole samples (10000 draws, seed 42 by
+definitions. With `--coverage common`, all requested predictors use the same
+rows. In the default diagnostic `available` mode, each predictor uses its
+covered rows and each pair uses their intersection. `coverage.csv` records
+unscored rows and exclusions. Paired intervals resample whole samples (10000 draws, seed 42 by
 default) and are exploratory. Two reference baselines are
 included by default: seeded random scores, and a logistic regression on the
 one-hot first and last four residues with no MHC or flank input, fitted

@@ -1891,6 +1891,8 @@ class Class1NeuralNetwork(object):
         instance_hyperparameters : dict, optional
             Hyperparameters from the Class1NeuralNetwork instance.
             These take precedence for things like peptide_encoding.
+        network_weights : list of numpy.ndarray, optional
+            Saved weights used to infer the placeholder allele representation.
         """
         keras_metadata = None
 
@@ -2007,6 +2009,8 @@ class Class1NeuralNetwork(object):
             Configuration dictionary with 'merged_networks' key
         instance_hyperparameters : dict, optional
             Hyperparameters from the Class1NeuralNetwork instance.
+        network_weights : list of numpy.ndarray, optional
+            Saved weights used to infer the placeholder allele representation.
         """
         merged_configs = config['merged_networks']
         merge_method = config.get('merge_method', 'average')
@@ -2559,7 +2563,7 @@ class Class1NeuralNetwork(object):
     @staticmethod
     def _regularized_parameters(network):
         """
-        Parameters subject to master-branch dense kernel regularization.
+        Parameters subject to dense kernel regularization.
         """
         for name, param in network.named_parameters():
             if not param.requires_grad or not name.endswith("weight"):
@@ -3172,7 +3176,7 @@ class Class1NeuralNetwork(object):
         )
 
     def _create_optimizer(self, network):
-        """Create an optimizer with the historical Keras update equations."""
+        """Create the configured optimizer using Keras or PyTorch equations."""
         optimizer_name = self.hyperparameters["optimizer"].lower()
         implementation = self.hyperparameters["optimizer_implementation"].lower()
         if implementation not in ("keras", "pytorch"):
@@ -3250,7 +3254,7 @@ class Class1NeuralNetwork(object):
         ----------
         peptides : EncodableSequences or list of string
         affinities : list of float
-            nM affinities. Must be same length of as peptides.
+            nM affinities. Must have the same length as peptides.
         allele_encoding : AlleleEncoding
             If not specified, the model will be a single-allele predictor.
         inequalities : list of string, each element one of ">", "<", or "=".
@@ -3269,22 +3273,15 @@ class Class1NeuralNetwork(object):
             data-dependent weight initialization, the initial
             example shuffle, the per-epoch training-batch shuffle, and
             random-negative sampling. When None (the default) the RNGs are
-            left as the worker configured them (entropy-seeded), so
-            training stays stochastic and decorrelated across workers, as
-            it always has been.
+            left unchanged. The caller or worker initializer is responsible
+            for setting independent RNG states.
 
-            Reproducibility caveats: a fixed ``seed`` reproduces a run
-            bit-for-bit only at a *fixed effective minibatch size*. fit()
-            may shrink the minibatch to fit available VRAM (see
-            ``check_training_batch_fits`` below), and that shrink depends on
-            free GPU memory and how many workers share the card — so the
-            same seed on a busier or smaller GPU can diverge. A warning is
-            logged whenever the shrink fires under a non-None seed. On CUDA,
-            determinism additionally assumes the default (Linear/RMSprop)
-            architecture: opting into ``MHCFLURRY_MATMUL_PRECISION`` enables
-            ``cudnn.benchmark`` autotuning, and convolutional
-            ``locally_connected_layers`` variants are not guaranteed
-            bit-identical run-to-run. CPU runs are fully deterministic.
+            A seed does not guarantee identical weights across hardware,
+            dependency versions or numerical settings. Automatic minibatch
+            reduction can also change a trajectory; release workflows reject
+            that reduction. Preserve the effective batch, source, dependencies,
+            device and precision settings alongside the seed. See PyTorch's
+            reproducibility notes for backend-specific determinism controls.
         save_all_checkpoints : bool
             Retain both terminal and minimum-validation weights from this fit.
             This does not change the primary state selected by the

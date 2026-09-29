@@ -157,7 +157,7 @@ add_cluster_parallelism_args(parser)
 
 def assign_folds(df, num_folds, held_out_samples, seed=None):
     """
-    Split training data into mulitple test/train pairs, which we refer to as
+    Split training data into multiple test/train pairs, which we refer to as
     folds. Note that a given data point may be assigned to multiple test or
     train sets; these folds are NOT a non-overlapping partition as used in cross
     validation.
@@ -176,7 +176,7 @@ def assign_folds(df, num_folds, held_out_samples, seed=None):
         Master seed. When given, numpy's global RNG (which the per-fold
         ``.sample()`` call below draws from) is seeded up front, so
         held-out-sample membership is reproducible. When None, fold
-        assignment is left entropy-random as before.
+        assignment is left in the current NumPy RNG state.
 
     Returns
     -------
@@ -619,9 +619,8 @@ def _run_compile_warmup(hyperparameters, fold_num, constant_data):
     """One forward+backward through a freshly-built processing network.
 
     Companion to ``mhcflurry.cli.train_pan_allele_models_command._run_compile_warmup``.
-    Used by ``run_single_worker_torch_compile_warmup`` to populate the
-    torch.compile on-disk cache once per unique architecture before the
-    production worker pool launches. Discards the resulting model.
+    Retained for explicit ``compile_warmup_only`` calls. Normal training uses
+    the full-residency resource probe instead. Discards the resulting model.
     """
     from mhcflurry.flanking_encoding import FlankingEncoding
 

@@ -13,11 +13,9 @@
 """Shared PyTorch training helpers used by multiple mhcflurry trainers.
 
 These helpers are model-agnostic: they assume only that the caller has a
-``torch.nn.Module`` network and a ``torch.device``. The pure-helper subset
-extracted here is the foundation for unifying perf-critical paths
-(async H2D, prefetcher, batched validation) between
-``Class1NeuralNetwork`` (affinity) and ``Class1ProcessingNeuralNetwork``
-in follow-up changes.
+``torch.nn.Module`` network and a ``torch.device``. They provide checkpoint copying, numerical settings, compilation and
+validation sizing for ``Class1NeuralNetwork`` (affinity) and
+``Class1ProcessingNeuralNetwork``.
 
 Anything that touches affinity-specific machinery (random-negative
 resampling, multi-output / inequality losses, allele encoding,
@@ -43,47 +41,18 @@ def copy_module_state_dict_to_cpu(module):
 
 
 def configure_matmul_precision(device):
-    """Optionally enable TF32 + cuDNN benchmark on CUDA Ampere+.
+    """Apply an explicitly requested CUDA matmul precision and cuDNN autotuning.
 
-    Both are runtime settings with no JIT/startup overhead, but TF32 changes
-    CUDA matmul numerics. Leave PyTorch's default behavior untouched unless
-    the caller explicitly opts in with ``MHCFLURRY_MATMUL_PRECISION``.
+    ``MHCFLURRY_MATMUL_PRECISION`` accepts ``highest``, ``high`` or ``medium``.
+    When unset, this helper leaves PyTorch settings unchanged. CPU and MPS
+    calls are no-ops. On CUDA it sets float32 matmul precision and enables
+    cuDNN benchmarking when cuDNN is available. ``highest`` retains full
+    float32 matmul precision; the other modes may use reduced-precision
+    internal operations on supported hardware.
 
-    **TF32 (``torch.set_float32_matmul_precision``)** — changes matmul
-    kernel selection. On Ampere+ (A100/H100/L40S/...) it can be ~2×
-    faster for matmul-heavy paths, with fp32 accumulation preserved but
-    input-mantissa truncation.
-
-    **cuDNN benchmark** — tells cuDNN to search for the fastest
-    algorithm for each (shape, dtype, stride) tuple on first call and
-    cache the result. Useful when input shapes are stable across
-    iterations (our fit-generator + fit paths guarantee this via
-    drop_last + fixed-size pretrain chunks). One-time cost of
-    benchmarking on the first forward pass (~1-2 s), then every
-    subsequent call hits the cached best algorithm. mhcflurry's MLP
-    doesn't use Conv layers in the default architecture, so the gain
-    is modest here — but it's free and lets convolutional variants
-    (if ever configured via ``locally_connected_layers``) benefit.
-
-    Backend interactions:
-    - CUDA Ampere+: TF32 enabled + cudnn.benchmark on.
-    - CUDA pre-Ampere (V100/T4): TF32 is no-op; cudnn.benchmark still helps.
-    - CPU: both are no-ops.
-    - MPS: both are no-ops.
-
-    Opt in via ``MHCFLURRY_MATMUL_PRECISION={highest,high,medium}``.
-    ``highest`` keeps full fp32 precision while still enabling
-    ``cudnn.benchmark``.
-
-    Determinism note: ``cudnn.benchmark`` autotunes per shape and can
-    select different algorithms run-to-run, so enabling this opt-in
-    weakens the seeded-fit bit-for-bit guarantee for any workload that
-    actually triggers cuDNN kernels (e.g. convolutional
-    ``locally_connected_layers`` variants). The default Linear/RMSprop MLP
-    triggers no cuDNN kernels, so it stays deterministic either way; CPU
-    runs are unaffected. We deliberately do not call
-    ``torch.use_deterministic_algorithms(True)`` here because some ops lack
-    deterministic CUDA kernels and would raise.
+    cuDNN benchmarking chooses algorithms for observed input shapes and can
+    add initial search time or affect reproducibility. This helper does not
+    enable deterministic algorithms or guarantee identical seeded results.
     """
     if device.type != "cuda":
         return

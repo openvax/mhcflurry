@@ -63,7 +63,7 @@ def run(args=None):
     parser.add_argument("--scored-pool", action="append", default=[],
                         help="Saved real scored pool(s) to concatenate for matching parity.")
     parser.add_argument("--baseline-matching-source",
-                        help="Frozen historical processing_matching.py for exact baseline replay.")
+                        help="Frozen processing_matching.py implementing the same policy for exact parity checks.")
     parser.add_argument("--affinity-predictor", help="Optional actual weights for numeric/string prediction parity.")
     parser.add_argument("--allele", default="HLA-A*02:01")
     parsed = parser.parse_args(args)

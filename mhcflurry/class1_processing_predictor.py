@@ -289,8 +289,8 @@ class Class1ProcessingPredictor(object):
             If True, a ValueError will be raised in the case of unsupported
             peptides. If False, a warning will be logged and the predictions
             for those peptides will be NaN.
-        batch_size : int
-            Prediction batch size.
+        batch_size : int or "auto"
+            Prediction batch size, automatically sized by default.
 
         Returns
         -------
@@ -348,7 +348,7 @@ class Class1ProcessingPredictor(object):
         Parameters
         ----------
         sequences : FlankingEncoding
-        batch_size : int
+        batch_size : int or "auto"
         throw : boolean
 
         Returns

@@ -449,17 +449,19 @@ def _model_versions(name, releases):
 
 def _print_downloads(records):
     primary = [record for record in records if record['group'] == 'Prediction models']
+    primary.sort(key=lambda record: record['name'] != 'models_class1_presentation')
     historical = [record for record in records if record['group'] != 'Prediction models']
     if primary:
         _heading('Prediction models — latest weights and available versions')
+        if primary[0]['name'] == 'models_class1_presentation':
+            print('Recommended: models_class1_presentation (includes affinity and processing).')
+            print()
         releases = {}
         rows = [(record['name'] + (' (affinity)' if record['name'] == 'models_class1_pan' else ''),
                  *_model_versions(record['name'], releases))
                 for record in primary]
         _print_table(('MODEL', 'LATEST', 'OTHER VERSIONS', 'INSTALLED'), rows,
                      colors={1: '36', 3: _status_color}, wrap_columns=(2, 3))
-        if any(record['name'] == 'models_class1_presentation' for record in primary):
-            print('The presentation bundle includes its own affinity and processing models.')
         print("Shared archive aliases are grouped under one version; 'releases NAME' lists all.")
         if any('?' in row[3] or '!' in row[3] for row in rows):
             print('Installed: ? unknown source; ! recorded source differs from that catalogue.')

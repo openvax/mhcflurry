@@ -140,10 +140,10 @@ class MSEWithInequalities(Loss):
     Supports training a regression model on data that includes inequalities
     (e.g. x < 100). Mean square error is used as the loss for elements with
     an (=) inequality. For elements with e.g. a (> 0.5) inequality, then the loss
-    for that element is (y - 0.5)^2 (standard MSE) if y < 500 and 0 otherwise.
+    for that element is (y - 0.5)^2 (standard MSE) if y < 0.5 and 0 otherwise.
 
     This loss assumes that the normal range for y_true and y_pred is 0 - 1. As a
-    hack, the implementation uses other intervals for y_pred to encode the
+    hack, the implementation uses other intervals for y_true to encode the
     inequality information.
 
     y_true is interpreted as follows:
@@ -190,7 +190,7 @@ class MSEWithInequalitiesAndMultipleOutputs(Loss):
     Loss supporting inequalities and multiple outputs.
 
     This loss assumes that the normal range for y_true and y_pred is 0 - 1. As a
-    hack, the implementation uses other intervals for y_pred to encode the
+    hack, the implementation uses other intervals for y_true to encode the
     inequality and output-index information.
 
     Inequalities are encoded into the regression target as in

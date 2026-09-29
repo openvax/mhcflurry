@@ -314,10 +314,12 @@ def model_select(
     Parameters
     ----------
     fold_num : int
-    models : list of Class1NeuralNetwork
+    models : list of Class1ProcessingNeuralNetwork
     min_models : int
     max_models : int
     constant_data : dict
+    save_validation_predictions : bool
+        Include per-model validation predictions in the result.
 
     Returns
     -------

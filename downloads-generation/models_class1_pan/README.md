@@ -1,9 +1,9 @@
-# Class I pan-allele models (ensemble)
+# Class I pan-allele affinity models (historical generator)
 
-This download contains trained MHC Class I MHCflurry models before model selection.
+This recipe produces candidate and selected affinity ensembles. The public
+`models_class1_pan` download contains selected models; `models_class1_pan_unselected`
+is a separate historical candidate bundle. Neither is the full presentation bundle.
 
-To generate this download run:
-
-```
-./GENERATE.sh
-```
+The maintained training workflow is documented in
+[scripts/training/README.md](../../scripts/training/README.md). The `GENERATE.sh`
+here records the historical recipe and does not describe the current weights.

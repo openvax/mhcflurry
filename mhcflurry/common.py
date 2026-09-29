@@ -95,8 +95,9 @@ def fraction_arg(value):
 def add_random_seed_arg(parser):
     """Add the standard ``--random-seed`` argument to a CLI parser.
 
-    Every mhcflurry command that involves randomness exposes this flag so a
-    single value reproduces the whole run. Pair with :func:`configure_random_seed`
+    Training commands use this flag to record a shared source of random seeds.
+    It does not guarantee identical results across devices or library versions.
+    Pair with :func:`configure_random_seed`
     at the start of the command's ``run``/``main``.
     """
     parser.add_argument(
@@ -337,7 +338,7 @@ def normalize_sequence_resolved_allele_name(raw_name):
 
 
 def normalize_class1_genotype(value):
-    """Canonicalize a whitespace-delimited class-I genotype into a tuple."""
+    """Canonicalize whitespace-delimited class-I MHC alleles into a tuple."""
     if not isinstance(value, str) or not value.strip():
         raise ValueError(
             "Expected a non-empty whitespace-delimited class-I genotype; "
@@ -357,7 +358,7 @@ def allele_locus_name(
     """Return a class-I MHC locus label using mhcgnomes parsing.
 
     Human loci are returned as ``HLA-A``, ``HLA-B``, etc. Mouse H-2 loci are
-    collapsed to ``H2`` for the plotting/genotype-sampling code that only needs
+    collapsed to ``H2`` for the plotting/MHC-sampling code that only needs
     a species-level bucket. Unparseable inputs raise when ``raise_on_error`` is
     true. Valid but unhandled loci still return ``default_value``.
     """
