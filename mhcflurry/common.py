@@ -38,9 +38,9 @@ from mhcgnomes import (
 from . import amino_acid
 
 
-# Default master seed for every CLI command that involves randomness. Fixed
-# (not entropy) so runs are reproducible out of the box; pass --random-seed N
-# to get a different, still-reproducible run.
+# Default master seed for CLI commands that accept --random-seed. A fixed
+# seed supports reproducible sampling; numerical results can still depend on
+# hardware, library versions and nondeterministic kernels.
 DEFAULT_RANDOM_SEED = 42
 
 
@@ -105,12 +105,11 @@ def add_random_seed_arg(parser):
         type=int,
         metavar="N",
         default=DEFAULT_RANDOM_SEED,
-        help="Master random seed controlling all randomness in this command "
+        help="Master random seed for this command "
         "(numpy, Python `random`, and torch): data shuffles, fold/held-out "
         "sampling, weight initialization, and random peptide/negative "
-        "sampling. Defaults to %(default)s, so runs are reproducible out of "
-        "the box; pass a different integer for a different (still "
-        "reproducible) run.")
+        "sampling. Default: %(default)s. Exact numerical results can still "
+        "vary with hardware, library versions and nondeterministic kernels.")
 
 
 def configure_random_seed(seed=None, name="mhcflurry"):

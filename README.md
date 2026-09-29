@@ -85,9 +85,10 @@ fast local checks and full suite.
 
 ## Docker
 
-The Docker image includes the full presentation weights, the command-line
-tools and Jupyter notebooks. It runs predictions on the CPU and supports
-Intel/AMD and ARM Linux. Check the image's version with:
+Docker images built from version 2.3.6 onward include the full presentation
+weights, the command-line tools and Jupyter notebooks. They run predictions
+on the CPU and support Intel/AMD and ARM Linux. Check the published image's
+version with:
 
 ```shell
 docker pull openvax/mhcflurry:latest
