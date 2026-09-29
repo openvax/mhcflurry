@@ -1,12 +1,20 @@
 """Verify a built distribution image with network access disabled."""
 import sys
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import numpy
 
 from mhcflurry import Class1AffinityPredictor, Class1PresentationPredictor
 from mhcflurry import __version__
+from mhcflurry.downloads import get_downloads_dir
 
 assert __version__ == sys.argv[1], (__version__, sys.argv[1])
+# The default user must be able to refresh current weights and add older releases.
+cache = Path(get_downloads_dir())
+for directory in (cache, cache.parent):
+    with TemporaryDirectory(prefix=".smoke-", dir=directory) as scratch:
+        Path(scratch, "writable").write_text("ok")
 predictor = Class1PresentationPredictor.load()
 peptides = ["TPVCPNGPG", "RLLEGMEMI"]
 alleles = ["HLA-A*02:01"]

@@ -1,6 +1,11 @@
 .git
 .agents
 .codex
+.aws
+.ssh
+.docker
+.env
+.env.*
 .venv
 venv
 __pycache__

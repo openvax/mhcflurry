@@ -19,7 +19,7 @@ RUN pip install /opt/mhcflurry && \
     pip check && \
     useradd --create-home --uid 1000 mhcflurry && \
     mkdir /work && cp /opt/mhcflurry/notebooks/*.ipynb /work/ && \
-    chown -R mhcflurry:mhcflurry /work
+    chown -R mhcflurry:mhcflurry /work /opt/mhcflurry-data
 
 USER mhcflurry
 WORKDIR /work
