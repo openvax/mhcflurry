@@ -21,10 +21,10 @@ For the boundary family, external residues enter only the boundary branches;
 the central CNN sees X outside the peptide. Missing context is not evidence
 of a true protein terminus. No fabricated BOS/EOS token is introduced.
 
-Implement this outer-padding choice as an opt-in serialized hyperparameter;
-old configs retain zero padding and unchanged predictions. Verify every
+The outer-padding choice is an opt-in serialized hyperparameter;
+old configs retain zero padding and unchanged predictions. Validation covers every
 requested width, short/long peptides, full/partial/missing flanks, convolution
-alignment, and save/load compatibility before cloud training.
+alignment, and save/load compatibility before training.
 
 Rank widths within each family using paired sample-held-out predictions
 (macro AUPRC and PPV@N, with AUROC/micro safeguards). Preserve all conditions;
@@ -35,8 +35,8 @@ restoration relative to historical runs. Plot metrics against width, per-sample
 deltas and epoch traces; keep prediction rows joinable to external predictors.
 
 Run on one Modal A100 through runplz, using persistent volumes and a bounded
-timeout. Keep an exact source archive and durable commands/logs. Never stop
-unrelated Modal jobs. No release/publishing is part of this experiment.
+timeout. Keep an exact source archive and durable commands/logs. This experiment does
+not publish weights.
 
 ## Maintained command
 

@@ -102,10 +102,13 @@ def save_predictor(predictor, models_dir, model_names_to_write=None, write_metad
     files giving the model weights. If there are pan-allele predictors in
     the ensemble, the pseudosequences are also stored in the
     directory. There is also a small file "info.txt" with basic metadata:
-    when the models were trained, by whom, on what host.
+    the save time, user and host (not the original training time).
 
     Parameters
     ----------
+    predictor : Class1AffinityPredictor
+        Predictor to serialize.
+
     models_dir : string
         Path to directory. It will be created if it doesn't exist.
 
@@ -259,6 +262,9 @@ def load_predictor(
 
     Parameters
     ----------
+    predictor_class : type
+        Predictor class to instantiate.
+
     models_dir : string
         Path to directory. If unspecified the default downloaded models are
         used.
@@ -266,9 +272,13 @@ def load_predictor(
     max_models : int, optional
         Maximum number of `Class1NeuralNetwork` instances to load
 
-    optimization_level : int
-        If >0, model optimization will be attempted. Defaults to value of
-        environment variable MHCFLURRY_OPTIMIZATION_LEVEL.
+    optimization_level : int or None
+        If >0, model optimization will be attempted. When None, use
+        optimization_level_default supplied by the public loader.
+
+    optimization_level_default : int or None
+        Fallback supplied by the public loader when no explicit level is set.
+        That loader reads MHCFLURRY_OPTIMIZATION_LEVEL with a default of 1.
 
     Returns
     -------

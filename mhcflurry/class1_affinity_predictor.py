@@ -520,16 +520,18 @@ class Class1AffinityPredictor(object):
 
         Parameters
         ----------
-        models_dir : string
-            Path to directory. If unspecified the default downloaded models are
-            used.
+        models_dir : string, optional
+            Path to a standalone affinity predictor. If omitted, use the
+            affinity path override or the active release's standalone bundle;
+            if that default bundle is absent, load the affinity component of
+            the default presentation predictor. Explicit paths take precedence.
 
         max_models : int, optional
             Maximum number of `Class1NeuralNetwork` instances to load
 
         optimization_level : int
             If >0, model optimization will be attempted. Defaults to value of
-            environment variable MHCFLURRY_OPTIMIZATION_LEVEL.
+            environment variable MHCFLURRY_OPTIMIZATION_LEVEL (1 when unset).
 
         Returns
         -------
@@ -1458,8 +1460,11 @@ class Class1AffinityPredictor(object):
             centrality_measure=DEFAULT_CENTRALITY_MEASURE,
             model_kwargs=None):
         """
-        Predict nM binding affinities. Gives more detailed output than `predict`
-        method, including 5-95% prediction intervals.
+        Predict nM binding affinities with optional ensemble-member detail.
+
+        The default output includes the 5th and 95th percentiles of member
+        predictions, interpolated in log-affinity space. These describe
+        ensemble spread, not calibrated confidence intervals for true affinity.
 
         If multiple predictors are available for an allele, the predictions are
         the geometric means of the individual model predictions.
@@ -1485,6 +1490,9 @@ class Class1AffinityPredictor(object):
             If True, a "prediction_percentile" column will be included giving
             the percentile ranks. If no percentile rank info is available,
             this will be ignored with a warning.
+        include_confidence_intervals : boolean, default True
+            Include ``prediction_low`` and ``prediction_high``, the 5th and
+            95th ensemble-member percentiles described above.
         centrality_measure : string or callable
             Measure of central tendency to use to combine predictions in the
             ensemble. Options include: mean, median, robust_mean.
@@ -1965,8 +1973,8 @@ class Class1AffinityPredictor(object):
            amortizing all the small kernel-launch + Python-dispatch
            overhead that was dominating wall-clock time on the pan-allele
            full-universe calibration. Effective batch size per forward:
-           ``allele_batch_size * peptide_batch_size``, sized so it fits
-           comfortably in an A100's 80 GB.
+           ``allele_batch_size * peptide_batch_size``. Automatic sizes account
+           for the current device and resident working set.
 
         Uses the same geometric-mean ensemble aggregation and percentile
         method as ``calibrate_percentile_ranks``. The batched floating-point
@@ -1982,9 +1990,10 @@ class Class1AffinityPredictor(object):
         mutate the predictor's network weights in place between calls on the
         same instance without first calling ``clear_calibration_fast_cache()``.
 
-        Only handles pan-allele models. Mass-spec-only models and
-        ``class1_presentation_predictor`` should keep using the slower
-        per-allele path.
+        Only the pan-allele networks contribute to this path. Use
+        ``calibrate_percentile_ranks`` for allele-specific ensembles or
+        ensembles mixing pan-allele and allele-specific networks. Presentation
+        calibration has its own score-based API.
 
         Parameters
         ----------
@@ -2001,13 +2010,15 @@ class Class1AffinityPredictor(object):
             distributions, same format as ``calibrate_percentile_ranks``.
         summary_top_peptide_fractions : iterable of float — only used
             when ``motif_summary=True``.
-        allele_batch_size : int — how many alleles share a single forward
-            through the merge + main dense. 64 is a reasonable default
-            on an A100-80GB with the release pan-allele arch + the 800k
-            peptide calibration set (peak VRAM ~ allele_batch_size *
-            peptide_batch_size * 4 bytes per hidden unit).
-        peptide_batch_size : int — peptide chunk size on device.
-        device : str or torch.device — defaults to CUDA if available.
+        allele_batch_size : int or "auto"
+            Alleles per forward pass. The default auto sizes for device capacity.
+        peptide_batch_size : int or "auto"
+            Peptides per device chunk; auto sized by default.
+        num_workers_per_gpu : int, default 1
+            Co-resident worker count used for automatic memory budgeting.
+        device : str or torch.device, optional
+            Uses MHCflurry's configured device when omitted (auto selects
+            CUDA, then MPS, then CPU).
         verbose : bool — per-batch timing to stdout.
         method : {"compact", "histogram"}, optional
             Compact by default; explicit bins select the historical histogram.

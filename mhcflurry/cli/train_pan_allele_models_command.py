@@ -235,7 +235,7 @@ add_cluster_parallelism_args(parser)
 
 def assign_folds(df, num_folds, held_out_fraction, held_out_max, seed=None):
     """
-    Split training data into multple test/train pairs, which we refer to as
+    Split training data into multiple test/train pairs, which we refer to as
     folds. Note that a given data point may be assigned to multiple test or
     train sets; these folds are NOT a non-overlapping partition as used in cross
     validation.
@@ -260,7 +260,7 @@ def assign_folds(df, num_folds, held_out_fraction, held_out_max, seed=None):
         Master seed. When given, numpy's global RNG (which the per-allele
         ``.sample()`` calls below draw from) is seeded up front, so fold
         membership is reproducible. When None, fold assignment is left
-        entropy-random as before.
+        in the current NumPy RNG state.
 
     Returns
     -------
@@ -352,6 +352,11 @@ def pretrain_data_iterator(
     filename : string
     master_allele_encoding : AlleleEncoding
     peptides_per_chunk : int
+    shard_rank : int
+        Zero-based worker shard index.
+    num_shards : int
+        Assign each CSV chunk to one shard by its chunk index.
+
     Returns
     -------
     Generator of (AlleleEncoding, EncodableSequences, float affinities) tuples
@@ -905,9 +910,8 @@ def _build_train_peptides(peptide_values):
 def _run_compile_warmup(hyperparameters, fold_num, constant_data):
     """One forward+backward through a freshly-built network for compile-cache priming.
 
-    Used by ``run_single_worker_torch_compile_warmup`` to populate the
-    torch.compile on-disk cache once per unique architecture before the
-    production worker pool launches. Trains for one epoch on
+    Retained for explicit ``compile_warmup_only`` calls. Normal training uses
+    the full-residency resource probe instead. Trains for one epoch on
     ``minibatch_size`` rows with pretrain/validation/early-stop disabled,
     discards the resulting model, and returns. The compile cache write
     is the only durable side effect.

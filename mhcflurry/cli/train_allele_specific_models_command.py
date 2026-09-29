@@ -190,8 +190,7 @@ def run(argv=sys.argv[1:]):
     # ordering, and alleles_by_similarity's ``.sample``. Per-fit weight init
     # and shuffles happen inside workers (which reseed from entropy), so
     # those are pinned separately via derive_seed below. --random-seed
-    # defaults to 42 (reproducible out of the box); the resolved value is
-    # logged either way.
+    # defaults to 42; the resolved value is logged either way.
     master_seed = configure_random_seed(
         args.random_seed, name="train-allele-specific")
 

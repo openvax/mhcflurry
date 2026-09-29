@@ -31,8 +31,8 @@ across random per-peptide 4-subsets of the allele pool.
 Run:
     python scripts/validate_against_public.py \\
         --ours out/models.unselected.release/    \\
-        --public $(mhcflurry-downloads path models_class1_pan)/models.combined/ \\
-        --public-presentation $(mhcflurry-downloads path models_class1_presentation)/models/
+        --public "$(mhcflurry downloads path models_class1_pan)/models.combined/" \\
+        --public-presentation "$(mhcflurry downloads path models_class1_presentation)/models/"
 """
 
 from __future__ import annotations

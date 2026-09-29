@@ -84,6 +84,9 @@ def test_info_puts_weight_versions_before_history_and_configuration(versioned_ca
     assert text.index('LATEST') < text.index('Historical models')
     assert text.index('Historical models') < text.index('Resolved configuration')
     assert 'OTHER VERSIONS' in text and 'INSTALLED' in text
+    assert 'Recommended: models_class1_presentation (includes affinity and processing).' in text
+    model_rows = [line for line in text.splitlines() if line.startswith('models_class1_')]
+    assert model_rows[0].startswith(BUNDLE + ' ')
     assert 'Full presentation predictor, including' not in text
     assert 'Default prediction paths' not in text
     assert 'mhcflurry downloads --verbose info' in text

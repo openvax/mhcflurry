@@ -22,11 +22,11 @@ The common automatic options are:
 
 | Option | Automatic behavior |
 |---|---|
-| `--gpus` | Uses every visible CUDA device unless a count is supplied. |
-| `--num-jobs auto` | Chooses the total worker count from device and host capacity. |
+| `--gpus` | With the `auto` or `gpu` backend, discovers every visible CUDA device unless a count is supplied. |
+| `--num-jobs auto` | Chooses the total worker count from CUDA and host capacity; runs serially on CPU/MPS. |
 | `--max-workers-per-gpu auto` | Packs complete estimated worker working sets into each GPU. |
 | `--dataloader-num-workers auto` | Sizes pretraining DataLoader children from CPU and host memory. |
-| `--torch-compile auto` | Enables compilation only on devices where it is expected to help. |
+| `--torch-compile auto` | Reads `MHCFLURRY_TORCH_COMPILE`; compilation is off when unset. Enabling it affects CUDA only. |
 
 Automatic GPU packing has no default fixed worker cap. Explicit CLI values and
 explicit per-workload memory estimates remain authoritative; the planner logs
@@ -56,8 +56,20 @@ These variables are intended for custom model locations, debugging, and
 controlled benchmarks. Ordinary prediction and training do not require them.
 
 `MHCFLURRY_DEFAULT_CLASS1_MODELS`
-: Path to the default model directory. If unset, MHCflurry uses the models from
-  the installed download bundle.
+: Path to the default **affinity** predictor. Without this override,
+  `Class1AffinityPredictor.load()` uses the active release's standalone affinity
+  bundle when installed, then falls back to the affinity component of its
+  presentation bundle. Explicit model paths take precedence.
+
+`MHCFLURRY_DEFAULT_CLASS1_PRESENTATION_MODELS_DIR`
+: Path to the default presentation predictor, including its affinity and
+  processing components. Otherwise, uses the active release's presentation bundle.
+
+`MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS_DIR`
+: Path to the default standalone processing predictor. Otherwise, uses the
+  active release's standalone processing bundle.
+
+See {doc}`model_downloads` for release selection and download-directory overrides.
 
 `MHCFLURRY_OPTIMIZATION_LEVEL`
 : Controls pan-allele ensemble merging. The default, `1`, enables the faster
@@ -85,6 +97,12 @@ see {doc}`shared_percent_rank_transforms`.
 
 The direct Python training APIs use `seed=None` by default, preserving their
 historical stochastic behavior unless the caller opts in.
+
+A fixed seed does not guarantee identical weights across devices, dependency
+versions or numerical settings. Preserve those settings and the effective
+training batch alongside the seed. See the
+[PyTorch reproducibility guide](https://docs.pytorch.org/docs/stable/notes/randomness.html)
+for backend-specific determinism controls.
 
 ## Unified and historical command names
 

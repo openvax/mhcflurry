@@ -38,5 +38,6 @@ These are acceptance checks for model work. General behavior tests belong in
 - Use ignored `jobs/` for local launchers, interrupted experiments, and
   machine-specific debugging.
 - Promote reusable operational tools from `jobs/` into `scripts/`.
-- Put reproducible user/release artifacts under
-  `downloads-generation/<download_name>/` with a `GENERATE.sh` entry point.
+- Keep artifact generation reproducible through saved commands, configuration,
+  input/source hashes and seeds. Use the maintained `training/` and `release/`
+  workflows for current models; `downloads-generation/` retains historical recipes.

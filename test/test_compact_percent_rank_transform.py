@@ -1,4 +1,4 @@
-"""Regression tests for the experimental, label-free percentile approximation."""
+"""Regression tests for the label-free compact percentile approximation."""
 
 import importlib.util
 import json

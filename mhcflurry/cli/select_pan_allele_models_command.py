@@ -408,6 +408,8 @@ def model_select(
     min_models : int
     max_models : int
     constant_data : dict
+    save_validation_predictions : bool
+        Include per-model validation predictions in the result.
 
     Returns
     -------

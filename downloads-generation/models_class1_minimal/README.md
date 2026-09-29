@@ -1,13 +1,14 @@
-# Class I allele-specific models (minimal: ensemble size of 1)
+# Legacy minimal allele-specific affinity models
 
-This download contains "minimal" MHC Class I MHCflurry predictors consisting
-of a single model per allele. These predictors are expected to have slightly
-lower accuracy than the standard ensembles (models_class1) but are small and
-fast. Useful for testing.
+This historical bundle contains one affinity network per supported allele.
+It is small and useful for compatibility tests; use `models_class1_presentation`
+for current prediction work.
 
-To download these models and set them as the default predictor, run:
+To use it explicitly without changing the default weights:
 
-```
-$ mhcflurry-downloads fetch models_class1_minimal
-$ export MHCFLURRY_DEFAULT_CLASS1_MODELS=$(mhcflurry-downloads path models_class1_minimal)/models
+```bash
+mhcflurry downloads fetch models_class1_minimal
+mhcflurry predict INPUT.csv --affinity-only \
+  --models "$(mhcflurry downloads path models_class1_minimal)/models" \
+  --out predictions.csv
 ```

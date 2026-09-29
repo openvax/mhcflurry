@@ -1,6 +1,7 @@
 # Command-line reference
 
-This page lists every command and option. If you are new to MHCflurry or are
+This page gives generated help for the main commands and workflow namespaces.
+Use a workflow's subcommand help for its complete options. If you are new to MHCflurry or are
 choosing a workflow, start with the {ref}`tutorial <commandline_tutorial>` and
 return here to look up specific arguments.
 
@@ -62,12 +63,8 @@ an existing calibration.
 run `mhcflurry train --help` or the concrete subcommand help for the complete
 argument list.
 
-```console
-$ mhcflurry train --help
-usage: mhcflurry train <subcommand> [args]
-
-Subcommands:
-  pan-allele-release  Run the retrain/evaluate/plot/release workflow.
+```{command-output} mhcflurry train --help
+:nostderr:
 ```
 
 The release workflow delegates to the maintained release script:
@@ -113,7 +110,7 @@ $ mhcflurry train pan-allele-release --help
     :prog: mhcflurry class1-train-presentation-models
 ```
 
-## Evaluation and figures (new in 2.3.0)
+## Evaluation and figures
 
 ```{eval-rst}
 .. _ref-mhcflurry-eval:
@@ -125,17 +122,8 @@ $ mhcflurry train pan-allele-release --help
 generation, and paper-style figure rendering. It is a namespace command; run
 the concrete subcommand help for the complete argument list.
 
-```console
-$ mhcflurry eval --help
-usage: mhcflurry eval <subcommand> [args]
-
-Subcommands:
-  compare-models                 Compare two model ensembles.
-  plot-comparison                Render diagnostic plots from compare output.
-  paper-figures render           Render paper figures from saved inputs.
-  paper-figures score-predictions
-                                 Derive score tables from saved predictions.
-  paper-figures run              Compare, render paper figures, and write PDFs.
+```{command-output} mhcflurry eval --help
+:nostderr:
 ```
 
 ```{eval-rst}

@@ -23,6 +23,10 @@ pip install --upgrade "mhcflurry>=2.3,<2.4"
 mhcflurry downloads fetch models_class1_presentation
 ```
 
+The presentation bundle includes affinity and processing components. Browse
+current and historical weights with `mhcflurry downloads info`; select a weight
+release for prediction with `--model-release`.
+
 Predict a few peptides:
 
 ```shell
@@ -81,19 +85,40 @@ fast local checks and full suite.
 
 ## Docker
 
-Run the latest image from Docker Hub:
+Docker images built from version 2.3.6 onward include the full presentation
+weights, the command-line tools and Jupyter notebooks. They run predictions
+on the CPU and support Intel/AMD and ARM Linux. Check the published image's
+version with:
 
 ```shell
-docker run -p 9999:9999 --rm openvax/mhcflurry:latest
+docker pull openvax/mhcflurry:latest
+docker run --rm openvax/mhcflurry:latest mhcflurry --version
 ```
 
-Then open `http://localhost:9999` to use the included Jupyter environment. To
-build the image from a checkout:
+Stable releases publish a matching version tag and update `latest` after
+both architecture builds pass an offline prediction check. Publication status
+is visible in the [Docker workflow](https://github.com/openvax/mhcflurry/actions/workflows/docker.yml);
+an incomplete publication can leave `latest` on the previous version.
+
+Run predictions against files in the current directory:
 
 ```shell
-docker build -t mhcflurry:latest .
-docker run -p 9999:9999 --rm mhcflurry:latest
+docker run --rm -v "$PWD:/work" openvax/mhcflurry:latest \
+    mhcflurry predict input.csv --out predictions.csv
 ```
+
+To start Jupyter, run the image without a command:
+
+```shell
+docker run --rm -p 127.0.0.1:9999:9999 -v "$PWD:/work" openvax/mhcflurry:latest
+```
+
+Open the localhost URL printed in the logs, including its access token.
+Without the volume mount, the image starts in a directory containing the
+example notebooks. Mounted directories must be writable by the container's
+user (UID 1000). To build from a checkout, use
+`docker build -t mhcflurry:local .`. For CUDA training, a separate image can be
+built with `docker build -f docker/Dockerfile.train -t mhcflurry:train .`.
 
 ## More resources
 

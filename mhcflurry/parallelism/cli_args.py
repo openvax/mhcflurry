@@ -206,7 +206,7 @@ def add_local_parallelism_args(parser):
         default="auto",
         help="Enable torch.compile for training loss modules. 'auto' "
              "(default) reads MHCFLURRY_TORCH_COMPILE_LOSS env; when unset, "
-             "loss compilation defaults on inside maybe_compile_loss. CUDA "
+             "loss compilation follows enabled CUDA network compilation. CUDA "
              "workers run a one-op autograd warmup before compiling losses to "
              "avoid the PyTorch 2.4 / Triton invalid-device-context bug.")
     group.add_argument(
@@ -245,8 +245,8 @@ def add_prediction_parallelism_args(parser):
         type=_num_jobs_arg,
         metavar="N",
         help="Number of local prediction worker processes. Pass 'auto' "
-             "(default) to use ``--gpus * --max-workers-per-gpu`` when "
-             "CUDA GPUs are specified, otherwise run serially. Pass 0 for "
+             "(default) to size from detected CUDA capacity, host memory "
+             "and work items; CPU/MPS run serially. Pass 0 for "
              "serial prediction.")
     group.add_argument(
         "--backend",
@@ -259,7 +259,8 @@ def add_prediction_parallelism_args(parser):
         type=int,
         metavar="N",
         help="Number of CUDA GPUs to assign across parallel prediction "
-             "workers. When CUDA_VISIBLE_DEVICES is set, this is a count "
+             "workers. Defaults to all visible CUDA devices with the auto "
+             "or gpu backend. When CUDA_VISIBLE_DEVICES is set, this is a count "
              "within that scheduler-visible mask. Requires --num-jobs > 0.")
     group.add_argument(
         "--max-workers-per-gpu",
@@ -284,7 +285,7 @@ def add_prediction_parallelism_args(parser):
         choices=("auto", "0", "1"),
         default="auto",
         help="Enable torch.compile for forward kernels. 'auto' reads "
-             "MHCFLURRY_TORCH_COMPILE.")
+             "MHCFLURRY_TORCH_COMPILE (off when unset). CUDA only.")
     group.add_argument(
         "--matmul-precision",
         choices=("none", "highest", "high", "medium"),

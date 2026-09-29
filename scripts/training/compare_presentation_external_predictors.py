@@ -72,7 +72,7 @@ Condition = namedtuple("Condition", ["label", "higher_is_better", "role"])
 def row_identity(frame):
     """Hash benchmark row identity; NA-like strings compare consistently.
 
-    compare-models saves canonical genotypes (sorted, homozygous copies
+    compare-models saves canonical MHC allele sets (sorted, homozygous copies
     removed), so both sides pass through its idempotent normalizer first.
     """
     hit = pandas.to_numeric(frame["hit"], errors="raise")

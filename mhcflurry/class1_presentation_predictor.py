@@ -258,8 +258,7 @@ class Class1PresentationPredictor(object):
             throw=True,
             model_kwargs=None):
         """
-        Predict binding affinities across samples (each corresponding to up to
-        six MHC  I alleles).
+        Predict binding affinities across samples, each with an MHC allele set.
 
         Two modes are supported: each peptide can be evaluated for binding to
         any of the alleles in any sample (this is what happens when sample_names
@@ -315,7 +314,7 @@ class Class1PresentationPredictor(object):
             Whether to include affinity percentile ranks
         verbose : int
             Set to 0 for quiet.
-        throw : verbose
+        throw : bool
             Whether to throw exception (vs. just log a warning) on invalid
             peptides, etc.
         model_kwargs : dict, optional
@@ -552,7 +551,7 @@ class Class1PresentationPredictor(object):
         c_flanks : list of string [same length as peptides]
         throw : boolean
             Whether to raise exception on unsupported peptides
-        verbose  : int
+        verbose : int
         batch_size : int or "auto"
 
         Returns
@@ -809,7 +808,7 @@ class Class1PresentationPredictor(object):
 
         You can also specify sample_names, in which case peptide is evaluated
         for binding the alleles in the corresponding sample only. See
-        `predict_affinity` for an examples.
+        `predict_affinity` for examples.
 
         Parameters
         ----------
@@ -817,7 +816,8 @@ class Class1PresentationPredictor(object):
             Peptide sequences
         alleles : list of string or dict of string -> list of string
             If you are predicting for a single sample, pass a list of strings
-            indicating the sample MHC allele set. If you are predicting across
+            indicating the sample MHC allele set (at most six alleles in this
+            list form). If you are predicting across
             multiple samples, pass a dict where the keys are (arbitrary)
             sample names and the values are the alleles to predict for that
             sample. Set to an empty list or dict to perform processing
@@ -839,7 +839,7 @@ class Class1PresentationPredictor(object):
             Whether to include affinity percentile ranks
         verbose : int
             Set to 0 for quiet.
-        throw : verbose
+        throw : bool
             Whether to throw exception (vs. just log a warning) on invalid
             peptides, etc.
         affinity_model_kwargs : dict, optional
@@ -1014,10 +1014,9 @@ class Class1PresentationPredictor(object):
 
         Score columns (those ending in ``"score"``) sort descending (stronger
         binders first); ``affinity`` / ``affinity_percentile`` sort ascending
-        (stronger = lower nM). ``peptide`` is a deterministic secondary key and
-        the sort is stable, so the row order is independent of the input row
-        order. This is what lets the predict-scan CLI's parallel (chunked) path
-        reproduce the serial path's ranking exactly, including tie ordering.
+        (lower is stronger). ``peptide`` is the secondary key. Rows tied on
+        both keys retain their input order. The scan CLI preserves serial
+        input order when combining parallel chunks before this sort.
 
         Returns a new DataFrame; the index is not reset.
         """
@@ -1060,7 +1059,7 @@ class Class1PresentationPredictor(object):
         ...    comparison_quantity="affinity",
         ...    filter_value=500,
         ...    verbose=0)
-        >>> bool((predictions.affinity < 500).all())
+        >>> bool((predictions.affinity <= 500).all())
         True
         >>> {"sequence_name", "pos", "peptide", "affinity"}.issubset(predictions.columns)
         True
@@ -1076,25 +1075,26 @@ class Class1PresentationPredictor(object):
             (multiple MHC allele sets, where the number of sets must equal
             the number of sequences), or (4) a dict giving multiple MHC allele sets,
             which will each be run over the sequences.
-        result : string
-            Specify 'best' to return the strongest peptide for each sequence,
+        result : string, default "best"
+            Specify 'best' to return the strongest peptide for each sequence
+            and sample,
             'all' to return predictions for all peptides, or 'filtered' to
             return predictions where the comparison_quantity is stronger
-            (i.e (<) for affinity, (>) for scores) than filter_value.
-        comparison_quantity : string
+            or equal to filter_value (<= for affinity/percentile, >= for scores).
+        comparison_quantity : string, optional
             One of "presentation_score", "processing_score", "affinity", or
             "affinity_percentile". Prediction to use to rank (if result is
-            "best") or filter (if result is "filtered") results. Default is
-            "presentation_score".
+            "best") or filter (if result is "filtered") results. With MHC
+            alleles, defaults to presentation when supported, else affinity;
+            without MHC alleles, defaults to processing.
         filter_value : float
             Threshold value to use, only relevant when result is "filtered".
-            If comparison_quantity is "affinity", then all results less than
-            (i.e. tighter than) the specified nM affinity are retained. If it's
-            "presentation_score" or "processing_score" then results greater than
-            the indicated filter_value are retained.
-        peptide_lengths : list of int
-            Peptide lengths to predict for.
-        use_flanks : bool
+            Affinity and affinity-percentile values at or below the threshold
+            are retained; presentation and processing scores at or above it
+            are retained. Required when result is "filtered".
+        peptide_lengths : sequence of int, default (8, 9, 10, 11)
+            Peptide lengths to scan.
+        use_flanks : bool, default True
             Whether to include flanking sequences when running the AP predictor
             (for better cleavage prediction).
         include_affinity_percentile : bool
@@ -1110,9 +1110,11 @@ class Class1PresentationPredictor(object):
 
         Returns
         -------
-        pandas.DataFrame with columns:
-            peptide, n_flank, c_flank, sequence_name, affinity, best_allele,
-            processing_score, presentation_score
+        pandas.DataFrame
+            Includes sequence_name, zero-based pos, peptide and sample_name.
+            Available predictor components determine affinity, best_allele,
+            processing_score and presentation_score columns. Flank columns
+            and percentile columns depend on inputs, options and calibration.
         """
         if len(alleles) == 0:
             alleles = {}
@@ -1285,6 +1287,18 @@ class Class1PresentationPredictor(object):
         ----------
         models_dir : string
             Path to directory. It will be created if it doesn't exist.
+        write_affinity_predictor : bool, default True
+            Save the embedded affinity ensemble.
+        write_processing_predictor : bool, default True
+            Save the available embedded processing ensembles.
+        write_weights : bool, default True
+            Save fitted logistic-regression coefficients; requires a fitted model.
+        write_percent_ranks : bool, default True
+            Replace the presentation calibration with its current state.
+        write_info : bool, default True
+            Write save-time package, host and release-provenance metadata.
+        write_metadata : bool, default True
+            Write dataframes in metadata_dataframes.
         """
         if write_weights and self.weights_dataframe is None:
             raise RuntimeError("Can't save before fitting")

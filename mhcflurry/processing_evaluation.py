@@ -14,7 +14,7 @@ IDENTITY = ["sample_id", "peptide", "protein_accession", "n_flank", "c_flank", "
 
 
 def hit_identity(frame):
-    """Ordered hit identities, including genotype and protein context."""
+    """Ordered hit identities, including MHC alleles and protein context."""
     hits = frame.loc[frame.hit.eq(1), IDENTITY].fillna("").astype(str)
     return pandas.util.hash_pandas_object(hits, index=False).to_numpy()
 

@@ -18,7 +18,8 @@ releases containing that bundle and groups entries with the same archive URLs.
 For example, catalogues `2.2.0` and `2.0.0` point to the same presentation archive.
 `list` groups prediction models, legacy models, experiments, and supporting data.
 The first table shows the latest weights, distinct older archive versions and
-installed catalogue directories for affinity, processing and presentation.
+installed catalogue directories, with the recommended presentation bundle first,
+followed by standalone affinity and processing bundles.
 Aliases sharing the same archive are grouped in the availability columns;
 `releases DOWNLOAD` lists every valid identifier. Historical resources appear
 below the main predictors. Terminal output uses restrained color; redirected
@@ -47,7 +48,9 @@ ready to use.
 
 The public **2.1.5, 2.2.0, and 2.2.1 packages used the same 2020 model archives**,
 registered under catalogue `2.2.0`. There is no separate `2.1.5` or `2.2.1`
-weight catalogue. The new `2.3.0` models use the 2023 training data.
+weight catalogue. The `2.3.0` models use the 2023 curated affinity snapshot and an updated
+processing training recipe; this does not mean every component gained new
+2023 observations. See {doc}`release_training_recipe`.
 
 Fetch both presentation bundles once:
 

@@ -39,7 +39,7 @@ class FlankingEncoding(object):
 
     Instances of this class have an immutable list of peptides with
     flanking sequences. Encodings are cached in the instances for faster
-    performance when the same set of peptides needs to encoded more than once.
+    performance when the same set of peptides needs to be encoded more than once.
     """
     unknown_character = "X"
 
@@ -248,11 +248,10 @@ class FlankingEncoding(object):
         """
         Encode variable-length sequences to a fixed-size matrix.
 
-        Helper function. Users should use `vector_encode`.
+        Helper function. Users should use `categorical_encode`.
 
         Parameters
         ----------
-        vector_encoding_name : string
         df : pandas.DataFrame
         peptide_max_length : int
         n_flank_length : int

@@ -53,7 +53,7 @@ def robust_mean(log_values):
 
     Returns
     -------
-    center : numpy.array of length log_values.shape[1]
+    center : numpy.array of length log_values.shape[0]
 
     """
     if log_values.shape[1] <= 3:

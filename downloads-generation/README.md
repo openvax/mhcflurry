@@ -1,7 +1,10 @@
 # Downloads generation
 
-This directory contains reproducible generators for datasets and trained models
-published with MHCflurry.
+This directory retains generators for historical datasets and model bundles.
+Their recipes describe the corresponding archives, not necessarily the current
+release. Current training and weight packaging are documented in
+[scripts/training/README.md](../scripts/training/README.md) and
+[scripts/release/README.md](../scripts/release/README.md).
 
 Prediction users do not need these generators. Use `mhcflurry downloads fetch`
 to install published models and datasets.

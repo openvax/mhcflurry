@@ -62,10 +62,10 @@ _SUBCOMMANDS = {
         "Render paper-style figures from retraining artifacts."),
     "predict": (
         "mhcflurry.cli.predict_command", "run",
-        "Predict MHC binding affinities for peptide/allele pairs."),
+        "Predict affinity, processing and presentation for peptides and MHC alleles."),
     "predict-scan": (
         "mhcflurry.cli.predict_scan_command", "run",
-        "Scan protein sequences for MHC-binding peptides."),
+        "Scan protein sequences for predicted MHC I ligands."),
     "downloads": (
         "mhcflurry.cli.downloads_command", "run",
         "Fetch, inspect, resolve data + model downloads."),
@@ -129,10 +129,10 @@ _HELP_GROUPS = (
         "class1-select-pan-allele-models",
         "class1-select-processing-models",
     )),
-    ("Release training (new in 2.3.0)", (
+    ("Release training", (
         "train",
     )),
-    ("Evaluation and figures (new in 2.3.0)", (
+    ("Evaluation and figures", (
         "eval", "compare-models", "plot-model-comparison", "paper-figures",
     )),
     ("Helpers", (
@@ -146,12 +146,9 @@ _HELP_GROUPS = (
 def _check_help_groups():
     """Fail-fast at import time if _HELP_GROUPS drifts from _SUBCOMMANDS.
 
-    Cost of import-time enforcement: a malformed edit to either constant
-    breaks ``import mhcflurry.cli.main`` for everyone, including the
-    legacy ``mhcflurry-*`` console scripts (which don't otherwise depend
-    on this module — they import their command module directly). The
-    upside is that drift can't ship: the help screen always lists every
-    registered subcommand in exactly one group.
+    Missing or unknown command names prevent importing this dispatcher.
+    Historical console scripts import their command modules directly and
+    do not run this check. Duplicate grouping is checked by CLI tests.
     """
     grouped = {name for _, names in _HELP_GROUPS for name in names}
     missing = set(_SUBCOMMANDS) - grouped

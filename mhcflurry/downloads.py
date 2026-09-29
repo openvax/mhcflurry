@@ -162,7 +162,7 @@ def get_default_class1_models_dir(test_exists=True):
     ----------
 
     test_exists : boolean, optional
-        Whether to raise an exception of the path does not exist
+        Whether to raise an exception if the path does not exist
 
     Returns
     -------
@@ -192,7 +192,7 @@ def get_default_class1_presentation_models_dir(test_exists=True):
     ----------
 
     test_exists : boolean, optional
-        Whether to raise an exception of the path does not exist
+        Whether to raise an exception if the path does not exist
 
     Returns
     -------
@@ -224,7 +224,7 @@ def get_default_class1_processing_models_dir(test_exists=True):
     ----------
 
     test_exists : boolean, optional
-        Whether to raise an exception of the path does not exist
+        Whether to raise an exception if the path does not exist
 
     Returns
     -------
@@ -252,18 +252,15 @@ def get_release_downloads(release):
     release : string
         Release whose download metadata to return.
 
-    The dict keys are the names of the downloads. The values are a dict
-    with two entries:
-
-    downloaded : bool
-        Whether the download is currently available locally
-
-    metadata : dict
-        Info about the download from downloads.yml such as URL
-
-    up_to_date : bool or None
-        Whether the download URL(s) match what was used to download the current
-        data. This is None if it cannot be determined.
+    Returns
+    -------
+    collections.OrderedDict
+        Download names mapped to dictionaries with three entries:
+        ``downloaded`` (bool), whether the local directory exists;
+        ``metadata`` (dict), catalogue metadata such as URLs; and
+        ``up_to_date`` (bool or None), whether the recorded download URLs
+        match the catalogue, or None when unknown. This does not verify
+        the integrity of installed files.
     """
     downloads = (
         get_downloads_metadata()

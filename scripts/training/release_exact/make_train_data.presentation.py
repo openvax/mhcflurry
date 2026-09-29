@@ -105,7 +105,7 @@ def canonicalize_training_allele(raw_name):
 
 
 def split_hla_genotype(value):
-    """Split a whitespace-delimited genotype and canonicalize allele tokens."""
+    """Split whitespace-delimited MHC alleles and canonicalize each token."""
     return normalize_class1_genotype(value)
 
 

@@ -19,8 +19,8 @@ Maintained operational documentation lives next to the scripts it describes:
 - [Training pipeline](https://github.com/openvax/mhcflurry/tree/master/scripts/training)
 - [Release, synchronization, and deployment](https://github.com/openvax/mhcflurry/tree/master/scripts/release)
 - [Generated model and data bundles](https://github.com/openvax/mhcflurry/tree/master/downloads-generation)
-- {doc}`release_training_recipe` records the scientific settings inherited from
-  the published 2.1.x/2.2.x recipe and every deliberate exception.
+- {doc}`release_training_recipe` records the data and component settings used
+  for the published 2.3.0 weights.
 - {doc}`release_neural_hyperparameter_audit` explains framework equations and compatibility choices.
 
 The public release entry point is:

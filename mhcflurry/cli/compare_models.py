@@ -2007,7 +2007,7 @@ def _load_presentation_benchmark(data_dir, limit_files, row_filter=None, samples
 
 
 def _normalize_benchmark_genotype(value):
-    """Canonicalize a whitespace-delimited class-I genotype deterministically."""
+    """Canonicalize a whitespace-delimited class-I MHC allele set deterministically."""
     try:
         normalized = sorted(normalize_class1_genotype(value))
     except ValueError as exc:

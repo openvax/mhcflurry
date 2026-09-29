@@ -79,8 +79,8 @@ class NonDaemonProcess(_NonDaemonProcessMixin, multiprocessing.Process):
 class NonDaemonContext(type(multiprocessing.get_context())):
     """A multiprocessing context that hands out ``NonDaemonProcess`` workers.
 
-    Subclasses the current default context so the start method (fork on
-    Linux, spawn on macOS) is preserved — we only swap the Process
+    Subclasses the current default multiprocessing context so its start
+    method is preserved — we only swap the Process
     class. The Pool uses ``self._ctx.Process(...)`` to create workers
     and will now get our non-daemonic variant.
     """
@@ -212,7 +212,18 @@ def worker_pool_with_gpu_assignments_from_args(
 
     Parameters
     ----------
-    args : argparse.ArgumentParser
+    args : argparse.Namespace
+        Parsed local-parallelism options.
+    workload_name : str
+        Workload profile used for automatic sizing.
+    workload_hints : dict, optional
+        Model/data size hints for that profile.
+    start_method : str, optional
+        Multiprocessing start method.
+    worker_context_module : str, optional
+        Module whose WORKER_CONTEXT receives constant data.
+    worker_context_data : dict, optional
+        Constant data installed once per worker.
 
     Returns
     -------

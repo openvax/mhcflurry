@@ -538,7 +538,7 @@ def index_encoding(sequences, letter_to_index_dict):
     same shape. The map from characters to integers is given by
     `letter_to_index_dict`.
 
-    Given a sequence of `n` strings all of length `k`, return a `k * n` array where
+    Given a sequence of `n` strings all of length `k`, return an `n * k` array where
     the (`i`, `j`)th element is `letter_to_index_dict[sequence[i][j]]`.
 
     Parameters
@@ -548,7 +548,7 @@ def index_encoding(sequences, letter_to_index_dict):
 
     Returns
     -------
-    numpy.array of integers with shape (`k`, `n`)
+    numpy.array of integers with shape (`n`, `k`)
     """
     df = pandas.DataFrame(iter(s) for s in sequences)
     with warnings.catch_warnings():
@@ -579,7 +579,7 @@ def fixed_vectors_encoding(index_encoded_sequences, letter_to_vector_df):
 
     Returns
     -------
-    numpy.array of integers with shape (`n`, `k`, `m`)
+    numpy.array with shape (`n`, `k`, `m`), using the vector table's dtype
     """
     num_sequences, sequence_length = index_encoded_sequences.shape
     target_shape = (num_sequences, sequence_length, letter_to_vector_df.shape[1])

@@ -87,12 +87,20 @@ def cluster_results_from_args(
 
     Parameters
     ----------
-    args
-    work_function
-    work_items
-    constant_data
-    result_serialization_method
-    clear_constant_data
+    args : argparse.Namespace
+        Parsed cluster configuration.
+    work_function : callable
+        Function called with each item's keyword arguments and constant_data.
+    work_items : iterable of dict
+        Keyword arguments for each work item.
+    constant_data : object, optional
+        Shared input made available to each job.
+    input_serialization_method : str
+        Input serializer: 'pickle' or 'dill'.
+    result_serialization_method : str
+        Result serializer: 'pickle' or 'save_predictor'.
+    clear_constant_data : bool
+        Clear the shared-input dictionary after serialization to free memory.
 
     Returns
     -------
@@ -129,8 +137,8 @@ def cluster_results(
     Parallel map on an HPC cluster.
 
     Returns [work_function(item) for item in work_items] where each invocation
-    of work_function is performed as a separate HPC cluster job. Order is
-    preserved.
+    of work_function is performed as a separate HPC cluster job. Results are
+    yielded as completed jobs are observed, not in input order.
 
     Optionally, "constant data" can be specified, which will be passed to
     each work_function() invocation as a keyword argument called constant_data.
@@ -158,6 +166,11 @@ def cluster_results(
     result_serialization_method : string, one of "pickle" or "save_predictor"
         The "save_predictor" works only when the return type of work_function
         is Class1AffinityPredictor
+    input_serialization_method : str
+        Input/context serialization format (pickle or dill).
+    additional_complete_file : str, optional
+        Alternative worker-completion marker, relative to the job directory.
+        Its presence also triggers result/error inspection.
     max_retries : int
         How many times to attempt to re-launch a failed worker
     clear_constant_data : bool
