@@ -14,7 +14,7 @@ from .common import (
     normalize_class1_genotype,
     normalize_sequence_resolved_allele_name,
 )
-from .training_provenance import study_identity
+from .training_provenance import identity_text, study_identity
 
 
 BENCHMARK_FILES = {
@@ -105,8 +105,10 @@ def build_release_holdout(
     ).drop_duplicates()
     if sample_metadata.sample_id.duplicated().any():
         raise ValueError("Conflicting metadata for a source sample")
-    sample_metadata["sample_id"] = sample_metadata.sample_id.astype(str)
-    sample_metadata["pmid"] = sample_metadata.pmid.astype(str)
+    sample_metadata["sample_id"] = sample_metadata.sample_id.map(identity_text)
+    if sample_metadata.sample_id.eq("").any():
+        raise ValueError("Source sample metadata contains missing sample IDs")
+    sample_metadata["pmid"] = sample_metadata.pmid.map(identity_text)
     holdout_pmids = tuple(str(value) for value in presentation_holdout_pmids)
     presentation_samples = set(sample_metadata.loc[
         sample_metadata.mhc_class.eq("I")

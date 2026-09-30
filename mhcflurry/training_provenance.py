@@ -53,6 +53,11 @@ def decode_sources(value):
                 "study_id", "sample_id", "assay_id", "source", "source_row", "source_sha256"))
             for record in records):
         raise ValueError("Invalid source_provenance records")
+    for record in records:
+        if record["complete"] and (
+                not record["source_row"] or len(record["source_sha256"]) != 64
+                or any(char not in "0123456789abcdef" for char in record["source_sha256"])):
+            raise ValueError("Complete source_provenance requires a source row and SHA-256")
     return records
 
 
@@ -90,6 +95,7 @@ def deduplicate_measurements(frame, subset):
     if PROVENANCE_COLUMN not in frame:
         return frame.drop_duplicates(subset).copy()
     # Position-based indexing also handles callers with duplicate index labels.
+    original_index = frame.index
     frame = frame.reset_index(drop=True)
     result = frame.drop_duplicates(subset).copy()
     duplicated = frame.duplicated(subset, keep=False)
@@ -102,4 +108,5 @@ def deduplicate_measurements(frame, subset):
                 "source": "unknown", "source_row": "", "source_sha256": "",
             }])
         result.loc[group.index[0], PROVENANCE_COLUMN] = encode_sources(records)
+    result.index = original_index.take(result.index)
     return result

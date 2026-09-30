@@ -126,7 +126,7 @@ def test_build_apply_and_validate_release_holdout(tmp_path, monkeypatch):
     assert policy["affinity_pmhc_count"] == 3
     assert policy["policy"]["affinity"].startswith(
         "Evaluate affinity metrics on all monoallelic samples.")
-    assert "presentation evaluation cannot leak" in (
+    assert "Zero pMHC overlap does not prove whole-sample" in (
         policy["policy"]["affinity"])
     assert set(map(tuple, pandas.read_csv(
         holdout_dir / AFFINITY_PMHCS_FILE).to_numpy())) == {
@@ -203,12 +203,15 @@ def test_build_apply_and_validate_release_holdout(tmp_path, monkeypatch):
     assert all(options["chunksize"] for options in sample_read_options)
     assert result["schema_version"] == 1
     assert result["affinity_overlap_rows"] == 0
+    assert result["affinity_source_overlap_rows"] == 0
+    assert result["sample_disjointness"] == "unresolved"
     assert result["processing_overlap_rows"] == 0
     assert result["presentation_overlap_rows"] == 0
     assert result["policy_sha256"]
     assert set(result["holdout_files"]) == {
         "affinity_pmhcs.csv",
         "affinity_samples.csv",
+        "affinity_source_samples.csv",
         "processing_samples.csv",
         "presentation_samples.csv",
     }

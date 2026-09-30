@@ -41,8 +41,7 @@ class SampleAliases:
                     raise ValueError("Aliases must map studies to studies or samples to samples")
                 if source in self.mapping and self.mapping[source] != target:
                     raise ValueError(f"Conflicting alias for {source}")
-                if source != target:
-                    self.mapping[source] = target
+                self.mapping[source] = target
             for source in self.mapping:
                 self.resolve(*source)
 
@@ -57,7 +56,7 @@ class SampleAliases:
             if target is None:
                 study_target = self.mapping.get((current[0], ""))
                 target = (study_target[0], current[1]) if study_target else None
-            if target is None:
+            if target is None or target == current:
                 return current
             current = target
 

@@ -6,6 +6,11 @@ Use the evaluation commands after training a model to compare it with a public
 release or another run. The normal workflow separates reusable metrics from
 plot rendering, so you can change figures without rerunning predictions.
 
+Before describing a cohort as sample-disjoint, audit the union of all compared
+models' training, development and selection lineage. Peptide–MHC exclusion alone
+does not prove this. See {doc}`training_provenance` for the audit command,
+shared-cohort export, and limitations of historical and external evidence.
+
 ## Quick evaluation
 
 Compare a candidate run with the installed public models:
