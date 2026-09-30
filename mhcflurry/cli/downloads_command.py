@@ -648,9 +648,14 @@ def info_subcommand(args):
         if 'presentation_components' in record:
             _heading('Components inside presentation bundle')
             _print_presentation_components(record['presentation_components'])
-            print('  Use these paths explicitly to select embedded components.')
-            if record['name'] != 'models_class1_pan':
+            if record['name'] == 'models_class1_pan':
+                print('  Default affinity loading can fall back to this component when the')
+                print('  standalone path is absent and no affinity-path override is set.')
+            elif record['name'] == 'models_class1_processing':
+                print('  Use these paths explicitly to select embedded processing components.')
                 print('  Standalone processing loading does not fall back to presentation.')
+            else:
+                print('  Presentation loading uses these embedded components.')
             source = record['presentation_components'][0]['source_matches']
             print('  Presentation source URLs: ' + (
                 'match catalogue' if source is True else

@@ -161,6 +161,7 @@ def test_model_table_checks_embedded_component_directories(versioned_cache, caps
     text = capsys.readouterr().out
     assert str(models / 'processing_predictor_with_flanks') + ' [missing manifest]' in text
     assert str(models / 'processing_predictor_without_flanks') + ' [not installed]' in text
+    assert 'Standalone processing loading does not fall back' in text
 
     component_manifest(models / 'affinity_predictor')
     component_manifest(models / 'processing_predictor_with_flanks')
@@ -229,8 +230,11 @@ def test_component_details_preserve_standalone_status_and_paths(versioned_cache,
     assert str(affinity) + ' [manifest present]' in text
     assert str(root / BUNDLE / 'models' / 'processing_predictor_with_flanks') in text
     assert 'not installed' in text
-    assert 'does not fall back' in text
+    assert 'Presentation loading uses these embedded components' in text
     assert 'equivalence to standalone weights' in text
+    downloads_command.run(['info', 'models_class1_pan'])
+    text = capsys.readouterr().out
+    assert 'Default affinity loading can fall back to this component' in text
     downloads_command.run(['list', '--json'])
     records = json.loads(capsys.readouterr().out)['downloads']
     assert next(r for r in records if r['name'] == 'models_class1_pan') == {
