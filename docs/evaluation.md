@@ -78,6 +78,13 @@ both BA and EL, receive paired comparisons.
 The metrics directory is the reusable contract between evaluation and plotting.
 Keep it when iterating on figure style or assembling a review packet.
 
+`compare-models` defines PPV@N with N equal to the group's positive count.
+If a score tie crosses the cutoff, its contribution is the expected number of
+positives under uniform selection within that tie. This makes the metric
+independent of input row order. `metric_policy.json` records this rule; older
+comparison directories may use a different tie policy. Existing published
+reports are not rewritten when the software is upgraded.
+
 Report raw-score and percentile metrics separately, recording the calibration
 method and background. Preserve public baselines unchanged; see
 {doc}`shared_percent_rank_transforms` for controlled recalibration comparisons.
