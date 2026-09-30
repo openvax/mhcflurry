@@ -431,7 +431,11 @@ class Class1ProcessingPredictor(object):
 
         model_names_to_write : list of string, optional
             Only write the weights for the specified models. Useful for
-            incremental updates during training. Passing an explicit empty
+            incremental updates during training: previously saved members of
+            this predictor remain in the manifest. In a fresh directory, save
+            only the requested members, in the requested order. Such a subset
+            has no percentile calibration; calibrate the exported predictor
+            separately. Passing an explicit empty
             list writes no model artifacts; this is used by calibration-only
             updates that replace percentile calibration without touching the
             manifest, weights, or retained checkpoints.
@@ -452,11 +456,44 @@ class Class1ProcessingPredictor(object):
             model_names_to_write = list(model_names_to_write)
             write_model_artifacts = len(model_names_to_write) > 0
 
+        names = self.manifest_df.model_name.tolist()
+        if len(set(model_names_to_write)) != len(model_names_to_write):
+            raise ValueError("Duplicate model names requested for saving")
+        unknown = set(model_names_to_write) - set(names)
+        if unknown:
+            raise ValueError("Unknown model names: %s" % sorted(unknown))
+
+        manifest_path = join(models_dir, "manifest.csv")
+        retained = pandas.DataFrame()
+        existing_manifest = exists(manifest_path)
+        if (write_model_artifacts and existing_manifest
+                and set(names) - set(model_names_to_write)):
+            previous = pandas.read_csv(manifest_path)
+            if "model_name" not in previous or previous.model_name.duplicated().any():
+                raise ValueError("Invalid existing processing manifest: %s" % manifest_path)
+            retained = previous.loc[
+                previous.model_name.isin(set(names) - set(model_names_to_write))
+            ].copy()
+            # Never publish references to missing old members during an
+            # incremental save. Use their on-disk configs, not unsaved changes.
+            for _, row in retained.iterrows():
+                paths = [self.weights_path(models_dir, row.model_name)]
+                for policy in ("terminal", "best", "best_ap"):
+                    filename = row.get("checkpoint_%s_weights" % policy)
+                    if pandas.notna(filename) and filename:
+                        if not isinstance(filename, str) or basename(filename) != filename:
+                            raise ValueError("Invalid retained processing checkpoint path")
+                        paths.append(join(models_dir, filename))
+                for path in paths:
+                    if not exists(path):
+                        raise ValueError("Missing previously saved model artifact: %s" % path)
+
         if not exists(models_dir):
             mkdir(models_dir)
 
+        index_by_name = dict(zip(names, self.manifest_df.index))
         sub_manifest_df = self.manifest_df.loc[
-            self.manifest_df.model_name.isin(model_names_to_write)
+            [index_by_name[name] for name in model_names_to_write]
         ].copy()
 
         # Network JSON configs may have changed since the models were added,
@@ -492,15 +529,26 @@ class Class1ProcessingPredictor(object):
             "config_json"
         ] = updated_network_config_jsons
 
+        subset_export = False
         if write_model_artifacts:
-            write_manifest_df = self.manifest_df[[
-                c for c in self.manifest_df.columns if c != "model"
-            ]]
-            manifest_path = join(models_dir, "manifest.csv")
+            selected = self.manifest_df.loc[sub_manifest_df.index].drop(columns="model")
+            write_manifest_df = pandas.concat([retained, selected], ignore_index=True)
+            saved_names = set(write_manifest_df.model_name)
+            output_order = ([name for name in names if name in saved_names]
+                            if existing_manifest else list(model_names_to_write))
+            write_manifest_df = write_manifest_df.set_index(
+                "model_name", drop=False).loc[output_order]
+            subset_export = saved_names != set(names)
             write_manifest_df.to_csv(manifest_path, index=False)
             logging.info("Wrote: %s", manifest_path)
 
-        if write_percent_ranks:
+        if subset_export:
+            # A full-ensemble calibration is invalid for an exported subset.
+            for filename in ("percent_ranks.csv", "percent_ranks.json"):
+                path = join(models_dir, filename)
+                if exists(path):
+                    remove(path)
+        elif write_percent_ranks:
             save_percent_rank_transforms(models_dir, {
                 "processing_score": self.percent_rank_transform
             } if self.percent_rank_transform is not None else {})

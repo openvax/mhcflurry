@@ -1741,6 +1741,7 @@ add_path release_holdout
 
 add_glob processing/models.selected.*
 add_path processing/hits_with_tpm.csv.bz2
+add_path processing/hits_with_tpm.provenance.json
 add_path processing/gpu_occupancy.csv
 add_path processing/hyperparameters.base.yaml
 add_glob processing/hyperparameters.*.yaml

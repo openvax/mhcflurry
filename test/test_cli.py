@@ -4064,6 +4064,8 @@ def test_run_orchestrator_training_stats_only(tmp_path):
     assert compare_models.run(args) == 0
     # Side files written.
     assert json.loads((out_dir / "side_a.json").read_text())["label"] == "candidate"
+    assert json.loads((out_dir / "metric_policy.json").read_text())["ppv_at_n"] == (
+        "expected-uniform-cutoff-ties-v1")
     assert json.loads((out_dir / "side_b.json").read_text())["label"] == "baseline"
     # Top-level summary mentions both labels.
     summary_md = (out_dir / "summary.md").read_text()

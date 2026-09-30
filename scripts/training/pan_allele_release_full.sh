@@ -432,11 +432,19 @@ cp "$RECIPE_DIR/make_train_data.processing.py" .
 # table this run already wrote instead of recompressing it.
 if [ -s "$(pwd)/hits_with_tpm.csv.bz2" ] && \
         bzip2 -t "$(pwd)/hits_with_tpm.csv.bz2" 2>/dev/null; then
+    python annotate_hits_with_expression.py \
+        --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
+        --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
+        --random-seed "$RELEASE_RANDOM_SEED" \
+        --provenance "$(pwd)/hits_with_tpm.provenance.json" \
+        --out "$(pwd)/hits_with_tpm.csv.bz2" --validate-existing
     echo "Reusing annotated hits: $(pwd)/hits_with_tpm.csv.bz2"
 else
     python annotate_hits_with_expression.py \
         --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
         --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
+        --random-seed "$RELEASE_RANDOM_SEED" \
+        --provenance "$(pwd)/hits_with_tpm.provenance.json" \
         --out "$(pwd)/hits_with_tpm.csv"
     compress_csv_bzip2 "$(pwd)/hits_with_tpm.csv"
 fi

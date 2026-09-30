@@ -352,6 +352,12 @@ def run(args):
         json.dump(_side_to_json(side_a), fd, indent=2, sort_keys=True)
     with open(os.path.join(args.out, "side_b.json"), "w") as fd:
         json.dump(_side_to_json(side_b), fd, indent=2, sort_keys=True)
+    with open(os.path.join(args.out, "metric_policy.json"), "w") as fd:
+        json.dump({
+            "schema_version": 1,
+            "ppv_at_n": "expected-uniform-cutoff-ties-v1",
+            "n": "number of positives in the evaluated group",
+        }, fd, indent=2, sort_keys=True)
 
     _stamp("running components: %s" % (", ".join(components) or "(none)"))
 
@@ -418,7 +424,7 @@ def _reset_comparison_outputs(out_dir):
         elif os.path.exists(path):
             os.unlink(path)
     for name in (
-            "side_a.json", "side_b.json", "release_summary.csv",
+            "side_a.json", "side_b.json", "metric_policy.json", "release_summary.csv",
             "release_summary.md", "summary.md", "summary.pdf"):
         path = os.path.join(out_dir, name)
         try:
@@ -744,12 +750,19 @@ def _validate_component_configuration(args, components, side_a, side_b):
 
 
 def _ppv_at_n(y_true, y_score, n):
-    # Stable sort so tied scores break deterministically (by original index),
-    # making PPV@N reproducible run-to-run. Applied symmetrically to sides A
-    # and B, so it does not bias the comparison.
-    order = numpy.argsort(-y_score, kind="stable")
-    top = order[:n]
-    return float(y_true[top].sum()) / float(n) if n > 0 else numpy.nan
+    """Expected precision among the top N, sampling uniformly within ties."""
+    if n <= 0:
+        return numpy.nan
+    y_true = numpy.asarray(y_true)
+    y_score = numpy.asarray(y_score)
+    if n > len(y_score):
+        raise ValueError("N exceeds the number of scored rows")
+    cutoff = numpy.partition(y_score, len(y_score) - n)[len(y_score) - n]
+    above = y_score > cutoff
+    tied = y_score == cutoff
+    remaining = n - int(above.sum())
+    hits = y_true[above].sum() + remaining * y_true[tied].mean()
+    return float(hits) / float(n)
 
 
 def _metrics(y_true, y_score):

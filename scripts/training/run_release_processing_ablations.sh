@@ -81,6 +81,8 @@ if [ ! -f "$SHARED_DIR/train_data.csv.bz2" ]; then
     python "$REPO/downloads-generation/models_class1_processing/annotate_hits_with_expression.py" \
         --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
         --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
+        --random-seed "$RELEASE_RANDOM_SEED" \
+        --provenance "$SHARED_DIR/hits_with_tpm.provenance.json" \
         --out "$SHARED_DIR/hits_with_tpm.csv"
     compress_csv_bzip2 "$SHARED_DIR/hits_with_tpm.csv"
 
@@ -96,6 +98,12 @@ if [ ! -f "$SHARED_DIR/train_data.csv.bz2" ]; then
         "${TRAINING_PARALLELISM_ARGS[@]}"
     compress_csv_bzip2 "$SHARED_DIR/train_data.csv"
 fi
+python "$REPO/downloads-generation/models_class1_processing/annotate_hits_with_expression.py" \
+    --hits "$(mhcflurry-downloads path data_mass_spec_annotated)/annotated_ms.csv.bz2" \
+    --expression "$(mhcflurry-downloads path data_curated)/rna_expression.csv.bz2" \
+    --random-seed "$RELEASE_RANDOM_SEED" \
+    --provenance "$SHARED_DIR/hits_with_tpm.provenance.json" \
+    --out "$SHARED_DIR/hits_with_tpm.csv.bz2" --validate-existing
 mhcflurry train validate-processing-data --data "$SHARED_DIR/train_data.csv.bz2"
 
 conditions=(

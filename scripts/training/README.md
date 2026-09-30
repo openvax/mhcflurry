@@ -32,6 +32,14 @@ Affinity, processing, and presentation stages write persistent GPU telemetry.
 Worker packing defaults to workload-aware `auto`; pin a count only for a measured
 machine-specific benchmark.
 
+Processing source annotations use `RELEASE_RANDOM_SEED` (default 42) for ties
+between maximum-expression sources. Canonical row order makes the selection
+independent of input row order. `processing/hits_with_tpm.provenance.json`
+records the policy, seed, input and output hashes, generator hash and versions.
+Resuming the full workflow validates this record before reusing annotated hits.
+Old runs without that evidence must remain historical artifacts; use a new run
+directory for preparation with the reproducible policy.
+
 ## Reproduce the 2.3.0 weights
 
 Use the frozen `final-2.3.0-candidate-v2` recipe identifier. It selects the

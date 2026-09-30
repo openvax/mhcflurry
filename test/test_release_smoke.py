@@ -119,7 +119,9 @@ def run_block(block, cwd, prelude=""):
 
 def test_annotated_hits_are_reused_so_relaunch_keeps_the_recorded_hash(tmp_path):
     block = bash_block(SCRIPTS[0].read_text(), 'if [ -s "$(pwd)/hits_with_tpm.csv.bz2" ]')
-    prelude = ('python() { echo "ANNOTATED"; }\n'
+    prelude = ('RELEASE_RANDOM_SEED=42\n'
+               'python() { case "$*" in *--validate-existing*) echo "VALIDATED";; '
+               '*) echo "ANNOTATED";; esac; }\n'
                'compress_csv_bzip2() { echo "COMPRESSED"; }\n'
                'mhcflurry-downloads() { echo /stub; }\n')
     assert "ANNOTATED" in run_block(block, tmp_path, prelude)
@@ -127,6 +129,7 @@ def test_annotated_hits_are_reused_so_relaunch_keeps_the_recorded_hash(tmp_path)
                    stdout=(tmp_path / "hits_with_tpm.csv.bz2").open("wb"), check=True)
     reused = run_block(block, tmp_path, prelude)
     assert "Reusing annotated hits" in reused and "ANNOTATED" not in reused
+    assert "VALIDATED" in reused
     (tmp_path / "hits_with_tpm.csv.bz2").write_bytes(b"truncated garbage")
     assert "ANNOTATED" in run_block(block, tmp_path, prelude)
 
