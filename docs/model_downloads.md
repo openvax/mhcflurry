@@ -22,15 +22,18 @@ installed catalogue directories, with the recommended presentation bundle first,
 followed by standalone affinity and processing bundles.
 Affinity and processing rows also show components found inside installed
 presentation bundles as `RELEASE via presentation`; standalone bundle installs
-remain separate entries. These component entries require their expected model
-directories to exist and carry the presentation bundle's `?` or `!` source
-marker when its recorded source is unknown or differs from the catalogue.
+remain separate entries. Components must have a model directory and
+`manifest.csv` to appear in the table. A bundle containing only one processing
+variant is marked `with flanks only` or `without flanks only`. The presentation
+bundle's `?` or `!` marker indicates unknown or different source URLs.
 Aliases sharing the same archive are grouped in the availability columns;
 `releases DOWNLOAD` lists every valid identifier. Historical resources appear
 below the main predictors. Terminal output uses restrained color; redirected
 output and `NO_COLOR=1` remain plain.
 Use `--kind data` for data only, or `--release 2.2.0` to inspect an older catalogue.
-`info DOWNLOAD` adds descriptions, archive locations, and fetch/use commands.
+`info DOWNLOAD` adds descriptions, archive locations, fetch/use commands and
+exact embedded component paths. These presence checks do not verify weight
+file integrity or prove that embedded and standalone ensembles are identical.
 All three commands support `--json` and read the installed package's catalogue
 offline. Update the package to obtain a newer catalogue.
 
@@ -47,10 +50,17 @@ offline. Update the package to obtain a newer catalogue.
 
 The presentation bundle contains its own affinity and processing components.
 The standalone bundles can be absent while full presentation prediction is
-ready to use. This inventory does not change loading precedence: the default
-affinity loader can fall back to the presentation component, while processing
-APIs continue to use their documented standalone path unless explicitly given
-another model directory.
+ready to use. `Class1AffinityPredictor.load()` can fall back to the default
+presentation bundle when standalone affinity weights are absent and no
+affinity-path override is set. `Class1ProcessingPredictor.load()` has no such
+fallback: pass an embedded component path explicitly, or use
+`Class1PresentationPredictor.load().processing_predictor_with_flanks` (or
+`processing_predictor_without_flanks`). Explicit paths and release selection
+retain their existing precedence.
+
+In JSON output, `downloaded`, `status` and `path` still describe the named
+bundle. The additive `presentation_components` entries describe embedded paths,
+directory/manifest presence and the presentation bundle's source status.
 
 ## Compare new and historical weights
 
@@ -103,8 +113,9 @@ mhcflurry downloads url models_class1_presentation --release 2.3.0
 ```
 
 `info` starts with model availability, followed by historical resources and
-resolved configuration. Use `mhcflurry downloads --verbose info` for all default
-predictor paths and environment variables. The variables are **optional
+resolved configuration. Use `mhcflurry downloads --verbose info` for configured
+default predictor paths, components inside the default presentation predictor,
+and environment variables. The variables are **optional
 overrides**: `unset` means
 the default is in use, not that the local path is missing. On macOS the default
 root is `~/Library/Application Support/mhcflurry/4/`; each weight release has

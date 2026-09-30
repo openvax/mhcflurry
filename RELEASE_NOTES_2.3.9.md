@@ -1,10 +1,11 @@
 # MHCflurry 2.3.9
 
-This maintenance release makes the local model inventory report affinity and
-processing components that are available inside installed presentation
-bundles. Embedded components are labeled separately from standalone bundle
-installs, and their display retains the presentation bundle's source-status
-marker.
+Download inventory now distinguishes standalone bundles from components inside
+presentation bundles. Affinity and processing rows can show `2.3.0 via
+presentation`; detailed inspection shows each component's exact path and
+whether its manifest is present, including incomplete processing variants.
 
-The inventory checks for the expected component directories without importing
-model libraries. Model-selection precedence and predictions are unchanged.
+Existing standalone installation fields retain their meaning in JSON output;
+component metadata is additive. Inspection remains offline and does not load
+or modify weights. Model selection, environment overrides and prediction
+behavior are unchanged. Default weights remain 2.3.0.

@@ -17,6 +17,9 @@ import pytest
     (['downloads', 'info'], 0), (['downloads', 'list', '--json'], 0),
     (['downloads', 'releases', 'models_class1_presentation', '--json'], 0),
     (['downloads', 'info', 'models_class1_presentation'], 0),
+    (['downloads', 'info', 'models_class1_pan'], 0),
+    (['downloads', 'info', 'models_class1_processing', '--json'], 0),
+    (['downloads', '--verbose', 'info'], 0),
     (['predict', '--model-release', 'not-a-release'], 2),
 ])
 def test_discovery_does_not_import_numerical_stack(argv, code):

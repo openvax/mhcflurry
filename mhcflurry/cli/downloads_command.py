@@ -342,7 +342,9 @@ def fetch_subcommand(args):
 
 def _download_records(release, kind="all"):
     records = []
-    for name, info in get_release_downloads(release).items():
+    downloads = get_release_downloads(release)
+    presentation = downloads.get('models_class1_presentation')
+    for name, info in downloads.items():
         description = get_bundle_description(name)
         if kind != "all" and description["kind"] != kind:
             continue
@@ -358,6 +360,12 @@ def _download_records(release, kind="all"):
             path=os.path.abspath(get_path(name, test_exists=False, release=release)),
             urls=get_download_urls(info["metadata"]),
             default=info["metadata"].get("default", False)))
+        if presentation and (name == 'models_class1_presentation' or
+                             name in _PRESENTATION_COMPONENT_DIRS):
+            records[-1]['presentation_components'] = _presentation_components(
+                get_path('models_class1_presentation', 'models',
+                         test_exists=False, release=release),
+                name, presentation['up_to_date'])
     return records
 
 
@@ -398,16 +406,30 @@ _PRESENTATION_COMPONENT_DIRS = {
 }
 
 
-def _presentation_component_installed(name, release):
-    """Return whether a presentation bundle contains a complete component."""
-    component_dirs = _PRESENTATION_COMPONENT_DIRS.get(name)
-    if not component_dirs:
-        return False
-    presentation_models = get_path(
-        'models_class1_presentation', 'models', test_exists=False,
-        release=release)
-    return all(os.path.isdir(os.path.join(presentation_models, component))
-               for component in component_dirs)
+def _presentation_components(models_dir, name=None, source_matches=None):
+    """Inspect component paths without loading weights or verifying integrity."""
+    components = []
+    for bundle, directories in _PRESENTATION_COMPONENT_DIRS.items():
+        if name not in (None, 'models_class1_presentation', bundle):
+            continue
+        for directory in directories:
+            path = os.path.abspath(os.path.join(models_dir, directory))
+            components.append(dict(
+                name=directory, path=path,
+                directory_exists=os.path.isdir(path),
+                manifest_exists=os.path.isfile(os.path.join(path, 'manifest.csv')),
+                source_matches=source_matches))
+    return components
+
+
+def _print_presentation_components(components):
+    """Show each component's exact path and limited filesystem checks."""
+    for component in components:
+        status = ('manifest present' if component['manifest_exists'] else
+                  'missing manifest' if component['directory_exists'] else
+                  'not installed')
+        print('  %s: %s [%s]' % (component['name'], component['path'], status))
+    print('  Presence does not verify model files or imply equivalence to standalone weights.')
 
 
 def _print_table(headers, rows, colors=None, wrap_columns=()):
@@ -442,7 +464,7 @@ def _model_versions(name, releases):
     versions = get_bundle_versions(name)
     installed = []
     custom = get_current_release() is None
-    custom_candidates = {'': [], ' via presentation': []}
+    custom_candidates = {}
     standalone_releases = {
         release for version in versions for release in version['releases']}
     presentation_releases = (
@@ -462,14 +484,23 @@ def _model_versions(name, releases):
         if standalone and standalone['downloaded']:
             sources.append((standalone, ''))
         presentation = release_downloads.get('models_class1_presentation')
-        if (presentation and
-                _presentation_component_installed(name, release)):
-            sources.append((presentation, ' via presentation'))
+        if presentation and name in _PRESENTATION_COMPONENT_DIRS:
+            components = _presentation_components(get_path(
+                'models_class1_presentation', 'models', test_exists=False,
+                release=release), name)
+            present = [item for item in components if item['manifest_exists']]
+            if present:
+                suffix = ' via presentation'
+                if len(present) != len(components):
+                    variant = ('with flanks' if present[0]['name'].endswith('_with_flanks')
+                               else 'without flanks')
+                    suffix += ' (%s only)' % variant
+                sources.append((presentation, suffix))
         for info, suffix in sources:
             marker = ("" if info['up_to_date'] is True else
                       "?" if info['up_to_date'] is None else "!")
             if custom:
-                custom_candidates[suffix].append((release, marker))
+                custom_candidates.setdefault(suffix, []).append((release, marker))
             else:
                 installed.append(release + marker + suffix)
 
@@ -505,6 +536,7 @@ def _print_downloads(records):
         _print_table(('MODEL', 'LATEST', 'OTHER VERSIONS', 'INSTALLED'), rows,
                      colors={1: '36', 3: _status_color}, wrap_columns=(2, 3))
         print("Shared archive aliases are grouped under one version; 'releases NAME' lists all.")
+        print("'via presentation' identifies embedded components, not standalone bundle installs.")
         if any('?' in row[3] or '!' in row[3] for row in rows):
             print('Installed: ? unknown source; ! recorded source differs from that catalogue.')
     for group, kind in (('Historical models', 'models'), ('Supporting data', 'data')):
@@ -520,7 +552,7 @@ def _print_downloads(records):
             rows.append((record['name'], yes_no(record['downloaded']), source))
         _print_table(('DOWNLOAD', 'LOCAL', 'SOURCE'), rows,
                      colors={1: _status_color, 2: _status_color})
-    print("\nLocal status checks directories and recorded source URLs, not file integrity.")
+    print("\nLocal status checks directories, component manifests and recorded source URLs, not file integrity.")
     print("Details: mhcflurry downloads info NAME | Versions: mhcflurry downloads releases NAME")
 
 
@@ -603,7 +635,8 @@ def info_subcommand(args):
             return
         print(_style(record['name'] + " — " + release, '1;36'))
         print(record['description'])
-        print("Status: " + record['status'])
+        print(('Standalone bundle status: ' if record['name'] in _PRESENTATION_COMPONENT_DIRS
+               else 'Status: ') + record['status'])
         print("Directory: " + record['path'])
         print("\nFetch: " + fetch)
         print("Locate: mhcflurry downloads path %s --release %s" % (record['name'], release))
@@ -612,6 +645,16 @@ def info_subcommand(args):
         elif record['name'] == 'models_class1_pan':
             print("Predict: mhcflurry predict INPUT.csv --affinity-only --models " +
                   quote(os.path.join(record['path'], 'models.combined')))
+        if 'presentation_components' in record:
+            _heading('Components inside presentation bundle')
+            _print_presentation_components(record['presentation_components'])
+            print('  Use these paths explicitly to select embedded components.')
+            if record['name'] != 'models_class1_pan':
+                print('  Standalone processing loading does not fall back to presentation.')
+            source = record['presentation_components'][0]['source_matches']
+            print('  Presentation source URLs: ' + (
+                'match catalogue' if source is True else
+                'differ from catalogue' if source is False else 'unknown'))
         _heading("Versions / archive sources (shared URLs grouped)")
         for version in record['versions']:
             print("  " + ', '.join(version['releases']))
@@ -632,6 +675,7 @@ def info_subcommand(args):
         downloads_dir=os.path.abspath(get_downloads_dir(release)),
         default_model_paths={key: dict(path=os.path.abspath(value), exists=os.path.exists(value))
                              for key, value in defaults.items()},
+        default_presentation_components=_presentation_components(defaults['presentation']),
         environment_overrides={key: os.environ.get(key) or None for key in ENVIRONMENT_VARIABLES},
         downloads=_download_records(release))
     if args.json:
@@ -649,6 +693,10 @@ def info_subcommand(args):
         _heading("Default prediction paths (before --models / --model-release)")
         for kind, item in config['default_model_paths'].items():
             print("  %s: %s [%s]" % (kind, item['path'], 'exists' if item['exists'] else 'not installed'))
+        print('  Affinity can fall back to presentation when its default standalone path is absent')
+        print('  and no affinity-path override is set. Standalone processing has no such fallback.')
+        _heading('Components inside default presentation predictor')
+        _print_presentation_components(config['default_presentation_components'])
     overrides = {key: value for key, value in config['environment_overrides'].items()
                  if value or args.verbose}
     if overrides:
