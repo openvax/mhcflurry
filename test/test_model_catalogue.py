@@ -21,13 +21,18 @@ def versioned_cache(tmp_path, monkeypatch):
     return tmp_path
 
 
-def record_source(path, release):
+def record_source(path, release, bundle=BUNDLE):
     path.mkdir(parents=True, exist_ok=True)
-    metadata = downloads.get_release_downloads(release)[BUNDLE]['metadata']
+    metadata = downloads.get_release_downloads(release)[bundle]['metadata']
     with (path / 'DOWNLOAD_INFO.csv').open('w', newline='') as fd:
         writer = csv.writer(fd)
         writer.writerow(['url'])
         writer.writerows([url] for url in downloads.get_download_urls(metadata))
+
+
+def component_manifest(path):
+    path.mkdir(parents=True, exist_ok=True)
+    (path / 'manifest.csv').write_text('model_name,config_json\n')
 
 
 def test_all_bundles_have_descriptions():
@@ -56,6 +61,7 @@ def test_list_json_and_historical_source(versioned_cache, capsys):
     assert presentation['path'] == str(versioned_cache / '2.2.0' / BUNDLE)
     assert '/pre-2.0/' in presentation['urls'][0]
     assert presentation['status'] == 'not installed'
+    assert not (versioned_cache / '2.2.0').exists()
 
 
 def test_info_resolves_defaults_and_source_status(versioned_cache, capsys):
@@ -111,6 +117,168 @@ def test_model_table_marks_unverified_sources_and_custom_roots(tmp_path, monkeyp
     assert downloads_command._model_versions(BUNDLE, {})[2] == 'custom: 2.2.0'
     (path / 'DOWNLOAD_INFO.csv').write_text('url\nhttps://example.org/custom-models\n')
     assert downloads_command._model_versions(BUNDLE, {})[2] == 'custom!'
+
+
+def test_model_table_shows_components_available_through_presentation(
+        versioned_cache):
+    presentation = versioned_cache / '2.3.0' / BUNDLE
+    models = presentation / 'models'
+    component_manifest(models / 'affinity_predictor')
+    component_manifest(models / 'processing_predictor_with_flanks')
+    component_manifest(models / 'processing_predictor_without_flanks')
+    record_source(presentation, '2.3.0')
+    standalone = versioned_cache / '2.2.0' / 'models_class1_pan'
+    record_source(standalone, '2.2.0', 'models_class1_pan')
+
+    assert downloads_command._model_versions('models_class1_pan', {})[2] == (
+        '2.3.0 via presentation, 2.2.0')
+    assert downloads_command._model_versions('models_class1_processing', {})[2] == (
+        '2.3.0 via presentation')
+    assert downloads_command._model_versions(BUNDLE, {})[2] == '2.3.0'
+    assert downloads.get_default_class1_processing_models_dir(test_exists=False) == str(
+        versioned_cache / '2.3.0' / 'models_class1_processing' /
+        'models.selected.with_flanks')
+    record_source(versioned_cache / '2.3.0' / 'models_class1_pan',
+                  '2.3.0', 'models_class1_pan')
+    assert downloads_command._model_versions('models_class1_pan', {})[2] == (
+        '2.3.0, 2.3.0 via presentation, 2.2.0')
+
+
+def test_model_table_checks_embedded_component_directories(versioned_cache, capsys):
+    presentation = versioned_cache / '2.3.0' / BUNDLE
+    models = presentation / 'models'
+    models.mkdir(parents=True)
+    record_source(presentation, '2.3.0')
+
+    assert downloads_command._model_versions('models_class1_pan', {})[2] == '—'
+    assert downloads_command._model_versions('models_class1_processing', {})[2] == '—'
+
+    (models / 'affinity_predictor').mkdir()
+    (models / 'processing_predictor_with_flanks').mkdir()
+    assert downloads_command._model_versions('models_class1_pan', {})[2] == '—'
+    assert downloads_command._model_versions('models_class1_processing', {})[2] == '—'
+    downloads_command.run(['info', 'models_class1_processing'])
+    text = capsys.readouterr().out
+    assert str(models / 'processing_predictor_with_flanks') + ' [missing manifest]' in text
+    assert str(models / 'processing_predictor_without_flanks') + ' [not installed]' in text
+    assert 'Standalone processing loading does not fall back' in text
+
+    component_manifest(models / 'affinity_predictor')
+    component_manifest(models / 'processing_predictor_with_flanks')
+    assert downloads_command._model_versions('models_class1_pan', {})[2] == (
+        '2.3.0 via presentation')
+    assert downloads_command._model_versions('models_class1_processing', {})[2] == (
+        '2.3.0 via presentation (with flanks only)')
+
+    component_manifest(models / 'processing_predictor_without_flanks')
+    assert downloads_command._model_versions('models_class1_processing', {})[2] == (
+        '2.3.0 via presentation')
+    (models / 'processing_predictor_with_flanks' / 'manifest.csv').unlink()
+    assert downloads_command._model_versions('models_class1_processing', {})[2] == (
+        '2.3.0 via presentation (without flanks only)')
+
+
+def test_embedded_component_source_status_and_custom_roots(
+        tmp_path, monkeypatch):
+    monkeypatch.setattr(downloads, '_CURRENT_RELEASE', None)
+    monkeypatch.setattr(downloads, '_DOWNLOADS_DIR', str(tmp_path))
+    presentation = tmp_path / BUNDLE
+    component_manifest(presentation / 'models' / 'affinity_predictor')
+
+    assert downloads_command._model_versions('models_class1_pan', {})[2] == (
+        'custom? via presentation')
+    record_source(presentation, '2.3.0')
+    assert downloads_command._model_versions('models_class1_pan', {})[2] == (
+        'custom: 2.3.0 via presentation')
+    (presentation / 'DOWNLOAD_INFO.csv').write_text(
+        'url\nhttps://example.org/custom-models\n')
+    assert downloads_command._model_versions('models_class1_pan', {})[2] == (
+        'custom! via presentation')
+
+
+def test_versioned_embedded_component_preserves_source_markers(versioned_cache):
+    presentation = versioned_cache / '2.3.0' / BUNDLE
+    component_manifest(presentation / 'models' / 'affinity_predictor')
+
+    assert downloads_command._model_versions('models_class1_pan', {})[2] == (
+        '2.3.0? via presentation')
+    (presentation / 'DOWNLOAD_INFO.csv').write_text(
+        'url\nhttps://example.org/different-presentation\n')
+    assert downloads_command._model_versions('models_class1_pan', {})[2] == (
+        '2.3.0! via presentation')
+
+
+def test_component_details_preserve_standalone_status_and_paths(versioned_cache, capsys):
+    root = versioned_cache / '2.3.0'
+    affinity = root / BUNDLE / 'models' / 'affinity_predictor'
+    component_manifest(affinity)
+    record_source(root / BUNDLE, '2.3.0')
+    before = {p.relative_to(root): (p.read_bytes(), p.stat().st_mtime_ns)
+              for p in root.rglob('*') if p.is_file()}
+    downloads_command.run(['info', 'models_class1_pan', '--json'])
+    record = json.loads(capsys.readouterr().out)
+    assert record['downloaded'] is False
+    assert record['status'] == 'not installed'
+    assert record['source_matches'] is None
+    assert record['path'] == str(root / 'models_class1_pan')
+    assert record['presentation_components'] == [dict(
+        name='affinity_predictor', path=str(affinity), directory_exists=True,
+        manifest_exists=True, source_matches=True)]
+
+    downloads_command.run(['info', BUNDLE])
+    text = capsys.readouterr().out
+    assert str(affinity) + ' [manifest present]' in text
+    assert str(root / BUNDLE / 'models' / 'processing_predictor_with_flanks') in text
+    assert 'not installed' in text
+    assert 'Presentation loading uses these embedded components' in text
+    assert 'equivalence to standalone weights' in text
+    downloads_command.run(['info', 'models_class1_pan'])
+    text = capsys.readouterr().out
+    assert 'Default affinity loading can fall back to the default presentation bundle' in text
+    downloads_command.run(['list', '--json'])
+    records = json.loads(capsys.readouterr().out)['downloads']
+    assert next(r for r in records if r['name'] == 'models_class1_pan') == {
+        key: value for key, value in record.items() if key not in ('versions', 'fetch_command')}
+    assert {p.relative_to(root): (p.read_bytes(), p.stat().st_mtime_ns)
+            for p in root.rglob('*') if p.is_file()} == before
+    assert not (root / 'models_class1_pan').exists()
+
+
+def test_component_details_follow_browsed_release_not_default_override(
+        versioned_cache, monkeypatch, capsys):
+    custom = versioned_cache / 'custom predictor'
+    component_manifest(custom / 'affinity_predictor')
+    component_manifest(versioned_cache / '2.2.0' / BUNDLE / 'models' /
+                       'processing_predictor_without_flanks')
+    monkeypatch.setattr(downloads, '_MHCFLURRY_DEFAULT_CLASS1_PRESENTATION_MODELS_DIR', str(custom))
+    affinity_override = str(versioned_cache / 'missing affinity override')
+    monkeypatch.setattr(downloads, '_MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR', affinity_override)
+    downloads_command.run(['info', 'models_class1_processing', '--release', '2.2.0', '--json'])
+    components = json.loads(capsys.readouterr().out)['presentation_components']
+    assert [item['manifest_exists'] for item in components] == [False, True]
+    assert all('/2.2.0/' in item['path'] for item in components)
+    downloads_command.run(['info', 'models_class1_pan', '--release', '2.2.0'])
+    text = capsys.readouterr().out
+    assert 'default presentation bundle' in text
+    assert 'Browsing does not select weights' in text
+    assert str(versioned_cache / '2.2.0' / BUNDLE / 'models' / 'affinity_predictor') in text
+
+    downloads_command.run(['info', '--release', '2.2.0', '--json'])
+    config = json.loads(capsys.readouterr().out)
+    assert config['default_model_paths']['affinity'] == dict(path=affinity_override, exists=False)
+    assert config['default_model_paths']['presentation'] == dict(path=str(custom), exists=True)
+    assert config['default_presentation_components'][0]['path'] == str(custom / 'affinity_predictor')
+    assert config['default_model_paths']['processing']['path'] == str(
+        versioned_cache / '2.3.0' / 'models_class1_processing' / 'models.selected.with_flanks')
+    # Discovery neither rewrites overrides nor introduces a processing fallback.
+    with pytest.raises(IOError, match='No such directory'):
+        downloads.get_default_class1_models_dir()
+    with pytest.raises(RuntimeError):
+        downloads.get_default_class1_processing_models_dir()
+    downloads_command.run(['--verbose', 'info'])
+    text = capsys.readouterr().out
+    assert str(custom / 'affinity_predictor') in text
+    assert 'no affinity-path override' in text
 
 
 @pytest.mark.parametrize('environment', [{}, {'NO_COLOR': '1'}, {'TERM': 'dumb'}])
