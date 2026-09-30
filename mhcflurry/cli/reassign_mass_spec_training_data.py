@@ -18,6 +18,7 @@ import sys
 import pandas
 
 from mhcflurry.release_holdout import exclude_affinity_pmhcs
+from mhcflurry.sample_disjointness import exclude_source_samples
 
 
 def make_parser(prog=None):
@@ -31,6 +32,8 @@ def make_parser(prog=None):
     parser.add_argument(
         "--exclude-pmhcs",
         help="CSV of frozen evaluation allele,peptide pairs to exclude.")
+    parser.add_argument("--exclude-source-samples", help="CSV of study_id,sample_id exclusions")
+    parser.add_argument("--sample-aliases", help="Explicit study/specimen alias CSV")
     parser.add_argument(
         "--verbose",
         action="store_true",
@@ -46,9 +49,13 @@ def reassign_mass_spec_training_data(
         set_measurement_value=None,
         exclude_pmhcs=None,
         out_csv=None,
-        verbose=False):
+        verbose=False,
+        exclude_source_samples_manifest=None,
+        sample_aliases=None):
     """Return a curated training dataframe with requested MS-row edits."""
-    df = pandas.read_csv(data)
+    df = pandas.read_csv(data, dtype={"sample_id": str, "study_id": str})
+    if sample_aliases and not exclude_source_samples_manifest:
+        raise ValueError("sample_aliases requires exclude_source_samples_manifest")
     print("Read %d rows from %s" % (len(df), data), file=sys.stderr)
     if verbose:
         print(df, file=sys.stderr)
@@ -67,6 +74,8 @@ def reassign_mass_spec_training_data(
 
     if exclude_pmhcs:
         df = exclude_affinity_pmhcs(df, exclude_pmhcs)
+    if exclude_source_samples_manifest:
+        df = exclude_source_samples(df, exclude_source_samples_manifest, sample_aliases)
 
     if set_measurement_value is not None:
         indexer = df.measurement_kind == "mass_spec"
@@ -96,7 +105,9 @@ def run_argv(argv=None, prog=None):
         set_measurement_value=args.set_measurement_value,
         exclude_pmhcs=args.exclude_pmhcs,
         out_csv=args.out_csv,
-        verbose=args.verbose)
+        verbose=args.verbose,
+        exclude_source_samples_manifest=args.exclude_source_samples,
+        sample_aliases=args.sample_aliases)
 
 
 def main(argv=None):

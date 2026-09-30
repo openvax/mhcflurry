@@ -26,9 +26,10 @@ The workflow runs these stages in order:
 1. Build and persist the pMHC and sample manifests for the frozen release
    holdout (all monoallelic samples for affinity; PMID 31154438 for processing
    and presentation).
-2. Train affinity outside the benchmark pMHC intersection and presentation
-   outside the complete multiallelic holdout samples.
-3. Validate zero holdout overlap in the final training artifacts.
+2. Train affinity outside the benchmark pMHC intersection and known source
+   samples/studies, and presentation outside the multiallelic holdout samples.
+3. Validate the recorded exclusions in final training artifacts. These checks
+   do not certify complete biological-sample separation when lineage is missing.
 4. Compare the new models with a configured public release or run directory,
    restricted to the frozen component-specific evaluation samples.
 5. Render diagnostic plots and a combined PDF.
@@ -38,6 +39,11 @@ The workflow runs these stages in order:
 Each stage has a `--skip-*` option for controlled resumption. Logs and
 `status.tsv` are written under `<run-dir>/workflow_logs/`. Deployment is off by
 default.
+
+Use the [training-sample audit](../../docs/training_provenance.md) before claiming
+sample-disjoint evaluation. It covers the union of pretraining, training,
+development and selection across every compared model. Historical affinity and
+external predictor lineage may remain unresolved; preserve that caveat.
 
 The command delegates process orchestration to
 `retrain_evaluate_deploy.sh`. That script remains internal because it owns shell

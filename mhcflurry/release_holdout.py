@@ -14,6 +14,7 @@ from .common import (
     normalize_class1_genotype,
     normalize_sequence_resolved_allele_name,
 )
+from .training_provenance import identity_text, study_identity
 
 
 BENCHMARK_FILES = {
@@ -22,6 +23,7 @@ BENCHMARK_FILES = {
 }
 AFFINITY_PMHCS_FILE = "affinity_pmhcs.csv"
 AFFINITY_SAMPLES_FILE = "affinity_samples.csv"
+AFFINITY_SOURCE_SAMPLES_FILE = "affinity_source_samples.csv"
 PROCESSING_SAMPLES_FILE = "processing_samples.csv"
 PRESENTATION_SAMPLES_FILE = "presentation_samples.csv"
 POLICY_FILE = "policy.json"
@@ -41,6 +43,7 @@ def _benchmark_rows(path, chunksize):
     for chunk in pandas.read_csv(
             path,
             usecols=["peptide", "sample_id", "hit", "hla"],
+            dtype={"sample_id": str},
             chunksize=chunksize):
         yield chunk
 
@@ -67,8 +70,10 @@ def build_release_holdout(
 
     Affinity metrics are evaluated on every monoallelic benchmark sample.
     Every pMHC from current affinity training that appears in those rows or in
-    the selected multiallelic holdout (hit or decoy) is excluded so downstream
-    presentation evaluation cannot leak through the affinity component.
+    the selected multiallelic holdout (hit or decoy) is excluded. A separate
+    source-sample manifest covers the union of these evaluation samples.
+    Neither manifest alone proves complete biological-sample separation when
+    historical training lineage or cross-study specimen aliases are missing.
     Processing and presentation are evaluated only on the named multiallelic
     source-study holdout; presentation excludes those samples from training in
     full.
@@ -96,9 +101,14 @@ def build_release_holdout(
     sample_metadata = pandas.read_csv(
         mass_spec_data,
         usecols=["sample_id", "pmid", "format", "mhc_class"],
-    ).drop_duplicates("sample_id")
-    sample_metadata["sample_id"] = sample_metadata.sample_id.astype(str)
-    sample_metadata["pmid"] = sample_metadata.pmid.astype(str)
+        dtype={"sample_id": str, "pmid": str},
+    ).drop_duplicates()
+    if sample_metadata.sample_id.duplicated().any():
+        raise ValueError("Conflicting metadata for a source sample")
+    sample_metadata["sample_id"] = sample_metadata.sample_id.map(identity_text)
+    if sample_metadata.sample_id.eq("").any():
+        raise ValueError("Source sample metadata contains missing sample IDs")
+    sample_metadata["pmid"] = sample_metadata.pmid.map(identity_text)
     holdout_pmids = tuple(str(value) for value in presentation_holdout_pmids)
     presentation_samples = set(sample_metadata.loc[
         sample_metadata.mhc_class.eq("I")
@@ -167,6 +177,12 @@ def build_release_holdout(
     affinity_samples_frame = pandas.DataFrame({
         "sample_id": sorted(affinity_samples),
     })
+    study_map = sample_metadata.set_index("sample_id").pmid.map(study_identity)
+    source_samples_frame = pandas.DataFrame({
+        "sample_id": sorted(affinity_samples | presentation_samples),
+    })
+    source_samples_frame["study_id"] = source_samples_frame.sample_id.map(study_map).fillna("")
+    source_samples_frame = source_samples_frame[["study_id", "sample_id"]]
     processing_frame = pandas.DataFrame({
         "sample_id": sorted(presentation_samples),
     })
@@ -176,6 +192,7 @@ def build_release_holdout(
     affinity_frame.to_csv(out_dir / AFFINITY_PMHCS_FILE, index=False)
     affinity_samples_frame.to_csv(
         out_dir / AFFINITY_SAMPLES_FILE, index=False)
+    source_samples_frame.to_csv(out_dir / AFFINITY_SOURCE_SAMPLES_FILE, index=False)
     processing_frame.to_csv(out_dir / PROCESSING_SAMPLES_FILE, index=False)
     presentation_frame.to_csv(out_dir / PRESENTATION_SAMPLES_FILE, index=False)
 
@@ -183,6 +200,7 @@ def build_release_holdout(
     for filename, frame in (
             (AFFINITY_PMHCS_FILE, affinity_frame),
             (AFFINITY_SAMPLES_FILE, affinity_samples_frame),
+            (AFFINITY_SOURCE_SAMPLES_FILE, source_samples_frame),
             (PROCESSING_SAMPLES_FILE, processing_frame),
             (PRESENTATION_SAMPLES_FILE, presentation_frame)):
         holdout_files[filename] = {
@@ -191,15 +209,17 @@ def build_release_holdout(
         }
 
     policy = {
-        "schema_version": 1,
+        "schema_version": 2,
         "policy": {
             "affinity": (
                 "Evaluate affinity metrics on all monoallelic samples. "
                 "Exclude every current-training pMHC that occurs in those "
                 "rows or in the named multiallelic source-study holdout, "
                 "including decoys; expand multiallelic genotypes to every "
-                "listed allele so presentation evaluation cannot leak "
-                "through the affinity component."
+                "listed allele. Also exclude source samples (or studies "
+                "where sample identities are unavailable) using preserved "
+                "provenance. Zero pMHC overlap does not prove whole-sample "
+                "disjointness; run audit-samples on all model lineage."
             ),
             "processing": (
                 "Evaluate only the named multiallelic source-study holdout; "
@@ -227,6 +247,8 @@ def build_release_holdout(
         "holdout_files": holdout_files,
         "affinity_pmhc_count": len(affinity_frame),
         "affinity_sample_count": len(affinity_samples_frame),
+        "source_sample_count": len(source_samples_frame),
+        "source_samples_missing_study": int(source_samples_frame.study_id.eq("").sum()),
         "processing_sample_count": len(processing_frame),
         "presentation_sample_count": len(presentation_frame),
     }
@@ -238,7 +260,7 @@ def build_release_holdout(
 
 def load_excluded_samples(path):
     """Load a generated one-column sample exclusion manifest."""
-    frame = pandas.read_csv(path)
+    frame = pandas.read_csv(path, dtype={"sample_id": str}, keep_default_na=False)
     if list(frame.columns) != ["sample_id"]:
         raise ValueError(
             f"Expected one sample_id column in {path}; "
@@ -283,7 +305,7 @@ def validate_holdout_manifests(holdout_dir):
     policy_path = holdout_dir / POLICY_FILE
     with open(policy_path) as fd:
         policy = json.load(fd)
-    if policy.get("schema_version") != 1:
+    if policy.get("schema_version") not in (1, 2):
         raise ValueError(
             f"Unsupported release holdout policy schema: {policy_path}")
     expected_files = {
@@ -292,6 +314,8 @@ def validate_holdout_manifests(holdout_dir):
         PROCESSING_SAMPLES_FILE,
         PRESENTATION_SAMPLES_FILE,
     }
+    if policy["schema_version"] == 2:
+        expected_files.add(AFFINITY_SOURCE_SAMPLES_FILE)
     holdout_files = policy.get("holdout_files", {})
     if set(holdout_files) != expected_files:
         raise ValueError(
@@ -316,7 +340,11 @@ def validate_release_holdout(
         processing_training_data,
         presentation_training_data,
         out=None):
-    """Fail if any frozen evaluation identity remains in release training."""
+    """Check recorded pMHC/sample IDs, without asserting complete lineage.
+
+    Whole biological-sample separation additionally requires ``audit-samples``
+    across pretraining, training, development and selection for every model.
+    """
     holdout_dir = Path(holdout_dir).resolve()
     policy = validate_holdout_manifests(holdout_dir)
     affinity = pandas.read_csv(
@@ -345,15 +373,27 @@ def validate_release_holdout(
         processing_training_data, PROCESSING_SAMPLES_FILE)
     presentation_overlap = count_sample_overlaps(
         presentation_training_data, PRESENTATION_SAMPLES_FILE)
+    source_overlap = 0
+    if policy["schema_version"] == 2:
+        from .sample_disjointness import exclude_source_samples
+        for chunk in pandas.read_csv(affinity_training_data, chunksize=100_000):
+            source_overlap += len(chunk) - len(exclude_source_samples(
+                chunk, holdout_dir / AFFINITY_SOURCE_SAMPLES_FILE))
 
     result = {
         "schema_version": 1,
+        "sample_disjointness": "unresolved",
+        "sample_disjointness_reason": (
+            "Recorded pMHC/source checks do not establish complete component lineage; "
+            "use audit-samples for every compared model."),
         "policy_sha256": _sha256(holdout_dir / POLICY_FILE),
         "holdout_files": policy["holdout_files"],
         "affinity_overlap_rows": int(affinity_overlap),
         "processing_overlap_rows": int(processing_overlap),
         "presentation_overlap_rows": int(presentation_overlap),
     }
+    if policy["schema_version"] == 2:
+        result["affinity_source_overlap_rows"] = int(source_overlap)
     if out:
         with open(out, "w") as fd:
             json.dump(result, fd, indent=2, sort_keys=True)
@@ -385,6 +425,15 @@ def make_parser(prog="mhcflurry train release-holdout"):
     validate.add_argument("--processing-training-data", required=True)
     validate.add_argument("--presentation-training-data", required=True)
     validate.add_argument("--out")
+    audit = subparsers.add_parser(
+        "audit-samples", help="Audit all model lineage and export one shared cohort")
+    audit.add_argument("--inventory", required=True, help="Reviewed lineage inventory JSON")
+    audit.add_argument("--cohort", required=True, help="Frozen CSV with sample_id and optional study_id")
+    audit.add_argument("--sample-metadata", help="CSV mapping sample_id to study_id")
+    audit.add_argument("--aliases", help="Explicit study/specimen alias CSV")
+    audit.add_argument("--out-dir", required=True, help="New output directory; never overwritten")
+    audit.add_argument("--report-only", action="store_true",
+                       help="Write findings without failing on unresolved/overlapping samples")
     return parser
 
 
@@ -399,7 +448,7 @@ def run_argv(argv=None, prog="mhcflurry train release-holdout"):
             presentation_holdout_pmids=args.presentation_holdout_pmids,
             chunksize=args.chunksize,
         )
-    else:
+    elif args.command == "validate":
         validate_release_holdout(
             holdout_dir=args.holdout_dir,
             affinity_training_data=args.affinity_training_data,
@@ -407,6 +456,15 @@ def run_argv(argv=None, prog="mhcflurry train release-holdout"):
             presentation_training_data=args.presentation_training_data,
             out=args.out,
         )
+    else:
+        from .sample_disjointness import audit_samples
+        report = audit_samples(
+            args.inventory, args.cohort, args.out_dir,
+            aliases_path=args.aliases, sample_metadata=args.sample_metadata)
+        print(json.dumps(report, indent=2, sort_keys=True))
+        if report["status"] != "disjoint" and not args.report_only:
+            raise ValueError(
+                "Whole-sample disjointness is not verified; see sample_disjointness.json")
     return 0
 
 

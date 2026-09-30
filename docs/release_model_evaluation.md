@@ -90,8 +90,11 @@ the previous cohort SHA256 was
 `81d18501616358b3c4b0f87d6e405ed50ea67dfefa31d6f8097d39818d658b41`.
 
 The cohort is disjoint from the inventoried MHCflurry training peptide sources.
-Unavailable or incomplete training records, especially for external predictors,
-prevent claiming disjointness from every model ever trained. Ten patients limit
+This is peptide-level exclusion: older affinity artifacts lack sufficient
+provenance to certify whole biological-sample separation across all compared
+MHCflurry models. External predictors' training overlap is also uncertified.
+See {doc}`training_provenance` for the distinction and the conservative audit.
+Ten patients limit
 precision and generalizability; the release changed both recipes and data, so
 its gains cannot be attributed solely to newer data. PPV@N uses the retained
 positive count in each patient, with expected precision across score ties.
