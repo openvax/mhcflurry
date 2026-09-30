@@ -130,6 +130,9 @@ def test_audit_union_includes_selection_and_preserves_identical_positive_negativ
     assert report["cohort"]["retained_samples"] == 1
     assert report["cohort"]["input_positives"] == 2
     assert report["input_files"][str(train)]["sha256"] == file_sha256(train)
+    assert len(report["generator"]["source_sha256"]) == 64
+    assert report["generator"]["random_seed"] is None
+    assert report["generator"]["arguments"]["inventory_path"] == str(path)
     with pytest.raises(FileExistsError):
         audit_samples(path, cohort, tmp_path / "audit")
 

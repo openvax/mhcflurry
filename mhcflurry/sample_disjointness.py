@@ -2,12 +2,15 @@
 
 import json
 from pathlib import Path
+import platform
 
 import pandas
 
+from . import training_provenance
 from .training_provenance import (
     PROVENANCE_COLUMN, decode_sources, file_sha256, identity_text, study_identity,
 )
+from .version import __version__
 
 
 STAGES = ("pretraining", "training", "development", "selection")
@@ -259,6 +262,19 @@ def audit_samples(inventory_path, cohort_path, out_dir, *, aliases_path=None,
     external = table.loc[table.kind.eq("external")]
     report = {
         "schema_version": 1,
+        "generator": {
+            "package_version": __version__, "python_version": platform.python_version(),
+            "pandas_version": pandas.__version__, "random_seed": None,
+            "source_sha256": file_sha256(__file__),
+            "training_provenance_sha256": file_sha256(training_provenance.__file__),
+            "function": "mhcflurry.sample_disjointness.audit_samples",
+            "arguments": {
+                "inventory_path": str(inventory_path.resolve()),
+                "cohort_path": str(cohort_path.resolve()), "out_dir": str(out_dir.resolve()),
+                "aliases_path": str(Path(aliases_path).resolve()) if aliases_path else None,
+                "sample_metadata": str(Path(sample_metadata).resolve()) if sample_metadata else None,
+            },
+        },
         "status": "disjoint" if internal.status.eq("disjoint").all() else "not_verified",
         "external_status": ("not_inventoried" if external.empty else
                             "disjoint" if external.status.eq("disjoint").all() else "not_verified"),

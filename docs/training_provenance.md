@@ -68,6 +68,10 @@ overlapping or unresolved against any inventoried MHCflurry model. Use
 failure. External evidence has a separate status and does not silently become
 verified when MHCflurry passes.
 
+The JSON also records the generating function and arguments, package/source
+hashes and Python/pandas versions. The audit is deterministic and uses no random
+seed. Freeze the inventory and source files while it runs.
+
 The exported cohort contains only samples verified against **all** inventoried
 MHCflurry models. Use that one cohort for every comparator, retaining all its
 positive and negative rows. Disclose changed counts and hashes; never filter
