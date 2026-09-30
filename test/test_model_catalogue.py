@@ -234,7 +234,7 @@ def test_component_details_preserve_standalone_status_and_paths(versioned_cache,
     assert 'equivalence to standalone weights' in text
     downloads_command.run(['info', 'models_class1_pan'])
     text = capsys.readouterr().out
-    assert 'Default affinity loading can fall back to this component' in text
+    assert 'Default affinity loading can fall back to the default presentation bundle' in text
     downloads_command.run(['list', '--json'])
     records = json.loads(capsys.readouterr().out)['downloads']
     assert next(r for r in records if r['name'] == 'models_class1_pan') == {
@@ -257,6 +257,11 @@ def test_component_details_follow_browsed_release_not_default_override(
     components = json.loads(capsys.readouterr().out)['presentation_components']
     assert [item['manifest_exists'] for item in components] == [False, True]
     assert all('/2.2.0/' in item['path'] for item in components)
+    downloads_command.run(['info', 'models_class1_pan', '--release', '2.2.0'])
+    text = capsys.readouterr().out
+    assert 'default presentation bundle' in text
+    assert 'Browsing does not select weights' in text
+    assert str(versioned_cache / '2.2.0' / BUNDLE / 'models' / 'affinity_predictor') in text
 
     downloads_command.run(['info', '--release', '2.2.0', '--json'])
     config = json.loads(capsys.readouterr().out)

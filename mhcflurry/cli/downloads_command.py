@@ -649,8 +649,9 @@ def info_subcommand(args):
             _heading('Components inside presentation bundle')
             _print_presentation_components(record['presentation_components'])
             if record['name'] == 'models_class1_pan':
-                print('  Default affinity loading can fall back to this component when the')
-                print('  standalone path is absent and no affinity-path override is set.')
+                print('  Default affinity loading can fall back to the default presentation bundle')
+                print('  when its standalone path is absent and no affinity-path override is set.')
+                print('  Browsing does not select weights; use --models DIR or --model-release RELEASE.')
             elif record['name'] == 'models_class1_processing':
                 print('  Use these paths explicitly to select embedded processing components.')
                 print('  Standalone processing loading does not fall back to presentation.')
