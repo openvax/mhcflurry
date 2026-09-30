@@ -21,9 +21,9 @@ def versioned_cache(tmp_path, monkeypatch):
     return tmp_path
 
 
-def record_source(path, release):
+def record_source(path, release, bundle=BUNDLE):
     path.mkdir(parents=True, exist_ok=True)
-    metadata = downloads.get_release_downloads(release)[BUNDLE]['metadata']
+    metadata = downloads.get_release_downloads(release)[bundle]['metadata']
     with (path / 'DOWNLOAD_INFO.csv').open('w', newline='') as fd:
         writer = csv.writer(fd)
         writer.writerow(['url'])
@@ -111,6 +111,77 @@ def test_model_table_marks_unverified_sources_and_custom_roots(tmp_path, monkeyp
     assert downloads_command._model_versions(BUNDLE, {})[2] == 'custom: 2.2.0'
     (path / 'DOWNLOAD_INFO.csv').write_text('url\nhttps://example.org/custom-models\n')
     assert downloads_command._model_versions(BUNDLE, {})[2] == 'custom!'
+
+
+def test_model_table_shows_components_available_through_presentation(
+        versioned_cache):
+    presentation = versioned_cache / '2.3.0' / BUNDLE
+    models = presentation / 'models'
+    (models / 'affinity_predictor').mkdir(parents=True)
+    (models / 'processing_predictor_with_flanks').mkdir()
+    (models / 'processing_predictor_without_flanks').mkdir()
+    record_source(presentation, '2.3.0')
+    standalone = versioned_cache / '2.2.0' / 'models_class1_pan'
+    record_source(standalone, '2.2.0', 'models_class1_pan')
+
+    assert downloads_command._model_versions('models_class1_pan', {})[2] == (
+        '2.3.0 via presentation, 2.2.0')
+    assert downloads_command._model_versions('models_class1_processing', {})[2] == (
+        '2.3.0 via presentation')
+    assert downloads_command._model_versions(BUNDLE, {})[2] == '2.3.0'
+    assert downloads.get_default_class1_processing_models_dir(test_exists=False) == str(
+        versioned_cache / '2.3.0' / 'models_class1_processing' /
+        'models.selected.with_flanks')
+
+
+def test_model_table_checks_embedded_component_directories(versioned_cache):
+    presentation = versioned_cache / '2.3.0' / BUNDLE
+    models = presentation / 'models'
+    models.mkdir(parents=True)
+    record_source(presentation, '2.3.0')
+
+    assert downloads_command._model_versions('models_class1_pan', {})[2] == '—'
+    assert downloads_command._model_versions('models_class1_processing', {})[2] == '—'
+
+    (models / 'affinity_predictor').mkdir()
+    (models / 'processing_predictor_with_flanks').mkdir()
+    assert downloads_command._model_versions('models_class1_pan', {})[2] == (
+        '2.3.0 via presentation')
+    assert downloads_command._model_versions('models_class1_processing', {})[2] == '—'
+
+    (models / 'processing_predictor_without_flanks').mkdir()
+    assert downloads_command._model_versions('models_class1_processing', {})[2] == (
+        '2.3.0 via presentation')
+
+
+def test_embedded_component_source_status_and_custom_roots(
+        tmp_path, monkeypatch):
+    monkeypatch.setattr(downloads, '_CURRENT_RELEASE', None)
+    monkeypatch.setattr(downloads, '_DOWNLOADS_DIR', str(tmp_path))
+    presentation = tmp_path / BUNDLE
+    (presentation / 'models' / 'affinity_predictor').mkdir(parents=True)
+
+    assert downloads_command._model_versions('models_class1_pan', {})[2] == (
+        'custom? via presentation')
+    record_source(presentation, '2.3.0')
+    assert downloads_command._model_versions('models_class1_pan', {})[2] == (
+        'custom: 2.3.0 via presentation')
+    (presentation / 'DOWNLOAD_INFO.csv').write_text(
+        'url\nhttps://example.org/custom-models\n')
+    assert downloads_command._model_versions('models_class1_pan', {})[2] == (
+        'custom! via presentation')
+
+
+def test_versioned_embedded_component_preserves_source_markers(versioned_cache):
+    presentation = versioned_cache / '2.3.0' / BUNDLE
+    (presentation / 'models' / 'affinity_predictor').mkdir(parents=True)
+
+    assert downloads_command._model_versions('models_class1_pan', {})[2] == (
+        '2.3.0? via presentation')
+    (presentation / 'DOWNLOAD_INFO.csv').write_text(
+        'url\nhttps://example.org/different-presentation\n')
+    assert downloads_command._model_versions('models_class1_pan', {})[2] == (
+        '2.3.0! via presentation')
 
 
 @pytest.mark.parametrize('environment', [{}, {'NO_COLOR': '1'}, {'TERM': 'dumb'}])

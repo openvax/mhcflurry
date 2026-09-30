@@ -20,6 +20,11 @@ For example, catalogues `2.2.0` and `2.0.0` point to the same presentation archi
 The first table shows the latest weights, distinct older archive versions and
 installed catalogue directories, with the recommended presentation bundle first,
 followed by standalone affinity and processing bundles.
+Affinity and processing rows also show components found inside installed
+presentation bundles as `RELEASE via presentation`; standalone bundle installs
+remain separate entries. These component entries require their expected model
+directories to exist and carry the presentation bundle's `?` or `!` source
+marker when its recorded source is unknown or differs from the catalogue.
 Aliases sharing the same archive are grouped in the availability columns;
 `releases DOWNLOAD` lists every valid identifier. Historical resources appear
 below the main predictors. Terminal output uses restrained color; redirected
@@ -42,7 +47,10 @@ offline. Update the package to obtain a newer catalogue.
 
 The presentation bundle contains its own affinity and processing components.
 The standalone bundles can be absent while full presentation prediction is
-ready to use.
+ready to use. This inventory does not change loading precedence: the default
+affinity loader can fall back to the presentation component, while processing
+APIs continue to use their documented standalone path unless explicitly given
+another model directory.
 
 ## Compare new and historical weights
 

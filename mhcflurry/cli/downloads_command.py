@@ -390,6 +390,26 @@ def _status_color(text):
     return "32"
 
 
+_PRESENTATION_COMPONENT_DIRS = {
+    'models_class1_pan': ('affinity_predictor',),
+    'models_class1_processing': (
+        'processing_predictor_with_flanks',
+        'processing_predictor_without_flanks'),
+}
+
+
+def _presentation_component_installed(name, release):
+    """Return whether a presentation bundle contains a complete component."""
+    component_dirs = _PRESENTATION_COMPONENT_DIRS.get(name)
+    if not component_dirs:
+        return False
+    presentation_models = get_path(
+        'models_class1_presentation', 'models', test_exists=False,
+        release=release)
+    return all(os.path.isdir(os.path.join(presentation_models, component))
+               for component in component_dirs)
+
+
 def _print_table(headers, rows, colors=None, wrap_columns=()):
     """Align plain cell widths before adding optional terminal color."""
     if not rows:
@@ -418,30 +438,52 @@ def _print_table(headers, rows, colors=None, wrap_columns=()):
 
 
 def _model_versions(name, releases):
-    """Describe distinct archive sources and installed catalogue directories."""
+    """Describe archive sources and installed standalone or embedded models."""
     versions = get_bundle_versions(name)
     installed = []
     custom = get_current_release() is None
-    custom_status = None
-    for version in versions:
-        for release in version['releases']:
-            if release not in releases:
-                releases[release] = get_release_downloads(release)
-            info = releases[release][name]
-            if not info['downloaded']:
-                continue
+    custom_candidates = {'': [], ' via presentation': []}
+    standalone_releases = {
+        release for version in versions for release in version['releases']}
+    presentation_releases = (
+        {release for version in get_bundle_versions('models_class1_presentation')
+         for release in version['releases']}
+        if name in _PRESENTATION_COMPONENT_DIRS else set())
+    candidate_releases = standalone_releases | presentation_releases
+
+    for release in get_downloads_metadata()['releases']:
+        if release not in candidate_releases:
+            continue
+        if release not in releases:
+            releases[release] = get_release_downloads(release)
+        release_downloads = releases[release]
+        sources = []
+        standalone = release_downloads.get(name)
+        if standalone and standalone['downloaded']:
+            sources.append((standalone, ''))
+        presentation = release_downloads.get('models_class1_presentation')
+        if (presentation and
+                _presentation_component_installed(name, release)):
+            sources.append((presentation, ' via presentation'))
+        for info, suffix in sources:
             marker = ("" if info['up_to_date'] is True else
                       "?" if info['up_to_date'] is None else "!")
             if custom:
-                custom_status = marker
-                if not marker:
-                    return (versions[0]['releases'][0],
-                            ', '.join(v['releases'][0] for v in versions[1:]) or '—',
-                            'custom: ' + release)
+                custom_candidates[suffix].append((release, marker))
             else:
-                installed.append(release + marker)
-    if custom and custom_status is not None:
-        installed = ['custom' + custom_status]
+                installed.append(release + marker + suffix)
+
+    if custom:
+        for suffix, candidates in custom_candidates.items():
+            if not candidates:
+                continue
+            matching = next((release for release, marker in candidates
+                             if not marker), None)
+            if matching:
+                installed.append('custom: ' + matching + suffix)
+            else:
+                marker = '?' if any(marker == '?' for _, marker in candidates) else '!'
+                installed.append('custom' + marker + suffix)
     return (versions[0]['releases'][0],
             ', '.join(v['releases'][0] for v in versions[1:]) or '—',
             ', '.join(installed) or '—')
