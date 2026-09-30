@@ -27,9 +27,11 @@ def identity_text(value):
 def study_identity(value):
     """Normalize numeric PubMed identifiers; retain explicit namespaces."""
     text = identity_text(value)
+    if text.lower().startswith("pmid:"):
+        text = text.split(":", 1)[1]
     if text.endswith(".0") and text[:-2].isdigit():
         text = text[:-2]
-    return "pmid:" + text if text.isdigit() else text
+    return "pmid:" + str(int(text)) if text.isdigit() else text
 
 
 def encode_sources(records):

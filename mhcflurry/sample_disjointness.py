@@ -24,6 +24,8 @@ IDENTITY_COLUMNS = ("study_id", "sample_id")
 
 def _known_study(value):
     namespace, separator, identifier = value.partition(":")
+    if namespace == "pmid":
+        return identifier.isdigit() and int(identifier) > 0
     return bool(namespace and separator and identifier)
 
 

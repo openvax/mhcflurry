@@ -277,3 +277,16 @@ def test_unknown_inventory_fields_cannot_hide_extra_training_sources(tmp_path, l
     path.write_text(json.dumps(inventory))
     with pytest.raises(ValueError, match="Unrecognized"):
         audit_samples(path, cohort, tmp_path / "invalid")
+
+
+@pytest.mark.parametrize("study", ["pmid:nan", "pmid:0", "pmid:"])
+def test_invalid_pubmed_identifiers_are_unresolved(tmp_path, study):
+    _, path, cohort, train = audit_fixture(tmp_path)
+    write_csv(train, [dict(source_provenance=encode_sources([source(study)]))])
+    assert audit_samples(path, cohort, tmp_path / "invalid-pmid")["cohort"]["retained_rows"] == 0
+
+
+def test_numeric_pubmed_formats_resolve_to_same_study(tmp_path):
+    _, path, cohort, train = audit_fixture(tmp_path)
+    write_csv(train, [dict(source_provenance=encode_sources([source("PMID:0001.0")]))])
+    assert audit_samples(path, cohort, tmp_path / "normalized")["cohort"]["retained_rows"] == 2
