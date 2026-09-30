@@ -19,6 +19,11 @@ COMPONENTS = {
 IDENTITY_COLUMNS = ("study_id", "sample_id")
 
 
+def _known_study(value):
+    namespace, separator, identifier = value.partition(":")
+    return bool(namespace and separator and identifier)
+
+
 def read_identities(path):
     """Read literal identity strings, including leading zeroes and 'NA'."""
     return pandas.read_csv(path, dtype=str, keep_default_na=False)
@@ -95,6 +100,8 @@ def exclude_source_samples(frame, manifest, aliases=None):
     excluded = {aliases.resolve(*row) for row in targets.itertuples(index=False, name=None)}
     if any(not study and not sample for study, sample in excluded):
         raise ValueError("Sample exclusions require at least one identity")
+    if any(study and not _known_study(study) for study, _ in excluded):
+        raise ValueError("Study identities require an explicit namespace or a resolved alias")
     studies = {study for study, _ in excluded if study}
     unscoped = {sample for study, sample in excluded if not study}
     whole_studies = {study for study, sample in excluded if study and not sample}
@@ -103,7 +110,7 @@ def exclude_source_samples(frame, manifest, aliases=None):
         overlap = any(pair in excluded or pair[1] in unscoped or pair[0] in whole_studies
                       or (pair[0] in studies and not pair[1]) for pair in pairs)
         remove.append(overlap)
-        unresolved += int(not overlap and (not complete or any(not p[0] for p in pairs)))
+        unresolved += int(not overlap and (not complete or any(not _known_study(p[0]) for p in pairs)))
     print(f"Source holdout excluded {sum(remove)} rows; "
           f"{unresolved} retained rows have unresolved provenance")
     return frame.loc[~pandas.Series(remove, index=frame.index, dtype=bool)].copy()
@@ -124,6 +131,8 @@ def audit_samples(inventory_path, cohort_path, out_dir, *, aliases_path=None,
     inventory = json.loads(inventory_path.read_text())
     if inventory.get("schema_version") != 1 or not inventory.get("models"):
         raise ValueError("Expected a schema_version=1 inventory with nonempty models")
+    if set(inventory) - {"schema_version", "identity_review", "models"}:
+        raise ValueError("Unrecognized inventory fields")
     aliases = SampleAliases(aliases_path)
     cohort = read_identities(cohort_path)
     if cohort.empty or "sample_id" not in cohort or cohort.sample_id.eq("").any():
@@ -170,6 +179,8 @@ def audit_samples(inventory_path, cohort_path, out_dir, *, aliases_path=None,
     rows, summaries, names = [], [], set()
     identity_review = identity_text(inventory.get("identity_review", ""))
     for model in inventory["models"]:
+        if set(model) - {"name", "kind", "artifacts", "components"}:
+            raise ValueError("Unrecognized model inventory fields")
         name, kind = model.get("name"), model.get("kind")
         if not isinstance(name, str) or not name or name in names or kind not in COMPONENTS:
             raise ValueError("Models require unique names and a supported kind")
@@ -188,6 +199,8 @@ def audit_samples(inventory_path, cohort_path, out_dir, *, aliases_path=None,
         samples, studies, unknown_studies = set(), set(), set()
         unknown_rows = 0
         for component in components.values():
+            if set(component) - {"complete", "evidence", *STAGES}:
+                raise ValueError("Unrecognized component inventory fields")
             if component.get("complete") is not True or not identity_text(component.get("evidence", "")):
                 reasons.append("Component coverage is not declared complete with evidence")
             component_rows = 0
@@ -197,6 +210,8 @@ def audit_samples(inventory_path, cohort_path, out_dir, *, aliases_path=None,
                     reasons.append(f"Missing {stage} inventory (use [] only when reviewed as unused)")
                     continue
                 for entry in entries:
+                    if set(entry) - {"path", "identity_mode", "study_column", "sample_column"}:
+                        raise ValueError("Unrecognized source entry fields")
                     path = inventory_file(entry["path"])
                     for chunk in pandas.read_csv(path, dtype=str, keep_default_na=False, chunksize=100_000):
                         component_rows += len(chunk)
@@ -204,9 +219,9 @@ def audit_samples(inventory_path, cohort_path, out_dir, *, aliases_path=None,
                                 chunk, aliases, identity_mode=entry.get("identity_mode", "source_provenance"),
                                 study_column=entry.get("study_column", "study_id"),
                                 sample_column=entry.get("sample_column", "sample_id")):
-                            unknown_rows += int(not complete or any(not pair[0] for pair in pairs))
+                            unknown_rows += int(not complete or any(not _known_study(pair[0]) for pair in pairs))
                             for study, sample in pairs:
-                                if study:
+                                if _known_study(study):
                                     studies.add(study)
                                     if sample:
                                         samples.add((study, sample))
@@ -221,7 +236,7 @@ def audit_samples(inventory_path, cohort_path, out_dir, *, aliases_path=None,
                 status = "overlap"
                 reason = ("Whole study excluded: training sample identities unavailable"
                           if study in unknown_studies else "Shared biological sample")
-            elif reasons or not study:
+            elif reasons or not _known_study(study):
                 status, reason = "unresolved", "; ".join(reasons) or "Cohort study identity unavailable"
             else:
                 status, reason = "disjoint", "No shared sample in the reviewed lineage inventory"

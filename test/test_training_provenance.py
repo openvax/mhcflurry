@@ -251,3 +251,26 @@ def test_incomplete_provenance_stays_unknown_after_deduplication(tmp_path):
     deduplicate_measurements(frame, ["peptide"]).to_csv(train, index=False)
     report = audit_samples(path, cohort, tmp_path / "unknown-contributor")
     assert report["cohort"]["retained_rows"] == 0
+
+
+def test_unnamespaced_study_cannot_be_assumed_distinct(tmp_path):
+    _, path, cohort, train = audit_fixture(tmp_path)
+    write_csv(train, [dict(source_provenance=encode_sources([source("paper-name", "specimen")]))])
+    report = audit_samples(path, cohort, tmp_path / "unqualified")
+    assert report["cohort"]["retained_rows"] == 0
+    aliases = write_csv(tmp_path / "aliases.csv", [dict(
+        study_id="paper-name", sample_id="", canonical_study_id="3", canonical_sample_id="")])
+    assert audit_samples(path, cohort, tmp_path / "resolved", aliases_path=aliases)["status"] == "disjoint"
+
+
+@pytest.mark.parametrize("level", ["root", "model", "component", "source"])
+def test_unknown_inventory_fields_cannot_hide_extra_training_sources(tmp_path, level):
+    inventory, path, cohort, _ = audit_fixture(tmp_path)
+    model = inventory["models"][0]
+    component = model["components"]["affinity"]
+    target = {"root": inventory, "model": model, "component": component,
+              "source": component["training"][0]}[level]
+    target["finetuning"] = [{"path": "overlapping-source.csv"}]
+    path.write_text(json.dumps(inventory))
+    with pytest.raises(ValueError, match="Unrecognized"):
+        audit_samples(path, cohort, tmp_path / "invalid")
