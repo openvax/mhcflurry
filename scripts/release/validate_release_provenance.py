@@ -79,7 +79,7 @@ def sha256(path):
 
 
 def collect_holdout_provenance(run_dir, require_artifacts=False):
-    """Validate and summarize the release holdout proof files."""
+    """Validate recorded overlap checks without upgrading their proof scope."""
     holdout_dir = pathlib.Path(run_dir) / "release_holdout"
     policy_path = holdout_dir / "policy.json"
     validation_path = holdout_dir / "validation.json"
@@ -92,7 +92,7 @@ def collect_holdout_provenance(run_dir, require_artifacts=False):
 
     policy = json.loads(policy_path.read_text())
     validation = json.loads(validation_path.read_text())
-    if policy.get("schema_version") != 1:
+    if policy.get("schema_version") not in (1, 2):
         raise ValueError("Unsupported release holdout policy schema")
     if validation.get("schema_version") != 1:
         raise ValueError("Unsupported release holdout validation schema")
@@ -101,14 +101,17 @@ def collect_holdout_provenance(run_dir, require_artifacts=False):
             "Release holdout validation does not match policy.json")
 
     manifest_records = policy.get("holdout_files", {})
-    if set(manifest_records) != set(HOLDOUT_MANIFESTS):
+    expected_manifests = set(HOLDOUT_MANIFESTS)
+    if policy["schema_version"] == 2:
+        expected_manifests.add("affinity_source_samples.csv")
+    if set(manifest_records) != expected_manifests:
         raise ValueError(
             "Release holdout policy has unexpected manifests: %s" %
             sorted(manifest_records))
     if validation.get("holdout_files") != manifest_records:
         raise ValueError(
             "Release holdout validation manifest records do not match policy")
-    for filename in HOLDOUT_MANIFESTS:
+    for filename in sorted(expected_manifests):
         path = holdout_dir / filename
         expected = manifest_records[filename]
         if not path.is_file() or sha256(path) != expected.get("sha256"):
@@ -123,6 +126,8 @@ def collect_holdout_provenance(run_dir, require_artifacts=False):
             "presentation_overlap_rows",
         )
     }
+    if policy["schema_version"] == 2:
+        overlaps["affinity_source_overlap_rows"] = validation.get("affinity_source_overlap_rows")
     if any(value != 0 for value in overlaps.values()):
         raise ValueError(
             "Release holdout validation contains overlap: %s" % overlaps)
@@ -135,6 +140,10 @@ def collect_holdout_provenance(run_dir, require_artifacts=False):
             "presentation_holdout_pmids", []),
         "holdout_files": manifest_records,
         "overlap_rows": overlaps,
+        "sample_disjointness": "unresolved",
+        "sample_disjointness_reason": (
+            "Recorded pMHC/source checks do not establish complete biological-sample separation; "
+            "a reviewed union-of-models lineage audit is required."),
     }
 
 

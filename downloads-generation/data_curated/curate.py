@@ -22,6 +22,9 @@ import pandas
 import numpy
 
 from mhcflurry.common import normalize_allele_name
+from mhcflurry.training_provenance import (
+    PROVENANCE_COLUMN, annotate_sources, deduplicate_measurements,
+)
 
 
 def normalize_allele_name_or_return_unknown(s):
@@ -98,7 +101,9 @@ EXCLUDE_IEDB_ALLELES = [
 
 
 def load_data_kim2014(filename):
-    df = pandas.read_table(filename)
+    df = pandas.read_table(filename, dtype={"sample_id": str, "pmid": str, "assay_id": str})
+    df = annotate_sources(df, filename, "kim2014", study_column="pmid",
+                          sample_column="sample_id", assay_column="assay_id")
     print("Loaded kim2014 data: %s" % str(df.shape))
     df["measurement_source"] = "kim2014"
     df["measurement_kind"] = "affinity"
@@ -120,7 +125,9 @@ def load_data_kim2014(filename):
 
 
 def load_data_systemhc_atlas(filename, min_probability=0.99):
-    df = pandas.read_csv(filename)
+    df = pandas.read_csv(filename, dtype={"sample_id": str, "pmid": str, "assay_id": str})
+    df = annotate_sources(df, filename, "systemhc-atlas", study_column="pmid",
+                          sample_column="sample_id", assay_column="assay_id")
     print("Loaded systemhc atlas data: %s" % str(df.shape))
 
     df["measurement_kind"] = "mass_spec"
@@ -142,14 +149,17 @@ def load_data_systemhc_atlas(filename, min_probability=0.99):
     print("Systemhc atlas data now: %s" % str(df.shape))
 
     print("Removing duplicates")
-    df = df.drop_duplicates(["allele", "peptide"])
+    df = deduplicate_measurements(df, ["allele", "peptide"])
     print("Systemhc atlas data now: %s" % str(df.shape))
 
     return df
 
 
 def load_data_iedb(iedb_csv, include_qualitative=True):
-    iedb_df = pandas.read_csv(iedb_csv, skiprows=1, low_memory=False)
+    iedb_df = pandas.read_csv(iedb_csv, skiprows=1, low_memory=False,
+                            dtype={"PubMed ID": str, "Assay IRI": str, "sample_id": str})
+    iedb_df = annotate_sources(iedb_df, iedb_csv, "iedb", study_column="PubMed ID",
+                               sample_column="sample_id", assay_column="Assay IRI")
     print("Loaded iedb data: %s" % str(iedb_df.shape))
 
     print("Selecting only class I")
@@ -256,13 +266,18 @@ def load_data_iedb(iedb_csv, include_qualitative=True):
     train_data["original_allele"] = iedb_df["Allele Name"].values
     train_data["measurement_type"] = iedb_df["measurement_type"].values
     train_data["measurement_kind"] = iedb_df["measurement_kind"].values
-    train_data = train_data.drop_duplicates().reset_index(drop=True)
+    measurement_columns = list(train_data.columns)
+    train_data[PROVENANCE_COLUMN] = iedb_df[PROVENANCE_COLUMN].values
+    train_data = deduplicate_measurements(
+        train_data, measurement_columns).reset_index(drop=True)
 
     return train_data
 
 
 def load_data_additional_ms(filename):
-    df = pandas.read_csv(filename)
+    df = pandas.read_csv(filename, dtype={"sample_id": str, "original_pmid": str})
+    df = annotate_sources(df, filename, "additional-ms", study_column="original_pmid",
+                          sample_column="sample_id", assay_column="assay_id")
     print("Loaded additional MS", filename, df.shape)
     print(df)
     print("Entries:", len(df))
@@ -318,8 +333,8 @@ def run():
     print("Combined df: %s" % (str(df.shape)))
 
     print("Removing combined duplicates")
-    df = df.drop_duplicates(
-        ["allele", "peptide", "measurement_value", "measurement_kind"])
+    df = deduplicate_measurements(
+        df, ["allele", "peptide", "measurement_value", "measurement_kind"])
     print("New combined df: %s" % (str(df.shape)))
 
     df = df[[
@@ -331,6 +346,7 @@ def run():
         "measurement_kind",
         "measurement_source",
         "original_allele",
+        PROVENANCE_COLUMN,
     ]].sort_values(["allele", "peptide"]).dropna()
 
     print("Final combined df: %s" % (str(df.shape)))

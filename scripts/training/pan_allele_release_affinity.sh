@@ -334,6 +334,11 @@ if [ -n "${RELEASE_HOLDOUT_DIR:-}" ]; then
     RELEASE_HOLDOUT_ARGS=(
         --exclude-pmhcs "$RELEASE_HOLDOUT_DIR/affinity_pmhcs.csv"
     )
+    if [ -f "$RELEASE_HOLDOUT_DIR/affinity_source_samples.csv" ]; then
+        RELEASE_HOLDOUT_ARGS+=(
+            --exclude-source-samples "$RELEASE_HOLDOUT_DIR/affinity_source_samples.csv"
+        )
+    fi
 fi
 mhcflurry class1-reassign-mass-spec-training-data \
     "$(mhcflurry-downloads path data_curated)/curated_training_data.csv.bz2" \
