@@ -49,6 +49,7 @@ def _allele_sequence_keys():
     return list(seqs.index)
 
 
+@pytest.mark.downloads
 def test_canonicalize_allele_series_against_real_allele_sequences():
     keys = _allele_sequence_keys()
     key_set = set(keys)
@@ -72,6 +73,7 @@ def test_canonicalize_allele_series_against_real_allele_sequences():
     assert all(x in key_set for x in out if x is not None)
 
 
+@pytest.mark.downloads
 def test_canonicalize_allele_series_resolves_a_real_retired_alias():
     # Find a real retired/aliased name in the key set: a key whose alias-applied
     # normalization differs from the key itself. Then confirm a request for that
@@ -89,6 +91,7 @@ def test_canonicalize_allele_series_resolves_a_real_retired_alias():
     assert resolved in key_set
 
 
+@pytest.mark.downloads
 def test_predictor_canonicalize_matches_resolver():
     # Single source of truth: the predictor canonicalizes via an AlleleKeyResolver
     # over its own maps, so canonicalize_allele_name matches a resolver built the

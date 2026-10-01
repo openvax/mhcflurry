@@ -27,6 +27,8 @@ from mhcflurry.common import allele_locus_name, normalize_allele_name
 from mhcflurry.downloads import get_path
 from mhcflurry.testing_utils import startup, cleanup
 
+pytestmark = pytest.mark.downloads
+
 
 DATA_PATH = os.path.join(
     os.path.dirname(__file__),
