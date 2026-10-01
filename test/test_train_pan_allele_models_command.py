@@ -40,7 +40,7 @@ from .pytest_helpers import mhcflurry_cli
 
 from mhcflurry.testing_utils import cleanup, startup
 
-pytest.fixture(autouse=True, scope="module")
+@pytest.fixture(autouse=True, scope="module")
 def setup_module():
     startup()
     yield

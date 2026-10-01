@@ -32,7 +32,8 @@ mhcflurry downloads fetch models_class1_presentation
 ```
 
 This bundle includes the binding-affinity and antigen-processing components
-needed for presentation prediction.
+needed for presentation prediction. Conda users can follow
+{ref}`using-conda` instead.
 
 ## Make a first prediction
 
@@ -50,13 +51,6 @@ Save it as `peptides.csv`, then run:
 
 ```shell
 mhcflurry predict peptides.csv --out predictions.csv
-```
-
-Flanks are used by default when both columns are present. To compare the same
-rows without that context:
-
-```shell
-mhcflurry predict peptides.csv --no-flanking --out predictions-no-flanks.csv
 ```
 
 If the source context is unavailable, omit the flank columns; MHCflurry uses
@@ -77,21 +71,21 @@ the main prediction columns:
 
 Separate allele arguments request separate predictions. A delimited allele
 list represents one MHC allele set and reports its strongest-binding allele. See
-{ref}`allele-input-semantics` for examples. Historical `mhcflurry-*` command
-names remain supported for existing scripts.
+{ref}`allele-input-semantics` for examples.
 
 ## Where to go next
 
-- {doc}`model_downloads` lists available weight releases and shows how to select older weights.
-- {doc}`release_model_evaluation` compares the released models with figures and a PDF.
+1. {doc}`commandline_tutorial` or {doc}`python_tutorial`: the full prediction
+   workflow, including protein scanning.
+2. {doc}`release_model_evaluation`: how the released models compare with other
+   predictors.
+3. {doc}`model_downloads`: other weight releases, if you need to reproduce an
+   older analysis.
 
-- {doc}`commandline_tutorial`: predict peptides and scan proteins.
-- {doc}`python_tutorial`: use predictors from Python.
-- {doc}`training`: fit and select custom models.
-- {doc}`evaluation`: compare trained models and generate evaluation figures.
-- {doc}`commandline_tools`: complete generated command reference.
-- {doc}`configuration`: runtime defaults, hardware autosizing, and
-  reproducibility.
+If you have your own measurements, {doc}`training` and {doc}`evaluation` cover
+fitting and validating custom models.
+
+(using-conda)=
 
 ## Using conda
 

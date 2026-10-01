@@ -27,7 +27,9 @@ from mhcflurry.pseudosequences import LEGACY_ALLELE_SEQUENCES_FILENAME
 
 from mhcflurry.testing_utils import cleanup, startup
 
-pytest.fixture(autouse=True, scope="module")
+pytestmark = pytest.mark.downloads
+
+@pytest.fixture(autouse=True, scope="module")
 def setup_module():
     startup()
     yield
@@ -73,40 +75,44 @@ HYPERPARAMETERS = {
 }
 
 
-ALLELE_TO_SEQUENCE = pandas.read_csv(
-    get_path(
-        "allele_sequences", LEGACY_ALLELE_SEQUENCES_FILENAME),
-    index_col=0).sequence.to_dict()
+@pytest.fixture(scope="module")
+def training_data():
+    """Load bundles on first use so collecting this module needs no downloads."""
+    allele_to_sequence = pandas.read_csv(
+        get_path(
+            "allele_sequences", LEGACY_ALLELE_SEQUENCES_FILENAME),
+        index_col=0).sequence.to_dict()
 
+    train_df = pandas.read_csv(
+        get_path(
+            "data_curated", "curated_training_data.affinity.csv.bz2"))
 
-TRAIN_DF = pandas.read_csv(
-    get_path(
-        "data_curated", "curated_training_data.affinity.csv.bz2"))
+    train_df = train_df.loc[train_df.allele.isin(allele_to_sequence)]
+    train_df = train_df.loc[train_df.peptide.str.len() >= 8]
+    train_df = train_df.loc[train_df.peptide.str.len() <= 15]
 
-TRAIN_DF = TRAIN_DF.loc[TRAIN_DF.allele.isin(ALLELE_TO_SEQUENCE)]
-TRAIN_DF = TRAIN_DF.loc[TRAIN_DF.peptide.str.len() >= 8]
-TRAIN_DF = TRAIN_DF.loc[TRAIN_DF.peptide.str.len() <= 15]
+    train_df = train_df.loc[
+        train_df.allele.isin(train_df.allele.value_counts().iloc[:3].index)
+    ]
 
-TRAIN_DF = TRAIN_DF.loc[
-    TRAIN_DF.allele.isin(TRAIN_DF.allele.value_counts().iloc[:3].index)
-]
+    ms_hits_df = pandas.read_csv(
+        get_path(
+            "data_curated", "curated_training_data.csv.bz2"))
+    ms_hits_df = ms_hits_df.loc[ms_hits_df.allele.isin(train_df.allele.unique())]
+    ms_hits_df = ms_hits_df.loc[ms_hits_df.peptide.str.len() >= 8]
+    ms_hits_df = ms_hits_df.loc[ms_hits_df.peptide.str.len() <= 15]
+    ms_hits_df = ms_hits_df.loc[~ms_hits_df.peptide.isin(train_df.peptide)]
 
-
-MS_HITS_DF = pandas.read_csv(
-    get_path(
-        "data_curated", "curated_training_data.csv.bz2"))
-MS_HITS_DF = MS_HITS_DF.loc[MS_HITS_DF.allele.isin(TRAIN_DF.allele.unique())]
-MS_HITS_DF = MS_HITS_DF.loc[MS_HITS_DF.peptide.str.len() >= 8]
-MS_HITS_DF = MS_HITS_DF.loc[MS_HITS_DF.peptide.str.len() <= 15]
-MS_HITS_DF = MS_HITS_DF.loc[~MS_HITS_DF.peptide.isin(TRAIN_DF.peptide)]
-
-print("Loaded %d training and %d ms hits" % (
-    len(TRAIN_DF), len(MS_HITS_DF)))
+    print("Loaded %d training and %d ms hits" % (
+        len(train_df), len(ms_hits_df)))
+    return allele_to_sequence, train_df, ms_hits_df
 
 
 @pytest.mark.slow
 @pytest.mark.integration
-def test_train_simple():
+def test_train_simple(training_data):
+    allele_to_sequence, train_df, ms_hits_df = training_data
+
     # Reset random seeds to ensure reproducibility regardless of test order
     import numpy
     import random
@@ -117,18 +123,18 @@ def test_train_simple():
 
     network = Class1NeuralNetwork(**HYPERPARAMETERS)
     allele_encoding = AlleleEncoding(
-        TRAIN_DF.allele.values,
-        allele_to_sequence=ALLELE_TO_SEQUENCE)
+        train_df.allele.values,
+        allele_to_sequence=allele_to_sequence)
     network.fit(
-        TRAIN_DF.peptide.values,
-        affinities=TRAIN_DF.measurement_value.values,
+        train_df.peptide.values,
+        affinities=train_df.measurement_value.values,
         allele_encoding=allele_encoding,
-        inequalities=TRAIN_DF.measurement_inequality.values)
+        inequalities=train_df.measurement_inequality.values)
 
-    validation_df = MS_HITS_DF.copy()
+    validation_df = ms_hits_df.copy()
     validation_df["hit"] = 1
 
-    decoys_df = MS_HITS_DF.copy()
+    decoys_df = ms_hits_df.copy()
     decoys_df["hit"] = 0
     decoys_df["allele"] = decoys_df.allele.sample(frac=1.0).values
 

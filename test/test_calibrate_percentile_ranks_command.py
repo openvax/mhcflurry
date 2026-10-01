@@ -37,7 +37,7 @@ os.environ["MHCFLURRY_CLUSTER_WORKER_COMMAND"] = (
 
 from mhcflurry.testing_utils import cleanup, startup
 
-pytest.fixture(autouse=True, scope="module")
+@pytest.fixture(autouse=True, scope="module")
 def setup_module():
     startup()
     yield

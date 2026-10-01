@@ -38,22 +38,18 @@ from mhcflurry.pseudosequences import (
 )
 from mhcflurry.testing_utils import cleanup, startup
 
-DOWNLOADED_PREDICTOR = None
-
-
 @pytest.fixture(autouse=True, scope="module")
 def setup_teardown():
-    """Load the downloaded predictor once for this module."""
-    global DOWNLOADED_PREDICTOR
     startup()
-    try:
-        DOWNLOADED_PREDICTOR = Class1AffinityPredictor.load()
-    except Exception:
-        DOWNLOADED_PREDICTOR = None
     logging.basicConfig(level=logging.DEBUG)
     yield
-    DOWNLOADED_PREDICTOR = None
     cleanup()
+
+
+@pytest.fixture(scope="module")
+def downloaded_predictor():
+    """Default released affinity predictor, from the presentation bundle."""
+    return Class1AffinityPredictor.load()
 
 
 # To hunt down a weird warning we were seeing in pandas.
@@ -68,10 +64,9 @@ warnings.showwarning = warn_with_traceback
 
 def test_fit_class1_pan_allele_models_derives_member_seeds(monkeypatch):
     allele = "HLA-A*02:01"
-    allele_to_sequence = pandas.read_csv(
-        get_path("allele_sequences", LEGACY_ALLELE_SEQUENCES_FILENAME),
-        index_col=0,
-    ).sequence.to_dict()
+    # Released 2.2.0 allele_sequences entry; fit is patched out, so only the
+    # seeds matter and the bundle itself is not needed.
+    sequence = "YFGERAMPYGEKVAHTHVDTLYGVRYHYYTWAVLAYTWY"
     observed_seeds = []
 
     def record_seed(_model, *_args, **kwargs):
@@ -79,7 +74,7 @@ def test_fit_class1_pan_allele_models_derives_member_seeds(monkeypatch):
 
     monkeypatch.setattr(Class1NeuralNetwork, "fit", record_seed)
     predictor = Class1AffinityPredictor(
-        allele_to_sequence={allele: allele_to_sequence[allele]},
+        allele_to_sequence={allele: sequence},
     )
     predictor.fit_class1_pan_allele_models(
         n_models=2,
@@ -471,9 +466,7 @@ def test_missing_percent_rank_error_infers_models_dir_from_loaded_models(tmp_pat
     ) in message
 
 
-def predict_and_check(
-    allele, peptide, predictor=DOWNLOADED_PREDICTOR, expected_range=(0, 500)
-):
+def predict_and_check(allele, peptide, predictor, expected_range=(0, 500)):
     def debug():
         print(
             "\n%s"
@@ -638,26 +631,26 @@ def test_class1_affinity_predictor_a0205_memorize_training_data():
     assert numpy.isnan(ic50_pred[2])
 
 
-def test_no_nans():
-    df = DOWNLOADED_PREDICTOR.predict_to_dataframe(
+def test_no_nans(downloaded_predictor):
+    df = downloaded_predictor.predict_to_dataframe(
         alleles=["A02:01", "A02:02"], peptides=["SIINFEKL", "SIINFEKLL"]
     )
     print(df)
     assert not df.isnull().any().any()
 
 
-def test_predict_implementations_equivalent():
+def test_predict_implementations_equivalent(downloaded_predictor):
     for allele in ["HLA-A02:01", "A02:02"]:
         for centrality_measure in ["mean", "robust_mean"]:
             peptides = ["SIINFEKL", "SYYNFIIIKL", "SIINKFELQY"]
 
-            pred1 = DOWNLOADED_PREDICTOR.predict(
+            pred1 = downloaded_predictor.predict(
                 allele=allele,
                 peptides=peptides + ["SSSN"],
                 throw=False,
                 centrality_measure=centrality_measure,
             )
-            pred2 = DOWNLOADED_PREDICTOR.predict_to_dataframe(
+            pred2 = downloaded_predictor.predict_to_dataframe(
                 allele=allele,
                 peptides=peptides + ["SSSN"],
                 throw=False,
@@ -665,26 +658,26 @@ def test_predict_implementations_equivalent():
             ).prediction.values
             testing.assert_almost_equal(pred1, pred2, decimal=2)
 
-            pred1 = DOWNLOADED_PREDICTOR.predict(
+            pred1 = downloaded_predictor.predict(
                 allele=allele, peptides=peptides, centrality_measure=centrality_measure
             )
-            pred2 = DOWNLOADED_PREDICTOR.predict_to_dataframe(
+            pred2 = downloaded_predictor.predict_to_dataframe(
                 allele=allele, peptides=peptides, centrality_measure=centrality_measure
             ).prediction.values
             testing.assert_almost_equal(pred1, pred2, decimal=2)
 
 
-def test_no_runtime_warnings_for_unsupported_rows():
+def test_no_runtime_warnings_for_unsupported_rows(downloaded_predictor):
     with warnings.catch_warnings():
         warnings.simplefilter("error", RuntimeWarning)
-        df = DOWNLOADED_PREDICTOR.predict_to_dataframe(
+        df = downloaded_predictor.predict_to_dataframe(
             allele="HLA-A*02:01",
             peptides=["SIINFEKL", "SSSN"],
             throw=False,
             include_confidence_intervals=True,
             centrality_measure="mean",
         )
-        df2 = DOWNLOADED_PREDICTOR.predict_to_dataframe(
+        df2 = downloaded_predictor.predict_to_dataframe(
             allele="HLA-A*02:01",
             peptides=["SSSN"],
             throw=False,

@@ -104,6 +104,23 @@ historical software version also requires that version in its own environment.
 See {doc}`release_model_evaluation` for the completed comparison across public
 software versions, NetMHCpan BA/EL outputs, and MixMHCpred on identical rows.
 
+## Older allele-specific models
+
+MHCflurry still distributes the allele-specific predictors described in the
+2018 paper. Use the current pan-allele presentation bundle unless you
+specifically need these historical models. They are a separate, affinity-only bundle
+selected with `--models` rather than `--model-release`:
+
+```shell
+mhcflurry downloads fetch models_class1
+mhcflurry predict \
+    --alleles HLA-A0201 HLA-A0301 \
+    --peptides SIINFEKL SIINFEKD SIINFEKQ \
+    --models "$(mhcflurry downloads path models_class1)/models" \
+    --affinity-only \
+    --out predictions.csv
+```
+
 ## Local storage and overrides
 
 ```shell
@@ -152,8 +169,9 @@ mapping explicitly.
 
 ## Percentile calibration
 
-Released predictors already include calibration. For custom models,
-{doc}`shared_percent_rank_transforms` documents compact calibration, which uses
+Released affinity and presentation predictors include percentile calibration;
+released processing predictors do not. For custom models, or for processing
+percentiles, {doc}`shared_percent_rank_transforms` documents compact calibration, which uses
 a small validated knot representation instead of dense histogram tables.
 Calibration changes percentile mappings, not raw model scores or weights.
 Use a separate model copy and an appropriate background reference; do not fit

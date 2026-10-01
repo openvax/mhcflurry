@@ -24,6 +24,7 @@ import warnings
 import mhcgnomes
 import numpy as np
 import pandas as pd
+import pytest
 
 from mhcflurry import Class1AffinityPredictor, Class1PresentationPredictor
 from mhcflurry.common import normalize_sequence_resolved_allele_name
@@ -97,6 +98,7 @@ def test_expected_data_has_high_and_low_contexts():
     assert (context_min["pres_without_presentation_score"] < 0.2).all()
 
 
+@pytest.mark.downloads
 def test_presentation_predictions():
     expected_df = _load_expected()
 

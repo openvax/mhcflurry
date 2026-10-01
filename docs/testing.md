@@ -19,12 +19,17 @@ $ ./lint.sh
 $ python -m pytest -q test/test_amino_acid.py test/test_random_negative_peptides.py
 ```
 
-To run the broad fast tier, skip the tests marked as slow integration,
-cached-bundle, or benchmark checks:
+To run the broad fast tier, fetch the default presentation bundle once, then
+skip the tests marked as slow or as needing other download bundles:
 
 ```shell
+$ mhcflurry downloads fetch models_class1_presentation
 $ python -m pytest -q test -m "not slow and not downloads"
 ```
+
+The fast tier uses the presentation bundle because prediction commands, the
+tutorial examples and the default predictors all need it. Any catalogue
+release works.
 
 When working on training internals, add the directly affected files rather
 than jumping immediately to the full suite. Useful examples:
@@ -108,7 +113,9 @@ that cannot be covered at a narrower level.
   through the public CLI/API.
 
 `downloads`
-: Tests that require locally cached MHCflurry download bundles. These
-  tests should not fetch from the network; missing bundles should fail
-  or skip with an instruction to run `mhcflurry downloads fetch`
-  outside pytest.
+: Tests that require locally cached MHCflurry download bundles other than
+  the default presentation bundle, or that compare against a specific
+  catalogue (CI pins `2.2.0`). These tests should not fetch from the
+  network; missing bundles should fail or skip with an instruction to run
+  `mhcflurry downloads fetch` outside pytest. Load bundles in a fixture or
+  test body, not at import time, so deselection works without them.

@@ -87,7 +87,8 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
-        "downloads: marks tests that require locally cached MHCflurry bundles",
+        "downloads: marks tests that need cached bundles beyond the default "
+        "presentation bundle, or a pinned catalogue",
     )
 
     # PyTorch warns that padding='same' with even kernels may allocate a

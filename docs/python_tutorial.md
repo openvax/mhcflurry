@@ -54,8 +54,6 @@ strongest binder across that MHC allele set is reported for each peptide.
 |---|---|
 | `alleles=["A0201", "A0301"]` | One MHC allele set; one result per peptide. |
 | `alleles={"sample1": [...], "sample2": [...]}` | Multiple named MHC allele sets; one result per sample and peptide. |
-| `Class1AffinityPredictor.predict_to_dataframe(allele="A0201", ...)` | Score every peptide against one allele. |
-| `Class1AffinityPredictor.predict_to_dataframe(alleles=[...], ...)` | Pair each peptide with the allele at the same position. |
 
 ```{note}
 MHCflurry normalizes allele names using the [mhcgnomes](https://github.com/pirl-unc/mhcgnomes)
@@ -145,6 +143,14 @@ standalone affinity bundle when installed, falling back to the affinity
 component of its presentation bundle. Accessing `predictor.affinity_predictor`
 as above guarantees that both calls use the same loaded affinity ensemble.
 
+The affinity predictor treats alleles per peptide rather than as an MHC allele
+set:
+
+| Python input | Meaning |
+|---|---|
+| `predict_to_dataframe(allele="A0201", ...)` | Score every peptide against one allele. |
+| `predict_to_dataframe(alleles=[...], ...)` | Pair each peptide with the allele at the same position. |
+
 The `prediction_low` and `prediction_high` fields give the 5-95 percentile
 predictions across the models in the ensemble. This detailed information is not
 available through the higher-level {class}`~mhcflurry.Class1PresentationPredictor`
@@ -152,8 +158,9 @@ interface.
 
 Under the hood, `Class1AffinityPredictor` itself delegates to an ensemble of
 {class}`~mhcflurry.Class1NeuralNetwork` instances, which implement the neural network
-models used for prediction. To fit your own affinity prediction models, call
-{meth}`~mhcflurry.Class1NeuralNetwork.fit`.
+models used for prediction. To fit your own models, start with the
+{doc}`training` guide; {meth}`~mhcflurry.Class1NeuralNetwork.fit` is the
+underlying Python method.
 
 You can similarly use {class}`~mhcflurry.Class1ProcessingPredictor` directly for
 antigen processing prediction, and there is a low-level

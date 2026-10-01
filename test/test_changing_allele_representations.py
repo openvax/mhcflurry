@@ -20,16 +20,21 @@ from mhcflurry.pseudosequences import LEGACY_ALLELE_SEQUENCES_FILENAME
 
 from mhcflurry.testing_utils import cleanup, startup
 
-pytest.fixture(autouse=True, scope="module")
+pytestmark = pytest.mark.downloads
+
+@pytest.fixture(autouse=True, scope="module")
 def setup_module():
     startup()
     yield
     cleanup()
 
-ALLELE_TO_SEQUENCE = pandas.read_csv(
-    get_path(
-        "allele_sequences", LEGACY_ALLELE_SEQUENCES_FILENAME),
-    index_col=0).sequence.to_dict()
+@pytest.fixture(scope="module")
+def released_allele_sequences():
+    """Load the bundle on first use so collecting this module needs no downloads."""
+    return pandas.read_csv(
+        get_path(
+            "allele_sequences", LEGACY_ALLELE_SEQUENCES_FILENAME),
+        index_col=0).sequence.to_dict()
 
 HYPERPARAMETERS = {
     'activation': 'tanh',
@@ -71,7 +76,7 @@ HYPERPARAMETERS = {
 
 @pytest.mark.slow
 @pytest.mark.integration
-def test_changing_allele_representations():
+def test_changing_allele_representations(released_allele_sequences):
     allele1 = "HLA-A*02:01"
     allele2 = "HLA-C*03:04"
     allele3 = "HLA-B*07:02"
@@ -80,7 +85,7 @@ def test_changing_allele_representations():
 
     allele_to_sequence = {}
     for allele in [allele1, allele2]:
-        allele_to_sequence[allele] = ALLELE_TO_SEQUENCE[allele]
+        allele_to_sequence[allele] = released_allele_sequences[allele]
 
     data1 = []
     for i in range(5000):
@@ -103,7 +108,7 @@ def test_changing_allele_representations():
     assert value1 < 100, value1
     assert value2 > 4000, value2
 
-    allele_to_sequence[allele3] = ALLELE_TO_SEQUENCE[allele3]
+    allele_to_sequence[allele3] = released_allele_sequences[allele3]
     predictor.allele_to_sequence = allele_to_sequence
     predictor.clear_cache()
 

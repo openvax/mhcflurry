@@ -118,3 +118,9 @@ The stable-model tables above and the PDF include public 2.1.5/2.2.0/2.2.1,
 NetMHCpan 4.0/4.1/4.2 BA and EL, and MixMHCpred 3.0. The archive includes full-precision aggregate tables, rendering code, and
 a separately labeled prerelease component comparison. It does not include
 MixMHCpred 2.0.2, whose incomplete coverage required a different subset. Model archive checksums accompany the [2.3.0 release](https://github.com/openvax/mhcflurry/releases/tag/2.3.0).
+
+```{toctree}
+:hidden:
+
+release_model_evaluation_details
+```

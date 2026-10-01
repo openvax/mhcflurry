@@ -1,31 +1,37 @@
 # MHCflurry documentation
 
 MHCflurry predicts MHC class I binding affinity, antigen processing, and peptide
-presentation. Start with the introduction for installation and a first
-prediction, then choose either the command-line or Python tutorial. The
-reference pages are intentionally exhaustive and are best used to look up a
-specific option after you know which workflow you need.
+presentation. Most users only need the released models and one of the two
+tutorials below.
 
 ## Start here
 
-- {doc}`intro` explains the three prediction types and gets you to a first
-  result.
-- {doc}`commandline_tutorial` covers peptide prediction and protein scanning.
-- {doc}`python_tutorial` shows the same predictors through the Python API.
+- {doc}`intro` installs MHCflurry and makes a first prediction.
+- {doc}`commandline_tutorial` scores peptides and scans proteins from the shell.
+- {doc}`python_tutorial` does the same from Python.
 
-## Common next steps
+## Choosing and trusting models
 
-- {doc}`training` explains custom model fitting and release-style retraining.
-- {doc}`evaluation` compares trained models and builds diagnostic or
-  publication-style figures.
-- {doc}`model_downloads` covers available weights, older releases, and model selection.
-- {doc}`release_model_evaluation` compares the released weights on identical rows.
-- {doc}`shared_percent_rank_transforms` explains compact percentile calibration.
-- {doc}`configuration` explains automatic hardware planning, expert overrides,
-  and reproducibility.
-- {doc}`commandline_tools` and {doc}`api` are the complete references.
+- {doc}`model_downloads` lists the available weights and shows how to select an
+  older release.
+- {doc}`release_model_evaluation` compares the released weights with other
+  predictors on identical data.
 
-Contributors and release maintainers can start with {doc}`maintainers`.
+## Training your own models
+
+- {doc}`training` fits custom models from your own measurements.
+- {doc}`evaluation` compares a trained model with a released one.
+
+## Reference
+
+- {doc}`commandline_tools` documents the command-line options.
+- {doc}`api` documents every Python class and method.
+- {doc}`configuration` covers hardware autosizing, environment overrides, and
+  reproducibility.
+
+Specialized topics, such as custom percentile calibration and training-sample
+audits, are listed under **Advanced topics** in the sidebar. Contributors and
+release maintainers can start with {doc}`maintainers`.
 
 ```{toctree}
 :maxdepth: 2
@@ -42,12 +48,10 @@ python_tutorial
 :caption: User guides
 :hidden:
 
-training
-evaluation
-training_provenance
 model_downloads
 release_model_evaluation
-release_model_evaluation_details
+training
+evaluation
 ```
 
 ```{toctree}
@@ -56,9 +60,17 @@ release_model_evaluation_details
 :hidden:
 
 commandline_tools
-configuration
 api
+configuration
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Advanced topics
+:hidden:
+
 shared_percent_rank_transforms
+training_provenance
 ```
 
 ```{toctree}
@@ -66,21 +78,35 @@ shared_percent_rank_transforms
 :caption: Contributors and maintainers
 :hidden:
 
+maintainers
 testing
 development
 orchestrator
 auto_sizing_audit
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Training internals
+:hidden:
+
 release_training_recipe
 release_neural_hyperparameter_audit
+final_230_candidate_experiment
 affinity_dual_checkpoint_workflow
-processing_cleavage_boundary_experiment
-processing_kernel_sweep
-processing_hyperparameter_campaign
 processing_preparation_acceleration
 probabilistic_processing_matching
 presentation_percentile_calibration
-final_230_candidate_experiment
-exact_public_data_experiment
 saved_candidate_evaluation
-maintainers
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Controlled experiments
+:hidden:
+
+processing_cleavage_boundary_experiment
+processing_kernel_sweep
+processing_hyperparameter_campaign
+exact_public_data_experiment
 ```

@@ -20,6 +20,7 @@ from mhcflurry.downloads import get_path
 
 from mhcflurry.testing_utils import cleanup, startup
 
+pytestmark = pytest.mark.downloads
 
 
 def setup_module():
