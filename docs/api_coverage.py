@@ -1,16 +1,20 @@
 """Fail documentation builds that silently omit the public Python API."""
 
-REQUIRED_API_OBJECTS = (
-    "mhcflurry.Class1AffinityPredictor",
+import mhcflurry
+
+# Methods that the guides link to directly.
+REQUIRED_METHODS = (
     "mhcflurry.Class1AffinityPredictor.calibrate_percentile_ranks",
-    "mhcflurry.Class1ProcessingPredictor",
     "mhcflurry.Class1ProcessingPredictor.percentile_ranks",
-    "mhcflurry.Class1PresentationPredictor",
     "mhcflurry.Class1PresentationPredictor.percentile_ranks",
-    "mhcflurry.HistogramPercentRankTransform",
-    "mhcflurry.CompactPercentRankTransform",
     "mhcflurry.CompactPercentRankTransform.transform",
 )
+
+# Every public class, so a new export cannot silently go undocumented.
+REQUIRED_API_OBJECTS = tuple(
+    "mhcflurry.%s" % name for name in mhcflurry.__all__
+    if not name.startswith("__")
+) + REQUIRED_METHODS
 
 
 def check_public_api(app, exception):

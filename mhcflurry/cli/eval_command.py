@@ -292,7 +292,7 @@ def _run_paper_figures(argv, prog):
                 "%s external-predictors" % prog).parse_args(argv[1:]))
     if subcommand == "run":
         return _run_paper_figures_pipeline(
-            _make_paper_figures_run_parser("%s run" % prog).parse_args(
+            make_paper_figures_run_parser("%s run" % prog).parse_args(
                 argv[1:]))
     if subcommand.startswith("-"):
         # Compatibility shortcut: ``mhcflurry eval paper-figures --out ...``
@@ -664,7 +664,8 @@ def _run_external_predictors(args):
     return 0
 
 
-def _make_paper_figures_run_parser(prog):
+def make_paper_figures_run_parser(prog="mhcflurry eval paper-figures run"):
+    """Build the ``eval paper-figures run`` parser."""
     parser = argparse.ArgumentParser(
         prog=prog,
         description=(

@@ -4,8 +4,7 @@
 
 This tutorial follows the common workflow: download the released models, score
 peptides, then scan proteins for candidate ligands. Most users can stop there;
-training, evaluation, configuration, and exhaustive flag descriptions are
-linked later.
+{ref}`cli-next-steps` points to training, evaluation, and the full reference.
 
 (downloading)=
 (downloading-models)=
@@ -128,59 +127,14 @@ See the {ref}`command reference <ref-mhcflurry-predict-scan>` for FASTA/CSV
 input, presentation-score filtering, peptide lengths, and output options.
 
 
-## Training models
+(cli-next-steps)=
 
-Training is an advanced workflow; most users should use the released models.
-If you have custom measurements, choose the smallest workflow that matches the
-data:
+## Next steps
 
-- allele-specific affinity models for one or a few well-covered alleles;
-- pan-allele affinity models for measurements spanning many alleles; or
-- `mhcflurry train pan-allele-release` for a complete retrain, selection,
-  calibration, and evaluation run.
-
-The {doc}`training` guide covers input schemas, hyperparameters, output bundles,
-and release-style training without interrupting this prediction tutorial.
-
-
-## Evaluating trained models
-
-After fitting a model, compare it with a released predictor before using it as a
-default. A local comparison and diagnostic PDF take two commands:
-
-```shell
-$ mhcflurry eval compare-models \
-    --a results/new_run/ \
-    --b public \
-    --out results/new_run/eval_comparison/
-
-$ mhcflurry eval plot-comparison \
-    --input results/new_run/eval_comparison/ \
-    --summary-pdf results/new_run/eval_comparison/plots/model_comparison_figures.pdf
-```
-
-The {doc}`evaluation` guide explains the output layers, saved-prediction schema,
-paper-style figures, and remote release behavior.
-
-## Using older allele-specific models
-
-MHCflurry still distributes the allele-specific predictors described in the
-2018 paper. Download them and pass their model directory explicitly:
-
-```shell
-$ mhcflurry downloads fetch models_class1
-$ mhcflurry predict \
-    --alleles HLA-A0201 HLA-A0301 \
-    --peptides SIINFEKL SIINFEKD SIINFEKQ \
-    --models "$(mhcflurry downloads path models_class1)/models" \
-    --out /tmp/predictions.csv
-```
-
-Use the current pan-allele presentation bundle unless you specifically need
-these historical models.
-
-## Configuration and command reference
-
-See {doc}`configuration` for prediction batches, hardware autosizing,
-reproducibility, and unified command aliases. The complete generated argument
-reference is in {doc}`commandline_tools`.
+- {doc}`model_downloads` shows how to select other weight releases, including
+  the older allele-specific models.
+- {doc}`training` and {doc}`evaluation` cover fitting custom models and
+  comparing them with the released ones. Most users do not need to train.
+- {doc}`configuration` covers prediction batch sizes, hardware autosizing, and
+  reproducibility.
+- {doc}`commandline_tools` is the full command and option reference.

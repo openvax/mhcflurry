@@ -1,25 +1,22 @@
 # Command-line reference
 
-This page gives generated help for the main commands and workflow namespaces.
-Use a workflow's subcommand help for its complete options. If you are new to MHCflurry or are
-choosing a workflow, start with the {ref}`tutorial <commandline_tutorial>` and
-return here to look up specific arguments.
+This page documents the options of the prediction, training, calibration,
+evaluation, and helper commands. Workflow namespaces with many specialized
+subcommands (`mhcflurry eval`, `mhcflurry train`, `mhcflurry pseudosequences`)
+are listed here; run a subcommand's `--help` for its options. If you are new to
+MHCflurry, start with the {ref}`tutorial <commandline_tutorial>` and return here
+to look up specific arguments.
 
-MHCflurry provides a unified `mhcflurry` command while retaining the
-historical `mhcflurry-*` names. Both forms use the same implementation. See
-{doc}`configuration` for the naming convention, {doc}`evaluation` for the
-evaluation workflow, and the generated argument reference below for every
-option.
-
-Prediction help uses a compact usage line, spaced options and terminal colors.
-Redirected help stays plain text; set `NO_COLOR=1` to disable colors in a terminal.
-Browse and select weight releases with `mhcflurry downloads releases`,
-`mhcflurry downloads list`, and `mhcflurry predict --model-release RELEASE`.
-See {doc}`model_downloads` for bundle descriptions, local paths, and a worked
-comparison with historical weights. Use {doc}`shared_percent_rank_transforms`
-for compact percentile calibration.
+Commands are grouped in the order a project usually needs them: prediction
+first, then training, calibration, and evaluation, with release and helper
+workflows last. Run `mhcflurry <command> --help` for the same information in a
+terminal; set `NO_COLOR=1` to disable colored help. Historical `mhcflurry-*`
+script names remain available; see {doc}`configuration`.
 
 ## Prediction and data
+
+See {doc}`model_downloads` for bundle descriptions, local paths, and selecting
+older weights with `--model-release`.
 
 ```{eval-rst}
 .. _ref-mhcflurry-predict:
@@ -38,40 +35,10 @@ for compact percentile calibration.
     :prog: mhcflurry downloads
 ```
 
-## Calibration
+## Training and model selection
 
-See {doc}`shared_percent_rank_transforms` for examples and background
-requirements. Calibration writes into `--models-dir`; use a copy to preserve
-an existing calibration.
-
-```{eval-rst}
-.. _ref-mhcflurry-calibrate-percentile-ranks:
-
-.. autoprogram:: mhcflurry.cli.calibrate_percentile_ranks_command:parser
-    :prog: mhcflurry calibrate-percentile-ranks
-```
-
-## Class I training and selection
-
-```{eval-rst}
-.. _ref-mhcflurry-train:
-```
-
-### `mhcflurry train`
-
-`mhcflurry train` groups release-training workflows. It is a namespace command;
-run `mhcflurry train --help` or the concrete subcommand help for the complete
-argument list.
-
-```{command-output} mhcflurry train --help
-:nostderr:
-```
-
-The release workflow delegates to the maintained release script:
-
-```console
-$ mhcflurry train pan-allele-release --help
-```
+See {doc}`training` for choosing between these commands. Training commands fit
+candidate models; selection commands choose the ensemble members to keep.
 
 ```{eval-rst}
 .. _ref-mhcflurry-class1-train-allele-specific-models:
@@ -110,53 +77,104 @@ $ mhcflurry train pan-allele-release --help
     :prog: mhcflurry class1-train-presentation-models
 ```
 
-## Evaluation and figures
+## Percentile calibration
+
+Released affinity and presentation predictors ship with percentile
+calibration; released processing predictors do not. Calibrate custom models, or
+a released processing predictor when you need processing percentiles. See
+{doc}`shared_percent_rank_transforms` for examples and background
+requirements. Calibration writes into `--models-dir`; use a copy to preserve
+an existing calibration.
 
 ```{eval-rst}
-.. _ref-mhcflurry-eval:
+.. _ref-mhcflurry-calibrate-percentile-ranks:
+
+.. autoprogram:: mhcflurry.cli.calibrate_percentile_ranks_command:parser
+    :prog: mhcflurry calibrate-percentile-ranks
 ```
 
-### `mhcflurry eval`
+(ref-mhcflurry-eval)=
 
-`mhcflurry eval` groups model comparison, diagnostic plotting, reusable score
-generation, and paper-style figure rendering. It is a namespace command; run
-the concrete subcommand help for the complete argument list.
+## Evaluation
 
-```{command-output} mhcflurry eval --help
-:nostderr:
-```
+See {doc}`evaluation` for the workflow and output layout.
 
-```{eval-rst}
-.. _ref-mhcflurry-eval-artifacts:
-```
+(ref-mhcflurry-eval-artifacts)=
 
-### Evaluation and Plotting Artifacts
+### Metrics and figures
 
-The commands deliberately separate reusable metrics from rendering. See
-{doc}`evaluation` for the output map, saved-prediction schema, paper-figure
-workflow, and external-predictor integration.
+These commands cover the common path: compute metrics, render diagnostics, and
+optionally produce paper-style figures. The shorter `mhcflurry compare-models`,
+`mhcflurry plot-model-comparison`, and `mhcflurry paper-figures` forms remain
+available for existing scripts.
 
 ```{eval-rst}
 .. _ref-mhcflurry-compare-models:
 
 .. autoprogram:: mhcflurry.cli.compare_models:parser
-    :prog: mhcflurry compare-models
+    :prog: mhcflurry eval compare-models
 
 .. _ref-mhcflurry-plot-model-comparison:
 
 .. autoprogram:: mhcflurry.cli.plot_model_comparison:parser
-    :prog: mhcflurry plot-model-comparison
+    :prog: mhcflurry eval plot-comparison
+
+.. _ref-mhcflurry-paper-figures-run:
+
+.. autoprogram:: mhcflurry.cli.eval_command:make_paper_figures_run_parser()
+    :prog: mhcflurry eval paper-figures run
 
 .. _ref-mhcflurry-paper-figures:
 
 .. autoprogram:: mhcflurry.cli.paper_figures:parser
-    :prog: mhcflurry paper-figures
+    :prog: mhcflurry eval paper-figures render
 ```
 
-Prefer the namespaced `mhcflurry eval ...` form in new automation. Compatibility
-shortcuts remain available for existing scripts.
+### Other evaluation workflows
 
-## Pseudosequence registry helper
+`mhcflurry eval` also contains specialized workflows for release experiments
+and external-predictor comparisons. Run the subcommand's `--help` for its
+options.
+
+```{command-output} mhcflurry eval --help
+:nostderr:
+```
+
+(ref-mhcflurry-train)=
+
+## Release and research workflows
+
+`mhcflurry train` groups the release pipeline and research workflows used to
+produce the published models. Most need a source checkout; see
+{doc}`training` and {doc}`maintainers`. Run the subcommand's `--help` for its
+options.
+
+```{command-output} mhcflurry train --help
+:nostderr:
+```
+
+## Helpers
+
+These commands support release training and data preparation rather than
+prediction. They match the `Helpers` group in `mhcflurry --help`. The generated
+hyperparameter grids feed the maintained training scripts; see the
+[training pipeline README](https://github.com/openvax/mhcflurry/tree/master/scripts/training)
+for how each grid is used. {doc}`training_provenance` shows how the mass-spec
+reassignment command excludes evaluation peptide–MHC pairs and source samples.
+
+```{eval-rst}
+.. _ref-mhcflurry-class1-generate-training-hyperparameters:
+
+.. autoprogram:: mhcflurry.cli.generate_training_hyperparameters:make_parser()
+    :prog: mhcflurry class1-generate-training-hyperparameters
+
+.. _ref-mhcflurry-class1-reassign-mass-spec-training-data:
+
+.. autoprogram:: mhcflurry.cli.reassign_mass_spec_training_data:make_parser()
+    :prog: mhcflurry class1-reassign-mass-spec-training-data
+```
+
+### `mhcflurry pseudosequences`
 
 ```{note}
 `mhcflurry pseudosequences` is a shell-helper CLI for the

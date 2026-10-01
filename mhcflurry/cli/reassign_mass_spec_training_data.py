@@ -25,15 +25,30 @@ def make_parser(prog=None):
     """Build the command-line parser."""
     parser = argparse.ArgumentParser(description=__doc__, prog=prog)
     parser.add_argument("data", metavar="CSV", help="Training data.")
-    parser.add_argument("--ms-only", action="store_true", default=False)
-    parser.add_argument("--drop-negative-ms", action="store_true", default=False)
-    parser.add_argument("--set-measurement-value", type=float)
-    parser.add_argument("--out-csv")
+    parser.add_argument(
+        "--ms-only",
+        action="store_true",
+        default=False,
+        help="Keep only mass-spec rows.")
+    parser.add_argument(
+        "--drop-negative-ms",
+        action="store_true",
+        default=False,
+        help="Drop mass-spec rows whose measurement_inequality is not '<'.")
+    parser.add_argument(
+        "--set-measurement-value",
+        type=float,
+        help="Replace measurement_value for every remaining mass-spec row.")
+    parser.add_argument(
+        "--out-csv",
+        help="Write the edited table here. Without it, nothing is written.")
     parser.add_argument(
         "--exclude-pmhcs",
         help="CSV of frozen evaluation allele,peptide pairs to exclude.")
     parser.add_argument("--exclude-source-samples", help="CSV of study_id,sample_id exclusions")
-    parser.add_argument("--sample-aliases", help="Explicit study/specimen alias CSV")
+    parser.add_argument(
+        "--sample-aliases",
+        help="Explicit study/specimen alias CSV; requires --exclude-source-samples.")
     parser.add_argument(
         "--verbose",
         action="store_true",

@@ -17,17 +17,22 @@ The low-level commands fit candidate models. Production ensembles also require
 model selection and percentile calibration; use the release workflow when you
 need the complete pipeline.
 
-## Small allele-specific example
+The release workflow and the `mhcflurry train` data-preparation/sweep wrappers
+require a source checkout containing `scripts/`. Run them from the checkout root
+or use an editable install of that checkout. The low-level `mhcflurry
+class1-train-*` commands are included in the installed Python package.
 
-The training command accepts a YAML list of architectures. This single,
-four-member architecture is suitable for learning the workflow; it is not a
-replacement for the released ensemble search:
+## Small allele-specific example
 
 Fetch the curated example data:
 
 ```shell
 mhcflurry downloads fetch data_curated
 ```
+
+The training command accepts a YAML list of architectures. This single,
+four-member architecture is suitable for learning the workflow; it is not a
+replacement for the released ensemble search:
 
 ```yaml
 - activation: tanh
@@ -79,14 +84,48 @@ The curated data used in the example and for released models is the
 `data_curated` download bundle. Use `mhcflurry downloads path data_curated` to
 locate it.
 
-## Pan-allele and release training
+## Pan-allele training
 
-The release workflow and the `mhcflurry train` data-preparation/sweep wrappers
-require a source checkout containing `scripts/`. Run them from the checkout root
-or use an editable install of that checkout. The low-level `mhcflurry
-class1-train-*` commands are included in the installed Python package.
+Pan-allele training additionally needs an allele pseudosequence table and a
+model-selection step. Each training allele must resolve to a key in that table;
+rows for alleles without a matching pseudosequence are excluded. Start with
+the command help and the maintained training recipes rather than copying
+individual flags from an old run:
 
-### Processing-specific data policy
+```shell
+mhcflurry class1-train-pan-allele-models --help
+mhcflurry train pan-allele-release --help
+```
+
+## Release workflow
+
+The release workflow can run locally or on a configured remote backend. It
+records source and workflow provenance, resumes completed phases, compares the
+candidate with public models, and copies review artifacts back to the control
+machine. Deployment is opt-in.
+
+Leave worker counts, GPU packing, DataLoader workers, and prediction batches on
+`auto` initially. See {doc}`configuration` before pinning resource values and
+the [maintained training scripts](https://github.com/openvax/mhcflurry/tree/master/scripts/training)
+for the current release recipe.
+
+## Evaluate before use
+
+Run `mhcflurry eval compare-models` against a public baseline and inspect the
+summary metrics and plots. Prediction-affecting changes need held-out evidence,
+not only a successful unit-test run. See {doc}`evaluation` for the evaluation
+workflow.
+
+Refit calibration after changing an ensemble's members or weights. The release
+workflow handles affinity and presentation; standalone processing calibration
+is explicit. See {doc}`shared_percent_rank_transforms` for reference requirements
+and preserving previous calibrations for comparisons.
+
+## Processing training data
+
+Most users can skip this section. It applies only when training new antigen
+processing models. Like the release workflow, these commands need a source
+checkout.
 
 New processing training and model selection require affinity/length-matched
 hit/decoy risk sets. Generate them with the maintained command:
@@ -130,38 +169,3 @@ directly comparable AUPRC values. Historical random-decoy evaluation requires
 `--allow-legacy-processing-plots`. Affinity regression and end-to-end
 presentation retain their separate objectives/cohorts; matched processing
 results are not plotted on their absolute-performance axes.
-
-### Release workflow
-
-Pan-allele training additionally needs an allele pseudosequence table and a
-model-selection step. Each training allele must resolve to a key in that table;
-rows for alleles without a matching pseudosequence are excluded. Start with
-the command help and the maintained training recipes rather than copying
-individual flags from an old run:
-
-```shell
-mhcflurry class1-train-pan-allele-models --help
-mhcflurry train pan-allele-release --help
-```
-
-The release workflow can run locally or on a configured remote backend. It
-records source and workflow provenance, resumes completed phases, compares the
-candidate with public models, and copies review artifacts back to the control
-machine. Deployment is opt-in.
-
-Leave worker counts, GPU packing, DataLoader workers, and prediction batches on
-`auto` initially. See {doc}`configuration` before pinning resource values and
-the [maintained training scripts](https://github.com/openvax/mhcflurry/tree/master/scripts/training)
-for the current release recipe.
-
-## Evaluate before use
-
-Run `mhcflurry eval compare-models` against a public baseline and inspect the
-summary metrics and plots. Prediction-affecting changes need held-out evidence,
-not only a successful unit-test run. See {doc}`evaluation` for the evaluation
-workflow.
-
-Refit calibration after changing an ensemble's members or weights. The release
-workflow handles affinity and presentation; standalone processing calibration
-is explicit. See {doc}`shared_percent_rank_transforms` for reference requirements
-and preserving previous calibrations for comparisons.
