@@ -115,9 +115,6 @@ _HELP_GROUPS = (
     ("Data management", (
         "downloads",
     )),
-    ("Calibration", (
-        "calibrate-percentile-ranks",
-    )),
     ("Class I training", (
         "class1-train-allele-specific-models",
         "class1-train-pan-allele-models",
@@ -129,16 +126,22 @@ _HELP_GROUPS = (
         "class1-select-pan-allele-models",
         "class1-select-processing-models",
     )),
-    ("Release training", (
-        "train",
+    ("Calibration", (
+        "calibrate-percentile-ranks",
     )),
     ("Evaluation and figures", (
-        "eval", "compare-models", "plot-model-comparison", "paper-figures",
+        "eval",
+    )),
+    ("Release training", (
+        "train",
     )),
     ("Helpers", (
         "class1-generate-training-hyperparameters",
         "class1-reassign-mass-spec-training-data",
         "pseudosequences",
+    )),
+    ("Shortcuts for eval subcommands", (
+        "compare-models", "plot-model-comparison", "paper-figures",
     )),
 )
 
@@ -200,10 +203,6 @@ def format_help():
         "",
         "MHCflurry %s" % __version__,
         "",
-        "Historical standalone mhcflurry-* scripts remain installed as",
-        "compatibility shims. New namespaces such as train and eval live",
-        "under the unified mhcflurry command.",
-        "",
     ]
     name_width = max(
         len(name) for _, names in _HELP_GROUPS for name in names
@@ -217,10 +216,12 @@ def format_help():
     lines.extend([
         "Examples:",
         "  mhcflurry predict --alleles HLA-A0201 --peptides SIINFEKL --out out.csv",
-        "  mhcflurry train pan-allele-release --run-dir runs/2.3.0 --release 2.3.0",
         "  mhcflurry eval compare-models --a results/new_run/ --b public --out cmp/",
         "  mhcflurry eval paper-figures run --a results/new_run/ --out eval/",
+        "  mhcflurry train pan-allele-release --run-dir runs/2.3.0 --release 2.3.0",
         "  mhcflurry <subcommand> --help",
+        "",
+        "Historical mhcflurry-* scripts remain installed and run the same code.",
         "",
         "Options:",
         "  -h, --help     show this help message and exit",
