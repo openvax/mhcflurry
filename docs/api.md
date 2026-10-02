@@ -2,10 +2,6 @@
 
 # API Documentation
 
-This is the complete generated API reference. Start with the
-{doc}`python_tutorial` for the common prediction workflow, then use this page to
-look up individual classes and methods.
-
 For calibration-specific examples and compatibility, see
 {doc}`shared_percent_rank_transforms`.
 

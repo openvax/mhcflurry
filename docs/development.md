@@ -1,8 +1,5 @@
 # Development
 
-This page is for contributors working from a source checkout. Prediction users
-can use the installation steps in {doc}`intro` instead.
-
 ## Set up a checkout
 
 Source `develop.sh` to create and activate the editable virtual environment:

@@ -1,8 +1,5 @@
 # Maintainer workflows
 
-This section collects repository and release material that ordinary prediction
-users do not need.
-
 ## Contributing and verification
 
 - Read the [contribution guide](https://github.com/openvax/mhcflurry/blob/master/CONTRIBUTING.md)
@@ -55,7 +52,7 @@ others reference.
 ## Controlled experiments
 
 These pages define controlled comparisons: the question, the fixed controls,
-and the commands that run them. They are not needed for ordinary training.
+and the commands that run them.
 
 - {doc}`processing_cleavage_boundary_experiment` asks whether boundary-spanning
   sequence context adds signal after controlling for binding affinity.

@@ -1,9 +1,5 @@
 # Python library tutorial
 
-Use the Python API to add MHCflurry predictions to notebooks and analysis
-pipelines. This page covers the common presentation and affinity calls; the
-{ref}`API-documentation` contains the complete interfaces.
-
 For most applications, use
 {class}`~mhcflurry.Class1PresentationPredictor`: it returns binding, processing,
 and combined presentation predictions from one interface. Use the lower-level
@@ -12,10 +8,9 @@ themselves.
 
 ## Loading a predictor
 
-{class}`~mhcflurry.Class1PresentationPredictor` provides binding, processing,
-and combined presentation predictions. Calling `load()` without a path uses
-the downloaded release model (see {ref}`downloading`); pass a model directory
-to load a custom predictor.
+`Class1PresentationPredictor.load()` without a path uses the downloaded
+release model (see {ref}`downloading`); pass a model directory to load a custom
+predictor.
 
 ```{doctest}
 >>> from mhcflurry import Class1PresentationPredictor
@@ -26,10 +21,9 @@ True
 
 ## Predicting for individual peptides
 
-To generate predictions for individual peptides, we can use the
-{meth}`~mhcflurry.Class1PresentationPredictor.predict` method of the {class}`~mhcflurry.Class1PresentationPredictor`,
-loaded above. Scores depend on the loaded model release. This method returns a {class}`pandas.DataFrame` with binding affinity, processing, and presentation
-predictions:
+{meth}`~mhcflurry.Class1PresentationPredictor.predict` returns a
+{class}`pandas.DataFrame` with binding affinity, processing, and presentation
+predictions, whose values depend on the loaded model release:
 
 ```{doctest}
 >>> predictions = predictor.predict(
@@ -88,10 +82,9 @@ Here the strongest binder for each sample / peptide pair is returned.
 
 ## Scanning protein sequences
 
-The {meth}`~mhcflurry.Class1PresentationPredictor.predict_sequences` method supports
-scanning protein sequences for MHC ligands. Here's an example to identify all
-8–11mer peptides with a predicted binding affinity at most 500 nM to any allele
-across two sample MHC allele sets and two short peptide sequences.
+{meth}`~mhcflurry.Class1PresentationPredictor.predict_sequences` scans protein
+sequences for MHC ligands. This example keeps 8–11mers with a predicted binding
+affinity of at most 500 nM to any allele in either of two samples:
 
 ```{doctest}
 >>> scan = predictor.predict_sequences(
@@ -116,16 +109,11 @@ True
 When using `predict_sequences`, the flanking sequences for each peptide are
 automatically included in the processing and presentation predictions.
 
-See the documentation for {class}`~mhcflurry.Class1PresentationPredictor` for other
-useful methods.
-
 ## Lower level interfaces
 
 The {class}`~mhcflurry.Class1PresentationPredictor` delegates to a
 {class}`~mhcflurry.Class1AffinityPredictor` instance for binding affinity predictions.
-If all you need are binding affinities, you can use this instance directly.
-
-Here's an example:
+If you only need binding affinities, use this instance directly:
 
 ```{doctest}
 >>> affinity_predictor = predictor.affinity_predictor
@@ -165,8 +153,6 @@ underlying Python method.
 You can similarly use {class}`~mhcflurry.Class1ProcessingPredictor` directly for
 antigen processing prediction, and there is a low-level
 {class}`~mhcflurry.Class1ProcessingNeuralNetwork` with a {meth}`~mhcflurry.Class1ProcessingNeuralNetwork.fit` method.
-
-See the API documentation of these classes for details.
 
 When interpreting percentile outputs, lower means stronger and loading a
 model preserves its saved calibration. For custom calibration or standalone

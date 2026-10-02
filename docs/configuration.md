@@ -1,10 +1,5 @@
 # Configuration and performance
 
-MHCflurry chooses safe defaults for ordinary prediction and training commands.
-Most users should start without environment-variable overrides or fixed worker
-counts, then pin a value only when reproducing a benchmark or diagnosing a
-specific machine.
-
 ## Automatic hardware planning
 
 Prediction, training, calibration, selection, and evaluation commands share a
@@ -53,7 +48,7 @@ overrides.
 ## Environment overrides
 
 These variables are intended for custom model locations, debugging, and
-controlled benchmarks. Ordinary prediction and training do not require them.
+controlled benchmarks.
 
 `MHCFLURRY_DEFAULT_CLASS1_MODELS`
 : Path to the default **affinity** predictor. Without this override,

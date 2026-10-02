@@ -2,17 +2,13 @@
 
 # Command-line tutorial
 
-This tutorial follows the common workflow: download the released models, score
-peptides, then scan proteins for candidate ligands. Most users can stop there;
-{ref}`cli-next-steps` points to training, evaluation, and the full reference.
-
 (downloading)=
 (downloading-models)=
 
 ## Download models
 
-Most users need only the presentation bundle. It includes the binding-affinity
-and antigen-processing components:
+Download the presentation bundle, which includes the binding-affinity and
+antigen-processing components:
 
 ```shell
 $ mhcflurry downloads fetch models_class1_presentation
@@ -109,8 +105,7 @@ By default, the output keeps rows with affinity percentile at most 2. Use
 different filter. Scanning supplies N/C source-protein flanks automatically;
 use `--no-flanking` for predictions without that context.
 
-We'll generate predictions across `example.fasta`, a FASTA file with two short
-sequences:
+`example.fasta` contains two short sequences:
 
 ```{literalinclude} /example.fasta
 ```
@@ -127,14 +122,12 @@ See the {ref}`command reference <ref-mhcflurry-predict-scan>` for FASTA/CSV
 input, presentation-score filtering, peptide lengths, and output options.
 
 
-(cli-next-steps)=
-
 ## Next steps
 
 - {doc}`model_downloads` shows how to select other weight releases, including
   the older allele-specific models.
 - {doc}`training` and {doc}`evaluation` cover fitting custom models and
-  comparing them with the released ones. Most users do not need to train.
+  comparing them with the released ones.
 - {doc}`configuration` covers prediction batch sizes, hardware autosizing, and
   reproducibility.
 - {doc}`commandline_tools` is the full command and option reference.
