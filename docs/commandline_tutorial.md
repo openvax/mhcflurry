@@ -122,6 +122,8 @@ See the {ref}`command reference <ref-mhcflurry-predict-scan>` for FASTA/CSV
 input, presentation-score filtering, peptide lengths, and output options.
 
 
+(cli-next-steps)=
+
 ## Next steps
 
 - {doc}`model_downloads` shows how to select other weight releases, including

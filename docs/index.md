@@ -31,7 +31,8 @@ presentation.
 ## Advanced topics
 
 - {doc}`shared_percent_rank_transforms` explains custom percentile calibration.
-- {doc}`training_provenance` audits training-sample overlap between models.
+- {doc}`training_provenance` checks whether evaluation samples overlap any
+  compared model's training data.
 
 Contributors and release maintainers can start with {doc}`maintainers`.
 

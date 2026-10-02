@@ -4,11 +4,11 @@ For most applications, use
 {class}`~mhcflurry.Class1PresentationPredictor`: it returns binding, processing,
 and combined presentation predictions from one interface. Use the lower-level
 affinity or processing predictors only when you need those components by
-themselves.
+themselves. {doc}`api` documents every class and method.
 
 ## Loading a predictor
 
-`Class1PresentationPredictor.load()` without a path uses the downloaded
+{meth}`~mhcflurry.Class1PresentationPredictor.load` without a path uses the downloaded
 release model (see {ref}`downloading`); pass a model directory to load a custom
 predictor.
 
