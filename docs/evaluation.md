@@ -156,9 +156,6 @@ manifest.
 
 ## Specialized workflows
 
-These workflows support release experiments and controlled comparisons. Most
-evaluations do not need them.
-
 ### Reusing saved affinity predictions
 
 Affinity comparison summaries include a `benchmark_identity` hash calculated

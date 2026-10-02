@@ -1,16 +1,9 @@
 # Command-line reference
 
-This page documents the options of the prediction, training, calibration,
-evaluation, and helper commands. Workflow namespaces with many specialized
-subcommands (`mhcflurry eval`, `mhcflurry train`, `mhcflurry pseudosequences`)
-are listed here; run a subcommand's `--help` for its options. If you are new to
-MHCflurry, start with the {ref}`tutorial <commandline_tutorial>` and return here
-to look up specific arguments.
-
-Commands are grouped in the order a project usually needs them: prediction
-first, then training, calibration, and evaluation, with release and helper
-workflows last. Run `mhcflurry <command> --help` for the same information in a
-terminal; set `NO_COLOR=1` to disable colored help. Historical `mhcflurry-*`
+Workflow namespaces with many specialized subcommands (`mhcflurry eval`,
+`mhcflurry train`, `mhcflurry pseudosequences`) list their subcommands here; run
+a subcommand's `--help` for its options. Run `mhcflurry <command> --help` for
+the same information in a terminal; set `NO_COLOR=1` to disable colored help. Historical `mhcflurry-*`
 script names remain available; see {doc}`configuration`.
 
 ## Prediction and data
@@ -103,8 +96,7 @@ See {doc}`evaluation` for the workflow and output layout.
 
 ### Metrics and figures
 
-These commands cover the common path: compute metrics, render diagnostics, and
-optionally produce paper-style figures. The shorter `mhcflurry compare-models`,
+The shorter `mhcflurry compare-models`,
 `mhcflurry plot-model-comparison`, and `mhcflurry paper-figures` forms remain
 available for existing scripts.
 
@@ -133,8 +125,7 @@ available for existing scripts.
 ### Other evaluation workflows
 
 `mhcflurry eval` also contains specialized workflows for release experiments
-and external-predictor comparisons. Run the subcommand's `--help` for its
-options.
+and external-predictor comparisons.
 
 ```{command-output} mhcflurry eval --help
 :nostderr:
@@ -156,7 +147,7 @@ options.
 ## Helpers
 
 These commands support release training and data preparation rather than
-prediction. They match the `Helpers` group in `mhcflurry --help`. The generated
+prediction. The generated
 hyperparameter grids feed the maintained training scripts; see the
 [training pipeline README](https://github.com/openvax/mhcflurry/tree/master/scripts/training)
 for how each grid is used. {doc}`training_provenance` shows how the mass-spec

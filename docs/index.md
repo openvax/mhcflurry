@@ -1,8 +1,7 @@
 # MHCflurry documentation
 
 MHCflurry predicts MHC class I binding affinity, antigen processing, and peptide
-presentation. Most users only need the released models and one of the two
-tutorials below.
+presentation.
 
 ## Start here
 
@@ -29,9 +28,7 @@ tutorials below.
 - {doc}`configuration` covers hardware autosizing, environment overrides, and
   reproducibility.
 
-Specialized topics, such as custom percentile calibration and training-sample
-audits, are listed under **Advanced topics** in the sidebar. Contributors and
-release maintainers can start with {doc}`maintainers`.
+Contributors and release maintainers can start with {doc}`maintainers`.
 
 ```{toctree}
 :maxdepth: 2
