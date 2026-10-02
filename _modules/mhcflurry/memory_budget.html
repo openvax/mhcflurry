@@ -1,0 +1,316 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.memory_budget &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.memory_budget</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.memory_budget</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Shared memory-budget calculations for training and inference.</span>
+
+<span class="sd">Launch-time worker packing and runtime batch sizing must use the same budget.</span>
+<span class="sd">Otherwise each layer can independently claim the same free memory and a plan</span>
+<span class="sd">that looks conservative on paper can still OOM. This module is deliberately</span>
+<span class="sd">free of torch imports so the parent process can size a spawn/fork worker pool</span>
+<span class="sd">without initializing CUDA.</span>
+<span class="sd">"""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+
+<span class="n">GIB</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">)</span>
+
+<span class="c1"># Keep one shared reserve for CUDA contexts, allocator fragmentation, and</span>
+<span class="c1"># allocations racing between co-resident workers. The reserve is a small</span>
+<span class="c1"># fraction on large accelerators but never disappears on small ones.</span>
+<span class="n">MEMORY_RESERVE_FRACTION</span> <span class="o">=</span> <span class="mf">0.10</span>
+<span class="n">DEVICE_MIN_RESERVE_BYTES</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span>
+<span class="n">HOST_MIN_RESERVE_BYTES</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span>
+
+
+<div class="viewcode-block" id="memory_reserve_bytes">
+<a class="viewcode-back" href="../../api.html#mhcflurry.memory_budget.memory_reserve_bytes">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">memory_reserve_bytes</span><span class="p">(</span>
+        <span class="n">available_bytes</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">min_reserve_bytes</span><span class="o">=</span><span class="n">DEVICE_MIN_RESERVE_BYTES</span><span class="p">,</span>
+        <span class="n">reserve_fraction</span><span class="o">=</span><span class="n">MEMORY_RESERVE_FRACTION</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the shared reserve to leave outside an automatic plan."""</span>
+    <span class="n">available_bytes</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">available_bytes</span><span class="p">),</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">available_bytes</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="n">reserve</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">min_reserve_bytes</span><span class="p">),</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">available_bytes</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="n">reserve_fraction</span><span class="p">)),</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">reserve</span><span class="p">,</span> <span class="n">available_bytes</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="usable_memory_bytes">
+<a class="viewcode-back" href="../../api.html#mhcflurry.memory_budget.usable_memory_bytes">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">usable_memory_bytes</span><span class="p">(</span>
+        <span class="n">available_bytes</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">min_reserve_bytes</span><span class="o">=</span><span class="n">DEVICE_MIN_RESERVE_BYTES</span><span class="p">,</span>
+        <span class="n">reserve_fraction</span><span class="o">=</span><span class="n">MEMORY_RESERVE_FRACTION</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Memory an automatic plan may spend after the shared reserve."""</span>
+    <span class="n">available_bytes</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">available_bytes</span><span class="p">),</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">max</span><span class="p">(</span>
+        <span class="n">available_bytes</span> <span class="o">-</span> <span class="n">memory_reserve_bytes</span><span class="p">(</span>
+            <span class="n">available_bytes</span><span class="p">,</span>
+            <span class="n">min_reserve_bytes</span><span class="o">=</span><span class="n">min_reserve_bytes</span><span class="p">,</span>
+            <span class="n">reserve_fraction</span><span class="o">=</span><span class="n">reserve_fraction</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="mi">0</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="per_worker_memory_budget_bytes">
+<a class="viewcode-back" href="../../api.html#mhcflurry.memory_budget.per_worker_memory_budget_bytes">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">per_worker_memory_budget_bytes</span><span class="p">(</span>
+        <span class="n">available_bytes</span><span class="p">,</span>
+        <span class="n">num_workers</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">min_reserve_bytes</span><span class="o">=</span><span class="n">DEVICE_MIN_RESERVE_BYTES</span><span class="p">,</span>
+        <span class="n">reserve_fraction</span><span class="o">=</span><span class="n">MEMORY_RESERVE_FRACTION</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Split usable memory evenly between co-resident workers."""</span>
+    <span class="k">return</span> <span class="n">usable_memory_bytes</span><span class="p">(</span>
+        <span class="n">available_bytes</span><span class="p">,</span>
+        <span class="n">min_reserve_bytes</span><span class="o">=</span><span class="n">min_reserve_bytes</span><span class="p">,</span>
+        <span class="n">reserve_fraction</span><span class="o">=</span><span class="n">reserve_fraction</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">//</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_workers</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="memory_worker_capacity">
+<a class="viewcode-back" href="../../api.html#mhcflurry.memory_budget.memory_worker_capacity">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">memory_worker_capacity</span><span class="p">(</span>
+        <span class="n">available_gb</span><span class="p">,</span>
+        <span class="n">per_worker_gb</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">min_reserve_bytes</span><span class="o">=</span><span class="n">DEVICE_MIN_RESERVE_BYTES</span><span class="p">,</span>
+        <span class="n">reserve_fraction</span><span class="o">=</span><span class="n">MEMORY_RESERVE_FRACTION</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return how many complete worker working sets fit in available memory.</span>
+
+<span class="sd">    At least one worker is returned: a caller with a GPU should attempt one</span>
+<span class="sd">    worker and let its normal preflight produce the detailed undersized-device</span>
+<span class="sd">    warning. There is intentionally no default performance hard cap here.</span>
+<span class="sd">    """</span>
+    <span class="n">available_gb</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">available_gb</span><span class="p">)</span>
+    <span class="n">per_worker_gb</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">per_worker_gb</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">available_gb</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">per_worker_gb</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Memory capacity inputs must be finite; got available_gb=</span><span class="si">%r</span><span class="s2">, "</span>
+            <span class="s2">"per_worker_gb=</span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">available_gb</span><span class="p">,</span> <span class="n">per_worker_gb</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="n">available_bytes</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">available_gb</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">*</span> <span class="n">GIB</span>
+    <span class="n">per_worker_bytes</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">per_worker_gb</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">*</span> <span class="n">GIB</span>
+    <span class="k">if</span> <span class="n">per_worker_bytes</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">1</span>
+    <span class="k">return</span> <span class="nb">max</span><span class="p">(</span>
+        <span class="mi">1</span><span class="p">,</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">usable_memory_bytes</span><span class="p">(</span>
+            <span class="n">available_bytes</span><span class="p">,</span>
+            <span class="n">min_reserve_bytes</span><span class="o">=</span><span class="n">min_reserve_bytes</span><span class="p">,</span>
+            <span class="n">reserve_fraction</span><span class="o">=</span><span class="n">reserve_fraction</span><span class="p">,</span>
+        <span class="p">)</span> <span class="o">//</span> <span class="n">per_worker_bytes</span><span class="p">),</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="module_tensor_bytes">
+<a class="viewcode-back" href="../../api.html#mhcflurry.memory_budget.module_tensor_bytes">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">module_tensor_bytes</span><span class="p">(</span><span class="n">module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return unique parameter and buffer bytes for a torch-like module."""</span>
+    <span class="n">seen</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">total</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">tensors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">module</span><span class="o">.</span><span class="n">parameters</span><span class="p">(</span><span class="n">recurse</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+    <span class="n">tensors</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">module</span><span class="o">.</span><span class="n">buffers</span><span class="p">(</span><span class="n">recurse</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">tensor</span> <span class="ow">in</span> <span class="n">tensors</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">device</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">data_ptr</span><span class="p">()))</span>
+        <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="nb">id</span><span class="p">(</span><span class="n">tensor</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="n">total</span> <span class="o">+=</span> <span class="nb">int</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">nelement</span><span class="p">())</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">element_size</span><span class="p">())</span>
+    <span class="k">return</span> <span class="n">total</span></div>
+
+
+
+<div class="viewcode-block" id="training_module_bytes">
+<a class="viewcode-back" href="../../api.html#mhcflurry.memory_budget.training_module_bytes">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">training_module_bytes</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">optimizer_state_copies</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Estimate model, gradient, and optimizer-state bytes for training.</span>
+
+<span class="sd">    Parameters and buffers are counted exactly. Trainable parameters also need</span>
+<span class="sd">    one gradient tensor and, for Adam/RMSProp-like optimizers, one or more</span>
+<span class="sd">    parameter-sized state tensors. The caller supplies that state count.</span>
+<span class="sd">    """</span>
+    <span class="n">parameter_bytes</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">parameter</span><span class="o">.</span><span class="n">nelement</span><span class="p">())</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">parameter</span><span class="o">.</span><span class="n">element_size</span><span class="p">())</span>
+        <span class="k">for</span> <span class="n">parameter</span> <span class="ow">in</span> <span class="n">module</span><span class="o">.</span><span class="n">parameters</span><span class="p">(</span><span class="n">recurse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">buffer_bytes</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">buffer</span><span class="o">.</span><span class="n">nelement</span><span class="p">())</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">buffer</span><span class="o">.</span><span class="n">element_size</span><span class="p">())</span>
+        <span class="k">for</span> <span class="n">buffer</span> <span class="ow">in</span> <span class="n">module</span><span class="o">.</span><span class="n">buffers</span><span class="p">(</span><span class="n">recurse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">buffer_bytes</span>
+        <span class="o">+</span> <span class="n">parameter_bytes</span> <span class="o">*</span> <span class="p">(</span><span class="mi">2</span> <span class="o">+</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">optimizer_state_copies</span><span class="p">),</span> <span class="mi">0</span><span class="p">))</span>
+    <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

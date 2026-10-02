@@ -1,0 +1,242 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neural training semantics &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Reproduce the 2.3.0 model training" href="final_230_candidate_experiment.html" />
+    <link rel="prev" title="Release training recipe" href="release_training_recipe.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Neural training semantics</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#framework-semantic-discrepancies-found">Framework-semantic discrepancies found</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Neural training semantics</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/release_neural_hyperparameter_audit.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="neural-training-semantics">
+<h1>Neural training semantics<a class="headerlink" href="#neural-training-semantics" title="Link to this heading"></a></h1>
+<p>MHCflurry 2.3.0 uses PyTorch while retaining support for historical model
+weights. Matching a hyperparameter name does not always match the training
+equation across frameworks. This reference describes those distinctions;
+<a class="reference internal" href="release_training_recipe.html"><span class="doc">Release training recipe</span></a> is the authoritative recipe for the released
+weights. See <a class="reference internal" href="release_model_evaluation.html"><span class="doc">Evaluation of the 2.3.0 weights</span></a> for the completed comparison of
+the released ensembles on identical evaluation rows.</p>
+<section id="framework-semantic-discrepancies-found">
+<h2>Framework-semantic discrepancies found<a class="headerlink" href="#framework-semantic-discrepancies-found" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Discrepancy</p></th>
+<th class="head"><p>Release relevance</p></th>
+<th class="head"><p>Resolution / justification</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Processing layers silently used PyTorch Kaiming/fan-in initialization and nonzero random biases</p></td>
+<td><p>Direct: every processing candidate</p></td>
+<td><p>Made explicit and equation-tested. Initialization is explicit in every generated recipe; see the final recipe for each processing family.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Affinity LSUV observed raw Linear output instead of the activated Dense output</p></td>
+<td><p>Direct: every affinity candidate uses LSUV</p></td>
+<td><p>Both targets are explicit. Historical parity uses post-activation; the 2.3.0 affinity recipe selects pre-activation.</p></td>
+</tr>
+<tr class="row-even"><td><p>Native PyTorch RMSprop places epsilon outside the square root; Keras places it inside</p></td>
+<td><p>Direct: every affinity optimizer step</p></td>
+<td><p>Fixed with a public, tested Keras equation and an explicit implementation switch. PyTorch documents this framework difference.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Native PyTorch and Keras Adam place epsilon differently relative to bias correction</p></td>
+<td><p>Direct: every processing optimizer step</p></td>
+<td><p>Both equations are public and tested, and the selected implementation is serialized. The final no-flank and boundary families use Keras-compatible Adam; the short-flank family uses native RMSprop.</p></td>
+</tr>
+<tr class="row-even"><td><p>Both PyTorch trainers rounded validation rows as <code class="docutils literal notranslate"><span class="pre">floor(N</span> <span class="pre">*</span> <span class="pre">split)</span></code> instead of using Keras’ split boundary <code class="docutils literal notranslate"><span class="pre">floor(N</span> <span class="pre">*</span> <span class="pre">(1</span> <span class="pre">-</span> <span class="pre">split))</span></code></p></td>
+<td><p>Direct but usually one row per network</p></td>
+<td><p>Fixed centrally and regression-tested. This is deterministic parity, not an optimization question.</p></td>
+</tr>
+<tr class="row-odd"><td><p>PyTorch BatchNorm updates running variance with an unbiased estimate; Keras uses population variance</p></td>
+<td><p>Inactive in the release affinity grid; processing has no BN</p></td>
+<td><p>Fixed in <code class="docutils literal notranslate"><span class="pre">KerasBatchNorm1d</span></code> and tested against the Keras equation, so non-release configurations are not left divergent.</p></td>
+</tr>
+<tr class="row-even"><td><p>Generic PyTorch Xavier fan calculation was wrong for the transposed 3-D <code class="docutils literal notranslate"><span class="pre">LocallyConnected1D</span></code> storage</p></td>
+<td><p>Inactive: release affinity grid has no local layers</p></td>
+<td><p>Fixed using Keras’ <code class="docutils literal notranslate"><span class="pre">(output_length,</span> <span class="pre">flattened_input,</span> <span class="pre">filters)</span></code> fans.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Native SGD fallback used LR 0.001 and unknown optimizer names silently became Adam</p></td>
+<td><p>Inactive: release uses RMSprop/Adam</p></td>
+<td><p>Fixed: Keras SGD default LR is 0.01 and unknown names now fail.</p></td>
+</tr>
+<tr class="row-even"><td><p>Keras Glorot/He <em>normal</em> initializers use variance-corrected truncated normals; PyTorch’s normal initializers are untruncated</p></td>
+<td><p>Inactive: release uses Glorot uniform</p></td>
+<td><p>Follow-up only if those non-release initializer values are to remain supported for new training. Loaded historical weights are unaffected.</p></td>
+</tr>
+<tr class="row-odd"><td><p>TensorFlow and PyTorch dropout RNGs, shuffles, reduction order, and GPU kernels differ</p></td>
+<td><p>Direct stochastic trajectory, but not a hyperparameter drift</p></td>
+<td><p>Irreducible framework difference. Compare distributions and held-out metrics, not byte-identical weights.</p></td>
+</tr>
+<tr class="row-even"><td><p>Fixed master/per-fit seeds replace entropy-derived seeds</p></td>
+<td><p>Direct identities/trajectory</p></td>
+<td><p>Intentional reproducibility improvement. It does not change the sampled distributions.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Device-side encoding, compact cartesian batches, validation batching, lazy proteome sampling, and prediction chunking</p></td>
+<td><p>Execution only</p></td>
+<td><p>Algebra/prediction parity is covered by tests. Release training fails if autosizing would shrink a configured minibatch.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> and reduced float32 matmul precision</p></td>
+<td><p>Could alter trajectory</p></td>
+<td><p>Off for release; eager + <code class="docutils literal notranslate"><span class="pre">highest</span></code> precision is pinned.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Native RMSprop adds epsilon outside the square root; Keras-compatible RMSprop
+adds it inside. Adam implementations also differ in epsilon placement relative
+to bias correction. These are explicit optimizer choices, not transparent
+performance switches. See the <a class="reference external" href="https://docs.pytorch.org/docs/stable/generated/torch.optim.RMSprop.html">PyTorch RMSprop documentation</a>,
+<a class="reference external" href="https://keras.io/api/optimizers/rmsprop/">Keras RMSprop documentation</a>, and
+<a class="reference external" href="https://arxiv.org/abs/1412.6980">Adam paper</a>.</p>
+<p>The public class defaults, compatibility generators, and frozen release recipe
+serve different purposes. The compatibility affinity generator defaults to
+minibatch 128; the 2.3.0 release recipe explicitly selects 1024 with native
+RMSprop and pre-activation LSUV. Always retain the generated hyperparameter YAML
+with a training run. Framework RNGs and reduction order preclude byte-identical
+retraining; validate prediction quality on a common held-out cohort.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="release_training_recipe.html" class="btn btn-neutral float-left" title="Release training recipe" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="final_230_candidate_experiment.html" class="btn btn-neutral float-right" title="Reproduce the 2.3.0 model training" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

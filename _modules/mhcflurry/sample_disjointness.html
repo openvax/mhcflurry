@@ -1,0 +1,467 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.sample_disjointness &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.sample_disjointness</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.sample_disjointness</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Conservative biological-sample audits of explicitly inventoried lineage."""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">training_provenance</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.training_provenance</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">PROVENANCE_COLUMN</span><span class="p">,</span> <span class="n">decode_sources</span><span class="p">,</span> <span class="n">file_sha256</span><span class="p">,</span> <span class="n">identity_text</span><span class="p">,</span> <span class="n">study_identity</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.version</span><span class="w"> </span><span class="kn">import</span> <span class="n">__version__</span>
+
+
+<span class="n">STAGES</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"pretraining"</span><span class="p">,</span> <span class="s2">"training"</span><span class="p">,</span> <span class="s2">"development"</span><span class="p">,</span> <span class="s2">"selection"</span><span class="p">)</span>
+<span class="n">COMPONENTS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"affinity"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"affinity"</span><span class="p">,),</span> <span class="s2">"processing"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"processing"</span><span class="p">,),</span>
+    <span class="s2">"presentation"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"affinity"</span><span class="p">,</span> <span class="s2">"processing"</span><span class="p">,</span> <span class="s2">"presentation"</span><span class="p">),</span>
+    <span class="s2">"external"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"external"</span><span class="p">,),</span>
+<span class="p">}</span>
+<span class="n">IDENTITY_COLUMNS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"study_id"</span><span class="p">,</span> <span class="s2">"sample_id"</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_known_study</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+    <span class="n">namespace</span><span class="p">,</span> <span class="n">separator</span><span class="p">,</span> <span class="n">identifier</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="s2">":"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">namespace</span> <span class="o">==</span> <span class="s2">"pmid"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">identifier</span><span class="o">.</span><span class="n">isdigit</span><span class="p">()</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">identifier</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+    <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="n">namespace</span> <span class="ow">and</span> <span class="n">separator</span> <span class="ow">and</span> <span class="n">identifier</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="read_identities">
+<a class="viewcode-back" href="../../api.html#mhcflurry.sample_disjointness.read_identities">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">read_identities</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Read literal identity strings, including leading zeroes and 'NA'."""</span>
+    <span class="k">return</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">keep_default_na</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="SampleAliases">
+<a class="viewcode-back" href="../../api.html#mhcflurry.sample_disjointness.SampleAliases">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SampleAliases</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Resolve explicit specimen and study aliases; reject ambiguous cycles."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="n">path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">frame</span> <span class="o">=</span> <span class="n">read_identities</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"study_id"</span><span class="p">,</span> <span class="s2">"sample_id"</span><span class="p">,</span> <span class="s2">"canonical_study_id"</span><span class="p">,</span> <span class="s2">"canonical_sample_id"</span><span class="p">]</span>
+            <span class="k">if</span> <span class="nb">list</span><span class="p">(</span><span class="n">frame</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span> <span class="o">!=</span> <span class="n">columns</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Aliases require columns </span><span class="si">{</span><span class="n">columns</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">frame</span><span class="o">.</span><span class="n">itertuples</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+                <span class="n">source</span> <span class="o">=</span> <span class="p">(</span><span class="n">study_identity</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="n">identity_text</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+                <span class="n">target</span> <span class="o">=</span> <span class="p">(</span><span class="n">study_identity</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span> <span class="n">identity_text</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="mi">3</span><span class="p">]))</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">source</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">target</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">or</span> <span class="nb">bool</span><span class="p">(</span><span class="n">source</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">!=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">target</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Aliases must map studies to studies or samples to samples"</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">source</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="p">[</span><span class="n">source</span><span class="p">]</span> <span class="o">!=</span> <span class="n">target</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Conflicting alias for </span><span class="si">{</span><span class="n">source</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="p">[</span><span class="n">source</span><span class="p">]</span> <span class="o">=</span> <span class="n">target</span>
+            <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">resolve</span><span class="p">(</span><span class="o">*</span><span class="n">source</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SampleAliases.resolve">
+<a class="viewcode-back" href="../../api.html#mhcflurry.sample_disjointness.SampleAliases.resolve">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">resolve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">study</span><span class="p">,</span> <span class="n">sample</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return the canonical study/sample pair for one source identity."""</span>
+        <span class="n">current</span><span class="p">,</span> <span class="n">seen</span> <span class="o">=</span> <span class="p">(</span><span class="n">study_identity</span><span class="p">(</span><span class="n">study</span><span class="p">),</span> <span class="n">identity_text</span><span class="p">(</span><span class="n">sample</span><span class="p">)),</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">current</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Cyclic sample/study aliases: </span><span class="si">{</span><span class="n">current</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">current</span><span class="p">)</span>
+            <span class="n">target</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">current</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">study_target</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="o">.</span><span class="n">get</span><span class="p">((</span><span class="n">current</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s2">""</span><span class="p">))</span>
+                <span class="n">target</span> <span class="o">=</span> <span class="p">(</span><span class="n">study_target</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">current</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">if</span> <span class="n">study_target</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">target</span> <span class="o">==</span> <span class="n">current</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">current</span>
+            <span class="n">current</span> <span class="o">=</span> <span class="n">target</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="source_identities">
+<a class="viewcode-back" href="../../api.html#mhcflurry.sample_disjointness.source_identities">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">source_identities</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">aliases</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">identity_mode</span><span class="o">=</span><span class="s2">"source_provenance"</span><span class="p">,</span>
+                      <span class="n">study_column</span><span class="o">=</span><span class="s2">"study_id"</span><span class="p">,</span> <span class="n">sample_column</span><span class="o">=</span><span class="s2">"sample_id"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Yield contributor identities and provenance completeness for each row.</span>
+
+<span class="sd">    Direct sample tables require an explicit inventory declaration. Assay IDs</span>
+<span class="sd">    and source row numbers never substitute for biological samples.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">identity_mode</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"source_provenance"</span><span class="p">,</span> <span class="s2">"sample_table"</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown identity_mode: </span><span class="si">{</span><span class="n">identity_mode</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">frame</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="s2">"records"</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">identity_mode</span> <span class="o">==</span> <span class="s2">"sample_table"</span><span class="p">:</span>
+            <span class="n">sources</span> <span class="o">=</span> <span class="p">[{</span><span class="s2">"study_id"</span><span class="p">:</span> <span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">study_column</span><span class="p">,</span> <span class="s2">""</span><span class="p">),</span>
+                        <span class="s2">"sample_id"</span><span class="p">:</span> <span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">sample_column</span><span class="p">,</span> <span class="s2">""</span><span class="p">),</span> <span class="s2">"complete"</span><span class="p">:</span> <span class="kc">True</span><span class="p">}]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">sources</span> <span class="o">=</span> <span class="n">decode_sources</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">PROVENANCE_COLUMN</span><span class="p">,</span> <span class="s2">""</span><span class="p">))</span>
+        <span class="n">pairs</span> <span class="o">=</span> <span class="p">[</span><span class="n">aliases</span><span class="o">.</span><span class="n">resolve</span><span class="p">(</span><span class="n">source</span><span class="p">[</span><span class="s2">"study_id"</span><span class="p">],</span> <span class="n">source</span><span class="p">[</span><span class="s2">"sample_id"</span><span class="p">])</span> <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="n">sources</span><span class="p">]</span>
+        <span class="n">complete</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">sources</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span><span class="n">source</span><span class="p">[</span><span class="s2">"complete"</span><span class="p">]</span> <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="n">sources</span><span class="p">)</span>
+        <span class="k">yield</span> <span class="n">pairs</span><span class="p">,</span> <span class="n">complete</span></div>
+
+
+
+<div class="viewcode-block" id="exclude_source_samples">
+<a class="viewcode-back" href="../../api.html#mhcflurry.sample_disjointness.exclude_source_samples">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">exclude_source_samples</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">manifest</span><span class="p">,</span> <span class="n">aliases</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Exclude whole held-out samples, or whole studies if samples are unknown.</span>
+
+<span class="sd">    Any overlapping contributor removes the entire deduplicated measurement.</span>
+<span class="sd">    Unknown lineage remains reported as unresolved. Missing study metadata on</span>
+<span class="sd">    an exclusion conservatively matches that sample ID in every study.</span>
+<span class="sd">    """</span>
+    <span class="n">aliases</span> <span class="o">=</span> <span class="n">SampleAliases</span><span class="p">(</span><span class="n">aliases</span><span class="p">)</span>
+    <span class="n">targets</span> <span class="o">=</span> <span class="n">read_identities</span><span class="p">(</span><span class="n">manifest</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">list</span><span class="p">(</span><span class="n">targets</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">list</span><span class="p">(</span><span class="n">IDENTITY_COLUMNS</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Sample exclusions require study_id,sample_id columns"</span><span class="p">)</span>
+    <span class="n">excluded</span> <span class="o">=</span> <span class="p">{</span><span class="n">aliases</span><span class="o">.</span><span class="n">resolve</span><span class="p">(</span><span class="o">*</span><span class="n">row</span><span class="p">)</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">targets</span><span class="o">.</span><span class="n">itertuples</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">)}</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="ow">not</span> <span class="n">study</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">sample</span> <span class="k">for</span> <span class="n">study</span><span class="p">,</span> <span class="n">sample</span> <span class="ow">in</span> <span class="n">excluded</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Sample exclusions require at least one identity"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">study</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">_known_study</span><span class="p">(</span><span class="n">study</span><span class="p">)</span> <span class="k">for</span> <span class="n">study</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">excluded</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Study identities require an explicit namespace or a resolved alias"</span><span class="p">)</span>
+    <span class="n">studies</span> <span class="o">=</span> <span class="p">{</span><span class="n">study</span> <span class="k">for</span> <span class="n">study</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">excluded</span> <span class="k">if</span> <span class="n">study</span><span class="p">}</span>
+    <span class="n">unscoped</span> <span class="o">=</span> <span class="p">{</span><span class="n">sample</span> <span class="k">for</span> <span class="n">study</span><span class="p">,</span> <span class="n">sample</span> <span class="ow">in</span> <span class="n">excluded</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">study</span><span class="p">}</span>
+    <span class="n">whole_studies</span> <span class="o">=</span> <span class="p">{</span><span class="n">study</span> <span class="k">for</span> <span class="n">study</span><span class="p">,</span> <span class="n">sample</span> <span class="ow">in</span> <span class="n">excluded</span> <span class="k">if</span> <span class="n">study</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">sample</span><span class="p">}</span>
+    <span class="n">remove</span><span class="p">,</span> <span class="n">unresolved</span> <span class="o">=</span> <span class="p">[],</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">pairs</span><span class="p">,</span> <span class="n">complete</span> <span class="ow">in</span> <span class="n">source_identities</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">aliases</span><span class="p">):</span>
+        <span class="n">overlap</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span><span class="n">pair</span> <span class="ow">in</span> <span class="n">excluded</span> <span class="ow">or</span> <span class="n">pair</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">in</span> <span class="n">unscoped</span> <span class="ow">or</span> <span class="n">pair</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="n">whole_studies</span>
+                      <span class="ow">or</span> <span class="p">(</span><span class="n">pair</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="n">studies</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">pair</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">pair</span> <span class="ow">in</span> <span class="n">pairs</span><span class="p">)</span>
+        <span class="n">remove</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">overlap</span><span class="p">)</span>
+        <span class="n">unresolved</span> <span class="o">+=</span> <span class="nb">int</span><span class="p">(</span><span class="ow">not</span> <span class="n">overlap</span> <span class="ow">and</span> <span class="p">(</span><span class="ow">not</span> <span class="n">complete</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span><span class="ow">not</span> <span class="n">_known_study</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">pairs</span><span class="p">)))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Source holdout excluded </span><span class="si">{</span><span class="nb">sum</span><span class="p">(</span><span class="n">remove</span><span class="p">)</span><span class="si">}</span><span class="s2"> rows; "</span>
+          <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">unresolved</span><span class="si">}</span><span class="s2"> retained rows have unresolved provenance"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">frame</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="o">~</span><span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">remove</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">frame</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="audit_samples">
+<a class="viewcode-back" href="../../api.html#mhcflurry.sample_disjointness.audit_samples">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">audit_samples</span><span class="p">(</span><span class="n">inventory_path</span><span class="p">,</span> <span class="n">cohort_path</span><span class="p">,</span> <span class="n">out_dir</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">aliases_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                  <span class="n">sample_metadata</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Write a new lineage audit and one shared sample-filtered cohort.</span>
+
+<span class="sd">    Separation is conditional on the supplied inventory and identity review.</span>
+<span class="sd">    Only samples disjoint from every inventoried MHCflurry model enter the</span>
+<span class="sd">    exported cohort. External uncertainty is reported separately. Passing an</span>
+<span class="sd">    audit does not make a previously inspected benchmark an untouched test set.</span>
+<span class="sd">    """</span>
+    <span class="n">inventory_path</span><span class="p">,</span> <span class="n">cohort_path</span><span class="p">,</span> <span class="n">out_dir</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">Path</span><span class="p">,</span> <span class="p">(</span><span class="n">inventory_path</span><span class="p">,</span> <span class="n">cohort_path</span><span class="p">,</span> <span class="n">out_dir</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">out_dir</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">FileExistsError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Audit output directory already exists: </span><span class="si">{</span><span class="n">out_dir</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">inventory</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">inventory_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
+    <span class="k">if</span> <span class="n">inventory</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"schema_version"</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">inventory</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"models"</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Expected a schema_version=1 inventory with nonempty models"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">inventory</span><span class="p">)</span> <span class="o">-</span> <span class="p">{</span><span class="s2">"schema_version"</span><span class="p">,</span> <span class="s2">"identity_review"</span><span class="p">,</span> <span class="s2">"models"</span><span class="p">}:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unrecognized inventory fields"</span><span class="p">)</span>
+    <span class="n">aliases</span> <span class="o">=</span> <span class="n">SampleAliases</span><span class="p">(</span><span class="n">aliases_path</span><span class="p">)</span>
+    <span class="n">cohort</span> <span class="o">=</span> <span class="n">read_identities</span><span class="p">(</span><span class="n">cohort_path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">cohort</span><span class="o">.</span><span class="n">empty</span> <span class="ow">or</span> <span class="s2">"sample_id"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">cohort</span> <span class="ow">or</span> <span class="n">cohort</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">eq</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Cohort requires rows with nonempty sample_id values"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">"hit"</span> <span class="ow">in</span> <span class="n">cohort</span><span class="p">:</span>
+        <span class="n">labels</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">cohort</span><span class="o">.</span><span class="n">hit</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">"raise"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">labels</span><span class="o">.</span><span class="n">isin</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Cohort hit labels must be 0 or 1"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">sample_metadata</span><span class="p">:</span>
+        <span class="n">metadata</span> <span class="o">=</span> <span class="n">read_identities</span><span class="p">(</span><span class="n">sample_metadata</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">metadata</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">set</span><span class="p">(</span><span class="n">IDENTITY_COLUMNS</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Sample metadata requires study_id,sample_id columns"</span><span class="p">)</span>
+        <span class="n">metadata</span> <span class="o">=</span> <span class="n">metadata</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">metadata</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">duplicated</span><span class="p">()</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Conflicting study metadata for cohort sample"</span><span class="p">)</span>
+        <span class="n">supplied</span> <span class="o">=</span> <span class="n">cohort</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">metadata</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">"sample_id"</span><span class="p">)</span><span class="o">.</span><span class="n">study_id</span><span class="p">)</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s2">"study_id"</span> <span class="ow">in</span> <span class="n">cohort</span><span class="p">:</span>
+            <span class="n">conflicts</span> <span class="o">=</span> <span class="p">(</span><span class="n">cohort</span><span class="o">.</span><span class="n">study_id</span><span class="o">.</span><span class="n">ne</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">supplied</span><span class="o">.</span><span class="n">ne</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span>
+                         <span class="o">&amp;</span> <span class="n">cohort</span><span class="o">.</span><span class="n">study_id</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">study_identity</span><span class="p">)</span><span class="o">.</span><span class="n">ne</span><span class="p">(</span><span class="n">supplied</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">study_identity</span><span class="p">)))</span>
+            <span class="k">if</span> <span class="n">conflicts</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Cohort conflicts with supplied study metadata"</span><span class="p">)</span>
+            <span class="n">cohort</span><span class="p">[</span><span class="s2">"study_id"</span><span class="p">]</span> <span class="o">=</span> <span class="n">cohort</span><span class="o">.</span><span class="n">study_id</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">cohort</span><span class="o">.</span><span class="n">study_id</span><span class="o">.</span><span class="n">ne</span><span class="p">(</span><span class="s2">""</span><span class="p">),</span> <span class="n">supplied</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cohort</span><span class="p">[</span><span class="s2">"study_id"</span><span class="p">]</span> <span class="o">=</span> <span class="n">supplied</span>
+    <span class="k">if</span> <span class="s2">"study_id"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">cohort</span><span class="p">:</span>
+        <span class="n">cohort</span><span class="p">[</span><span class="s2">"study_id"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">""</span>
+    <span class="n">identities</span> <span class="o">=</span> <span class="n">cohort</span><span class="p">[</span><span class="nb">list</span><span class="p">(</span><span class="n">IDENTITY_COLUMNS</span><span class="p">)]</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span>
+    <span class="n">canonical</span> <span class="o">=</span> <span class="p">[</span><span class="n">aliases</span><span class="o">.</span><span class="n">resolve</span><span class="p">(</span><span class="o">*</span><span class="n">row</span><span class="p">)</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">identities</span><span class="o">.</span><span class="n">itertuples</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">)]</span>
+    <span class="n">file_records</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">record_file</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">file_records</span><span class="p">:</span>
+            <span class="n">file_records</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">)]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"sha256"</span><span class="p">:</span> <span class="n">file_sha256</span><span class="p">(</span><span class="n">path</span><span class="p">)}</span>
+        <span class="k">return</span> <span class="n">path</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">inventory_file</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">record_file</span><span class="p">(</span><span class="n">path</span> <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">is_absolute</span><span class="p">()</span> <span class="k">else</span> <span class="n">inventory_path</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="n">path</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="p">(</span><span class="n">inventory_path</span><span class="p">,</span> <span class="n">cohort_path</span><span class="p">,</span> <span class="n">aliases_path</span><span class="p">,</span> <span class="n">sample_metadata</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">path</span><span class="p">:</span>
+            <span class="n">record_file</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="n">rows</span><span class="p">,</span> <span class="n">summaries</span><span class="p">,</span> <span class="n">names</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[],</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">identity_review</span> <span class="o">=</span> <span class="n">identity_text</span><span class="p">(</span><span class="n">inventory</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"identity_review"</span><span class="p">,</span> <span class="s2">""</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">inventory</span><span class="p">[</span><span class="s2">"models"</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">model</span><span class="p">)</span> <span class="o">-</span> <span class="p">{</span><span class="s2">"name"</span><span class="p">,</span> <span class="s2">"kind"</span><span class="p">,</span> <span class="s2">"artifacts"</span><span class="p">,</span> <span class="s2">"components"</span><span class="p">}:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unrecognized model inventory fields"</span><span class="p">)</span>
+        <span class="n">name</span><span class="p">,</span> <span class="n">kind</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">),</span> <span class="n">model</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"kind"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">name</span> <span class="ow">or</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">names</span> <span class="ow">or</span> <span class="n">kind</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">COMPONENTS</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Models require unique names and a supported kind"</span><span class="p">)</span>
+        <span class="n">names</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="n">reasons</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">identity_review</span><span class="p">:</span>
+            <span class="n">reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"No documented review of aliases and shared specimens"</span><span class="p">)</span>
+        <span class="n">artifacts</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"artifacts"</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">artifacts</span><span class="p">:</span>
+            <span class="n">reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"No model artifacts inventoried"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">artifact</span> <span class="ow">in</span> <span class="n">artifacts</span><span class="p">:</span>
+            <span class="n">inventory_file</span><span class="p">(</span><span class="n">artifact</span><span class="p">)</span>
+        <span class="n">components</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"components"</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">components</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">set</span><span class="p">(</span><span class="n">COMPONENTS</span><span class="p">[</span><span class="n">kind</span><span class="p">]):</span>
+            <span class="n">reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"Missing or unexpected component inventory"</span><span class="p">)</span>
+        <span class="n">samples</span><span class="p">,</span> <span class="n">studies</span><span class="p">,</span> <span class="n">unknown_studies</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(),</span> <span class="nb">set</span><span class="p">(),</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="n">unknown_rows</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">component</span> <span class="ow">in</span> <span class="n">components</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">component</span><span class="p">)</span> <span class="o">-</span> <span class="p">{</span><span class="s2">"complete"</span><span class="p">,</span> <span class="s2">"evidence"</span><span class="p">,</span> <span class="o">*</span><span class="n">STAGES</span><span class="p">}:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unrecognized component inventory fields"</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">component</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"complete"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">True</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">identity_text</span><span class="p">(</span><span class="n">component</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"evidence"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)):</span>
+                <span class="n">reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"Component coverage is not declared complete with evidence"</span><span class="p">)</span>
+            <span class="n">component_rows</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">for</span> <span class="n">stage</span> <span class="ow">in</span> <span class="n">STAGES</span><span class="p">:</span>
+                <span class="n">entries</span> <span class="o">=</span> <span class="n">component</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stage</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">entries</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                    <span class="n">reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Missing </span><span class="si">{</span><span class="n">stage</span><span class="si">}</span><span class="s2"> inventory (use [] only when reviewed as unused)"</span><span class="p">)</span>
+                    <span class="k">continue</span>
+                <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">entries</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span> <span class="o">-</span> <span class="p">{</span><span class="s2">"path"</span><span class="p">,</span> <span class="s2">"identity_mode"</span><span class="p">,</span> <span class="s2">"study_column"</span><span class="p">,</span> <span class="s2">"sample_column"</span><span class="p">}:</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unrecognized source entry fields"</span><span class="p">)</span>
+                    <span class="n">path</span> <span class="o">=</span> <span class="n">inventory_file</span><span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="s2">"path"</span><span class="p">])</span>
+                    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">keep_default_na</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">chunksize</span><span class="o">=</span><span class="mi">100_000</span><span class="p">):</span>
+                        <span class="n">component_rows</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+                        <span class="k">for</span> <span class="n">pairs</span><span class="p">,</span> <span class="n">complete</span> <span class="ow">in</span> <span class="n">source_identities</span><span class="p">(</span>
+                                <span class="n">chunk</span><span class="p">,</span> <span class="n">aliases</span><span class="p">,</span> <span class="n">identity_mode</span><span class="o">=</span><span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"identity_mode"</span><span class="p">,</span> <span class="s2">"source_provenance"</span><span class="p">),</span>
+                                <span class="n">study_column</span><span class="o">=</span><span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"study_column"</span><span class="p">,</span> <span class="s2">"study_id"</span><span class="p">),</span>
+                                <span class="n">sample_column</span><span class="o">=</span><span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"sample_column"</span><span class="p">,</span> <span class="s2">"sample_id"</span><span class="p">)):</span>
+                            <span class="n">unknown_rows</span> <span class="o">+=</span> <span class="nb">int</span><span class="p">(</span><span class="ow">not</span> <span class="n">complete</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span><span class="ow">not</span> <span class="n">_known_study</span><span class="p">(</span><span class="n">pair</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">pair</span> <span class="ow">in</span> <span class="n">pairs</span><span class="p">))</span>
+                            <span class="k">for</span> <span class="n">study</span><span class="p">,</span> <span class="n">sample</span> <span class="ow">in</span> <span class="n">pairs</span><span class="p">:</span>
+                                <span class="k">if</span> <span class="n">_known_study</span><span class="p">(</span><span class="n">study</span><span class="p">):</span>
+                                    <span class="n">studies</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">study</span><span class="p">)</span>
+                                    <span class="k">if</span> <span class="n">sample</span><span class="p">:</span>
+                                        <span class="n">samples</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="n">study</span><span class="p">,</span> <span class="n">sample</span><span class="p">))</span>
+                                    <span class="k">else</span><span class="p">:</span>
+                                        <span class="n">unknown_studies</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">study</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">component_rows</span><span class="p">:</span>
+                <span class="n">reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"No source rows inventoried for a component"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">unknown_rows</span><span class="p">:</span>
+            <span class="n">reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">unknown_rows</span><span class="si">}</span><span class="s2"> rows lack complete source/study provenance"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">study</span><span class="p">,</span> <span class="n">sample</span><span class="p">),</span> <span class="n">source</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">canonical</span><span class="p">,</span> <span class="n">identities</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="s2">"records"</span><span class="p">),</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">study</span><span class="p">,</span> <span class="n">sample</span><span class="p">)</span> <span class="ow">in</span> <span class="n">samples</span> <span class="ow">or</span> <span class="n">study</span> <span class="ow">in</span> <span class="n">unknown_studies</span><span class="p">:</span>
+                <span class="n">status</span> <span class="o">=</span> <span class="s2">"overlap"</span>
+                <span class="n">reason</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"Whole study excluded: training sample identities unavailable"</span>
+                          <span class="k">if</span> <span class="n">study</span> <span class="ow">in</span> <span class="n">unknown_studies</span> <span class="k">else</span> <span class="s2">"Shared biological sample"</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">reasons</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">_known_study</span><span class="p">(</span><span class="n">study</span><span class="p">):</span>
+                <span class="n">status</span><span class="p">,</span> <span class="n">reason</span> <span class="o">=</span> <span class="s2">"unresolved"</span><span class="p">,</span> <span class="s2">"; "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">reasons</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">"Cohort study identity unavailable"</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">status</span><span class="p">,</span> <span class="n">reason</span> <span class="o">=</span> <span class="s2">"disjoint"</span><span class="p">,</span> <span class="s2">"No shared sample in the reviewed lineage inventory"</span>
+            <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="o">**</span><span class="n">source</span><span class="p">,</span> <span class="s2">"model"</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span> <span class="s2">"kind"</span><span class="p">:</span> <span class="n">kind</span><span class="p">,</span> <span class="s2">"status"</span><span class="p">:</span> <span class="n">status</span><span class="p">,</span> <span class="s2">"reason"</span><span class="p">:</span> <span class="n">reason</span><span class="p">})</span>
+        <span class="n">summaries</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s2">"name"</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span> <span class="s2">"kind"</span><span class="p">:</span> <span class="n">kind</span><span class="p">,</span> <span class="s2">"unresolved_reasons"</span><span class="p">:</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">reasons</span><span class="p">)),</span>
+                          <span class="s2">"known_samples"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">samples</span><span class="p">),</span> <span class="s2">"known_studies"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">studies</span><span class="p">),</span>
+                          <span class="s2">"studies_without_sample_ids"</span><span class="p">:</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">unknown_studies</span><span class="p">)})</span>
+    <span class="n">table</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+    <span class="n">internal</span> <span class="o">=</span> <span class="n">table</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">table</span><span class="o">.</span><span class="n">kind</span><span class="o">.</span><span class="n">ne</span><span class="p">(</span><span class="s2">"external"</span><span class="p">)]</span>
+    <span class="k">if</span> <span class="n">internal</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Inventory must include at least one MHCflurry model"</span><span class="p">)</span>
+    <span class="n">eligible</span> <span class="o">=</span> <span class="n">internal</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">IDENTITY_COLUMNS</span><span class="p">),</span> <span class="n">dropna</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">status</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span>
+        <span class="k">lambda</span> <span class="n">values</span><span class="p">:</span> <span class="n">values</span><span class="o">.</span><span class="n">eq</span><span class="p">(</span><span class="s2">"disjoint"</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">())</span>
+    <span class="n">kept</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">eligible</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">eligible</span><span class="p">]</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+    <span class="n">mask</span> <span class="o">=</span> <span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">row</span><span class="p">)</span> <span class="ow">in</span> <span class="n">kept</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cohort</span><span class="p">[</span><span class="nb">list</span><span class="p">(</span><span class="n">IDENTITY_COLUMNS</span><span class="p">)]</span><span class="o">.</span><span class="n">itertuples</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">)]</span>
+    <span class="n">filtered</span> <span class="o">=</span> <span class="n">cohort</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span>
+    <span class="n">out_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">table</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">out_dir</span> <span class="o">/</span> <span class="s2">"sample_audit.csv"</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">filtered</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">out_dir</span> <span class="o">/</span> <span class="s2">"cohort.csv.gz"</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">compression</span><span class="o">=</span><span class="p">{</span><span class="s2">"method"</span><span class="p">:</span> <span class="s2">"gzip"</span><span class="p">,</span> <span class="s2">"mtime"</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>
+    <span class="n">external</span> <span class="o">=</span> <span class="n">table</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">table</span><span class="o">.</span><span class="n">kind</span><span class="o">.</span><span class="n">eq</span><span class="p">(</span><span class="s2">"external"</span><span class="p">)]</span>
+    <span class="n">report</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"schema_version"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="s2">"generator"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"package_version"</span><span class="p">:</span> <span class="n">__version__</span><span class="p">,</span> <span class="s2">"python_version"</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">python_version</span><span class="p">(),</span>
+            <span class="s2">"pandas_version"</span><span class="p">:</span> <span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="p">,</span> <span class="s2">"random_seed"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s2">"source_sha256"</span><span class="p">:</span> <span class="n">file_sha256</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span>
+            <span class="s2">"training_provenance_sha256"</span><span class="p">:</span> <span class="n">file_sha256</span><span class="p">(</span><span class="n">training_provenance</span><span class="o">.</span><span class="vm">__file__</span><span class="p">),</span>
+            <span class="s2">"function"</span><span class="p">:</span> <span class="s2">"mhcflurry.sample_disjointness.audit_samples"</span><span class="p">,</span>
+            <span class="s2">"arguments"</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">"inventory_path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">inventory_path</span><span class="o">.</span><span class="n">resolve</span><span class="p">()),</span>
+                <span class="s2">"cohort_path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">cohort_path</span><span class="o">.</span><span class="n">resolve</span><span class="p">()),</span> <span class="s2">"out_dir"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">out_dir</span><span class="o">.</span><span class="n">resolve</span><span class="p">()),</span>
+                <span class="s2">"aliases_path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">aliases_path</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">())</span> <span class="k">if</span> <span class="n">aliases_path</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="s2">"sample_metadata"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">sample_metadata</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">())</span> <span class="k">if</span> <span class="n">sample_metadata</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">},</span>
+        <span class="s2">"status"</span><span class="p">:</span> <span class="s2">"disjoint"</span> <span class="k">if</span> <span class="n">internal</span><span class="o">.</span><span class="n">status</span><span class="o">.</span><span class="n">eq</span><span class="p">(</span><span class="s2">"disjoint"</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span> <span class="k">else</span> <span class="s2">"not_verified"</span><span class="p">,</span>
+        <span class="s2">"external_status"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"not_inventoried"</span> <span class="k">if</span> <span class="n">external</span><span class="o">.</span><span class="n">empty</span> <span class="k">else</span>
+                            <span class="s2">"disjoint"</span> <span class="k">if</span> <span class="n">external</span><span class="o">.</span><span class="n">status</span><span class="o">.</span><span class="n">eq</span><span class="p">(</span><span class="s2">"disjoint"</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span> <span class="k">else</span> <span class="s2">"not_verified"</span><span class="p">),</span>
+        <span class="s2">"identity_review"</span><span class="p">:</span> <span class="n">identity_review</span><span class="p">,</span> <span class="s2">"models"</span><span class="p">:</span> <span class="n">summaries</span><span class="p">,</span> <span class="s2">"input_files"</span><span class="p">:</span> <span class="n">file_records</span><span class="p">,</span>
+        <span class="s2">"cohort"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"input_rows"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">cohort</span><span class="p">),</span> <span class="s2">"retained_rows"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">filtered</span><span class="p">),</span>
+                   <span class="s2">"input_samples"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">identities</span><span class="p">),</span> <span class="s2">"retained_samples"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">kept</span><span class="p">),</span>
+                   <span class="s2">"sha256"</span><span class="p">:</span> <span class="n">file_sha256</span><span class="p">(</span><span class="n">out_dir</span> <span class="o">/</span> <span class="s2">"cohort.csv.gz"</span><span class="p">)},</span>
+        <span class="s2">"sample_audit_sha256"</span><span class="p">:</span> <span class="n">file_sha256</span><span class="p">(</span><span class="n">out_dir</span> <span class="o">/</span> <span class="s2">"sample_audit.csv"</span><span class="p">),</span>
+        <span class="s2">"limitations"</span><span class="p">:</span> <span class="p">[</span>
+            <span class="s2">"Separation is conditional on the supplied lineage and identity review."</span><span class="p">,</span>
+            <span class="s2">"Peptide/MHC overlap must be checked independently."</span><span class="p">,</span>
+            <span class="s2">"Every comparator must use the same exported cohort."</span><span class="p">,</span>
+            <span class="s2">"An inspected benchmark does not become an untouched test set by passing an audit."</span><span class="p">,</span>
+        <span class="p">],</span>
+    <span class="p">}</span>
+    <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">data</span> <span class="ow">in</span> <span class="p">((</span><span class="s2">"input"</span><span class="p">,</span> <span class="n">cohort</span><span class="p">),</span> <span class="p">(</span><span class="s2">"retained"</span><span class="p">,</span> <span class="n">filtered</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="s2">"hit"</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">labels</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">hit</span><span class="p">)</span>
+            <span class="n">report</span><span class="p">[</span><span class="s2">"cohort"</span><span class="p">][</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">_positives"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">labels</span><span class="o">.</span><span class="n">eq</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+            <span class="n">report</span><span class="p">[</span><span class="s2">"cohort"</span><span class="p">][</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">_negatives"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">labels</span><span class="o">.</span><span class="n">eq</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+    <span class="p">(</span><span class="n">out_dir</span> <span class="o">/</span> <span class="s2">"sample_disjointness.json"</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">report</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

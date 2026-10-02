@@ -1,0 +1,1598 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.parallelism.planning &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.parallelism.planning</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.parallelism.planning</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Hardware planning helpers for local parallelism."""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">replace</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">..common</span><span class="w"> </span><span class="kn">import</span> <span class="n">configure_pytorch</span><span class="p">,</span> <span class="n">normalize_pytorch_backend</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..memory_budget</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">GIB</span><span class="p">,</span>
+    <span class="n">HOST_MIN_RESERVE_BYTES</span><span class="p">,</span>
+    <span class="n">memory_worker_capacity</span><span class="p">,</span>
+    <span class="n">per_worker_memory_budget_bytes</span><span class="p">,</span>
+    <span class="n">usable_memory_bytes</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..workload_planning</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">HOST_RAM_PER_DATALOADER_CHILD_GB</span><span class="p">,</span>
+    <span class="n">WORKLOAD_GENERIC</span><span class="p">,</span>
+    <span class="n">available_or_total_memory_gb</span><span class="p">,</span>
+    <span class="n">capacity_warnings</span><span class="p">,</span>
+    <span class="n">env_float</span><span class="p">,</span>
+    <span class="n">env_int</span><span class="p">,</span>
+    <span class="n">host_memory_num_jobs_cap</span><span class="p">,</span>
+    <span class="n">plan_local_parallelism</span><span class="p">,</span>
+    <span class="n">system_memory_info_gb</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<span class="c1"># Generic per-worker VRAM fallback when a command cannot provide an analytic</span>
+<span class="c1"># model/dataset estimate. Workload-aware commands replace it; compile warmup</span>
+<span class="c1"># measurements may only raise the estimate. Override remains for expert use.</span>
+<span class="n">_AUTO_MWPG_PER_WORKER_GB_DEFAULT</span> <span class="o">=</span> <span class="mf">4.0</span>
+
+<span class="c1"># Fallback free-VRAM estimate per GPU (gigabytes) when ``nvidia-smi`` is not</span>
+<span class="c1"># available. This path deliberately does not import torch: local pools use fork</span>
+<span class="c1"># on Linux, and touching the CUDA runtime in the parent before forking causes</span>
+<span class="c1"># CUDA re-initialization failures in children.</span>
+<span class="n">_AUTO_MWPG_FREE_VRAM_FALLBACK_GB</span> <span class="o">=</span> <span class="mf">16.0</span>
+
+
+<span class="c1"># ----- Auto DataLoader prefetch worker count --------------------------------</span>
+<span class="c1">#</span>
+<span class="c1"># ``dataloader_num_workers`` controls child processes for the streaming</span>
+<span class="c1"># pretraining DataLoader. The standard affinity fit() loop is device-resident</span>
+<span class="c1"># and forms minibatches by indexing tensors directly, so this knob does not</span>
+<span class="c1"># control affinity fine-tuning.</span>
+<span class="c1">#</span>
+<span class="c1"># The pretraining trade-off:</span>
+<span class="c1">#</span>
+<span class="c1"># * 0 -&gt; in-process batch building. No spawn cost; no parallel prefetch.</span>
+<span class="c1">#   Acceptable on tiny/CPU-only configs.</span>
+<span class="c1"># * 1 -&gt; one prefetcher per fit() worker. Hides some CSV/encoding/collation</span>
+<span class="c1">#   work behind the GPU step.</span>
+<span class="c1"># * 2-4 -&gt; multiple prefetchers feed batches in parallel. Past 4 we hit</span>
+<span class="c1">#   diminishing returns on most boxes from PyTorch queue and process</span>
+<span class="c1">#   scheduling overhead.</span>
+<span class="c1">#</span>
+<span class="c1"># This auto-resolver picks per-fit-worker prefetch count from:</span>
+<span class="c1">#   * total vCPUs (default ``os.cpu_count()``)</span>
+<span class="c1">#   * fit-worker count (NUM_JOBS or num_gpus × max_workers_per_gpu)</span>
+<span class="c1">#   * total RAM in GB (optional, for tight-RAM boxes)</span>
+<span class="c1">#   * optional expert hard cap (none by default)</span>
+<span class="c1">#</span>
+<span class="c1"># Intent: the recipe pins ``DATALOADER_NUM_WORKERS=auto`` and the orchestrator</span>
+<span class="c1"># computes the right value per box. Hardware tier mismatches like the</span>
+<span class="c1"># L40S-tuned "1" landing on a 176-vCPU 8×A100 box can't recur.</span>
+
+<span class="n">_AUTO_DATALOADER_HARD_CAP_DEFAULT</span> <span class="o">=</span> <span class="mi">4</span>
+
+<span class="c1"># Approximate RSS that one DataLoader child holds: torch + mhcflurry imports</span>
+<span class="c1"># (~0.5 GB) plus a small per-batch buffer.</span>
+<span class="n">_AUTO_DATALOADER_RAM_PER_CHILD_GB</span> <span class="o">=</span> <span class="n">HOST_RAM_PER_DATALOADER_CHILD_GB</span>
+
+<span class="c1"># Approximate RSS that the main fit() worker holds before any DataLoader</span>
+<span class="c1"># children. Used by the RAM guard to avoid over-allocating prefetchers when</span>
+<span class="c1"># RAM-per-fit is tight. ~2 GB covers torch, mhcflurry, the validation cache,</span>
+<span class="c1"># and pretraining batch state.</span>
+<span class="n">_AUTO_DATALOADER_RAM_BASELINE_PER_FIT_GB</span> <span class="o">=</span> <span class="mf">2.0</span>
+
+<span class="c1"># Effective cores per DL child for the CPU budget. Each prefetcher does</span>
+<span class="c1"># fancy-indexing + collation in one process; with ~50% blocking on the work</span>
+<span class="c1"># queue, two physical cores per child is a comfortable upper bound.</span>
+<span class="n">_AUTO_DATALOADER_CORES_PER_CHILD</span> <span class="o">=</span> <span class="mi">2</span>
+
+<div class="viewcode-block" id="cuda_visible_devices_from_env">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.cuda_visible_devices_from_env">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cuda_visible_devices_from_env</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Return CUDA_VISIBLE_DEVICES entries, or ``None`` when unset."""</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"CUDA_VISIBLE_DEVICES"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[]</span>
+    <span class="n">devices</span> <span class="o">=</span> <span class="p">[</span><span class="n">part</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">value</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">","</span><span class="p">)</span> <span class="k">if</span> <span class="n">part</span><span class="o">.</span><span class="n">strip</span><span class="p">()]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">devices</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">devices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"-1"</span><span class="p">,</span> <span class="s2">"none"</span><span class="p">,</span> <span class="s2">"void"</span><span class="p">,</span> <span class="s2">"nodevfiles"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[]</span>
+    <span class="k">return</span> <span class="n">devices</span></div>
+
+
+<div class="viewcode-block" id="free_vram_per_gpu_override_gb">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.free_vram_per_gpu_override_gb">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">free_vram_per_gpu_override_gb</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return env-pinned free VRAM in GB as a per-GPU list, or ``None``.</span>
+
+<span class="sd">    ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB`` accepts either one</span>
+<span class="sd">    value applied to every GPU or a comma/space-separated list. It exists for</span>
+<span class="sd">    tests and unusual launchers where ``nvidia-smi`` is hidden but the caller</span>
+<span class="sd">    knows the device budget.</span>
+<span class="sd">    """</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">"MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB"</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">parts</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">value</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">","</span><span class="p">,</span> <span class="s2">" "</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">()</span> <span class="k">if</span> <span class="n">p</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">parts</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">vals</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">parts</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Environment variable </span><span class="si">%s</span><span class="s2">=</span><span class="si">%r</span><span class="s2"> contains a non-float entry: </span><span class="si">%s</span><span class="s2">"</span>
+            <span class="o">%</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">exc</span><span class="p">)</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="ow">or</span> <span class="n">item</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">vals</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Environment variable </span><span class="si">%s</span><span class="s2">=</span><span class="si">%r</span><span class="s2"> must contain finite non-negative "</span>
+            <span class="s2">"free-VRAM values"</span> <span class="o">%</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="c1"># A single value applies to every GPU.</span>
+        <span class="n">vals</span> <span class="o">=</span> <span class="n">vals</span> <span class="o">*</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">vals</span><span class="p">[:</span><span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">),</span> <span class="mi">1</span><span class="p">)]</span></div>
+
+
+
+<div class="viewcode-block" id="free_vram_override_gb">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.free_vram_override_gb">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">free_vram_override_gb</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Minimum env-pinned free VRAM in GB, or ``None``."""</span>
+    <span class="n">vals</span> <span class="o">=</span> <span class="n">free_vram_per_gpu_override_gb</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span> <span class="k">if</span> <span class="n">vals</span> <span class="k">else</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="detect_num_cuda_devices_no_torch">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.detect_num_cuda_devices_no_torch">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">detect_num_cuda_devices_no_torch</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Return the number of visible CUDA devices without importing torch.</span>
+
+<span class="sd">    ``CUDA_VISIBLE_DEVICES`` is authoritative when set by a scheduler or</span>
+<span class="sd">    container. Otherwise shell out so the orchestrator can size a fork-based</span>
+<span class="sd">    worker pool without initializing CUDA in the parent process. Returns 0</span>
+<span class="sd">    when nvidia-smi is unavailable or no GPUs are visible.</span>
+<span class="sd">    """</span>
+    <span class="n">cuda_visible_devices</span> <span class="o">=</span> <span class="n">cuda_visible_devices_from_env</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">cuda_visible_devices</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">cuda_visible_devices</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span>
+            <span class="p">[</span><span class="s2">"nvidia-smi"</span><span class="p">,</span> <span class="s2">"-L"</span><span class="p">],</span>
+            <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span>
+            <span class="ne">OSError</span><span class="p">,</span>
+            <span class="n">subprocess</span><span class="o">.</span><span class="n">CalledProcessError</span><span class="p">,</span>
+            <span class="n">subprocess</span><span class="o">.</span><span class="n">TimeoutExpired</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="c1"># nvidia-smi -L output is one line per device:</span>
+    <span class="c1">#   "GPU 0: NVIDIA A100-SXM4-80GB (UUID: GPU-...)"</span>
+    <span class="c1"># Match the index-prefixed form so we don't count MIG slices or stray</span>
+    <span class="c1"># diagnostic lines that happen to start with "GPU ".</span>
+    <span class="n">pattern</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">"^GPU \d+:"</span><span class="p">)</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">"ignore"</span><span class="p">)</span><span class="o">.</span><span class="n">splitlines</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">pattern</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">):</span>
+            <span class="n">n</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="k">return</span> <span class="n">n</span></div>
+
+
+
+<div class="viewcode-block" id="free_vram_per_gpu_from_nvidia_smi_gb">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.free_vram_per_gpu_from_nvidia_smi_gb">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">free_vram_per_gpu_from_nvidia_smi_gb</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return a list of free VRAM (GB) per visible GPU using ``nvidia-smi``.</span>
+
+<span class="sd">    Returns ``None`` if ``nvidia-smi`` is unavailable or returns nothing. The</span>
+<span class="sd">    per-GPU list (not collapsed to a scalar) lets capacity diagnostics see</span>
+<span class="sd">    heterogeneous / partially-occupied cards; the worker-count math separately</span>
+<span class="sd">    takes the ``min`` via ``free_vram_from_nvidia_smi_gb``.</span>
+
+<span class="sd">    This is intentionally a subprocess call instead of ``torch.cuda`` so the</span>
+<span class="sd">    orchestrator can size a fork-based worker pool without initializing CUDA in</span>
+<span class="sd">    the parent process.</span>
+<span class="sd">    """</span>
+    <span class="n">cuda_visible_devices</span> <span class="o">=</span> <span class="n">cuda_visible_devices_from_env</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">cuda_visible_devices</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">cuda_visible_devices</span> <span class="o">=</span> <span class="n">cuda_visible_devices</span><span class="p">[:</span><span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">),</span> <span class="mi">1</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cuda_visible_devices</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">device_args</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"-i"</span><span class="p">,</span> <span class="s2">","</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">cuda_visible_devices</span><span class="p">)]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">device_args</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="n">command</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"nvidia-smi"</span><span class="p">]</span> <span class="o">+</span> <span class="n">device_args</span> <span class="o">+</span> <span class="p">[</span>
+        <span class="s2">"--query-gpu=memory.free"</span><span class="p">,</span>
+        <span class="s2">"--format=csv,noheader,nounits"</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span>
+            <span class="n">command</span><span class="p">,</span>
+            <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span>
+            <span class="ne">OSError</span><span class="p">,</span>
+            <span class="n">subprocess</span><span class="o">.</span><span class="n">CalledProcessError</span><span class="p">,</span>
+            <span class="n">subprocess</span><span class="o">.</span><span class="n">TimeoutExpired</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">vals</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">"ignore"</span><span class="p">)</span><span class="o">.</span><span class="n">splitlines</span><span class="p">():</span>
+        <span class="n">line</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># nvidia-smi reports MiB for memory.free with nounits.</span>
+            <span class="n">vals</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span> <span class="o">/</span> <span class="mf">1024.0</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">IndexError</span><span class="p">):</span>
+            <span class="k">continue</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">vals</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">vals</span><span class="p">[:</span><span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">),</span> <span class="mi">1</span><span class="p">)]</span></div>
+
+
+
+<div class="viewcode-block" id="free_vram_from_nvidia_smi_gb">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.free_vram_from_nvidia_smi_gb">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">free_vram_from_nvidia_smi_gb</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Minimum free VRAM (GB) across visible GPUs, or ``None``."""</span>
+    <span class="n">vals</span> <span class="o">=</span> <span class="n">free_vram_per_gpu_from_nvidia_smi_gb</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span> <span class="k">if</span> <span class="n">vals</span> <span class="k">else</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="detect_free_vram_per_gpu_gb">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.detect_free_vram_per_gpu_gb">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">detect_free_vram_per_gpu_gb</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Per-GPU free VRAM (GB) as a list, or ``None`` if undetectable.</span>
+
+<span class="sd">    Env override (``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB``) first,</span>
+<span class="sd">    then ``nvidia-smi``. Unlike the scalar helpers used by the worker-count</span>
+<span class="sd">    math, this preserves the per-GPU values so capacity warnings can flag</span>
+<span class="sd">    small or uneven cards.</span>
+<span class="sd">    """</span>
+    <span class="n">override</span> <span class="o">=</span> <span class="n">free_vram_per_gpu_override_gb</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">override</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">override</span>
+    <span class="k">return</span> <span class="n">free_vram_per_gpu_from_nvidia_smi_gb</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="auto_max_workers_per_gpu">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.auto_max_workers_per_gpu">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">auto_max_workers_per_gpu</span><span class="p">(</span>
+        <span class="n">num_jobs</span><span class="p">,</span> <span class="n">num_gpus</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">"auto"</span><span class="p">,</span> <span class="n">per_worker_gb</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Pick ``max_workers_per_gpu`` based on detected hardware.</span>
+
+<span class="sd">    Returns an int ≥ 1. Logic:</span>
+
+<span class="sd">      * ``num_gpus == 0`` (CPU-only) → 1.</span>
+<span class="sd">      * Otherwise: take the minimum of two capacity limits:</span>
+<span class="sd">          - ``num_jobs // num_gpus`` — don't oversubscribe a GPU beyond the</span>
+<span class="sd">            jobs that actually exist.</span>
+<span class="sd">          - complete per-worker working sets that fit in free VRAM after the</span>
+<span class="sd">            shared allocator/context reserve.</span>
+
+<span class="sd">    Free VRAM is read from ``nvidia-smi`` (or from</span>
+<span class="sd">    ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB``). It deliberately</span>
+<span class="sd">    avoids ``torch.cuda`` so resolving local parallelism before forking does</span>
+<span class="sd">    not initialize CUDA in the parent process. Per-worker VRAM upper bound and</span>
+<span class="sd">    the optional expert hard cap are overridable via</span>
+<span class="sd">    ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB`` and</span>
+<span class="sd">    ``MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP``.</span>
+
+<span class="sd">    Calibrate's per-worker footprint is dominated by the cached_stages</span>
+<span class="sd">    tensor, so the planner passes ``per_worker_gb`` explicitly — the affinity</span>
+<span class="sd">    calibration workload profile's ``device_worker_gb`` of 24 GB — overriding</span>
+<span class="sd">    the 4 GB train default. When given, the explicit hint wins over the env</span>
+<span class="sd">    var. (No env var for it: the workload-specific knowledge belongs in the</span>
+<span class="sd">    workload profile, not in a global env.)</span>
+
+<span class="sd">    The result is logged so the chosen value is visible in the worker</span>
+<span class="sd">    log alongside the reasoning.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">num_gpus</span> <span class="ow">or</span> <span class="n">num_gpus</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">backend</span> <span class="o">==</span> <span class="s2">"cpu"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">1</span>
+
+    <span class="k">if</span> <span class="n">per_worker_gb</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">per_worker_gb</span> <span class="o">=</span> <span class="n">env_float</span><span class="p">(</span>
+            <span class="s2">"MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_PER_WORKER_GB"</span><span class="p">,</span>
+            <span class="n">_AUTO_MWPG_PER_WORKER_GB_DEFAULT</span><span class="p">,</span>
+            <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">per_worker_gb</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">per_worker_gb</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">per_worker_gb</span><span class="p">)</span> <span class="ow">or</span> <span class="n">per_worker_gb</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"per_worker_gb must be a finite non-negative number; got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span>
+            <span class="n">per_worker_gb</span>
+        <span class="p">)</span>
+    <span class="n">hard_cap_raw</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+        <span class="s2">"MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP"</span><span class="p">)</span>
+    <span class="n">hard_cap</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">env_int</span><span class="p">(</span>
+            <span class="s2">"MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_HARD_CAP"</span><span class="p">,</span>
+            <span class="n">hard_cap_raw</span><span class="p">,</span>
+            <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">hard_cap_raw</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
+        <span class="k">else</span> <span class="kc">None</span>
+    <span class="p">)</span>
+    <span class="c1"># Backward-compatible expert override. The default path uses the shared</span>
+    <span class="c1"># reserve calculation instead of a fixed spendable fraction.</span>
+    <span class="n">vram_fraction_raw</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+        <span class="s2">"MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_VRAM_FRACTION"</span><span class="p">)</span>
+    <span class="n">vram_fraction</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">env_float</span><span class="p">(</span>
+            <span class="s2">"MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_VRAM_FRACTION"</span><span class="p">,</span>
+            <span class="n">vram_fraction_raw</span><span class="p">,</span>
+            <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">vram_fraction_raw</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
+        <span class="k">else</span> <span class="kc">None</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Honor an explicit env override even when it resolves to 0.0 (falsy);</span>
+    <span class="c1"># only fall through to nvidia-smi when no override was set at all.</span>
+    <span class="n">free_vram_override</span> <span class="o">=</span> <span class="n">free_vram_override_gb</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">)</span>
+    <span class="n">free_vram_gb</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">free_vram_override</span>
+        <span class="k">if</span> <span class="n">free_vram_override</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="n">free_vram_from_nvidia_smi_gb</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">free_vram_gb_used</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">free_vram_gb</span>
+        <span class="k">if</span> <span class="n">free_vram_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="n">_AUTO_MWPG_FREE_VRAM_FALLBACK_GB</span>
+    <span class="p">)</span>
+
+    <span class="c1"># When ``num_jobs`` is user-explicit (&gt;0) it caps how many workers/GPU</span>
+    <span class="c1"># we can pack: e.g. --num-jobs 8 across 8 GPUs means 1/GPU regardless</span>
+    <span class="c1"># of VRAM. When ``num_jobs &lt;= 0`` (the default; user delegated to</span>
+    <span class="c1"># auto_num_jobs), don't let it clamp — otherwise this is a chicken/egg</span>
+    <span class="c1"># with auto_num_jobs (which derives num_jobs from max_workers_per_gpu)</span>
+    <span class="c1"># and the resolver pins itself to whatever happens to be in args</span>
+    <span class="c1"># before the resolver runs. Practical effect on the 8x80GB tier:</span>
+    <span class="c1"># without the user-explicit guard, by_jobs would clamp MWPG to 2</span>
+    <span class="c1"># (16//8) when production sets num_jobs=16; with the guard, memory and</span>
+    <span class="c1"># host/CPU capacity determine concurrency.</span>
+    <span class="c1"># ``num_jobs`` may arrive as ``"auto"`` when called from</span>
+    <span class="c1"># ``resolve_local_parallelism_args`` (which resolves MWPG before</span>
+    <span class="c1"># num_jobs); treat that as "user delegated" — same as ``num_jobs=0``.</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">num_jobs</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"auto"</span><span class="p">:</span>
+        <span class="n">num_jobs_int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">num_jobs_int</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">per_worker_gb</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">by_vram</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="k">elif</span> <span class="n">vram_fraction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">by_vram</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+            <span class="mi">1</span><span class="p">,</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">free_vram_gb_used</span> <span class="o">*</span> <span class="n">vram_fraction</span> <span class="o">/</span> <span class="n">per_worker_gb</span><span class="p">),</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">by_vram</span> <span class="o">=</span> <span class="n">memory_worker_capacity</span><span class="p">(</span>
+            <span class="n">free_vram_gb_used</span><span class="p">,</span>
+            <span class="n">per_worker_gb</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">hard_cap</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">by_vram</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">by_vram</span><span class="p">,</span> <span class="n">hard_cap</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">num_jobs_int</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">by_jobs</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_jobs_int</span> <span class="o">//</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">),</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="n">chosen</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="n">by_jobs</span><span class="p">,</span> <span class="n">by_vram</span><span class="p">))</span>
+        <span class="n">by_jobs_log</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">by_jobs</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">chosen</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">by_vram</span><span class="p">)</span>
+        <span class="n">by_jobs_log</span> <span class="o">=</span> <span class="s2">"skipped (num_jobs auto)"</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">"auto_max_workers_per_gpu: chose </span><span class="si">%d</span><span class="s2"> "</span>
+        <span class="s2">"(num_jobs=</span><span class="si">%d</span><span class="s2">, num_gpus=</span><span class="si">%d</span><span class="s2">, by_jobs=</span><span class="si">%s</span><span class="s2">, by_vram=</span><span class="si">%d</span><span class="s2"> at "</span>
+        <span class="s2">"free_vram=</span><span class="si">%.1f</span><span class="s2"> GB</span><span class="si">%s</span><span class="s2">, </span><span class="si">%.1f</span><span class="s2"> GB/worker, budget=</span><span class="si">%s</span><span class="s2">, hard_cap=</span><span class="si">%s</span><span class="s2">)"</span><span class="p">,</span>
+        <span class="n">chosen</span><span class="p">,</span>
+        <span class="n">num_jobs_int</span><span class="p">,</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">),</span>
+        <span class="n">by_jobs_log</span><span class="p">,</span>
+        <span class="n">by_vram</span><span class="p">,</span>
+        <span class="n">free_vram_gb_used</span><span class="p">,</span>
+        <span class="s2">""</span> <span class="k">if</span> <span class="n">free_vram_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">" (fallback)"</span><span class="p">,</span>
+        <span class="n">per_worker_gb</span><span class="p">,</span>
+        <span class="p">(</span>
+            <span class="s2">"legacy </span><span class="si">%.2f</span><span class="s2"> fraction"</span> <span class="o">%</span> <span class="n">vram_fraction</span>
+            <span class="k">if</span> <span class="n">vram_fraction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">"shared reserve"</span>
+        <span class="p">),</span>
+        <span class="n">hard_cap</span> <span class="k">if</span> <span class="n">hard_cap</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">"none"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">chosen</span></div>
+
+
+
+<div class="viewcode-block" id="auto_dataloader_num_workers">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.auto_dataloader_num_workers">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">auto_dataloader_num_workers</span><span class="p">(</span>
+        <span class="n">num_fit_workers</span><span class="p">,</span>
+        <span class="n">vcpus</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">ram_gb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">hard_cap</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Pick per-fit-worker DataLoader child count from box capacity.</span>
+
+<span class="sd">    Returns an int &gt;= 0. The result is the value that should be plugged</span>
+<span class="sd">    into each component model's ``dataloader_num_workers`` hyperparameter.</span>
+<span class="sd">    A return of ``0`` means in-process batching (no prefetch children),</span>
+<span class="sd">    which is correct for serial runs and very tight CPU configs.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    num_fit_workers : int</span>
+<span class="sd">        Total fit() worker processes that will share the box. Equal to</span>
+<span class="sd">        ``num_gpus * max_workers_per_gpu`` for the canonical GPU run, or</span>
+<span class="sd">        ``num_jobs`` for CPU-only runs.</span>
+<span class="sd">    vcpus : int, optional</span>
+<span class="sd">        Total vCPU count. Default ``os.cpu_count()``.</span>
+<span class="sd">    ram_gb : float, optional</span>
+<span class="sd">        Total system RAM in GB. ``None`` skips the RAM cap (CPU-only</span>
+<span class="sd">        decision).</span>
+<span class="sd">    hard_cap : int, optional</span>
+<span class="sd">        Maximum DL children per fit-worker. Default 4 (overridable via</span>
+<span class="sd">        ``MHCFLURRY_AUTO_DATALOADER_HARD_CAP``); beyond this, process/queue</span>
+<span class="sd">        overhead reduced measured throughput.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    1. **Serial / no GPU work**: if ``num_fit_workers &lt;= 0``, return 0.</span>
+<span class="sd">       The caller will run fit() in-process; spawning children would buy</span>
+<span class="sd">       nothing and cost a process-fork.</span>
+<span class="sd">    2. **CPU budget per fit-worker**: ``cpu_per_fit = vcpus // num_fit_workers``.</span>
+<span class="sd">       Each DL child needs ~``_AUTO_DATALOADER_CORES_PER_CHILD`` (=2)</span>
+<span class="sd">       physical cores to keep up with fancy-indexing + collate without</span>
+<span class="sd">       starving the main fit-worker's OMP/MKL pool.</span>
+<span class="sd">    3. **CPU cap**: ``cpu_cap = cpu_per_fit // 2``.</span>
+<span class="sd">    4. **RAM cap** (when ``ram_gb`` is provided): each DL child holds</span>
+<span class="sd">       ~``_AUTO_DATALOADER_RAM_PER_CHILD_GB`` (=0.5) GB of RSS for the</span>
+<span class="sd">       torch+mhcflurry imports; the main fit-worker baseline is</span>
+<span class="sd">       ~``_AUTO_DATALOADER_RAM_BASELINE_PER_FIT_GB`` (=2.0) GB.</span>
+<span class="sd">       ``ram_cap = max(0, (ram_per_fit_gb - 2.0) / 0.5)``.</span>
+<span class="sd">    5. **Throughput cap**: ``min(cpu_cap, ram_cap, hard_cap)``.</span>
+<span class="sd">    6. **Floor**: return 0 when any CPU, RAM or explicit hard cap is 0.</span>
+<span class="sd">       Otherwise the minimum is 1.</span>
+
+<span class="sd">    **Edge cases**</span>
+
+<span class="sd">    * ``num_fit_workers &gt; vcpus`` → ``cpu_per_fit = 0``, ``cpu_cap = 0``,</span>
+<span class="sd">      result 0. The main fit-workers themselves are oversubscribed; adding</span>
+<span class="sd">      DL children would make it worse.</span>
+<span class="sd">    * ``ram_gb`` very small (e.g. &lt; 2 GB / fit) → ``ram_cap = 0``, falls back</span>
+<span class="sd">      to in-process batching to preserve correctness over throughput.</span>
+<span class="sd">    * ``hard_cap`` env override of ``0`` → forces in-process for diagnostics.</span>
+
+<span class="sd">    **Cross-checks (see test_orchestrator_helpers.py)**</span>
+
+<span class="sd">    * 8×A100-80GB Verda (176v / 16 fit / 400G) → 4</span>
+<span class="sd">    * 8×A100-40GB (176v / 8 fit / 400G) → 4</span>
+<span class="sd">    * 8×L40S (96v / 16 fit / 200G) → 3</span>
+<span class="sd">    * Single A100 80G Lambda (30v / 2 fit / 200G) → 4</span>
+<span class="sd">    * Single A100 80G tight (16v / 2 fit / 64G) → 4</span>
+<span class="sd">    * Single T4 (8v / 1 fit / 16G) → 4</span>
+<span class="sd">    * CPU 8-thread (8v / 0 fit) → 0</span>
+<span class="sd">    * Tight cluster node (32v / 16 fit / 64G) → 1</span>
+<span class="sd">    * RAM-starved (176v / 16 fit / 32G) → 0</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">num_fit_workers</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_fit_workers</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="n">num_fit_workers</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_fit_workers</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">vcpus</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">vcpus</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span> <span class="ow">or</span> <span class="mi">1</span>
+    <span class="n">vcpus</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">vcpus</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">hard_cap</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">hard_cap</span> <span class="o">=</span> <span class="n">env_int</span><span class="p">(</span>
+            <span class="s2">"MHCFLURRY_AUTO_DATALOADER_HARD_CAP"</span><span class="p">,</span>
+            <span class="n">_AUTO_DATALOADER_HARD_CAP_DEFAULT</span><span class="p">,</span>
+            <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="p">)</span>
+    <span class="n">hard_cap</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">hard_cap</span><span class="p">)</span>
+
+    <span class="n">cpu_per_fit</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">vcpus</span> <span class="o">//</span> <span class="n">num_fit_workers</span><span class="p">)</span>
+    <span class="n">cpu_cap</span> <span class="o">=</span> <span class="n">cpu_per_fit</span> <span class="o">//</span> <span class="n">_AUTO_DATALOADER_CORES_PER_CHILD</span>
+
+    <span class="k">if</span> <span class="n">ram_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">ram_per_fit</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">ram_gb</span><span class="p">)</span> <span class="o">/</span> <span class="n">num_fit_workers</span>
+        <span class="n">ram_for_dl</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">ram_per_fit</span> <span class="o">-</span> <span class="n">_AUTO_DATALOADER_RAM_BASELINE_PER_FIT_GB</span><span class="p">)</span>
+        <span class="n">ram_cap</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">ram_for_dl</span> <span class="o">/</span> <span class="n">_AUTO_DATALOADER_RAM_PER_CHILD_GB</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">ram_cap</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">chosen</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">hard_cap</span><span class="p">,</span> <span class="n">cpu_cap</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">ram_cap</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">chosen</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">chosen</span><span class="p">,</span> <span class="n">ram_cap</span><span class="p">)</span>
+
+    <span class="c1"># Floor at 1 when the box has CPU + RAM + cap headroom; floor at 0</span>
+    <span class="c1"># when ANY of cpu_cap / ram_cap / hard_cap is itself 0 (the user or</span>
+    <span class="c1"># the box explicitly forced in-process batching). The 1-floor exists</span>
+    <span class="c1"># so capable boxes don't accidentally disable prefetch when integer</span>
+    <span class="c1"># division rounds down to 0; it must not override an explicit 0.</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">cpu_cap</span> <span class="o">==</span> <span class="mi">0</span>
+        <span class="ow">or</span> <span class="p">(</span><span class="n">ram_cap</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">ram_cap</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="ow">or</span> <span class="n">hard_cap</span> <span class="o">==</span> <span class="mi">0</span>
+    <span class="p">):</span>
+        <span class="n">chosen</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">chosen</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">chosen</span><span class="p">)</span>
+    <span class="n">chosen</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">chosen</span><span class="p">)</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">"auto_dataloader_num_workers: chose </span><span class="si">%d</span><span class="s2"> (num_fit_workers=</span><span class="si">%d</span><span class="s2">, vcpus=</span><span class="si">%d</span><span class="s2">, "</span>
+        <span class="s2">"ram_gb=</span><span class="si">%s</span><span class="s2">, cpu_per_fit=</span><span class="si">%d</span><span class="s2">, cpu_cap=</span><span class="si">%d</span><span class="s2">, ram_cap=</span><span class="si">%s</span><span class="s2">, hard_cap=</span><span class="si">%s</span><span class="s2">)"</span><span class="p">,</span>
+        <span class="n">chosen</span><span class="p">,</span> <span class="n">num_fit_workers</span><span class="p">,</span> <span class="n">vcpus</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ram_gb</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">"</span> <span class="k">if</span> <span class="n">ram_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">"?"</span><span class="p">,</span>
+        <span class="n">cpu_per_fit</span><span class="p">,</span> <span class="n">cpu_cap</span><span class="p">,</span>
+        <span class="nb">str</span><span class="p">(</span><span class="n">ram_cap</span><span class="p">)</span> <span class="k">if</span> <span class="n">ram_cap</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">"?"</span><span class="p">,</span>
+        <span class="n">hard_cap</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">chosen</span></div>
+
+
+
+<div class="viewcode-block" id="resolve_dataloader_num_workers">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.resolve_dataloader_num_workers">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">resolve_dataloader_num_workers</span><span class="p">(</span>
+        <span class="n">value</span><span class="p">,</span>
+        <span class="n">num_fit_workers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">vcpus</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">ram_gb</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Normalize a ``dataloader_num_workers`` value to an int.</span>
+
+<span class="sd">    Accepts ``"auto"`` / unset / ``None`` (delegates to</span>
+<span class="sd">    ``auto_dataloader_num_workers``), or any int-coercible value. Used by</span>
+<span class="sd">    both the orchestrator-side resolver and the shell helper that injects</span>
+<span class="sd">    ``dataloader_num_workers`` into the recipe's hyperparameters.yaml.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"auto"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">auto_dataloader_num_workers</span><span class="p">(</span>
+            <span class="n">num_fit_workers</span><span class="o">=</span><span class="n">num_fit_workers</span><span class="p">,</span>
+            <span class="n">vcpus</span><span class="o">=</span><span class="n">vcpus</span><span class="p">,</span>
+            <span class="n">ram_gb</span><span class="o">=</span><span class="n">ram_gb</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"dataloader_num_workers must be 'auto' or a non-negative integer; "</span>
+            <span class="s2">"got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">value</span><span class="p">,)</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">out</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"dataloader_num_workers must be &gt;= 0; got </span><span class="si">%d</span><span class="s2">"</span> <span class="o">%</span> <span class="n">out</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">out</span></div>
+
+
+
+<div class="viewcode-block" id="auto_random_negative_pool_epochs">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.auto_random_negative_pool_epochs">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">auto_random_negative_pool_epochs</span><span class="p">(</span>
+        <span class="n">num_random_negatives</span><span class="p">,</span>
+        <span class="n">peptide_max_length</span><span class="p">,</span>
+        <span class="n">num_workers</span><span class="p">,</span>
+        <span class="n">ram_gb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">safety_fraction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">per_pool_epoch_per_worker_bytes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">hard_cap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">base_worker_gb</span><span class="o">=</span><span class="mf">0.0</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Pick ``random_negative_pool_epochs`` from box capacity.</span>
+
+<span class="sd">    The pool sits in the heap of every fit-worker process. Per-pool-epoch</span>
+<span class="sd">    memory cost is dominated by:</span>
+
+<span class="sd">    * ``num_random_negatives × peptide_max_length`` int8 indices,</span>
+<span class="sd">    * intermediate ``pandas.Series[str]`` allocations and encoder buffers</span>
+<span class="sd">      observed in practice at ~10–40× the int8 size on 2026-04 measurements</span>
+<span class="sd">      (the old ``pool_epochs=100`` run OOM'd a 944 GB box at ~199 GB / worker</span>
+<span class="sd">      worth of transient pool cost).</span>
+
+<span class="sd">    We budget for the pessimistic ``per_pool_epoch_per_worker_bytes`` figure</span>
+<span class="sd">    so the auto value is safe under transient peaks; tunable via env when</span>
+<span class="sd">    a workload is known to behave better than the empirical pessimistic</span>
+<span class="sd">    figure.</span>
+
+<span class="sd">    Returns an int &gt;= 1. ``1`` means fresh random negatives every epoch.</span>
+<span class="sd">    ``&gt; 1`` amortizes random-negative generation + encoding across N epochs.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    num_random_negatives : int</span>
+<span class="sd">        Number of random-negative peptides per epoch (the planner's</span>
+<span class="sd">        ``get_total_count()``). The size of one pool-epoch in the cycle.</span>
+<span class="sd">    peptide_max_length : int</span>
+<span class="sd">        Longest peptide the encoding allocates space for. With</span>
+<span class="sd">        the fixed-vector encoding lookup, the</span>
+<span class="sd">        per-peptide footprint is ``peptide_max_length`` int8 bytes.</span>
+<span class="sd">    num_workers : int</span>
+<span class="sd">        Total fit() worker processes that will share the box. Each holds</span>
+<span class="sd">        its own RN pool, so total RAM cost = ``num_workers × pool_epochs ×</span>
+<span class="sd">        per_pool_epoch_per_worker_bytes``.</span>
+<span class="sd">    ram_gb : float, optional</span>
+<span class="sd">        Total system RAM in GB. ``None`` returns ``1`` (safe default —</span>
+<span class="sd">        we don't know the budget so don't bump pool_epochs above legacy).</span>
+<span class="sd">    safety_fraction : float, optional</span>
+<span class="sd">        Expert fraction of RAM available to RN pools across all workers. By</span>
+<span class="sd">        default the shared host reserve is used and ``base_worker_gb`` is</span>
+<span class="sd">        subtracted first. Override via</span>
+<span class="sd">        ``MHCFLURRY_AUTO_RN_POOL_SAFETY_FRACTION``.</span>
+<span class="sd">    per_pool_epoch_per_worker_bytes : float, optional</span>
+<span class="sd">        Empirical per-pool-epoch per-worker RAM cost in bytes. Default</span>
+<span class="sd">        ``1 GB`` (conservative — captures the int8 indices + transient</span>
+<span class="sd">        pandas + encoder buffers seen on the 2026-04 run). Override via</span>
+<span class="sd">        ``MHCFLURRY_AUTO_RN_POOL_PER_EPOCH_PER_WORKER_GB``.</span>
+<span class="sd">    hard_cap : int, optional</span>
+<span class="sd">        Maximum pool epochs. Default 10 (expert-overridable); larger pools</span>
+<span class="sd">        add startup/memory cost after generation overhead is already amortized.</span>
+
+<span class="sd">    base_worker_gb : float, optional</span>
+<span class="sd">        Baseline host memory per fit worker, subtracted before sizing pools.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    Total available bytes for RN pools across the box is usable host memory</span>
+<span class="sd">    after the shared reserve and fit-worker base RSS. An explicit</span>
+<span class="sd">    ``safety_fraction`` replaces that calculation.</span>
+<span class="sd">    Per-worker budget is ``available / max(num_workers, 1)``. The number of</span>
+<span class="sd">    pool epochs that fit is</span>
+<span class="sd">    ``per_worker_budget / per_pool_epoch_per_worker_bytes``, clamped to</span>
+<span class="sd">    ``[1, hard_cap]``.</span>
+
+<span class="sd">    **Cross-checks**</span>
+
+<span class="sd">    * 8×A100-80GB Verda shares the same reserve and worker-RSS estimate as</span>
+<span class="sd">      the outer process planner, then stops at the throughput cap.</span>
+<span class="sd">    * Single A100 80G Lambda uses the shared host reserve minus the two</span>
+<span class="sd">      workers' base RSS, then fills the remaining per-worker pool budget.</span>
+<span class="sd">    * Tight and RAM-starved nodes naturally fall back toward one pooled epoch</span>
+<span class="sd">      as the fit-worker base RSS consumes the shared usable budget.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">num_workers</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_workers</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">1</span>
+    <span class="k">if</span> <span class="n">ram_gb</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">1</span>
+    <span class="k">if</span> <span class="n">safety_fraction</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">raw_fraction</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="s2">"MHCFLURRY_AUTO_RN_POOL_SAFETY_FRACTION"</span><span class="p">)</span>
+        <span class="n">safety_fraction</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">env_float</span><span class="p">(</span>
+                <span class="s2">"MHCFLURRY_AUTO_RN_POOL_SAFETY_FRACTION"</span><span class="p">,</span>
+                <span class="n">raw_fraction</span><span class="p">,</span>
+                <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">raw_fraction</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">per_pool_epoch_per_worker_bytes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">per_pool_epoch_per_worker_bytes</span> <span class="o">=</span> <span class="n">env_float</span><span class="p">(</span>
+            <span class="s2">"MHCFLURRY_AUTO_RN_POOL_PER_EPOCH_PER_WORKER_GB"</span><span class="p">,</span> <span class="s2">"1.0"</span><span class="p">,</span>
+            <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1024</span> <span class="o">**</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">hard_cap</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">hard_cap</span> <span class="o">=</span> <span class="n">env_int</span><span class="p">(</span>
+            <span class="s2">"MHCFLURRY_AUTO_RN_POOL_HARD_CAP"</span><span class="p">,</span>
+            <span class="s2">"10"</span><span class="p">,</span>
+            <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">..memory_budget</span><span class="w"> </span><span class="kn">import</span> <span class="n">HOST_MIN_RESERVE_BYTES</span><span class="p">,</span> <span class="n">usable_memory_bytes</span>
+    <span class="n">available_bytes</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">ram_gb</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1024</span> <span class="o">**</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">safety_fraction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">pool_budget</span> <span class="o">=</span> <span class="n">available_bytes</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="n">safety_fraction</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">pool_budget</span> <span class="o">=</span> <span class="n">usable_memory_bytes</span><span class="p">(</span>
+            <span class="n">available_bytes</span><span class="p">,</span>
+            <span class="n">min_reserve_bytes</span><span class="o">=</span><span class="n">HOST_MIN_RESERVE_BYTES</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">pool_budget</span> <span class="o">-=</span> <span class="p">(</span>
+            <span class="nb">max</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">base_worker_gb</span><span class="p">),</span> <span class="mf">0.0</span><span class="p">)</span>
+            <span class="o">*</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_workers</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="o">*</span> <span class="p">(</span><span class="mi">1024</span> <span class="o">**</span> <span class="mi">3</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="n">per_worker_budget</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">pool_budget</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">/</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_workers</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">by_memory</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">per_worker_budget</span> <span class="o">/</span> <span class="nb">max</span><span class="p">(</span>
+        <span class="n">per_pool_epoch_per_worker_bytes</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)))</span>
+    <span class="c1"># The `num_random_negatives` and `peptide_max_length` inputs are</span>
+    <span class="c1"># accepted for API symmetry / future extensions (e.g. variable-size</span>
+    <span class="c1"># encodings); the empirical per-pool-epoch figure already covers them.</span>
+    <span class="k">del</span> <span class="n">num_random_negatives</span><span class="p">,</span> <span class="n">peptide_max_length</span>
+    <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">by_memory</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">hard_cap</span><span class="p">)))</span></div>
+
+
+
+<div class="viewcode-block" id="resolved_int">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.resolved_int">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">resolved_int</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"auto"</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"</span><span class="si">%s</span><span class="s2"> must be resolved to an int before use; got 'auto'"</span> <span class="o">%</span> <span class="n">name</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="auto_num_jobs">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.auto_num_jobs">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">auto_num_jobs</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">,</span> <span class="n">max_workers_per_gpu</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Compute total fit-worker count from GPU plan.</span>
+
+<span class="sd">    Returns ``num_gpus * max_workers_per_gpu`` for GPU runs, ``0`` when no</span>
+<span class="sd">    GPUs are visible (caller decides serial vs explicit CPU pool). Treats</span>
+<span class="sd">    ``"auto"`` ``max_workers_per_gpu`` as not-yet-resolved and raises;</span>
+<span class="sd">    callers must resolve it first via ``auto_max_workers_per_gpu``.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">num_gpus</span> <span class="ow">or</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="n">max_workers_per_gpu</span> <span class="o">=</span> <span class="n">resolved_int</span><span class="p">(</span>
+        <span class="n">max_workers_per_gpu</span><span class="p">,</span> <span class="s2">"max_workers_per_gpu"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">)</span> <span class="o">*</span> <span class="n">max_workers_per_gpu</span></div>
+
+
+
+<div class="viewcode-block" id="resolve_max_workers_per_gpu">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.resolve_max_workers_per_gpu">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">resolve_max_workers_per_gpu</span><span class="p">(</span>
+        <span class="n">args</span><span class="p">,</span> <span class="n">per_worker_gb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_gpus</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Resolve ``args.max_workers_per_gpu`` to an int, mutating ``args``.</span>
+
+<span class="sd">    Accepts the literal string ``"auto"`` (the default) or an int. When</span>
+<span class="sd">    ``"auto"``, calls ``auto_max_workers_per_gpu`` with the rest of the</span>
+<span class="sd">    args' parallelism config to pick a value. Idempotent — calling</span>
+<span class="sd">    twice on the same args is a no-op the second time.</span>
+
+<span class="sd">    ``per_worker_gb`` lets workload-specific commands (e.g. calibrate,</span>
+<span class="sd">    where cached_stages dominates per-worker VRAM at ~15 GB) override</span>
+<span class="sd">    the train-default. Falls back to env var / the module default when</span>
+<span class="sd">    not given.</span>
+
+<span class="sd">    Returns the resolved int (also stored on ``args.max_workers_per_gpu``</span>
+<span class="sd">    so subsequent consumers see the int).</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">backend</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">backend</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"backend"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">num_gpus</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">num_gpus</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"gpus"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"max_workers_per_gpu"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="s2">"auto"</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"auto"</span><span class="p">:</span>
+        <span class="n">resolved</span> <span class="o">=</span> <span class="n">auto_max_workers_per_gpu</span><span class="p">(</span>
+            <span class="n">num_jobs</span><span class="o">=</span><span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"num_jobs"</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">num_gpus</span><span class="o">=</span><span class="n">num_gpus</span><span class="p">,</span>
+            <span class="n">backend</span><span class="o">=</span><span class="n">backend</span><span class="p">,</span>
+            <span class="n">per_worker_gb</span><span class="o">=</span><span class="n">per_worker_gb</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">resolved</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">max_workers_per_gpu</span> <span class="o">=</span> <span class="n">resolved</span>
+    <span class="k">return</span> <span class="n">resolved</span></div>
+
+
+
+<div class="viewcode-block" id="num_workers_per_gpu_from_args">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.num_workers_per_gpu_from_args">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">num_workers_per_gpu_from_args</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return resolved ``max_workers_per_gpu`` for model auto-sizing.</span>
+
+<span class="sd">    Callers must run ``resolve_local_parallelism_args`` first so workload- and</span>
+<span class="sd">    hardware-aware defaults have already converted the CLI sentinel ``"auto"``</span>
+<span class="sd">    into an integer.</span>
+<span class="sd">    """</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"max_workers_per_gpu"</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">1</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"auto"</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"max_workers_per_gpu is still 'auto'; call "</span>
+            <span class="s2">"resolve_local_parallelism_args before using it as "</span>
+            <span class="s2">"num_workers_per_gpu."</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">resolved_int</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="s2">"max_workers_per_gpu"</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="refresh_device_memory_budget">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.refresh_device_memory_budget">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">refresh_device_memory_budget</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Snapshot and propagate one fixed launch-time entitlement per worker."""</span>
+    <span class="n">plan</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"workload_plan"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span>
+            <span class="n">plan</span> <span class="ow">is</span> <span class="kc">None</span>
+            <span class="ow">or</span> <span class="n">plan</span><span class="o">.</span><span class="n">backend</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"auto"</span><span class="p">,</span> <span class="s2">"gpu"</span><span class="p">)</span>
+            <span class="ow">or</span> <span class="nb">int</span><span class="p">(</span><span class="n">plan</span><span class="o">.</span><span class="n">gpus</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">device_memory_budget_bytes</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">available_bytes</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span>
+        <span class="n">args</span><span class="p">,</span> <span class="s2">"_device_memory_available_bytes_at_launch"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">available_bytes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">per_gpu</span> <span class="o">=</span> <span class="n">detect_free_vram_per_gpu_gb</span><span class="p">(</span><span class="n">plan</span><span class="o">.</span><span class="n">gpus</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">per_gpu</span><span class="p">:</span>
+            <span class="n">available_bytes</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">per_gpu</span><span class="p">)</span> <span class="o">*</span> <span class="n">GIB</span><span class="p">)</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">_device_memory_available_bytes_at_launch</span> <span class="o">=</span> <span class="n">available_bytes</span>
+    <span class="k">if</span> <span class="n">available_bytes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">device_memory_budget_bytes</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">budget_bytes</span> <span class="o">=</span> <span class="n">per_worker_memory_budget_bytes</span><span class="p">(</span>
+        <span class="n">available_bytes</span><span class="p">,</span>
+        <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">plan</span><span class="o">.</span><span class="n">max_workers_per_gpu</span><span class="p">),</span> <span class="mi">1</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">device_memory_budget_bytes</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">budget_bytes</span><span class="p">)</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">workload_plan</span> <span class="o">=</span> <span class="n">replace</span><span class="p">(</span>
+        <span class="n">plan</span><span class="p">,</span>
+        <span class="n">device_memory_available_gb</span><span class="o">=</span><span class="n">available_bytes</span> <span class="o">/</span> <span class="n">GIB</span><span class="p">,</span>
+        <span class="n">device_memory_budget_gb</span><span class="o">=</span><span class="n">budget_bytes</span> <span class="o">/</span> <span class="n">GIB</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">budget_bytes</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="resolve_local_parallelism_args">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.resolve_local_parallelism_args">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">resolve_local_parallelism_args</span><span class="p">(</span>
+        <span class="n">args</span><span class="p">,</span>
+        <span class="n">cap_auto_num_jobs</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">per_worker_gb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">workload_name</span><span class="o">=</span><span class="n">WORKLOAD_GENERIC</span><span class="p">,</span>
+        <span class="n">workload_hints</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Resolve and normalize local parallelism arguments through the planner."""</span>
+    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"_local_parallelism_args_resolved"</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">args</span>
+
+    <span class="n">plan</span> <span class="o">=</span> <span class="n">plan_local_parallelism</span><span class="p">(</span>
+        <span class="n">args</span><span class="p">,</span>
+        <span class="n">workload_name</span><span class="o">=</span><span class="n">workload_name</span><span class="p">,</span>
+        <span class="n">workload_hints</span><span class="o">=</span><span class="n">workload_hints</span><span class="p">,</span>
+        <span class="n">per_worker_gb</span><span class="o">=</span><span class="n">per_worker_gb</span><span class="p">,</span>
+        <span class="n">cap_auto_num_jobs</span><span class="o">=</span><span class="n">cap_auto_num_jobs</span><span class="p">,</span>
+        <span class="n">normalize_backend</span><span class="o">=</span><span class="n">normalize_pytorch_backend</span><span class="p">,</span>
+        <span class="n">detect_num_cuda_devices</span><span class="o">=</span><span class="n">detect_num_cuda_devices_no_torch</span><span class="p">,</span>
+        <span class="n">auto_max_workers_per_gpu</span><span class="o">=</span><span class="n">auto_max_workers_per_gpu</span><span class="p">,</span>
+        <span class="n">auto_num_jobs</span><span class="o">=</span><span class="n">auto_num_jobs</span><span class="p">,</span>
+        <span class="n">resolve_dataloader_num_workers</span><span class="o">=</span><span class="n">resolve_dataloader_num_workers</span><span class="p">,</span>
+        <span class="n">auto_random_negative_pool_epochs</span><span class="o">=</span><span class="n">auto_random_negative_pool_epochs</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">args</span><span class="o">.</span><span class="n">backend</span> <span class="o">=</span> <span class="n">plan</span><span class="o">.</span><span class="n">backend</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">gpus</span> <span class="o">=</span> <span class="n">plan</span><span class="o">.</span><span class="n">gpus</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">gpus_was_auto</span> <span class="o">=</span> <span class="n">plan</span><span class="o">.</span><span class="n">gpus_was_auto</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">max_workers_per_gpu</span> <span class="o">=</span> <span class="n">plan</span><span class="o">.</span><span class="n">max_workers_per_gpu</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">max_workers_per_gpu_was_auto</span> <span class="o">=</span> <span class="n">plan</span><span class="o">.</span><span class="n">max_workers_per_gpu_was_auto</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">num_jobs</span> <span class="o">=</span> <span class="n">plan</span><span class="o">.</span><span class="n">num_jobs</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">num_jobs_was_auto</span> <span class="o">=</span> <span class="n">plan</span><span class="o">.</span><span class="n">num_jobs_was_auto</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">dataloader_num_workers</span> <span class="o">=</span> <span class="n">plan</span><span class="o">.</span><span class="n">dataloader_num_workers</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">dataloader_num_workers_was_auto</span> <span class="o">=</span> <span class="n">plan</span><span class="o">.</span><span class="n">dataloader_num_workers_was_auto</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">random_negative_pool_epochs</span> <span class="o">=</span> <span class="n">plan</span><span class="o">.</span><span class="n">random_negative_pool_epochs</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">random_negative_pool_epochs_was_auto</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">plan</span><span class="o">.</span><span class="n">random_negative_pool_epochs_was_auto</span>
+    <span class="p">)</span>
+    <span class="p">(</span>
+        <span class="n">cpu_threads_per_worker</span><span class="p">,</span>
+        <span class="n">cpu_threads_per_worker_was_auto</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">=</span> <span class="n">resolve_cpu_thread_budget</span><span class="p">(</span><span class="n">plan</span><span class="p">)</span>
+    <span class="n">plan</span> <span class="o">=</span> <span class="n">replace</span><span class="p">(</span>
+        <span class="n">plan</span><span class="p">,</span>
+        <span class="n">cpu_threads_per_worker</span><span class="o">=</span><span class="n">cpu_threads_per_worker</span><span class="p">,</span>
+        <span class="n">cpu_threads_per_worker_was_auto</span><span class="o">=</span><span class="n">cpu_threads_per_worker_was_auto</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">cpu_threads_per_worker</span> <span class="o">=</span> <span class="n">cpu_threads_per_worker</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">cpu_threads_per_worker_was_auto</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">cpu_threads_per_worker_was_auto</span>
+    <span class="p">)</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">workload_plan</span> <span class="o">=</span> <span class="n">plan</span>
+    <span class="n">refresh_device_memory_budget</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+    <span class="n">plan</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">workload_plan</span>
+
+    <span class="k">if</span> <span class="p">(</span>
+            <span class="n">plan</span><span class="o">.</span><span class="n">num_jobs</span> <span class="o">==</span> <span class="mi">0</span>
+            <span class="ow">and</span> <span class="ow">not</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"cluster_parallelism"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="n">cpu_threads_per_worker_was_auto</span><span class="p">):</span>
+        <span class="c1"># Serial commands execute the work function directly in this process,</span>
+        <span class="c1"># so worker_init never gets a chance to resize native/PyTorch pools</span>
+        <span class="c1"># that were initialized before planning ran.</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.worker_runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">configure_worker_cpu_threads</span>
+        <span class="n">applied_threads</span> <span class="o">=</span> <span class="n">configure_worker_cpu_threads</span><span class="p">(</span>
+            <span class="n">cpu_threads_per_worker</span><span class="p">,</span>
+            <span class="n">auto_owned</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">configure_pytorch</span><span class="p">(</span><span class="n">num_threads</span><span class="o">=</span><span class="n">applied_threads</span><span class="p">)</span>
+
+    <span class="c1"># Promote orchestrator-owned tuning knobs from CLI to env so the</span>
+    <span class="c1"># existing call sites (pytorch_training.maybe_compile_network,</span>
+    <span class="c1"># configure_matmul_precision, class1_training._timing_enabled,</span>
+    <span class="c1"># hoist_torchinductor_compile_threads) read a single source of truth.</span>
+    <span class="c1"># Auto -&gt; leave env untouched (preserves backward-compat for env-only</span>
+    <span class="c1"># deploys); explicit CLI value -&gt; overrides env. Workers inherit</span>
+    <span class="c1"># via the multiprocessing fork done after this resolver runs.</span>
+    <span class="k">if</span> <span class="n">plan</span><span class="o">.</span><span class="n">torch_compile</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"0"</span><span class="p">,</span> <span class="s2">"1"</span><span class="p">):</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"MHCFLURRY_TORCH_COMPILE"</span><span class="p">]</span> <span class="o">=</span> <span class="n">plan</span><span class="o">.</span><span class="n">torch_compile</span>
+    <span class="k">if</span> <span class="n">plan</span><span class="o">.</span><span class="n">torch_compile_loss</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"0"</span><span class="p">,</span> <span class="s2">"1"</span><span class="p">):</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"MHCFLURRY_TORCH_COMPILE_LOSS"</span><span class="p">]</span> <span class="o">=</span> <span class="n">plan</span><span class="o">.</span><span class="n">torch_compile_loss</span>
+    <span class="k">if</span> <span class="n">plan</span><span class="o">.</span><span class="n">matmul_precision</span> <span class="o">!=</span> <span class="s2">"none"</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"MHCFLURRY_MATMUL_PRECISION"</span><span class="p">]</span> <span class="o">=</span> <span class="n">plan</span><span class="o">.</span><span class="n">matmul_precision</span>
+    <span class="k">if</span> <span class="n">plan</span><span class="o">.</span><span class="n">enable_timing</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"MHCFLURRY_ENABLE_TIMING"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"1"</span>
+
+    <span class="c1"># Preflight: compare the resolved plan against measured machine capacity</span>
+    <span class="c1"># (per-GPU free VRAM, available RAM, CPU count) and warn when we are below</span>
+    <span class="c1"># a safe operating range, so a future OOM/contention is diagnosable.</span>
+    <span class="n">preflight</span> <span class="o">=</span> <span class="n">capacity_warnings</span><span class="p">(</span>
+        <span class="n">workload_name</span><span class="o">=</span><span class="n">plan</span><span class="o">.</span><span class="n">workload_name</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="n">plan</span><span class="o">.</span><span class="n">backend</span><span class="p">,</span>
+        <span class="n">gpus</span><span class="o">=</span><span class="n">plan</span><span class="o">.</span><span class="n">gpus</span><span class="p">,</span>
+        <span class="n">num_jobs</span><span class="o">=</span><span class="n">plan</span><span class="o">.</span><span class="n">num_jobs</span><span class="p">,</span>
+        <span class="n">per_gpu_free_vram_gb</span><span class="o">=</span><span class="n">detect_free_vram_per_gpu_gb</span><span class="p">(</span><span class="n">plan</span><span class="o">.</span><span class="n">gpus</span><span class="p">),</span>
+        <span class="n">device_worker_gb</span><span class="o">=</span><span class="n">plan</span><span class="o">.</span><span class="n">device_worker_gb</span><span class="p">,</span>
+        <span class="n">available_ram_gb</span><span class="o">=</span><span class="n">plan</span><span class="o">.</span><span class="n">host_memory_available_gb</span><span class="p">,</span>
+        <span class="n">host_worker_gb</span><span class="o">=</span><span class="n">plan</span><span class="o">.</span><span class="n">host_worker_gb</span><span class="p">,</span>
+        <span class="n">cpu_count</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">(),</span>
+    <span class="p">)</span>
+    <span class="k">for</span> <span class="n">warning</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">plan</span><span class="o">.</span><span class="n">warnings</span><span class="p">)</span> <span class="o">+</span> <span class="n">preflight</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Local parallelism:"</span><span class="p">,</span> <span class="n">warning</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.torch_compile</span><span class="w"> </span><span class="kn">import</span> <span class="n">hoist_torchinductor_compile_threads</span>
+    <span class="n">hoist_torchinductor_compile_threads</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Local workload plan:"</span><span class="p">,</span> <span class="n">plan</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">_local_parallelism_args_resolved</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">return</span> <span class="n">args</span></div>
+
+
+
+<div class="viewcode-block" id="resolve_cpu_threads_per_worker">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.resolve_cpu_threads_per_worker">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">resolve_cpu_threads_per_worker</span><span class="p">(</span><span class="n">plan</span><span class="p">,</span> <span class="n">cpu_count</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Set unset BLAS/OpenMP thread env vars from the final worker plan."""</span>
+    <span class="n">threads</span><span class="p">,</span> <span class="n">_was_auto</span> <span class="o">=</span> <span class="n">resolve_cpu_thread_budget</span><span class="p">(</span><span class="n">plan</span><span class="p">,</span> <span class="n">cpu_count</span><span class="o">=</span><span class="n">cpu_count</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">threads</span></div>
+
+
+
+<div class="viewcode-block" id="resolve_cpu_thread_budget">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.resolve_cpu_thread_budget">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">resolve_cpu_thread_budget</span><span class="p">(</span><span class="n">plan</span><span class="p">,</span> <span class="n">cpu_count</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Resolve native threads per fit worker and environment ownership.</span>
+
+<span class="sd">    A uniform runtime resize is safe only when all supported environment</span>
+<span class="sd">    variables are unset or were written by an earlier mhcflurry auto pass.</span>
+<span class="sd">    Any caller-owned value makes the environment authoritative; the numeric</span>
+<span class="sd">    auto estimate is still recorded for diagnostics but must not be applied</span>
+<span class="sd">    to loaded native or PyTorch pools.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">cpu_count</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">cpu_count</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span> <span class="ow">or</span> <span class="mi">1</span>
+    <span class="n">fit_workers</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">plan</span><span class="o">.</span><span class="n">num_jobs</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">reserved</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">fit_workers</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">plan</span><span class="o">.</span><span class="n">dataloader_num_workers</span><span class="p">)</span>
+    <span class="n">available</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">cpu_count</span><span class="p">)</span> <span class="o">-</span> <span class="n">reserved</span><span class="p">,</span> <span class="n">fit_workers</span><span class="p">)</span>
+    <span class="n">per_worker</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">available</span> <span class="o">//</span> <span class="n">fit_workers</span><span class="p">)</span>
+    <span class="n">auto_owned</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="s2">"OMP_NUM_THREADS"</span><span class="p">,</span> <span class="s2">"MKL_NUM_THREADS"</span><span class="p">,</span> <span class="s2">"OPENBLAS_NUM_THREADS"</span><span class="p">):</span>
+        <span class="n">marker</span> <span class="o">=</span> <span class="s2">"MHCFLURRY_</span><span class="si">%s</span><span class="s2">_AUTO"</span> <span class="o">%</span> <span class="n">name</span>
+        <span class="n">marker_value</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">marker</span><span class="p">)</span>
+        <span class="n">current_value</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="c1"># Record the exact value written by the auto planner. A boolean marker</span>
+        <span class="c1"># is insufficient: after an earlier auto pass, a caller can replace</span>
+        <span class="c1"># OMP_NUM_THREADS while the inherited marker remains in the</span>
+        <span class="c1"># environment. Treat the value as auto-owned only while it still</span>
+        <span class="c1"># matches what MHCflurry wrote.</span>
+        <span class="n">marker_matches</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">marker_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">marker_value</span> <span class="o">==</span> <span class="n">current_value</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">current_value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">marker_matches</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">per_worker</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="n">marker</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">per_worker</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">auto_owned</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">"CPU thread budget: </span><span class="si">%d</span><span class="s2"> thread(s)/fit-worker "</span>
+        <span class="s2">"(cpus=</span><span class="si">%d</span><span class="s2">, fit_workers=</span><span class="si">%d</span><span class="s2">, dataloader_workers=</span><span class="si">%d</span><span class="s2">, source=</span><span class="si">%s</span><span class="s2">)"</span><span class="p">,</span>
+        <span class="n">per_worker</span><span class="p">,</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">cpu_count</span><span class="p">),</span>
+        <span class="n">fit_workers</span><span class="p">,</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">plan</span><span class="o">.</span><span class="n">dataloader_num_workers</span><span class="p">),</span>
+        <span class="s2">"auto"</span> <span class="k">if</span> <span class="n">auto_owned</span> <span class="k">else</span> <span class="s2">"environment"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">per_worker</span><span class="p">,</span> <span class="n">auto_owned</span></div>
+
+
+
+<div class="viewcode-block" id="refine_local_parallelism_from_warmup">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.refine_local_parallelism_from_warmup">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">refine_local_parallelism_from_warmup</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">reports</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Tighten an automatic plan using representative warmup measurements.</span>
+
+<span class="sd">    The analytic estimate remains the floor because a one-batch warmup does</span>
+<span class="sd">    not contain a full resident dataset or validation. Measured CUDA reserved</span>
+<span class="sd">    memory and process peak RSS can only increase the estimated working set and</span>
+<span class="sd">    reduce automatic concurrency. Explicit ``--num-jobs`` and</span>
+<span class="sd">    ``--max-workers-per-gpu`` values are never changed.</span>
+<span class="sd">    """</span>
+    <span class="n">reports</span> <span class="o">=</span> <span class="p">[</span><span class="n">report</span> <span class="k">for</span> <span class="n">report</span> <span class="ow">in</span> <span class="p">(</span><span class="n">reports</span> <span class="ow">or</span> <span class="p">[])</span> <span class="k">if</span> <span class="n">report</span><span class="p">]</span>
+    <span class="n">plan</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"workload_plan"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">plan</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">reports</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">args</span>
+
+    <span class="n">gib</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">)</span>
+    <span class="n">device_values</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="nb">max</span><span class="p">(</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">report</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"cuda_process_peak_estimate_bytes"</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">report</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"cuda_peak_allocated_bytes"</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">report</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"cuda_peak_reserved_bytes"</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">),</span>
+        <span class="p">)</span> <span class="o">/</span> <span class="n">gib</span>
+        <span class="k">for</span> <span class="n">report</span> <span class="ow">in</span> <span class="n">reports</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">report</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"cuda_peak_allocated_bytes"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">or</span> <span class="n">report</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"cuda_peak_reserved_bytes"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">or</span> <span class="n">report</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"cuda_process_peak_estimate_bytes"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="p">)</span>
+    <span class="p">]</span>
+    <span class="n">host_values</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">report</span><span class="p">[</span><span class="s2">"host_peak_rss_bytes"</span><span class="p">])</span> <span class="o">/</span> <span class="n">gib</span>
+        <span class="k">for</span> <span class="n">report</span> <span class="ow">in</span> <span class="n">reports</span>
+        <span class="k">if</span> <span class="n">report</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"host_peak_rss_bytes"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+    <span class="p">]</span>
+    <span class="n">device_peak_gb</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">device_values</span><span class="p">)</span> <span class="k">if</span> <span class="n">device_values</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="n">host_peak_gb</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">host_values</span><span class="p">)</span> <span class="k">if</span> <span class="n">host_values</span> <span class="k">else</span> <span class="kc">None</span>
+
+    <span class="c1"># Peak counters are exact for the representative step; the margin covers</span>
+    <span class="c1"># later allocator fragmentation and small input-shape differences.</span>
+    <span class="n">measured_device_worker_gb</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">device_peak_gb</span> <span class="o">*</span> <span class="mf">1.15</span> <span class="k">if</span> <span class="n">device_peak_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="p">)</span>
+    <span class="c1"># RUSAGE_SELF measures only the warmed fit worker. Production also starts</span>
+    <span class="c1"># DataLoader children, so retain their analytic allowance when the</span>
+    <span class="c1"># measured main-process RSS becomes the binding estimate.</span>
+    <span class="n">measured_host_worker_gb</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">host_peak_gb</span> <span class="o">*</span> <span class="mf">1.10</span>
+        <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">plan</span><span class="o">.</span><span class="n">dataloader_num_workers</span><span class="p">)</span> <span class="o">*</span> <span class="n">HOST_RAM_PER_DATALOADER_CHILD_GB</span>
+        <span class="k">if</span> <span class="n">host_peak_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="p">)</span>
+    <span class="n">device_candidates</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">value</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="n">plan</span><span class="o">.</span><span class="n">device_worker_gb</span><span class="p">,</span>
+            <span class="n">measured_device_worker_gb</span><span class="p">,</span>
+        <span class="p">)</span> <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+    <span class="p">]</span>
+    <span class="n">host_candidates</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">value</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="n">plan</span><span class="o">.</span><span class="n">host_worker_gb</span><span class="p">,</span>
+            <span class="n">measured_host_worker_gb</span><span class="p">,</span>
+        <span class="p">)</span> <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+    <span class="p">]</span>
+    <span class="n">device_worker_gb</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="nb">max</span><span class="p">(</span><span class="n">device_candidates</span><span class="p">)</span> <span class="k">if</span> <span class="n">device_candidates</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="p">)</span>
+    <span class="n">host_worker_gb</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">host_candidates</span><span class="p">)</span> <span class="k">if</span> <span class="n">host_candidates</span> <span class="k">else</span> <span class="mf">0.0</span>
+
+    <span class="n">new_mwpg</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">plan</span><span class="o">.</span><span class="n">max_workers_per_gpu</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span>
+            <span class="n">plan</span><span class="o">.</span><span class="n">max_workers_per_gpu_was_auto</span>
+            <span class="ow">and</span> <span class="n">plan</span><span class="o">.</span><span class="n">gpus</span> <span class="o">&gt;</span> <span class="mi">0</span>
+            <span class="ow">and</span> <span class="n">device_worker_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="n">launch_available_bytes</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span>
+            <span class="n">args</span><span class="p">,</span> <span class="s2">"_device_memory_available_bytes_at_launch"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">launch_available_bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">measured_mwpg</span> <span class="o">=</span> <span class="n">memory_worker_capacity</span><span class="p">(</span>
+                <span class="n">launch_available_bytes</span> <span class="o">/</span> <span class="n">GIB</span><span class="p">,</span>
+                <span class="n">device_worker_gb</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">measured_mwpg</span> <span class="o">=</span> <span class="n">auto_max_workers_per_gpu</span><span class="p">(</span>
+                <span class="n">num_jobs</span><span class="o">=</span><span class="s2">"auto"</span><span class="p">,</span>
+                <span class="n">num_gpus</span><span class="o">=</span><span class="n">plan</span><span class="o">.</span><span class="n">gpus</span><span class="p">,</span>
+                <span class="n">backend</span><span class="o">=</span><span class="n">plan</span><span class="o">.</span><span class="n">backend</span><span class="p">,</span>
+                <span class="n">per_worker_gb</span><span class="o">=</span><span class="n">device_worker_gb</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="n">new_mwpg</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">new_mwpg</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">measured_mwpg</span><span class="p">))</span>
+
+    <span class="n">new_num_jobs</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">plan</span><span class="o">.</span><span class="n">num_jobs</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">plan</span><span class="o">.</span><span class="n">num_jobs_was_auto</span> <span class="ow">and</span> <span class="n">new_num_jobs</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">plan</span><span class="o">.</span><span class="n">gpus</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">new_num_jobs</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">new_num_jobs</span><span class="p">,</span> <span class="n">plan</span><span class="o">.</span><span class="n">gpus</span> <span class="o">*</span> <span class="n">new_mwpg</span><span class="p">)</span>
+    <span class="n">host_cap</span> <span class="o">=</span> <span class="n">plan</span><span class="o">.</span><span class="n">host_memory_num_jobs_cap</span>
+    <span class="k">if</span> <span class="n">plan</span><span class="o">.</span><span class="n">host_memory_available_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">host_cap</span> <span class="o">=</span> <span class="n">host_memory_num_jobs_cap</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">"available_gb"</span><span class="p">:</span> <span class="n">plan</span><span class="o">.</span><span class="n">host_memory_available_gb</span><span class="p">,</span>
+                <span class="s2">"total_gb"</span><span class="p">:</span> <span class="n">plan</span><span class="o">.</span><span class="n">host_memory_total_gb</span><span class="p">,</span>
+            <span class="p">},</span>
+            <span class="n">host_worker_gb</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span>
+                <span class="n">plan</span><span class="o">.</span><span class="n">num_jobs_was_auto</span>
+                <span class="ow">and</span> <span class="n">host_cap</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="n">new_num_jobs</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="n">new_num_jobs</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">new_num_jobs</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">host_cap</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">plan</span><span class="o">.</span><span class="n">max_workers_per_gpu_was_auto</span> <span class="ow">and</span> <span class="n">plan</span><span class="o">.</span><span class="n">gpus</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">new_mwpg</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>
+                    <span class="n">new_mwpg</span><span class="p">,</span>
+                    <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="p">(</span><span class="n">new_num_jobs</span> <span class="o">+</span> <span class="n">plan</span><span class="o">.</span><span class="n">gpus</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="n">plan</span><span class="o">.</span><span class="n">gpus</span><span class="p">),</span>
+                <span class="p">)</span>
+
+    <span class="n">changed</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">new_mwpg</span> <span class="o">!=</span> <span class="n">plan</span><span class="o">.</span><span class="n">max_workers_per_gpu</span>
+        <span class="ow">or</span> <span class="n">new_num_jobs</span> <span class="o">!=</span> <span class="n">plan</span><span class="o">.</span><span class="n">num_jobs</span>
+    <span class="p">)</span>
+    <span class="n">refined</span> <span class="o">=</span> <span class="n">replace</span><span class="p">(</span>
+        <span class="n">plan</span><span class="p">,</span>
+        <span class="n">max_workers_per_gpu</span><span class="o">=</span><span class="n">new_mwpg</span><span class="p">,</span>
+        <span class="n">num_jobs</span><span class="o">=</span><span class="n">new_num_jobs</span><span class="p">,</span>
+        <span class="n">capacity</span><span class="o">=</span><span class="p">(</span>
+            <span class="nb">min</span><span class="p">(</span><span class="n">new_num_jobs</span><span class="p">,</span> <span class="n">plan</span><span class="o">.</span><span class="n">gpus</span> <span class="o">*</span> <span class="n">new_mwpg</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">new_num_jobs</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">plan</span><span class="o">.</span><span class="n">gpus</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="n">plan</span><span class="o">.</span><span class="n">capacity</span>
+        <span class="p">),</span>
+        <span class="n">device_worker_gb</span><span class="o">=</span><span class="n">device_worker_gb</span><span class="p">,</span>
+        <span class="n">host_worker_gb</span><span class="o">=</span><span class="n">host_worker_gb</span><span class="p">,</span>
+        <span class="n">host_memory_num_jobs_cap</span><span class="o">=</span><span class="n">host_cap</span><span class="p">,</span>
+        <span class="n">warmup_device_peak_gb</span><span class="o">=</span><span class="n">device_peak_gb</span><span class="p">,</span>
+        <span class="n">warmup_host_peak_gb</span><span class="o">=</span><span class="n">host_peak_gb</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="p">(</span>
+        <span class="n">cpu_threads_per_worker</span><span class="p">,</span>
+        <span class="n">cpu_threads_per_worker_was_auto</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">=</span> <span class="n">resolve_cpu_thread_budget</span><span class="p">(</span><span class="n">refined</span><span class="p">)</span>
+    <span class="n">refined</span> <span class="o">=</span> <span class="n">replace</span><span class="p">(</span>
+        <span class="n">refined</span><span class="p">,</span>
+        <span class="n">cpu_threads_per_worker</span><span class="o">=</span><span class="n">cpu_threads_per_worker</span><span class="p">,</span>
+        <span class="n">cpu_threads_per_worker_was_auto</span><span class="o">=</span><span class="n">cpu_threads_per_worker_was_auto</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">workload_plan</span> <span class="o">=</span> <span class="n">refined</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">max_workers_per_gpu</span> <span class="o">=</span> <span class="n">new_mwpg</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">num_jobs</span> <span class="o">=</span> <span class="n">new_num_jobs</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">cpu_threads_per_worker</span> <span class="o">=</span> <span class="n">cpu_threads_per_worker</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">cpu_threads_per_worker_was_auto</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">cpu_threads_per_worker_was_auto</span>
+    <span class="p">)</span>
+    <span class="n">refresh_device_memory_budget</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+    <span class="n">refined</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">workload_plan</span>
+    <span class="k">if</span> <span class="p">(</span>
+            <span class="n">refined</span><span class="o">.</span><span class="n">warmup_device_peak_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">refined</span><span class="o">.</span><span class="n">device_memory_budget_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">refined</span><span class="o">.</span><span class="n">warmup_device_peak_gb</span>
+            <span class="o">&gt;</span> <span class="n">refined</span><span class="o">.</span><span class="n">device_memory_budget_gb</span><span class="p">):</span>
+        <span class="n">warning</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">"observed device peak (</span><span class="si">%.1f</span><span class="s2"> GB) exceeds the </span><span class="si">%.1f</span><span class="s2"> GB "</span>
+            <span class="s2">"per-worker entitlement on the smallest GPU; the resolved "</span>
+            <span class="s2">"concurrency cannot accommodate the measured workload without "</span>
+            <span class="s2">"elastic batch shrink or OOM."</span>
+            <span class="o">%</span> <span class="p">(</span>
+                <span class="n">refined</span><span class="o">.</span><span class="n">warmup_device_peak_gb</span><span class="p">,</span>
+                <span class="n">refined</span><span class="o">.</span><span class="n">device_memory_budget_gb</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">warning</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">refined</span><span class="o">.</span><span class="n">warnings</span><span class="p">:</span>
+            <span class="n">refined</span> <span class="o">=</span> <span class="n">replace</span><span class="p">(</span>
+                <span class="n">refined</span><span class="p">,</span>
+                <span class="n">warnings</span><span class="o">=</span><span class="n">refined</span><span class="o">.</span><span class="n">warnings</span> <span class="o">+</span> <span class="p">(</span><span class="n">warning</span><span class="p">,),</span>
+            <span class="p">)</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">workload_plan</span> <span class="o">=</span> <span class="n">refined</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">"Local parallelism:"</span><span class="p">,</span> <span class="n">warning</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">changed</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">"Warmup memory calibration tightened local parallelism: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">refined</span><span class="p">,),</span>
+            <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">"Warmup memory calibration confirmed local parallelism: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">refined</span><span class="p">,),</span>
+            <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">args</span></div>
+
+
+
+<div class="viewcode-block" id="refine_local_parallelism_from_spawn_context">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.refine_local_parallelism_from_spawn_context">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">refine_local_parallelism_from_spawn_context</span><span class="p">(</span>
+        <span class="n">args</span><span class="p">,</span> <span class="n">context_bytes</span><span class="p">,</span> <span class="n">memory</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Cap automatic spawn workers using the loaded per-process context.</span>
+
+<span class="sd">    Spawn serializes the full worker initializer context into every process,</span>
+<span class="sd">    unlike fork's copy-on-write inheritance. Input files may be compressed, so</span>
+<span class="sd">    their on-disk size is not a reliable host-RAM estimate. This refinement is</span>
+<span class="sd">    deliberately performed after the dataset/model context has been loaded but</span>
+<span class="sd">    before any workers start.</span>
+<span class="sd">    """</span>
+    <span class="n">plan</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"workload_plan"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">plan</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">int</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"num_jobs"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">args</span>
+    <span class="n">context_bytes</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">context_bytes</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">context_bytes</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"context_bytes must be non-negative"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">context_bytes</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">args</span>
+    <span class="k">if</span> <span class="n">memory</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">memory</span> <span class="o">=</span> <span class="n">system_memory_info_gb</span><span class="p">()</span>
+    <span class="n">available_gb</span> <span class="o">=</span> <span class="n">available_or_total_memory_gb</span><span class="p">(</span><span class="n">memory</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">available_gb</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">args</span>
+
+    <span class="c1"># Deep object-size accounting captures resident array/string payloads. The</span>
+    <span class="c1"># multiplier covers pickle reconstruction, indexes, allocator overhead,</span>
+    <span class="c1"># and transient copies while the child imports its runtime. The runtime</span>
+    <span class="c1"># floor prevents a tiny context from erasing the workload profile's normal</span>
+    <span class="c1"># Python/torch allowance.</span>
+    <span class="n">context_gb</span> <span class="o">=</span> <span class="n">context_bytes</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">)</span>
+    <span class="n">context_host_worker_gb</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="mf">1.0</span>
+        <span class="o">+</span> <span class="n">context_gb</span> <span class="o">*</span> <span class="mf">1.5</span>
+        <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">plan</span><span class="o">.</span><span class="n">dataloader_num_workers</span><span class="p">)</span>
+        <span class="o">*</span> <span class="n">HOST_RAM_PER_DATALOADER_CHILD_GB</span>
+    <span class="p">)</span>
+    <span class="n">host_worker_gb</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">plan</span><span class="o">.</span><span class="n">host_worker_gb</span><span class="p">),</span> <span class="n">context_host_worker_gb</span><span class="p">)</span>
+    <span class="n">host_cap</span> <span class="o">=</span> <span class="n">host_memory_num_jobs_cap</span><span class="p">(</span><span class="n">memory</span><span class="p">,</span> <span class="n">host_worker_gb</span><span class="p">)</span>
+    <span class="n">usable_host_gb</span> <span class="o">=</span> <span class="n">usable_memory_bytes</span><span class="p">(</span>
+        <span class="nb">float</span><span class="p">(</span><span class="n">available_gb</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">),</span>
+        <span class="n">min_reserve_bytes</span><span class="o">=</span><span class="n">HOST_MIN_RESERVE_BYTES</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">)</span>
+    <span class="c1"># The generic host-cap helper deliberately returns at least one worker so</span>
+    <span class="c1"># GPU planning can attempt a minimally viable launch. Spawn is different:</span>
+    <span class="c1"># the parent already owns the loaded context, and starting even one child</span>
+    <span class="c1"># makes another full copy. If the safe remaining budget cannot hold that</span>
+    <span class="c1"># copy, execute serially in the parent instead of forcing a likely OOM.</span>
+    <span class="k">if</span> <span class="n">usable_host_gb</span> <span class="o">&lt;</span> <span class="n">host_worker_gb</span><span class="p">:</span>
+        <span class="n">host_cap</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">warnings</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">plan</span><span class="o">.</span><span class="n">warnings</span><span class="p">)</span>
+    <span class="n">new_num_jobs</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">plan</span><span class="o">.</span><span class="n">num_jobs</span><span class="p">)</span>
+    <span class="n">new_mwpg</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">plan</span><span class="o">.</span><span class="n">max_workers_per_gpu</span><span class="p">)</span>
+    <span class="n">host_cap_applied</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">if</span> <span class="p">(</span>
+            <span class="n">host_cap</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">plan</span><span class="o">.</span><span class="n">num_jobs_was_auto</span>
+            <span class="ow">and</span> <span class="n">new_num_jobs</span> <span class="o">&gt;</span> <span class="nb">int</span><span class="p">(</span><span class="n">host_cap</span><span class="p">)):</span>
+        <span class="n">host_cap_applied</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="s2">"auto num_jobs capped from </span><span class="si">%d</span><span class="s2"> to </span><span class="si">%d</span><span class="s2"> by loaded spawn context "</span>
+            <span class="s2">"(</span><span class="si">%.1f</span><span class="s2"> GB available from </span><span class="si">%s</span><span class="s2">, </span><span class="si">%.1f</span><span class="s2"> GB context, </span><span class="si">%.1f</span><span class="s2"> GB/worker)"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">new_num_jobs</span><span class="p">,</span>
+                <span class="nb">int</span><span class="p">(</span><span class="n">host_cap</span><span class="p">),</span>
+                <span class="nb">float</span><span class="p">(</span><span class="n">available_gb</span><span class="p">),</span>
+                <span class="n">memory</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"source"</span><span class="p">,</span> <span class="s2">"unknown"</span><span class="p">),</span>
+                <span class="n">context_gb</span><span class="p">,</span>
+                <span class="n">host_worker_gb</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">new_num_jobs</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">host_cap</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">plan</span><span class="o">.</span><span class="n">max_workers_per_gpu_was_auto</span> <span class="ow">and</span> <span class="n">plan</span><span class="o">.</span><span class="n">gpus</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">new_mwpg</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>
+                <span class="n">new_mwpg</span><span class="p">,</span>
+                <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="p">(</span><span class="n">new_num_jobs</span> <span class="o">+</span> <span class="n">plan</span><span class="o">.</span><span class="n">gpus</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="n">plan</span><span class="o">.</span><span class="n">gpus</span><span class="p">),</span>
+            <span class="p">)</span>
+    <span class="k">elif</span> <span class="p">(</span>
+            <span class="n">host_cap</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="ow">not</span> <span class="n">plan</span><span class="o">.</span><span class="n">num_jobs_was_auto</span>
+            <span class="ow">and</span> <span class="n">new_num_jobs</span> <span class="o">&gt;</span> <span class="nb">int</span><span class="p">(</span><span class="n">host_cap</span><span class="p">)):</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="s2">"explicit num_jobs=</span><span class="si">%d</span><span class="s2"> exceeds loaded spawn-context host-memory "</span>
+            <span class="s2">"estimate </span><span class="si">%d</span><span class="s2">; honoring CLI override"</span> <span class="o">%</span> <span class="p">(</span><span class="n">new_num_jobs</span><span class="p">,</span> <span class="n">host_cap</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="n">refined</span> <span class="o">=</span> <span class="n">replace</span><span class="p">(</span>
+        <span class="n">plan</span><span class="p">,</span>
+        <span class="n">max_workers_per_gpu</span><span class="o">=</span><span class="n">new_mwpg</span><span class="p">,</span>
+        <span class="n">num_jobs</span><span class="o">=</span><span class="n">new_num_jobs</span><span class="p">,</span>
+        <span class="n">capacity</span><span class="o">=</span><span class="p">(</span>
+            <span class="n">new_num_jobs</span>
+            <span class="k">if</span> <span class="n">host_cap_applied</span>
+            <span class="k">else</span> <span class="n">plan</span><span class="o">.</span><span class="n">capacity</span>
+        <span class="p">),</span>
+        <span class="n">host_worker_gb</span><span class="o">=</span><span class="n">host_worker_gb</span><span class="p">,</span>
+        <span class="n">host_memory_total_gb</span><span class="o">=</span><span class="n">memory</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"total_gb"</span><span class="p">),</span>
+        <span class="n">host_memory_available_gb</span><span class="o">=</span><span class="n">memory</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"available_gb"</span><span class="p">),</span>
+        <span class="n">host_memory_source</span><span class="o">=</span><span class="n">memory</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"source"</span><span class="p">,</span> <span class="s2">"unknown"</span><span class="p">),</span>
+        <span class="n">host_memory_num_jobs_cap</span><span class="o">=</span><span class="n">host_cap</span><span class="p">,</span>
+        <span class="n">warnings</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">warnings</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="p">(</span>
+        <span class="n">cpu_threads_per_worker</span><span class="p">,</span>
+        <span class="n">cpu_threads_per_worker_was_auto</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">=</span> <span class="n">resolve_cpu_thread_budget</span><span class="p">(</span><span class="n">refined</span><span class="p">)</span>
+    <span class="n">refined</span> <span class="o">=</span> <span class="n">replace</span><span class="p">(</span>
+        <span class="n">refined</span><span class="p">,</span>
+        <span class="n">cpu_threads_per_worker</span><span class="o">=</span><span class="n">cpu_threads_per_worker</span><span class="p">,</span>
+        <span class="n">cpu_threads_per_worker_was_auto</span><span class="o">=</span><span class="n">cpu_threads_per_worker_was_auto</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">workload_plan</span> <span class="o">=</span> <span class="n">refined</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">max_workers_per_gpu</span> <span class="o">=</span> <span class="n">new_mwpg</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">num_jobs</span> <span class="o">=</span> <span class="n">new_num_jobs</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">cpu_threads_per_worker</span> <span class="o">=</span> <span class="n">cpu_threads_per_worker</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">cpu_threads_per_worker_was_auto</span> <span class="o">=</span> <span class="n">cpu_threads_per_worker_was_auto</span>
+    <span class="n">refresh_device_memory_budget</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+    <span class="n">refined</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">workload_plan</span>
+    <span class="k">if</span> <span class="n">new_num_jobs</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">plan</span><span class="o">.</span><span class="n">num_jobs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="c1"># Commands decide between their serial and parallel branches</span>
+        <span class="c1"># immediately after this late, context-aware refinement. Apply the</span>
+        <span class="c1"># runtime limit here because no worker initializer will run.</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.worker_runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">configure_worker_cpu_threads</span>
+        <span class="n">applied_threads</span> <span class="o">=</span> <span class="n">configure_worker_cpu_threads</span><span class="p">(</span>
+            <span class="n">cpu_threads_per_worker</span><span class="p">,</span>
+            <span class="n">auto_owned</span><span class="o">=</span><span class="n">cpu_threads_per_worker_was_auto</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">configure_pytorch</span><span class="p">(</span><span class="n">num_threads</span><span class="o">=</span><span class="n">applied_threads</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">refined</span> <span class="o">!=</span> <span class="n">plan</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">"Loaded spawn-context memory refinement: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">refined</span><span class="p">,</span>
+            <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">args</span></div>
+
+
+
+<div class="viewcode-block" id="apply_random_negative_pool_epochs_to_work_items">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.apply_random_negative_pool_epochs_to_work_items">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">apply_random_negative_pool_epochs_to_work_items</span><span class="p">(</span>
+        <span class="n">work_items</span><span class="p">,</span> <span class="n">pool_epochs</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Inject ``random_negative_pool_epochs`` into every work item's hyperparameters.</span>
+
+<span class="sd">    Parallel to ``apply_dataloader_num_workers_to_work_items``: the orchestrator</span>
+<span class="sd">    chooses an auto value once at startup (or honors the CLI int) and writes it</span>
+<span class="sd">    into every per-work-item hyperparameter dict. fit() reads it from</span>
+<span class="sd">    ``self.hyperparameters['random_negative_pool_epochs']`` when constructing</span>
+<span class="sd">    its ``RandomNegativesPool``.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    work_items : list of dict</span>
+<span class="sd">        Each dict has a ``hyperparameters`` sub-dict.</span>
+<span class="sd">    pool_epochs : int</span>
+<span class="sd">        The resolved value from ``resolve_local_parallelism_args`` (&gt;= 1).</span>
+<span class="sd">    log : callable, optional</span>
+<span class="sd">        Logging hook. Defaults to ``print``.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="nb">print</span>
+    <span class="n">pool_epochs_int</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">pool_epochs</span><span class="p">)</span>
+    <span class="n">overridden</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">work_items</span><span class="p">:</span>
+        <span class="n">hp</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"hyperparameters"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">hp</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">prev</span> <span class="o">=</span> <span class="n">hp</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"random_negative_pool_epochs"</span><span class="p">)</span>
+        <span class="n">hp</span><span class="p">[</span><span class="s2">"random_negative_pool_epochs"</span><span class="p">]</span> <span class="o">=</span> <span class="n">pool_epochs_int</span>
+        <span class="k">if</span> <span class="n">prev</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">int</span><span class="p">(</span><span class="n">prev</span><span class="p">)</span> <span class="o">!=</span> <span class="n">pool_epochs_int</span><span class="p">:</span>
+            <span class="n">overridden</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="n">log</span><span class="p">(</span>
+        <span class="s2">"apply_random_negative_pool_epochs_to_work_items: set </span><span class="si">%d</span><span class="s2">/</span><span class="si">%d</span><span class="s2"> items to "</span>
+        <span class="s2">"random_negative_pool_epochs=</span><span class="si">%d</span><span class="s2"> (overridden=</span><span class="si">%d</span><span class="s2">)"</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">work_items</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">work_items</span><span class="p">),</span> <span class="n">pool_epochs_int</span><span class="p">,</span> <span class="n">overridden</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="apply_dataloader_num_workers_to_work_items">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.apply_dataloader_num_workers_to_work_items">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">apply_dataloader_num_workers_to_work_items</span><span class="p">(</span><span class="n">work_items</span><span class="p">,</span> <span class="n">num_workers</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Inject ``dataloader_num_workers`` into every work item's hyperparameters.</span>
+
+<span class="sd">    Writes the resolved value into affinity work-item hyperparameters. It is</span>
+<span class="sd">    consumed by streaming pretraining; in-memory affinity fitting ignores it.</span>
+<span class="sd">    Processing models do not use this affinity DataLoader hyperparameter.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    work_items : list of dict</span>
+<span class="sd">        Each dict has a ``hyperparameters`` sub-dict (the canonical shape</span>
+<span class="sd">        produced by ``train_pan_allele_models_command`` /</span>
+<span class="sd">        ``train_allele_specific_models_command``).</span>
+<span class="sd">    num_workers : int</span>
+<span class="sd">        The resolved value from</span>
+<span class="sd">        ``resolve_local_parallelism_args``. Use 0 to force in-process</span>
+<span class="sd">        batching (no prefetch children).</span>
+<span class="sd">    log : callable, optional</span>
+<span class="sd">        Logging hook for the human-readable summary. Defaults to ``print``.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="nb">print</span>
+    <span class="n">overridden</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">work_items</span><span class="p">:</span>
+        <span class="n">hp</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"hyperparameters"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">hp</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">prev</span> <span class="o">=</span> <span class="n">hp</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"dataloader_num_workers"</span><span class="p">)</span>
+        <span class="n">hp</span><span class="p">[</span><span class="s2">"dataloader_num_workers"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_workers</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">prev</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">int</span><span class="p">(</span><span class="n">prev</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_workers</span><span class="p">):</span>
+            <span class="n">overridden</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="n">log</span><span class="p">(</span>
+        <span class="s2">"apply_dataloader_num_workers_to_work_items: set </span><span class="si">%d</span><span class="s2">/</span><span class="si">%d</span><span class="s2"> items to "</span>
+        <span class="s2">"dataloader_num_workers=</span><span class="si">%d</span><span class="s2"> (overridden=</span><span class="si">%d</span><span class="s2">)"</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">work_items</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">work_items</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_workers</span><span class="p">),</span> <span class="n">overridden</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="apply_resolved_training_hyperparameters_to_work_items">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.apply_resolved_training_hyperparameters_to_work_items">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">apply_resolved_training_hyperparameters_to_work_items</span><span class="p">(</span>
+        <span class="n">work_items</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Inject resolved per-model training knobs into work item hyperparameters.</span>
+
+<span class="sd">    ``resolve_local_parallelism_args`` owns hardware-dependent CLI resolution.</span>
+<span class="sd">    Trainers should call this once after constructing work items so pan-allele,</span>
+<span class="sd">    allele-specific, and future affinity trainers all persist the same resolved</span>
+<span class="sd">    settings in component-model hyperparameters.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"dataloader_num_workers"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">apply_dataloader_num_workers_to_work_items</span><span class="p">(</span>
+            <span class="n">work_items</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">dataloader_num_workers</span><span class="p">),</span> <span class="n">log</span><span class="o">=</span><span class="n">log</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"random_negative_pool_epochs"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">apply_random_negative_pool_epochs_to_work_items</span><span class="p">(</span>
+            <span class="n">work_items</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">random_negative_pool_epochs</span><span class="p">),</span> <span class="n">log</span><span class="o">=</span><span class="n">log</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

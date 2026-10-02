@@ -1,0 +1,312 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.class1_encoding &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.class1_encoding</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.class1_encoding</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Peptide encoding helpers for class I neural networks."""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">amino_acid</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.encodable_sequences</span><span class="w"> </span><span class="kn">import</span> <span class="n">EncodableSequences</span>
+
+<span class="n">_DEVICE_PEPTIDE_ENCODING_TRUE_VALUES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"1"</span><span class="p">,</span>
+    <span class="s2">"true"</span><span class="p">,</span>
+    <span class="s2">"yes"</span><span class="p">,</span>
+    <span class="s2">"on"</span><span class="p">,</span>
+    <span class="s2">"auto"</span><span class="p">,</span>
+    <span class="s2">"cpu"</span><span class="p">,</span>
+    <span class="s2">"device"</span><span class="p">,</span>
+    <span class="s2">"torch"</span><span class="p">,</span>
+    <span class="s2">"gpu"</span><span class="p">,</span>
+    <span class="s2">"mps"</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="n">_DEVICE_PEPTIDE_ENCODING_FALSE_VALUES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"0"</span><span class="p">,</span>
+    <span class="s2">"false"</span><span class="p">,</span>
+    <span class="s2">"no"</span><span class="p">,</span>
+    <span class="s2">"off"</span><span class="p">,</span>
+    <span class="s2">"numpy"</span><span class="p">,</span>
+    <span class="s2">"legacy"</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="n">_warned_legacy_peptide_vector_encoding</span> <span class="o">=</span> <span class="p">[]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_warn_legacy_peptide_vector_encoding</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Warn once that the legacy dense-vector peptide path is gone."""</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_warned_legacy_peptide_vector_encoding</span><span class="p">:</span>
+        <span class="n">_warned_legacy_peptide_vector_encoding</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"peptide_amino_acid_encoding_torch=</span><span class="si">%r</span><span class="s2"> is deprecated and ignored: "</span>
+            <span class="s2">"peptides are always index-encoded ((N, L) int8) and embedded on "</span>
+            <span class="s2">"device via a frozen table. The legacy dense-vector peptide "</span>
+            <span class="s2">"encoding path has been removed."</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_peptide_torch_encoding_name</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the fixed amino-acid encoding for the peptide embedding table.</span>
+
+<span class="sd">    Peptides are always index-encoded ((N, L) int8) and embedded via a frozen</span>
+<span class="sd">    ``torch.nn.functional.embedding`` table (device-agnostic: CUDA/MPS/CPU). The</span>
+<span class="sd">    table comes from ``amino_acid.get_vector_encoding_df`` and is registered as</span>
+<span class="sd">    a non-persistent buffer, so it moves with ``.to(device)`` but never trains</span>
+<span class="sd">    or bloats the NPZ weight list.</span>
+
+<span class="sd">    The legacy ``peptide_amino_acid_encoding_torch=False`` dense-vector path has</span>
+<span class="sd">    been removed; a falsy value is accepted but ignored (with a one-time</span>
+<span class="sd">    deprecation warning) so older configs still load. A non-default value names</span>
+<span class="sd">    the encoding directly; an unknown name still raises.</span>
+<span class="sd">    """</span>
+    <span class="n">mode</span> <span class="o">=</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"peptide_amino_acid_encoding_torch"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mode</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">mode_normalized</span> <span class="o">=</span> <span class="n">mode</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">mode_normalized</span> <span class="ow">in</span> <span class="n">_DEVICE_PEPTIDE_ENCODING_FALSE_VALUES</span><span class="p">:</span>
+            <span class="n">_warn_legacy_peptide_vector_encoding</span><span class="p">(</span><span class="n">mode</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">amino_acid</span><span class="o">.</span><span class="n">get_vector_encoding_df</span><span class="p">(</span><span class="n">mode</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">mode</span>
+            <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                <span class="k">pass</span>
+            <span class="k">if</span> <span class="n">mode_normalized</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_DEVICE_PEPTIDE_ENCODING_TRUE_VALUES</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"Unsupported peptide_amino_acid_encoding_torch value </span><span class="si">%r</span><span class="s2">. "</span>
+                    <span class="s2">"Expected bool, a true/false string, or one of </span><span class="si">%s</span><span class="s2">."</span>
+                    <span class="o">%</span> <span class="p">(</span><span class="n">mode</span><span class="p">,</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">amino_acid</span><span class="o">.</span><span class="n">ENCODING_DATA_FRAMES</span><span class="p">))</span>
+                <span class="p">)</span>
+    <span class="k">elif</span> <span class="ow">not</span> <span class="n">mode</span><span class="p">:</span>
+        <span class="n">_warn_legacy_peptide_vector_encoding</span><span class="p">(</span><span class="n">mode</span><span class="p">)</span>
+
+    <span class="n">peptide_encoding</span> <span class="o">=</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"peptide_encoding"</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="n">encoding_name</span> <span class="o">=</span> <span class="n">peptide_encoding</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"vector_encoding_name"</span><span class="p">,</span> <span class="s2">"BLOSUM62"</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">amino_acid</span><span class="o">.</span><span class="n">get_vector_encoding_df</span><span class="p">(</span><span class="n">encoding_name</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Peptide encoding requires a fixed vector encoding with a torch "</span>
+            <span class="s2">"lookup table; got </span><span class="si">%r</span><span class="s2">. Available: </span><span class="si">%s</span><span class="s2">"</span>
+            <span class="o">%</span> <span class="p">(</span><span class="n">encoding_name</span><span class="p">,</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">amino_acid</span><span class="o">.</span><span class="n">ENCODING_DATA_FRAMES</span><span class="p">))</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+    <span class="k">return</span> <span class="n">encoding_name</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_peptide_uses_torch_encoding</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Deprecated: peptides are always index-encoded now (always True)."""</span>
+    <span class="k">return</span> <span class="kc">True</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_peptide_torch_encoding_table</span><span class="p">(</span><span class="n">encoding_name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return a float32 lookup table indexed by ``AMINO_ACID_INDEX``."""</span>
+    <span class="k">return</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">vector_encoding_index_table</span><span class="p">(</span><span class="n">encoding_name</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_peptide_torch_encoding_shape</span><span class="p">(</span><span class="n">index_shape</span><span class="p">,</span> <span class="n">encoding_name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Expand an ``(L,)`` categorical peptide shape to ``(L, V)``."""</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">index_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">amino_acid</span><span class="o">.</span><span class="n">vector_encoding_length</span><span class="p">(</span><span class="n">encoding_name</span><span class="p">),</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_categorical_kwargs_for_peptide_encoding</span><span class="p">(</span><span class="n">peptide_encoding</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Extract kwargs shared by vector and categorical peptide encoders."""</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="n">key</span><span class="p">:</span> <span class="n">value</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">peptide_encoding</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="s2">"alignment_method"</span><span class="p">,</span>
+            <span class="s2">"left_edge"</span><span class="p">,</span>
+            <span class="s2">"right_edge"</span><span class="p">,</span>
+            <span class="s2">"max_length"</span><span class="p">,</span>
+            <span class="s2">"trim"</span><span class="p">,</span>
+            <span class="s2">"allow_unsupported_amino_acids"</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="p">}</span>
+
+
+<div class="viewcode-block" id="peptide_sequences_to_network_input">
+<a class="viewcode-back" href="../../api.html#mhcflurry.class1_encoding.peptide_sequences_to_network_input">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">peptide_sequences_to_network_input</span><span class="p">(</span>
+        <span class="n">peptides</span><span class="p">,</span>
+        <span class="n">peptide_encoding</span><span class="p">,</span>
+        <span class="n">peptide_amino_acid_encoding_torch</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Encode string or numeric peptides to categorical network inputs.</span>
+
+<span class="sd">    Numeric inputs align directly into a Torch tensor on ``device``; strings</span>
+<span class="sd">    retain the established NumPy representation and encoding cache. Peptides are</span>
+<span class="sd">    always returned as compact ``(N, L)`` int8 amino-acid indices; the</span>
+<span class="sd">    fixed-vector lookup then happens through the network's frozen torch</span>
+<span class="sd">    embedding table. (``peptide_amino_acid_encoding_torch`` is accepted for</span>
+<span class="sd">    config compatibility but the legacy dense-vector path is gone.)</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">peptide_amino_acid_encoding_torch</span><span class="p">:</span>
+        <span class="n">_warn_legacy_peptide_vector_encoding</span><span class="p">(</span><span class="n">peptide_amino_acid_encoding_torch</span><span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.numeric_sequences</span><span class="w"> </span><span class="kn">import</span> <span class="n">NumericSequences</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">peptides</span><span class="p">,</span> <span class="n">NumericSequences</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">peptides</span><span class="o">.</span><span class="n">aligned_tensor</span><span class="p">(</span><span class="n">peptide_encoding</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">encoder</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">encoder</span><span class="o">.</span><span class="n">variable_length_to_fixed_length_categorical</span><span class="p">(</span>
+            <span class="o">**</span><span class="n">_categorical_kwargs_for_peptide_encoding</span><span class="p">(</span><span class="n">peptide_encoding</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">"int8"</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

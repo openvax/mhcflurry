@@ -1,0 +1,618 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.cli.plot_loss_curves &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.cli.plot_loss_curves</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.cli.plot_loss_curves</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Plot training loss curves for every network in a run + highlight</span>
+<span class="sd">which ones were picked by the selection step.</span>
+
+<span class="sd">The fit_info arrays (``loss``, ``val_loss``, plus the optional</span>
+<span class="sd">per-epoch timing breakdowns) are serialized inside each row's ``config_json`` in</span>
+<span class="sd">the trained models' ``manifest.csv``. Before selection, that manifest</span>
+<span class="sd">has one row per candidate; after selection it contains only the models</span>
+<span class="sd">that entered the final ensemble.</span>
+
+<span class="sd">Usage — aggregate curves over the full candidate pool, colored by</span>
+<span class="sd">selection status:</span>
+
+<span class="sd">    mhcflurry train plot-loss-curves \\</span>
+<span class="sd">        --unselected-dir results/new_run/models.unselected.combined \\</span>
+<span class="sd">        --selected-dir results/new_run/models.combined \\</span>
+<span class="sd">        --out results/plots/loss_curves</span>
+
+<span class="sd">Usage — just the selected ensemble:</span>
+
+<span class="sd">    mhcflurry train plot-loss-curves \\</span>
+<span class="sd">        --selected-dir results/new_run/models.combined \\</span>
+<span class="sd">        --out results/plots/loss_curves</span>
+
+<span class="sd">Produces (in ``--out``):</span>
+<span class="sd">  - ``loss_curves_by_model.png`` — per-model train+val curves. Non-</span>
+<span class="sd">    selected models in gray (if ``--unselected-dir`` is provided),</span>
+<span class="sd">    selected in color.</span>
+<span class="sd">  - ``loss_curves_by_arch.png`` — curves colored by architecture identity.</span>
+<span class="sd">  - ``per_fold_summary.png`` — one panel per fold showing val_loss</span>
+<span class="sd">    convergence of selected vs non-selected.</span>
+<span class="sd">  - ``summary.csv`` — final-epoch losses and explicit checkpoint metadata.</span>
+<span class="sd">"""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">ast</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">defaultdict</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_matplotlib_available</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Return ``True`` when PNG plots can be written in this environment."""</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span>  <span class="c1"># noqa: F401</span>
+    <span class="k">except</span> <span class="ne">ImportError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">"Skipping PNG loss plots: matplotlib is not installed "</span>
+            <span class="sa">f</span><span class="s2">"(</span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">). Summary CSV will still be written."</span><span class="p">,</span>
+            <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">return</span> <span class="kc">True</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_config_json</span><span class="p">(</span><span class="n">raw</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Handle both JSON and Python-repr config_json encodings."""</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">ast</span><span class="o">.</span><span class="n">literal_eval</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_architecture_metadata</span><span class="p">(</span><span class="n">hp</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Describe affinity dense networks and processing CNNs without conflation."""</span>
+    <span class="k">if</span> <span class="s2">"convolutional_kernel_size"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">hp</span><span class="p">:</span>
+        <span class="n">sizes</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">hp</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"layer_sizes"</span><span class="p">,</span> <span class="p">[]))</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">"model_type"</span><span class="p">:</span> <span class="s2">"affinity"</span><span class="p">,</span> <span class="s2">"architecture"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">sizes</span><span class="p">),</span>
+                <span class="s2">"architecture_key"</span><span class="p">:</span> <span class="s2">"affinity:"</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">sizes</span><span class="p">),</span>
+                <span class="s2">"l1"</span><span class="p">:</span> <span class="n">hp</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"dense_layer_l1_regularization"</span><span class="p">),</span> <span class="s2">"l2"</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span>
+    <span class="n">fields</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">"amino_acid_encoding"</span><span class="p">,</span> <span class="s2">"peptide_max_length"</span><span class="p">,</span> <span class="s2">"n_flank_length"</span><span class="p">,</span>
+        <span class="s2">"c_flank_length"</span><span class="p">,</span> <span class="s2">"flanking_averages"</span><span class="p">,</span> <span class="s2">"convolutional_filters"</span><span class="p">,</span>
+        <span class="s2">"convolutional_kernel_size"</span><span class="p">,</span> <span class="s2">"convolutional_padding_mode"</span><span class="p">,</span>
+        <span class="s2">"convolutional_activation"</span><span class="p">,</span> <span class="s2">"convolutional_kernel_l1_l2"</span><span class="p">,</span> <span class="s2">"dropout_rate"</span><span class="p">,</span>
+        <span class="s2">"post_convolutional_dense_layer_sizes"</span><span class="p">,</span> <span class="s2">"normalization"</span><span class="p">,</span>
+        <span class="s2">"cleavage_boundary_flank_length"</span><span class="p">,</span> <span class="s2">"cleavage_boundary_peptide_length"</span><span class="p">,</span>
+        <span class="s2">"cleavage_boundary_hidden_size"</span><span class="p">,</span> <span class="s2">"cleavage_boundary_context_dropout"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">architecture</span> <span class="o">=</span> <span class="s2">"CNN k</span><span class="si">%s</span><span class="s2">/f</span><span class="si">%s</span><span class="s2">, flanks </span><span class="si">%s</span><span class="s2">/</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+        <span class="n">hp</span><span class="p">[</span><span class="s2">"convolutional_kernel_size"</span><span class="p">],</span> <span class="n">hp</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"convolutional_filters"</span><span class="p">,</span> <span class="s2">"?"</span><span class="p">),</span>
+        <span class="n">hp</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"n_flank_length"</span><span class="p">,</span> <span class="s2">"?"</span><span class="p">),</span> <span class="n">hp</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"c_flank_length"</span><span class="p">,</span> <span class="s2">"?"</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">hp</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"cleavage_boundary_flank_length"</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="n">architecture</span> <span class="o">+=</span> <span class="s2">", boundary </span><span class="si">%s</span><span class="s2">x</span><span class="si">%s</span><span class="s2">/h</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="n">hp</span><span class="p">[</span><span class="s2">"cleavage_boundary_flank_length"</span><span class="p">],</span>
+            <span class="n">hp</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"cleavage_boundary_peptide_length"</span><span class="p">,</span> <span class="s2">"?"</span><span class="p">),</span>
+            <span class="n">hp</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"cleavage_boundary_hidden_size"</span><span class="p">,</span> <span class="s2">"?"</span><span class="p">))</span>
+    <span class="c1"># Label a malformed or scalar entry blank rather than aborting the</span>
+    <span class="c1"># plotting stage, which a sweep runs after training has finished.</span>
+    <span class="n">regularization</span> <span class="o">=</span> <span class="n">hp</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"convolutional_kernel_l1_l2"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">regularization</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">regularization</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">regularization</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"model_type"</span><span class="p">:</span> <span class="s2">"processing"</span><span class="p">,</span> <span class="s2">"architecture"</span><span class="p">:</span> <span class="n">architecture</span><span class="p">,</span>
+            <span class="s2">"architecture_key"</span><span class="p">:</span> <span class="s2">"processing:"</span> <span class="o">+</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span>
+                <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">hp</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">},</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+            <span class="s2">"l1"</span><span class="p">:</span> <span class="n">regularization</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s2">"l2"</span><span class="p">:</span> <span class="n">regularization</span><span class="p">[</span><span class="mi">1</span><span class="p">]}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_epoch_label</span><span class="p">(</span><span class="n">models</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Label observed fit history, without assuming pretraining exists."""</span>
+    <span class="k">return</span> <span class="p">(</span><span class="s2">"Epoch (fit calls concatenated)"</span>
+            <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">m</span><span class="p">[</span><span class="s2">"phase_curves"</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">models</span><span class="p">)</span> <span class="k">else</span> <span class="s2">"Epoch"</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_load_manifest_curves</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Load a manifest.csv and pull per-model fit_info curves.</span>
+
+<span class="sd">    Returns a list of dicts: {model_name, arch, layer_sizes, l1, fold,</span>
+<span class="sd">    loss_history, val_loss_history, final_val_loss, phase}.</span>
+<span class="sd">    """</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">)</span>
+    <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+        <span class="n">cfg</span> <span class="o">=</span> <span class="n">_parse_config_json</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">config_json</span><span class="p">)</span>
+        <span class="n">hp</span> <span class="o">=</span> <span class="n">cfg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"hyperparameters"</span><span class="p">,</span> <span class="n">cfg</span><span class="p">)</span>
+        <span class="n">fit_info</span> <span class="o">=</span> <span class="n">cfg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"fit_info"</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
+        <span class="c1"># Each fit_info record is one .fit() invocation; pan-allele has</span>
+        <span class="c1"># a pretrain pass then a finetune pass. Both are useful to plot.</span>
+        <span class="n">model_row</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"model_name"</span><span class="p">:</span> <span class="n">r</span><span class="o">.</span><span class="n">model_name</span><span class="p">,</span>
+            <span class="s2">"layer_sizes"</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">hp</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"layer_sizes"</span><span class="p">,</span> <span class="p">[])),</span>
+            <span class="o">**</span><span class="n">_architecture_metadata</span><span class="p">(</span><span class="n">hp</span><span class="p">),</span>
+            <span class="s2">"fold"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s2">"arch_num"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s2">"replicate"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s2">"work_item_name"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s2">"phase_curves"</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="p">}</span>
+        <span class="k">for</span> <span class="n">fit_rec</span> <span class="ow">in</span> <span class="n">fit_info</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fit_rec</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="n">tinfo</span> <span class="o">=</span> <span class="n">fit_rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"training_info"</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+            <span class="n">model_row</span><span class="p">[</span><span class="s2">"fold"</span><span class="p">]</span> <span class="o">=</span> <span class="n">tinfo</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"fold_num"</span><span class="p">,</span> <span class="n">model_row</span><span class="p">[</span><span class="s2">"fold"</span><span class="p">])</span>
+            <span class="n">model_row</span><span class="p">[</span><span class="s2">"arch_num"</span><span class="p">]</span> <span class="o">=</span> <span class="n">tinfo</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                <span class="s2">"architecture_num"</span><span class="p">,</span> <span class="n">model_row</span><span class="p">[</span><span class="s2">"arch_num"</span><span class="p">])</span>
+            <span class="n">model_row</span><span class="p">[</span><span class="s2">"replicate"</span><span class="p">]</span> <span class="o">=</span> <span class="n">tinfo</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                <span class="s2">"replicate_num"</span><span class="p">,</span> <span class="n">model_row</span><span class="p">[</span><span class="s2">"replicate"</span><span class="p">])</span>
+            <span class="n">model_row</span><span class="p">[</span><span class="s2">"work_item_name"</span><span class="p">]</span> <span class="o">=</span> <span class="n">tinfo</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                <span class="s2">"work_item_name"</span><span class="p">,</span> <span class="n">model_row</span><span class="p">[</span><span class="s2">"work_item_name"</span><span class="p">])</span>
+            <span class="n">losses</span> <span class="o">=</span> <span class="n">fit_rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"loss"</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
+            <span class="n">val_losses</span> <span class="o">=</span> <span class="n">fit_rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"val_loss"</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
+            <span class="n">model_row</span><span class="p">[</span><span class="s2">"phase_curves"</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s2">"phase"</span><span class="p">:</span> <span class="n">tinfo</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"phase"</span><span class="p">,</span> <span class="s2">"unknown"</span><span class="p">),</span>
+                <span class="s2">"loss"</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">losses</span><span class="p">),</span>
+                <span class="s2">"val_loss"</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">val_losses</span><span class="p">),</span>
+                <span class="s2">"final_val_loss"</span><span class="p">:</span> <span class="p">(</span>
+                    <span class="nb">float</span><span class="p">(</span><span class="n">val_losses</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="k">if</span> <span class="n">val_losses</span> <span class="k">else</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"nan"</span><span class="p">)</span>
+                <span class="p">),</span>
+                <span class="s2">"best_epoch"</span><span class="p">:</span> <span class="n">fit_rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"best_epoch"</span><span class="p">),</span>
+                <span class="s2">"best_val_loss"</span><span class="p">:</span> <span class="n">fit_rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"best_val_loss"</span><span class="p">),</span>
+                <span class="s2">"restored_best_weights"</span><span class="p">:</span> <span class="n">fit_rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"restored_best_weights"</span><span class="p">),</span>
+                <span class="s2">"checkpoint_policy"</span><span class="p">:</span> <span class="p">(</span>
+                    <span class="n">fit_rec</span><span class="p">[</span><span class="s2">"restored_checkpoint_policy"</span><span class="p">]</span> <span class="k">if</span> <span class="s2">"restored_checkpoint_policy"</span> <span class="ow">in</span> <span class="n">fit_rec</span> <span class="k">else</span>
+                    <span class="s2">"best"</span> <span class="k">if</span> <span class="n">fit_rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"restored_best_weights"</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">True</span> <span class="k">else</span>
+                    <span class="s2">"terminal"</span> <span class="k">if</span> <span class="n">fit_rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"restored_best_weights"</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">False</span> <span class="k">else</span>
+                    <span class="s2">"unknown"</span><span class="p">),</span>
+            <span class="p">})</span>
+        <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">model_row</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">rows</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_selection_key</span><span class="p">(</span><span class="n">model</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the stable identity of a candidate across selection cloning."""</span>
+    <span class="k">if</span> <span class="n">model</span><span class="p">[</span><span class="s2">"work_item_name"</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="p">(</span><span class="s2">"work_item_name"</span><span class="p">,</span> <span class="n">model</span><span class="p">[</span><span class="s2">"work_item_name"</span><span class="p">])</span>
+    <span class="n">training_coordinates</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">model</span><span class="p">[</span><span class="s2">"fold"</span><span class="p">],</span>
+        <span class="n">model</span><span class="p">[</span><span class="s2">"arch_num"</span><span class="p">],</span>
+        <span class="n">model</span><span class="p">[</span><span class="s2">"replicate"</span><span class="p">],</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">training_coordinates</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="s2">"training_coordinates"</span><span class="p">,)</span> <span class="o">+</span> <span class="n">training_coordinates</span>
+    <span class="k">return</span> <span class="p">(</span><span class="s2">"model_name"</span><span class="p">,</span> <span class="n">model</span><span class="p">[</span><span class="s2">"model_name"</span><span class="p">])</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_plot_all_curves</span><span class="p">(</span><span class="n">selected_keys</span><span class="p">,</span> <span class="n">all_models</span><span class="p">,</span> <span class="n">out_path</span><span class="p">,</span> <span class="n">title_suffix</span><span class="o">=</span><span class="s2">""</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Plot train/val curves for every model, gray non-selected + colored selected.</span>
+
+<span class="sd">    Non-selected models get a low-alpha gray; selected get distinguishable</span>
+<span class="sd">    colors so the eye can follow them through the phase transitions.</span>
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+    <span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">14</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
+
+    <span class="n">cmap</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">get_cmap</span><span class="p">(</span><span class="s2">"tab10"</span><span class="p">)</span>
+    <span class="n">selected_color_idx</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">all_models</span><span class="p">:</span>
+        <span class="n">is_selected</span> <span class="o">=</span> <span class="n">_selection_key</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="ow">in</span> <span class="n">selected_keys</span>
+        <span class="n">label</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">is_selected</span><span class="p">:</span>
+            <span class="n">color</span> <span class="o">=</span> <span class="n">cmap</span><span class="p">(</span><span class="n">selected_color_idx</span> <span class="o">%</span> <span class="mi">10</span><span class="p">)</span>
+            <span class="n">alpha</span> <span class="o">=</span> <span class="mf">0.9</span>
+            <span class="n">lw</span> <span class="o">=</span> <span class="mf">1.4</span>
+            <span class="n">label</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">m</span><span class="p">[</span><span class="s1">'architecture'</span><span class="p">]</span><span class="si">}</span><span class="s2"> f</span><span class="si">{</span><span class="n">m</span><span class="p">[</span><span class="s1">'fold'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span>
+            <span class="n">selected_color_idx</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">color</span> <span class="o">=</span> <span class="s2">"#666666"</span>
+            <span class="n">alpha</span> <span class="o">=</span> <span class="mf">0.12</span>
+            <span class="n">lw</span> <span class="o">=</span> <span class="mf">0.7</span>
+        <span class="c1"># Plot all fit epochs even if inference restored an earlier checkpoint.</span>
+        <span class="n">loss_curve</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">val_curve</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">ph</span> <span class="ow">in</span> <span class="n">m</span><span class="p">[</span><span class="s2">"phase_curves"</span><span class="p">]:</span>
+            <span class="n">loss_curve</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">ph</span><span class="p">[</span><span class="s2">"loss"</span><span class="p">])</span>
+            <span class="n">val_curve</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">ph</span><span class="p">[</span><span class="s2">"val_loss"</span><span class="p">])</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">loss_curve</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">loss_curve</span><span class="p">):</span>
+            <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+                <span class="n">x</span><span class="p">,</span> <span class="n">loss_curve</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="n">lw</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">val_curve</span><span class="p">):</span>
+            <span class="n">xv</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">val_curve</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+                <span class="n">xv</span><span class="p">,</span> <span class="n">val_curve</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="n">lw</span><span class="p">,</span>
+                <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">,</span>
+            <span class="p">)</span>
+
+    <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">"Train loss"</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="n">_epoch_label</span><span class="p">(</span><span class="n">all_models</span><span class="p">))</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"loss"</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_yscale</span><span class="p">(</span><span class="s2">"log"</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">"Val loss"</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="n">_epoch_label</span><span class="p">(</span><span class="n">all_models</span><span class="p">))</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"val loss"</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_yscale</span><span class="p">(</span><span class="s2">"log"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="mi">0</span> <span class="o">&lt;</span> <span class="n">selected_color_idx</span> <span class="o">&lt;=</span> <span class="mi">12</span><span class="p">:</span>
+        <span class="c1"># Only show legend when it won't swallow the plot. With &gt;12</span>
+        <span class="c1"># selected models the legend is more noise than signal.</span>
+        <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s2">"upper right"</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">ncol</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">"Loss curves (</span><span class="si">{</span><span class="n">selected_color_idx</span><span class="si">}</span><span class="s2"> selected of </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">all_models</span><span class="p">)</span><span class="si">}</span><span class="s2">) "</span>
+        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">title_suffix</span><span class="si">}</span><span class="s2">"</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span>
+        <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">text</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">,</span> <span class="s2">"Full epoch history; final epoch may differ from inference checkpoint (see summary.csv)."</span><span class="p">,</span>
+             <span class="n">ha</span><span class="o">=</span><span class="s2">"center"</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">9</span><span class="p">)</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">(</span><span class="n">rect</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.04</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">out_path</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">150</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fig</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_plot_by_arch</span><span class="p">(</span><span class="n">all_models</span><span class="p">,</span> <span class="n">out_path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Color curves by architecture — groups see how different archs</span>
+<span class="sd">    behave during training, independent of selection outcome."""</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+    <span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">14</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
+
+    <span class="n">arch_groups</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">all_models</span><span class="p">:</span>
+        <span class="n">arch_groups</span><span class="p">[</span><span class="n">m</span><span class="p">[</span><span class="s2">"architecture_key"</span><span class="p">]]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+
+    <span class="n">sorted_archs</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">arch_groups</span><span class="p">)</span>
+    <span class="n">cmap</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">get_cmap</span><span class="p">(</span><span class="s2">"viridis"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">arch</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">sorted_archs</span><span class="p">):</span>
+        <span class="n">color</span> <span class="o">=</span> <span class="n">cmap</span><span class="p">(</span><span class="n">i</span> <span class="o">/</span> <span class="nb">max</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">sorted_archs</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">arch_groups</span><span class="p">[</span><span class="n">arch</span><span class="p">]):</span>
+            <span class="n">loss_curve</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">val_curve</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">ph</span> <span class="ow">in</span> <span class="n">m</span><span class="p">[</span><span class="s2">"phase_curves"</span><span class="p">]:</span>
+                <span class="n">loss_curve</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">ph</span><span class="p">[</span><span class="s2">"loss"</span><span class="p">])</span>
+                <span class="n">val_curve</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">ph</span><span class="p">[</span><span class="s2">"val_loss"</span><span class="p">])</span>
+            <span class="n">label</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"</span><span class="si">%d</span><span class="s2">: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">m</span><span class="p">[</span><span class="s2">"architecture"</span><span class="p">]))</span> <span class="k">if</span> <span class="n">j</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">loss_curve</span><span class="p">):</span>
+                <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+                    <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">loss_curve</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="n">loss_curve</span><span class="p">,</span>
+                    <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">val_curve</span><span class="p">):</span>
+                <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+                    <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">val_curve</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="n">val_curve</span><span class="p">,</span>
+                    <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>
+                <span class="p">)</span>
+
+    <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">"Train loss by arch"</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="n">_epoch_label</span><span class="p">(</span><span class="n">all_models</span><span class="p">))</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"loss"</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_yscale</span><span class="p">(</span><span class="s2">"log"</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s2">"upper right"</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">"Val loss by arch"</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="n">_epoch_label</span><span class="p">(</span><span class="n">all_models</span><span class="p">))</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"val loss"</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_yscale</span><span class="p">(</span><span class="s2">"log"</span><span class="p">)</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">out_path</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">150</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fig</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_plot_per_fold</span><span class="p">(</span><span class="n">selected_keys</span><span class="p">,</span> <span class="n">all_models</span><span class="p">,</span> <span class="n">out_path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""One panel per fold; selected vs non-selected val_loss curves."""</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+    <span class="n">folds</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">({</span><span class="n">m</span><span class="p">[</span><span class="s2">"fold"</span><span class="p">]</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">all_models</span> <span class="k">if</span> <span class="n">m</span><span class="p">[</span><span class="s2">"fold"</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">})</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">folds</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span>
+        <span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">folds</span><span class="p">),</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">folds</span><span class="p">),</span> <span class="mi">5</span><span class="p">),</span> <span class="n">sharey</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">folds</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">axes</span> <span class="o">=</span> <span class="p">[</span><span class="n">axes</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="n">fold</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">axes</span><span class="p">,</span> <span class="n">folds</span><span class="p">):</span>
+        <span class="n">fold_models</span> <span class="o">=</span> <span class="p">[</span><span class="n">m</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">all_models</span> <span class="k">if</span> <span class="n">m</span><span class="p">[</span><span class="s2">"fold"</span><span class="p">]</span> <span class="o">==</span> <span class="n">fold</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">fold_models</span><span class="p">:</span>
+            <span class="n">val_curve</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">ph</span> <span class="ow">in</span> <span class="n">m</span><span class="p">[</span><span class="s2">"phase_curves"</span><span class="p">]:</span>
+                <span class="n">val_curve</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">ph</span><span class="p">[</span><span class="s2">"val_loss"</span><span class="p">])</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">val_curve</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">_selection_key</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="ow">in</span> <span class="n">selected_keys</span><span class="p">:</span>
+                <span class="n">color</span> <span class="o">=</span> <span class="s2">"#d62728"</span>
+                <span class="n">alpha</span> <span class="o">=</span> <span class="mf">0.95</span>
+                <span class="n">lw</span> <span class="o">=</span> <span class="mf">1.4</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">color</span> <span class="o">=</span> <span class="s2">"#666666"</span>
+                <span class="n">alpha</span> <span class="o">=</span> <span class="mf">0.18</span>
+                <span class="n">lw</span> <span class="o">=</span> <span class="mf">0.7</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+                <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">val_curve</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="n">val_curve</span><span class="p">,</span>
+                <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="n">lw</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Fold </span><span class="si">{</span><span class="n">fold</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="n">_epoch_label</span><span class="p">(</span><span class="n">fold_models</span><span class="p">))</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_yscale</span><span class="p">(</span><span class="s2">"log"</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"val loss"</span><span class="p">)</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span>
+        <span class="s2">"Val loss per fold — red=selected, gray=not-selected"</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">out_path</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">150</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fig</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="make_parser">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.plot_loss_curves.make_parser">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_parser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="s2">"mhcflurry train plot-loss-curves"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the command-line parser for training-loss diagnostics."""</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">,</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">RawDescriptionHelpFormatter</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--unselected-dir"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Path to models.unselected.combined/ (has the full candidate "</span>
+            <span class="s2">"pool). When provided, all candidates are plotted in gray + "</span>
+            <span class="s2">"the selected ones in color."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--selected-dir"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Path to models.combined/ (the selected ensemble)"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--out"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Output directory"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+
+<div class="viewcode-block" id="run">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.plot_loss_curves.run">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Generate training-loss plots and a per-model summary."""</span>
+
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">selected</span> <span class="o">=</span> <span class="n">_load_manifest_curves</span><span class="p">(</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">selected_dir</span><span class="p">,</span> <span class="s2">"manifest.csv"</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">selected_keys</span> <span class="o">=</span> <span class="p">{</span><span class="n">_selection_key</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">selected</span><span class="p">}</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">unselected_dir</span><span class="p">:</span>
+        <span class="n">all_models</span> <span class="o">=</span> <span class="n">_load_manifest_curves</span><span class="p">(</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">unselected_dir</span><span class="p">,</span> <span class="s2">"manifest.csv"</span><span class="p">),</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">all_models</span> <span class="o">=</span> <span class="n">selected</span>
+
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">"Loaded </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">all_models</span><span class="p">)</span><span class="si">}</span><span class="s2"> candidate model(s); "</span>
+        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">selected_keys</span><span class="p">)</span><span class="si">}</span><span class="s2"> selected."</span>
+    <span class="p">)</span>
+
+    <span class="n">wrote_plots</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">if</span> <span class="n">_matplotlib_available</span><span class="p">():</span>
+        <span class="n">_plot_all_curves</span><span class="p">(</span>
+            <span class="n">selected_keys</span><span class="p">,</span> <span class="n">all_models</span><span class="p">,</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span> <span class="s2">"loss_curves_by_model.png"</span><span class="p">),</span>
+            <span class="n">title_suffix</span><span class="o">=</span><span class="s2">"(selected in color)"</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">_plot_by_arch</span><span class="p">(</span>
+            <span class="n">all_models</span><span class="p">,</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span> <span class="s2">"loss_curves_by_arch.png"</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="n">_plot_per_fold</span><span class="p">(</span>
+            <span class="n">selected_keys</span><span class="p">,</span> <span class="n">all_models</span><span class="p">,</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span> <span class="s2">"per_fold_summary.png"</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="n">wrote_plots</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">all_models</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">ph</span> <span class="ow">in</span> <span class="n">m</span><span class="p">[</span><span class="s2">"phase_curves"</span><span class="p">]:</span>
+            <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s2">"model_name"</span><span class="p">:</span> <span class="n">m</span><span class="p">[</span><span class="s2">"model_name"</span><span class="p">],</span>
+                <span class="s2">"layer_sizes"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">m</span><span class="p">[</span><span class="s2">"layer_sizes"</span><span class="p">]),</span>
+                <span class="s2">"model_type"</span><span class="p">:</span> <span class="n">m</span><span class="p">[</span><span class="s2">"model_type"</span><span class="p">],</span>
+                <span class="s2">"architecture"</span><span class="p">:</span> <span class="n">m</span><span class="p">[</span><span class="s2">"architecture"</span><span class="p">],</span>
+                <span class="s2">"architecture_key"</span><span class="p">:</span> <span class="n">m</span><span class="p">[</span><span class="s2">"architecture_key"</span><span class="p">],</span>
+                <span class="s2">"l1"</span><span class="p">:</span> <span class="n">m</span><span class="p">[</span><span class="s2">"l1"</span><span class="p">],</span>
+                <span class="s2">"l2"</span><span class="p">:</span> <span class="n">m</span><span class="p">[</span><span class="s2">"l2"</span><span class="p">],</span>
+                <span class="s2">"fold"</span><span class="p">:</span> <span class="n">m</span><span class="p">[</span><span class="s2">"fold"</span><span class="p">],</span>
+                <span class="s2">"replicate"</span><span class="p">:</span> <span class="n">m</span><span class="p">[</span><span class="s2">"replicate"</span><span class="p">],</span>
+                <span class="s2">"selected"</span><span class="p">:</span> <span class="n">_selection_key</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="ow">in</span> <span class="n">selected_keys</span><span class="p">,</span>
+                <span class="s2">"phase"</span><span class="p">:</span> <span class="n">ph</span><span class="p">[</span><span class="s2">"phase"</span><span class="p">],</span>
+                <span class="s2">"n_epochs"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">ph</span><span class="p">[</span><span class="s2">"loss"</span><span class="p">]),</span>
+                <span class="s2">"final_loss"</span><span class="p">:</span> <span class="p">(</span>
+                    <span class="nb">float</span><span class="p">(</span><span class="n">ph</span><span class="p">[</span><span class="s2">"loss"</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="k">if</span> <span class="n">ph</span><span class="p">[</span><span class="s2">"loss"</span><span class="p">]</span> <span class="k">else</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"nan"</span><span class="p">)</span>
+                <span class="p">),</span>
+                <span class="s2">"final_val_loss"</span><span class="p">:</span> <span class="n">ph</span><span class="p">[</span><span class="s2">"final_val_loss"</span><span class="p">],</span>
+                <span class="s2">"best_epoch"</span><span class="p">:</span> <span class="n">ph</span><span class="p">[</span><span class="s2">"best_epoch"</span><span class="p">],</span>
+                <span class="s2">"best_val_loss"</span><span class="p">:</span> <span class="n">ph</span><span class="p">[</span><span class="s2">"best_val_loss"</span><span class="p">],</span>
+                <span class="s2">"restored_best_weights"</span><span class="p">:</span> <span class="n">ph</span><span class="p">[</span><span class="s2">"restored_best_weights"</span><span class="p">],</span>
+                <span class="s2">"checkpoint_policy"</span><span class="p">:</span> <span class="n">ph</span><span class="p">[</span><span class="s2">"checkpoint_policy"</span><span class="p">],</span>
+            <span class="p">})</span>
+    <span class="n">summary_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+    <span class="n">summary_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span> <span class="s2">"summary.csv"</span><span class="p">),</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">wrote_plots</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Wrote plots + summary to </span><span class="si">{</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="si">}</span><span class="s2">/"</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Wrote summary to </span><span class="si">{</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="si">}</span><span class="s2">/"</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="mi">0</span></div>
+
+
+
+<div class="viewcode-block" id="run_argv">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.plot_loss_curves.run_argv">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_argv</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prog</span><span class="o">=</span><span class="s2">"mhcflurry train plot-loss-curves"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Parse ``argv`` and generate training-loss diagnostics."""</span>
+    <span class="k">return</span> <span class="n">run</span><span class="p">(</span><span class="n">make_parser</span><span class="p">(</span><span class="n">prog</span><span class="p">)</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="main">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.plot_loss_curves.main">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Compatibility entry point for the repository script."""</span>
+    <span class="k">return</span> <span class="n">run_argv</span><span class="p">()</span></div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

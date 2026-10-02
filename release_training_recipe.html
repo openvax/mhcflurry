@@ -1,0 +1,251 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Release training recipe &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Neural training semantics" href="release_neural_hyperparameter_audit.html" />
+    <link rel="prev" title="Resource planning guarantees" href="auto_sizing_audit.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Release training recipe</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#components">Components</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#data-and-evaluation">Data and evaluation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#calibration-and-compatibility">Calibration and compatibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#reproduce-a-run">Reproduce a run</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Release training recipe</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/release_training_recipe.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="release-training-recipe">
+<h1>Release training recipe<a class="headerlink" href="#release-training-recipe" title="Link to this heading"></a></h1>
+<p>The 2.3.0 weights use the <code class="docutils literal notranslate"><span class="pre">final-2.3.0-candidate-v2</span></code> recipe identifier and the
+<code class="docutils literal notranslate"><span class="pre">current</span></code> data vintage: the curated 2023 affinity snapshot plus the configured
+mass-spectrometry sources. The identifier is fixed for reproducibility; its
+name does not describe the software’s release status. The machine-readable
+settings are in <code class="docutils literal notranslate"><span class="pre">scripts/training/final_230_candidate_v2_recipe.json</span></code>.</p>
+<section id="components">
+<h2>Components<a class="headerlink" href="#components" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Component</p></th>
+<th class="head"><p>Release configuration</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Affinity</p></td>
+<td><p>35 architectures × 4 folds; minibatch 1024; native PyTorch RMSprop; Glorot initialization; pre-activation LSUV; dropout 0.5; patience 20; terminal weights for selection.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Processing without flanks</p></td>
+<td><p>128 architectures × 4 folds; minibatch 512; Glorot initialization and Keras-equation Adam; selected ensemble.</p></td>
+</tr>
+<tr class="row-even"><td><p>Short-flank processing</p></td>
+<td><p>One kernel-13 architecture × 4 folds; five residues on each side; native RMSprop; Glorot initialization; best inner-validation AP checkpoints.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Boundary processing</p></td>
+<td><p>One large-ReLU architecture × 4 folds; five flank residues and five peptide residues at each cleavage boundary; Glorot initialization, Keras-equation Adam and terminal checkpoints.</p></td>
+</tr>
+<tr class="row-even"><td><p>Presentation with flanks</p></td>
+<td><p>Equal mixture of the four short-flank and four boundary networks, combined with affinity by the fitted logistic model.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Presentation without flanks</p></td>
+<td><p>Selected no-flank processing ensemble, combined with affinity by its separately fitted logistic model.</p></td>
+</tr>
+<tr class="row-even"><td><p>Long-flank processing</p></td>
+<td><p>Separate 15-residue-flank diagnostic grid; it is not the processing ensemble embedded in the presentation predictor.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Training checkpoints and model-selection records remain in the training run.
+An inference download needs the selected weights, model manifests, allele
+sequences, fitted presentation coefficients and calibration. Training data and
+provenance are retained for overlap audits; unused alternative checkpoints are
+not part of the inference model.</p>
+</section>
+<section id="data-and-evaluation">
+<h2>Data and evaluation<a class="headerlink" href="#data-and-evaluation" title="Link to this heading"></a></h2>
+<p>Affinity uses measured affinities and the configured mass-spec reassignment.
+Its synthetic negatives are random amino-acid peptides. Processing training
+uses protein-derived negatives matched within sample, length and affinity
+constraints. Presentation training uses protein-derived negatives in its own
+training table. These training samplers do not define a comparison’s test set.</p>
+<p>A model comparison must freeze one positive/negative row set, score every
+comparator on it, and exclude training overlap identically for every model.
+Sample/source disjointness and peptide disjointness are separate checks;
+missing lineage cannot be treated as proof of separation. The maintained
+release holdout manifests are an input exclusion mechanism, not a guarantee
+that an arbitrary public comparator has never seen the same data.</p>
+<p>Report end-to-end presentation, affinity-only ranking and processing-only
+ranking separately. Never average their AP values. For multi-patient results,
+report per-patient metrics and paired patient-bootstrap intervals. See
+<a class="reference internal" href="evaluation.html"><span class="doc">Evaluating trained models</span></a> for score orientation, common-row joins and output formats.</p>
+</section>
+<section id="calibration-and-compatibility">
+<h2>Calibration and compatibility<a class="headerlink" href="#calibration-and-compatibility" title="Link to this heading"></a></h2>
+<p>Raw affinity is in nM, lower is stronger. Processing and presentation scores
+range from zero to one, higher is stronger. Percentile ranks range from zero
+to 100, lower is stronger; they are background ranks, not calibrated biological
+probabilities.</p>
+<p>New calibrations use the shared compact method: 64 knots, increasing to 128
+only when independent, label-free background validation justifies it.
+Affinity uses log(IC50); processing and presentation use logit(score).
+Existing public histogram calibrations load without refitting or conversion.
+See <a class="reference internal" href="shared_percent_rank_transforms.html"><span class="doc">Percentile calibration for all predictors</span></a> for the exact rules and compatibility.</p>
+<p>The release workflow calibrates affinity and presentation. Standalone
+processing calibration is a separate command with an explicit background and
+flank policy. Evaluating raw scores does not validate a percentile API: check
+both saved score representations before publishing weights.</p>
+</section>
+<section id="reproduce-a-run">
+<h2>Reproduce a run<a class="headerlink" href="#reproduce-a-run" title="Link to this heading"></a></h2>
+<p>Use the maintained release entry point and explicit recipe/data settings;
+see the <a class="reference external" href="https://github.com/openvax/mhcflurry/tree/master/scripts/release">release workflow</a>
+and <a class="reference internal" href="final_230_candidate_experiment.html"><span class="doc">Reproduce the 2.3.0 model training</span></a> for launch and collection commands.
+Freeze the source commit, seed, data hashes and complete settings before
+training. Preserve the resulting <code class="docutils literal notranslate"><span class="pre">release_provenance.json</span></code>, holdout manifests,
+training tables, selection records and comparison outputs.</p>
+<p>Worker counts and prediction chunks may be autosized. Training minibatches
+are scientific settings and must not be silently reduced to fit a device.
+The release path uses eager execution and highest float32 matmul precision.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="auto_sizing_audit.html" class="btn btn-neutral float-left" title="Resource planning guarantees" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="release_neural_hyperparameter_audit.html" class="btn btn-neutral float-right" title="Neural training semantics" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

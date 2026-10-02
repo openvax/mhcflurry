@@ -1,0 +1,422 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Processing hyperparameter campaign &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Replaying historical processing data" href="exact_public_data_experiment.html" />
+    <link rel="prev" title="Processing kernel-width experiment" href="processing_kernel_sweep.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Processing hyperparameter campaign</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#maintained-commands">Maintained commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#checkpoints-and-initialization">Checkpoints and initialization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#focused-width-optimizer-checkpoint-confirmation">Focused width / optimizer / checkpoint confirmation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#recorded-development-result">Recorded development result</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#recovery-and-outputs">Recovery and outputs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#analyze-an-incomplete-or-completed-recipe-screen">Analyze an incomplete or completed recipe screen</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#cached-within-fold-ensemble-diagnostics">Cached within-fold ensemble diagnostics</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Processing hyperparameter campaign</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/processing_hyperparameter_campaign.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="processing-hyperparameter-campaign">
+<h1>Processing hyperparameter campaign<a class="headerlink" href="#processing-hyperparameter-campaign" title="Link to this heading"></a></h1>
+<p>The maintained sweep compares processing-specific recipes; it does
+not assume that affinity’s winning optimizer transfers. All new fits use a
+frozen affinity/length-matched table and preserve fold and reference identities.
+Development results and the repeatedly inspected release benchmark are distinct.</p>
+<section id="maintained-commands">
+<h2>Maintained commands<a class="headerlink" href="#maintained-commands" title="Link to this heading"></a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">train</span> <span class="pre">processing-hyperparameter-sweep</span> <span class="pre">--design</span> <span class="pre">kernel-width</span></code>
+for the six-width, two-family, four-fold comparison (48 networks). The existing
+<code class="docutils literal notranslate"><span class="pre">processing-kernel-sweep</span></code> command remains an alias for the width workflow.</p>
+<p>Use <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">train</span> <span class="pre">processing-hyperparameter-sweep</span> <span class="pre">--design</span> <span class="pre">training-recipe</span></code>
+for the optimizer/initialization/batch factorial (64 networks):</p>
+<ul class="simple">
+<li><p>Keras-compatible Adam versus native PyTorch RMSprop.</p></li>
+<li><p>Glorot, orthogonal only, pre-LSUV and post-LSUV.</p></li>
+<li><p>Minibatches 512/1024, two architecture families and two paired folds.</p></li>
+</ul>
+<p>The recipe screen holds width 11, ReLU, 512 filters, dropout 0.5, learning rate
+0.001 and L1/L2 zero fixed. The width screen retains its original L1=1e-6.
+Thus its width-11 control is not silently reused as a zero-L1 recipe fit.
+The families are an external-flank CNN and a whole-peptide CNN plus 5x5
+boundary branches, not a fixed mixture of networks.</p>
+<p>Required arguments include <code class="docutils literal notranslate"><span class="pre">--out</span></code>, <code class="docutils literal notranslate"><span class="pre">--train-data</span></code>, <code class="docutils literal notranslate"><span class="pre">--public-root</span></code>,
+<code class="docutils literal notranslate"><span class="pre">--release-holdout-dir</span></code> and <code class="docutils literal notranslate"><span class="pre">--source-commit</span></code>. Use <code class="docutils literal notranslate"><span class="pre">--evaluation</span> <span class="pre">none</span></code> for
+development screening. <code class="docutils literal notranslate"><span class="pre">--prepare-only</span></code> writes the exact design without training.
+<code class="docutils literal notranslate"><span class="pre">--folds-from</span></code> inherits the first two folds for the recipe screen; pass the same
+frozen table as <code class="docutils literal notranslate"><span class="pre">--train-data</span></code> to preserve all numerical metadata exactly.</p>
+</section>
+<section id="checkpoints-and-initialization">
+<h2>Checkpoints and initialization<a class="headerlink" href="#checkpoints-and-initialization" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">save_all_checkpoints=True</span></code> retains independent best-loss and terminal processing
+weights, plus best-AP when ranking monitoring is enabled.
+<code class="docutils literal notranslate"><span class="pre">restore_best_weights=True</span></code> chooses the best state for <code class="docutils literal notranslate"><span class="pre">checkpoint_metric</span></code>
+(<code class="docutils literal notranslate"><span class="pre">val_loss</span></code> by default; opt-in <code class="docutils literal notranslate"><span class="pre">val_macro_ap</span></code>). Checkpoints use NPZ sidecars; they do not enter manifest
+JSON as weight arrays. Loading a referenced missing checkpoint fails. Refitting
+without retention clears old references. Older predictors still load without
+checkpoint sidecars, and missing historical terminal states are not synthesized.</p>
+<p><code class="docutils literal notranslate"><span class="pre">monitor_validation_ranking=True</span></code> records equal-sample AP and PPV&#64;N after every
+epoch. It requires explicit sample-disjoint training/stopping-validation masks
+and sample IDs. Each validation sample must contain both labels. AP uses grouped
+score ties; PPV breaks ties by original input-row order. Exact AP ties retain
+the earliest epoch. Inner-best AP is saved as <code class="docutils literal notranslate"><span class="pre">best_ap</span></code>, separately from <code class="docutils literal notranslate"><span class="pre">best</span></code>
+(loss) and <code class="docutils literal notranslate"><span class="pre">terminal</span></code>. <code class="docutils literal notranslate"><span class="pre">checkpoint_metric=val_macro_ap</span></code> enables this monitoring
+and chooses that state when restoration is enabled. Patience remains based on
+validation loss, so retained-state comparisons share one training trajectory.
+Historical defaults and predictions remain unchanged. Fit metadata explicitly
+records the restored policy, best loss/ranking epochs, and inner sample identity.</p>
+</section>
+<section id="focused-width-optimizer-checkpoint-confirmation">
+<h2>Focused width / optimizer / checkpoint confirmation<a class="headerlink" href="#focused-width-optimizer-checkpoint-confirmation" title="Link to this heading"></a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">train</span> <span class="pre">processing-hyperparameter-sweep</span> <span class="pre">--design</span> <span class="pre">ranking-confirmation</span></code>
+with <code class="docutils literal notranslate"><span class="pre">--folds-from</span> <span class="pre">FROZEN_TABLE</span> <span class="pre">--train-data</span> <span class="pre">FROZEN_TABLE</span> <span class="pre">--evaluation</span> <span class="pre">none</span></code>.
+This creates 24 fits: legacy 5-aa CNN, widths 11/13/15, Adam/Keras versus
+RMSprop/PyTorch and four paired folds. Glorot, batch 512, ReLU, 512 filters,
+dropout 0.5, no normalization, fixed BLOSUM62 and zero L1/L2 are held constant.
+All three checkpoint states have joinable outer-fold predictions and separate
+per-sample and pooled-per-fold metric tables. Primary inference uses inner-best
+AP; outer evaluation cannot select epochs. The source generator exposes
+<code class="docutils literal notranslate"><span class="pre">processing_candidate_hyperparameters</span></code> for this explicit shortlist; it is not
+a global default change or a final release recipe.</p>
+<p>Set <code class="docutils literal notranslate"><span class="pre">PROCESSING_RANKING_CONFIRMATION=1</span></code> in the runplz Modal launcher, together
+with the frozen table, absolute deadline and timeout at most four hours.
+This mode skips both the width and full recipe factorials. It is incompatible
+with <code class="docutils literal notranslate"><span class="pre">PROCESSING_RECIPE_AFTER_WIDTHS=1</span></code>. Training tables and independent
+checkpoint files survive completed conditions; the budget is never extended
+by retries. New experiments require compact selection and a separate full-presentation
+evaluation before release, regardless of development improvements.</p>
+<p>Analyze collected condition-level checkpoint tables with
+<code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">eval</span> <span class="pre">processing-confirmation-analysis</span> <span class="pre">--experiment</span> <span class="pre">RUN_DIR</span> <span class="pre">--out</span> <span class="pre">NEW_DIR</span></code>.
+The command checks identical fold/sample/count identities across every state
+and condition, writes paired sample-bootstrap intervals and figures, and only
+exports <code class="docutils literal notranslate"><span class="pre">candidate_hyperparameters.yaml</span></code> after all six conditions are complete
+and the declared development gate passes. The gate compares inner-best-AP
+candidates against Adam/width-11 best-loss control: positive AP and PPV changes,
+95% paired AP lower bound above zero, PPV lower bound above -0.002, and every
+fold’s pooled AUROC/AP/PPV changes at least -0.002. These are exploratory
+intervals, not corrected for repeated screening or study dependence. A recipe
+export is not a model release or a substitute for presentation validation.</p>
+<p><code class="docutils literal notranslate"><span class="pre">initialization_method</span></code> has explicit <code class="docutils literal notranslate"><span class="pre">none</span></code>, <code class="docutils literal notranslate"><span class="pre">orthogonal</span></code>, <code class="docutils literal notranslate"><span class="pre">lsuv_pre</span></code> and
+<code class="docutils literal notranslate"><span class="pre">lsuv_post</span></code> values. <code class="docutils literal notranslate"><span class="pre">none</span></code> preserves the configured kernel initialization. Non-default methods
+apply to fresh fits; continued fitting does not reinitialize a trained network.
+Calibration uses at most <code class="docutils literal notranslate"><span class="pre">initialization_batch_size</span></code> training rows (default
+512), never stopping-validation rows. Their fit-input row indices are saved.</p>
+<p>Eligible layers are boundary hidden layers, the main convolution, and hidden
+pointwise convolutional heads, in forward order. Scalar heads and output/gating
+weights are protected. Pre/post refer to before/after the configured activation,
+before normalization or dropout. Variance excludes positions beyond actual
+configured input extent; missing-context X rows within that extent remain.
+Dropout is disabled during initialization. Non-convergence fails explicitly
+and restores the pre-initialization parameters. Diagnostics include each layer’s
+variance and iteration count. See the <a class="reference external" href="https://arxiv.org/abs/1511.06422">LSUV paper</a>.</p>
+</section>
+<section id="recorded-development-result">
+<h2>Recorded development result<a class="headerlink" href="#recorded-development-result" title="Link to this heading"></a></h2>
+<p>The complete panel (<code class="docutils literal notranslate"><span class="pre">processing-ranking-confirmation-20260909</span></code>; runplz run
+<code class="docutils literal notranslate"><span class="pre">a8889cc8dfbb4f4390d4ceb153ad81e1</span></code>; source <code class="docutils literal notranslate"><span class="pre">9778c625</span></code>; 24 fits in 65 minutes
+on one A100-40GB) promoted
+<code class="docutils literal notranslate"><span class="pre">legacy_5aa__rmsprop_pytorch__k13</span></code> with inner-best-AP weights.
+<code class="docutils literal notranslate"><span class="pre">confirmed_processing_candidate_hyperparameters()</span></code> in
+<code class="docutils literal notranslate"><span class="pre">scripts/training/generate_processing_recipe.py</span></code> names that recipe together
+with the run, source and decision hashes; it equals the exported
+<code class="docutils literal notranslate"><span class="pre">candidate_hyperparameters.yaml</span></code>. Macro metrics average four paired folds
+within each of 37 held-out samples. Differences are against Adam/Keras width
+11 best-loss weights (macro AUROC 0.7717, AUPRC 0.7555, PPV&#64;N 0.7001), using
+10000 paired sample-bootstrap draws with seed 42.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Inner-best-AP condition</p></th>
+<th class="head text-right"><p>AUROC</p></th>
+<th class="head text-right"><p>AUPRC</p></th>
+<th class="head text-right"><p>PPV&#64;N</p></th>
+<th class="head text-right"><p>AUPRC difference</p></th>
+<th class="head text-right"><p>PPV&#64;N difference</p></th>
+<th class="head"><p>Gate</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Adam/Keras, width 11</p></td>
+<td class="text-right"><p>0.7810</p></td>
+<td class="text-right"><p>0.7641</p></td>
+<td class="text-right"><p>0.7128</p></td>
+<td class="text-right"><p>+0.0086 [0.0043, 0.0126]</p></td>
+<td class="text-right"><p>+0.0127 [0.0085, 0.0169]</p></td>
+<td><p>pass</p></td>
+</tr>
+<tr class="row-odd"><td><p>Adam/Keras, width 13</p></td>
+<td class="text-right"><p>0.7857</p></td>
+<td class="text-right"><p>0.7671</p></td>
+<td class="text-right"><p>0.7162</p></td>
+<td class="text-right"><p>+0.0116 [0.0048, 0.0182]</p></td>
+<td class="text-right"><p>+0.0162 [0.0105, 0.0219]</p></td>
+<td><p>pass</p></td>
+</tr>
+<tr class="row-even"><td><p>Adam/Keras, width 15</p></td>
+<td class="text-right"><p>0.7838</p></td>
+<td class="text-right"><p>0.7666</p></td>
+<td class="text-right"><p>0.7153</p></td>
+<td class="text-right"><p>+0.0111 [0.0043, 0.0176]</p></td>
+<td class="text-right"><p>+0.0153 [0.0085, 0.0216]</p></td>
+<td><p>pass</p></td>
+</tr>
+<tr class="row-odd"><td><p>RMSprop/PyTorch, width 11</p></td>
+<td class="text-right"><p>0.7798</p></td>
+<td class="text-right"><p>0.7629</p></td>
+<td class="text-right"><p>0.7090</p></td>
+<td class="text-right"><p>+0.0074 [0.0021, 0.0128]</p></td>
+<td class="text-right"><p>+0.0089 [0.0035, 0.0144]</p></td>
+<td><p>fail: pooled fold AUROC -0.0039, AUPRC -0.0074</p></td>
+</tr>
+<tr class="row-even"><td><p>RMSprop/PyTorch, width 13</p></td>
+<td class="text-right"><p>0.7870</p></td>
+<td class="text-right"><p>0.7701</p></td>
+<td class="text-right"><p>0.7155</p></td>
+<td class="text-right"><p>+0.0146 [0.0085, 0.0207]</p></td>
+<td class="text-right"><p>+0.0154 [0.0101, 0.0206]</p></td>
+<td><p>pass, promoted</p></td>
+</tr>
+<tr class="row-odd"><td><p>RMSprop/PyTorch, width 15</p></td>
+<td class="text-right"><p>0.7869</p></td>
+<td class="text-right"><p>0.7688</p></td>
+<td class="text-right"><p>0.7146</p></td>
+<td class="text-right"><p>+0.0133 [0.0076, 0.0191]</p></td>
+<td class="text-right"><p>+0.0145 [0.0088, 0.0203]</p></td>
+<td><p>pass</p></td>
+</tr>
+</tbody>
+</table>
+<p>The retained-state choice is the largest single effect. In all six conditions
+inner-best-AP and terminal weights outscore best-loss weights on AUPRC and
+PPV&#64;N; best-loss epochs ranged from 4 to 34 and inner-best-AP epochs from 14
+to 44. Within the control, switching states alone gains +0.0086 AUPRC.
+Terminal weights scored similarly but were never eligible, by design. Widths
+13 and 15 lead width 11 with either optimizer, but the promoted recipe’s
+AUPRC margin over the other passing conditions (0.001 to 0.006) lies inside
+every paired interval; it is the recorded point-estimate tie-break, not a
+resolved difference.</p>
+<p>These are single-fit, four-fold development scores on one training trajectory
+per fold, without multiple-screening or study-cluster correction. They do not
+change public downloads, default hyperparameters or predictions, and they say
+nothing about ensembles or presentation. Compact selection on a common
+held-out panel and the separate presentation gate remain required before any
+release use; family and width diversity is preserved for that step.</p>
+</section>
+<section id="recovery-and-outputs">
+<h2>Recovery and outputs<a class="headerlink" href="#recovery-and-outputs" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">--resume-from</span> <span class="pre">PRIOR_WIDTH_RUN</span></code> copies complete conditions and frozen folds to
+a separate run after checking input/design identity. Incomplete conditions stay
+in the old run and are reinitialized in the new one. Every copied file is hashed.
+Existing recovery artifacts must match those hashes on resume. A lossless CSV
+parser preserves saved reference scores; strict fold checks are not relaxed.</p>
+<p>Every new condition saves epoch losses, optimizer steps, epoch timing, stop
+reason, initialization diagnostics, best/terminal weights, and context-joinable
+per-member predictions on each model’s held-out fold. Root summaries give each
+sample equal weight after averaging repeated folds within sample. These
+one-decoy validation AP values are not comparable to ten-decoy processing or
+full-presentation AP levels. Four/eight-member selection still requires a
+common held-out panel unseen by every member; this screen does not perform it.</p>
+<p>The runplz Modal launcher accepts <code class="docutils literal notranslate"><span class="pre">PROCESSING_KERNEL_TRAIN_DATA</span></code> and
+<code class="docutils literal notranslate"><span class="pre">PROCESSING_KERNEL_PRIOR_SWEEP</span></code> to reuse completed preparation and fits.
+<code class="docutils literal notranslate"><span class="pre">PROCESSING_KERNEL_EVALUATION=none</span></code> is the default.
+<code class="docutils literal notranslate"><span class="pre">PROCESSING_RECIPE_AFTER_WIDTHS=1</span></code> queues the factorial behind width completion
+on the same single GPU. It requires an absolute
+<code class="docutils literal notranslate"><span class="pre">MHCFLURRY_EXPERIMENT_DEADLINE_EPOCH</span></code>; command descendants are terminated at
+that deadline, without marking the stage complete. Set an absolute deadline
+within the allocated compute budget, leaving margin for teardown. The launcher
+caps each function timeout at 15.5 hours; retries must respect the same deadline.</p>
+<p>The launcher writes width figures first, then a combined
+<code class="docutils literal notranslate"><span class="pre">campaign-all-figures.pdf</span></code> after the recipe screen. Raw inputs and prediction
+caches remain independently collectible even if a later stage fails. A generated
+PDF is not a substitute for inspected figures, paired uncertainty, four-fold
+confirmation, compact selection and an end-to-end presentation gate.</p>
+</section>
+<section id="analyze-an-incomplete-or-completed-recipe-screen">
+<h2>Analyze an incomplete or completed recipe screen<a class="headerlink" href="#analyze-an-incomplete-or-completed-recipe-screen" title="Link to this heading"></a></h2>
+<p>Run the maintained read-only analysis against a collected snapshot from one run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>processing-recipe-analysis<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--experiment<span class="w"> </span>collected/recipe_sweep/experiment.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--metrics<span class="w"> </span>collected/recipe_sweep/validation_per_sample.csv<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--out<span class="w"> </span>experiments/recipe-analysis-snapshot
+</pre></div>
+</div>
+<p>The output directory must be new or empty. The command preserves unreported
+conditions as pending and rejects incomplete folds, mismatched sample cohorts
+or counts, nonfinite metrics, and uncontrolled hyperparameter differences.
+It averages folds within each sample, then bootstraps samples jointly for each
+one-factor contrast. It does not average across unmatched factorial cells to
+claim an overall optimizer or initialization effect. Optimizer comparisons
+include their implementation (for example, Adam/Keras versus RMSprop/PyTorch).</p>
+<p>Outputs include a PDF and page PNGs, condition means, design completion status,
+paired contrasts, per-sample differences, and a provenance manifest with input
+and analysis-source hashes. Gray plot cells mean pending, not poor performance.
+Pareto flags describe AUPRC/PPV point estimates only; they are not significance
+tests, ensemble selections, or release acceptance. Intervals are exploratory,
+conditional on trained fits, and uncorrected for screening or study clustering.</p>
+<p>The shared <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">train</span> <span class="pre">plot-loss-curves</span></code> command recognizes processing CNN
+architecture identities and convolutional L1/L2 regularization. Its curves and
+<code class="docutils literal notranslate"><span class="pre">final_loss</span></code>/<code class="docutils literal notranslate"><span class="pre">final_val_loss</span></code> columns describe final training epochs, even when
+inference restores an earlier checkpoint. Separate best-epoch, best-validation-
+loss, and checkpoint-policy columns record that distinction. Historical fits
+without explicit restoration metadata report an unknown checkpoint policy.</p>
+</section>
+<section id="cached-within-fold-ensemble-diagnostics">
+<h2>Cached within-fold ensemble diagnostics<a class="headerlink" href="#cached-within-fold-ensemble-diagnostics" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">eval</span> <span class="pre">processing-fold-ensembles</span> <span class="pre">--ensembles</span> <span class="pre">ensembles.json</span> <span class="pre">--out</span> <span class="pre">NEW_DIR</span></code>
+accepts a JSON object mapping ensemble names to ordered checkpoint prediction
+cache paths (relative to that JSON). It verifies each cache checksum/sidecar,
+training-table fingerprint, sample/row/context/label identity, and one distinct
+member per condition per fold. Every mean uses only the models from the row’s
+held-out fold. Best and terminal are reported separately by default; use
+<code class="docutils literal notranslate"><span class="pre">--checkpoint-policy</span> <span class="pre">best</span></code> to request only the primary policy.</p>
+<p>Outputs preserve averaged predictions, fold-to-member identities, per-sample
+and pooled-per-fold metrics, sample means, provenance and source. Pass the
+sample means to <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">eval</span> <span class="pre">paired-sample-metrics</span></code> for paired plots. This
+is a no-training, no-inference development diagnostic of multiple fold-specific
+ensembles. It does not measure one fixed ensemble spanning different folds,
+select members, or establish release acceptance. A final fixed ensemble still
+requires a common panel unseen by every one of its members.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="processing_kernel_sweep.html" class="btn btn-neutral float-left" title="Processing kernel-width experiment" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="exact_public_data_experiment.html" class="btn btn-neutral float-right" title="Replaying historical processing data" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

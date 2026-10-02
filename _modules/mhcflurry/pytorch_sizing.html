@@ -1,0 +1,1269 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.pytorch_sizing &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.pytorch_sizing</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.pytorch_sizing</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Prediction and training batch-size helpers."""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">gc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.memory_budget</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">DEVICE_MIN_RESERVE_BYTES</span><span class="p">,</span>
+    <span class="n">MEMORY_RESERVE_FRACTION</span><span class="p">,</span>
+    <span class="n">memory_reserve_bytes</span><span class="p">,</span>
+    <span class="n">usable_memory_bytes</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">DEFAULT_PREDICT_BATCH_SIZE</span> <span class="o">=</span> <span class="s2">"auto"</span>
+<span class="n">AUTO_BATCH_MAX_ROWS</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">maxsize</span>
+<span class="n">AUTO_BATCH_MIN_ROWS</span> <span class="o">=</span> <span class="mi">1024</span>  <span class="c1"># floor: avoid pathologically tiny batches</span>
+<span class="n">AUTO_BATCH_CPU_FALLBACK</span> <span class="o">=</span> <span class="mi">32_768</span>  <span class="c1"># CPU: large batches thrash L3; stay modest</span>
+<span class="n">AUTO_BATCH_FREE_FRACTION</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">AUTO_BATCH_CALIBRATION_PROBE_ROWS</span> <span class="o">=</span> <span class="mi">4096</span>
+<span class="n">AUTO_BATCH_CALIBRATION_SAFETY_MULTIPLIER</span> <span class="o">=</span> <span class="mf">2.0</span>
+<span class="n">_MPS_PSUTIL_WARNED</span> <span class="o">=</span> <span class="kc">False</span>  <span class="c1"># one-shot warning if psutil is missing on MPS</span>
+<span class="n">CUDA_FREE_BEFORE_CONTEXT_ENV</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="s2">"MHCFLURRY_CUDA_FREE_BEFORE_CONTEXT_BYTES"</span>
+<span class="p">)</span>
+<span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"</span><span class="p">):</span>
+    <span class="n">raw_default_batch_size</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE"</span><span class="p">]</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">DEFAULT_PREDICT_BATCH_SIZE</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">raw_default_batch_size</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE must be a positive integer; "</span>
+            <span class="s2">"got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="n">raw_default_batch_size</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+    <span class="k">if</span> <span class="n">DEFAULT_PREDICT_BATCH_SIZE</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"MHCFLURRY_DEFAULT_PREDICT_BATCH_SIZE must be a positive integer; "</span>
+            <span class="s2">"got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="n">raw_default_batch_size</span>
+        <span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">"Configured default predict batch size: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">DEFAULT_PREDICT_BATCH_SIZE</span>
+    <span class="p">)</span>
+
+
+<div class="viewcode-block" id="default_prediction_batch_is_auto">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.default_prediction_batch_is_auto">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">default_prediction_batch_is_auto</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Whether the effective default prediction batch can shrink on OOM."""</span>
+    <span class="k">return</span> <span class="n">DEFAULT_PREDICT_BATCH_SIZE</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="begin_peak_memory_measurement">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.begin_peak_memory_measurement">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">begin_peak_memory_measurement</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Reset CUDA peak counters and return an opaque measurement token."""</span>
+    <span class="n">token</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"started"</span><span class="p">:</span> <span class="kc">True</span><span class="p">}</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+        <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+            <span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">()</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">reset_peak_memory_stats</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+            <span class="n">token</span><span class="p">[</span><span class="s2">"cuda_device"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="n">token</span><span class="p">[</span><span class="s2">"cuda_error"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">token</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_process_namespace_pids</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Return host/container PID aliases reported for this process."""</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{</span><span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()}</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"/proc/self/status"</span><span class="p">)</span> <span class="k">as</span> <span class="n">status_fd</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">status_fd</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"NSpid:"</span><span class="p">):</span>
+                    <span class="k">continue</span>
+                <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">:]:</span>
+                    <span class="n">result</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+                <span class="k">break</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+        <span class="k">pass</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<div class="viewcode-block" id="cuda_process_memory_bytes">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.cuda_process_memory_bytes">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cuda_process_memory_bytes</span><span class="p">(</span><span class="n">pid</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return this process's CUDA memory from ``nvidia-smi``, if available.</span>
+
+<span class="sd">    PyTorch allocator counters omit the CUDA context and other non-PyTorch</span>
+<span class="sd">    allocations. Those bytes matter when many worker processes share a GPU.</span>
+<span class="sd">    Querying the driver gives resource probes a complete steady-state working</span>
+<span class="sd">    set without initializing CUDA in the parent process.</span>
+<span class="sd">    """</span>
+    <span class="n">pids</span> <span class="o">=</span> <span class="n">_process_namespace_pids</span><span class="p">()</span> <span class="k">if</span> <span class="n">pid</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{</span><span class="nb">int</span><span class="p">(</span><span class="n">pid</span><span class="p">)}</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="s2">"nvidia-smi"</span><span class="p">,</span>
+                <span class="s2">"--query-compute-apps=pid,used_memory"</span><span class="p">,</span>
+                <span class="s2">"--format=csv,noheader,nounits"</span><span class="p">,</span>
+            <span class="p">],</span>
+            <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span>
+            <span class="ne">OSError</span><span class="p">,</span>
+            <span class="n">subprocess</span><span class="o">.</span><span class="n">CalledProcessError</span><span class="p">,</span>
+            <span class="n">subprocess</span><span class="o">.</span><span class="n">TimeoutExpired</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">total_mib</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">found</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">"ignore"</span><span class="p">)</span><span class="o">.</span><span class="n">splitlines</span><span class="p">():</span>
+        <span class="n">fields</span> <span class="o">=</span> <span class="p">[</span><span class="n">field</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">","</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">row_pid</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">used_mib</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">row_pid</span> <span class="ow">in</span> <span class="n">pids</span><span class="p">:</span>
+            <span class="n">total_mib</span> <span class="o">+=</span> <span class="n">used_mib</span>
+            <span class="n">found</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">total_mib</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">20</span><span class="p">))</span> <span class="k">if</span> <span class="n">found</span> <span class="k">else</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="cuda_free_memory_before_context_bytes">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.cuda_free_memory_before_context_bytes">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cuda_free_memory_before_context_bytes</span><span class="p">(</span><span class="n">device_id</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Query one physical CUDA device's free memory without importing torch."""</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="s2">"nvidia-smi"</span><span class="p">,</span>
+                <span class="s2">"--id=</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">device_id</span><span class="p">,</span>
+                <span class="s2">"--query-gpu=memory.free"</span><span class="p">,</span>
+                <span class="s2">"--format=csv,noheader,nounits"</span><span class="p">,</span>
+            <span class="p">],</span>
+            <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">output</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">"ignore"</span><span class="p">)</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">except</span> <span class="p">(</span>
+            <span class="ne">IndexError</span><span class="p">,</span>
+            <span class="ne">OSError</span><span class="p">,</span>
+            <span class="n">subprocess</span><span class="o">.</span><span class="n">CalledProcessError</span><span class="p">,</span>
+            <span class="n">subprocess</span><span class="o">.</span><span class="n">TimeoutExpired</span><span class="p">,</span>
+            <span class="ne">ValueError</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">20</span><span class="p">))</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_nonnegative_env_bytes</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Read an optional non-negative byte count from the environment."""</span>
+    <span class="n">raw</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">raw</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"</span><span class="si">%s</span><span class="s2"> must be a non-negative integer; got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">raw</span><span class="p">)</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"</span><span class="si">%s</span><span class="s2"> must be a non-negative integer; got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">raw</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_cuda_process_bytes_with_baseline</span><span class="p">(</span>
+        <span class="n">free_bytes</span><span class="p">,</span> <span class="n">measured_process_bytes</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">allow_baseline</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Include context usage when driver PIDs differ across namespaces."""</span>
+    <span class="n">candidates</span> <span class="o">=</span> <span class="p">[</span><span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">measured_process_bytes</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">0</span><span class="p">)]</span>
+    <span class="n">baseline_free</span> <span class="o">=</span> <span class="n">_nonnegative_env_bytes</span><span class="p">(</span><span class="n">CUDA_FREE_BEFORE_CONTEXT_ENV</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">allow_baseline</span> <span class="ow">and</span> <span class="n">baseline_free</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">candidates</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">baseline_free</span> <span class="o">-</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">free_bytes</span><span class="p">),</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">0</span><span class="p">))</span>
+    <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="n">candidates</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_process_peak_rss_bytes</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Best-effort process peak RSS in bytes on Linux and macOS."""</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">resource</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">resource</span><span class="o">.</span><span class="n">getrusage</span><span class="p">(</span><span class="n">resource</span><span class="o">.</span><span class="n">RUSAGE_SELF</span><span class="p">)</span><span class="o">.</span><span class="n">ru_maxrss</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">value</span> <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">"darwin"</span> <span class="k">else</span> <span class="n">value</span> <span class="o">*</span> <span class="mi">1024</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="end_peak_memory_measurement">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.end_peak_memory_measurement">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">end_peak_memory_measurement</span><span class="p">(</span><span class="n">token</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Finish a measurement begun by :func:`begin_peak_memory_measurement`."""</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"host_peak_rss_bytes"</span><span class="p">:</span> <span class="n">_process_peak_rss_bytes</span><span class="p">()}</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="n">token</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"cuda_device"</span><span class="p">)</span> <span class="k">if</span> <span class="n">token</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">device</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="s2">"cuda_peak_allocated_bytes"</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">max_memory_allocated</span><span class="p">(</span><span class="n">device</span><span class="p">)),</span>
+                <span class="s2">"cuda_peak_reserved_bytes"</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">max_memory_reserved</span><span class="p">(</span><span class="n">device</span><span class="p">)),</span>
+            <span class="p">})</span>
+            <span class="n">current_reserved</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">memory_reserved</span><span class="p">(</span><span class="n">device</span><span class="p">))</span>
+            <span class="n">current_free</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">mem_get_info</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+            <span class="n">measured_process_bytes</span> <span class="o">=</span> <span class="n">cuda_process_memory_bytes</span><span class="p">()</span>
+            <span class="n">process_bytes</span> <span class="o">=</span> <span class="n">_cuda_process_bytes_with_baseline</span><span class="p">(</span>
+                <span class="n">current_free</span><span class="p">,</span>
+                <span class="n">measured_process_bytes</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">measured_process_bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="n">CUDA_FREE_BEFORE_CONTEXT_ENV</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">):</span>
+                <span class="c1"># nvidia-smi is a current whole-process measurement; PyTorch's</span>
+                <span class="c1"># peak is an allocator high-water mark. A before-context free</span>
+                <span class="c1"># memory baseline covers PID-namespaced containers where the</span>
+                <span class="c1"># nvidia-smi process PID cannot match os.getpid(). Preserve the</span>
+                <span class="c1"># observed non-PyTorch component and add allocator growth that</span>
+                <span class="c1"># was released before the probe ended.</span>
+                <span class="n">non_torch_bytes</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">process_bytes</span> <span class="o">-</span> <span class="n">current_reserved</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                <span class="n">result</span><span class="p">[</span><span class="s2">"cuda_process_memory_bytes"</span><span class="p">]</span> <span class="o">=</span> <span class="n">process_bytes</span>
+                <span class="n">result</span><span class="p">[</span><span class="s2">"cuda_process_peak_estimate_bytes"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">non_torch_bytes</span>
+                    <span class="o">+</span> <span class="n">result</span><span class="p">[</span><span class="s2">"cuda_peak_reserved_bytes"</span><span class="p">]</span>
+                <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="s2">"cuda_error"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="is_device_out_of_memory_error">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.is_device_out_of_memory_error">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">is_device_out_of_memory_error</span><span class="p">(</span><span class="n">exc</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Whether ``exc`` is a CUDA/MPS allocator out-of-memory error."""</span>
+    <span class="n">message</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="s2">"out of memory"</span> <span class="ow">in</span> <span class="n">message</span>
+        <span class="ow">and</span> <span class="p">(</span><span class="s2">"cuda"</span> <span class="ow">in</span> <span class="n">message</span> <span class="ow">or</span> <span class="s2">"mps"</span> <span class="ow">in</span> <span class="n">message</span> <span class="ow">or</span> <span class="s2">"allocator"</span> <span class="ow">in</span> <span class="n">message</span><span class="p">)</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="release_cached_device_memory">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.release_cached_device_memory">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">release_cached_device_memory</span><span class="p">(</span><span class="n">device</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return unused accelerator allocator blocks to the shared device."""</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+        <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"cuda"</span><span class="p">:</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">empty_cache</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"mps"</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">mps</span><span class="p">,</span> <span class="s2">"empty_cache"</span><span class="p">):</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">mps</span><span class="o">.</span><span class="n">empty_cache</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="release_device_memory_after_oom">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.release_device_memory_after_oom">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">release_device_memory_after_oom</span><span class="p">(</span><span class="n">device</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Release cached allocator blocks before retrying a smaller auto batch."""</span>
+    <span class="n">release_cached_device_memory</span><span class="p">(</span><span class="n">device</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="synchronize_device">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.synchronize_device">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">synchronize_device</span><span class="p">(</span><span class="n">device</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Wait for accelerator work so deferred errors surface at their source.</span>
+
+<span class="sd">    CUDA and MPS kernels are asynchronous. Without an explicit synchronization</span>
+<span class="sd">    at the end of an elastic prediction attempt, an OOM from a network forward</span>
+<span class="sd">    can be reported by an unrelated later tensor transfer, outside the retry</span>
+<span class="sd">    loop that can safely reduce the batch size.</span>
+<span class="sd">    """</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"cuda"</span><span class="p">:</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"mps"</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">mps</span><span class="p">,</span> <span class="s2">"synchronize"</span><span class="p">):</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">mps</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="release_unused_torch_memory">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.release_unused_torch_memory">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">release_unused_torch_memory</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Collect dead tensors and return unused accelerator cache memory.</span>
+
+<span class="sd">    Resource probes deliberately reuse one worker for several architectures.</span>
+<span class="sd">    Python reference cycles can otherwise keep the previous fit's tensors</span>
+<span class="sd">    alive until a later, unrelated collection, while allocator cache blocks</span>
+<span class="sd">    continue to hide global device headroom. Collect cycles before emptying</span>
+<span class="sd">    the backend cache so the next probe observes only its own residency.</span>
+<span class="sd">    """</span>
+    <span class="n">gc</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">empty_cache</span><span class="p">()</span>
+            <span class="k">return</span>
+    <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">(</span>
+                <span class="nb">hasattr</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">backends</span><span class="p">,</span> <span class="s2">"mps"</span><span class="p">)</span>
+                <span class="ow">and</span> <span class="n">torch</span><span class="o">.</span><span class="n">backends</span><span class="o">.</span><span class="n">mps</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span>
+                <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">torch</span><span class="p">,</span> <span class="s2">"mps"</span><span class="p">)</span>
+                <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">mps</span><span class="p">,</span> <span class="s2">"empty_cache"</span><span class="p">)):</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">mps</span><span class="o">.</span><span class="n">empty_cache</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
+        <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="estimate_peak_bytes_per_row">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.estimate_peak_bytes_per_row">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">estimate_peak_bytes_per_row</span><span class="p">(</span><span class="n">model</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Worst-case peak activation bytes per sample during a forward.</span>
+
+<span class="sd">    Walks the model's configured layers and returns the maximum hidden-</span>
+<span class="sd">    layer width (in fp32 bytes) × 2 (one input + one output of the</span>
+<span class="sd">    current layer stay live under torch's eval-time no_grad reuse). A</span>
+<span class="sd">    4× multiplier covers framework overhead, cuDNN scratch buffers,</span>
+<span class="sd">    and Python-side tensor bookkeeping. Used by ``compute_prediction_batch_size``.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">model</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">32</span> <span class="o">*</span> <span class="mi">1024</span>  <span class="c1"># conservative 32 KB/row fallback</span>
+    <span class="c1"># Class1ProcessingModel is convolutional over the full</span>
+    <span class="c1"># flank+peptide sequence. Its peak activation is not represented by</span>
+    <span class="c1"># the affinity model's peptide_dense_layers/dense_layers attributes,</span>
+    <span class="c1"># so compute it from the Conv1d sequence width. This keeps prediction</span>
+    <span class="c1"># autosizing sensitive to future flank length / filter count changes</span>
+    <span class="c1"># instead of falling back to the generic 1024-width estimate.</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">conv1</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">conv1</span>
+        <span class="n">seq_len</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">n_flank_length</span><span class="p">)</span>
+            <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">peptide_max_length</span><span class="p">)</span>
+            <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">c_flank_length</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">widths</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">seq_len</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">conv1</span><span class="o">.</span><span class="n">in_channels</span><span class="p">),</span>
+            <span class="n">seq_len</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">conv1</span><span class="o">.</span><span class="n">out_channels</span><span class="p">),</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">convs_name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"n_flank_post_convs"</span><span class="p">,</span> <span class="s2">"c_flank_post_convs"</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">convs_name</span><span class="p">,</span> <span class="p">[]):</span>
+                <span class="n">widths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">seq_len</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">out_channels</span><span class="p">))</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"flanking_averages"</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="n">widths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">seq_len</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">conv1</span><span class="o">.</span><span class="n">out_channels</span><span class="p">))</span>
+        <span class="n">peak</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">widths</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">peak</span> <span class="o">*</span> <span class="mi">4</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">*</span> <span class="mi">4</span><span class="p">)</span>  <span class="c1"># fp32 × 2 buffers × 4x safety</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+        <span class="k">pass</span>
+    <span class="c1"># MergedClass1NeuralNetwork wraps N sub-networks and runs each one's</span>
+    <span class="c1"># forward independently in a list comprehension, then combines the</span>
+    <span class="c1"># outputs. All N sub-networks' peak intermediates are alive</span>
+    <span class="c1"># simultaneously, so the per-row peak is the SUM of per-sub-network</span>
+    <span class="c1"># peaks, not the max. Without this, the merged ensemble's auto-sized</span>
+    <span class="c1"># batch overshoots VRAM by Nx (~8x for the production 8-network</span>
+    <span class="c1"># release ensemble) and OOMs in calibrate's cartesian forward.</span>
+    <span class="n">sub_networks</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"networks"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">sub_networks</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"peptide_encoding_shape"</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span>
+                <span class="n">estimate_peak_bytes_per_row</span><span class="p">(</span><span class="n">net</span><span class="p">)</span> <span class="k">for</span> <span class="n">net</span> <span class="ow">in</span> <span class="n">sub_networks</span>
+            <span class="p">))</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">"Could not estimate peak per-row bytes for merged ensemble; "</span>
+                <span class="s2">"falling back to per-network walk: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span>
+                <span class="n">exc</span><span class="p">,</span>
+            <span class="p">)</span>
+    <span class="n">widths</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">lc_out_len</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">peptide_encoding_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">lc_out_ch</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">peptide_encoding_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">for</span> <span class="n">lc_layer</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">lc_layers</span><span class="p">:</span>
+            <span class="n">lc_out_ch</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">lc_layer</span><span class="p">,</span> <span class="s2">"out_channels"</span><span class="p">,</span> <span class="n">lc_out_ch</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">lc_out_len</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">lc_layer</span><span class="o">.</span><span class="n">output_length</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+                <span class="k">pass</span>
+        <span class="n">widths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">lc_out_len</span> <span class="o">*</span> <span class="n">lc_out_ch</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">peptide_dense_layers</span><span class="p">:</span>
+            <span class="n">widths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">out_features</span><span class="p">))</span>
+    <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+        <span class="n">widths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">1024</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">allele_out</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"allele_embedding"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">allele_out</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">allele_embedding</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"allele_dense_layers"</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="n">allele_out</span> <span class="o">=</span> <span class="n">layer</span><span class="o">.</span><span class="n">out_features</span>
+        <span class="k">if</span> <span class="n">allele_out</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">widths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">allele_out</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+        <span class="k">pass</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">dense_layers</span><span class="p">:</span>
+            <span class="n">widths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">out_features</span><span class="p">))</span>
+    <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+        <span class="n">widths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">1024</span><span class="p">)</span>
+    <span class="n">peak</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">widths</span><span class="p">)</span> <span class="k">if</span> <span class="n">widths</span> <span class="k">else</span> <span class="mi">1024</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">peak</span> <span class="o">*</span> <span class="mi">4</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">*</span> <span class="mi">4</span><span class="p">)</span>  <span class="c1"># fp32 × 2 buffers × 4x safety</span></div>
+
+
+
+<div class="viewcode-block" id="free_device_memory_bytes">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.free_device_memory_bytes">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">free_device_memory_bytes</span><span class="p">(</span><span class="n">device</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Best-effort free-memory query. Returns a conservative value when</span>
+<span class="sd">    the device doesn't expose a direct free-memory API.</span>
+
+<span class="sd">    - CUDA: ``torch.cuda.mem_get_info`` (exposed free + reserved tracking).</span>
+<span class="sd">    - MPS: Apple's ``recommended_max_memory`` on unified memory,</span>
+<span class="sd">      minus whatever the MPS driver has already handed us. Cap by</span>
+<span class="sd">      ``psutil`` available RAM when present so other apps aren't</span>
+<span class="sd">      evicted. Falls back to 4 GB if neither API is reachable.</span>
+<span class="sd">    - CPU / unknown: 2 GB conservative budget (the helper short-circuits</span>
+<span class="sd">      for CPU anyway, but keep a sensible value in case callers pass</span>
+<span class="sd">      a foreign device).</span>
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+    <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"cuda"</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">free</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">mem_get_info</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+            <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">free</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">props</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">get_device_properties</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+            <span class="n">reserved</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">memory_reserved</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+            <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">props</span><span class="o">.</span><span class="n">total_memory</span><span class="p">)</span> <span class="o">-</span> <span class="nb">int</span><span class="p">(</span><span class="n">reserved</span><span class="p">),</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"mps"</span><span class="p">:</span>
+        <span class="c1"># Apple Silicon: unified memory, so "free VRAM" is better</span>
+        <span class="c1"># estimated from the MPS driver's recommended ceiling minus</span>
+        <span class="c1"># whatever it's already allocated. Ceiling is typically</span>
+        <span class="c1"># ~75-80% of total system RAM on M-series chips.</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">ceiling</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">mps</span><span class="o">.</span><span class="n">recommended_max_memory</span><span class="p">())</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">ceiling</span> <span class="o">=</span> <span class="mi">4</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">)</span>
+        <span class="n">allocated</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">allocated</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">mps</span><span class="o">.</span><span class="n">driver_allocated_memory</span><span class="p">())</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">pass</span>
+        <span class="n">free</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">ceiling</span> <span class="o">-</span> <span class="n">allocated</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="c1"># Don't evict other apps: also cap by the OS-reported free</span>
+        <span class="c1"># RAM when psutil is available. This gets us a realistic</span>
+        <span class="c1"># "what's safe to claim right now" rather than the MPS</span>
+        <span class="c1"># driver's peak permission.</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">psutil</span>
+            <span class="n">free</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">free</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">psutil</span><span class="o">.</span><span class="n">virtual_memory</span><span class="p">()</span><span class="o">.</span><span class="n">available</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="kn">from</span><span class="w"> </span><span class="nn">.workload_planning</span><span class="w"> </span><span class="kn">import</span> <span class="n">system_memory_info_gb</span>
+                <span class="n">available_gb</span> <span class="o">=</span> <span class="n">system_memory_info_gb</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"available_gb"</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">available_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">free</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">free</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">available_gb</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">)))</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="c1"># psutil isn't a hard dep. Log once per process so the</span>
+                <span class="c1"># skip is visible rather than silent — without this cap</span>
+                <span class="c1"># the MPS driver's "recommended max" can exceed what's</span>
+                <span class="c1"># actually safe to claim alongside other apps.</span>
+                <span class="k">global</span> <span class="n">_MPS_PSUTIL_WARNED</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">_MPS_PSUTIL_WARNED</span><span class="p">:</span>
+                    <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="s2">"psutil not available and OS memory fallback failed; "</span>
+                        <span class="s2">"MPS free-memory estimate will use "</span>
+                        <span class="s2">"torch.mps.recommended_max_memory alone, which may "</span>
+                        <span class="s2">"overshoot actual available RAM."</span>
+                    <span class="p">)</span>
+                    <span class="n">_MPS_PSUTIL_WARNED</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="c1"># Any other psutil failure (broken install, etc.) — skip</span>
+            <span class="c1"># the cap but don't fail the whole batch-size query.</span>
+            <span class="k">pass</span>
+        <span class="c1"># Zero is a valid and important measurement: on unified-memory Macs it</span>
+        <span class="c1"># means the process has no safe headroom. Replacing it with the 4 GiB</span>
+        <span class="c1"># API fallback would make auto-sizing attempt another large allocation</span>
+        <span class="c1"># under peak memory pressure. The caller turns a zero budget into its</span>
+        <span class="c1"># one-row minimum batch.</span>
+        <span class="k">return</span> <span class="n">free</span>
+    <span class="k">return</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="DeviceMemoryBudget">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.DeviceMemoryBudget">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DeviceMemoryBudget</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Stable per-worker device-memory entitlement and remaining headroom."""</span>
+
+    <span class="n">free_bytes</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">total_bytes</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">reserve_bytes</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">worker_entitlement_bytes</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">process_bytes</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">available_bytes</span><span class="p">:</span> <span class="nb">int</span></div>
+
+
+
+<div class="viewcode-block" id="device_memory_budget">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.device_memory_budget">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">device_memory_budget</span><span class="p">(</span>
+        <span class="n">device</span><span class="p">,</span>
+        <span class="n">num_workers_per_gpu</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">free_memory_fraction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">reserve_fraction</span><span class="o">=</span><span class="n">MEMORY_RESERVE_FRACTION</span><span class="p">,</span>
+        <span class="n">reserve_min_bytes</span><span class="o">=</span><span class="n">DEVICE_MIN_RESERVE_BYTES</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return a race-free memory budget for one co-resident worker.</span>
+
+<span class="sd">    The old calculation divided *live free memory* by the declared worker</span>
+<span class="sd">    count. Live free memory already reflects allocations made by workers that</span>
+<span class="sd">    initialized earlier, so that calculation double-discounted memory and made</span>
+<span class="sd">    the resulting batch size depend on startup order. Here every worker gets a</span>
+<span class="sd">    fixed entitlement captured from launch-time free capacity (falling back to</span>
+<span class="sd">    total device capacity for direct API calls), subtracts its own resident</span>
+<span class="sd">    working set, and finally caps the result by live global headroom. Managed</span>
+<span class="sd">    workers therefore cannot collectively claim more than the shared launch</span>
+<span class="sd">    budget.</span>
+<span class="sd">    """</span>
+    <span class="n">workers</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_workers_per_gpu</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">workers</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"num_workers_per_gpu must be at least 1"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">free_memory_fraction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">free_memory_fraction</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">free_memory_fraction</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span>
+                <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">free_memory_fraction</span><span class="p">)</span>
+                <span class="ow">or</span> <span class="ow">not</span> <span class="mi">0</span> <span class="o">&lt;</span> <span class="n">free_memory_fraction</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"free_memory_fraction must be in (0, 1]"</span><span class="p">)</span>
+
+    <span class="n">free</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">free_device_memory_bytes</span><span class="p">(</span><span class="n">device</span><span class="p">))</span>
+    <span class="n">total</span> <span class="o">=</span> <span class="n">free</span>
+    <span class="n">process_bytes</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"cuda"</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+            <span class="n">free</span><span class="p">,</span> <span class="n">total</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">mem_get_info</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="n">process_bytes</span> <span class="o">=</span> <span class="n">cuda_process_memory_bytes</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">process_bytes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">process_bytes</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">memory_reserved</span><span class="p">(</span><span class="n">device</span><span class="p">))</span>
+            <span class="n">process_bytes</span> <span class="o">=</span> <span class="n">_cuda_process_bytes_with_baseline</span><span class="p">(</span>
+                <span class="n">free</span><span class="p">,</span>
+                <span class="n">process_bytes</span><span class="p">,</span>
+                <span class="c1"># A launch baseline is isolated only when this is the sole</span>
+                <span class="c1"># resident worker. With peers it can include allocations made</span>
+                <span class="c1"># by workers that initialized after this process.</span>
+                <span class="n">allow_baseline</span><span class="o">=</span><span class="p">(</span><span class="n">workers</span> <span class="o">==</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+                <span class="n">total</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">get_device_properties</span><span class="p">(</span><span class="n">device</span><span class="p">)</span><span class="o">.</span><span class="n">total_memory</span><span class="p">)</span>
+                <span class="n">process_bytes</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">memory_reserved</span><span class="p">(</span><span class="n">device</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">total</span> <span class="o">=</span> <span class="n">free</span>
+                <span class="n">process_bytes</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">elif</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"mps"</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+            <span class="n">total</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">mps</span><span class="o">.</span><span class="n">recommended_max_memory</span><span class="p">())</span>
+            <span class="n">process_bytes</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">mps</span><span class="o">.</span><span class="n">driver_allocated_memory</span><span class="p">())</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">total</span> <span class="o">=</span> <span class="n">free</span>
+            <span class="n">process_bytes</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="n">reserve</span> <span class="o">=</span> <span class="n">memory_reserve_bytes</span><span class="p">(</span>
+        <span class="n">total</span><span class="p">,</span>
+        <span class="n">min_reserve_bytes</span><span class="o">=</span><span class="n">reserve_min_bytes</span><span class="p">,</span>
+        <span class="n">reserve_fraction</span><span class="o">=</span><span class="n">reserve_fraction</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">spendable</span> <span class="o">=</span> <span class="n">usable_memory_bytes</span><span class="p">(</span>
+        <span class="n">total</span><span class="p">,</span>
+        <span class="n">min_reserve_bytes</span><span class="o">=</span><span class="n">reserve_min_bytes</span><span class="p">,</span>
+        <span class="n">reserve_fraction</span><span class="o">=</span><span class="n">reserve_fraction</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">free_memory_fraction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">spendable</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>
+            <span class="n">spendable</span><span class="p">,</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">total</span> <span class="o">*</span> <span class="n">free_memory_fraction</span><span class="p">),</span>
+        <span class="p">)</span>
+    <span class="n">entitlement</span> <span class="o">=</span> <span class="n">spendable</span> <span class="o">//</span> <span class="n">workers</span>
+    <span class="n">launch_budget</span> <span class="o">=</span> <span class="n">_nonnegative_env_bytes</span><span class="p">(</span>
+        <span class="s2">"MHCFLURRY_DEVICE_MEMORY_BUDGET_BYTES"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">launch_budget</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">entitlement</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">entitlement</span><span class="p">,</span> <span class="n">launch_budget</span><span class="p">)</span>
+    <span class="n">available</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>
+        <span class="nb">max</span><span class="p">(</span><span class="n">free</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+        <span class="nb">max</span><span class="p">(</span><span class="n">entitlement</span> <span class="o">-</span> <span class="nb">max</span><span class="p">(</span><span class="n">process_bytes</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">0</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">DeviceMemoryBudget</span><span class="p">(</span>
+        <span class="n">free_bytes</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="n">free</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+        <span class="n">total_bytes</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="n">total</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+        <span class="n">reserve_bytes</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="n">reserve</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+        <span class="n">worker_entitlement_bytes</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="n">entitlement</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+        <span class="n">process_bytes</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="n">process_bytes</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+        <span class="n">available_bytes</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="n">available</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="compute_prediction_batch_size">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.compute_prediction_batch_size">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">compute_prediction_batch_size</span><span class="p">(</span>
+        <span class="n">device</span><span class="p">,</span>
+        <span class="n">model</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">num_workers_per_gpu</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">free_memory_fraction</span><span class="o">=</span><span class="n">AUTO_BATCH_FREE_FRACTION</span><span class="p">,</span>
+        <span class="n">max_rows</span><span class="o">=</span><span class="n">AUTO_BATCH_MAX_ROWS</span><span class="p">,</span>
+        <span class="n">min_rows</span><span class="o">=</span><span class="n">AUTO_BATCH_MIN_ROWS</span><span class="p">,</span>
+        <span class="n">cpu_fallback</span><span class="o">=</span><span class="n">AUTO_BATCH_CPU_FALLBACK</span><span class="p">,</span>
+        <span class="n">total_rows</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Auto-size a prediction batch for ``device`` and ``model``.</span>
+
+<span class="sd">    Uses the worker's remaining fixed device-memory entitlement and the model's</span>
+<span class="sd">    per-row peak activation estimate, capped by current global headroom.</span>
+<span class="sd">    ``max_rows`` is only an optional caller limit; the default auto path has no</span>
+<span class="sd">    hardwired batch cap.</span>
+
+<span class="sd">    CPU: returns ``cpu_fallback`` — large batches on CPU thrash L3</span>
+<span class="sd">    cache and rarely help for the small networks mhcflurry trains.</span>
+<span class="sd">    """</span>
+    <span class="n">workers</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_workers_per_gpu</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">workers</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"num_workers_per_gpu must be at least 1"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">max_rows</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_rows</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"max_rows must be at least 1"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">total_rows</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">total_rows</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"total_rows must be non-negative"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">free_memory_fraction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">free_memory_fraction</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">free_memory_fraction</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span>
+                <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">free_memory_fraction</span><span class="p">)</span>
+                <span class="ow">or</span> <span class="ow">not</span> <span class="mi">0</span> <span class="o">&lt;</span> <span class="n">free_memory_fraction</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"free_memory_fraction must be in (0, 1]"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"cpu"</span><span class="p">:</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">cpu_fallback</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">rows</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"cpu_fallback must be at least 1"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="nb">min</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">total_rows</span><span class="p">),</span> <span class="mi">1</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">total_rows</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">rows</span>
+        <span class="p">)</span>
+    <span class="n">peak_bytes</span> <span class="o">=</span> <span class="n">estimate_peak_bytes_per_row</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+    <span class="n">memory</span> <span class="o">=</span> <span class="n">device_memory_budget</span><span class="p">(</span>
+        <span class="n">device</span><span class="p">,</span>
+        <span class="n">num_workers_per_gpu</span><span class="o">=</span><span class="n">workers</span><span class="p">,</span>
+        <span class="n">free_memory_fraction</span><span class="o">=</span><span class="n">free_memory_fraction</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">free</span> <span class="o">=</span> <span class="n">memory</span><span class="o">.</span><span class="n">free_bytes</span>
+    <span class="n">budget</span> <span class="o">=</span> <span class="n">memory</span><span class="o">.</span><span class="n">available_bytes</span>
+    <span class="n">rows</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">budget</span> <span class="o">//</span> <span class="n">peak_bytes</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">rows</span> <span class="o">&lt;</span> <span class="n">min_rows</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"Auto-sized prediction batch below the normal floor: </span><span class="si">%d</span><span class="s2"> rows "</span>
+            <span class="s2">"(free=</span><span class="si">%.2f</span><span class="s2"> GB, workers/GPU=</span><span class="si">%d</span><span class="s2">, peak=</span><span class="si">%.1f</span><span class="s2"> KB/row)."</span><span class="p">,</span>
+            <span class="n">rows</span><span class="p">,</span>
+            <span class="n">free</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">),</span>
+            <span class="n">workers</span><span class="p">,</span>
+            <span class="n">peak_bytes</span> <span class="o">/</span> <span class="mf">1024.0</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">max_rows</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_rows</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">total_rows</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">total_rows</span><span class="p">),</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="env_workers_per_gpu">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.env_workers_per_gpu">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">env_workers_per_gpu</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Read the ``MHCFLURRY_MAX_WORKERS_PER_GPU`` env var.</span>
+
+<span class="sd">    The local parallelism pool sets this in each training worker so</span>
+<span class="sd">    auto-sized batching + training-memory checks can partition VRAM</span>
+<span class="sd">    across co-resident workers without the caller wiring it explicitly.</span>
+<span class="sd">    """</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_MAX_WORKERS_PER_GPU"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">value</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">pass</span>
+    <span class="k">return</span> <span class="n">default</span></div>
+
+
+
+<div class="viewcode-block" id="resolve_prediction_batch_size">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.resolve_prediction_batch_size">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">resolve_prediction_batch_size</span><span class="p">(</span>
+        <span class="n">value</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers_per_gpu</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">total_rows</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Resolve an explicit int or ``"auto"`` to a concrete batch size.</span>
+
+<span class="sd">    Accepts ``None`` as a synonym for ``"auto"``. Propagates an</span>
+<span class="sd">    explicit int through unchanged so callers can always pin the size</span>
+<span class="sd">    when they know better than the heuristic.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">compute_prediction_batch_size</span><span class="p">(</span>
+            <span class="n">device</span><span class="p">,</span>
+            <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+            <span class="n">num_workers_per_gpu</span><span class="o">=</span><span class="n">num_workers_per_gpu</span><span class="p">,</span>
+            <span class="n">total_rows</span><span class="o">=</span><span class="n">total_rows</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">result</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"prediction batch size must be at least 1"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="calibrate_prediction_batch_size">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.calibrate_prediction_batch_size">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">calibrate_prediction_batch_size</span><span class="p">(</span>
+        <span class="n">batch_size</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">,</span>
+        <span class="n">model</span><span class="p">,</span>
+        <span class="n">inputs</span><span class="p">,</span>
+        <span class="n">num_workers_per_gpu</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">total_rows</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">probe_rows</span><span class="o">=</span><span class="n">AUTO_BATCH_CALIBRATION_PROBE_ROWS</span><span class="p">,</span>
+        <span class="n">safety_multiplier</span><span class="o">=</span><span class="n">AUTO_BATCH_CALIBRATION_SAFETY_MULTIPLIER</span><span class="p">,</span>
+        <span class="n">transfer_inputs_to_device</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Tighten an automatic CUDA prediction batch from a real forward probe.</span>
+
+<span class="sd">    The analytic estimator cannot know the exact allocator and convolution</span>
+<span class="sd">    workspace chosen for every model shape and CUDA runtime. This function</span>
+<span class="sd">    measures the incremental peak of the loaded model with its real resident</span>
+<span class="sd">    input tensors, then recomputes the batch from the worker's remaining fixed</span>
+<span class="sd">    device-memory entitlement. The result never exceeds either ``batch_size``</span>
+<span class="sd">    or the largest batch exercised successfully by the probe. CUDA convolution</span>
+<span class="sd">    workspaces are not reliably linear in batch size, especially while peer</span>
+<span class="sd">    workers initialize, so extrapolating above a measured batch is unsafe.</span>
+
+<span class="sd">    CPU and MPS return ``batch_size`` unchanged. MPS does not expose an</span>
+<span class="sd">    equivalent resettable peak allocator counter, so it retains the analytic</span>
+<span class="sd">    estimate and the caller's elastic OOM retry. Explicit batches should not be</span>
+<span class="sd">    passed to this function; callers retain authority over pinned values.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    batch_size : int</span>
+<span class="sd">        Analytically selected automatic batch size.</span>
+<span class="sd">    device : torch.device</span>
+<span class="sd">        Device on which ``model`` and ``inputs`` reside.</span>
+<span class="sd">    model : callable</span>
+<span class="sd">        Eval-mode model accepting the sliced ``inputs`` mapping.</span>
+<span class="sd">    inputs : mapping</span>
+<span class="sd">        Tensor inputs with a shared leading row dimension. They may remain on</span>
+<span class="sd">        the host when ``transfer_inputs_to_device`` is true.</span>
+<span class="sd">    num_workers_per_gpu : int</span>
+<span class="sd">        Co-resident workers sharing the device entitlement.</span>
+<span class="sd">    total_rows : int, optional</span>
+<span class="sd">        Number of available rows. Inferred from ``inputs`` when omitted.</span>
+<span class="sd">    probe_rows : int</span>
+<span class="sd">        Maximum rows in the measurement forward. The actual probe is also</span>
+<span class="sd">        capped at one eighth of the analytic entitlement so measurement cannot</span>
+<span class="sd">        consume the batch it is meant to protect.</span>
+<span class="sd">    safety_multiplier : float</span>
+<span class="sd">        Margin applied to the measured per-row peak when deciding whether the</span>
+<span class="sd">        verified probe batch must be tightened further.</span>
+<span class="sd">    transfer_inputs_to_device : bool</span>
+<span class="sd">        Move each probe slice to ``device`` inside the protected measurement.</span>
+<span class="sd">        This models streaming inference and makes transfer OOMs recoverable.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    int</span>
+<span class="sd">        A calibrated batch no larger than ``batch_size`` or the successfully</span>
+<span class="sd">        exercised probe batch.</span>
+<span class="sd">    """</span>
+    <span class="n">batch_size</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">batch_size</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">batch_size</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"batch_size must be at least 1"</span><span class="p">)</span>
+    <span class="n">workers</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_workers_per_gpu</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">workers</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"num_workers_per_gpu must be at least 1"</span><span class="p">)</span>
+    <span class="n">probe_rows</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">probe_rows</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">probe_rows</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"probe_rows must be at least 1"</span><span class="p">)</span>
+    <span class="n">safety_multiplier</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">safety_multiplier</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span>
+            <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">safety_multiplier</span><span class="p">)</span>
+            <span class="ow">or</span> <span class="n">safety_multiplier</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"safety_multiplier must be finite and at least 1"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">!=</span> <span class="s2">"cuda"</span> <span class="ow">or</span> <span class="n">batch_size</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">batch_size</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">inputs</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"inputs must contain at least one tensor"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">total_rows</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">total_rows</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">inputs</span><span class="o">.</span><span class="n">values</span><span class="p">())))</span>
+    <span class="n">total_rows</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">total_rows</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">total_rows</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"total_rows must be non-negative"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">total_rows</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">total_rows</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+
+    <span class="n">analytic_bytes_per_row</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">estimate_peak_bytes_per_row</span><span class="p">(</span><span class="n">model</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">memory_before</span> <span class="o">=</span> <span class="n">device_memory_budget</span><span class="p">(</span>
+        <span class="n">device</span><span class="p">,</span>
+        <span class="n">num_workers_per_gpu</span><span class="o">=</span><span class="n">workers</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="c1"># Keep the probe safely inside the analytic entitlement. A one-eighth</span>
+    <span class="c1"># slice is large enough to exercise release processing convolutions while</span>
+    <span class="c1"># leaving room for co-resident workers probing at the same time.</span>
+    <span class="n">entitlement_probe_rows</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+        <span class="n">memory_before</span><span class="o">.</span><span class="n">available_bytes</span> <span class="o">//</span> <span class="p">(</span><span class="n">analytic_bytes_per_row</span> <span class="o">*</span> <span class="mi">8</span><span class="p">),</span>
+        <span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">actual_probe_rows</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>
+        <span class="n">batch_size</span><span class="p">,</span>
+        <span class="n">total_rows</span><span class="p">,</span>
+        <span class="n">probe_rows</span><span class="p">,</span>
+        <span class="n">entitlement_probe_rows</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"CUDA prediction batch calibration unavailable before any "</span>
+            <span class="s2">"successful probe; forcing batch 1: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span>
+            <span class="n">exc</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="mi">1</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">finish</span><span class="p">(</span><span class="n">result</span><span class="p">):</span>
+        <span class="c1"># cuDNN may reserve a workspace far larger than the final calibrated</span>
+        <span class="c1"># batch needs. The probe output and sliced inputs are dead at each</span>
+        <span class="c1"># return below, so give those unused blocks back before peer workers</span>
+        <span class="c1"># make their own probes or transfers.</span>
+        <span class="n">release_cached_device_memory</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">run_probe</span><span class="p">(</span><span class="n">rows</span><span class="p">):</span>
+        <span class="n">probe_inputs</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">name</span><span class="p">:</span> <span class="p">(</span>
+                <span class="n">value</span><span class="p">[:</span><span class="n">rows</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">transfer_inputs_to_device</span> <span class="k">else</span> <span class="n">value</span><span class="p">[:</span><span class="n">rows</span><span class="p">]</span>
+            <span class="p">)</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">inputs</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="p">}</span>
+        <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">model</span><span class="p">(</span><span class="n">probe_inputs</span><span class="p">)</span>
+
+    <span class="c1"># Trigger lazy CUDA context, kernel, and optional compile setup before</span>
+    <span class="c1"># resetting counters. The measured pass then represents repeatable</span>
+    <span class="c1"># inference allocation rather than one-time initialization.</span>
+    <span class="n">warmup_output</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">warmup_output</span> <span class="o">=</span> <span class="n">run_probe</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">is_device_out_of_memory_error</span><span class="p">(</span><span class="n">exc</span><span class="p">):</span>
+            <span class="n">release_device_memory_after_oom</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"CUDA prediction batch calibration failed before any successful "</span>
+            <span class="s2">"probe; forcing batch 1: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span>
+            <span class="n">exc</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">finish</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">del</span> <span class="n">warmup_output</span>
+
+    <span class="n">measurement_error</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">allocated_before</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">memory_allocated</span><span class="p">(</span><span class="n">device</span><span class="p">))</span>
+            <span class="n">reserved_before</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">memory_reserved</span><span class="p">(</span><span class="n">device</span><span class="p">))</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">reset_peak_memory_stats</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="n">measurement_error</span> <span class="o">=</span> <span class="n">exc</span>
+
+        <span class="n">probe_output</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">probe_output</span> <span class="o">=</span> <span class="n">run_probe</span><span class="p">(</span><span class="n">actual_probe_rows</span><span class="p">)</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">is_device_out_of_memory_error</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span> <span class="ow">and</span> <span class="n">actual_probe_rows</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">previous_probe_rows</span> <span class="o">=</span> <span class="n">actual_probe_rows</span>
+                <span class="n">actual_probe_rows</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">actual_probe_rows</span> <span class="o">//</span> <span class="mi">2</span><span class="p">)</span>
+                <span class="n">release_device_memory_after_oom</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">"CUDA prediction batch probe OOM at </span><span class="si">%d</span><span class="s2"> rows; retrying "</span>
+                    <span class="s2">"calibration at </span><span class="si">%d</span><span class="s2">."</span><span class="p">,</span>
+                    <span class="n">previous_probe_rows</span><span class="p">,</span>
+                    <span class="n">actual_probe_rows</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">is_device_out_of_memory_error</span><span class="p">(</span><span class="n">exc</span><span class="p">):</span>
+                <span class="n">release_device_memory_after_oom</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">"CUDA prediction batch calibration failed above the verified "</span>
+                <span class="s2">"one-row warmup; forcing batch 1: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span>
+                <span class="n">exc</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">finish</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">del</span> <span class="n">probe_output</span>
+        <span class="k">break</span>
+
+    <span class="k">if</span> <span class="n">measurement_error</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"CUDA prediction batch counters unavailable; using verified "</span>
+            <span class="s2">"probe batch </span><span class="si">%d</span><span class="s2">: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span>
+            <span class="n">actual_probe_rows</span><span class="p">,</span>
+            <span class="n">measurement_error</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">finish</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">actual_probe_rows</span><span class="p">,</span> <span class="n">total_rows</span><span class="p">))</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">peak_allocated</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">max_memory_allocated</span><span class="p">(</span><span class="n">device</span><span class="p">))</span> <span class="o">-</span> <span class="n">allocated_before</span><span class="p">,</span>
+            <span class="mi">0</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">peak_reserved</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">max_memory_reserved</span><span class="p">(</span><span class="n">device</span><span class="p">))</span> <span class="o">-</span> <span class="n">reserved_before</span><span class="p">,</span>
+            <span class="mi">0</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"CUDA prediction batch peak counters unavailable; using verified "</span>
+            <span class="s2">"probe batch </span><span class="si">%d</span><span class="s2">: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span>
+            <span class="n">actual_probe_rows</span><span class="p">,</span>
+            <span class="n">exc</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">finish</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">actual_probe_rows</span><span class="p">,</span> <span class="n">total_rows</span><span class="p">))</span>
+
+    <span class="n">measured_peak_bytes</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">peak_allocated</span><span class="p">,</span> <span class="n">peak_reserved</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">measured_peak_bytes</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"CUDA prediction batch calibration observed no incremental peak; "</span>
+            <span class="s2">"using verified probe batch </span><span class="si">%d</span><span class="s2">."</span><span class="p">,</span>
+            <span class="n">actual_probe_rows</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">finish</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">actual_probe_rows</span><span class="p">,</span> <span class="n">total_rows</span><span class="p">))</span>
+    <span class="n">measured_bytes_per_row</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span>
+        <span class="n">measured_peak_bytes</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="n">actual_probe_rows</span><span class="p">)</span>
+    <span class="p">))</span>
+    <span class="n">effective_bytes_per_row</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+        <span class="n">analytic_bytes_per_row</span><span class="p">,</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">measured_bytes_per_row</span> <span class="o">*</span> <span class="n">safety_multiplier</span><span class="p">)),</span>
+    <span class="p">)</span>
+    <span class="n">memory_after</span> <span class="o">=</span> <span class="n">device_memory_budget</span><span class="p">(</span>
+        <span class="n">device</span><span class="p">,</span>
+        <span class="n">num_workers_per_gpu</span><span class="o">=</span><span class="n">workers</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">calibrated</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+        <span class="n">memory_after</span><span class="o">.</span><span class="n">available_bytes</span> <span class="o">//</span> <span class="n">effective_bytes_per_row</span><span class="p">,</span>
+        <span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="c1"># A real forward proves that ``actual_probe_rows`` fits this architecture;</span>
+    <span class="c1"># it does not prove that a larger convolution uses the same CUDA algorithm</span>
+    <span class="c1"># or workspace. In particular, co-resident workers can cross those</span>
+    <span class="c1"># allocator thresholds at slightly different times. Never extrapolate an</span>
+    <span class="c1"># automatic batch above the largest shape that actually ran successfully.</span>
+    <span class="n">calibrated</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>
+        <span class="n">calibrated</span><span class="p">,</span>
+        <span class="n">actual_probe_rows</span><span class="p">,</span>
+        <span class="n">batch_size</span><span class="p">,</span>
+        <span class="n">total_rows</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">"Calibrated CUDA prediction batch: </span><span class="si">%d</span><span class="s2"> -&gt; </span><span class="si">%d</span><span class="s2"> rows "</span>
+        <span class="s2">"(probe=</span><span class="si">%d</span><span class="s2">, analytic=</span><span class="si">%.1f</span><span class="s2"> KB/row, measured=</span><span class="si">%.1f</span><span class="s2"> KB/row, "</span>
+        <span class="s2">"effective=</span><span class="si">%.1f</span><span class="s2"> KB/row, remaining entitlement=</span><span class="si">%.2f</span><span class="s2"> GB, "</span>
+        <span class="s2">"verified ceiling=</span><span class="si">%d</span><span class="s2">)."</span><span class="p">,</span>
+        <span class="n">batch_size</span><span class="p">,</span>
+        <span class="n">calibrated</span><span class="p">,</span>
+        <span class="n">actual_probe_rows</span><span class="p">,</span>
+        <span class="n">analytic_bytes_per_row</span> <span class="o">/</span> <span class="mf">1024.0</span><span class="p">,</span>
+        <span class="n">measured_bytes_per_row</span> <span class="o">/</span> <span class="mf">1024.0</span><span class="p">,</span>
+        <span class="n">effective_bytes_per_row</span> <span class="o">/</span> <span class="mf">1024.0</span><span class="p">,</span>
+        <span class="n">memory_after</span><span class="o">.</span><span class="n">available_bytes</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">),</span>
+        <span class="n">actual_probe_rows</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">finish</span><span class="p">(</span><span class="n">calibrated</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># Inference keeps only activations of the current layer alive (input +</span>
+<span class="c1"># output). Training keeps the whole forward-pass activation stack for backward</span>
+<span class="c1"># plus gradients and optimizer state. RMSProp/Adam each store 1-2x weights in</span>
+<span class="c1"># moving averages on top, so 4x the inference peak is a conservative floor that</span>
+<span class="c1"># leaves headroom for cuDNN workspace and Python-side torch overhead.</span>
+<span class="n">TRAINING_PEAK_MULTIPLIER</span> <span class="o">=</span> <span class="mi">4</span>
+
+
+<div class="viewcode-block" id="check_training_batch_fits">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_sizing.check_training_batch_fits">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">check_training_batch_fits</span><span class="p">(</span>
+        <span class="n">requested_batch_size</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">,</span>
+        <span class="n">model</span><span class="p">,</span>
+        <span class="n">num_workers_per_gpu</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">free_memory_fraction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">min_batch</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>
+        <span class="n">logger</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Verify that ``requested_batch_size`` will fit on ``device``.</span>
+
+<span class="sd">    Training peak memory = activations kept alive across the forward</span>
+<span class="sd">    pass (for backward), plus gradients, plus optimizer state. That's</span>
+<span class="sd">    roughly ``4 × estimate_peak_bytes_per_row`` (inference peak).</span>
+
+<span class="sd">    Returns ``(effective_batch_size, shrunk: bool)``. When the</span>
+<span class="sd">    requested batch is too large for the available VRAM — partitioned</span>
+<span class="sd">    across co-resident workers — the batch is shrunk to the largest</span>
+<span class="sd">    power-of-two that fits. ``min_batch`` is a normal-performance floor, not</span>
+<span class="sd">    a memory-safety floor: under severe pressure the result may be smaller so</span>
+<span class="sd">    the guard does not knowingly force an OOM. A loud warning is emitted via</span>
+<span class="sd">    ``logger`` / stderr explaining that the</span>
+<span class="sd">    training dynamics (BN running stats, gradient noise scale) now</span>
+<span class="sd">    differ from what the caller configured.</span>
+
+<span class="sd">    CPU short-circuits — no OOM risk there that a size-based heuristic</span>
+<span class="sd">    can catch. Returns ``(requested_batch_size, False)`` in that case.</span>
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+    <span class="n">requested_batch_size</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">requested_batch_size</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">requested_batch_size</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"requested training batch size must be at least 1"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"cpu"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">requested_batch_size</span><span class="p">,</span> <span class="kc">False</span>
+    <span class="n">workers</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_workers_per_gpu</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">workers</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"num_workers_per_gpu must be at least 1"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">free_memory_fraction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">free_memory_fraction</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">free_memory_fraction</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span>
+                <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">free_memory_fraction</span><span class="p">)</span>
+                <span class="ow">or</span> <span class="ow">not</span> <span class="mi">0</span> <span class="o">&lt;</span> <span class="n">free_memory_fraction</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"free_memory_fraction must be in (0, 1]"</span><span class="p">)</span>
+    <span class="n">peak_bytes</span> <span class="o">=</span> <span class="n">estimate_peak_bytes_per_row</span><span class="p">(</span><span class="n">model</span><span class="p">)</span> <span class="o">*</span> <span class="n">TRAINING_PEAK_MULTIPLIER</span>
+    <span class="n">memory</span> <span class="o">=</span> <span class="n">device_memory_budget</span><span class="p">(</span>
+        <span class="n">device</span><span class="p">,</span>
+        <span class="n">num_workers_per_gpu</span><span class="o">=</span><span class="n">workers</span><span class="p">,</span>
+        <span class="n">free_memory_fraction</span><span class="o">=</span><span class="n">free_memory_fraction</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">free</span> <span class="o">=</span> <span class="n">memory</span><span class="o">.</span><span class="n">free_bytes</span>
+    <span class="n">budget</span> <span class="o">=</span> <span class="n">memory</span><span class="o">.</span><span class="n">available_bytes</span>
+    <span class="n">max_rows</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">budget</span> <span class="o">//</span> <span class="n">peak_bytes</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">requested_batch_size</span> <span class="o">&lt;=</span> <span class="n">max_rows</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">requested_batch_size</span><span class="p">,</span> <span class="kc">False</span>
+    <span class="n">shrunk</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="k">while</span> <span class="n">shrunk</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">&lt;=</span> <span class="n">max_rows</span><span class="p">:</span>
+        <span class="n">shrunk</span> <span class="o">*=</span> <span class="mi">2</span>
+    <span class="n">below_normal_floor</span> <span class="o">=</span> <span class="n">shrunk</span> <span class="o">&lt;</span> <span class="nb">int</span><span class="p">(</span><span class="n">min_batch</span><span class="p">)</span>
+    <span class="n">message</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">"!!! TRAINING BATCH WILL NOT FIT !!!  "</span>
+        <span class="s2">"Requested minibatch_size=</span><span class="si">%d</span><span class="s2"> on </span><span class="si">%s</span><span class="s2"> with </span><span class="si">%d</span><span class="s2"> worker(s)/GPU. "</span>
+        <span class="s2">"Estimated need ~</span><span class="si">%.1f</span><span class="s2"> GB of </span><span class="si">%.1f</span><span class="s2"> GB free VRAM (per-worker budget "</span>
+        <span class="s2">"~</span><span class="si">%.1f</span><span class="s2"> GB). Shrinking to </span><span class="si">%d</span><span class="s2">.  "</span>
+        <span class="s2">"This CHANGES TRAINING DYNAMICS: batch-norm running stats, "</span>
+        <span class="s2">"gradient noise scale, and effective learning-rate schedule "</span>
+        <span class="s2">"all depend on batch size. Re-check convergence before "</span>
+        <span class="s2">"trusting the trained model. To pin an explicit size and "</span>
+        <span class="s2">"silence this guard, set a minibatch_size the caller knows "</span>
+        <span class="s2">"fits.</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="n">requested_batch_size</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">workers</span><span class="p">,</span>
+            <span class="n">requested_batch_size</span> <span class="o">*</span> <span class="n">peak_bytes</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+            <span class="n">free</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+            <span class="n">budget</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+            <span class="n">shrunk</span><span class="p">,</span>
+            <span class="p">(</span>
+                <span class="s2">" Available memory requires going below the normal "</span>
+                <span class="s2">"performance floor of </span><span class="si">%d</span><span class="s2">."</span> <span class="o">%</span> <span class="nb">int</span><span class="p">(</span><span class="n">min_batch</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">below_normal_floor</span> <span class="k">else</span> <span class="s2">""</span>
+            <span class="p">),</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">logger</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+    <span class="c1"># Also scream to stderr so it's loud in the job log regardless of</span>
+    <span class="c1"># which logger config the caller uses.</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span> <span class="o">+</span> <span class="n">message</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"1"</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="n">message</span>
+            <span class="o">+</span> <span class="s2">" Automatic shrink is forbidden by "</span>
+            <span class="s2">"MHCFLURRY_FAIL_ON_TRAINING_BATCH_SHRINK=1."</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">shrunk</span><span class="p">),</span> <span class="kc">True</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

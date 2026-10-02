@@ -1,0 +1,1087 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.cli.select_allele_specific_models_command &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.cli.select_allele_specific_models_command</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.cli.select_allele_specific_models_command</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""</span>
+<span class="sd">Model select class1 single allele models.</span>
+<span class="sd">"""</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">random</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pprint</span><span class="w"> </span><span class="kn">import</span> <span class="n">pprint</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.stats</span><span class="w"> </span><span class="kn">import</span> <span class="n">kendalltau</span><span class="p">,</span> <span class="n">percentileofscore</span><span class="p">,</span> <span class="n">pearsonr</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">roc_auc_score</span>
+
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">tqdm</span>  <span class="c1"># progress bar</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">..class1_affinity_predictor</span><span class="w"> </span><span class="kn">import</span> <span class="n">Class1AffinityPredictor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..common</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">add_random_seed_arg</span><span class="p">,</span>
+    <span class="n">configure_logging</span><span class="p">,</span>
+    <span class="n">configure_random_seed</span><span class="p">,</span>
+    <span class="n">derive_seed</span><span class="p">,</span>
+    <span class="n">filter_canonicalizable_alleles</span><span class="p">,</span>
+    <span class="n">install_sigusr1_stack_trace_handler</span><span class="p">,</span>
+    <span class="n">positive_int_arg</span><span class="p">,</span>
+    <span class="n">normalize_allele_name</span><span class="p">,</span>
+    <span class="n">random_peptides</span><span class="p">,</span>
+    <span class="n">write_generate_sh</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..encodable_sequences</span><span class="w"> </span><span class="kn">import</span> <span class="n">EncodableSequences</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..parallelism</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">add_local_parallelism_args</span><span class="p">,</span>
+    <span class="n">worker_pool_with_gpu_assignments_from_args</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..workload_planning</span><span class="w"> </span><span class="kn">import</span> <span class="n">WORKLOAD_AFFINITY_SELECTION</span><span class="p">,</span> <span class="n">path_size_bytes</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..regression_target</span><span class="w"> </span><span class="kn">import</span> <span class="n">from_ic50</span>
+
+<span class="n">tqdm</span><span class="o">.</span><span class="n">monitor_interval</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># see https://github.com/tqdm/tqdm/issues/481</span>
+
+
+<span class="c1"># To avoid pickling large matrices to send to child processes when running in</span>
+<span class="c1"># parallel, we use this global variable as a place to store data. Data that is</span>
+<span class="c1"># stored here before creating the thread pool will be inherited to the child</span>
+<span class="c1"># processes upon fork() call, allowing local workers to read the same</span>
+<span class="c1"># copy-on-write pages instead of receiving a pickled copy.</span>
+<span class="n">WORKER_CONTEXT</span> <span class="o">=</span> <span class="p">{}</span>
+
+
+<span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">)</span>
+
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--data"</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"FILE.csv"</span><span class="p">,</span>
+    <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+        <span class="s2">"Model selection data CSV. Expected columns: "</span>
+        <span class="s2">"allele, peptide, measurement_value"</span><span class="p">))</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--exclude-data"</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"FILE.csv"</span><span class="p">,</span>
+    <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+        <span class="s2">"Data to EXCLUDE from model selection. Useful to specify the original "</span>
+        <span class="s2">"training data used"</span><span class="p">))</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--models-dir"</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"DIR"</span><span class="p">,</span>
+    <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Directory to read models"</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--out-models-dir"</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"DIR"</span><span class="p">,</span>
+    <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Directory to write selected models"</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--out-unselected-predictions"</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"FILE.csv"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Write predictions for validation data using unselected predictor to "</span>
+    <span class="s2">"FILE.csv"</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--unselected-accuracy-scorer"</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"SCORER"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">"combined:mass-spec,mse"</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--unselected-accuracy-scorer-num-samples"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--unselected-accuracy-percentile-threshold"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mi">95</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--allele"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">nargs</span><span class="o">=</span><span class="s2">"+"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Alleles to select models for. If not specified, all alleles with "</span>
+    <span class="s2">"enough measurements will be used."</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--combined-min-models"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Min number of models to select per allele when using combined selector"</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--combined-max-models"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Max number of models to select per allele when using combined selector"</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--combined-min-contribution-percent"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Use only model selectors that can contribute at least X </span><span class="si">%%</span><span class="s2"> to the "</span>
+    <span class="s2">"total score. Default: </span><span class="si">%(default)s</span><span class="s2">"</span><span class="p">)</span>
+
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--mass-spec-min-measurements"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Min number of measurements required for an allele to use mass-spec model "</span>
+    <span class="s2">"selection"</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--mass-spec-min-models"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Min number of models to select per allele when using mass-spec selector"</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--mass-spec-max-models"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Max number of models to select per allele when using mass-spec selector"</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--mse-min-measurements"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Min number of measurements required for an allele to use MSE model "</span>
+    <span class="s2">"selection"</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--mse-min-models"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Min number of models to select per allele when using MSE selector"</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--mse-max-models"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Max number of models to select per allele when using MSE selector"</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--scoring"</span><span class="p">,</span>
+    <span class="n">nargs</span><span class="o">=</span><span class="s2">"+"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="p">[</span><span class="s2">"mse"</span><span class="p">,</span> <span class="s2">"consensus"</span><span class="p">],</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Scoring procedures to use in order"</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--consensus-min-models"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Min number of models to select per allele when using consensus selector"</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--consensus-max-models"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Max number of models to select per allele when using consensus selector"</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--consensus-num-peptides-per-length"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Num peptides per length to use for consensus scoring"</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--mass-spec-regex"</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"REGEX"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">"mass[- ]spec"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Regular expression for mass-spec data. Runs on measurement_source col."</span>
+    <span class="s2">"Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--verbosity"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Verbosity. Default: </span><span class="si">%(default)s</span><span class="s2">"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+<span class="n">add_local_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+<span class="n">add_random_seed_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="run">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.run">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]):</span>
+    <span class="n">install_sigusr1_stack_trace_handler</span><span class="p">()</span>
+
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">prefix</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"combined"</span><span class="p">,</span> <span class="s2">"mass_spec"</span><span class="p">,</span> <span class="s2">"mse"</span><span class="p">,</span> <span class="s2">"consensus"</span><span class="p">):</span>
+        <span class="n">minimum</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"</span><span class="si">%s</span><span class="s2">_min_models"</span> <span class="o">%</span> <span class="n">prefix</span><span class="p">)</span>
+        <span class="n">maximum</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"</span><span class="si">%s</span><span class="s2">_max_models"</span> <span class="o">%</span> <span class="n">prefix</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">minimum</span> <span class="o">&gt;</span> <span class="n">maximum</span><span class="p">:</span>
+            <span class="n">parser</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">"--</span><span class="si">%s</span><span class="s2">-min-models must not exceed --</span><span class="si">%s</span><span class="s2">-max-models"</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="n">prefix</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"_"</span><span class="p">,</span> <span class="s2">"-"</span><span class="p">),</span> <span class="n">prefix</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"_"</span><span class="p">,</span> <span class="s2">"-"</span><span class="p">)))</span>
+
+    <span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">)</span>
+
+    <span class="n">configure_logging</span><span class="p">(</span><span class="n">verbose</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">verbosity</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># Seed all randomness up front (the allele shuffle below runs in this</span>
+    <span class="c1"># process). Per-allele scrambling in model_select runs in workers, so we</span>
+    <span class="c1"># also stash the master seed in WORKER_CONTEXT and reseed per allele there.</span>
+    <span class="n">master_seed</span> <span class="o">=</span> <span class="n">configure_random_seed</span><span class="p">(</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">random_seed</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"select-allele-specific"</span><span class="p">)</span>
+
+    <span class="n">input_predictor</span> <span class="o">=</span> <span class="n">Class1AffinityPredictor</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">models_dir</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Loaded: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">input_predictor</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">allele</span><span class="p">:</span>
+        <span class="c1"># User-supplied alleles must canonicalize; mismatch is a config error.</span>
+        <span class="n">alleles</span> <span class="o">=</span> <span class="p">[</span><span class="n">normalize_allele_name</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">allele</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Pre-filter pseudogene / null / questionable supported_alleles so a</span>
+        <span class="c1"># single bad row doesn't crash the parallel selection mid-fold.</span>
+        <span class="n">alleles</span> <span class="o">=</span> <span class="n">filter_canonicalizable_alleles</span><span class="p">(</span>
+            <span class="n">input_predictor</span><span class="o">.</span><span class="n">supported_alleles</span><span class="p">,</span>
+            <span class="n">log_label</span><span class="o">=</span><span class="s2">"supported_alleles"</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">metadata_dfs</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">data</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Loaded data: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">shape</span><span class="p">)))</span>
+
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+            <span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span> <span class="o">&gt;=</span> <span class="mi">8</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span> <span class="o">&lt;=</span> <span class="mi">15</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Subselected to 8-15mers: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">shape</span><span class="p">)))</span>
+
+        <span class="c1"># Allele names in data are assumed to be already normalized.</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">df</span><span class="o">.</span><span class="n">allele</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">alleles</span><span class="p">)]</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Selected </span><span class="si">%d</span><span class="s2"> alleles: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">alleles</span><span class="p">),</span> <span class="s1">' '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">alleles</span><span class="p">)))</span>
+
+        <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">exclude_data</span><span class="p">:</span>
+            <span class="n">exclude_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">exclude_data</span><span class="p">)</span>
+            <span class="n">metadata_dfs</span><span class="p">[</span><span class="s2">"model_selection_exclude"</span><span class="p">]</span> <span class="o">=</span> <span class="n">exclude_df</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">"Loaded exclude data: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">shape</span><span class="p">)))</span>
+
+            <span class="n">df</span><span class="p">[</span><span class="s2">"_key"</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">allele</span> <span class="o">+</span> <span class="s2">"__"</span> <span class="o">+</span> <span class="n">df</span><span class="o">.</span><span class="n">peptide</span>
+            <span class="n">exclude_df</span><span class="p">[</span><span class="s2">"_key"</span><span class="p">]</span> <span class="o">=</span> <span class="n">exclude_df</span><span class="o">.</span><span class="n">allele</span> <span class="o">+</span> <span class="s2">"__"</span> <span class="o">+</span> <span class="n">exclude_df</span><span class="o">.</span><span class="n">peptide</span>
+            <span class="n">df</span><span class="p">[</span><span class="s2">"_excluded"</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">_key</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">exclude_df</span><span class="o">.</span><span class="n">_key</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">"Excluding measurements per allele (counts): "</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"allele"</span><span class="p">)</span><span class="o">.</span><span class="n">_excluded</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+
+            <span class="nb">print</span><span class="p">(</span><span class="s2">"Excluding measurements per allele (fractions): "</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"allele"</span><span class="p">)</span><span class="o">.</span><span class="n">_excluded</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="o">~</span><span class="n">df</span><span class="o">.</span><span class="n">_excluded</span><span class="p">]</span>
+            <span class="k">del</span> <span class="n">df</span><span class="p">[</span><span class="s2">"_excluded"</span><span class="p">]</span>
+            <span class="k">del</span> <span class="n">df</span><span class="p">[</span><span class="s2">"_key"</span><span class="p">]</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">"Reduced data to: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">shape</span><span class="p">)))</span>
+
+        <span class="n">metadata_dfs</span><span class="p">[</span><span class="s2">"model_selection_data"</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span>
+
+        <span class="n">df</span><span class="p">[</span><span class="s2">"mass_spec"</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">measurement_source</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">contains</span><span class="p">(</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">mass_spec_regex</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">out_unselected_predictions</span><span class="p">:</span>
+        <span class="n">df</span><span class="p">[</span><span class="s2">"unselected_prediction"</span><span class="p">]</span> <span class="o">=</span> <span class="n">input_predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
+            <span class="n">alleles</span><span class="o">=</span><span class="n">df</span><span class="o">.</span><span class="n">allele</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+            <span class="n">peptides</span><span class="o">=</span><span class="n">df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out_unselected_predictions</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Wrote: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">args</span><span class="o">.</span><span class="n">out_unselected_predictions</span><span class="p">)</span>
+
+    <span class="n">selectors</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">selector_to_model_selection_kwargs</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">make_selector</span><span class="p">(</span>
+            <span class="n">scoring</span><span class="p">,</span>
+            <span class="n">combined_min_contribution_percent</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">combined_min_contribution_percent</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">scoring</span> <span class="ow">in</span> <span class="n">selectors</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="n">selectors</span><span class="p">[</span><span class="n">scoring</span><span class="p">],</span> <span class="n">selector_to_model_selection_kwargs</span><span class="p">[</span><span class="n">scoring</span><span class="p">])</span>
+
+        <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">scoring</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"combined:"</span><span class="p">):</span>
+            <span class="n">model_selection_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">'min_models'</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">combined_min_models</span><span class="p">,</span>
+                <span class="s1">'max_models'</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">combined_max_models</span><span class="p">,</span>
+            <span class="p">}</span>
+            <span class="n">component_selectors</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">component_selector</span> <span class="ow">in</span> <span class="n">scoring</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">":"</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">","</span><span class="p">):</span>
+                <span class="n">component_selectors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="n">make_selector</span><span class="p">(</span>
+                        <span class="n">component_selector</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">selector</span> <span class="o">=</span> <span class="n">CombinedModelSelector</span><span class="p">(</span>
+                <span class="n">component_selectors</span><span class="p">,</span>
+                <span class="n">min_contribution_percent</span><span class="o">=</span><span class="n">combined_min_contribution_percent</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">scoring</span> <span class="o">==</span> <span class="s2">"mse"</span><span class="p">:</span>
+            <span class="n">model_selection_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">'min_models'</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">mse_min_models</span><span class="p">,</span>
+                <span class="s1">'max_models'</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">mse_max_models</span><span class="p">,</span>
+            <span class="p">}</span>
+            <span class="n">min_measurements</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">mse_min_measurements</span>
+            <span class="n">selector</span> <span class="o">=</span> <span class="n">MSEModelSelector</span><span class="p">(</span>
+                <span class="n">df</span><span class="o">=</span><span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="o">~</span><span class="n">df</span><span class="o">.</span><span class="n">mass_spec</span><span class="p">],</span>
+                <span class="n">predictor</span><span class="o">=</span><span class="n">input_predictor</span><span class="p">,</span>
+                <span class="n">min_measurements</span><span class="o">=</span><span class="n">min_measurements</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">scoring</span> <span class="o">==</span> <span class="s2">"mass-spec"</span><span class="p">:</span>
+            <span class="n">mass_spec_df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">df</span><span class="o">.</span><span class="n">mass_spec</span><span class="p">]</span>
+            <span class="n">model_selection_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">'min_models'</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">mass_spec_min_models</span><span class="p">,</span>
+                <span class="s1">'max_models'</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">mass_spec_max_models</span><span class="p">,</span>
+            <span class="p">}</span>
+            <span class="n">min_measurements</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">mass_spec_min_measurements</span>
+            <span class="n">selector</span> <span class="o">=</span> <span class="n">MassSpecModelSelector</span><span class="p">(</span>
+                <span class="n">df</span><span class="o">=</span><span class="n">mass_spec_df</span><span class="p">,</span>
+                <span class="n">predictor</span><span class="o">=</span><span class="n">input_predictor</span><span class="p">,</span>
+                <span class="n">min_measurements</span><span class="o">=</span><span class="n">min_measurements</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">scoring</span> <span class="o">==</span> <span class="s2">"consensus"</span><span class="p">:</span>
+            <span class="n">model_selection_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">'min_models'</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">consensus_min_models</span><span class="p">,</span>
+                <span class="s1">'max_models'</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">consensus_max_models</span><span class="p">,</span>
+            <span class="p">}</span>
+            <span class="n">selector</span> <span class="o">=</span> <span class="n">ConsensusModelSelector</span><span class="p">(</span>
+                <span class="n">predictor</span><span class="o">=</span><span class="n">input_predictor</span><span class="p">,</span>
+                <span class="n">num_peptides_per_length</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">consensus_num_peptides_per_length</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unsupported scoring method: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">scoring</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Instantiated model selector </span><span class="si">%s</span><span class="s2"> in </span><span class="si">%0.2f</span><span class="s2"> sec."</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="n">scoring</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span><span class="p">))</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">selector</span><span class="p">,</span> <span class="n">model_selection_kwargs</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">scoring</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">scoring</span><span class="p">:</span>
+        <span class="p">(</span><span class="n">selector</span><span class="p">,</span> <span class="n">model_selection_kwargs</span><span class="p">)</span> <span class="o">=</span> <span class="n">make_selector</span><span class="p">(</span><span class="n">scoring</span><span class="p">)</span>
+        <span class="n">selectors</span><span class="p">[</span><span class="n">scoring</span><span class="p">]</span> <span class="o">=</span> <span class="n">selector</span>
+        <span class="n">selector_to_model_selection_kwargs</span><span class="p">[</span><span class="n">scoring</span><span class="p">]</span> <span class="o">=</span> <span class="n">model_selection_kwargs</span>
+
+    <span class="n">unselected_accuracy_scorer</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">unselected_accuracy_scorer</span><span class="p">:</span>
+        <span class="c1"># Force running all selectors by setting combined_min_contribution_percent=0.</span>
+        <span class="n">unselected_accuracy_scorer</span> <span class="o">=</span> <span class="n">make_selector</span><span class="p">(</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">unselected_accuracy_scorer</span><span class="p">,</span>
+            <span class="n">combined_min_contribution_percent</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Using unselected accuracy scorer: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">unselected_accuracy_scorer</span><span class="p">)</span>
+    <span class="n">WORKER_CONTEXT</span><span class="p">[</span><span class="s2">"unselected_accuracy_scorer"</span><span class="p">]</span> <span class="o">=</span> <span class="n">unselected_accuracy_scorer</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Selectors for alleles:"</span><span class="p">)</span>
+    <span class="n">allele_to_selector</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">allele_to_model_selection_kwargs</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">allele</span> <span class="ow">in</span> <span class="n">alleles</span><span class="p">:</span>
+        <span class="n">selector</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">possible_selector</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">scoring</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">selectors</span><span class="p">[</span><span class="n">possible_selector</span><span class="p">]</span><span class="o">.</span><span class="n">usable_for_allele</span><span class="p">(</span><span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">):</span>
+                <span class="n">selector</span> <span class="o">=</span> <span class="n">selectors</span><span class="p">[</span><span class="n">possible_selector</span><span class="p">]</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="si">%20s</span><span class="s2"> </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">selector</span><span class="o">.</span><span class="n">plan_summary</span><span class="p">(</span><span class="n">allele</span><span class="p">)))</span>
+                <span class="k">break</span>
+        <span class="k">if</span> <span class="n">selector</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"No selectors usable for allele: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">allele</span><span class="p">)</span>
+        <span class="n">allele_to_selector</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span> <span class="o">=</span> <span class="n">selector</span>
+        <span class="n">allele_to_model_selection_kwargs</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">selector_to_model_selection_kwargs</span><span class="p">[</span><span class="n">possible_selector</span><span class="p">])</span>
+
+    <span class="n">WORKER_CONTEXT</span><span class="p">[</span><span class="s2">"args"</span><span class="p">]</span> <span class="o">=</span> <span class="n">args</span>
+    <span class="n">WORKER_CONTEXT</span><span class="p">[</span><span class="s2">"input_predictor"</span><span class="p">]</span> <span class="o">=</span> <span class="n">input_predictor</span>
+    <span class="n">WORKER_CONTEXT</span><span class="p">[</span><span class="s2">"unselected_accuracy_scorer"</span><span class="p">]</span> <span class="o">=</span> <span class="n">unselected_accuracy_scorer</span>
+    <span class="n">WORKER_CONTEXT</span><span class="p">[</span><span class="s2">"allele_to_selector"</span><span class="p">]</span> <span class="o">=</span> <span class="n">allele_to_selector</span>
+    <span class="n">WORKER_CONTEXT</span><span class="p">[</span><span class="s2">"allele_to_model_selection_kwargs"</span><span class="p">]</span> <span class="o">=</span> <span class="n">allele_to_model_selection_kwargs</span>
+    <span class="n">WORKER_CONTEXT</span><span class="p">[</span><span class="s2">"seed"</span><span class="p">]</span> <span class="o">=</span> <span class="n">master_seed</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Attempting to create directory: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Done."</span><span class="p">)</span>
+
+    <span class="n">result_predictor</span> <span class="o">=</span> <span class="n">Class1AffinityPredictor</span><span class="p">(</span><span class="n">metadata_dataframes</span><span class="o">=</span><span class="n">metadata_dfs</span><span class="p">)</span>
+
+    <span class="n">worker_pool</span> <span class="o">=</span> <span class="n">worker_pool_with_gpu_assignments_from_args</span><span class="p">(</span>
+        <span class="n">args</span><span class="p">,</span>
+        <span class="n">workload_name</span><span class="o">=</span><span class="n">WORKLOAD_AFFINITY_SELECTION</span><span class="p">,</span>
+        <span class="n">workload_hints</span><span class="o">=</span><span class="p">{</span>
+            <span class="s2">"data_bytes"</span><span class="p">:</span> <span class="nb">sum</span><span class="p">(</span>
+                <span class="n">value</span> <span class="ow">or</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="p">(</span>
+                    <span class="n">path_size_bytes</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">data</span><span class="p">),</span>
+                    <span class="n">path_size_bytes</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">exclude_data</span><span class="p">),</span>
+                <span class="p">)</span>
+            <span class="p">)</span> <span class="ow">or</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="n">worker_context_module</span><span class="o">=</span><span class="vm">__name__</span><span class="p">,</span>
+        <span class="n">worker_context_data</span><span class="o">=</span><span class="n">WORKER_CONTEXT</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">worker_pool</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Serial run</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Running in serial."</span><span class="p">)</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">model_select</span><span class="p">(</span><span class="n">allele</span><span class="p">)</span> <span class="k">for</span> <span class="n">allele</span> <span class="ow">in</span> <span class="n">alleles</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Parallel run</span>
+        <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="n">alleles</span><span class="p">)</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="n">worker_pool</span><span class="o">.</span><span class="n">imap_unordered</span><span class="p">(</span>
+            <span class="n">model_select</span><span class="p">,</span>
+            <span class="n">alleles</span><span class="p">,</span>
+            <span class="n">chunksize</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">unselected_summary</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">model_selection_dfs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">result</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span><span class="n">results</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">alleles</span><span class="p">)):</span>
+            <span class="n">pprint</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+            <span class="n">summary_dict</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+            <span class="n">summary_dict</span><span class="p">[</span><span class="s2">"retained"</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s2">"selected"</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="k">del</span> <span class="n">summary_dict</span><span class="p">[</span><span class="s2">"selected"</span><span class="p">]</span>
+
+            <span class="n">unselected_summary</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">summary_dict</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">result</span><span class="p">[</span><span class="s1">'selected'</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">model_selection_dfs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s1">'selected'</span><span class="p">]</span><span class="o">.</span><span class="n">metadata_dataframes</span><span class="p">[</span><span class="s1">'model_selection'</span><span class="p">])</span>
+                <span class="n">result_predictor</span><span class="o">.</span><span class="n">merge_in_place</span><span class="p">([</span><span class="n">result</span><span class="p">[</span><span class="s1">'selected'</span><span class="p">]])</span>
+        <span class="k">if</span> <span class="n">worker_pool</span><span class="p">:</span>
+            <span class="n">worker_pool</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="n">worker_pool</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+            <span class="n">worker_pool</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">worker_pool</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">worker_pool</span><span class="o">.</span><span class="n">terminate</span><span class="p">()</span>
+            <span class="n">worker_pool</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">model_selection_dfs</span><span class="p">:</span>
+        <span class="n">model_selection_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span>
+            <span class="n">model_selection_dfs</span><span class="p">,</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">model_selection_df</span><span class="p">[</span><span class="s2">"selector"</span><span class="p">]</span> <span class="o">=</span> <span class="n">model_selection_df</span><span class="o">.</span><span class="n">allele</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+            <span class="n">allele_to_selector</span><span class="p">)</span>
+        <span class="n">result_predictor</span><span class="o">.</span><span class="n">metadata_dataframes</span><span class="p">[</span><span class="s2">"model_selection"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">model_selection_df</span><span class="p">)</span>
+
+    <span class="n">result_predictor</span><span class="o">.</span><span class="n">metadata_dataframes</span><span class="p">[</span><span class="s2">"unselected_summary"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">unselected_summary</span><span class="p">))</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Done model selecting for </span><span class="si">%d</span><span class="s2"> alleles."</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">alleles</span><span class="p">))</span>
+    <span class="n">result_predictor</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">)</span>
+    <span class="n">write_generate_sh</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">)</span>
+
+    <span class="n">model_selection_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Model selection time </span><span class="si">%0.2f</span><span class="s2"> min."</span> <span class="o">%</span> <span class="p">(</span><span class="n">model_selection_time</span> <span class="o">/</span> <span class="mf">60.0</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Predictor written to: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">args</span><span class="o">.</span><span class="n">out_models_dir</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="ScrambledPredictor">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.ScrambledPredictor">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ScrambledPredictor</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">predictor</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span> <span class="o">=</span> <span class="n">predictor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_predictions</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_allele</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="ScrambledPredictor.predict">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.ScrambledPredictor.predict">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">peptides</span><span class="p">,</span> <span class="n">allele</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">peptides</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_predictions</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_predictions</span><span class="p">[</span><span class="n">peptides</span><span class="p">]</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">peptides</span><span class="o">=</span><span class="n">peptides</span><span class="p">,</span> <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_allele</span> <span class="o">=</span> <span class="n">allele</span>
+        <span class="k">assert</span> <span class="n">allele</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">_allele</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_predictions</span><span class="p">[</span><span class="n">peptides</span><span class="p">]</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">frac</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span><span class="o">.</span><span class="n">values</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="model_select">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.model_select">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">model_select</span><span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">constant_data</span><span class="o">=</span><span class="n">WORKER_CONTEXT</span><span class="p">):</span>
+    <span class="c1"># Runs in a worker, which reseeds its RNGs from entropy on startup. Reseed</span>
+    <span class="c1"># from the run's master seed mixed with the allele so the scrambling</span>
+    <span class="c1"># ``.sample(frac=1.0)`` in the accuracy scorer is reproducible per allele.</span>
+    <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">derive_seed</span><span class="p">(</span><span class="n">constant_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"seed"</span><span class="p">),</span> <span class="n">allele</span><span class="p">)</span> <span class="o">%</span> <span class="p">(</span><span class="mi">2</span> <span class="o">**</span> <span class="mi">32</span><span class="p">))</span>
+
+    <span class="n">unselected_accuracy_scorer</span> <span class="o">=</span> <span class="n">constant_data</span><span class="p">[</span><span class="s2">"unselected_accuracy_scorer"</span><span class="p">]</span>
+    <span class="n">selector</span> <span class="o">=</span> <span class="n">constant_data</span><span class="p">[</span><span class="s2">"allele_to_selector"</span><span class="p">][</span><span class="n">allele</span><span class="p">]</span>
+    <span class="n">model_selection_kwargs</span> <span class="o">=</span> <span class="n">constant_data</span><span class="p">[</span>
+        <span class="s2">"allele_to_model_selection_kwargs"</span>
+    <span class="p">][</span><span class="n">allele</span><span class="p">]</span>
+    <span class="n">predictor</span> <span class="o">=</span> <span class="n">constant_data</span><span class="p">[</span><span class="s2">"input_predictor"</span><span class="p">]</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">constant_data</span><span class="p">[</span><span class="s2">"args"</span><span class="p">]</span>
+    <span class="n">unselected_accuracy_scorer_samples</span> <span class="o">=</span> <span class="n">constant_data</span><span class="p">[</span><span class="s2">"args"</span><span class="p">]</span><span class="o">.</span><span class="n">unselected_accuracy_scorer_num_samples</span>
+
+    <span class="n">result_dict</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"allele"</span><span class="p">:</span> <span class="n">allele</span>
+    <span class="p">}</span>
+
+    <span class="n">unselected_score</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">unselected_score_percentile</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">unselected_score_scrambled_mean</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">unselected_accuracy_scorer</span><span class="p">:</span>
+        <span class="n">unselected_score_function</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">unselected_accuracy_scorer</span><span class="o">.</span><span class="n">score_function</span><span class="p">(</span><span class="n">allele</span><span class="p">))</span>
+
+        <span class="n">additional_metadata</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">unselected_score</span> <span class="o">=</span> <span class="n">unselected_score_function</span><span class="p">(</span>
+            <span class="n">predictor</span><span class="p">,</span> <span class="n">additional_metadata_out</span><span class="o">=</span><span class="n">additional_metadata</span><span class="p">)</span>
+        <span class="n">scrambled_predictor</span> <span class="o">=</span> <span class="n">ScrambledPredictor</span><span class="p">(</span><span class="n">predictor</span><span class="p">)</span>
+        <span class="n">scrambled_scores</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
+            <span class="n">unselected_score_function</span><span class="p">(</span>
+                <span class="n">scrambled_predictor</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">unselected_accuracy_scorer_samples</span><span class="p">)</span>
+        <span class="p">])</span>
+        <span class="n">unselected_score_scrambled_mean</span> <span class="o">=</span> <span class="n">scrambled_scores</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+        <span class="n">unselected_score_percentile</span> <span class="o">=</span> <span class="n">percentileofscore</span><span class="p">(</span>
+            <span class="n">scrambled_scores</span><span class="p">,</span> <span class="n">unselected_score</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">"Unselected score and percentile"</span><span class="p">,</span>
+            <span class="n">allele</span><span class="p">,</span>
+            <span class="n">unselected_score</span><span class="p">,</span>
+            <span class="n">unselected_score_percentile</span><span class="p">,</span>
+            <span class="n">additional_metadata</span><span class="p">)</span>
+        <span class="n">result_dict</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+            <span class="nb">dict</span><span class="p">((</span><span class="s2">"unselected_</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+                 <span class="k">for</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+                 <span class="ow">in</span> <span class="n">additional_metadata</span><span class="o">.</span><span class="n">items</span><span class="p">()))</span>
+
+    <span class="n">selected</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">threshold</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">unselected_accuracy_percentile_threshold</span>
+    <span class="k">if</span> <span class="n">unselected_score_percentile</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">unselected_score_percentile</span> <span class="o">&gt;=</span> <span class="n">threshold</span><span class="p">:</span>
+        <span class="n">selected</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">model_select</span><span class="p">(</span>
+            <span class="n">score_function</span><span class="o">=</span><span class="n">selector</span><span class="o">.</span><span class="n">score_function</span><span class="p">(</span><span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">),</span>
+            <span class="n">alleles</span><span class="o">=</span><span class="p">[</span><span class="n">allele</span><span class="p">],</span>
+            <span class="o">**</span><span class="n">model_selection_kwargs</span><span class="p">)</span>
+
+    <span class="n">result_dict</span><span class="p">[</span><span class="s2">"unselected_score_plan"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">unselected_accuracy_scorer</span><span class="o">.</span><span class="n">plan_summary</span><span class="p">(</span><span class="n">allele</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">unselected_accuracy_scorer</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">result_dict</span><span class="p">[</span><span class="s2">"selector_score_plan"</span><span class="p">]</span> <span class="o">=</span> <span class="n">selector</span><span class="o">.</span><span class="n">plan_summary</span><span class="p">(</span><span class="n">allele</span><span class="p">)</span>
+    <span class="n">result_dict</span><span class="p">[</span><span class="s2">"unselected_accuracy_score_percentile"</span><span class="p">]</span> <span class="o">=</span> <span class="n">unselected_score_percentile</span>
+    <span class="n">result_dict</span><span class="p">[</span><span class="s2">"unselected_score"</span><span class="p">]</span> <span class="o">=</span> <span class="n">unselected_score</span>
+    <span class="n">result_dict</span><span class="p">[</span><span class="s2">"unselected_score_scrambled_mean"</span><span class="p">]</span> <span class="o">=</span> <span class="n">unselected_score_scrambled_mean</span>
+    <span class="n">result_dict</span><span class="p">[</span><span class="s2">"selected"</span><span class="p">]</span> <span class="o">=</span> <span class="n">selected</span>
+    <span class="n">result_dict</span><span class="p">[</span><span class="s2">"num_models"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">selected</span><span class="o">.</span><span class="n">neural_networks</span><span class="p">)</span> <span class="k">if</span> <span class="n">selected</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">result_dict</span></div>
+
+
+
+<div class="viewcode-block" id="cache_encoding">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.cache_encoding">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cache_encoding</span><span class="p">(</span><span class="n">predictor</span><span class="p">,</span> <span class="n">peptides</span><span class="p">):</span>
+    <span class="c1"># Encode the peptides for each neural network, so the encoding</span>
+    <span class="c1"># becomes cached.</span>
+    <span class="k">for</span> <span class="n">network</span> <span class="ow">in</span> <span class="n">predictor</span><span class="o">.</span><span class="n">neural_networks</span><span class="p">:</span>
+        <span class="n">network</span><span class="o">.</span><span class="n">peptides_to_network_input</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="ScoreFunction">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.ScoreFunction">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ScoreFunction</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Thin wrapper over a score function (Class1AffinityPredictor -&gt; float).</span>
+<span class="sd">    Used to keep a summary string associated with the function.</span>
+<span class="sd">    """</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">function</span><span class="p">,</span> <span class="n">summary</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">function</span> <span class="o">=</span> <span class="n">function</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">summary</span> <span class="o">=</span> <span class="n">summary</span> <span class="k">if</span> <span class="n">summary</span> <span class="k">else</span> <span class="s2">"(n/a)"</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">function</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="CombinedModelSelector">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.CombinedModelSelector">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CombinedModelSelector</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Model selector that computes a weighted average over other model selectors.</span>
+<span class="sd">    """</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_selectors</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">min_contribution_percent</span><span class="o">=</span><span class="mf">1.0</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">weights</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">model_selectors</span><span class="p">),))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model_selectors</span> <span class="o">=</span> <span class="n">model_selectors</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">selector_to_weight</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_selectors</span><span class="p">,</span> <span class="n">weights</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_contribution_percent</span> <span class="o">=</span> <span class="n">min_contribution_percent</span>
+
+<div class="viewcode-block" id="CombinedModelSelector.usable_for_allele">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.CombinedModelSelector.usable_for_allele">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">usable_for_allele</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="n">selector</span><span class="o">.</span><span class="n">usable_for_allele</span><span class="p">(</span><span class="n">allele</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">selector</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_selectors</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="CombinedModelSelector.plan_summary">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.CombinedModelSelector.plan_summary">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">plan_summary</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_function</span><span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">dry_run</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">summary</span></div>
+
+
+<div class="viewcode-block" id="CombinedModelSelector.score_function">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.CombinedModelSelector.score_function">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">score_function</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele</span><span class="p">,</span> <span class="n">dry_run</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="n">selector_to_max_weighted_score</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">selector</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_selectors</span><span class="p">:</span>
+            <span class="n">weight</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">selector_to_weight</span><span class="p">[</span><span class="n">selector</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">selector</span><span class="o">.</span><span class="n">usable_for_allele</span><span class="p">(</span><span class="n">allele</span><span class="p">):</span>
+                <span class="n">max_weighted_score</span> <span class="o">=</span> <span class="n">selector</span><span class="o">.</span><span class="n">max_absolute_value</span><span class="p">(</span><span class="n">allele</span><span class="p">)</span> <span class="o">*</span> <span class="n">weight</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">max_weighted_score</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="n">selector_to_max_weighted_score</span><span class="p">[</span><span class="n">selector</span><span class="p">]</span> <span class="o">=</span> <span class="n">max_weighted_score</span>
+        <span class="n">max_total_score</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">selector_to_max_weighted_score</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+
+        <span class="c1"># Use only selectors that can contribute &gt;1% to the total score</span>
+        <span class="n">selectors_to_use</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">selector</span>
+            <span class="k">for</span> <span class="n">selector</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_selectors</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">selector_to_max_weighted_score</span><span class="p">[</span><span class="n">selector</span><span class="p">]</span> <span class="o">&gt;</span>
+                <span class="n">max_total_score</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_contribution_percent</span> <span class="o">/</span> <span class="mf">100.0</span><span class="p">)</span>
+        <span class="p">]</span>
+
+        <span class="n">summary</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">([</span>
+            <span class="s2">"</span><span class="si">%s</span><span class="s2">(|</span><span class="si">%.3f</span><span class="s2">|)"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">selector</span><span class="o">.</span><span class="n">plan_summary</span><span class="p">(</span><span class="n">allele</span><span class="p">),</span>
+                <span class="n">selector_to_max_weighted_score</span><span class="p">[</span><span class="n">selector</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">selector</span> <span class="ow">in</span> <span class="n">selectors_to_use</span>
+        <span class="p">])</span>
+
+        <span class="k">if</span> <span class="n">dry_run</span><span class="p">:</span>
+            <span class="n">score</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">score_functions_and_weights</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="p">(</span><span class="n">selector</span><span class="o">.</span><span class="n">score_function</span><span class="p">(</span><span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">),</span>
+                 <span class="bp">self</span><span class="o">.</span><span class="n">selector_to_weight</span><span class="p">[</span><span class="n">selector</span><span class="p">])</span>
+                <span class="k">for</span> <span class="n">selector</span> <span class="ow">in</span> <span class="n">selectors_to_use</span>
+            <span class="p">]</span>
+
+            <span class="k">def</span><span class="w"> </span><span class="nf">score</span><span class="p">(</span><span class="n">predictor</span><span class="p">,</span> <span class="n">additional_metadata_out</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+                <span class="n">scores</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
+                    <span class="n">score_function</span><span class="p">(</span>
+                        <span class="n">predictor</span><span class="p">,</span>
+                        <span class="n">additional_metadata_out</span><span class="o">=</span><span class="n">additional_metadata_out</span><span class="p">)</span> <span class="o">*</span> <span class="n">weight</span>
+                    <span class="k">for</span> <span class="p">(</span><span class="n">score_function</span><span class="p">,</span> <span class="n">weight</span><span class="p">)</span> <span class="ow">in</span> <span class="n">score_functions_and_weights</span>
+                <span class="p">])</span>
+                <span class="k">if</span> <span class="n">additional_metadata_out</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">additional_metadata_out</span><span class="p">[</span><span class="s2">"combined_score_terms"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
+                        <span class="nb">list</span><span class="p">(</span><span class="n">scores</span><span class="p">))</span>
+
+                <span class="k">return</span> <span class="n">scores</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">ScoreFunction</span><span class="p">(</span><span class="n">score</span><span class="p">,</span> <span class="n">summary</span><span class="o">=</span><span class="n">summary</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ConsensusModelSelector">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.ConsensusModelSelector">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ConsensusModelSelector</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Model selector that scores sub-ensembles based on their Kendall tau</span>
+<span class="sd">    consistency with the full ensemble over a set of random peptides.</span>
+<span class="sd">    """</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">predictor</span><span class="p">,</span>
+            <span class="n">num_peptides_per_length</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span>
+            <span class="n">multiply_score_by_value</span><span class="o">=</span><span class="mf">10.0</span><span class="p">):</span>
+
+        <span class="p">(</span><span class="n">min_length</span><span class="p">,</span> <span class="n">max_length</span><span class="p">)</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">supported_peptide_lengths</span>
+        <span class="n">peptides</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">min_length</span><span class="p">,</span> <span class="n">max_length</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="n">peptides</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="n">random_peptides</span><span class="p">(</span><span class="n">num_peptides_per_length</span><span class="p">,</span> <span class="n">length</span><span class="o">=</span><span class="n">length</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">peptides</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span> <span class="o">=</span> <span class="n">predictor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">multiply_score_by_value</span> <span class="o">=</span> <span class="n">multiply_score_by_value</span>
+        <span class="n">cache_encoding</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">peptides</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ConsensusModelSelector.usable_for_allele">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.ConsensusModelSelector.usable_for_allele">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">usable_for_allele</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="ConsensusModelSelector.max_absolute_value">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.ConsensusModelSelector.max_absolute_value">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">max_absolute_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">multiply_score_by_value</span></div>
+
+
+<div class="viewcode-block" id="ConsensusModelSelector.plan_summary">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.ConsensusModelSelector.plan_summary">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">plan_summary</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">"consensus (</span><span class="si">%d</span><span class="s2"> points)"</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">peptides</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ConsensusModelSelector.score_function">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.ConsensusModelSelector.score_function">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">score_function</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele</span><span class="p">):</span>
+        <span class="n">full_ensemble_predictions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
+            <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">,</span>
+            <span class="n">peptides</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">peptides</span><span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">score</span><span class="p">(</span><span class="n">predictor</span><span class="p">,</span> <span class="n">additional_metadata_out</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+            <span class="n">predictions</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
+                <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">,</span>
+                <span class="n">peptides</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">peptides</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">tau</span> <span class="o">=</span> <span class="n">kendalltau</span><span class="p">(</span><span class="n">predictions</span><span class="p">,</span> <span class="n">full_ensemble_predictions</span><span class="p">)</span><span class="o">.</span><span class="n">correlation</span>
+            <span class="k">if</span> <span class="n">additional_metadata_out</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">additional_metadata_out</span><span class="p">[</span><span class="s2">"score_consensus_tau"</span><span class="p">]</span> <span class="o">=</span> <span class="n">tau</span>
+            <span class="k">return</span> <span class="n">tau</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">multiply_score_by_value</span>
+
+        <span class="k">return</span> <span class="n">ScoreFunction</span><span class="p">(</span>
+            <span class="n">score</span><span class="p">,</span> <span class="n">summary</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">plan_summary</span><span class="p">(</span><span class="n">allele</span><span class="p">))</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="MSEModelSelector">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.MSEModelSelector">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MSEModelSelector</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Model selector that uses mean-squared error to score models. Inequalities</span>
+<span class="sd">    are supported.</span>
+<span class="sd">    """</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">df</span><span class="p">,</span>
+            <span class="n">predictor</span><span class="p">,</span>
+            <span class="n">min_measurements</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="n">multiply_score_by_data_size</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="n">df</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span> <span class="o">=</span> <span class="n">predictor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_measurements</span> <span class="o">=</span> <span class="n">min_measurements</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">multiply_score_by_data_size</span> <span class="o">=</span> <span class="n">multiply_score_by_data_size</span>
+
+<div class="viewcode-block" id="MSEModelSelector.usable_for_allele">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.MSEModelSelector.usable_for_allele">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">usable_for_allele</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">allele</span> <span class="o">==</span> <span class="n">allele</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_measurements</span></div>
+
+
+<div class="viewcode-block" id="MSEModelSelector.max_absolute_value">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.MSEModelSelector.max_absolute_value">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">max_absolute_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">multiply_score_by_data_size</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">allele</span> <span class="o">==</span> <span class="n">allele</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mf">1.0</span></div>
+
+
+<div class="viewcode-block" id="MSEModelSelector.plan_summary">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.MSEModelSelector.plan_summary">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">plan_summary</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_function</span><span class="p">(</span><span class="n">allele</span><span class="p">)</span><span class="o">.</span><span class="n">summary</span></div>
+
+
+<div class="viewcode-block" id="MSEModelSelector.score_function">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.MSEModelSelector.score_function">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">score_function</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele</span><span class="p">):</span>
+        <span class="n">sub_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">allele</span> <span class="o">==</span> <span class="n">allele</span><span class="p">]</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">peptides</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">sub_df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">score</span><span class="p">(</span><span class="n">predictor</span><span class="p">,</span> <span class="n">additional_metadata_out</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+            <span class="n">predictions</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
+                <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">,</span>
+                <span class="n">peptides</span><span class="o">=</span><span class="n">peptides</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">deviations</span> <span class="o">=</span> <span class="n">from_ic50</span><span class="p">(</span><span class="n">predictions</span><span class="p">)</span> <span class="o">-</span> <span class="n">from_ic50</span><span class="p">(</span>
+                <span class="n">sub_df</span><span class="o">.</span><span class="n">measurement_value</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="s1">'measurement_inequality'</span> <span class="ow">in</span> <span class="n">sub_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="c1"># Must reverse meaning of inequality since we are working with</span>
+                <span class="c1"># transformed 0-1 values, which are anti-correlated with the ic50s.</span>
+                <span class="c1"># The measurement_inequality column is given in terms of ic50s.</span>
+                <span class="n">deviations</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+                    <span class="p">(</span>
+                    <span class="p">(</span><span class="n">sub_df</span><span class="o">.</span><span class="n">measurement_inequality</span> <span class="o">==</span> <span class="s2">"&lt;"</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">deviations</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">))</span> <span class="o">|</span>
+                    <span class="p">((</span><span class="n">sub_df</span><span class="o">.</span><span class="n">measurement_inequality</span> <span class="o">==</span> <span class="s2">"&gt;"</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">deviations</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">))</span>
+                    <span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+            <span class="n">score_mse</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="p">(</span><span class="n">deviations</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+            <span class="k">if</span> <span class="n">additional_metadata_out</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">additional_metadata_out</span><span class="p">[</span><span class="s2">"score_MSE"</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">score_mse</span>
+
+                <span class="c1"># We additionally include other scores on (=) measurements as</span>
+                <span class="c1"># a convenience</span>
+                <span class="n">eq_df</span> <span class="o">=</span> <span class="n">sub_df</span>
+                <span class="k">if</span> <span class="s1">'measurement_inequality'</span> <span class="ow">in</span> <span class="n">sub_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                    <span class="n">eq_df</span> <span class="o">=</span> <span class="n">sub_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+                        <span class="n">sub_df</span><span class="o">.</span><span class="n">measurement_inequality</span> <span class="o">==</span> <span class="s2">"="</span>
+                        <span class="p">]</span>
+                <span class="n">additional_metadata_out</span><span class="p">[</span><span class="s2">"score_pearsonr"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">pearsonr</span><span class="p">(</span>
+                        <span class="n">numpy</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">eq_df</span><span class="o">.</span><span class="n">measurement_value</span><span class="o">.</span><span class="n">values</span><span class="p">),</span>
+                        <span class="n">numpy</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">predictions</span><span class="p">[</span><span class="n">eq_df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span><span class="p">]))[</span><span class="mi">0</span><span class="p">])</span>
+
+                <span class="k">for</span> <span class="n">threshold</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">500</span><span class="p">,</span> <span class="mi">5000</span><span class="p">,</span> <span class="mi">15000</span><span class="p">]:</span>
+                    <span class="k">if</span> <span class="p">(</span><span class="n">eq_df</span><span class="o">.</span><span class="n">measurement_value</span> <span class="o">&lt;</span> <span class="n">threshold</span><span class="p">)</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                        <span class="n">additional_metadata_out</span><span class="p">[</span><span class="s2">"score_AUC@</span><span class="si">%d</span><span class="s2">"</span> <span class="o">%</span> <span class="n">threshold</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                            <span class="n">roc_auc_score</span><span class="p">(</span>
+                                <span class="p">(</span><span class="n">eq_df</span><span class="o">.</span><span class="n">measurement_value</span> <span class="o">&lt;</span> <span class="n">threshold</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+                                <span class="o">-</span><span class="mi">1</span> <span class="o">*</span> <span class="n">predictions</span><span class="p">[</span><span class="n">eq_df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span><span class="p">]))</span>
+
+            <span class="k">return</span> <span class="n">score_mse</span> <span class="o">*</span> <span class="p">(</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">sub_df</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">multiply_score_by_data_size</span> <span class="k">else</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">summary</span> <span class="o">=</span> <span class="s2">"mse (</span><span class="si">%d</span><span class="s2"> points)"</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">sub_df</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">ScoreFunction</span><span class="p">(</span><span class="n">score</span><span class="p">,</span> <span class="n">summary</span><span class="o">=</span><span class="n">summary</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="MassSpecModelSelector">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.MassSpecModelSelector">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MassSpecModelSelector</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Model selector that uses PPV of differentiating decoys from hits from</span>
+<span class="sd">    mass-spec experiments.</span>
+<span class="sd">    """</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">df</span><span class="p">,</span>
+            <span class="n">predictor</span><span class="p">,</span>
+            <span class="n">decoys_per_length</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+            <span class="n">min_measurements</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+            <span class="n">multiply_score_by_data_size</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+
+        <span class="c1"># Index is peptide, columns are alleles</span>
+        <span class="n">hit_matrix</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span>
+            <span class="p">[</span><span class="s2">"peptide"</span><span class="p">,</span> <span class="s2">"allele"</span><span class="p">])</span><span class="o">.</span><span class="n">measurement_value</span><span class="o">.</span><span class="n">count</span><span class="p">()</span><span class="o">.</span><span class="n">unstack</span><span class="p">()</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span>
+            <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">decoys_per_length</span><span class="p">:</span>
+            <span class="p">(</span><span class="n">min_length</span><span class="p">,</span> <span class="n">max_length</span><span class="p">)</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">supported_peptide_lengths</span>
+            <span class="n">decoys</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">min_length</span><span class="p">,</span> <span class="n">max_length</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="n">decoys</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="n">random_peptides</span><span class="p">(</span><span class="n">decoys_per_length</span><span class="p">,</span> <span class="n">length</span><span class="o">=</span><span class="n">length</span><span class="p">))</span>
+
+            <span class="n">decoy_matrix</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+                <span class="n">index</span><span class="o">=</span><span class="n">decoys</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">hit_matrix</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+            <span class="n">decoy_matrix</span><span class="p">[:]</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="n">full_matrix</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">hit_matrix</span><span class="p">,</span> <span class="n">decoy_matrix</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">full_matrix</span> <span class="o">=</span> <span class="n">hit_matrix</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">full_matrix</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">full_matrix</span> <span class="o">=</span> <span class="n">full_matrix</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">frac</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="n">full_matrix</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span> <span class="o">=</span> <span class="n">predictor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_measurements</span> <span class="o">=</span> <span class="n">min_measurements</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">multiply_score_by_data_size</span> <span class="o">=</span> <span class="n">multiply_score_by_data_size</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">peptides</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">full_matrix</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+        <span class="n">cache_encoding</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">peptides</span><span class="p">)</span>
+
+<div class="viewcode-block" id="MassSpecModelSelector.ppv">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.MassSpecModelSelector.ppv">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">ppv</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">predictions</span><span class="p">):</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"prediction"</span><span class="p">:</span> <span class="n">predictions</span><span class="p">,</span> <span class="s2">"y_true"</span><span class="p">:</span> <span class="n">y_true</span><span class="p">})</span>
+        <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">"prediction"</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span>
+            <span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">y_true</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+        <span class="p">]</span><span class="o">.</span><span class="n">y_true</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="MassSpecModelSelector.usable_for_allele">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.MassSpecModelSelector.usable_for_allele">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">usable_for_allele</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">allele</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="ow">and</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_measurements</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MassSpecModelSelector.max_absolute_value">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.MassSpecModelSelector.max_absolute_value">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">max_absolute_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">multiply_score_by_data_size</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mf">1.0</span></div>
+
+
+<div class="viewcode-block" id="MassSpecModelSelector.plan_summary">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.MassSpecModelSelector.plan_summary">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">plan_summary</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_function</span><span class="p">(</span><span class="n">allele</span><span class="p">)</span><span class="o">.</span><span class="n">summary</span></div>
+
+
+<div class="viewcode-block" id="MassSpecModelSelector.score_function">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.select_allele_specific_models_command.MassSpecModelSelector.score_function">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">score_function</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allele</span><span class="p">):</span>
+        <span class="n">total_hits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="n">total_decoys</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="n">multiplier</span> <span class="o">=</span> <span class="n">total_hits</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">multiply_score_by_data_size</span> <span class="k">else</span> <span class="mi">1</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">score</span><span class="p">(</span><span class="n">predictor</span><span class="p">,</span> <span class="n">additional_metadata_out</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+            <span class="n">predictions</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
+                <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">,</span>
+                <span class="n">peptides</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">peptides</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">ppv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ppv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">allele</span><span class="p">],</span> <span class="n">predictions</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">additional_metadata_out</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">additional_metadata_out</span><span class="p">[</span><span class="s2">"score_mass_spec_PPV"</span><span class="p">]</span> <span class="o">=</span> <span class="n">ppv</span>
+
+                <span class="c1"># We additionally compute AUC score.</span>
+                <span class="n">additional_metadata_out</span><span class="p">[</span><span class="s2">"score_mass_spec_AUC"</span><span class="p">]</span> <span class="o">=</span> <span class="n">roc_auc_score</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span> <span class="o">*</span> <span class="n">predictions</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">ppv</span> <span class="o">*</span> <span class="n">multiplier</span>
+
+        <span class="n">summary</span> <span class="o">=</span> <span class="s2">"mass-spec (</span><span class="si">%d</span><span class="s2"> hits / </span><span class="si">%d</span><span class="s2"> decoys)"</span> <span class="o">%</span> <span class="p">(</span><span class="n">total_hits</span><span class="p">,</span> <span class="n">total_decoys</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ScoreFunction</span><span class="p">(</span><span class="n">score</span><span class="p">,</span> <span class="n">summary</span><span class="o">=</span><span class="n">summary</span><span class="p">)</span></div>
+</div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">'__main__'</span><span class="p">:</span>
+    <span class="n">run</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

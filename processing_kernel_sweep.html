@@ -1,0 +1,244 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Processing kernel-width experiment &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Processing hyperparameter campaign" href="processing_hyperparameter_campaign.html" />
+    <link rel="prev" title="Cleavage-boundary processing models" href="processing_cleavage_boundary_experiment.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Processing kernel-width experiment</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#workflow">Workflow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#maintained-command">Maintained command</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#resume-preparation">Resume preparation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Processing kernel-width experiment</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/processing_kernel_sweep.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="processing-kernel-width-experiment">
+<h1>Processing kernel-width experiment<a class="headerlink" href="#processing-kernel-width-experiment" title="Link to this heading"></a></h1>
+<section id="workflow">
+<h2>Workflow<a class="headerlink" href="#workflow" title="Link to this heading"></a></h2>
+<p>Train six widths (5, 7, 9, 11, 13, 15) in each of two unmixed families:
+the legacy 5-aa-flank CNN and a peptide-only CNN with separate 5-outside/
+5-inside N/C boundary branches. Four paired sample folds per condition give
+48 networks. Keep 512 filters, ReLU, dropout 0.5, Glorot initialization,
+Keras-compatible Adam, batch 512, patience 20 and seed 42 fixed. Restore the
+best validation weights. This is not the final broad-grid ensemble selection.</p>
+<p>Use one frozen, length/affinity-matched training table, excluding release
+holdout samples. Do not reuse the earlier random-negative training table.
+Retain candidate-pool scores, matching assignments, data/model/source hashes,
+fold membership, all epoch losses, and per-fold validation predictions.</p>
+<p>Known flanks are adjacent to the actual peptide, including short peptides;
+there is no gap to a maximum-length peptide slot. Missing flank residues and
+convolution context beyond the supplied five residues are encoded as X.
+For the boundary family, external residues enter only the boundary branches;
+the central CNN sees X outside the peptide. Missing context is not evidence
+of a true protein terminus. No fabricated BOS/EOS token is introduced.</p>
+<p>The outer-padding choice is an opt-in serialized hyperparameter;
+old configs retain zero padding and unchanged predictions. Validation covers every
+requested width, short/long peptides, full/partial/missing flanks, convolution
+alignment, and save/load compatibility before training.</p>
+<p>Rank widths within each family using paired sample-held-out predictions
+(macro AUPRC and PPV&#64;N, with AUROC/micro safeguards). Preserve all conditions;
+do not label the release holdout an unbiased final test after using it to
+choose an architecture. Report actual public weights as a reference, not a
+matched-data control: these new fits also change negative policy and checkpoint
+restoration relative to historical runs. Plot metrics against width, per-sample
+deltas and epoch traces; keep prediction rows joinable to external predictors.</p>
+<p>Run on one Modal A100 through runplz, using persistent volumes and a bounded
+timeout. Keep an exact source archive and durable commands/logs. This experiment does
+not publish weights.</p>
+</section>
+<section id="maintained-command">
+<h2>Maintained command<a class="headerlink" href="#maintained-command" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span>train<span class="w"> </span>processing-kernel-sweep<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--out<span class="w"> </span>experiments/processing-kernels<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--train-data<span class="w"> </span>matched/train_data.csv<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--public-root<span class="w"> </span>/path/to/downloads/2.2.0<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--release-holdout-dir<span class="w"> </span>/path/to/release_holdout<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-commit<span class="w"> </span>COMMIT<span class="w"> </span>--gpus<span class="w"> </span><span class="m">1</span><span class="w"> </span>--num-jobs<span class="w"> </span><span class="m">1</span>
+</pre></div>
+</div>
+<p>The Modal launcher additionally generates the fresh matched table from the
+cached hit annotations and frozen public affinity predictor. It preserves
+scored candidate pools even if matching fails; failure never selects legacy
+random negatives. Set <code class="docutils literal notranslate"><span class="pre">PROCESSING_KERNEL_RUN_ID</span></code>,
+<code class="docutils literal notranslate"><span class="pre">PROCESSING_KERNEL_SOURCE_COMMIT</span></code>, and <code class="docutils literal notranslate"><span class="pre">PROCESSING_KERNEL_SOURCE_SHA256</span></code>, upload
+the exact source tarball to <code class="docutils literal notranslate"><span class="pre">/inputs/RUN_ID/source.tar.gz</span></code> in the
+<code class="docutils literal notranslate"><span class="pre">mhcflurry-230-final-weights</span></code> volume, then launch from that tarball’s extraction:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>runplz<span class="w"> </span>modal<span class="w"> </span>scripts/training/launch_processing_kernel_sweep_modal.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--detach<span class="w"> </span>--outputs-dir<span class="w"> </span>/path/to/local/experiment
+runplz<span class="w"> </span>status<span class="w"> </span>--outputs-dir<span class="w"> </span>/path/to/local/experiment
+runplz<span class="w"> </span>collect<span class="w"> </span>--outputs-dir<span class="w"> </span>/path/to/local/experiment
+</pre></div>
+</div>
+<p>The receipt identifies the run-specific remote output path; no whole-volume
+download is needed. Inside it, <code class="docutils literal notranslate"><span class="pre">processing.shared</span></code> retains matching inputs and
+outputs; <code class="docutils literal notranslate"><span class="pre">kernel_sweep</span></code> holds models, epoch-loss figures, member predictions,
+sample/fold metrics, and width plots. Training validation uses one matched
+negative per hit; release evaluation uses ten. Do not compare their AUPRC levels
+directly. The four folds can overlap in held-out samples: summaries average
+folds within sample before averaging samples, not independent-fold significance.</p>
+<p>Padding issue: <a class="reference external" href="https://github.com/openvax/mhcflurry/issues/404">#404</a>.
+The zero-padding behavior follows the <a class="reference external" href="https://docs.pytorch.org/docs/2.14/generated/torch.nn.Conv1d.html">PyTorch Conv1d API</a>.</p>
+</section>
+<section id="resume-preparation">
+<h2>Resume preparation<a class="headerlink" href="#resume-preparation" title="Link to this heading"></a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">train</span> <span class="pre">processing-data</span> <span class="pre">--resume</span></code> for the same output or
+<code class="docutils literal notranslate"><span class="pre">--resume-matching-dir</span> <span class="pre">PRIOR/train_data.csv.matching</span></code> for a new output. Resume
+verifies input/reference hashes, seed and matching policy. Completed samples
+are reconstructed from saved outputs; only unresolved peptide-length pools
+expand. Matching keeps the original affinity caliper and never silently drops
+hits. Exhausting the bounded expansion raises an error.</p>
+<p>Each round records score hashes, deterministic seeds, unresolved hits and
+sampling/scoring/write timings. Older pools without per-round hashes are marked
+on import; their source hashes and observed-row identities are still checked.
+For the Modal launcher, <code class="docutils literal notranslate"><span class="pre">PROCESSING_KERNEL_RESUME_MATCHING_DIR</span></code> names a read-only
+prior directory under <code class="docutils literal notranslate"><span class="pre">/out</span></code>; the resumed experiment writes a new run directory.</p>
+<p><code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">train</span> <span class="pre">benchmark-processing-sampler</span> <span class="pre">--out</span> <span class="pre">benchmark.json</span></code> measures the
+numeric-position and reservoir samplers on a synthetic CPU workload. A sampling
+microbenchmark does not establish an end-to-end preparation speedup.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="processing_cleavage_boundary_experiment.html" class="btn btn-neutral float-left" title="Cleavage-boundary processing models" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="processing_hyperparameter_campaign.html" class="btn btn-neutral float-right" title="Processing hyperparameter campaign" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,558 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.flanking_encoding &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.flanking_encoding</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.flanking_encoding</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""</span>
+<span class="sd">Class for encoding variable-length flanking and peptides to</span>
+<span class="sd">fixed-size numerical matrices</span>
+<span class="sd">"""</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">namedtuple</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">amino_acid</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.encodable_sequences</span><span class="w"> </span><span class="kn">import</span> <span class="n">EncodingError</span><span class="p">,</span> <span class="n">EncodableSequences</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+
+
+<span class="n">EncodingResult</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span>
+    <span class="s2">"EncodingResult"</span><span class="p">,</span>
+    <span class="p">[</span><span class="s2">"array"</span><span class="p">,</span> <span class="s2">"peptide_lengths"</span><span class="p">,</span> <span class="s2">"unsupported_mask"</span><span class="p">],</span>
+    <span class="n">defaults</span><span class="o">=</span><span class="p">(</span><span class="kc">None</span><span class="p">,))</span>
+
+
+<div class="viewcode-block" id="FlankingEncoding">
+<a class="viewcode-back" href="../../api.html#mhcflurry.flanking_encoding.FlankingEncoding">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FlankingEncoding</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Encode peptides and optionally their N- and C-flanking sequences into fixed</span>
+<span class="sd">    size numerical matrices. Similar to EncodableSequences but with support</span>
+<span class="sd">    for flanking sequences and the encoding scheme used by the processing</span>
+<span class="sd">    predictor.</span>
+
+<span class="sd">    Instances of this class have an immutable list of peptides with</span>
+<span class="sd">    flanking sequences. Encodings are cached in the instances for faster</span>
+<span class="sd">    performance when the same set of peptides needs to be encoded more than once.</span>
+<span class="sd">    """</span>
+    <span class="n">unknown_character</span> <span class="o">=</span> <span class="s2">"X"</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">peptides</span><span class="p">,</span> <span class="n">n_flanks</span><span class="p">,</span> <span class="n">c_flanks</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Constructor. Sequences of any lengths can be passed.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        peptides : list of string</span>
+<span class="sd">            Peptide sequences</span>
+<span class="sd">        n_flanks : list of string [same length as peptides]</span>
+<span class="sd">            Upstream sequences</span>
+<span class="sd">        c_flanks : list of string [same length as peptides]</span>
+<span class="sd">            Downstream sequences</span>
+<span class="sd">        """</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dataframe</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+            <span class="s2">"peptide"</span><span class="p">:</span> <span class="n">peptides</span><span class="p">,</span>
+            <span class="s2">"n_flank"</span><span class="p">:</span> <span class="n">n_flanks</span><span class="p">,</span>
+            <span class="s2">"c_flank"</span><span class="p">:</span> <span class="n">c_flanks</span><span class="p">,</span>
+        <span class="p">},</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">str</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tensor_cache</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Drop device tensors when pickling."""</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">state</span><span class="p">[</span><span class="s2">"tensor_cache"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">return</span> <span class="n">state</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Number of peptides.</span>
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dataframe</span><span class="p">)</span>
+
+<div class="viewcode-block" id="FlankingEncoding.clear_tensor_cache">
+<a class="viewcode-back" href="../../api.html#mhcflurry.flanking_encoding.FlankingEncoding.clear_tensor_cache">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clear_tensor_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Release cached torch tensors held by this encoding."""</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tensor_cache</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="FlankingEncoding.vector_encode">
+<a class="viewcode-back" href="../../api.html#mhcflurry.flanking_encoding.FlankingEncoding.vector_encode">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">vector_encode</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">vector_encoding_name</span><span class="p">,</span>
+            <span class="n">peptide_max_length</span><span class="p">,</span>
+            <span class="n">n_flank_length</span><span class="p">,</span>
+            <span class="n">c_flank_length</span><span class="p">,</span>
+            <span class="n">allow_unsupported_amino_acids</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">throw</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Encode variable-length sequences to a fixed-size dense matrix.</span>
+
+<span class="sd">        DEPRECATED (scheduled for removal): the processing model always</span>
+<span class="sd">        index-encodes sequences ((N, L) int8) and embeds on device. This dense</span>
+<span class="sd">        ``(N, L, V)`` encoder has no remaining caller — use</span>
+<span class="sd">        ``categorical_encode`` (or ``categorical_encode_tensors``) instead.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        vector_encoding_name : string</span>
+<span class="sd">            How to represent amino acids. One of "BLOSUM62", "one-hot", etc.</span>
+<span class="sd">            See `amino_acid.available_vector_encodings()`.</span>
+<span class="sd">        peptide_max_length : int</span>
+<span class="sd">            Maximum supported peptide length.</span>
+<span class="sd">        n_flank_length : int</span>
+<span class="sd">            Maximum supported N-flank length</span>
+<span class="sd">        c_flank_length : int</span>
+<span class="sd">            Maximum supported C-flank length</span>
+<span class="sd">        allow_unsupported_amino_acids : bool</span>
+<span class="sd">            If True, non-canonical amino acids will be replaced with the X</span>
+<span class="sd">            character before encoding.</span>
+<span class="sd">        throw : bool</span>
+<span class="sd">            Whether to raise exception on unsupported peptides</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.array with shape (num sequences, length, m)</span>
+
+<span class="sd">        where</span>
+<span class="sd">            - num sequences is number of peptides, i.e. len(self)</span>
+<span class="sd">            - length is peptide_max_length + n_flank_length + c_flank_length</span>
+<span class="sd">            - m is the vector encoding length (usually 21).</span>
+<span class="sd">        """</span>
+        <span class="n">cache_key</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">"vector_encode"</span><span class="p">,</span>
+            <span class="n">vector_encoding_name</span><span class="p">,</span>
+            <span class="n">peptide_max_length</span><span class="p">,</span>
+            <span class="n">n_flank_length</span><span class="p">,</span>
+            <span class="n">c_flank_length</span><span class="p">,</span>
+            <span class="n">allow_unsupported_amino_acids</span><span class="p">,</span>
+            <span class="n">throw</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">cache_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span>
+                <span class="n">vector_encoding_name</span><span class="o">=</span><span class="n">vector_encoding_name</span><span class="p">,</span>
+                <span class="n">df</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dataframe</span><span class="p">,</span>
+                <span class="n">peptide_max_length</span><span class="o">=</span><span class="n">peptide_max_length</span><span class="p">,</span>
+                <span class="n">n_flank_length</span><span class="o">=</span><span class="n">n_flank_length</span><span class="p">,</span>
+                <span class="n">c_flank_length</span><span class="o">=</span><span class="n">c_flank_length</span><span class="p">,</span>
+                <span class="n">allow_unsupported_amino_acids</span><span class="o">=</span><span class="n">allow_unsupported_amino_acids</span><span class="p">,</span>
+                <span class="n">throw</span><span class="o">=</span><span class="n">throw</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="FlankingEncoding.categorical_encode">
+<a class="viewcode-back" href="../../api.html#mhcflurry.flanking_encoding.FlankingEncoding.categorical_encode">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">categorical_encode</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">peptide_max_length</span><span class="p">,</span>
+            <span class="n">n_flank_length</span><span class="p">,</span>
+            <span class="n">c_flank_length</span><span class="p">,</span>
+            <span class="n">allow_unsupported_amino_acids</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">throw</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Encode variable-length sequences to fixed-size amino-acid indices.</span>
+
+<span class="sd">        This mirrors :meth:`vector_encode` but stops before expanding amino</span>
+<span class="sd">        acids to dense vector encodings. The resulting integer array is suited</span>
+<span class="sd">        for torch-side embedding lookup.</span>
+<span class="sd">        """</span>
+        <span class="n">cache_key</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">"categorical_encode"</span><span class="p">,</span>
+            <span class="n">peptide_max_length</span><span class="p">,</span>
+            <span class="n">n_flank_length</span><span class="p">,</span>
+            <span class="n">c_flank_length</span><span class="p">,</span>
+            <span class="n">allow_unsupported_amino_acids</span><span class="p">,</span>
+            <span class="n">throw</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">cache_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">encode_indices</span><span class="p">(</span>
+                <span class="n">df</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dataframe</span><span class="p">,</span>
+                <span class="n">peptide_max_length</span><span class="o">=</span><span class="n">peptide_max_length</span><span class="p">,</span>
+                <span class="n">n_flank_length</span><span class="o">=</span><span class="n">n_flank_length</span><span class="p">,</span>
+                <span class="n">c_flank_length</span><span class="o">=</span><span class="n">c_flank_length</span><span class="p">,</span>
+                <span class="n">allow_unsupported_amino_acids</span><span class="o">=</span><span class="n">allow_unsupported_amino_acids</span><span class="p">,</span>
+                <span class="n">throw</span><span class="o">=</span><span class="n">throw</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="FlankingEncoding.categorical_encode_tensors">
+<a class="viewcode-back" href="../../api.html#mhcflurry.flanking_encoding.FlankingEncoding.categorical_encode_tensors">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">categorical_encode_tensors</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">peptide_max_length</span><span class="p">,</span>
+            <span class="n">n_flank_length</span><span class="p">,</span>
+            <span class="n">c_flank_length</span><span class="p">,</span>
+            <span class="n">device</span><span class="p">,</span>
+            <span class="n">allow_unsupported_amino_acids</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">throw</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Encode variable-length sequences to cached torch tensors.</span>
+
+<span class="sd">        The CPU numpy encoding remains the source of truth. This method keeps</span>
+<span class="sd">        a device-resident view/copy keyed by encoding parameters and device so</span>
+<span class="sd">        repeated processing models can slice the same tensors without per-batch</span>
+<span class="sd">        host-to-device transfers.</span>
+<span class="sd">        """</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+
+        <span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"cuda"</span> <span class="ow">and</span> <span class="n">device</span><span class="o">.</span><span class="n">index</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">())</span>
+
+        <span class="n">cache_key</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">"categorical_encode_tensors"</span><span class="p">,</span>
+            <span class="n">peptide_max_length</span><span class="p">,</span>
+            <span class="n">n_flank_length</span><span class="p">,</span>
+            <span class="n">c_flank_length</span><span class="p">,</span>
+            <span class="n">allow_unsupported_amino_acids</span><span class="p">,</span>
+            <span class="n">throw</span><span class="p">,</span>
+            <span class="n">device</span><span class="o">.</span><span class="n">type</span><span class="p">,</span>
+            <span class="n">device</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">cache_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">tensor_cache</span><span class="p">:</span>
+            <span class="n">encoded</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">categorical_encode</span><span class="p">(</span>
+                <span class="n">peptide_max_length</span><span class="o">=</span><span class="n">peptide_max_length</span><span class="p">,</span>
+                <span class="n">n_flank_length</span><span class="o">=</span><span class="n">n_flank_length</span><span class="p">,</span>
+                <span class="n">c_flank_length</span><span class="o">=</span><span class="n">c_flank_length</span><span class="p">,</span>
+                <span class="n">allow_unsupported_amino_acids</span><span class="o">=</span><span class="n">allow_unsupported_amino_acids</span><span class="p">,</span>
+                <span class="n">throw</span><span class="o">=</span><span class="n">throw</span><span class="p">)</span>
+
+            <span class="n">sequence_array</span> <span class="o">=</span> <span class="n">encoded</span><span class="o">.</span><span class="n">array</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">sequence_array</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span><span class="p">:</span>
+                <span class="n">sequence_array</span> <span class="o">=</span> <span class="n">sequence_array</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">peptide_lengths</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">encoded</span><span class="o">.</span><span class="n">peptide_lengths</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">peptide_lengths</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span><span class="p">:</span>
+                <span class="n">peptide_lengths</span> <span class="o">=</span> <span class="n">peptide_lengths</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+            <span class="c1"># These transfers are blocking: the source tensors come from</span>
+            <span class="c1"># torch.from_numpy(...) and are not pinned, so non_blocking=True</span>
+            <span class="c1"># would be a silent no-op. This is a one-time, cached transfer per</span>
+            <span class="c1"># cache key (not a per-batch hot path), so pinning the host buffer</span>
+            <span class="c1"># to enable an async copy isn't worth the extra staging copy.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tensor_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">EncodingResult</span><span class="p">(</span>
+                <span class="n">array</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">sequence_array</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">),</span>
+                <span class="n">peptide_lengths</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">peptide_lengths</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">),</span>
+                <span class="n">unsupported_mask</span><span class="o">=</span><span class="p">(</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+                        <span class="n">encoded</span><span class="o">.</span><span class="n">unsupported_mask</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">,</span>
+                    <span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">encoded</span><span class="o">.</span><span class="n">unsupported_mask</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                    <span class="k">else</span> <span class="kc">None</span>
+                <span class="p">))</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tensor_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span></div>
+
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_fixed_length_index_encoding</span><span class="p">(</span>
+            <span class="n">df</span><span class="p">,</span>
+            <span class="n">peptide_max_length</span><span class="p">,</span>
+            <span class="n">n_flank_length</span><span class="p">,</span>
+            <span class="n">c_flank_length</span><span class="p">,</span>
+            <span class="n">allow_unsupported_amino_acids</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">throw</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Encode variable-length sequences to a fixed-size matrix.</span>
+
+<span class="sd">        Helper function. Users should use `categorical_encode`.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        df : pandas.DataFrame</span>
+<span class="sd">        peptide_max_length : int</span>
+<span class="sd">        n_flank_length : int</span>
+<span class="sd">        c_flank_length : int</span>
+<span class="sd">        allow_unsupported_amino_acids : bool</span>
+<span class="sd">        throw : bool</span>
+
+<span class="sd">        Returns a tuple ``(index_array, peptide_lengths, error_df)``.</span>
+<span class="sd">        """</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">error_df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+            <span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span> <span class="o">&gt;</span> <span class="n">peptide_max_length</span><span class="p">)</span> <span class="o">|</span>
+            <span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">error_df</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">"Sequence '</span><span class="si">%s</span><span class="s2">' (length </span><span class="si">%d</span><span class="s2">) unsupported. There are </span><span class="si">%d</span><span class="s2"> "</span>
+                <span class="s2">"total peptides with this length."</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="n">error_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">peptide</span><span class="p">,</span>
+                    <span class="nb">len</span><span class="p">(</span><span class="n">error_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">peptide</span><span class="p">),</span>
+                    <span class="nb">len</span><span class="p">(</span><span class="n">error_df</span><span class="p">)))</span>
+            <span class="k">if</span> <span class="n">throw</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">EncodingError</span><span class="p">(</span>
+                    <span class="n">message</span><span class="p">,</span>
+                    <span class="n">supported_peptide_lengths</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">peptide_max_length</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+
+            <span class="c1"># Replace invalid peptides with X's. The encoding will be set to</span>
+            <span class="c1"># NaNs for these peptides farther below.</span>
+            <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">error_df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="s2">"peptide"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"X"</span> <span class="o">*</span> <span class="n">peptide_max_length</span>
+
+        <span class="k">if</span> <span class="n">n_flank_length</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">n_flanks</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">n_flank</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span>
+                <span class="n">n_flank_length</span><span class="p">,</span>
+                <span class="n">side</span><span class="o">=</span><span class="s2">"left"</span><span class="p">,</span>
+                <span class="n">fillchar</span><span class="o">=</span><span class="s2">"X"</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">slice</span><span class="p">(</span><span class="o">-</span><span class="n">n_flank_length</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">n_flanks</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">([</span><span class="s2">""</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">str</span><span class="p">)</span>
+
+        <span class="n">c_flanks</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">c_flank</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span>
+            <span class="n">c_flank_length</span><span class="p">,</span>
+            <span class="n">side</span><span class="o">=</span><span class="s2">"right"</span><span class="p">,</span>
+            <span class="n">fillchar</span><span class="o">=</span><span class="s2">"X"</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">c_flank_length</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+        <span class="n">peptides</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+
+        <span class="n">concatenated</span> <span class="o">=</span> <span class="n">n_flanks</span> <span class="o">+</span> <span class="n">peptides</span> <span class="o">+</span> <span class="n">c_flanks</span>
+
+        <span class="n">encoder</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">concatenated</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+        <span class="n">array</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">variable_length_to_fixed_length_categorical</span><span class="p">(</span>
+            <span class="n">alignment_method</span><span class="o">=</span><span class="s2">"right_pad"</span><span class="p">,</span>
+            <span class="n">max_length</span><span class="o">=</span><span class="n">n_flank_length</span> <span class="o">+</span> <span class="n">peptide_max_length</span> <span class="o">+</span> <span class="n">c_flank_length</span><span class="p">,</span>
+            <span class="n">allow_unsupported_amino_acids</span><span class="o">=</span><span class="n">allow_unsupported_amino_acids</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span><span class="n">array</span><span class="p">,</span> <span class="n">peptides</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">error_df</span><span class="p">)</span>
+
+<div class="viewcode-block" id="FlankingEncoding.encode_indices">
+<a class="viewcode-back" href="../../api.html#mhcflurry.flanking_encoding.FlankingEncoding.encode_indices">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">encode_indices</span><span class="p">(</span>
+            <span class="n">df</span><span class="p">,</span>
+            <span class="n">peptide_max_length</span><span class="p">,</span>
+            <span class="n">n_flank_length</span><span class="p">,</span>
+            <span class="n">c_flank_length</span><span class="p">,</span>
+            <span class="n">allow_unsupported_amino_acids</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">throw</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Encode variable-length sequences to fixed-size amino-acid indices.</span>
+<span class="sd">        """</span>
+        <span class="n">array</span><span class="p">,</span> <span class="n">peptide_lengths</span><span class="p">,</span> <span class="n">error_df</span> <span class="o">=</span> <span class="n">FlankingEncoding</span><span class="o">.</span><span class="n">_fixed_length_index_encoding</span><span class="p">(</span>
+            <span class="n">df</span><span class="o">=</span><span class="n">df</span><span class="p">,</span>
+            <span class="n">peptide_max_length</span><span class="o">=</span><span class="n">peptide_max_length</span><span class="p">,</span>
+            <span class="n">n_flank_length</span><span class="o">=</span><span class="n">n_flank_length</span><span class="p">,</span>
+            <span class="n">c_flank_length</span><span class="o">=</span><span class="n">c_flank_length</span><span class="p">,</span>
+            <span class="n">allow_unsupported_amino_acids</span><span class="o">=</span><span class="n">allow_unsupported_amino_acids</span><span class="p">,</span>
+            <span class="n">throw</span><span class="o">=</span><span class="n">throw</span><span class="p">)</span>
+        <span class="n">unsupported_mask</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">array</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">error_df</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">unsupported_mask</span><span class="p">[</span><span class="n">error_df</span><span class="o">.</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="n">EncodingResult</span><span class="p">(</span>
+            <span class="n">array</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">"int8"</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+            <span class="n">peptide_lengths</span><span class="o">=</span><span class="n">peptide_lengths</span><span class="p">,</span>
+            <span class="n">unsupported_mask</span><span class="o">=</span><span class="n">unsupported_mask</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FlankingEncoding.encode">
+<a class="viewcode-back" href="../../api.html#mhcflurry.flanking_encoding.FlankingEncoding.encode">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">encode</span><span class="p">(</span>
+            <span class="n">vector_encoding_name</span><span class="p">,</span>
+            <span class="n">df</span><span class="p">,</span>
+            <span class="n">peptide_max_length</span><span class="p">,</span>
+            <span class="n">n_flank_length</span><span class="p">,</span>
+            <span class="n">c_flank_length</span><span class="p">,</span>
+            <span class="n">allow_unsupported_amino_acids</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">throw</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Encode variable-length sequences to a fixed-size matrix.</span>
+
+<span class="sd">        Helper function. Users should use `vector_encode`.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        vector_encoding_name : string</span>
+<span class="sd">        df : pandas.DataFrame</span>
+<span class="sd">        peptide_max_length : int</span>
+<span class="sd">        n_flank_length : int</span>
+<span class="sd">        c_flank_length : int</span>
+<span class="sd">        allow_unsupported_amino_acids : bool</span>
+<span class="sd">        throw : bool</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.array</span>
+<span class="sd">        """</span>
+        <span class="n">index_array</span><span class="p">,</span> <span class="n">peptide_lengths</span><span class="p">,</span> <span class="n">error_df</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">FlankingEncoding</span><span class="o">.</span><span class="n">_fixed_length_index_encoding</span><span class="p">(</span>
+                <span class="n">df</span><span class="o">=</span><span class="n">df</span><span class="p">,</span>
+                <span class="n">peptide_max_length</span><span class="o">=</span><span class="n">peptide_max_length</span><span class="p">,</span>
+                <span class="n">n_flank_length</span><span class="o">=</span><span class="n">n_flank_length</span><span class="p">,</span>
+                <span class="n">c_flank_length</span><span class="o">=</span><span class="n">c_flank_length</span><span class="p">,</span>
+                <span class="n">allow_unsupported_amino_acids</span><span class="o">=</span><span class="n">allow_unsupported_amino_acids</span><span class="p">,</span>
+                <span class="n">throw</span><span class="o">=</span><span class="n">throw</span><span class="p">))</span>
+        <span class="n">array</span> <span class="o">=</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">fixed_vectors_encoding</span><span class="p">(</span>
+            <span class="n">index_array</span><span class="p">,</span>
+            <span class="n">amino_acid</span><span class="o">.</span><span class="n">get_vector_encoding_df</span><span class="p">(</span><span class="n">vector_encoding_name</span><span class="p">))</span>
+
+        <span class="n">array</span> <span class="o">=</span> <span class="n">array</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">"float32"</span><span class="p">)</span>  <span class="c1"># So NaNs can be used.</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">error_df</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">array</span><span class="p">[</span><span class="n">error_df</span><span class="o">.</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">nan</span>
+
+        <span class="n">unsupported_mask</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">array</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">error_df</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">unsupported_mask</span><span class="p">[</span><span class="n">error_df</span><span class="o">.</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">EncodingResult</span><span class="p">(</span>
+            <span class="n">array</span><span class="p">,</span>
+            <span class="n">peptide_lengths</span><span class="o">=</span><span class="n">peptide_lengths</span><span class="p">,</span>
+            <span class="n">unsupported_mask</span><span class="o">=</span><span class="n">unsupported_mask</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

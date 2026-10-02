@@ -1,0 +1,415 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.proteome_decoys &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.proteome_decoys</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.proteome_decoys</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Utilities for generating proteome peptide decoy candidates."""</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.amino_acid</span><span class="w"> </span><span class="kn">import</span> <span class="n">COMMON_AMINO_ACIDS</span>
+
+
+<span class="n">PROTEOME_PEPTIDE_COLUMNS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">"protein_accession"</span><span class="p">,</span>
+    <span class="s2">"peptide"</span><span class="p">,</span>
+    <span class="s2">"n_flank"</span><span class="p">,</span>
+    <span class="s2">"c_flank"</span><span class="p">,</span>
+    <span class="s2">"start_position"</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<div class="viewcode-block" id="unique_in_order">
+<a class="viewcode-back" href="../../api.html#mhcflurry.proteome_decoys.unique_in_order">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">unique_in_order</span><span class="p">(</span><span class="n">values</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return unique non-null values while preserving first-seen order."""</span>
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">value</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">values</span> <span class="k">if</span> <span class="n">pandas</span><span class="o">.</span><span class="n">notnull</span><span class="p">(</span><span class="n">value</span><span class="p">)))</span></div>
+
+
+
+<div class="viewcode-block" id="infer_flanking_length">
+<a class="viewcode-back" href="../../api.html#mhcflurry.proteome_decoys.infer_flanking_length">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">infer_flanking_length</span><span class="p">(</span><span class="n">hit_df</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Infer the fixed flanking sequence length used for peptide decoys."""</span>
+    <span class="n">lengths</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">hit_df</span><span class="o">.</span><span class="n">n_flank</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span>
+    <span class="n">lengths</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">hit_df</span><span class="o">.</span><span class="n">c_flank</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">lengths</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Expected one flank length, got </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">lengths</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">lengths</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="load_reference_sequences">
+<a class="viewcode-back" href="../../api.html#mhcflurry.proteome_decoys.load_reference_sequences">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_reference_sequences</span><span class="p">(</span><span class="n">reference_csv</span><span class="p">,</span> <span class="n">accessions</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Load protein sequences keyed by accession for the requested accessions."""</span>
+    <span class="n">accessions</span> <span class="o">=</span> <span class="n">unique_in_order</span><span class="p">(</span><span class="n">accessions</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">reference_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span>
+            <span class="n">reference_csv</span><span class="p">,</span>
+            <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s2">"accession"</span><span class="p">,</span> <span class="s2">"seq"</span><span class="p">])</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="n">reference_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">reference_csv</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">"accession"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">reference_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Expected reference CSV </span><span class="si">%s</span><span class="s2"> to have an 'accession' column"</span> <span class="o">%</span>
+            <span class="n">reference_csv</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">"seq"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">reference_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Expected reference CSV </span><span class="si">%s</span><span class="s2"> to have a 'seq' column"</span> <span class="o">%</span> <span class="n">reference_csv</span><span class="p">)</span>
+
+    <span class="n">reference_df</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">reference_df</span>
+        <span class="o">.</span><span class="n">drop_duplicates</span><span class="p">(</span><span class="s2">"accession"</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">"accession"</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">missing</span> <span class="o">=</span> <span class="p">[</span><span class="n">accession</span> <span class="k">for</span> <span class="n">accession</span> <span class="ow">in</span> <span class="n">accessions</span>
+               <span class="k">if</span> <span class="n">accession</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">reference_df</span><span class="o">.</span><span class="n">index</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">missing</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Missing </span><span class="si">%d</span><span class="s2"> protein accessions in </span><span class="si">%s</span><span class="s2">, including: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">missing</span><span class="p">),</span> <span class="n">reference_csv</span><span class="p">,</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">missing</span><span class="p">[:</span><span class="mi">10</span><span class="p">])))</span>
+    <span class="k">return</span> <span class="n">reference_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">accessions</span><span class="p">]</span><span class="o">.</span><span class="n">seq</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="iter_protein_peptide_records">
+<a class="viewcode-back" href="../../api.html#mhcflurry.proteome_decoys.iter_protein_peptide_records">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">iter_protein_peptide_records</span><span class="p">(</span>
+        <span class="n">accession</span><span class="p">,</span>
+        <span class="n">sequence</span><span class="p">,</span>
+        <span class="n">lengths</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">11</span><span class="p">),</span>
+        <span class="n">flanking_length</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
+        <span class="n">valid_amino_acids</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Yield peptide/flank records for one protein sequence.</span>
+
+<span class="sd">    The start-position range intentionally matches the historical</span>
+<span class="sd">    ``write_proteome_peptides.py`` behavior so release data generation remains</span>
+<span class="sd">    comparable. Concretely, ``range(0, len(sequence) - min_length)`` has an</span>
+<span class="sd">    exclusive upper bound, so the last start position is</span>
+<span class="sd">    ``len(sequence) - min_length - 1`` and the single ``min_length``-mer that</span>
+<span class="sd">    would start at ``len(sequence) - min_length`` (the C-terminal</span>
+<span class="sd">    ``min_length``-mer) is NOT emitted. This off-by-one is deliberate</span>
+<span class="sd">    bug-for-bug parity, not an oversight: changing it would alter the decoy</span>
+<span class="sd">    set used to generate released models. ``test_iter_protein_peptide_records_*``</span>
+<span class="sd">    pins the resulting counts so the behavior can't drift silently.</span>
+<span class="sd">    """</span>
+    <span class="n">valid_amino_acids</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">valid_amino_acids</span> <span class="ow">or</span> <span class="n">COMMON_AMINO_ACIDS</span><span class="p">)</span>
+    <span class="n">lengths</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">lengths</span><span class="p">)</span>
+    <span class="n">min_length</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">lengths</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">start</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">sequence</span><span class="p">)</span> <span class="o">-</span> <span class="n">min_length</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="n">lengths</span><span class="p">:</span>
+            <span class="n">end_pos</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">length</span>
+            <span class="k">if</span> <span class="n">end_pos</span> <span class="o">&gt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">sequence</span><span class="p">):</span>
+                <span class="k">break</span>
+            <span class="n">peptide</span> <span class="o">=</span> <span class="n">sequence</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end_pos</span><span class="p">]</span>
+            <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">letter</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">valid_amino_acids</span> <span class="k">for</span> <span class="n">letter</span> <span class="ow">in</span> <span class="n">peptide</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="n">n_flank</span> <span class="o">=</span> <span class="n">sequence</span><span class="p">[</span>
+                <span class="nb">max</span><span class="p">(</span><span class="n">start</span> <span class="o">-</span> <span class="n">flanking_length</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span><span class="n">start</span>
+            <span class="p">]</span><span class="o">.</span><span class="n">rjust</span><span class="p">(</span><span class="n">flanking_length</span><span class="p">,</span> <span class="s2">"X"</span><span class="p">)</span>
+            <span class="n">c_flank</span> <span class="o">=</span> <span class="n">sequence</span><span class="p">[</span>
+                <span class="n">end_pos</span><span class="p">:(</span><span class="n">end_pos</span> <span class="o">+</span> <span class="n">flanking_length</span><span class="p">)</span>
+            <span class="p">]</span><span class="o">.</span><span class="n">ljust</span><span class="p">(</span><span class="n">flanking_length</span><span class="p">,</span> <span class="s2">"X"</span><span class="p">)</span>
+            <span class="k">yield</span> <span class="n">accession</span><span class="p">,</span> <span class="n">peptide</span><span class="p">,</span> <span class="n">n_flank</span><span class="p">,</span> <span class="n">c_flank</span><span class="p">,</span> <span class="n">start</span></div>
+
+
+
+<div class="viewcode-block" id="make_peptide_frame_for_accessions">
+<a class="viewcode-back" href="../../api.html#mhcflurry.proteome_decoys.make_peptide_frame_for_accessions">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_peptide_frame_for_accessions</span><span class="p">(</span>
+        <span class="n">accessions</span><span class="p">,</span>
+        <span class="n">sequences_by_accession</span><span class="p">,</span>
+        <span class="n">lengths</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">11</span><span class="p">),</span>
+        <span class="n">flanking_length</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
+        <span class="n">valid_amino_acids</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Generate a peptide/flank DataFrame for the requested accessions."""</span>
+    <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">accession</span> <span class="ow">in</span> <span class="n">unique_in_order</span><span class="p">(</span><span class="n">accessions</span><span class="p">):</span>
+        <span class="n">rows</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">iter_protein_peptide_records</span><span class="p">(</span>
+            <span class="n">accession</span><span class="o">=</span><span class="n">accession</span><span class="p">,</span>
+            <span class="n">sequence</span><span class="o">=</span><span class="n">sequences_by_accession</span><span class="p">[</span><span class="n">accession</span><span class="p">],</span>
+            <span class="n">lengths</span><span class="o">=</span><span class="n">lengths</span><span class="p">,</span>
+            <span class="n">flanking_length</span><span class="o">=</span><span class="n">flanking_length</span><span class="p">,</span>
+            <span class="n">valid_amino_acids</span><span class="o">=</span><span class="n">valid_amino_acids</span><span class="p">,</span>
+        <span class="p">))</span>
+    <span class="k">return</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="o">.</span><span class="n">from_records</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">PROTEOME_PEPTIDE_COLUMNS</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="sample_peptide_frame_for_accessions">
+<a class="viewcode-back" href="../../api.html#mhcflurry.proteome_decoys.sample_peptide_frame_for_accessions">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">sample_peptide_frame_for_accessions</span><span class="p">(</span>
+        <span class="n">accessions</span><span class="p">,</span>
+        <span class="n">sequences_by_accession</span><span class="p">,</span>
+        <span class="n">lengths</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">11</span><span class="p">),</span>
+        <span class="n">flanking_length</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
+        <span class="n">exclude_peptides</span><span class="o">=</span><span class="p">(),</span>
+        <span class="n">n</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">valid_amino_acids</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">sampling_method</span><span class="o">=</span><span class="s2">"positions"</span><span class="p">,</span>
+        <span class="n">allow_smaller</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Sample windows without replacement; build flanks only for retained rows.</span>
+
+<span class="sd">    Position sampling preserves the eligible population, not the historical</span>
+<span class="sd">    reservoir's RNG sequence. Use ``sampling_method='reservoir'`` for replay.</span>
+<span class="sd">    ``allow_smaller`` returns the complete eligible population on exhaustion.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"n must be non-negative"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">PROTEOME_PEPTIDE_COLUMNS</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">sampling_method</span> <span class="o">==</span> <span class="s2">"positions"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_sample_numeric_positions</span><span class="p">(</span>
+            <span class="n">accessions</span><span class="p">,</span> <span class="n">sequences_by_accession</span><span class="p">,</span> <span class="n">lengths</span><span class="p">,</span> <span class="n">flanking_length</span><span class="p">,</span>
+            <span class="n">exclude_peptides</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">valid_amino_acids</span><span class="p">,</span> <span class="n">allow_smaller</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">sampling_method</span> <span class="o">!=</span> <span class="s2">"reservoir"</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unknown peptide sampling method: "</span> <span class="o">+</span> <span class="n">sampling_method</span><span class="p">)</span>
+
+    <span class="n">exclude_peptides</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">exclude_peptides</span><span class="p">)</span>
+    <span class="n">reservoir</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">seen</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">accession</span> <span class="ow">in</span> <span class="n">unique_in_order</span><span class="p">(</span><span class="n">accessions</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">iter_protein_peptide_records</span><span class="p">(</span>
+                <span class="n">accession</span><span class="o">=</span><span class="n">accession</span><span class="p">,</span>
+                <span class="n">sequence</span><span class="o">=</span><span class="n">sequences_by_accession</span><span class="p">[</span><span class="n">accession</span><span class="p">],</span>
+                <span class="n">lengths</span><span class="o">=</span><span class="n">lengths</span><span class="p">,</span>
+                <span class="n">flanking_length</span><span class="o">=</span><span class="n">flanking_length</span><span class="p">,</span>
+                <span class="n">valid_amino_acids</span><span class="o">=</span><span class="n">valid_amino_acids</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">record</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">in</span> <span class="n">exclude_peptides</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">seen</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">reservoir</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">n</span><span class="p">:</span>
+                <span class="n">reservoir</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="n">replace_index</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="n">seen</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">replace_index</span> <span class="o">&lt;</span> <span class="n">n</span><span class="p">:</span>
+                <span class="n">reservoir</span><span class="p">[</span><span class="n">replace_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span>
+
+    <span class="k">if</span> <span class="n">seen</span> <span class="o">&lt;</span> <span class="n">n</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">allow_smaller</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Cannot take a larger sample than population when "</span>
+            <span class="s2">"'replace=False' (requested </span><span class="si">%d</span><span class="s2">, population </span><span class="si">%d</span><span class="s2">)"</span> <span class="o">%</span> <span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">seen</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="o">.</span><span class="n">from_records</span><span class="p">(</span>
+        <span class="n">reservoir</span><span class="p">,</span>
+        <span class="n">columns</span><span class="o">=</span><span class="n">PROTEOME_PEPTIDE_COLUMNS</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_sample_numeric_positions</span><span class="p">(</span><span class="n">accessions</span><span class="p">,</span> <span class="n">sequences</span><span class="p">,</span> <span class="n">lengths</span><span class="p">,</span> <span class="n">flank_length</span><span class="p">,</span>
+                              <span class="n">excluded</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">valid_amino_acids</span><span class="p">,</span> <span class="n">allow_smaller</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Draw from the same valid window population as the reference iterator."""</span>
+    <span class="n">lengths</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">lengths</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">lengths</span> <span class="ow">or</span> <span class="n">lengths</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Peptide lengths must be positive"</span><span class="p">)</span>
+    <span class="n">alphabet</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">valid_amino_acids</span> <span class="ow">or</span> <span class="n">COMMON_AMINO_ACIDS</span><span class="p">)</span>
+    <span class="n">excluded</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">excluded</span><span class="p">)</span>
+    <span class="n">segments</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">counts</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">accession</span> <span class="ow">in</span> <span class="n">unique_in_order</span><span class="p">(</span><span class="n">accessions</span><span class="p">):</span>
+        <span class="n">sequence</span> <span class="o">=</span> <span class="n">sequences</span><span class="p">[</span><span class="n">accession</span><span class="p">]</span>
+        <span class="n">invalid</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">fromiter</span><span class="p">((</span><span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">alphabet</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">sequence</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"int8"</span><span class="p">)</span>
+        <span class="n">prefix</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(([</span><span class="mi">0</span><span class="p">],</span> <span class="n">numpy</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">invalid</span><span class="p">)))</span>
+        <span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="n">lengths</span><span class="p">:</span>
+            <span class="c1"># Preserve the iterator's exclusive minimum-length terminal bound.</span>
+            <span class="n">count</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">sequence</span><span class="p">)</span> <span class="o">-</span> <span class="n">lengths</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">len</span><span class="p">(</span><span class="n">sequence</span><span class="p">)</span> <span class="o">-</span> <span class="n">length</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+            <span class="n">starts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">count</span><span class="p">)</span>
+            <span class="n">starts</span> <span class="o">=</span> <span class="n">starts</span><span class="p">[(</span><span class="n">prefix</span><span class="p">[</span><span class="n">starts</span> <span class="o">+</span> <span class="n">length</span><span class="p">]</span> <span class="o">-</span> <span class="n">prefix</span><span class="p">[</span><span class="n">starts</span><span class="p">])</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">starts</span><span class="p">):</span>
+                <span class="n">segments</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">accession</span><span class="p">,</span> <span class="n">sequence</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="n">starts</span><span class="p">))</span>
+                <span class="n">counts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">starts</span><span class="p">))</span>
+    <span class="n">ends</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">counts</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"int64"</span><span class="p">)</span>
+    <span class="n">total</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">ends</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ends</span><span class="p">)</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="c1"># Only numeric indices are shuffled. No peptide/flank tuples are created</span>
+    <span class="c1"># for the unsampled population. Rejecting excluded peptides from a random</span>
+    <span class="c1"># permutation is uniform sampling of the remaining eligible windows.</span>
+    <span class="n">positions</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span><span class="n">total</span><span class="p">)</span>
+    <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">offset</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">total</span><span class="p">,</span> <span class="mi">65536</span><span class="p">):</span>
+        <span class="n">chunk</span> <span class="o">=</span> <span class="n">positions</span><span class="p">[</span><span class="n">offset</span><span class="p">:</span><span class="n">offset</span> <span class="o">+</span> <span class="mi">65536</span><span class="p">]</span>
+        <span class="n">segment_indices</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">searchsorted</span><span class="p">(</span><span class="n">ends</span><span class="p">,</span> <span class="n">chunk</span><span class="p">,</span> <span class="n">side</span><span class="o">=</span><span class="s2">"right"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">segment_index</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">chunk</span><span class="p">,</span> <span class="n">segment_indices</span><span class="p">):</span>
+            <span class="n">accession</span><span class="p">,</span> <span class="n">sequence</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="n">starts</span> <span class="o">=</span> <span class="n">segments</span><span class="p">[</span><span class="n">segment_index</span><span class="p">]</span>
+            <span class="n">base</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">ends</span><span class="p">[</span><span class="n">segment_index</span> <span class="o">-</span> <span class="mi">1</span><span class="p">])</span> <span class="k">if</span> <span class="n">segment_index</span> <span class="k">else</span> <span class="mi">0</span>
+            <span class="n">start</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">starts</span><span class="p">[</span><span class="n">index</span> <span class="o">-</span> <span class="n">base</span><span class="p">])</span>
+            <span class="n">peptide</span> <span class="o">=</span> <span class="n">sequence</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">start</span> <span class="o">+</span> <span class="n">length</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">peptide</span> <span class="ow">in</span> <span class="n">excluded</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">end</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">length</span>
+            <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">accession</span><span class="p">,</span> <span class="n">peptide</span><span class="p">,</span>
+                         <span class="n">sequence</span><span class="p">[</span><span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">start</span> <span class="o">-</span> <span class="n">flank_length</span><span class="p">):</span><span class="n">start</span><span class="p">]</span><span class="o">.</span><span class="n">rjust</span><span class="p">(</span><span class="n">flank_length</span><span class="p">,</span> <span class="s2">"X"</span><span class="p">),</span>
+                         <span class="n">sequence</span><span class="p">[</span><span class="n">end</span><span class="p">:</span><span class="n">end</span> <span class="o">+</span> <span class="n">flank_length</span><span class="p">]</span><span class="o">.</span><span class="n">ljust</span><span class="p">(</span><span class="n">flank_length</span><span class="p">,</span> <span class="s2">"X"</span><span class="p">),</span> <span class="n">start</span><span class="p">))</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span> <span class="o">==</span> <span class="n">n</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="o">.</span><span class="n">from_records</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">PROTEOME_PEPTIDE_COLUMNS</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">allow_smaller</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Cannot take a larger sample than population when 'replace=False' "</span>
+                         <span class="s2">"(requested </span><span class="si">%d</span><span class="s2">, population </span><span class="si">%d</span><span class="s2">)"</span> <span class="o">%</span> <span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">rows</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="o">.</span><span class="n">from_records</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">PROTEOME_PEPTIDE_COLUMNS</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="peptides_by_length_from_frame">
+<a class="viewcode-back" href="../../api.html#mhcflurry.proteome_decoys.peptides_by_length_from_frame">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">peptides_by_length_from_frame</span><span class="p">(</span><span class="n">peptide_df</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return peptide DataFrames keyed by peptide length."""</span>
+    <span class="n">peptide_df</span> <span class="o">=</span> <span class="n">peptide_df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">peptide_df</span><span class="p">[</span><span class="s2">"length"</span><span class="p">]</span> <span class="o">=</span> <span class="n">peptide_df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span>
+    <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">peptide_df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"length"</span><span class="p">)))</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

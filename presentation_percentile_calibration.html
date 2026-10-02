@@ -1,0 +1,266 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Presentation percentile calibration &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Evaluate saved model runs" href="saved_candidate_evaluation.html" />
+    <link rel="prev" title="Processing negative matching" href="probabilistic_processing_matching.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Presentation percentile calibration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#experimental-compact-curve-comparison">Experimental compact-curve comparison</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#historical-tail-adaptive-histogram-method">Historical tail-adaptive histogram method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#calibrating-a-predictor">Calibrating a predictor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#historical-histogram-experiment-verification">Historical histogram experiment verification</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Presentation percentile calibration</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/presentation_percentile_calibration.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="presentation-percentile-calibration">
+<h1>Presentation percentile calibration<a class="headerlink" href="#presentation-percentile-calibration" title="Link to this heading"></a></h1>
+<p>New calibration now uses the shared <code class="docutils literal notranslate"><span class="pre">CompactPercentRankTransform</span></code>, also used
+for affinity and processing. See <a class="reference internal" href="shared_percent_rank_transforms.html"><span class="std std-doc">shared APIs and compatibility</span></a>.
+The automatic budget starts at 64 and permits 128 only after a meaningful
+label-free background-validation improvement. Historical calibrations still
+load as <code class="docutils literal notranslate"><span class="pre">HistogramPercentRankTransform</span></code>, without conversion or refitting.</p>
+<section id="experimental-compact-curve-comparison">
+<h2>Experimental compact-curve comparison<a class="headerlink" href="#experimental-compact-curve-comparison" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">eval</span> <span class="pre">presentation-percentiles</span></code> compares histogram mappings with
+continuous curves, without loading or retraining networks. The original
+experiment included 64/128/256 knots; the current production policy permits
+only 64/128. Specify those two budgets explicitly for a new comparison:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>presentation-percentiles<span class="w"> </span>fit<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--reference-dir<span class="w"> </span>/path/to/cached-reference<span class="w"> </span>--out<span class="w"> </span>/path/to/new-comparison<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--knots<span class="w"> </span><span class="m">64</span><span class="w"> </span><span class="m">128</span>
+mhcflurry<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>presentation-percentiles<span class="w"> </span>evaluate<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--calibration-dir<span class="w"> </span>/path/to/new-comparison<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--predictions<span class="w"> </span>/path/to/predictions_with_flanks.csv.bz2<span class="w"> </span>--mode<span class="w"> </span>with-flanks
+mhcflurry<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>presentation-percentiles<span class="w"> </span>evaluate<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--calibration-dir<span class="w"> </span>/path/to/new-comparison<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--predictions<span class="w"> </span>/path/to/predictions_without_flanks.csv.bz2<span class="w"> </span>--mode<span class="w"> </span>without-flanks
+mhcflurry<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>presentation-percentiles<span class="w"> </span>plot<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--calibration-dir<span class="w"> </span>/path/to/new-comparison
+</pre></div>
+</div>
+<p>The reference directory contains <code class="docutils literal notranslate"><span class="pre">reference_peptides.csv.bz2</span></code> and one aligned
+<code class="docutils literal notranslate"><span class="pre">reference_scores_*.npy</span></code> vector per allele. Prediction tables contain
+<code class="docutils literal notranslate"><span class="pre">sample_id</span></code>, <code class="docutils literal notranslate"><span class="pre">hla</span></code>, <code class="docutils literal notranslate"><span class="pre">hit</span></code>, and <code class="docutils literal notranslate"><span class="pre">a_</span></code>/<code class="docutils literal notranslate"><span class="pre">b_</span></code> presentation score/percentile columns;
+side <code class="docutils literal notranslate"><span class="pre">a</span></code> is the candidate and side <code class="docutils literal notranslate"><span class="pre">b</span></code> is the contextual public baseline.</p>
+<p>This experimental command splits the reference 60/20/20 by unique peptide,
+keeping all allele queries for a peptide together. Knot count is selected using
+background validation accuracy, not presentation labels. Its separate test
+split checks calibration. This is distinct from the production helper’s
+80/20 selection/refit policy and minimum-count safeguards; see
+<a class="reference internal" href="shared_percent_rank_transforms.html"><span class="doc">Percentile calibration for all predictors</span></a> for that rule. The experiment command’s
+historical default still includes 256, so use <code class="docutils literal notranslate"><span class="pre">--knots</span> <span class="pre">64</span> <span class="pre">128</span></code> as shown above.
+Full-reference refits are then compared on the frozen presentation rows.
+Outputs retain the splits, counts at percentile cutoffs, versioned curves,
+micro/per-sample metrics, tie-neutral PPV, ranking audits, transformation timings,
+and joinable prediction arrays, plus a report and PNG/SVG figures.</p>
+<p>The experimental curves interpolate in logit-score/logit-survival coordinates,
+using weighted midranks at distinct reference scores. End slopes estimated from
+up to 32 distinct reference scores provide explicitly modeled extrapolation.
+Extreme extrapolated percentiles are not empirically established probabilities.
+Existing raw-score ties and floating-point saturation cannot be recovered by
+this mapping. The original experiment was isolated; its generic compact
+implementation is now used by new predictor calibration and versioned loading.</p>
+</section>
+<section id="historical-tail-adaptive-histogram-method">
+<h2>Historical tail-adaptive histogram method<a class="headerlink" href="#historical-tail-adaptive-histogram-method" title="Link to this heading"></a></h2>
+<p>With no explicit <code class="docutils literal notranslate"><span class="pre">bins</span></code>, <code class="docutils literal notranslate"><span class="pre">method=&quot;histogram&quot;</span></code> calibration retains up to 10,000
+uniform-quantile bins and adds up to 10,000 bins in the top 1% of calibration
+scores. The base grid is bounded by the finite reference count. Additional quantiles
+are spaced logarithmically in upper-tail probability, down to <code class="docutils literal notranslate"><span class="pre">1</span> <span class="pre">/</span> <span class="pre">N</span></code> for <code class="docutils literal notranslate"><span class="pre">N</span></code>
+finite calibration scores. Their count is also capped by the number of
+calibration observations in that tail. Duplicate score edges are removed.</p>
+<p>Uniform quantiles can place thousands of informative high-scoring evaluation
+peptides in one percentile bin even though their raw scores are distinct.
+Preserving the original broad grid also retains the resolution needed when
+the presentation combiner’s score range is compressed near zero.</p>
+<p>This remains available for reproducing the earlier binning experiment.
+Neither method changes network predictions or any existing saved calibration
+merely by loading it. No calibration rule is fitted to evaluation labels.</p>
+</section>
+<section id="calibrating-a-predictor">
+<h2>Calibrating a predictor<a class="headerlink" href="#calibrating-a-predictor" title="Link to this heading"></a></h2>
+<p>The existing <code class="docutils literal notranslate"><span class="pre">mhcflurry-calibrate-percentile-ranks</span></code> command uses the new default
+automatically for <code class="docutils literal notranslate"><span class="pre">--predictor-kind</span> <span class="pre">class1_presentation</span></code> (compact by default;
+<code class="docutils literal notranslate"><span class="pre">--percentile-method</span> <span class="pre">histogram</span></code> reproduces the earlier tail-bin method). Re-run the original
+calibration recipe on a separate copy of the predictor, retaining
+the same calibration reference policy, random seed, and source provenance.
+For full candidates, that recipe is in
+<code class="docutils literal notranslate"><span class="pre">scripts/training/pan_allele_release_full.sh</span></code> and the saved <code class="docutils literal notranslate"><span class="pre">GENERATE.sh</span></code>.
+The calibration command writes into <code class="docutils literal notranslate"><span class="pre">--models-dir</span></code>; do not point it at the
+public baseline or the only preserved copy of the old candidate.</p>
+<p>An old <code class="docutils literal notranslate"><span class="pre">percent_ranks.csv</span></code> does not contain the raw calibration scores inside
+each bin. Merely subdividing that table would invent within-bin CDF detail.
+Regenerate calibration predictions when those scores were not retained, then
+repeat both with-flanks and without-flanks held-out comparisons. More bins
+cannot resolve missing calibration-tail support, true raw-score ties, or
+clipping beyond the calibration maximum.</p>
+</section>
+<section id="historical-histogram-experiment-verification">
+<h2>Historical histogram experiment verification<a class="headerlink" href="#historical-histogram-experiment-verification" title="Link to this heading"></a></h2>
+<p>The earlier histogram regression experiment used an independent million-score
+reference and 4,000 evaluation scores in a rare upper-tail interval. Its AUPRC
+was 0.93023 for raw scores, 0.50025 with the old uniform-quantile grid, and
+0.92849 with the tail-adaptive grid. These are historical synthetic results,
+not a recalibrated release-candidate performance claim. The current default
+calibration regression tests exercise compact interpolation instead.</p>
+<p>Tests also cover preservation of all base-grid edges, bounded extra-bin count,
+small reference sets, repeated/nonfinite values, monotonicity and endpoint
+behavior, compressed scores, explicit bin overrides, and saved-table loading.</p>
+<p>The archived real-candidate comparison found that 64 compact knots recovered
+the raw presentation ranking on the frozen with-flanks cohort: macro AUPRC
+0.337292 and macro PPV&#64;N 0.387948 (using tie-neutral PPV), with the same ranking
+metrics at 128 and 256 knots. This used the experiment’s independent cached
+background, not a fresh calibration on the complete release-policy reference.
+The artifact directory is
+<code class="docutils literal notranslate"><span class="pre">experiments/20260909T023206Z-compact-presentation-percentiles-comparison-9778c6256b7e</span></code>.</p>
+<p>Neither compact nor histogram calibration can turn those raw rankings into
+both metrics above 0.4. PPV&#64;N’s row-order tie-breaking is a
+<a class="reference external" href="https://github.com/openvax/mhcflurry/issues/405">separate evaluation issue</a>;
+it is not changed by this fix.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="probabilistic_processing_matching.html" class="btn btn-neutral float-left" title="Processing negative matching" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="saved_candidate_evaluation.html" class="btn btn-neutral float-right" title="Evaluate saved model runs" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

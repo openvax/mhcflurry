@@ -1,0 +1,647 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.release_holdout &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.release_holdout</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.release_holdout</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+
+<span class="sd">"""Build and validate the frozen evaluation holdout for model releases."""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">hashlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">normalize_class1_genotype</span><span class="p">,</span>
+    <span class="n">normalize_sequence_resolved_allele_name</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.training_provenance</span><span class="w"> </span><span class="kn">import</span> <span class="n">identity_text</span><span class="p">,</span> <span class="n">study_identity</span>
+
+
+<span class="n">BENCHMARK_FILES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"monoallelic"</span><span class="p">:</span> <span class="s2">"benchmark.monoallelic.train_excluded.csv.bz2"</span><span class="p">,</span>
+    <span class="s2">"multiallelic"</span><span class="p">:</span> <span class="s2">"benchmark.multiallelic.train_excluded.csv.bz2"</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="n">AFFINITY_PMHCS_FILE</span> <span class="o">=</span> <span class="s2">"affinity_pmhcs.csv"</span>
+<span class="n">AFFINITY_SAMPLES_FILE</span> <span class="o">=</span> <span class="s2">"affinity_samples.csv"</span>
+<span class="n">AFFINITY_SOURCE_SAMPLES_FILE</span> <span class="o">=</span> <span class="s2">"affinity_source_samples.csv"</span>
+<span class="n">PROCESSING_SAMPLES_FILE</span> <span class="o">=</span> <span class="s2">"processing_samples.csv"</span>
+<span class="n">PRESENTATION_SAMPLES_FILE</span> <span class="o">=</span> <span class="s2">"presentation_samples.csv"</span>
+<span class="n">POLICY_FILE</span> <span class="o">=</span> <span class="s2">"policy.json"</span>
+<span class="n">VALIDATION_FILE</span> <span class="o">=</span> <span class="s2">"validation.json"</span>
+<span class="n">PRESENTATION_HOLDOUT_PMIDS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"31154438"</span><span class="p">,)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_sha256</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+    <span class="n">digest</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">()</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">block</span> <span class="ow">in</span> <span class="nb">iter</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">fd</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">),</span> <span class="sa">b</span><span class="s2">""</span><span class="p">):</span>
+            <span class="n">digest</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">block</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">digest</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_benchmark_rows</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">chunksize</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span>
+            <span class="n">path</span><span class="p">,</span>
+            <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s2">"peptide"</span><span class="p">,</span> <span class="s2">"sample_id"</span><span class="p">,</span> <span class="s2">"hit"</span><span class="p">,</span> <span class="s2">"hla"</span><span class="p">],</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="p">{</span><span class="s2">"sample_id"</span><span class="p">:</span> <span class="nb">str</span><span class="p">},</span>
+            <span class="n">chunksize</span><span class="o">=</span><span class="n">chunksize</span><span class="p">):</span>
+        <span class="k">yield</span> <span class="n">chunk</span>
+
+
+<div class="viewcode-block" id="canonical_allele_mapping">
+<a class="viewcode-back" href="../../api.html#mhcflurry.release_holdout.canonical_allele_mapping">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">canonical_allele_mapping</span><span class="p">(</span><span class="n">values</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Map raw class-I allele names to sequence-resolved canonical names."""</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">raw</span> <span class="ow">in</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">values</span><span class="p">)</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">unique</span><span class="p">():</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">raw</span><span class="p">]</span> <span class="o">=</span> <span class="n">normalize_sequence_resolved_allele_name</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">raw</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="build_release_holdout">
+<a class="viewcode-back" href="../../api.html#mhcflurry.release_holdout.build_release_holdout">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">build_release_holdout</span><span class="p">(</span>
+        <span class="n">data_dir</span><span class="p">,</span>
+        <span class="n">training_data</span><span class="p">,</span>
+        <span class="n">mass_spec_data</span><span class="p">,</span>
+        <span class="n">out_dir</span><span class="p">,</span>
+        <span class="n">presentation_holdout_pmids</span><span class="o">=</span><span class="n">PRESENTATION_HOLDOUT_PMIDS</span><span class="p">,</span>
+        <span class="n">chunksize</span><span class="o">=</span><span class="mi">500_000</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Derive release exclusions for one frozen source-study holdout.</span>
+
+<span class="sd">    Affinity metrics are evaluated on every monoallelic benchmark sample.</span>
+<span class="sd">    Every pMHC from current affinity training that appears in those rows or in</span>
+<span class="sd">    the selected multiallelic holdout (hit or decoy) is excluded. A separate</span>
+<span class="sd">    source-sample manifest covers the union of these evaluation samples.</span>
+<span class="sd">    Neither manifest alone proves complete biological-sample separation when</span>
+<span class="sd">    historical training lineage or cross-study specimen aliases are missing.</span>
+<span class="sd">    Processing and presentation are evaluated only on the named multiallelic</span>
+<span class="sd">    source-study holdout; presentation excludes those samples from training in</span>
+<span class="sd">    full.</span>
+<span class="sd">    """</span>
+    <span class="n">data_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">data_dir</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="n">training_data</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">training_data</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="n">mass_spec_data</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">mass_spec_data</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="n">out_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">out_dir</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="n">out_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">training_data</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Missing affinity training data: </span><span class="si">{</span><span class="n">training_data</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">mass_spec_data</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Missing annotated MS data: </span><span class="si">{</span><span class="n">mass_spec_data</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+    <span class="n">training</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span>
+        <span class="n">training_data</span><span class="p">,</span> <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s2">"allele"</span><span class="p">,</span> <span class="s2">"peptide"</span><span class="p">])</span>
+    <span class="n">training_allele_map</span> <span class="o">=</span> <span class="n">canonical_allele_mapping</span><span class="p">(</span><span class="n">training</span><span class="o">.</span><span class="n">allele</span><span class="p">)</span>
+    <span class="n">training</span><span class="p">[</span><span class="s2">"canonical_allele"</span><span class="p">]</span> <span class="o">=</span> <span class="n">training</span><span class="o">.</span><span class="n">allele</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+        <span class="n">training_allele_map</span><span class="p">)</span>
+    <span class="n">training</span> <span class="o">=</span> <span class="n">training</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">training</span><span class="o">.</span><span class="n">canonical_allele</span><span class="o">.</span><span class="n">notna</span><span class="p">()]</span>
+    <span class="n">training_pmhcs</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span>
+        <span class="n">training</span><span class="o">.</span><span class="n">canonical_allele</span><span class="p">,</span> <span class="n">training</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">),</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+
+    <span class="n">sample_metadata</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span>
+        <span class="n">mass_spec_data</span><span class="p">,</span>
+        <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s2">"sample_id"</span><span class="p">,</span> <span class="s2">"pmid"</span><span class="p">,</span> <span class="s2">"format"</span><span class="p">,</span> <span class="s2">"mhc_class"</span><span class="p">],</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="p">{</span><span class="s2">"sample_id"</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="s2">"pmid"</span><span class="p">:</span> <span class="nb">str</span><span class="p">},</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">sample_metadata</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">duplicated</span><span class="p">()</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Conflicting metadata for a source sample"</span><span class="p">)</span>
+    <span class="n">sample_metadata</span><span class="p">[</span><span class="s2">"sample_id"</span><span class="p">]</span> <span class="o">=</span> <span class="n">sample_metadata</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">identity_text</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">sample_metadata</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">eq</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Source sample metadata contains missing sample IDs"</span><span class="p">)</span>
+    <span class="n">sample_metadata</span><span class="p">[</span><span class="s2">"pmid"</span><span class="p">]</span> <span class="o">=</span> <span class="n">sample_metadata</span><span class="o">.</span><span class="n">pmid</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">identity_text</span><span class="p">)</span>
+    <span class="n">holdout_pmids</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">presentation_holdout_pmids</span><span class="p">)</span>
+    <span class="n">presentation_samples</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">sample_metadata</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+        <span class="n">sample_metadata</span><span class="o">.</span><span class="n">mhc_class</span><span class="o">.</span><span class="n">eq</span><span class="p">(</span><span class="s2">"I"</span><span class="p">)</span>
+        <span class="o">&amp;</span> <span class="n">sample_metadata</span><span class="o">.</span><span class="n">format</span><span class="o">.</span><span class="n">eq</span><span class="p">(</span><span class="s2">"MULTIALLELIC"</span><span class="p">)</span>
+        <span class="o">&amp;</span> <span class="n">sample_metadata</span><span class="o">.</span><span class="n">pmid</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">holdout_pmids</span><span class="p">),</span>
+        <span class="s2">"sample_id"</span><span class="p">,</span>
+    <span class="p">])</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">presentation_samples</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"No multiallelic samples found for holdout PMIDs </span><span class="si">{</span><span class="n">holdout_pmids</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+    <span class="n">affinity_pmhcs</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">affinity_samples</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">evaluation_row_counts</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">hit_counts</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">input_files</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">genotype_cache</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">for</span> <span class="n">kind</span><span class="p">,</span> <span class="n">filename</span> <span class="ow">in</span> <span class="n">BENCHMARK_FILES</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">data_dir</span> <span class="o">/</span> <span class="n">filename</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Missing release benchmark: </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">row_count</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">hit_count</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">benchmark_samples</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">rows</span> <span class="ow">in</span> <span class="n">_benchmark_rows</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">chunksize</span><span class="o">=</span><span class="n">chunksize</span><span class="p">):</span>
+            <span class="n">rows</span><span class="p">[</span><span class="s2">"sample_id"</span><span class="p">]</span> <span class="o">=</span> <span class="n">rows</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"multiallelic"</span><span class="p">:</span>
+                <span class="n">rows</span> <span class="o">=</span> <span class="n">rows</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+                    <span class="n">rows</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">presentation_samples</span><span class="p">)]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">affinity_samples</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">rows</span><span class="o">.</span><span class="n">sample_id</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">rows</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">row_count</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+            <span class="n">hit_count</span> <span class="o">+=</span> <span class="nb">int</span><span class="p">(</span><span class="n">rows</span><span class="o">.</span><span class="n">hit</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+            <span class="n">benchmark_samples</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">rows</span><span class="o">.</span><span class="n">sample_id</span><span class="p">)</span>
+            <span class="n">rows</span><span class="p">[</span><span class="s2">"hla"</span><span class="p">]</span> <span class="o">=</span> <span class="n">rows</span><span class="o">.</span><span class="n">hla</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+            <span class="n">rows</span><span class="p">[</span><span class="s2">"peptide"</span><span class="p">]</span> <span class="o">=</span> <span class="n">rows</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">genotype</span><span class="p">,</span> <span class="n">genotype_rows</span> <span class="ow">in</span> <span class="n">rows</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"hla"</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+                <span class="n">alleles</span> <span class="o">=</span> <span class="n">genotype_cache</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">genotype</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">alleles</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">alleles</span> <span class="o">=</span> <span class="n">normalize_class1_genotype</span><span class="p">(</span><span class="n">genotype</span><span class="p">)</span>
+                    <span class="n">genotype_cache</span><span class="p">[</span><span class="n">genotype</span><span class="p">]</span> <span class="o">=</span> <span class="n">alleles</span>
+                <span class="n">peptides</span> <span class="o">=</span> <span class="n">genotype_rows</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">allele</span> <span class="ow">in</span> <span class="n">alleles</span><span class="p">:</span>
+                    <span class="n">affinity_pmhcs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+                        <span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">peptide</span><span class="p">)</span>
+                        <span class="k">for</span> <span class="n">peptide</span> <span class="ow">in</span> <span class="n">peptides</span>
+                        <span class="k">if</span> <span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">peptide</span><span class="p">)</span> <span class="ow">in</span> <span class="n">training_pmhcs</span><span class="p">)</span>
+        <span class="n">evaluation_row_counts</span><span class="p">[</span><span class="n">kind</span><span class="p">]</span> <span class="o">=</span> <span class="n">row_count</span>
+        <span class="n">hit_counts</span><span class="p">[</span><span class="n">kind</span><span class="p">]</span> <span class="o">=</span> <span class="n">hit_count</span>
+        <span class="n">input_files</span><span class="p">[</span><span class="n">kind</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+            <span class="s2">"sha256"</span><span class="p">:</span> <span class="n">_sha256</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"multiallelic"</span><span class="p">:</span>
+            <span class="n">missing</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">presentation_samples</span> <span class="o">-</span> <span class="n">benchmark_samples</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">missing</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"Holdout samples missing from multiallelic benchmark: "</span>
+                    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">missing</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+    <span class="n">affinity_frame</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+        <span class="nb">sorted</span><span class="p">(</span><span class="n">affinity_pmhcs</span><span class="p">),</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">"allele"</span><span class="p">,</span> <span class="s2">"peptide"</span><span class="p">])</span>
+    <span class="n">affinity_samples_frame</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+        <span class="s2">"sample_id"</span><span class="p">:</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">affinity_samples</span><span class="p">),</span>
+    <span class="p">})</span>
+    <span class="n">study_map</span> <span class="o">=</span> <span class="n">sample_metadata</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">"sample_id"</span><span class="p">)</span><span class="o">.</span><span class="n">pmid</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">study_identity</span><span class="p">)</span>
+    <span class="n">source_samples_frame</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+        <span class="s2">"sample_id"</span><span class="p">:</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">affinity_samples</span> <span class="o">|</span> <span class="n">presentation_samples</span><span class="p">),</span>
+    <span class="p">})</span>
+    <span class="n">source_samples_frame</span><span class="p">[</span><span class="s2">"study_id"</span><span class="p">]</span> <span class="o">=</span> <span class="n">source_samples_frame</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">study_map</span><span class="p">)</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span>
+    <span class="n">source_samples_frame</span> <span class="o">=</span> <span class="n">source_samples_frame</span><span class="p">[[</span><span class="s2">"study_id"</span><span class="p">,</span> <span class="s2">"sample_id"</span><span class="p">]]</span>
+    <span class="n">processing_frame</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+        <span class="s2">"sample_id"</span><span class="p">:</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">presentation_samples</span><span class="p">),</span>
+    <span class="p">})</span>
+    <span class="n">presentation_frame</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+        <span class="s2">"sample_id"</span><span class="p">:</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">presentation_samples</span><span class="p">),</span>
+    <span class="p">})</span>
+    <span class="n">affinity_frame</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">out_dir</span> <span class="o">/</span> <span class="n">AFFINITY_PMHCS_FILE</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">affinity_samples_frame</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span>
+        <span class="n">out_dir</span> <span class="o">/</span> <span class="n">AFFINITY_SAMPLES_FILE</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">source_samples_frame</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">out_dir</span> <span class="o">/</span> <span class="n">AFFINITY_SOURCE_SAMPLES_FILE</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">processing_frame</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">out_dir</span> <span class="o">/</span> <span class="n">PROCESSING_SAMPLES_FILE</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">presentation_frame</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">out_dir</span> <span class="o">/</span> <span class="n">PRESENTATION_SAMPLES_FILE</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="n">holdout_files</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">filename</span><span class="p">,</span> <span class="n">frame</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="p">(</span><span class="n">AFFINITY_PMHCS_FILE</span><span class="p">,</span> <span class="n">affinity_frame</span><span class="p">),</span>
+            <span class="p">(</span><span class="n">AFFINITY_SAMPLES_FILE</span><span class="p">,</span> <span class="n">affinity_samples_frame</span><span class="p">),</span>
+            <span class="p">(</span><span class="n">AFFINITY_SOURCE_SAMPLES_FILE</span><span class="p">,</span> <span class="n">source_samples_frame</span><span class="p">),</span>
+            <span class="p">(</span><span class="n">PROCESSING_SAMPLES_FILE</span><span class="p">,</span> <span class="n">processing_frame</span><span class="p">),</span>
+            <span class="p">(</span><span class="n">PRESENTATION_SAMPLES_FILE</span><span class="p">,</span> <span class="n">presentation_frame</span><span class="p">)):</span>
+        <span class="n">holdout_files</span><span class="p">[</span><span class="n">filename</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"rows"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">frame</span><span class="p">),</span>
+            <span class="s2">"sha256"</span><span class="p">:</span> <span class="n">_sha256</span><span class="p">(</span><span class="n">out_dir</span> <span class="o">/</span> <span class="n">filename</span><span class="p">),</span>
+        <span class="p">}</span>
+
+    <span class="n">policy</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"schema_version"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+        <span class="s2">"policy"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"affinity"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"Evaluate affinity metrics on all monoallelic samples. "</span>
+                <span class="s2">"Exclude every current-training pMHC that occurs in those "</span>
+                <span class="s2">"rows or in the named multiallelic source-study holdout, "</span>
+                <span class="s2">"including decoys; expand multiallelic genotypes to every "</span>
+                <span class="s2">"listed allele. Also exclude source samples (or studies "</span>
+                <span class="s2">"where sample identities are unavailable) using preserved "</span>
+                <span class="s2">"provenance. Zero pMHC overlap does not prove whole-sample "</span>
+                <span class="s2">"disjointness; run audit-samples on all model lineage."</span>
+            <span class="p">),</span>
+            <span class="s2">"processing"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"Evaluate only the named multiallelic source-study holdout; "</span>
+                <span class="s2">"enforce zero training sample-id overlap."</span>
+            <span class="p">),</span>
+            <span class="s2">"presentation"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="s2">"Evaluate only the named multiallelic source-study holdout "</span>
+                <span class="s2">"and exclude those whole samples from training."</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+        <span class="s2">"input_files"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="o">**</span><span class="n">input_files</span><span class="p">,</span>
+            <span class="s2">"affinity_training_data"</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">"path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">training_data</span><span class="p">),</span>
+                <span class="s2">"sha256"</span><span class="p">:</span> <span class="n">_sha256</span><span class="p">(</span><span class="n">training_data</span><span class="p">),</span>
+            <span class="p">},</span>
+            <span class="s2">"mass_spec_data"</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">"path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">mass_spec_data</span><span class="p">),</span>
+                <span class="s2">"sha256"</span><span class="p">:</span> <span class="n">_sha256</span><span class="p">(</span><span class="n">mass_spec_data</span><span class="p">),</span>
+            <span class="p">},</span>
+        <span class="p">},</span>
+        <span class="s2">"presentation_holdout_pmids"</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">holdout_pmids</span><span class="p">),</span>
+        <span class="s2">"evaluation_row_counts"</span><span class="p">:</span> <span class="n">evaluation_row_counts</span><span class="p">,</span>
+        <span class="s2">"evaluation_hit_counts"</span><span class="p">:</span> <span class="n">hit_counts</span><span class="p">,</span>
+        <span class="s2">"holdout_files"</span><span class="p">:</span> <span class="n">holdout_files</span><span class="p">,</span>
+        <span class="s2">"affinity_pmhc_count"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">affinity_frame</span><span class="p">),</span>
+        <span class="s2">"affinity_sample_count"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">affinity_samples_frame</span><span class="p">),</span>
+        <span class="s2">"source_sample_count"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">source_samples_frame</span><span class="p">),</span>
+        <span class="s2">"source_samples_missing_study"</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">source_samples_frame</span><span class="o">.</span><span class="n">study_id</span><span class="o">.</span><span class="n">eq</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()),</span>
+        <span class="s2">"processing_sample_count"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">processing_frame</span><span class="p">),</span>
+        <span class="s2">"presentation_sample_count"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">presentation_frame</span><span class="p">),</span>
+    <span class="p">}</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">out_dir</span> <span class="o">/</span> <span class="n">POLICY_FILE</span><span class="p">,</span> <span class="s2">"w"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">policy</span><span class="p">,</span> <span class="n">fd</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">fd</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">policy</span></div>
+
+
+
+<div class="viewcode-block" id="load_excluded_samples">
+<a class="viewcode-back" href="../../api.html#mhcflurry.release_holdout.load_excluded_samples">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_excluded_samples</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Load a generated one-column sample exclusion manifest."""</span>
+    <span class="n">frame</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="p">{</span><span class="s2">"sample_id"</span><span class="p">:</span> <span class="nb">str</span><span class="p">},</span> <span class="n">keep_default_na</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">list</span><span class="p">(</span><span class="n">frame</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span> <span class="o">!=</span> <span class="p">[</span><span class="s2">"sample_id"</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Expected one sample_id column in </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">; "</span>
+            <span class="sa">f</span><span class="s2">"got </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">frame</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">set</span><span class="p">(</span><span class="n">frame</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="exclude_samples">
+<a class="viewcode-back" href="../../api.html#mhcflurry.release_holdout.exclude_samples">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">exclude_samples</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">manifest</span><span class="p">,</span> <span class="n">label</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Remove rows belonging to samples in ``manifest`` and report counts."""</span>
+    <span class="n">excluded</span> <span class="o">=</span> <span class="n">load_excluded_samples</span><span class="p">(</span><span class="n">manifest</span><span class="p">)</span>
+    <span class="n">sample_ids</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+    <span class="n">mask</span> <span class="o">=</span> <span class="n">sample_ids</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">excluded</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">"Release holdout excluded </span><span class="si">{</span><span class="n">mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="si">}</span><span class="s2"> rows across "</span>
+        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">sample_ids</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2"> samples"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">frame</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="o">~</span><span class="n">mask</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="exclude_affinity_pmhcs">
+<a class="viewcode-back" href="../../api.html#mhcflurry.release_holdout.exclude_affinity_pmhcs">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">exclude_affinity_pmhcs</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">manifest</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Remove affinity rows whose canonical pMHC is in ``manifest``."""</span>
+    <span class="n">exclusions</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">manifest</span><span class="p">)</span>
+    <span class="n">required</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"allele"</span><span class="p">,</span> <span class="s2">"peptide"</span><span class="p">]</span>
+    <span class="k">if</span> <span class="nb">list</span><span class="p">(</span><span class="n">exclusions</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span> <span class="o">!=</span> <span class="n">required</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Expected columns </span><span class="si">{</span><span class="n">required</span><span class="si">}</span><span class="s2"> in </span><span class="si">{</span><span class="n">manifest</span><span class="si">}</span><span class="s2">; "</span>
+            <span class="sa">f</span><span class="s2">"got </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">exclusions</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">exclusion_index</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">MultiIndex</span><span class="o">.</span><span class="n">from_frame</span><span class="p">(</span><span class="n">exclusions</span><span class="p">[</span><span class="n">required</span><span class="p">])</span>
+    <span class="n">canonical</span> <span class="o">=</span> <span class="n">frame</span><span class="p">[</span><span class="n">required</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">allele_map</span> <span class="o">=</span> <span class="n">canonical_allele_mapping</span><span class="p">(</span><span class="n">canonical</span><span class="o">.</span><span class="n">allele</span><span class="p">)</span>
+    <span class="n">canonical</span><span class="p">[</span><span class="s2">"allele"</span><span class="p">]</span> <span class="o">=</span> <span class="n">canonical</span><span class="o">.</span><span class="n">allele</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">allele_map</span><span class="p">)</span>
+    <span class="n">row_index</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">MultiIndex</span><span class="o">.</span><span class="n">from_frame</span><span class="p">(</span><span class="n">canonical</span><span class="p">)</span>
+    <span class="n">mask</span> <span class="o">=</span> <span class="n">row_index</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">exclusion_index</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">"Release holdout excluded </span><span class="si">{</span><span class="n">mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="si">}</span><span class="s2"> affinity rows across "</span>
+        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">row_index</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span><span class="si">}</span><span class="s2"> unique pMHCs"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">frame</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="o">~</span><span class="n">mask</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="validate_holdout_manifests">
+<a class="viewcode-back" href="../../api.html#mhcflurry.release_holdout.validate_holdout_manifests">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_holdout_manifests</span><span class="p">(</span><span class="n">holdout_dir</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Validate the exclusion manifests against the frozen policy record."""</span>
+    <span class="n">holdout_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">holdout_dir</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="n">policy_path</span> <span class="o">=</span> <span class="n">holdout_dir</span> <span class="o">/</span> <span class="n">POLICY_FILE</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">policy_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+        <span class="n">policy</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">policy</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"schema_version"</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Unsupported release holdout policy schema: </span><span class="si">{</span><span class="n">policy_path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">expected_files</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">AFFINITY_PMHCS_FILE</span><span class="p">,</span>
+        <span class="n">AFFINITY_SAMPLES_FILE</span><span class="p">,</span>
+        <span class="n">PROCESSING_SAMPLES_FILE</span><span class="p">,</span>
+        <span class="n">PRESENTATION_SAMPLES_FILE</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="n">policy</span><span class="p">[</span><span class="s2">"schema_version"</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">expected_files</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">AFFINITY_SOURCE_SAMPLES_FILE</span><span class="p">)</span>
+    <span class="n">holdout_files</span> <span class="o">=</span> <span class="n">policy</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"holdout_files"</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">holdout_files</span><span class="p">)</span> <span class="o">!=</span> <span class="n">expected_files</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Release holdout policy has unexpected manifests: "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">holdout_files</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">filename</span><span class="p">,</span> <span class="n">expected</span> <span class="ow">in</span> <span class="n">holdout_files</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">holdout_dir</span> <span class="o">/</span> <span class="n">filename</span>
+        <span class="n">actual_sha256</span> <span class="o">=</span> <span class="n">_sha256</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">actual_sha256</span> <span class="o">!=</span> <span class="n">expected</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"sha256"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Release holdout manifest checksum mismatch: </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">actual_rows</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">actual_rows</span> <span class="o">!=</span> <span class="n">expected</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"rows"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Release holdout manifest row count mismatch: </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">policy</span></div>
+
+
+
+<div class="viewcode-block" id="validate_release_holdout">
+<a class="viewcode-back" href="../../api.html#mhcflurry.release_holdout.validate_release_holdout">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_release_holdout</span><span class="p">(</span>
+        <span class="n">holdout_dir</span><span class="p">,</span>
+        <span class="n">affinity_training_data</span><span class="p">,</span>
+        <span class="n">processing_training_data</span><span class="p">,</span>
+        <span class="n">presentation_training_data</span><span class="p">,</span>
+        <span class="n">out</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Check recorded pMHC/sample IDs, without asserting complete lineage.</span>
+
+<span class="sd">    Whole biological-sample separation additionally requires ``audit-samples``</span>
+<span class="sd">    across pretraining, training, development and selection for every model.</span>
+<span class="sd">    """</span>
+    <span class="n">holdout_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">holdout_dir</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="n">policy</span> <span class="o">=</span> <span class="n">validate_holdout_manifests</span><span class="p">(</span><span class="n">holdout_dir</span><span class="p">)</span>
+    <span class="n">affinity</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span>
+        <span class="n">affinity_training_data</span><span class="p">,</span> <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s2">"allele"</span><span class="p">,</span> <span class="s2">"peptide"</span><span class="p">])</span>
+    <span class="n">affinity_map</span> <span class="o">=</span> <span class="n">canonical_allele_mapping</span><span class="p">(</span><span class="n">affinity</span><span class="o">.</span><span class="n">allele</span><span class="p">)</span>
+    <span class="n">affinity</span><span class="p">[</span><span class="s2">"allele"</span><span class="p">]</span> <span class="o">=</span> <span class="n">affinity</span><span class="o">.</span><span class="n">allele</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">affinity_map</span><span class="p">)</span>
+    <span class="n">affinity</span> <span class="o">=</span> <span class="n">affinity</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">affinity</span><span class="o">.</span><span class="n">allele</span><span class="o">.</span><span class="n">notna</span><span class="p">()]</span>
+    <span class="n">affinity_exclusions</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span>
+        <span class="n">holdout_dir</span> <span class="o">/</span> <span class="n">AFFINITY_PMHCS_FILE</span><span class="p">)</span>
+    <span class="n">affinity_overlap</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">MultiIndex</span><span class="o">.</span><span class="n">from_frame</span><span class="p">(</span>
+        <span class="n">affinity</span><span class="p">[[</span><span class="s2">"allele"</span><span class="p">,</span> <span class="s2">"peptide"</span><span class="p">]])</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span>
+            <span class="n">pandas</span><span class="o">.</span><span class="n">MultiIndex</span><span class="o">.</span><span class="n">from_frame</span><span class="p">(</span><span class="n">affinity_exclusions</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">count_sample_overlaps</span><span class="p">(</span><span class="n">training_data</span><span class="p">,</span> <span class="n">manifest</span><span class="p">):</span>
+        <span class="n">excluded</span> <span class="o">=</span> <span class="n">load_excluded_samples</span><span class="p">(</span><span class="n">holdout_dir</span> <span class="o">/</span> <span class="n">manifest</span><span class="p">)</span>
+        <span class="n">overlap_rows</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span>
+                <span class="n">training_data</span><span class="p">,</span>
+                <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s2">"sample_id"</span><span class="p">],</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="p">{</span><span class="s2">"sample_id"</span><span class="p">:</span> <span class="nb">str</span><span class="p">},</span>
+                <span class="n">chunksize</span><span class="o">=</span><span class="mi">500_000</span><span class="p">):</span>
+            <span class="n">overlap_rows</span> <span class="o">+=</span> <span class="n">chunk</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">excluded</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">overlap_rows</span><span class="p">)</span>
+
+    <span class="n">processing_overlap</span> <span class="o">=</span> <span class="n">count_sample_overlaps</span><span class="p">(</span>
+        <span class="n">processing_training_data</span><span class="p">,</span> <span class="n">PROCESSING_SAMPLES_FILE</span><span class="p">)</span>
+    <span class="n">presentation_overlap</span> <span class="o">=</span> <span class="n">count_sample_overlaps</span><span class="p">(</span>
+        <span class="n">presentation_training_data</span><span class="p">,</span> <span class="n">PRESENTATION_SAMPLES_FILE</span><span class="p">)</span>
+    <span class="n">source_overlap</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="n">policy</span><span class="p">[</span><span class="s2">"schema_version"</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.sample_disjointness</span><span class="w"> </span><span class="kn">import</span> <span class="n">exclude_source_samples</span>
+        <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">affinity_training_data</span><span class="p">,</span> <span class="n">chunksize</span><span class="o">=</span><span class="mi">100_000</span><span class="p">):</span>
+            <span class="n">source_overlap</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">exclude_source_samples</span><span class="p">(</span>
+                <span class="n">chunk</span><span class="p">,</span> <span class="n">holdout_dir</span> <span class="o">/</span> <span class="n">AFFINITY_SOURCE_SAMPLES_FILE</span><span class="p">))</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"schema_version"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="s2">"sample_disjointness"</span><span class="p">:</span> <span class="s2">"unresolved"</span><span class="p">,</span>
+        <span class="s2">"sample_disjointness_reason"</span><span class="p">:</span> <span class="p">(</span>
+            <span class="s2">"Recorded pMHC/source checks do not establish complete component lineage; "</span>
+            <span class="s2">"use audit-samples for every compared model."</span><span class="p">),</span>
+        <span class="s2">"policy_sha256"</span><span class="p">:</span> <span class="n">_sha256</span><span class="p">(</span><span class="n">holdout_dir</span> <span class="o">/</span> <span class="n">POLICY_FILE</span><span class="p">),</span>
+        <span class="s2">"holdout_files"</span><span class="p">:</span> <span class="n">policy</span><span class="p">[</span><span class="s2">"holdout_files"</span><span class="p">],</span>
+        <span class="s2">"affinity_overlap_rows"</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">affinity_overlap</span><span class="p">),</span>
+        <span class="s2">"processing_overlap_rows"</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">processing_overlap</span><span class="p">),</span>
+        <span class="s2">"presentation_overlap_rows"</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">presentation_overlap</span><span class="p">),</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="n">policy</span><span class="p">[</span><span class="s2">"schema_version"</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">result</span><span class="p">[</span><span class="s2">"affinity_source_overlap_rows"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">source_overlap</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">out</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="s2">"w"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+            <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">fd</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">fd</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">nonzero</span> <span class="o">=</span> <span class="p">{</span><span class="n">key</span><span class="p">:</span> <span class="n">value</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+               <span class="k">if</span> <span class="n">key</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">"_overlap_rows"</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="p">}</span>
+    <span class="k">if</span> <span class="n">nonzero</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Release holdout validation failed: </span><span class="si">{</span><span class="n">nonzero</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="make_parser">
+<a class="viewcode-back" href="../../api.html#mhcflurry.release_holdout.make_parser">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_parser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="s2">"mhcflurry train release-holdout"</span><span class="p">):</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">)</span>
+    <span class="n">subparsers</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_subparsers</span><span class="p">(</span><span class="n">dest</span><span class="o">=</span><span class="s2">"command"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">build</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s2">"build"</span><span class="p">)</span>
+    <span class="n">build</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--data-dir"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">build</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--training-data"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">build</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--mass-spec-data"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">build</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--out-dir"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">build</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--presentation-holdout-pmids"</span><span class="p">,</span>
+        <span class="n">nargs</span><span class="o">=</span><span class="s2">"+"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">PRESENTATION_HOLDOUT_PMIDS</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">build</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--chunksize"</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">500_000</span><span class="p">)</span>
+    <span class="n">validate</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s2">"validate"</span><span class="p">)</span>
+    <span class="n">validate</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--holdout-dir"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">validate</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--affinity-training-data"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">validate</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--processing-training-data"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">validate</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--presentation-training-data"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">validate</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--out"</span><span class="p">)</span>
+    <span class="n">audit</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"audit-samples"</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Audit all model lineage and export one shared cohort"</span><span class="p">)</span>
+    <span class="n">audit</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--inventory"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Reviewed lineage inventory JSON"</span><span class="p">)</span>
+    <span class="n">audit</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--cohort"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Frozen CSV with sample_id and optional study_id"</span><span class="p">)</span>
+    <span class="n">audit</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--sample-metadata"</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"CSV mapping sample_id to study_id"</span><span class="p">)</span>
+    <span class="n">audit</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--aliases"</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Explicit study/specimen alias CSV"</span><span class="p">)</span>
+    <span class="n">audit</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--out-dir"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"New output directory; never overwritten"</span><span class="p">)</span>
+    <span class="n">audit</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--report-only"</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+                       <span class="n">help</span><span class="o">=</span><span class="s2">"Write findings without failing on unresolved/overlapping samples"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+
+<div class="viewcode-block" id="run_argv">
+<a class="viewcode-back" href="../../api.html#mhcflurry.release_holdout.run_argv">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_argv</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prog</span><span class="o">=</span><span class="s2">"mhcflurry train release-holdout"</span><span class="p">):</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">make_parser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">)</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">command</span> <span class="o">==</span> <span class="s2">"build"</span><span class="p">:</span>
+        <span class="n">build_release_holdout</span><span class="p">(</span>
+            <span class="n">data_dir</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">data_dir</span><span class="p">,</span>
+            <span class="n">training_data</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">training_data</span><span class="p">,</span>
+            <span class="n">mass_spec_data</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">mass_spec_data</span><span class="p">,</span>
+            <span class="n">out_dir</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">out_dir</span><span class="p">,</span>
+            <span class="n">presentation_holdout_pmids</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">presentation_holdout_pmids</span><span class="p">,</span>
+            <span class="n">chunksize</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">chunksize</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">elif</span> <span class="n">args</span><span class="o">.</span><span class="n">command</span> <span class="o">==</span> <span class="s2">"validate"</span><span class="p">:</span>
+        <span class="n">validate_release_holdout</span><span class="p">(</span>
+            <span class="n">holdout_dir</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">holdout_dir</span><span class="p">,</span>
+            <span class="n">affinity_training_data</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">affinity_training_data</span><span class="p">,</span>
+            <span class="n">processing_training_data</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">processing_training_data</span><span class="p">,</span>
+            <span class="n">presentation_training_data</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">presentation_training_data</span><span class="p">,</span>
+            <span class="n">out</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.sample_disjointness</span><span class="w"> </span><span class="kn">import</span> <span class="n">audit_samples</span>
+        <span class="n">report</span> <span class="o">=</span> <span class="n">audit_samples</span><span class="p">(</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">inventory</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">cohort</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">out_dir</span><span class="p">,</span>
+            <span class="n">aliases_path</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">aliases</span><span class="p">,</span> <span class="n">sample_metadata</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">sample_metadata</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">report</span><span class="p">[</span><span class="s2">"status"</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">"disjoint"</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">report_only</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Whole-sample disjointness is not verified; see sample_disjointness.json"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="mi">0</span></div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
+    <span class="n">run_argv</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

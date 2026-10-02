@@ -1,0 +1,475 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.cli.main &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.cli.main</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.cli.main</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Top-level ``mhcflurry`` CLI dispatcher.</span>
+
+<span class="sd">Every subcommand is registered as ``(module path, entry attr, one-line</span>
+<span class="sd">help)`` and lazy-imported on dispatch, so ``mhcflurry --help`` and</span>
+<span class="sd">``mhcflurry &lt;subcommand&gt; --help`` only pull in the modules they actually</span>
+<span class="sd">need. This keeps the torch-import cost off the top-level help path.</span>
+
+<span class="sd">Two flavors of subcommand:</span>
+
+<span class="sd">* **New under the parent**: ``train``, ``eval``, ``compare-models``,</span>
+<span class="sd">  ``plot-model-comparison``, ``paper-figures``.</span>
+<span class="sd">  Each module exposes ``run_argv(argv)`` which does its own argparse.</span>
+<span class="sd">* **Historical mhcflurry-* commands**: ``predict``, ``predict-scan``,</span>
+<span class="sd">  ``downloads``, ``calibrate-percentile-ranks``, the ``class1-train-*`` /</span>
+<span class="sd">  ``class1-select-*`` family, ``pseudosequences``. Each is wrapped by</span>
+<span class="sd">  invoking the command module's existing ``run(argv)`` (or ``main(argv)``</span>
+<span class="sd">  for ``pseudosequences``) on the post-subcommand argv. All</span>
+<span class="sd">  ``mhcflurry-*`` console_scripts in ``setup.py`` remain installed as</span>
+<span class="sd">  compat shims pointing at the same underlying entry functions.</span>
+<span class="sd">"""</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">importlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">..version</span><span class="w"> </span><span class="kn">import</span> <span class="n">__version__</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.help</span><span class="w"> </span><span class="kn">import</span> <span class="n">style_help</span>
+
+
+<span class="c1"># Every subcommand is ``(module_path, entry_attr, one-line help)``. The</span>
+<span class="c1"># entry function must accept a single ``argv`` argument; it owns its own</span>
+<span class="c1"># arg parsing.</span>
+<span class="n">_SUBCOMMANDS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"train"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.cli.train_command"</span><span class="p">,</span> <span class="s2">"run_argv"</span><span class="p">,</span>
+        <span class="s2">"Release-training workflows."</span><span class="p">),</span>
+    <span class="s2">"eval"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.cli.eval_command"</span><span class="p">,</span> <span class="s2">"run_argv"</span><span class="p">,</span>
+        <span class="s2">"Evaluation, model comparison, and paper-figure workflows."</span><span class="p">),</span>
+    <span class="s2">"compare-models"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.cli.compare_models"</span><span class="p">,</span> <span class="s2">"run_argv"</span><span class="p">,</span>
+        <span class="s2">"Compare two model ensembles on data_evaluation."</span><span class="p">),</span>
+    <span class="s2">"plot-model-comparison"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.cli.plot_model_comparison"</span><span class="p">,</span> <span class="s2">"run_argv"</span><span class="p">,</span>
+        <span class="s2">"Render plots from a compare-models output directory."</span><span class="p">),</span>
+    <span class="s2">"paper-figures"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.cli.paper_figures"</span><span class="p">,</span> <span class="s2">"run_argv"</span><span class="p">,</span>
+        <span class="s2">"Render paper-style figures from retraining artifacts."</span><span class="p">),</span>
+    <span class="s2">"predict"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.cli.predict_command"</span><span class="p">,</span> <span class="s2">"run"</span><span class="p">,</span>
+        <span class="s2">"Predict affinity, processing and presentation for peptides and MHC alleles."</span><span class="p">),</span>
+    <span class="s2">"predict-scan"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.cli.predict_scan_command"</span><span class="p">,</span> <span class="s2">"run"</span><span class="p">,</span>
+        <span class="s2">"Scan protein sequences for predicted MHC I ligands."</span><span class="p">),</span>
+    <span class="s2">"downloads"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.cli.downloads_command"</span><span class="p">,</span> <span class="s2">"run"</span><span class="p">,</span>
+        <span class="s2">"Fetch, inspect, resolve data + model downloads."</span><span class="p">),</span>
+    <span class="s2">"calibrate-percentile-ranks"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.cli.calibrate_percentile_ranks_command"</span><span class="p">,</span> <span class="s2">"run"</span><span class="p">,</span>
+        <span class="s2">"Calibrate percentile ranks on an existing predictor."</span><span class="p">),</span>
+    <span class="s2">"class1-train-allele-specific-models"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.cli.train_allele_specific_models_command"</span><span class="p">,</span> <span class="s2">"run"</span><span class="p">,</span>
+        <span class="s2">"Train Class I allele-specific affinity models."</span><span class="p">),</span>
+    <span class="s2">"class1-select-allele-specific-models"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.cli.select_allele_specific_models_command"</span><span class="p">,</span> <span class="s2">"run"</span><span class="p">,</span>
+        <span class="s2">"Select Class I allele-specific models from a candidate pool."</span><span class="p">),</span>
+    <span class="s2">"class1-train-pan-allele-models"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.cli.train_pan_allele_models_command"</span><span class="p">,</span> <span class="s2">"run"</span><span class="p">,</span>
+        <span class="s2">"Train Class I pan-allele affinity models."</span><span class="p">),</span>
+    <span class="s2">"class1-select-pan-allele-models"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.cli.select_pan_allele_models_command"</span><span class="p">,</span> <span class="s2">"run"</span><span class="p">,</span>
+        <span class="s2">"Select Class I pan-allele models from a candidate pool."</span><span class="p">),</span>
+    <span class="s2">"class1-train-processing-models"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.cli.train_processing_models_command"</span><span class="p">,</span> <span class="s2">"run"</span><span class="p">,</span>
+        <span class="s2">"Train Class I antigen-processing models."</span><span class="p">),</span>
+    <span class="s2">"class1-select-processing-models"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.cli.select_processing_models_command"</span><span class="p">,</span> <span class="s2">"run"</span><span class="p">,</span>
+        <span class="s2">"Select Class I processing models from a candidate pool."</span><span class="p">),</span>
+    <span class="s2">"class1-train-presentation-models"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.cli.train_presentation_models_command"</span><span class="p">,</span> <span class="s2">"run"</span><span class="p">,</span>
+        <span class="s2">"Train the Class I presentation predictor (affinity + processing)."</span><span class="p">),</span>
+    <span class="s2">"class1-generate-training-hyperparameters"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.cli.generate_training_hyperparameters"</span><span class="p">,</span> <span class="s2">"run_argv"</span><span class="p">,</span>
+        <span class="s2">"Generate release-training hyperparameter grids."</span><span class="p">),</span>
+    <span class="s2">"class1-reassign-mass-spec-training-data"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.cli.reassign_mass_spec_training_data"</span><span class="p">,</span> <span class="s2">"run_argv"</span><span class="p">,</span>
+        <span class="s2">"Reassign mass-spec rows in Class I affinity training data."</span><span class="p">),</span>
+    <span class="s2">"pseudosequences"</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">"mhcflurry.pseudosequences"</span><span class="p">,</span> <span class="s2">"main"</span><span class="p">,</span>
+        <span class="s2">"Pseudosequence CSV registry helper (filename / path / list)."</span><span class="p">),</span>
+<span class="p">}</span>
+
+
+<span class="c1"># Display grouping for the friendly help screen. Each subcommand listed</span>
+<span class="c1"># here must appear in ``_SUBCOMMANDS``; the closing assertion catches</span>
+<span class="c1"># drift between the two.</span>
+<span class="n">_HELP_GROUPS</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="p">(</span><span class="s2">"Prediction"</span><span class="p">,</span> <span class="p">(</span>
+        <span class="s2">"predict"</span><span class="p">,</span> <span class="s2">"predict-scan"</span><span class="p">,</span>
+    <span class="p">)),</span>
+    <span class="p">(</span><span class="s2">"Data management"</span><span class="p">,</span> <span class="p">(</span>
+        <span class="s2">"downloads"</span><span class="p">,</span>
+    <span class="p">)),</span>
+    <span class="p">(</span><span class="s2">"Class I training"</span><span class="p">,</span> <span class="p">(</span>
+        <span class="s2">"class1-train-allele-specific-models"</span><span class="p">,</span>
+        <span class="s2">"class1-train-pan-allele-models"</span><span class="p">,</span>
+        <span class="s2">"class1-train-processing-models"</span><span class="p">,</span>
+        <span class="s2">"class1-train-presentation-models"</span><span class="p">,</span>
+    <span class="p">)),</span>
+    <span class="p">(</span><span class="s2">"Class I selection"</span><span class="p">,</span> <span class="p">(</span>
+        <span class="s2">"class1-select-allele-specific-models"</span><span class="p">,</span>
+        <span class="s2">"class1-select-pan-allele-models"</span><span class="p">,</span>
+        <span class="s2">"class1-select-processing-models"</span><span class="p">,</span>
+    <span class="p">)),</span>
+    <span class="p">(</span><span class="s2">"Calibration"</span><span class="p">,</span> <span class="p">(</span>
+        <span class="s2">"calibrate-percentile-ranks"</span><span class="p">,</span>
+    <span class="p">)),</span>
+    <span class="p">(</span><span class="s2">"Evaluation and figures"</span><span class="p">,</span> <span class="p">(</span>
+        <span class="s2">"eval"</span><span class="p">,</span>
+    <span class="p">)),</span>
+    <span class="p">(</span><span class="s2">"Release training"</span><span class="p">,</span> <span class="p">(</span>
+        <span class="s2">"train"</span><span class="p">,</span>
+    <span class="p">)),</span>
+    <span class="p">(</span><span class="s2">"Helpers"</span><span class="p">,</span> <span class="p">(</span>
+        <span class="s2">"class1-generate-training-hyperparameters"</span><span class="p">,</span>
+        <span class="s2">"class1-reassign-mass-spec-training-data"</span><span class="p">,</span>
+        <span class="s2">"pseudosequences"</span><span class="p">,</span>
+    <span class="p">)),</span>
+    <span class="p">(</span><span class="s2">"Shortcuts for eval subcommands"</span><span class="p">,</span> <span class="p">(</span>
+        <span class="s2">"compare-models"</span><span class="p">,</span> <span class="s2">"plot-model-comparison"</span><span class="p">,</span> <span class="s2">"paper-figures"</span><span class="p">,</span>
+    <span class="p">)),</span>
+<span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_check_help_groups</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Fail-fast at import time if _HELP_GROUPS drifts from _SUBCOMMANDS.</span>
+
+<span class="sd">    Missing or unknown command names prevent importing this dispatcher.</span>
+<span class="sd">    Historical console scripts import their command modules directly and</span>
+<span class="sd">    do not run this check. Duplicate grouping is checked by CLI tests.</span>
+<span class="sd">    """</span>
+    <span class="n">grouped</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">names</span> <span class="ow">in</span> <span class="n">_HELP_GROUPS</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">names</span><span class="p">}</span>
+    <span class="n">missing</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">_SUBCOMMANDS</span><span class="p">)</span> <span class="o">-</span> <span class="n">grouped</span>
+    <span class="n">extra</span> <span class="o">=</span> <span class="n">grouped</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">_SUBCOMMANDS</span><span class="p">)</span>
+    <span class="c1"># Raise explicitly rather than ``assert`` so the guard survives ``python -O``</span>
+    <span class="c1"># (which strips assertions): drift must never ship silently.</span>
+    <span class="k">if</span> <span class="n">missing</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">"subcommands missing from _HELP_GROUPS: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">missing</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">extra</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">"_HELP_GROUPS lists unknown subcommands: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">extra</span><span class="p">)</span>
+
+
+<span class="n">_check_help_groups</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="build_parser">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.main.build_parser">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">build_parser</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Return the top-level parser used by ``--help`` and tooling.</span>
+
+<span class="sd">    Subparsers are registered by name only — no per-subcommand arguments</span>
+<span class="sd">    are added here. The legacy module owns its own ``--help`` output and</span>
+<span class="sd">    is invoked lazily by :func:`main`. Keeps this function torch-free.</span>
+<span class="sd">    """</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">prog</span><span class="o">=</span><span class="s2">"mhcflurry"</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"MHCflurry. Use 'mhcflurry &lt;subcommand&gt; --help' for details on "</span>
+            <span class="s2">"any subcommand."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="c1"># ``--version`` / ``-V`` is handled by main()'s early-exit before</span>
+    <span class="c1"># parse_args runs; no argparse action needed here.</span>
+    <span class="n">sub</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_subparsers</span><span class="p">(</span><span class="n">dest</span><span class="o">=</span><span class="s2">"subcommand"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="p">(</span><span class="n">_module</span><span class="p">,</span> <span class="n">_entry</span><span class="p">,</span> <span class="n">help_text</span><span class="p">)</span> <span class="ow">in</span> <span class="n">_SUBCOMMANDS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="n">help_text</span><span class="p">,</span> <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+
+<div class="viewcode-block" id="format_help">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.main.format_help">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">format_help</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Build the friendly help screen shown for bare ``mhcflurry`` and ``--help``.</span>
+
+<span class="sd">    Replaces argparse's default flat-listing layout with grouped sections,</span>
+<span class="sd">    a short usage banner, and a couple of example invocations. Pure-string</span>
+<span class="sd">    formatting; no argparse internals involved.</span>
+<span class="sd">    """</span>
+    <span class="n">lines</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="s2">"usage: mhcflurry &lt;subcommand&gt; [args]"</span><span class="p">,</span>
+        <span class="s2">""</span><span class="p">,</span>
+        <span class="s2">"MHCflurry </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">__version__</span><span class="p">,</span>
+        <span class="s2">""</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="n">name_width</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+        <span class="nb">len</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">names</span> <span class="ow">in</span> <span class="n">_HELP_GROUPS</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">names</span>
+    <span class="p">)</span>
+    <span class="k">for</span> <span class="n">group_name</span><span class="p">,</span> <span class="n">names</span> <span class="ow">in</span> <span class="n">_HELP_GROUPS</span><span class="p">:</span>
+        <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"</span><span class="si">%s</span><span class="s2">:"</span> <span class="o">%</span> <span class="n">group_name</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">names</span><span class="p">:</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">help_text</span> <span class="o">=</span> <span class="n">_SUBCOMMANDS</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"  </span><span class="si">%s</span><span class="s2">  </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">name</span><span class="o">.</span><span class="n">ljust</span><span class="p">(</span><span class="n">name_width</span><span class="p">),</span> <span class="n">help_text</span><span class="p">))</span>
+        <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span>
+    <span class="n">lines</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span>
+        <span class="s2">"Examples:"</span><span class="p">,</span>
+        <span class="s2">"  mhcflurry predict --alleles HLA-A0201 --peptides SIINFEKL --out out.csv"</span><span class="p">,</span>
+        <span class="s2">"  mhcflurry eval compare-models --a results/new_run/ --b public --out cmp/"</span><span class="p">,</span>
+        <span class="s2">"  mhcflurry eval paper-figures run --a results/new_run/ --out eval/"</span><span class="p">,</span>
+        <span class="s2">"  mhcflurry train pan-allele-release --run-dir runs/2.3.0 --release 2.3.0"</span><span class="p">,</span>
+        <span class="s2">"  mhcflurry &lt;subcommand&gt; --help"</span><span class="p">,</span>
+        <span class="s2">""</span><span class="p">,</span>
+        <span class="s2">"Historical mhcflurry-* scripts remain installed and run the same code."</span><span class="p">,</span>
+        <span class="s2">""</span><span class="p">,</span>
+        <span class="s2">"Options:"</span><span class="p">,</span>
+        <span class="s2">"  -h, --help     show this help message and exit"</span><span class="p">,</span>
+        <span class="s2">"  --version, -V  show 'mhcflurry </span><span class="si">%s</span><span class="s2">' and exit"</span> <span class="o">%</span> <span class="n">__version__</span><span class="p">,</span>
+    <span class="p">])</span>
+    <span class="k">return</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_rewrite_parser_prog</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="n">prog</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Recursively rewrite ``parser.prog`` and its subparsers' progs.</span>
+
+<span class="sd">    Returns a list of ``(parser, original_prog)`` pairs that</span>
+<span class="sd">    :func:`_restore_parser_progs` can use to undo the change. Walking the</span>
+<span class="sd">    subparser tree is necessary because sub-subcommands (``downloads</span>
+<span class="sd">    fetch``, ``pseudosequences filename``, …) take their prog from the</span>
+<span class="sd">    parent at parser-build time, which for legacy modules is import</span>
+<span class="sd">    time — before the unified dispatcher gets to rename the top-level</span>
+<span class="sd">    parser.</span>
+<span class="sd">    """</span>
+    <span class="n">saved</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">parser</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="s2">"prog"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">saved</span>
+    <span class="n">saved</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">parser</span><span class="p">,</span> <span class="n">parser</span><span class="o">.</span><span class="n">prog</span><span class="p">))</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">prog</span> <span class="o">=</span> <span class="n">prog</span>
+    <span class="c1"># argparse._SubParsersAction is technically a private name (underscore</span>
+    <span class="c1"># prefix), but the class has been stable across Python releases and is</span>
+    <span class="c1"># the standard handle every CLI tool that walks subparser trees uses</span>
+    <span class="c1"># (sphinx-autoprogram, click-&gt;argparse adapters, etc).</span>
+    <span class="k">for</span> <span class="n">action</span> <span class="ow">in</span> <span class="n">parser</span><span class="o">.</span><span class="n">_actions</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">action</span><span class="p">,</span> <span class="n">argparse</span><span class="o">.</span><span class="n">_SubParsersAction</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">sub_name</span><span class="p">,</span> <span class="n">sub_parser</span> <span class="ow">in</span> <span class="n">action</span><span class="o">.</span><span class="n">choices</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">saved</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">_rewrite_parser_prog</span><span class="p">(</span>
+                    <span class="n">sub_parser</span><span class="p">,</span> <span class="s2">"</span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">prog</span><span class="p">,</span> <span class="n">sub_name</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">saved</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_restore_parser_progs</span><span class="p">(</span><span class="n">saved</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Reverse :func:`_rewrite_parser_prog`; used as a tests-friendly finally."""</span>
+    <span class="k">for</span> <span class="n">parser</span><span class="p">,</span> <span class="n">original_prog</span> <span class="ow">in</span> <span class="n">saved</span><span class="p">:</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">prog</span> <span class="o">=</span> <span class="n">original_prog</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_entry_accepts_prog</span><span class="p">(</span><span class="n">entry_func</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return whether ``entry_func`` accepts a ``prog=`` display override."""</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">signature</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">signature</span><span class="p">(</span><span class="n">entry_func</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">return</span> <span class="s2">"prog"</span> <span class="ow">in</span> <span class="n">signature</span><span class="o">.</span><span class="n">parameters</span>
+
+
+<div class="viewcode-block" id="main">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.main.main">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Dispatch entry point for the ``mhcflurry`` console script."""</span>
+    <span class="k">if</span> <span class="n">argv</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">argv</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">argv</span><span class="p">:</span>
+        <span class="c1"># Bare ``mhcflurry``: treat as "user asked for help". stdout +</span>
+        <span class="c1"># exit 0 so the screen can be piped into ``less`` and so</span>
+        <span class="c1"># tab-completion shells that probe ``mhcflurry`` don't see a</span>
+        <span class="c1"># spurious error.</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">style_help</span><span class="p">(</span><span class="n">format_help</span><span class="p">(),</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">))</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"-h"</span><span class="p">,</span> <span class="s2">"--help"</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">style_help</span><span class="p">(</span><span class="n">format_help</span><span class="p">(),</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">))</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"-V"</span><span class="p">,</span> <span class="s2">"--version"</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"mhcflurry </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">__version__</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="n">subcommand</span> <span class="o">=</span> <span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">remaining</span> <span class="o">=</span> <span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+    <span class="k">if</span> <span class="n">subcommand</span> <span class="ow">in</span> <span class="n">_SUBCOMMANDS</span><span class="p">:</span>
+        <span class="n">module_path</span><span class="p">,</span> <span class="n">entry</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">_SUBCOMMANDS</span><span class="p">[</span><span class="n">subcommand</span><span class="p">]</span>
+        <span class="n">module</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="n">module_path</span><span class="p">)</span>
+        <span class="c1"># Subcommands' parsers normally default ``prog`` to ``sys.argv[0]``</span>
+        <span class="c1"># (the console script name). When dispatched under the parent, keep</span>
+        <span class="c1"># display ``prog`` separate from ``sys.argv`` so artifact-producing</span>
+        <span class="c1"># commands can still record a reproducible command in GENERATE.sh.</span>
+        <span class="n">prog</span> <span class="o">=</span> <span class="s2">"mhcflurry </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">subcommand</span>
+        <span class="n">saved_progs</span> <span class="o">=</span> <span class="n">_rewrite_parser_prog</span><span class="p">(</span>
+            <span class="nb">getattr</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="s2">"parser"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="n">prog</span><span class="p">)</span>
+        <span class="n">entry_func</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">entry</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">_entry_accepts_prog</span><span class="p">(</span><span class="n">entry_func</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">entry_func</span><span class="p">(</span><span class="n">remaining</span><span class="p">,</span> <span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">entry_func</span><span class="p">(</span><span class="n">remaining</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">_restore_parser_progs</span><span class="p">(</span><span class="n">saved_progs</span><span class="p">)</span>
+    <span class="c1"># Unknown subcommand — let argparse emit the standard error + usage.</span>
+    <span class="n">build_parser</span><span class="p">()</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+    <span class="k">return</span> <span class="mi">2</span>  <span class="c1"># unreachable; parse_args exits</span></div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">main</span><span class="p">()</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

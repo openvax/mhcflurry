@@ -1,0 +1,597 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.pytorch_losses &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.pytorch_losses</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.pytorch_losses</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""</span>
+<span class="sd">PyTorch loss functions for mhcflurry.</span>
+
+<span class="sd">Supports inequality constraints where training data includes (=), (&lt;), and (&gt;)</span>
+<span class="sd">relationships. For inequality constraints, penalization is applied only when</span>
+<span class="sd">predictions violate the constraint.</span>
+<span class="sd">"""</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn.functional</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">F</span>
+
+
+<div class="viewcode-block" id="MSEWithInequalities">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_losses.MSEWithInequalities">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MSEWithInequalities</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    MSE loss with inequality support.</span>
+
+<span class="sd">    y_true is encoded as follows:</span>
+<span class="sd">      - [0, 1]: equality constraint, standard MSE</span>
+<span class="sd">      - [2, 3]: greater-than constraint (value = y_true - 2), penalize if pred &lt; value</span>
+<span class="sd">      - [4, 5]: less-than constraint (value = y_true - 4), penalize if pred &gt; value</span>
+<span class="sd">    """</span>
+    <span class="n">supports_inequalities</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">supports_multiple_outputs</span> <span class="o">=</span> <span class="kc">False</span>
+
+<div class="viewcode-block" id="MSEWithInequalities.encode_y">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_losses.MSEWithInequalities.encode_y">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">encode_y</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">inequalities</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Encode targets with inequality information.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        y : array-like</span>
+<span class="sd">            Target values in [0, 1]</span>
+<span class="sd">        inequalities : array-like of str, optional</span>
+<span class="sd">            One of "=", "&gt;", "&lt;" for each target</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.ndarray</span>
+<span class="sd">        """</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">y</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"y contains NaN"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">y</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span> <span class="ow">or</span> <span class="p">(</span><span class="n">y</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Targets must be in [0, 1] for MSEWithInequalities"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">inequalities</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">y</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">inequalities</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">y</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"inequalities must have same length as y"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">ineq</span> <span class="ow">in</span> <span class="n">inequalities</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">ineq</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"="</span><span class="p">,</span> <span class="s2">"&gt;"</span><span class="p">,</span> <span class="s2">"&lt;"</span><span class="p">}:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Inequalities must be one of '=', '&gt;', '&lt;'"</span><span class="p">)</span>
+        <span class="n">offsets</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
+            <span class="p">{</span><span class="s1">'='</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">'&gt;'</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">'&lt;'</span><span class="p">:</span> <span class="mi">4</span><span class="p">}[</span><span class="n">ineq</span><span class="p">]</span> <span class="k">for</span> <span class="n">ineq</span> <span class="ow">in</span> <span class="n">inequalities</span>
+        <span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">encoded</span> <span class="o">=</span> <span class="n">y</span> <span class="o">+</span> <span class="n">offsets</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">encoded</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">encoded</span></div>
+
+
+<div class="viewcode-block" id="MSEWithInequalities.forward">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_losses.MSEWithInequalities.forward">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">,</span> <span class="n">y_true</span><span class="p">,</span> <span class="n">sample_weights</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Compute loss.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        y_pred : torch.Tensor</span>
+<span class="sd">            Predictions, shape (batch,) or (batch, 1)</span>
+<span class="sd">        y_true : torch.Tensor</span>
+<span class="sd">            Encoded targets, shape (batch,) or (batch, 1)</span>
+<span class="sd">        sample_weights : torch.Tensor or None</span>
+<span class="sd">            Optional per-example weights.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        torch.Tensor</span>
+<span class="sd">            Scalar loss value</span>
+<span class="sd">        """</span>
+        <span class="n">numerator</span><span class="p">,</span> <span class="n">denominator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">loss_numerator_and_denominator</span><span class="p">(</span>
+            <span class="n">y_pred</span><span class="p">,</span> <span class="n">y_true</span><span class="p">,</span> <span class="n">sample_weights</span><span class="o">=</span><span class="n">sample_weights</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">numerator</span> <span class="o">/</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="n">denominator</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MSEWithInequalities.loss_numerator_and_denominator">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_losses.MSEWithInequalities.loss_numerator_and_denominator">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">loss_numerator_and_denominator</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">,</span> <span class="n">y_true</span><span class="p">,</span> <span class="n">sample_weights</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return additive reduction terms for exact batched validation."""</span>
+        <span class="n">y_true</span> <span class="o">=</span> <span class="n">y_true</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">y_pred</span> <span class="o">=</span> <span class="n">y_pred</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># Handle (=) inequalities: 0 &lt;= y_true &lt;= 1</span>
+        <span class="n">diff1</span> <span class="o">=</span> <span class="n">y_pred</span> <span class="o">-</span> <span class="n">y_true</span>
+        <span class="n">diff1</span> <span class="o">=</span> <span class="n">diff1</span> <span class="o">*</span> <span class="p">(</span><span class="n">y_true</span> <span class="o">&gt;=</span> <span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span> <span class="o">*</span> <span class="p">(</span><span class="n">y_true</span> <span class="o">&lt;=</span> <span class="mf">1.0</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+
+        <span class="c1"># Handle (&gt;) inequalities: 2 &lt;= y_true &lt;= 3</span>
+        <span class="c1"># Penalize only if pred &lt; threshold (diff &lt; 0)</span>
+        <span class="n">diff2</span> <span class="o">=</span> <span class="n">y_pred</span> <span class="o">-</span> <span class="p">(</span><span class="n">y_true</span> <span class="o">-</span> <span class="mf">2.0</span><span class="p">)</span>
+        <span class="n">diff2</span> <span class="o">=</span> <span class="n">diff2</span> <span class="o">*</span> <span class="p">(</span><span class="n">y_true</span> <span class="o">&gt;=</span> <span class="mf">2.0</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span> <span class="o">*</span> <span class="p">(</span><span class="n">y_true</span> <span class="o">&lt;=</span> <span class="mf">3.0</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+        <span class="n">diff2</span> <span class="o">=</span> <span class="n">diff2</span> <span class="o">*</span> <span class="p">(</span><span class="n">diff2</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+
+        <span class="c1"># Handle (&lt;) inequalities: y_true &gt;= 4</span>
+        <span class="c1"># Penalize only if pred &gt; threshold (diff &gt; 0)</span>
+        <span class="n">diff3</span> <span class="o">=</span> <span class="n">y_pred</span> <span class="o">-</span> <span class="p">(</span><span class="n">y_true</span> <span class="o">-</span> <span class="mf">4.0</span><span class="p">)</span>
+        <span class="n">diff3</span> <span class="o">=</span> <span class="n">diff3</span> <span class="o">*</span> <span class="p">(</span><span class="n">y_true</span> <span class="o">&gt;=</span> <span class="mf">4.0</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+        <span class="n">diff3</span> <span class="o">=</span> <span class="n">diff3</span> <span class="o">*</span> <span class="p">(</span><span class="n">diff3</span> <span class="o">&gt;</span> <span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+
+        <span class="n">per_sample</span> <span class="o">=</span> <span class="n">diff1</span><span class="o">.</span><span class="n">square</span><span class="p">()</span> <span class="o">+</span> <span class="n">diff2</span><span class="o">.</span><span class="n">square</span><span class="p">()</span> <span class="o">+</span> <span class="n">diff3</span><span class="o">.</span><span class="n">square</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">sample_weights</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">denominator</span> <span class="o">=</span> <span class="p">(</span><span class="n">y_true</span> <span class="o">!=</span> <span class="mf">2.0</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">per_sample</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span> <span class="n">denominator</span>
+        <span class="n">sample_weights</span> <span class="o">=</span> <span class="n">sample_weights</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">per_sample</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">mask</span> <span class="o">=</span> <span class="p">(</span><span class="n">y_true</span> <span class="o">!=</span> <span class="mf">2.0</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+        <span class="n">denominator</span> <span class="o">=</span> <span class="p">(</span><span class="n">sample_weights</span> <span class="o">*</span> <span class="n">mask</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">per_sample</span> <span class="o">*</span> <span class="n">sample_weights</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span> <span class="n">denominator</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="MSEWithInequalitiesAndMultipleOutputs">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_losses.MSEWithInequalitiesAndMultipleOutputs">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MSEWithInequalitiesAndMultipleOutputs</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    MSE loss with inequality and multiple output support.</span>
+
+<span class="sd">    Extends MSEWithInequalities by encoding the output index into the target:</span>
+<span class="sd">    encoded_target = inequality_encoded_value + output_index * 10</span>
+<span class="sd">    """</span>
+    <span class="n">supports_inequalities</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">supports_multiple_outputs</span> <span class="o">=</span> <span class="kc">True</span>
+
+<div class="viewcode-block" id="MSEWithInequalitiesAndMultipleOutputs.encode_y">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_losses.MSEWithInequalitiesAndMultipleOutputs.encode_y">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">encode_y</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">inequalities</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">output_indices</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Encode targets with inequality and output index information.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        y : array-like</span>
+<span class="sd">            Target values in [0, 1]</span>
+<span class="sd">        inequalities : array-like of str, optional</span>
+<span class="sd">            One of "=", "&gt;", "&lt;" for each target</span>
+<span class="sd">        output_indices : array-like of int, optional</span>
+<span class="sd">            Output index for each target</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.ndarray</span>
+<span class="sd">        """</span>
+        <span class="n">encoded</span> <span class="o">=</span> <span class="n">MSEWithInequalities</span><span class="o">.</span><span class="n">encode_y</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">inequalities</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">output_indices</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">output_indices</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">output_indices</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">output_indices</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">encoded</span><span class="p">),):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"Expected output_indices to have shape </span><span class="si">%s</span><span class="s2"> not </span><span class="si">%s</span><span class="s2">"</span>
+                    <span class="o">%</span> <span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">encoded</span><span class="p">),),</span> <span class="n">output_indices</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">output_indices</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Invalid output indices: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">output_indices</span><span class="p">)</span>
+            <span class="n">encoded</span> <span class="o">=</span> <span class="n">encoded</span> <span class="o">+</span> <span class="n">output_indices</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span> <span class="o">*</span> <span class="mi">10</span>
+        <span class="k">return</span> <span class="n">encoded</span></div>
+
+
+<div class="viewcode-block" id="MSEWithInequalitiesAndMultipleOutputs.forward">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_losses.MSEWithInequalitiesAndMultipleOutputs.forward">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">,</span> <span class="n">y_true</span><span class="p">,</span> <span class="n">sample_weights</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Compute loss.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        y_pred : torch.Tensor</span>
+<span class="sd">            Predictions, shape (batch, num_outputs)</span>
+<span class="sd">        y_true : torch.Tensor</span>
+<span class="sd">            Encoded targets, shape (batch,) or (batch, 1)</span>
+<span class="sd">        sample_weights : torch.Tensor or None</span>
+<span class="sd">            Optional per-example weights.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        torch.Tensor</span>
+<span class="sd">            Scalar loss value</span>
+<span class="sd">        """</span>
+        <span class="n">numerator</span><span class="p">,</span> <span class="n">denominator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">loss_numerator_and_denominator</span><span class="p">(</span>
+            <span class="n">y_pred</span><span class="p">,</span> <span class="n">y_true</span><span class="p">,</span> <span class="n">sample_weights</span><span class="o">=</span><span class="n">sample_weights</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">numerator</span> <span class="o">/</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="n">denominator</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MSEWithInequalitiesAndMultipleOutputs.loss_numerator_and_denominator">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_losses.MSEWithInequalitiesAndMultipleOutputs.loss_numerator_and_denominator">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">loss_numerator_and_denominator</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">,</span> <span class="n">y_true</span><span class="p">,</span> <span class="n">sample_weights</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return additive reduction terms for exact batched validation."""</span>
+        <span class="n">y_true</span> <span class="o">=</span> <span class="n">y_true</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">y_pred</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">y_pred</span> <span class="o">=</span> <span class="n">y_pred</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># Decode output indices</span>
+        <span class="n">output_indices</span> <span class="o">=</span> <span class="p">(</span><span class="n">y_true</span> <span class="o">/</span> <span class="mf">10.0</span><span class="p">)</span><span class="o">.</span><span class="n">long</span><span class="p">()</span>
+        <span class="n">inequality_encoded</span> <span class="o">=</span> <span class="n">y_true</span> <span class="o">-</span> <span class="n">output_indices</span><span class="o">.</span><span class="n">float</span><span class="p">()</span> <span class="o">*</span> <span class="mf">10.0</span>
+
+        <span class="c1"># Select the relevant output for each sample</span>
+        <span class="n">batch_indices</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">y_true</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="n">y_pred</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">output_indices_clamped</span> <span class="o">=</span> <span class="n">output_indices</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">y_pred</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">selected_pred</span> <span class="o">=</span> <span class="n">y_pred</span><span class="p">[</span><span class="n">batch_indices</span><span class="p">,</span> <span class="n">output_indices_clamped</span><span class="p">]</span>
+
+        <span class="c1"># Apply MSEWithInequalities logic on selected predictions</span>
+        <span class="n">y_t</span> <span class="o">=</span> <span class="n">inequality_encoded</span>
+        <span class="n">y_p</span> <span class="o">=</span> <span class="n">selected_pred</span>
+
+        <span class="c1"># Handle (=) inequalities</span>
+        <span class="n">diff1</span> <span class="o">=</span> <span class="n">y_p</span> <span class="o">-</span> <span class="n">y_t</span>
+        <span class="n">diff1</span> <span class="o">=</span> <span class="n">diff1</span> <span class="o">*</span> <span class="p">(</span><span class="n">y_t</span> <span class="o">&gt;=</span> <span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span> <span class="o">*</span> <span class="p">(</span><span class="n">y_t</span> <span class="o">&lt;=</span> <span class="mf">1.0</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+
+        <span class="c1"># Handle (&gt;) inequalities</span>
+        <span class="n">diff2</span> <span class="o">=</span> <span class="n">y_p</span> <span class="o">-</span> <span class="p">(</span><span class="n">y_t</span> <span class="o">-</span> <span class="mf">2.0</span><span class="p">)</span>
+        <span class="n">diff2</span> <span class="o">=</span> <span class="n">diff2</span> <span class="o">*</span> <span class="p">(</span><span class="n">y_t</span> <span class="o">&gt;=</span> <span class="mf">2.0</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span> <span class="o">*</span> <span class="p">(</span><span class="n">y_t</span> <span class="o">&lt;=</span> <span class="mf">3.0</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+        <span class="n">diff2</span> <span class="o">=</span> <span class="n">diff2</span> <span class="o">*</span> <span class="p">(</span><span class="n">diff2</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+
+        <span class="c1"># Handle (&lt;) inequalities</span>
+        <span class="n">diff3</span> <span class="o">=</span> <span class="n">y_p</span> <span class="o">-</span> <span class="p">(</span><span class="n">y_t</span> <span class="o">-</span> <span class="mf">4.0</span><span class="p">)</span>
+        <span class="n">diff3</span> <span class="o">=</span> <span class="n">diff3</span> <span class="o">*</span> <span class="p">(</span><span class="n">y_t</span> <span class="o">&gt;=</span> <span class="mf">4.0</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+        <span class="n">diff3</span> <span class="o">=</span> <span class="n">diff3</span> <span class="o">*</span> <span class="p">(</span><span class="n">diff3</span> <span class="o">&gt;</span> <span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+
+        <span class="n">per_sample</span> <span class="o">=</span> <span class="n">diff1</span><span class="o">.</span><span class="n">square</span><span class="p">()</span> <span class="o">+</span> <span class="n">diff2</span><span class="o">.</span><span class="n">square</span><span class="p">()</span> <span class="o">+</span> <span class="n">diff3</span><span class="o">.</span><span class="n">square</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">sample_weights</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">denominator</span> <span class="o">=</span> <span class="p">(</span><span class="n">y_t</span> <span class="o">!=</span> <span class="mf">2.0</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">per_sample</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span> <span class="n">denominator</span>
+        <span class="n">sample_weights</span> <span class="o">=</span> <span class="n">sample_weights</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">per_sample</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">mask</span> <span class="o">=</span> <span class="p">(</span><span class="n">y_t</span> <span class="o">!=</span> <span class="mf">2.0</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+        <span class="n">denominator</span> <span class="o">=</span> <span class="p">(</span><span class="n">sample_weights</span> <span class="o">*</span> <span class="n">mask</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">per_sample</span> <span class="o">*</span> <span class="n">sample_weights</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span> <span class="n">denominator</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="MultiallelicMassSpecLoss">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_losses.MultiallelicMassSpecLoss">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MultiallelicMassSpecLoss</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Loss function for multiallelic mass spectrometry data.</span>
+
+<span class="sd">    For each (hit, decoy) pair, penalizes when any decoy allele prediction</span>
+<span class="sd">    is greater than the best hit allele prediction minus delta. The squared</span>
+<span class="sd">    hinge encourages each hit to exceed every decoy allele by at least delta.</span>
+
+<span class="sd">    y_true encoding:</span>
+<span class="sd">      - 1.0: hit (positive)</span>
+<span class="sd">      - 0.0: decoy (negative)</span>
+<span class="sd">      - -1.0: ignored</span>
+<span class="sd">    """</span>
+    <span class="n">supports_inequalities</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">supports_multiple_outputs</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">supports_independent_samples</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">delta</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">multiplier</span><span class="o">=</span><span class="mf">1.0</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">MultiallelicMassSpecLoss</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">delta</span> <span class="o">=</span> <span class="n">delta</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">multiplier</span> <span class="o">=</span> <span class="n">multiplier</span>
+
+<div class="viewcode-block" id="MultiallelicMassSpecLoss.encode_y">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_losses.MultiallelicMassSpecLoss.encode_y">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">encode_y</span><span class="p">(</span><span class="n">y</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Encode y (no-op for this loss)."""</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="p">[</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">])</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">y</span></div>
+
+
+<div class="viewcode-block" id="MultiallelicMassSpecLoss.forward">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_losses.MultiallelicMassSpecLoss.forward">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">,</span> <span class="n">y_true</span><span class="p">,</span> <span class="n">sample_weights</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Compute loss.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        y_pred : torch.Tensor</span>
+<span class="sd">            Predictions, shape (batch, num_alleles)</span>
+<span class="sd">        y_true : torch.Tensor</span>
+<span class="sd">            Labels, shape (batch,) or (batch, 1)</span>
+<span class="sd">        sample_weights : torch.Tensor or None</span>
+<span class="sd">            Accepted for interface compatibility; ignored by this pairwise loss.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        torch.Tensor</span>
+<span class="sd">            Scalar loss value</span>
+<span class="sd">        """</span>
+        <span class="n">y_true</span> <span class="o">=</span> <span class="n">y_true</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">y_pred</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">y_pred</span> <span class="o">=</span> <span class="n">y_pred</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># Get hit and decoy masks</span>
+        <span class="n">hit_mask</span> <span class="o">=</span> <span class="p">(</span><span class="n">y_true</span> <span class="o">==</span> <span class="mf">1.0</span><span class="p">)</span>
+        <span class="n">decoy_mask</span> <span class="o">=</span> <span class="p">(</span><span class="n">y_true</span> <span class="o">==</span> <span class="mf">0.0</span><span class="p">)</span>
+
+        <span class="n">num_hits</span> <span class="o">=</span> <span class="n">hit_mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+        <span class="n">num_decoys</span> <span class="o">=</span> <span class="n">decoy_mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">num_hits</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">num_decoys</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">y_pred</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">num_alleles</span> <span class="o">=</span> <span class="n">y_pred</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1"># Best allele prediction for each hit: (num_hits,)</span>
+        <span class="n">hit_preds</span> <span class="o">=</span> <span class="n">y_pred</span><span class="p">[</span><span class="n">hit_mask</span><span class="p">]</span>
+        <span class="n">hit_max</span> <span class="o">=</span> <span class="n">hit_preds</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">values</span>  <span class="c1"># (num_hits,)</span>
+
+        <span class="c1"># All decoy predictions: (num_decoys, num_alleles)</span>
+        <span class="n">decoy_preds</span> <span class="o">=</span> <span class="n">y_pred</span><span class="p">[</span><span class="n">decoy_mask</span><span class="p">]</span>
+
+        <span class="c1"># Compute pairwise terms:</span>
+        <span class="c1"># For each (decoy, allele, hit): max(0, decoy_pred - hit_max + delta)^2</span>
+        <span class="c1"># decoy_preds: (num_decoys, num_alleles) -&gt; (num_decoys, num_alleles, 1)</span>
+        <span class="c1"># hit_max: (num_hits,) -&gt; (1, 1, num_hits)</span>
+        <span class="n">term</span> <span class="o">=</span> <span class="n">decoy_preds</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">-</span> <span class="n">hit_max</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">delta</span>
+        <span class="n">penalty</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">square</span><span class="p">()</span>
+
+        <span class="n">denominator</span> <span class="o">=</span> <span class="n">num_hits</span> <span class="o">*</span> <span class="n">num_decoys</span> <span class="o">*</span> <span class="n">num_alleles</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">multiplier</span> <span class="o">*</span> <span class="n">penalty</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">/</span> <span class="n">denominator</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="StandardLoss">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_losses.StandardLoss">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">StandardLoss</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Wrapper for standard PyTorch loss functions (MSE, MAE, etc).</span>
+<span class="sd">    """</span>
+    <span class="n">supports_inequalities</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">supports_multiple_outputs</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">loss_name</span><span class="o">=</span><span class="s2">"mse"</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">StandardLoss</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">loss_name</span> <span class="o">=</span> <span class="n">loss_name</span>
+        <span class="k">if</span> <span class="n">loss_name</span> <span class="o">==</span> <span class="s2">"mse"</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_loss_fn</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">MSELoss</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">loss_name</span> <span class="o">==</span> <span class="s2">"mae"</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_loss_fn</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">L1Loss</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown standard loss: </span><span class="si">{</span><span class="n">loss_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+<div class="viewcode-block" id="StandardLoss.encode_y">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_losses.StandardLoss.encode_y">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">encode_y</span><span class="p">(</span><span class="n">y</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Encode y (simple cast to float32)."""</span>
+        <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="StandardLoss.forward">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_losses.StandardLoss.forward">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">,</span> <span class="n">y_true</span><span class="p">,</span> <span class="n">sample_weights</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Compute loss.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        y_pred : torch.Tensor</span>
+<span class="sd">        y_true : torch.Tensor</span>
+<span class="sd">        sample_weights : torch.Tensor | None</span>
+<span class="sd">            Optional per-example weights.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        torch.Tensor</span>
+<span class="sd">            Scalar loss value</span>
+<span class="sd">        """</span>
+        <span class="n">y_pred</span> <span class="o">=</span> <span class="n">y_pred</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">y_true</span> <span class="o">=</span> <span class="n">y_true</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">sample_weights</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loss_fn</span><span class="p">(</span><span class="n">y_pred</span><span class="p">,</span> <span class="n">y_true</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">loss_name</span> <span class="o">==</span> <span class="s2">"mse"</span><span class="p">:</span>
+            <span class="n">losses</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">mse_loss</span><span class="p">(</span><span class="n">y_pred</span><span class="p">,</span> <span class="n">y_true</span><span class="p">,</span> <span class="n">reduction</span><span class="o">=</span><span class="s2">"none"</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">loss_name</span> <span class="o">==</span> <span class="s2">"mae"</span><span class="p">:</span>
+            <span class="n">losses</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">l1_loss</span><span class="p">(</span><span class="n">y_pred</span><span class="p">,</span> <span class="n">y_true</span><span class="p">,</span> <span class="n">reduction</span><span class="o">=</span><span class="s2">"none"</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">losses</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loss_fn</span><span class="p">(</span><span class="n">y_pred</span><span class="p">,</span> <span class="n">y_true</span><span class="p">)</span>
+        <span class="n">sample_weights</span> <span class="o">=</span> <span class="n">sample_weights</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">losses</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">denominator</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="n">sample_weights</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span> <span class="nb">min</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">losses</span> <span class="o">*</span> <span class="n">sample_weights</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">/</span> <span class="n">denominator</span></div>
+</div>
+
+
+
+<span class="c1"># Registry of custom losses</span>
+<span class="n">_CUSTOM_LOSSES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">'mse_with_inequalities'</span><span class="p">:</span> <span class="n">MSEWithInequalities</span><span class="p">,</span>
+    <span class="s1">'mse_with_inequalities_and_multiple_outputs'</span><span class="p">:</span> <span class="n">MSEWithInequalitiesAndMultipleOutputs</span><span class="p">,</span>
+    <span class="s1">'multiallelic_mass_spec_loss'</span><span class="p">:</span> <span class="n">MultiallelicMassSpecLoss</span><span class="p">,</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="get_pytorch_loss">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_losses.get_pytorch_loss">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_pytorch_loss</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Get a PyTorch loss object by name.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    name : str</span>
+<span class="sd">        Loss name. Prefix with "custom:" for custom losses,</span>
+<span class="sd">        otherwise a standard loss name like "mse".</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    nn.Module</span>
+<span class="sd">        Loss module with encode_y, supports_inequalities,</span>
+<span class="sd">        and supports_multiple_outputs attributes.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"custom:"</span><span class="p">):</span>
+        <span class="n">custom_name</span> <span class="o">=</span> <span class="n">name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"custom:"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">custom_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_CUSTOM_LOSSES</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"No such custom loss: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">. "</span>
+                <span class="sa">f</span><span class="s2">"Supported: </span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">'custom:'</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">k</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">k</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">_CUSTOM_LOSSES</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">_CUSTOM_LOSSES</span><span class="p">[</span><span class="n">custom_name</span><span class="p">]()</span>
+    <span class="k">return</span> <span class="n">StandardLoss</span><span class="p">(</span><span class="n">name</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

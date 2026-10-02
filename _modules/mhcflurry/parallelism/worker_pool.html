@@ -1,0 +1,976 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.parallelism.worker_pool &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.parallelism.worker_pool</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.parallelism.worker_pool</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Multiprocessing worker-pool scheduling helpers."""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">itertools</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">multiprocessing</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">multiprocessing.pool</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">types</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">multiprocessing</span><span class="w"> </span><span class="kn">import</span> <span class="n">cpu_count</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pprint</span><span class="w"> </span><span class="kn">import</span> <span class="n">pprint</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">..common</span><span class="w"> </span><span class="kn">import</span> <span class="n">configure_pytorch</span><span class="p">,</span> <span class="n">normalize_pytorch_backend</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..workload_planning</span><span class="w"> </span><span class="kn">import</span> <span class="n">WORKLOAD_GENERIC</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.planning</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">cuda_visible_devices_from_env</span><span class="p">,</span>
+    <span class="n">refine_local_parallelism_from_spawn_context</span><span class="p">,</span>
+    <span class="n">resolve_local_parallelism_args</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.worker_runtime</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">configure_worker_cpu_threads</span><span class="p">,</span>
+    <span class="n">worker_init</span><span class="p">,</span>
+    <span class="n">worker_init_entry_point</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<span class="c1"># ---- Non-daemonic worker pool --------------------------------------------</span>
+<span class="c1">#</span>
+<span class="c1"># By default ``multiprocessing.Pool`` spawns daemon workers, and daemon</span>
+<span class="c1"># processes cannot fork their own children. Streaming pretraining can use</span>
+<span class="c1"># PyTorch DataLoader workers to prefetch batches, so mhcflurry's outer training</span>
+<span class="c1"># pool must use non-daemonic workers. The runtime fallback in</span>
+<span class="c1"># ``class1_training._effective_num_workers`` still downgrades to</span>
+<span class="c1"># ``num_workers=0`` if an external caller uses a daemon process, but production</span>
+<span class="c1"># training should keep prefetch available by using this pool.</span>
+<span class="c1">#</span>
+<span class="c1"># Non-daemon workers have one behavioral difference worth naming: if the</span>
+<span class="c1"># parent process dies ungracefully (e.g. SIGKILL), the workers may</span>
+<span class="c1"># linger as zombies rather than being auto-reaped by init. The</span>
+<span class="c1"># training orchestrator's ``try/finally`` closes and joins the pool on</span>
+<span class="c1"># clean exit, so this only matters under unusual fault modes.</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">_NonDaemonProcessMixin</span><span class="p">:</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">daemon</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="nd">@daemon</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">daemon</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Silently ignore; ``multiprocessing.Pool._repopulate_pool`` sets</span>
+        <span class="c1"># daemon=True on every fresh worker, so we must tolerate the</span>
+        <span class="c1"># assignment without raising.</span>
+        <span class="k">pass</span>
+
+
+<div class="viewcode-block" id="NonDaemonProcess">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.NonDaemonProcess">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NonDaemonProcess</span><span class="p">(</span><span class="n">_NonDaemonProcessMixin</span><span class="p">,</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Process</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""A ``multiprocessing.Process`` whose ``daemon`` flag cannot be set.</span>
+
+<span class="sd">    Reading ``.daemon`` always returns False; writes are no-ops. This</span>
+<span class="sd">    lets us instantiate ``multiprocessing.pool.Pool`` with a worker</span>
+<span class="sd">    class that declines to be a daemon, so the DataLoader inside each</span>
+<span class="sd">    worker can spawn its own prefetch children.</span>
+<span class="sd">    """</span></div>
+
+
+
+<div class="viewcode-block" id="NonDaemonContext">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.NonDaemonContext">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NonDaemonContext</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">multiprocessing</span><span class="o">.</span><span class="n">get_context</span><span class="p">())):</span>
+<span class="w">    </span><span class="sd">"""A multiprocessing context that hands out ``NonDaemonProcess`` workers.</span>
+
+<span class="sd">    Subclasses the current default multiprocessing context so its start</span>
+<span class="sd">    method is preserved — we only swap the Process</span>
+<span class="sd">    class. The Pool uses ``self._ctx.Process(...)`` to create workers</span>
+<span class="sd">    and will now get our non-daemonic variant.</span>
+<span class="sd">    """</span>
+
+    <span class="n">Process</span> <span class="o">=</span> <span class="n">NonDaemonProcess</span></div>
+
+
+
+<div class="viewcode-block" id="NonDaemonSpawnProcess">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.NonDaemonSpawnProcess">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NonDaemonSpawnProcess</span><span class="p">(</span>
+        <span class="n">_NonDaemonProcessMixin</span><span class="p">,</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">SpawnProcess</span><span class="p">):</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="NonDaemonSpawnContext">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.NonDaemonSpawnContext">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NonDaemonSpawnContext</span><span class="p">(</span><span class="n">multiprocessing</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">SpawnContext</span><span class="p">):</span>
+    <span class="n">Process</span> <span class="o">=</span> <span class="n">NonDaemonSpawnProcess</span></div>
+
+
+
+<span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">multiprocessing</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="s2">"ForkProcess"</span><span class="p">):</span>
+<div class="viewcode-block" id="NonDaemonForkProcess">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.NonDaemonForkProcess">[docs]</a>
+    <span class="k">class</span><span class="w"> </span><span class="nc">NonDaemonForkProcess</span><span class="p">(</span>
+            <span class="n">_NonDaemonProcessMixin</span><span class="p">,</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">ForkProcess</span><span class="p">):</span>
+        <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="NonDaemonForkContext">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.NonDaemonForkContext">[docs]</a>
+    <span class="k">class</span><span class="w"> </span><span class="nc">NonDaemonForkContext</span><span class="p">(</span><span class="n">multiprocessing</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">ForkContext</span><span class="p">):</span>
+        <span class="n">Process</span> <span class="o">=</span> <span class="n">NonDaemonForkProcess</span></div>
+
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">NonDaemonForkContext</span> <span class="o">=</span> <span class="kc">None</span>
+
+
+<span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">multiprocessing</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="s2">"ForkServerProcess"</span><span class="p">):</span>
+<div class="viewcode-block" id="NonDaemonForkServerProcess">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.NonDaemonForkServerProcess">[docs]</a>
+    <span class="k">class</span><span class="w"> </span><span class="nc">NonDaemonForkServerProcess</span><span class="p">(</span>
+            <span class="n">_NonDaemonProcessMixin</span><span class="p">,</span>
+            <span class="n">multiprocessing</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">ForkServerProcess</span><span class="p">):</span>
+        <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="NonDaemonForkServerContext">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.NonDaemonForkServerContext">[docs]</a>
+    <span class="k">class</span><span class="w"> </span><span class="nc">NonDaemonForkServerContext</span><span class="p">(</span>
+            <span class="n">multiprocessing</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">ForkServerContext</span><span class="p">):</span>
+        <span class="n">Process</span> <span class="o">=</span> <span class="n">NonDaemonForkServerProcess</span></div>
+
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">NonDaemonForkServerContext</span> <span class="o">=</span> <span class="kc">None</span>
+
+
+<span class="n">_NON_DAEMON_CONTEXT_BY_START_METHOD</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"spawn"</span><span class="p">:</span> <span class="n">NonDaemonSpawnContext</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="k">if</span> <span class="n">NonDaemonForkContext</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">_NON_DAEMON_CONTEXT_BY_START_METHOD</span><span class="p">[</span><span class="s2">"fork"</span><span class="p">]</span> <span class="o">=</span> <span class="n">NonDaemonForkContext</span>
+<span class="k">if</span> <span class="n">NonDaemonForkServerContext</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">_NON_DAEMON_CONTEXT_BY_START_METHOD</span><span class="p">[</span><span class="s2">"forkserver"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">NonDaemonForkServerContext</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="non_daemon_context">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.non_daemon_context">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">non_daemon_context</span><span class="p">(</span><span class="n">start_method</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return a multiprocessing context whose workers are non-daemonic."""</span>
+    <span class="k">if</span> <span class="n">start_method</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">NonDaemonContext</span><span class="p">()</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">context_class</span> <span class="o">=</span> <span class="n">_NON_DAEMON_CONTEXT_BY_START_METHOD</span><span class="p">[</span><span class="n">start_method</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Unsupported multiprocessing start_method: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">start_method</span><span class="p">,))</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+    <span class="k">return</span> <span class="n">context_class</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="NonDaemonPool">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.NonDaemonPool">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NonDaemonPool</span><span class="p">(</span><span class="n">multiprocessing</span><span class="o">.</span><span class="n">pool</span><span class="o">.</span><span class="n">Pool</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""A ``multiprocessing.Pool`` that runs non-daemonic workers.</span>
+
+<span class="sd">    Pool's constructor takes a ``context`` kwarg — we thread a</span>
+<span class="sd">    ``NonDaemonContext`` through so each worker is a</span>
+<span class="sd">    ``NonDaemonProcess``. Everything else (apply_async, imap, etc.)</span>
+<span class="sd">    inherits unchanged.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">start_method</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"start_method"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">start_method</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="s2">"context"</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Pass either context or start_method, not both"</span><span class="p">)</span>
+        <span class="c1"># Callers may pass their own context; if not, use our non-daemon one.</span>
+        <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"context"</span><span class="p">,</span> <span class="n">non_daemon_context</span><span class="p">(</span><span class="n">start_method</span><span class="p">))</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="chunk_ranges_for_local_parallelism">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.chunk_ranges_for_local_parallelism">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">chunk_ranges_for_local_parallelism</span><span class="p">(</span>
+        <span class="n">num_items</span><span class="p">,</span> <span class="n">num_jobs</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">chunks_per_worker</span><span class="o">=</span><span class="mi">4</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Split a row/sequence axis into stable contiguous chunks for local workers.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    num_items : int</span>
+<span class="sd">        Number of input items.</span>
+<span class="sd">    num_jobs : int</span>
+<span class="sd">        Number of worker processes. ``0`` yields one serial chunk.</span>
+<span class="sd">    chunks_per_worker : int</span>
+<span class="sd">        Target number of work chunks per worker for load balancing.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    list of tuple</span>
+<span class="sd">        ``(chunk_index, start, end)`` ranges.</span>
+<span class="sd">    """</span>
+    <span class="n">num_items</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_items</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">num_items</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[]</span>
+
+    <span class="n">num_jobs</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">target_chunks</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">num_items</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_jobs</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">chunks_per_worker</span><span class="p">)))</span>
+    <span class="n">chunk_size</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">num_items</span><span class="p">)</span> <span class="o">/</span> <span class="n">target_chunks</span><span class="p">))</span>
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="n">start</span> <span class="o">+</span> <span class="n">chunk_size</span><span class="p">,</span> <span class="n">num_items</span><span class="p">))</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">start</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">num_items</span><span class="p">,</span> <span class="n">chunk_size</span><span class="p">))</span>
+    <span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="worker_pool_with_gpu_assignments_from_args">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.worker_pool_with_gpu_assignments_from_args">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">worker_pool_with_gpu_assignments_from_args</span><span class="p">(</span>
+        <span class="n">args</span><span class="p">,</span>
+        <span class="n">workload_name</span><span class="o">=</span><span class="n">WORKLOAD_GENERIC</span><span class="p">,</span>
+        <span class="n">workload_hints</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">start_method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">worker_context_module</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">worker_context_data</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Create a multiprocessing.Pool where each worker uses its own GPU.</span>
+
+<span class="sd">    Uses commandline arguments. See `worker_pool_with_gpu_assignments`.</span>
+<span class="sd">    Resolves ``args.max_workers_per_gpu="auto"`` to an int (mutating</span>
+<span class="sd">    ``args`` so downstream consumers — e.g. inference batch sizing in</span>
+<span class="sd">    calibrate — observe the same value).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    args : argparse.Namespace</span>
+<span class="sd">        Parsed local-parallelism options.</span>
+<span class="sd">    workload_name : str</span>
+<span class="sd">        Workload profile used for automatic sizing.</span>
+<span class="sd">    workload_hints : dict, optional</span>
+<span class="sd">        Model/data size hints for that profile.</span>
+<span class="sd">    start_method : str, optional</span>
+<span class="sd">        Multiprocessing start method.</span>
+<span class="sd">    worker_context_module : str, optional</span>
+<span class="sd">        Module whose WORKER_CONTEXT receives constant data.</span>
+<span class="sd">    worker_context_data : dict, optional</span>
+<span class="sd">        Constant data installed once per worker.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    multiprocessing.Pool</span>
+<span class="sd">    """</span>
+    <span class="n">resolve_local_parallelism_args</span><span class="p">(</span>
+        <span class="n">args</span><span class="p">,</span>
+        <span class="n">workload_name</span><span class="o">=</span><span class="n">workload_name</span><span class="p">,</span>
+        <span class="n">workload_hints</span><span class="o">=</span><span class="n">workload_hints</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">refine_local_parallelism_from_worker_context</span><span class="p">(</span>
+        <span class="n">args</span><span class="p">,</span>
+        <span class="n">worker_context_data</span><span class="p">,</span>
+        <span class="n">start_method</span><span class="o">=</span><span class="n">start_method</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># --gpus only takes effect when there are worker processes to assign it to.</span>
+    <span class="c1"># A serial run (num_jobs == 0) ignores it. Warn when the user *explicitly*</span>
+    <span class="c1"># asked for GPUs but ends up serial, so "--gpus 4 --num-jobs 0" doesn't</span>
+    <span class="c1"># silently drop the GPU request. (The auto path legitimately resolves gpus</span>
+    <span class="c1"># alongside num_jobs == 0 on CPU-only boxes, so don't warn there.)</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">num_jobs</span> <span class="o">==</span> <span class="mi">0</span>
+            <span class="ow">and</span> <span class="n">args</span><span class="o">.</span><span class="n">gpus</span>
+            <span class="ow">and</span> <span class="ow">not</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"gpus_was_auto"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)):</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">"Warning: --gpus </span><span class="si">%d</span><span class="s2"> is ignored because num_jobs resolved to 0 "</span>
+            <span class="s2">"(serial run). Pass --num-jobs &gt; 0 to fan out across the "</span>
+            <span class="s2">"requested GPUs."</span> <span class="o">%</span> <span class="n">args</span><span class="o">.</span><span class="n">gpus</span><span class="p">,</span>
+            <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">worker_pool_with_gpu_assignments</span><span class="p">(</span>
+        <span class="n">num_jobs</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">num_jobs</span><span class="p">,</span>
+        <span class="n">num_gpus</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">gpus</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">backend</span><span class="p">,</span>
+        <span class="n">max_workers_per_gpu</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">max_workers_per_gpu</span><span class="p">,</span>
+        <span class="n">device_memory_budget_bytes</span><span class="o">=</span><span class="nb">getattr</span><span class="p">(</span>
+            <span class="n">args</span><span class="p">,</span> <span class="s2">"device_memory_budget_bytes"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="n">max_tasks_per_worker</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">max_tasks_per_worker</span><span class="p">,</span>
+        <span class="n">worker_log_dir</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">worker_log_dir</span><span class="p">,</span>
+        <span class="n">cpu_threads_per_worker</span><span class="o">=</span><span class="nb">getattr</span><span class="p">(</span>
+            <span class="n">args</span><span class="p">,</span> <span class="s2">"cpu_threads_per_worker"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="n">cpu_threads_per_worker_was_auto</span><span class="o">=</span><span class="nb">getattr</span><span class="p">(</span>
+            <span class="n">args</span><span class="p">,</span> <span class="s2">"cpu_threads_per_worker_was_auto"</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span>
+        <span class="n">start_method</span><span class="o">=</span><span class="n">start_method</span><span class="p">,</span>
+        <span class="n">worker_context_module</span><span class="o">=</span><span class="n">worker_context_module</span><span class="p">,</span>
+        <span class="n">worker_context_data</span><span class="o">=</span><span class="n">worker_context_data</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="refine_local_parallelism_from_worker_context">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.refine_local_parallelism_from_worker_context">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">refine_local_parallelism_from_worker_context</span><span class="p">(</span>
+        <span class="n">args</span><span class="p">,</span> <span class="n">worker_context_data</span><span class="p">,</span> <span class="n">start_method</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Apply spawn-context host sizing before code chooses serial/parallel."""</span>
+    <span class="n">effective_start_method</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">start_method</span>
+        <span class="ow">or</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">get_start_method</span><span class="p">(</span><span class="n">allow_none</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="ow">or</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">get_context</span><span class="p">()</span><span class="o">.</span><span class="n">get_start_method</span><span class="p">()</span>
+    <span class="p">)</span>
+    <span class="n">refinement_key</span> <span class="o">=</span> <span class="p">(</span><span class="nb">id</span><span class="p">(</span><span class="n">worker_context_data</span><span class="p">),</span> <span class="n">effective_start_method</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"_worker_context_memory_refinement_key"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">==</span> <span class="p">(</span>
+            <span class="n">refinement_key</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">args</span>
+    <span class="k">if</span> <span class="p">(</span>
+            <span class="n">worker_context_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">effective_start_method</span> <span class="o">!=</span> <span class="s2">"fork"</span>
+            <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">num_jobs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="n">refine_local_parallelism_from_spawn_context</span><span class="p">(</span>
+            <span class="n">args</span><span class="p">,</span>
+            <span class="n">estimate_worker_context_bytes</span><span class="p">(</span><span class="n">worker_context_data</span><span class="p">),</span>
+        <span class="p">)</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">_worker_context_memory_refinement_key</span> <span class="o">=</span> <span class="n">refinement_key</span>
+    <span class="k">return</span> <span class="n">args</span></div>
+
+
+
+<div class="viewcode-block" id="estimate_worker_context_bytes">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.estimate_worker_context_bytes">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">estimate_worker_context_bytes</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">_seen</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Best-effort deep resident size for data copied into spawn workers."""</span>
+    <span class="k">if</span> <span class="n">_seen</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">_seen</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">identity</span> <span class="o">=</span> <span class="nb">id</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">identity</span> <span class="ow">in</span> <span class="n">_seen</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="n">_seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">identity</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">complex</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="n">sys</span><span class="o">.</span><span class="n">getsizeof</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">,</span> <span class="nb">bytearray</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="n">sys</span><span class="o">.</span><span class="n">getsizeof</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+        <span class="c1"># Owned ndarrays usually include their buffer in getsizeof; views do</span>
+        <span class="c1"># not. Taking the maximum avoids double-counting the common case.</span>
+        <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">getsizeof</span><span class="p">(</span><span class="n">value</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">nbytes</span><span class="p">))</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="n">types</span><span class="o">.</span><span class="n">ModuleType</span><span class="p">,</span> <span class="n">types</span><span class="o">.</span><span class="n">FunctionType</span><span class="p">,</span> <span class="nb">type</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="c1"># pandas DataFrame/Series/Index expose accurate deep payload accounting.</span>
+    <span class="n">memory_usage</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="s2">"memory_usage"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="n">memory_usage</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">usage</span> <span class="o">=</span> <span class="n">memory_usage</span><span class="p">(</span><span class="n">deep</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">usage</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">usage</span><span class="p">,</span> <span class="s2">"sum"</span><span class="p">)</span> <span class="k">else</span> <span class="n">usage</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+            <span class="k">pass</span>
+
+    <span class="c1"># Torch tensors are optional and must not force a torch import in the</span>
+    <span class="c1"># orchestrator. Duck-type their exact storage payload when already loaded.</span>
+    <span class="k">if</span> <span class="p">(</span>
+            <span class="n">value</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__module__</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"torch"</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="s2">"nelement"</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="s2">"element_size"</span><span class="p">)):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">nelement</span><span class="p">())</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">element_size</span><span class="p">())</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+            <span class="k">pass</span>
+
+    <span class="n">size</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">getsizeof</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">size</span> <span class="o">+</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="n">estimate_worker_context_bytes</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">_seen</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">pair</span> <span class="ow">in</span> <span class="n">value</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">pair</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">,</span> <span class="nb">set</span><span class="p">,</span> <span class="nb">frozenset</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="n">size</span> <span class="o">+</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="n">estimate_worker_context_bytes</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">_seen</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">value</span>
+        <span class="p">)</span>
+    <span class="n">attributes</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="s2">"__dict__"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">attributes</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="n">size</span> <span class="o">+=</span> <span class="n">estimate_worker_context_bytes</span><span class="p">(</span><span class="n">attributes</span><span class="p">,</span> <span class="n">_seen</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">size</span></div>
+
+
+
+<div class="viewcode-block" id="worker_pool_uses_fork">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.worker_pool_uses_fork">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">worker_pool_uses_fork</span><span class="p">(</span><span class="n">worker_pool</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return True when local Pool workers inherit parent globals by fork."""</span>
+    <span class="n">context</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">worker_pool</span><span class="p">,</span> <span class="s2">"_ctx"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">context</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">context</span><span class="o">.</span><span class="n">get_start_method</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"fork"</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">get_start_method</span><span class="p">(</span><span class="n">allow_none</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">method</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">method</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">get_context</span><span class="p">()</span><span class="o">.</span><span class="n">get_start_method</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">"fork"</span>
+    <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+
+
+<div class="viewcode-block" id="attach_constant_data_to_work_items_if_needed">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.attach_constant_data_to_work_items_if_needed">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">attach_constant_data_to_work_items_if_needed</span><span class="p">(</span>
+        <span class="n">work_items</span><span class="p">,</span>
+        <span class="n">constant_data</span><span class="p">,</span>
+        <span class="n">worker_pool</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Attach constant data only when the Pool cannot inherit it by fork."""</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="nb">print</span>
+    <span class="k">if</span> <span class="n">worker_pool_uses_fork</span><span class="p">(</span><span class="n">worker_pool</span><span class="p">):</span>
+        <span class="n">log</span><span class="p">(</span>
+            <span class="s2">"Local Pool uses fork; workers inherit WORKER_CONTEXT without "</span>
+            <span class="s2">"per-task pickle payloads."</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="n">log</span><span class="p">(</span>
+        <span class="s2">"Local Pool does not use fork; attaching WORKER_CONTEXT to each work "</span>
+        <span class="s2">"item for worker delivery."</span>
+    <span class="p">)</span>
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">work_items</span><span class="p">:</span>
+        <span class="n">item</span><span class="p">[</span><span class="s2">"constant_data"</span><span class="p">]</span> <span class="o">=</span> <span class="n">constant_data</span>
+    <span class="k">return</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="worker_pool_with_gpu_assignments">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.worker_pool_with_gpu_assignments">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">worker_pool_with_gpu_assignments</span><span class="p">(</span>
+        <span class="n">num_jobs</span><span class="p">,</span>
+        <span class="n">num_gpus</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">max_workers_per_gpu</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">max_tasks_per_worker</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">worker_log_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">cpu_threads_per_worker</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">cpu_threads_per_worker_was_auto</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">start_method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">worker_context_module</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">worker_context_data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">device_memory_budget_bytes</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Create a multiprocessing.Pool where each worker uses its own GPU.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    num_jobs : int</span>
+<span class="sd">        Number of worker processes.</span>
+<span class="sd">    num_gpus : int</span>
+<span class="sd">    backend : string</span>
+<span class="sd">    max_workers_per_gpu : int</span>
+<span class="sd">    max_tasks_per_worker : int</span>
+<span class="sd">    worker_log_dir : string</span>
+<span class="sd">    cpu_threads_per_worker : int</span>
+<span class="sd">        Runtime BLAS/OpenMP/PyTorch thread limit applied in each worker.</span>
+<span class="sd">    cpu_threads_per_worker_was_auto : bool</span>
+<span class="sd">        Whether mhcflurry owns the uniform runtime limit. False preserves</span>
+<span class="sd">        caller-provided OMP/MKL/OpenBLAS settings.</span>
+<span class="sd">    start_method : string</span>
+<span class="sd">        Optional multiprocessing start method, e.g. ``"spawn"`` when workers</span>
+<span class="sd">        must not inherit PyTorch state from the parent process.</span>
+<span class="sd">    worker_context_module : string, optional</span>
+<span class="sd">        Module containing a ``WORKER_CONTEXT`` dictionary used by worker</span>
+<span class="sd">        functions.</span>
+<span class="sd">    worker_context_data : dict, optional</span>
+<span class="sd">        Constant data to install once per process during initialization. This</span>
+<span class="sd">        avoids serializing the same large payload with every queued task on</span>
+<span class="sd">        spawn-based platforms.</span>
+<span class="sd">    device_memory_budget_bytes : int, optional</span>
+<span class="sd">        Fixed launch-time device-memory entitlement propagated to each GPU</span>
+<span class="sd">        worker for elastic batch sizing. Kept last in the signature so adding</span>
+<span class="sd">        the planner-owned value does not change existing positional calls.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    multiprocessing.Pool</span>
+<span class="sd">    """</span>
+    <span class="n">backend</span> <span class="o">=</span> <span class="n">normalize_pytorch_backend</span><span class="p">(</span><span class="n">backend</span> <span class="ow">or</span> <span class="s2">"auto"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">worker_context_module</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="o">!=</span> <span class="p">(</span><span class="n">worker_context_data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"worker_context_module and worker_context_data must be supplied "</span>
+            <span class="s2">"together"</span>
+        <span class="p">)</span>
+    <span class="n">validate_worker_pool_args</span><span class="p">(</span>
+        <span class="n">num_jobs</span><span class="o">=</span><span class="n">num_jobs</span><span class="p">,</span>
+        <span class="n">num_gpus</span><span class="o">=</span><span class="n">num_gpus</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="n">backend</span><span class="p">,</span>
+        <span class="n">max_workers_per_gpu</span><span class="o">=</span><span class="n">max_workers_per_gpu</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">num_jobs</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">applied_threads</span> <span class="o">=</span> <span class="n">configure_worker_cpu_threads</span><span class="p">(</span>
+            <span class="n">cpu_threads_per_worker</span><span class="p">,</span>
+            <span class="n">auto_owned</span><span class="o">=</span><span class="n">cpu_threads_per_worker_was_auto</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">configure_pytorch</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="n">backend</span><span class="p">,</span> <span class="n">num_threads</span><span class="o">=</span><span class="n">applied_threads</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">worker_init_kwargs</span> <span class="o">=</span> <span class="n">worker_init_kwargs_for_scheduler</span><span class="p">(</span>
+        <span class="n">num_jobs</span><span class="o">=</span><span class="n">num_jobs</span><span class="p">,</span>
+        <span class="n">num_gpus</span><span class="o">=</span><span class="n">num_gpus</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="n">backend</span><span class="p">,</span>
+        <span class="n">max_workers_per_gpu</span><span class="o">=</span><span class="n">max_workers_per_gpu</span><span class="p">,</span>
+        <span class="n">device_memory_budget_bytes</span><span class="o">=</span><span class="n">device_memory_budget_bytes</span><span class="p">,</span>
+        <span class="n">cpu_threads_per_worker</span><span class="o">=</span><span class="n">cpu_threads_per_worker</span><span class="p">,</span>
+        <span class="n">cpu_threads_per_worker_was_auto</span><span class="o">=</span><span class="p">(</span>
+            <span class="n">cpu_threads_per_worker_was_auto</span>
+        <span class="p">))</span>
+    <span class="k">if</span> <span class="n">num_gpus</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">"Assigning </span><span class="si">%d</span><span class="s2"> workers across </span><span class="si">%d</span><span class="s2"> CUDA GPUs (</span><span class="si">%d</span><span class="s2"> workers max per GPU). "</span>
+            <span class="s2">"Overflow workers will run on CPU."</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">num_jobs</span><span class="p">,</span> <span class="n">num_gpus</span><span class="p">,</span> <span class="n">max_workers_per_gpu</span><span class="p">),</span>
+            <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">worker_num</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">worker_init_kwargs</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="s2">"Worker </span><span class="si">%d</span><span class="s2"> assigned backend=</span><span class="si">%s</span><span class="s2"> GPUs=</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="n">worker_num</span><span class="p">,</span>
+                    <span class="n">kwargs</span><span class="p">[</span><span class="s2">"backend"</span><span class="p">],</span>
+                    <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"gpu_device_nums"</span><span class="p">)),</span>
+                <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">worker_log_dir</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">worker_log_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">kwargs</span> <span class="ow">in</span> <span class="n">worker_init_kwargs</span><span class="p">:</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s2">"worker_log_dir"</span><span class="p">]</span> <span class="o">=</span> <span class="n">worker_log_dir</span>
+
+    <span class="n">worker_pool</span> <span class="o">=</span> <span class="n">make_worker_pool</span><span class="p">(</span>
+        <span class="n">processes</span><span class="o">=</span><span class="n">num_jobs</span><span class="p">,</span>
+        <span class="n">initializer</span><span class="o">=</span><span class="n">worker_init</span><span class="p">,</span>
+        <span class="n">initializer_kwargs_per_process</span><span class="o">=</span><span class="n">worker_init_kwargs</span><span class="p">,</span>
+        <span class="n">initializer_shared_kwargs</span><span class="o">=</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">"worker_context_module"</span><span class="p">:</span> <span class="n">worker_context_module</span><span class="p">,</span>
+                <span class="s2">"worker_context_data"</span><span class="p">:</span> <span class="n">worker_context_data</span><span class="p">,</span>
+            <span class="p">}</span>
+            <span class="k">if</span> <span class="n">worker_context_module</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="k">else</span> <span class="kc">None</span>
+        <span class="p">),</span>
+        <span class="n">max_tasks_per_worker</span><span class="o">=</span><span class="n">max_tasks_per_worker</span><span class="p">,</span>
+        <span class="n">start_method</span><span class="o">=</span><span class="n">start_method</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">worker_pool</span></div>
+
+
+
+<div class="viewcode-block" id="validate_worker_pool_args">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.validate_worker_pool_args">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_worker_pool_args</span><span class="p">(</span>
+        <span class="n">num_jobs</span><span class="p">,</span>
+        <span class="n">num_gpus</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="s2">"auto"</span><span class="p">,</span>
+        <span class="n">max_workers_per_gpu</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Validate local worker scheduling arguments.</span>
+
+<span class="sd">    ``--gpus`` controls CUDA worker assignment only. It does not select MPS</span>
+<span class="sd">    devices and it does not distribute a single model across multiple GPUs.</span>
+<span class="sd">    """</span>
+    <span class="n">backend</span> <span class="o">=</span> <span class="n">normalize_pytorch_backend</span><span class="p">(</span><span class="n">backend</span> <span class="ow">or</span> <span class="s2">"auto"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">num_jobs</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"num_jobs must be &gt;= 0"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">num_gpus</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">num_gpus</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="n">num_gpus</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"num_gpus must be &gt;= 0"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">max_workers_per_gpu</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"max_workers_per_gpu must be &gt;= 1"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">num_gpus</span> <span class="ow">and</span> <span class="n">num_jobs</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">backend</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"auto"</span><span class="p">,</span> <span class="s2">"gpu"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"num_gpus is only supported with backend 'auto' or 'gpu'"</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="worker_init_kwargs_for_scheduler">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.worker_init_kwargs_for_scheduler">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">worker_init_kwargs_for_scheduler</span><span class="p">(</span>
+        <span class="n">num_jobs</span><span class="p">,</span>
+        <span class="n">num_gpus</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="s2">"auto"</span><span class="p">,</span>
+        <span class="n">max_workers_per_gpu</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">cpu_threads_per_worker</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">cpu_threads_per_worker_was_auto</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">device_memory_budget_bytes</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Build per-worker init kwargs from the local scheduling configuration.</span>
+
+<span class="sd">    When ``num_gpus`` is set, workers are assigned one CUDA GPU each in round</span>
+<span class="sd">    robin order. Any additional workers are forced onto CPU by hiding CUDA and</span>
+<span class="sd">    setting their backend to ``cpu``.</span>
+<span class="sd">    """</span>
+    <span class="n">backend</span> <span class="o">=</span> <span class="n">normalize_pytorch_backend</span><span class="p">(</span><span class="n">backend</span> <span class="ow">or</span> <span class="s2">"auto"</span><span class="p">)</span>
+    <span class="n">validate_worker_pool_args</span><span class="p">(</span>
+        <span class="n">num_jobs</span><span class="o">=</span><span class="n">num_jobs</span><span class="p">,</span>
+        <span class="n">num_gpus</span><span class="o">=</span><span class="n">num_gpus</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="n">backend</span><span class="p">,</span>
+        <span class="n">max_workers_per_gpu</span><span class="o">=</span><span class="n">max_workers_per_gpu</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">num_gpus</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">{</span><span class="s2">"backend"</span><span class="p">:</span> <span class="n">backend</span><span class="p">,</span> <span class="s2">"max_workers_per_gpu"</span><span class="p">:</span> <span class="n">max_workers_per_gpu</span><span class="p">}</span>
+            <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="n">cpu_threads_per_worker</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">kwargs</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">kwargs</span><span class="p">[</span><span class="s2">"cpu_threads_per_worker"</span><span class="p">]</span> <span class="o">=</span> <span class="n">cpu_threads_per_worker</span>
+                <span class="n">kwargs</span><span class="p">[</span><span class="s2">"cpu_threads_per_worker_was_auto"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">cpu_threads_per_worker_was_auto</span>
+                <span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="n">cuda_visible_devices</span> <span class="o">=</span> <span class="n">cuda_visible_devices_from_env</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">cuda_visible_devices</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">gpu_device_nums</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">gpu_device_nums</span> <span class="o">=</span> <span class="n">cuda_visible_devices</span><span class="p">[:</span><span class="n">num_gpus</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">gpu_device_nums</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">num_gpus</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">"num_gpus=</span><span class="si">%d</span><span class="s2"> exceeds CUDA_VISIBLE_DEVICES=</span><span class="si">%r</span><span class="s2">; assigning "</span>
+                <span class="s2">"only the </span><span class="si">%d</span><span class="s2"> scheduler-visible GPU(s)"</span><span class="p">,</span>
+                <span class="n">num_gpus</span><span class="p">,</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"CUDA_VISIBLE_DEVICES"</span><span class="p">),</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">gpu_device_nums</span><span class="p">),</span>
+            <span class="p">)</span>
+
+    <span class="n">gpu_assignments</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="o">.</span><span class="n">from_iterable</span><span class="p">(</span>
+        <span class="n">gpu_device_nums</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">max_workers_per_gpu</span><span class="p">)))</span>
+
+    <span class="n">worker_kwargs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">worker_num</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">worker_num</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">gpu_assignments</span><span class="p">):</span>
+            <span class="n">worker_kwargs</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s2">"backend"</span><span class="p">:</span> <span class="s2">"gpu"</span><span class="p">,</span>
+                <span class="s2">"gpu_device_nums"</span><span class="p">:</span> <span class="p">[</span><span class="n">gpu_assignments</span><span class="p">[</span><span class="n">worker_num</span><span class="p">]],</span>
+                <span class="s2">"max_workers_per_gpu"</span><span class="p">:</span> <span class="n">max_workers_per_gpu</span><span class="p">,</span>
+            <span class="p">})</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">worker_kwargs</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s2">"backend"</span><span class="p">:</span> <span class="s2">"cpu"</span><span class="p">,</span>
+                <span class="s2">"gpu_device_nums"</span><span class="p">:</span> <span class="p">[],</span>
+                <span class="s2">"max_workers_per_gpu"</span><span class="p">:</span> <span class="n">max_workers_per_gpu</span><span class="p">,</span>
+            <span class="p">})</span>
+    <span class="k">if</span> <span class="n">cpu_threads_per_worker</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">kwargs</span> <span class="ow">in</span> <span class="n">worker_kwargs</span><span class="p">:</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s2">"cpu_threads_per_worker"</span><span class="p">]</span> <span class="o">=</span> <span class="n">cpu_threads_per_worker</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s2">"cpu_threads_per_worker_was_auto"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">cpu_threads_per_worker_was_auto</span>
+            <span class="p">)</span>
+    <span class="k">if</span> <span class="n">device_memory_budget_bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">kwargs</span> <span class="ow">in</span> <span class="n">worker_kwargs</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"backend"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"gpu"</span><span class="p">:</span>
+                <span class="n">kwargs</span><span class="p">[</span><span class="s2">"device_memory_budget_bytes"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+                    <span class="n">device_memory_budget_bytes</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">worker_kwargs</span></div>
+
+
+
+<div class="viewcode-block" id="make_worker_pool">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.make_worker_pool">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_worker_pool</span><span class="p">(</span>
+        <span class="n">processes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">initializer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">initializer_kwargs_per_process</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">initializer_shared_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">max_tasks_per_worker</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">start_method</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Convenience wrapper to create a multiprocessing.Pool.</span>
+
+<span class="sd">    This function adds support for per-worker initializer arguments, which are</span>
+<span class="sd">    not natively supported by the multiprocessing module. The motivation for</span>
+<span class="sd">    this feature is to support allocating each worker to a (different) GPU.</span>
+
+<span class="sd">    IMPLEMENTATION NOTE:</span>
+<span class="sd">        The per-worker initializer arguments are implemented using a</span>
+<span class="sd">        ``SimpleQueue``. Each worker reads its arguments from this queue when it</span>
+<span class="sd">        starts. When it terminates, it adds its initializer arguments back to</span>
+<span class="sd">        the queue, so a future process can initialize itself using these</span>
+<span class="sd">        arguments. ``SimpleQueue`` is important here: ``Queue.put`` uses a</span>
+<span class="sd">        feeder thread, so workers can observe a transiently empty queue during</span>
+<span class="sd">        startup and duplicate GPU assignments. A worker that puts its arguments</span>
+<span class="sd">        back can also hang forever joining that feeder thread during process</span>
+<span class="sd">        finalization.</span>
+
+<span class="sd">        There is one issue with this approach, however. If a worker crashes, it</span>
+<span class="sd">        never repopulates the queue of initializer arguments. This will prevent</span>
+<span class="sd">        any future worker from re-using those arguments. To deal with this</span>
+<span class="sd">        issue we add a second 'backup queue'. This queue always contains the</span>
+<span class="sd">        full set of initializer arguments: whenever a worker reads from it, it</span>
+<span class="sd">        always pushes the pop'd args back to the end of the queue immediately.</span>
+<span class="sd">        If the primary arg queue is ever empty, then workers will read</span>
+<span class="sd">        from this backup queue.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    processes : int</span>
+<span class="sd">        Number of workers. Default: num CPUs.</span>
+
+<span class="sd">    initializer : function, optional</span>
+<span class="sd">        Init function to call in each worker</span>
+
+<span class="sd">    initializer_kwargs_per_process : list of dict, optional</span>
+<span class="sd">        Arguments to pass to initializer function for each worker. Length of</span>
+<span class="sd">        list must equal the number of workers.</span>
+
+<span class="sd">    initializer_shared_kwargs : dict, optional</span>
+<span class="sd">        Arguments passed once to every worker initializer. Unlike work-item</span>
+<span class="sd">        arguments, large values here are serialized only once per process.</span>
+
+<span class="sd">    max_tasks_per_worker : int, optional</span>
+<span class="sd">        Restart workers after this many tasks.</span>
+
+<span class="sd">    start_method : string, optional</span>
+<span class="sd">        Multiprocessing start method to use for the worker pool.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    multiprocessing.Pool</span>
+<span class="sd">    """</span>
+
+    <span class="k">if</span> <span class="n">processes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">processes</span> <span class="o">=</span> <span class="n">cpu_count</span><span class="p">()</span>
+    <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="n">processes</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"processes must be a positive integer"</span><span class="p">)</span>
+    <span class="n">processes</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">processes</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">max_tasks_per_worker</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">max_tasks_per_worker</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_tasks_per_worker</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">max_tasks_per_worker</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"max_tasks_per_worker must be a positive integer"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">initializer_shared_kwargs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">initializer</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"initializer_shared_kwargs requires an initializer"</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">initializer_shared_kwargs</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"initializer_shared_kwargs must be a dict"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">initializer_kwargs_per_process</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">initializer</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"initializer_kwargs_per_process requires an initializer"</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">initializer_kwargs_per_process</span><span class="p">)</span> <span class="o">!=</span> <span class="n">processes</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"initializer_kwargs_per_process must contain one mapping "</span>
+                <span class="s2">"per worker (</span><span class="si">%d</span><span class="s2"> expected, </span><span class="si">%d</span><span class="s2"> received)"</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="n">processes</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">initializer_kwargs_per_process</span><span class="p">))</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span>
+                <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">kwargs</span> <span class="ow">in</span> <span class="n">initializer_kwargs_per_process</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="s2">"initializer_kwargs_per_process entries must be dicts"</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">initializer_shared_kwargs</span><span class="p">:</span>
+            <span class="n">overlaps</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">kwargs</span><span class="p">)</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">initializer_shared_kwargs</span><span class="p">))</span>
+                <span class="k">for</span> <span class="n">kwargs</span> <span class="ow">in</span> <span class="n">initializer_kwargs_per_process</span>
+            <span class="p">]</span>
+            <span class="n">overlaps</span> <span class="o">=</span> <span class="p">[</span><span class="n">values</span> <span class="k">for</span> <span class="n">values</span> <span class="ow">in</span> <span class="n">overlaps</span> <span class="k">if</span> <span class="n">values</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">overlaps</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"Initializer arguments supplied as both shared and "</span>
+                    <span class="s2">"per-process values: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">overlaps</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                <span class="p">)</span>
+
+    <span class="n">pool_context</span> <span class="o">=</span> <span class="n">non_daemon_context</span><span class="p">(</span><span class="n">start_method</span><span class="p">)</span> <span class="k">if</span> <span class="n">start_method</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="n">pool_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">'processes'</span><span class="p">:</span> <span class="n">processes</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="n">max_tasks_per_worker</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">pool_kwargs</span><span class="p">[</span><span class="s2">"maxtasksperchild"</span><span class="p">]</span> <span class="o">=</span> <span class="n">max_tasks_per_worker</span>
+    <span class="k">if</span> <span class="n">start_method</span><span class="p">:</span>
+        <span class="n">pool_kwargs</span><span class="p">[</span><span class="s2">"context"</span><span class="p">]</span> <span class="o">=</span> <span class="n">pool_context</span>
+
+    <span class="k">if</span> <span class="n">initializer</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">initializer_kwargs_per_process</span><span class="p">:</span>
+            <span class="n">assignment_context</span> <span class="o">=</span> <span class="n">pool_context</span> <span class="ow">or</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">get_context</span><span class="p">()</span>
+            <span class="n">slots</span> <span class="o">=</span> <span class="n">assignment_context</span><span class="o">.</span><span class="n">Array</span><span class="p">(</span><span class="s2">"q"</span><span class="p">,</span> <span class="n">processes</span><span class="p">)</span>
+            <span class="n">sequence</span> <span class="o">=</span> <span class="n">assignment_context</span><span class="o">.</span><span class="n">Value</span><span class="p">(</span><span class="s2">"q"</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">lock</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">pool_kwargs</span><span class="p">[</span><span class="s2">"initializer"</span><span class="p">]</span> <span class="o">=</span> <span class="n">worker_init_entry_point</span>
+            <span class="n">pool_kwargs</span><span class="p">[</span><span class="s2">"initargs"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">initializer</span><span class="p">,</span>
+                <span class="n">initializer_kwargs_per_process</span><span class="p">,</span>
+                <span class="n">slots</span><span class="p">,</span>
+                <span class="n">sequence</span><span class="p">,</span>
+                <span class="n">initializer_shared_kwargs</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">initializer_shared_kwargs</span><span class="p">:</span>
+            <span class="n">pool_kwargs</span><span class="p">[</span><span class="s2">"initializer"</span><span class="p">]</span> <span class="o">=</span> <span class="n">worker_init_entry_point</span>
+            <span class="n">pool_kwargs</span><span class="p">[</span><span class="s2">"initargs"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">initializer</span><span class="p">,</span>
+                <span class="kc">None</span><span class="p">,</span>
+                <span class="kc">None</span><span class="p">,</span>
+                <span class="kc">None</span><span class="p">,</span>
+                <span class="n">initializer_shared_kwargs</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">pool_kwargs</span><span class="p">[</span><span class="s2">"initializer"</span><span class="p">]</span> <span class="o">=</span> <span class="n">initializer</span>
+
+    <span class="c1"># Use a non-daemonic pool so workers can spawn DataLoader children.</span>
+    <span class="c1"># See NonDaemonPool for the rationale.</span>
+    <span class="n">worker_pool</span> <span class="o">=</span> <span class="n">NonDaemonPool</span><span class="p">(</span><span class="o">**</span><span class="n">pool_kwargs</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Started pool: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">str</span><span class="p">(</span><span class="n">worker_pool</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+    <span class="n">printable_pool_kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">pool_kwargs</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">initializer_shared_kwargs</span> <span class="ow">or</span> <span class="n">initializer_kwargs_per_process</span><span class="p">:</span>
+        <span class="n">printable_pool_kwargs</span><span class="p">[</span><span class="s2">"initargs"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">initializer</span><span class="p">,</span>
+            <span class="s2">"&lt;per-worker assignments&gt;"</span><span class="p">,</span>
+            <span class="s2">"&lt;shared initializer data: </span><span class="si">%s</span><span class="s2">&gt;"</span> <span class="o">%</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="nb">sorted</span><span class="p">(</span><span class="n">initializer_shared_kwargs</span> <span class="ow">or</span> <span class="p">{})</span>
+            <span class="p">),</span>
+        <span class="p">)</span>
+    <span class="n">pprint</span><span class="p">(</span><span class="n">printable_pool_kwargs</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">worker_pool</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

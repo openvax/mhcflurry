@@ -1,0 +1,626 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Detailed comparison of the 2.3.0 weights &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Training models" href="training.html" />
+    <link rel="prev" title="Evaluation of the 2.3.0 weights" href="release_model_evaluation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="release_model_evaluation.html">Evaluation of the 2.3.0 weights</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="release_model_evaluation.html#full-presentation-peptide-mhc-and-n-c-flanks">Full presentation: peptide, MHC and N/C flanks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="release_model_evaluation.html#no-flank-comparison-peptide-and-mhc">No-flank comparison: peptide and MHC</a></li>
+<li class="toctree-l2"><a class="reference internal" href="release_model_evaluation.html#cohort-and-overlap">Cohort and overlap</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="release_model_evaluation.html#components-and-artifacts">Components and artifacts</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Detailed comparison of the 2.3.0 weights</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#full-presentation-peptide-mhc-and-n-c-flanks">Full presentation: peptide, MHC and N/C flanks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#no-flank-comparison-peptide-and-mhc">No-flank comparison: peptide and MHC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cohort-and-overlap">Cohort and overlap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#components-and-artifacts">Components and artifacts</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#prerelease-comparison-2020-versus-2023-training-data">Prerelease comparison: 2020 versus 2023 training data</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+      <li class="breadcrumb-item active">Detailed comparison of the 2.3.0 weights</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/release_model_evaluation_details.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="detailed-comparison-of-the-2-3-0-weights">
+<h1>Detailed comparison of the 2.3.0 weights<a class="headerlink" href="#detailed-comparison-of-the-2-3-0-weights" title="Link to this heading"></a></h1>
+<p>MHCflurry 2.3.0 is evaluated on 16,400 positives and 164,731 negatives from
+ten patients (181,131 rows). Every model receives the same rows and labels;
+no predictor chooses its own negatives. Values are equal-patient means.</p>
+<p>The main comparison uses peptide, MHC alleles and N/C flanking sequences for
+MHCflurry. A second comparison omits the flanks. NetMHCpan and MixMHCpred
+receive peptide and MHC inputs in both comparisons; their scores are unchanged.
+All rows are evaluated against presentation labels. NetMHCpan BA outputs are
+binding-affinity ranking baselines, not full presentation predictors.</p>
+<p><a class="reference external" href="https://github.com/openvax/mhcflurry/releases/download/2.3.0/mhcflurry-2.3.0-model-comparison-v4.pdf">Download the comparison figures (PDF)</a>.</p>
+<p>See <a class="reference internal" href="release_model_evaluation.html"><span class="doc">Evaluation of the 2.3.0 weights</span></a> for the overview.</p>
+<section id="full-presentation-peptide-mhc-and-n-c-flanks">
+<h2>Full presentation: peptide, MHC and N/C flanks<a class="headerlink" href="#full-presentation-peptide-mhc-and-n-c-flanks" title="Link to this heading"></a></h2>
+<p>MHCflurry uses both N- and C-terminal source-protein context, as it does by
+default when those inputs are supplied. External tools receive no flanks.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Model / output</p></th>
+<th class="head text-right"><p>AP</p></th>
+<th class="head text-right"><p>PPV&#64;N</p></th>
+<th class="head text-right"><p>AUROC</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>MHCflurry 2.3.0</p></td>
+<td class="text-right"><p>0.7986</p></td>
+<td class="text-right"><p>0.7450</p></td>
+<td class="text-right"><p>0.9524</p></td>
+</tr>
+<tr class="row-odd"><td><p>MHCflurry 2.1.5</p></td>
+<td class="text-right"><p>0.7766</p></td>
+<td class="text-right"><p>0.7297</p></td>
+<td class="text-right"><p>0.9439</p></td>
+</tr>
+<tr class="row-even"><td><p>MHCflurry 2.2.0</p></td>
+<td class="text-right"><p>0.7766</p></td>
+<td class="text-right"><p>0.7297</p></td>
+<td class="text-right"><p>0.9439</p></td>
+</tr>
+<tr class="row-odd"><td><p>MHCflurry 2.2.1</p></td>
+<td class="text-right"><p>0.7766</p></td>
+<td class="text-right"><p>0.7297</p></td>
+<td class="text-right"><p>0.9439</p></td>
+</tr>
+<tr class="row-even"><td><p>NetMHCpan 4.0 BA</p></td>
+<td class="text-right"><p>0.6396</p></td>
+<td class="text-right"><p>0.6178</p></td>
+<td class="text-right"><p>0.9157</p></td>
+</tr>
+<tr class="row-odd"><td><p>NetMHCpan 4.0 EL</p></td>
+<td class="text-right"><p>0.6935</p></td>
+<td class="text-right"><p>0.6473</p></td>
+<td class="text-right"><p>0.9243</p></td>
+</tr>
+<tr class="row-even"><td><p>NetMHCpan 4.1 BA</p></td>
+<td class="text-right"><p>0.6710</p></td>
+<td class="text-right"><p>0.6507</p></td>
+<td class="text-right"><p>0.9256</p></td>
+</tr>
+<tr class="row-odd"><td><p>NetMHCpan 4.1 EL</p></td>
+<td class="text-right"><p>0.7671</p></td>
+<td class="text-right"><p>0.7240</p></td>
+<td class="text-right"><p>0.9417</p></td>
+</tr>
+<tr class="row-even"><td><p>NetMHCpan 4.2 BA</p></td>
+<td class="text-right"><p>0.6637</p></td>
+<td class="text-right"><p>0.6456</p></td>
+<td class="text-right"><p>0.9260</p></td>
+</tr>
+<tr class="row-odd"><td><p>NetMHCpan 4.2 EL</p></td>
+<td class="text-right"><p>0.7832</p></td>
+<td class="text-right"><p>0.7307</p></td>
+<td class="text-right"><p>0.9455</p></td>
+</tr>
+<tr class="row-even"><td><p>MixMHCpred 3.0</p></td>
+<td class="text-right"><p>0.7765</p></td>
+<td class="text-right"><p>0.7281</p></td>
+<td class="text-right"><p>0.9310</p></td>
+</tr>
+</tbody>
+</table>
+<figure class="align-default" id="id1">
+<img alt="AP, PPV at N and AUROC with patient-bootstrap intervals for all stable comparators on identical evaluation rows." src="_images/presentation_with_flanks.svg" />
+<figcaption>
+<p><span class="caption-text">Full-model and comparator scores on the same 181,131 rows. External tools use peptide and MHC inputs without flanks.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>Paired differences are <strong>MHCflurry 2.3.0 minus the comparator</strong>, with 95%
+patient-bootstrap intervals (10,000 paired resamples, seed 42). Positive
+values favor 2.3.0; intervals are not adjusted for multiple comparisons.</p>
+<figure class="align-default" id="id2">
+<img alt="Paired differences in AP, PPV at N and AUROC between MHCflurry 2.3.0 and each stable comparator." src="_images/paired_presentation_with_flanks.svg" />
+<figcaption>
+<p><span class="caption-text">Paired patient-bootstrap intervals for MHCflurry 2.3.0 minus each comparator.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Comparator</p></th>
+<th class="head text-right"><p>ΔAP [95% CI]</p></th>
+<th class="head text-right"><p>ΔPPV&#64;N [95% CI]</p></th>
+<th class="head text-right"><p>ΔAUROC [95% CI]</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>MHCflurry 2.1.5</p></td>
+<td class="text-right"><p>+0.02205 [0.00921, 0.03424]</p></td>
+<td class="text-right"><p>+0.01528 [0.00354, 0.02586]</p></td>
+<td class="text-right"><p>+0.00846 [0.00640, 0.01046]</p></td>
+</tr>
+<tr class="row-odd"><td><p>MHCflurry 2.2.0</p></td>
+<td class="text-right"><p>+0.02205 [0.00921, 0.03425]</p></td>
+<td class="text-right"><p>+0.01528 [0.00354, 0.02586]</p></td>
+<td class="text-right"><p>+0.00846 [0.00640, 0.01046]</p></td>
+</tr>
+<tr class="row-even"><td><p>MHCflurry 2.2.1</p></td>
+<td class="text-right"><p>+0.02205 [0.00921, 0.03425]</p></td>
+<td class="text-right"><p>+0.01528 [0.00354, 0.02586]</p></td>
+<td class="text-right"><p>+0.00846 [0.00640, 0.01046]</p></td>
+</tr>
+<tr class="row-odd"><td><p>NetMHCpan 4.0 BA</p></td>
+<td class="text-right"><p>+0.15906 [0.15044, 0.16797]</p></td>
+<td class="text-right"><p>+0.12720 [0.11462, 0.14069]</p></td>
+<td class="text-right"><p>+0.03664 [0.03149, 0.04148]</p></td>
+</tr>
+<tr class="row-even"><td><p>NetMHCpan 4.0 EL</p></td>
+<td class="text-right"><p>+0.10516 [0.08064, 0.12934]</p></td>
+<td class="text-right"><p>+0.09763 [0.07798, 0.11608]</p></td>
+<td class="text-right"><p>+0.02809 [0.02122, 0.03471]</p></td>
+</tr>
+<tr class="row-odd"><td><p>NetMHCpan 4.1 BA</p></td>
+<td class="text-right"><p>+0.12765 [0.11511, 0.13930]</p></td>
+<td class="text-right"><p>+0.09424 [0.08331, 0.10479]</p></td>
+<td class="text-right"><p>+0.02681 [0.02227, 0.03115]</p></td>
+</tr>
+<tr class="row-even"><td><p>NetMHCpan 4.1 EL</p></td>
+<td class="text-right"><p>+0.03157 [0.01382, 0.04765]</p></td>
+<td class="text-right"><p>+0.02097 [0.00490, 0.03512]</p></td>
+<td class="text-right"><p>+0.01071 [0.00654, 0.01453]</p></td>
+</tr>
+<tr class="row-odd"><td><p>NetMHCpan 4.2 BA</p></td>
+<td class="text-right"><p>+0.13491 [0.12200, 0.15079]</p></td>
+<td class="text-right"><p>+0.09934 [0.08576, 0.11166]</p></td>
+<td class="text-right"><p>+0.02640 [0.02278, 0.02993]</p></td>
+</tr>
+<tr class="row-even"><td><p>NetMHCpan 4.2 EL</p></td>
+<td class="text-right"><p>+0.01545 [0.00013, 0.02877]</p></td>
+<td class="text-right"><p>+0.01424 [-0.00280, 0.02874]</p></td>
+<td class="text-right"><p>+0.00687 [0.00327, 0.00996]</p></td>
+</tr>
+<tr class="row-odd"><td><p>MixMHCpred 3.0</p></td>
+<td class="text-right"><p>+0.02214 [0.00357, 0.04045]</p></td>
+<td class="text-right"><p>+0.01684 [-0.00153, 0.03557]</p></td>
+<td class="text-right"><p>+0.02134 [0.01747, 0.02541]</p></td>
+</tr>
+</tbody>
+</table>
+<p>All three paired intervals favor 2.3.0 over public 2.2.1. AP intervals also
+favor 2.3.0 over NetMHCpan 4.2 EL and MixMHCpred 3.0, while their PPV&#64;N
+intervals include zero. The external predictors receive less input context.</p>
+</section>
+<section id="no-flank-comparison-peptide-and-mhc">
+<h2>No-flank comparison: peptide and MHC<a class="headerlink" href="#no-flank-comparison-peptide-and-mhc" title="Link to this heading"></a></h2>
+<p>MHCflurry is evaluated without flank inputs. The evaluation rows, labels
+and external-tool scores are identical to the main comparison.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Model / output</p></th>
+<th class="head text-right"><p>AP</p></th>
+<th class="head text-right"><p>PPV&#64;N</p></th>
+<th class="head text-right"><p>AUROC</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>MHCflurry 2.3.0</p></td>
+<td class="text-right"><p>0.7893</p></td>
+<td class="text-right"><p>0.7373</p></td>
+<td class="text-right"><p>0.9501</p></td>
+</tr>
+<tr class="row-odd"><td><p>MHCflurry 2.1.5</p></td>
+<td class="text-right"><p>0.7713</p></td>
+<td class="text-right"><p>0.7258</p></td>
+<td class="text-right"><p>0.9409</p></td>
+</tr>
+<tr class="row-even"><td><p>MHCflurry 2.2.0</p></td>
+<td class="text-right"><p>0.7713</p></td>
+<td class="text-right"><p>0.7258</p></td>
+<td class="text-right"><p>0.9409</p></td>
+</tr>
+<tr class="row-odd"><td><p>MHCflurry 2.2.1</p></td>
+<td class="text-right"><p>0.7713</p></td>
+<td class="text-right"><p>0.7258</p></td>
+<td class="text-right"><p>0.9409</p></td>
+</tr>
+<tr class="row-even"><td><p>NetMHCpan 4.0 BA</p></td>
+<td class="text-right"><p>0.6396</p></td>
+<td class="text-right"><p>0.6178</p></td>
+<td class="text-right"><p>0.9157</p></td>
+</tr>
+<tr class="row-odd"><td><p>NetMHCpan 4.0 EL</p></td>
+<td class="text-right"><p>0.6935</p></td>
+<td class="text-right"><p>0.6473</p></td>
+<td class="text-right"><p>0.9243</p></td>
+</tr>
+<tr class="row-even"><td><p>NetMHCpan 4.1 BA</p></td>
+<td class="text-right"><p>0.6710</p></td>
+<td class="text-right"><p>0.6507</p></td>
+<td class="text-right"><p>0.9256</p></td>
+</tr>
+<tr class="row-odd"><td><p>NetMHCpan 4.1 EL</p></td>
+<td class="text-right"><p>0.7671</p></td>
+<td class="text-right"><p>0.7240</p></td>
+<td class="text-right"><p>0.9417</p></td>
+</tr>
+<tr class="row-even"><td><p>NetMHCpan 4.2 BA</p></td>
+<td class="text-right"><p>0.6637</p></td>
+<td class="text-right"><p>0.6456</p></td>
+<td class="text-right"><p>0.9260</p></td>
+</tr>
+<tr class="row-odd"><td><p>NetMHCpan 4.2 EL</p></td>
+<td class="text-right"><p>0.7832</p></td>
+<td class="text-right"><p>0.7307</p></td>
+<td class="text-right"><p>0.9455</p></td>
+</tr>
+<tr class="row-even"><td><p>MixMHCpred 3.0</p></td>
+<td class="text-right"><p>0.7765</p></td>
+<td class="text-right"><p>0.7281</p></td>
+<td class="text-right"><p>0.9310</p></td>
+</tr>
+</tbody>
+</table>
+<figure class="align-default" id="id3">
+<img alt="AP, PPV at N and AUROC with patient-bootstrap intervals for all stable comparators on identical evaluation rows." src="_images/presentation_without_flanks.svg" />
+<figcaption>
+<p><span class="caption-text">Full-model and comparator scores on the same 181,131 rows. External tools use peptide and MHC inputs without flanks.</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>Paired differences are <strong>MHCflurry 2.3.0 minus the comparator</strong>, with 95%
+patient-bootstrap intervals (10,000 paired resamples, seed 42). Positive
+values favor 2.3.0; intervals are not adjusted for multiple comparisons.</p>
+<figure class="align-default" id="id4">
+<img alt="Paired differences in AP, PPV at N and AUROC between MHCflurry 2.3.0 and each stable comparator." src="_images/paired_presentation_without_flanks.svg" />
+<figcaption>
+<p><span class="caption-text">Paired patient-bootstrap intervals for MHCflurry 2.3.0 minus each comparator.</span><a class="headerlink" href="#id4" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Comparator</p></th>
+<th class="head text-right"><p>ΔAP [95% CI]</p></th>
+<th class="head text-right"><p>ΔPPV&#64;N [95% CI]</p></th>
+<th class="head text-right"><p>ΔAUROC [95% CI]</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>MHCflurry 2.1.5</p></td>
+<td class="text-right"><p>+0.01797 [0.00489, 0.03004]</p></td>
+<td class="text-right"><p>+0.01148 [-0.00246, 0.02440]</p></td>
+<td class="text-right"><p>+0.00921 [0.00758, 0.01085]</p></td>
+</tr>
+<tr class="row-odd"><td><p>MHCflurry 2.2.0</p></td>
+<td class="text-right"><p>+0.01797 [0.00488, 0.03004]</p></td>
+<td class="text-right"><p>+0.01148 [-0.00246, 0.02440]</p></td>
+<td class="text-right"><p>+0.00921 [0.00758, 0.01085]</p></td>
+</tr>
+<tr class="row-even"><td><p>MHCflurry 2.2.1</p></td>
+<td class="text-right"><p>+0.01797 [0.00488, 0.03004]</p></td>
+<td class="text-right"><p>+0.01148 [-0.00246, 0.02440]</p></td>
+<td class="text-right"><p>+0.00921 [0.00758, 0.01085]</p></td>
+</tr>
+<tr class="row-odd"><td><p>NetMHCpan 4.0 BA</p></td>
+<td class="text-right"><p>+0.14971 [0.13926, 0.16070]</p></td>
+<td class="text-right"><p>+0.11954 [0.10419, 0.13420]</p></td>
+<td class="text-right"><p>+0.03438 [0.02938, 0.03923]</p></td>
+</tr>
+<tr class="row-even"><td><p>NetMHCpan 4.0 EL</p></td>
+<td class="text-right"><p>+0.09581 [0.07093, 0.12102]</p></td>
+<td class="text-right"><p>+0.08997 [0.07151, 0.10836]</p></td>
+<td class="text-right"><p>+0.02583 [0.01926, 0.03234]</p></td>
+</tr>
+<tr class="row-odd"><td><p>NetMHCpan 4.1 BA</p></td>
+<td class="text-right"><p>+0.11830 [0.10539, 0.13098]</p></td>
+<td class="text-right"><p>+0.08658 [0.07381, 0.09791]</p></td>
+<td class="text-right"><p>+0.02455 [0.02031, 0.02864]</p></td>
+</tr>
+<tr class="row-even"><td><p>NetMHCpan 4.1 EL</p></td>
+<td class="text-right"><p>+0.02222 [0.00433, 0.03875]</p></td>
+<td class="text-right"><p>+0.01331 [-0.00126, 0.02592]</p></td>
+<td class="text-right"><p>+0.00845 [0.00449, 0.01214]</p></td>
+</tr>
+<tr class="row-odd"><td><p>NetMHCpan 4.2 BA</p></td>
+<td class="text-right"><p>+0.12556 [0.11102, 0.14262]</p></td>
+<td class="text-right"><p>+0.09168 [0.07491, 0.10584]</p></td>
+<td class="text-right"><p>+0.02414 [0.02059, 0.02759]</p></td>
+</tr>
+<tr class="row-even"><td><p>NetMHCpan 4.2 EL</p></td>
+<td class="text-right"><p>+0.00610 [-0.00927, 0.01994]</p></td>
+<td class="text-right"><p>+0.00658 [-0.00917, 0.01983]</p></td>
+<td class="text-right"><p>+0.00461 [0.00111, 0.00762]</p></td>
+</tr>
+<tr class="row-odd"><td><p>MixMHCpred 3.0</p></td>
+<td class="text-right"><p>+0.01279 [-0.00645, 0.03160]</p></td>
+<td class="text-right"><p>+0.00918 [-0.00949, 0.02805]</p></td>
+<td class="text-right"><p>+0.01909 [0.01539, 0.02287]</p></td>
+</tr>
+</tbody>
+</table>
+<p>AP and AUROC intervals favor 2.3.0 over public 2.2.1; the PPV&#64;N interval
+includes zero. AP and PPV&#64;N differences versus NetMHCpan 4.2 EL and MixMHCpred
+3.0 also have intervals including zero. These results do not establish
+universal superiority.</p>
+</section>
+<section id="cohort-and-overlap">
+<h2>Cohort and overlap<a class="headerlink" href="#cohort-and-overlap" title="Link to this heading"></a></h2>
+<p>A separate benchmark builder sampled source-protein/length-matched negative
+windows, with seed 20260928 and an initial ten negatives per positive. Sampling
+did not use scores from either the old or new predictor. The final overlap
+audit removed an additional 380 rows (101 positives and 279 negatives) from
+every comparator without resampling. The revised cohort SHA256 is
+<code class="docutils literal notranslate"><span class="pre">9f0fbc92fd44ac58438102ae7496687b67f109685d8f1fecfc820a7262bf46cc</span></code>;
+the previous cohort SHA256 was
+<code class="docutils literal notranslate"><span class="pre">81d18501616358b3c4b0f87d6e405ed50ea67dfefa31d6f8097d39818d658b41</span></code>.</p>
+<p>The cohort is disjoint from the inventoried MHCflurry training peptide sources.
+Unavailable or incomplete training records, especially for external predictors,
+prevent claiming disjointness from every model ever trained. Ten patients limit
+precision and generalizability; the release changed both recipes and data, so
+its gains cannot be attributed solely to newer data. PPV&#64;N uses the retained
+positive count in each patient, with expected precision across score ties.</p>
+</section>
+<section id="components-and-artifacts">
+<h2>Components and artifacts<a class="headerlink" href="#components-and-artifacts" title="Link to this heading"></a></h2>
+<p>Affinity-only ligand-ranking AP increased from 0.6971 to 0.7224 versus public
+2.2.1. Processing-only AP decreased: 0.4144 versus 0.5399 with flanks and 0.4243
+versus 0.5794 without flanks. These are component rankings on the presentation
+cohort, not independent quantitative affinity or isolated processing endpoints.
+The full presentation improvements therefore do not imply that every component
+improved. Task AP values are never averaged.</p>
+<p>The with-flanks predictor contains four short-flank and four cleavage-boundary
+networks. The separately trained long-flank ensemble is a diagnostic and is not
+used in that full predictor. The saved presentation-percentile mapping preserves
+the raw-score AP, PPV&#64;N and AUROC on the complete revised cohort.</p>
+<p><a class="reference external" href="https://github.com/openvax/mhcflurry/releases/download/2.3.0/model-comparison.20260928-v4.tar.gz">Download the aggregate comparison tables and figures</a>.
+The stable-model tables above and the PDF include public 2.1.5/2.2.0/2.2.1,
+NetMHCpan 4.0/4.1/4.2 BA and EL, and MixMHCpred 3.0. The archive includes full-precision aggregate tables, rendering code, and
+a separately labeled prerelease component comparison. It does not include
+MixMHCpred 2.0.2, whose incomplete coverage required a different subset. Model archive checksums accompany the <a class="reference external" href="https://github.com/openvax/mhcflurry/releases/tag/2.3.0">2.3.0 release</a>.</p>
+<figure class="align-default" id="id5">
+<img alt="Component AP, PPV at N and AUROC across stable MHCflurry models on the same presentation labels." src="_images/affinity_ligand_ranking.svg" />
+<figcaption>
+<p><span class="caption-text">Affinity-based ligand ranking on the presentation cohort; this does not measure quantitative IC50 accuracy.</span><a class="headerlink" href="#id5" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<figure class="align-default" id="id6">
+<img alt="Component AP, PPV at N and AUROC across stable MHCflurry models on the same presentation labels." src="_images/processing_with_flanks.svg" />
+<figcaption>
+<p><span class="caption-text">Processing-only ranking with N/C flanks. The 2.3.0 component is the short-flank/boundary hybrid used by the full predictor.</span><a class="headerlink" href="#id6" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<figure class="align-default" id="id7">
+<img alt="Component AP, PPV at N and AUROC across stable MHCflurry models on the same presentation labels." src="_images/processing_without_flanks.svg" />
+<figcaption>
+<p><span class="caption-text">Processing-only ranking without flanks. Component metrics are not averaged with full presentation metrics.</span><a class="headerlink" href="#id7" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="prerelease-comparison-2020-versus-2023-training-data">
+<h2>Prerelease comparison: 2020 versus 2023 training data<a class="headerlink" href="#prerelease-comparison-2020-versus-2023-training-data" title="Link to this heading"></a></h2>
+<p>The labels <strong>2.3.0-pre — 2020 training data</strong> and <strong>2.3.0-pre — 2023 training
+data</strong> describe two prerelease runs of the same recipe family. The year refers
+to the curated affinity-data snapshot. These are experimental configurations,
+not additional downloadable weight releases.</p>
+<p>The 2023 prerelease run saved affinity and with-flanks processing components,
+but no full presentation model. Only the available component rankings are
+compared here, on the same 181,131 rows as every figure above. They must not be
+read as full-model presentation scores or combined into an average task AP.</p>
+<p>The processing architectures also differ: the 2020 score uses four short-flank
+and four boundary networks, whereas the 2023 score uses eight networks with
+15-residue flanks. This is <strong>not a controlled data-only ablation</strong>. The released
+2.3.0 full predictor above uses the completed short-flank/boundary hybrid.</p>
+<figure class="align-default" id="id8">
+<img alt="Affinity-based and processing-based ligand ranking for the 2020 and 2023 prerelease training-data arms on identical rows." src="_images/prerelease_components.svg" />
+<figcaption>
+<p><span class="caption-text">Available prerelease components; the 2023 arm has no full presentation model. Processing architectures differ.</span><a class="headerlink" href="#id8" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Component</p></th>
+<th class="head"><p>Training data</p></th>
+<th class="head text-right"><p>AP</p></th>
+<th class="head text-right"><p>PPV&#64;N</p></th>
+<th class="head text-right"><p>AUROC</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Affinity ligand ranking</p></td>
+<td><p>2020</p></td>
+<td class="text-right"><p>0.7113</p></td>
+<td class="text-right"><p>0.6799</p></td>
+<td class="text-right"><p>0.9295</p></td>
+</tr>
+<tr class="row-odd"><td><p>Affinity ligand ranking</p></td>
+<td><p>2023</p></td>
+<td class="text-right"><p>0.7202</p></td>
+<td class="text-right"><p>0.6899</p></td>
+<td class="text-right"><p>0.9353</p></td>
+</tr>
+<tr class="row-even"><td><p>Processing with flanks</p></td>
+<td><p>2020</p></td>
+<td class="text-right"><p>0.3446</p></td>
+<td class="text-right"><p>0.3739</p></td>
+<td class="text-right"><p>0.8198</p></td>
+</tr>
+<tr class="row-odd"><td><p>Processing with flanks</p></td>
+<td><p>2023</p></td>
+<td class="text-right"><p>0.3211</p></td>
+<td class="text-right"><p>0.3608</p></td>
+<td class="text-right"><p>0.8145</p></td>
+</tr>
+</tbody>
+</table>
+<figure class="align-default" id="id9">
+<img alt="Paired patient-bootstrap differences in AP, PPV at N and AUROC for the 2023 minus 2020 prerelease component scores." src="_images/paired_prerelease_components.svg" />
+<figcaption>
+<p><span class="caption-text">2023 minus 2020 component rankings, with 95% paired patient-bootstrap intervals. Positive values favor the 2023 arm.</span><a class="headerlink" href="#id9" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Component</p></th>
+<th class="head text-right"><p>ΔAP [95% CI]</p></th>
+<th class="head text-right"><p>ΔPPV&#64;N [95% CI]</p></th>
+<th class="head text-right"><p>ΔAUROC [95% CI]</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Affinity ligand ranking</p></td>
+<td class="text-right"><p>+0.00897 [-0.00170, 0.01910]</p></td>
+<td class="text-right"><p>+0.00999 [0.00187, 0.01698]</p></td>
+<td class="text-right"><p>+0.00581 [0.00303, 0.00897]</p></td>
+</tr>
+<tr class="row-odd"><td><p>Processing with flanks</p></td>
+<td class="text-right"><p>-0.02355 [-0.03138, -0.01533]</p></td>
+<td class="text-right"><p>-0.01310 [-0.02009, -0.00537]</p></td>
+<td class="text-right"><p>-0.00525 [-0.00828, -0.00207]</p></td>
+</tr>
+</tbody>
+</table>
+<p>The affinity AP interval includes zero; its PPV&#64;N and AUROC intervals favor the
+2023 arm. The processing intervals favor the scored 2020 hybrid, with the
+architecture caveat above. All intervals are conditional on the saved weights
+and unadjusted for multiple comparisons. The training-overlap and cohort
+limitations stated above apply unchanged.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="release_model_evaluation.html" class="btn btn-neutral float-left" title="Evaluation of the 2.3.0 weights" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="training.html" class="btn btn-neutral float-right" title="Training models" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

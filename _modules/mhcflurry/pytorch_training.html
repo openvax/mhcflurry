@@ -1,0 +1,399 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.pytorch_training &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.pytorch_training</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.pytorch_training</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Shared PyTorch training helpers used by multiple mhcflurry trainers.</span>
+
+<span class="sd">These helpers are model-agnostic: they assume only that the caller has a</span>
+<span class="sd">``torch.nn.Module`` network and a ``torch.device``. They provide checkpoint copying, numerical settings, compilation and</span>
+<span class="sd">validation sizing for ``Class1NeuralNetwork`` (affinity) and</span>
+<span class="sd">``Class1ProcessingNeuralNetwork``.</span>
+
+<span class="sd">Anything that touches affinity-specific machinery (random-negative</span>
+<span class="sd">resampling, multi-output / inequality losses, allele encoding,</span>
+<span class="sd">percentile-rank calibration) stays in the class I modules.</span>
+<span class="sd">"""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.parallelism</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_torchinductor_compile_threads_env</span>
+
+<span class="n">_TRITON_AUTOGRAD_WARMED_DEVICES</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="copy_module_state_dict_to_cpu">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_training.copy_module_state_dict_to_cpu">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">copy_module_state_dict_to_cpu</span><span class="p">(</span><span class="n">module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return an independent CPU checkpoint of a module's complete state."""</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="n">name</span><span class="p">:</span> <span class="n">value</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">module</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+    <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="configure_matmul_precision">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_training.configure_matmul_precision">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">configure_matmul_precision</span><span class="p">(</span><span class="n">device</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Apply an explicitly requested CUDA matmul precision and cuDNN autotuning.</span>
+
+<span class="sd">    ``MHCFLURRY_MATMUL_PRECISION`` accepts ``highest``, ``high`` or ``medium``.</span>
+<span class="sd">    When unset, this helper leaves PyTorch settings unchanged. CPU and MPS</span>
+<span class="sd">    calls are no-ops. On CUDA it sets float32 matmul precision and enables</span>
+<span class="sd">    cuDNN benchmarking when cuDNN is available. ``highest`` retains full</span>
+<span class="sd">    float32 matmul precision; the other modes may use reduced-precision</span>
+<span class="sd">    internal operations on supported hardware.</span>
+
+<span class="sd">    cuDNN benchmarking chooses algorithms for observed input shapes and can</span>
+<span class="sd">    add initial search time or affect reproducibility. This helper does not</span>
+<span class="sd">    enable deterministic algorithms or guarantee identical seeded results.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">!=</span> <span class="s2">"cuda"</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="n">precision</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_MATMUL_PRECISION"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">precision</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">set_float32_matmul_precision</span><span class="p">(</span><span class="n">precision</span><span class="p">)</span>
+    <span class="c1"># cuDNN benchmark is cheap to enable and has no effect if the</span>
+    <span class="c1"># workload never triggers a cuDNN kernel (plain Linear + RMSprop</span>
+    <span class="c1"># MLP). Guarded against environments that disabled cuDNN entirely.</span>
+    <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">backends</span><span class="o">.</span><span class="n">cudnn</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">backends</span><span class="o">.</span><span class="n">cudnn</span><span class="o">.</span><span class="n">benchmark</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+
+<div class="viewcode-block" id="maybe_compile_network">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_training.maybe_compile_network">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">maybe_compile_network</span><span class="p">(</span><span class="n">network</span><span class="p">,</span> <span class="n">device</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Wrap ``network`` with ``torch.compile`` when the env asks for it.</span>
+
+<span class="sd">    Gated on ``MHCFLURRY_TORCH_COMPILE=1`` and a CUDA device.</span>
+<span class="sd">    ``torch.compile`` is heavy: JIT graph capture + kernel fusion + on-</span>
+<span class="sd">    disk cache + recompile-on-shape-change. The TF32 knob is cheaper</span>
+<span class="sd">    and independent — see ``configure_matmul_precision``.</span>
+
+<span class="sd">    ``MHCFLURRY_TORCH_COMPILE_MODE`` picks the ``mode=`` kwarg (default,</span>
+<span class="sd">    reduce-overhead, max-autotune). Default is "default" — codegen time</span>
+<span class="sd">    is already heavy without max-autotune, and our shape-stable batching</span>
+<span class="sd">    is what unlocks the big wins regardless of mode.</span>
+
+<span class="sd">    Returns the compiled module (an ``OptimizedModule`` that forwards</span>
+<span class="sd">    ``.train()``, ``.eval()``, ``.state_dict()``, ``.parameters()`` to</span>
+<span class="sd">    the wrapped original) so call sites can swap it in without</span>
+<span class="sd">    threading a second reference through the training loop.</span>
+
+<span class="sd">    Compilation cost: first forward pass triggers graph capture +</span>
+<span class="sd">    codegen (typically 30 s – 2 min on a 2-layer MLP like ours).</span>
+<span class="sd">    Subsequent calls with the same input shapes hit the in-process</span>
+<span class="sd">    cache; subsequent *processes* hit the on-disk cache</span>
+<span class="sd">    (``~/.cache/torch``) as long as the graph matches.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">!=</span> <span class="s2">"cuda"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">network</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_TORCH_COMPILE"</span><span class="p">,</span> <span class="s2">"0"</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">"1"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">network</span>
+    <span class="c1"># Idempotent: if ``network`` is already an OptimizedModule (i.e.</span>
+    <span class="c1"># we've been called before on the same instance, from inside an</span>
+    <span class="c1"># epoch loop), return it unchanged.</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">network</span><span class="p">,</span> <span class="s2">"_orig_mod"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">network</span>
+    <span class="n">mode</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_TORCH_COMPILE_MODE"</span><span class="p">,</span> <span class="s2">"default"</span><span class="p">)</span>
+    <span class="n">resolve_torchinductor_compile_threads_env</span><span class="p">()</span>
+    <span class="c1"># ``dynamic=True`` tells dynamo to generate one shape-polymorphic</span>
+    <span class="c1"># graph instead of specializing on every batch shape it sees.</span>
+    <span class="c1"># mhcflurry's forward is called with at least three distinct row</span>
+    <span class="c1"># counts per work item — pretrain (64 rows), finetune (128), and</span>
+    <span class="c1"># validation (4× finetune = 512) — so dynamic=False triggers a</span>
+    <span class="c1"># recompile storm (8+ specializations observed in stderr with</span>
+    <span class="c1"># [0/8] from torch._dynamo.convert_frame). Each recompile is a</span>
+    <span class="c1"># 10-30 s codegen pass, defeating the point. Dynamic mode costs a</span>
+    <span class="c1"># few % on the individual kernel but avoids paying the storm.</span>
+    <span class="c1"># Override with MHCFLURRY_TORCH_COMPILE_DYNAMIC=0 for static mode</span>
+    <span class="c1"># if a caller can guarantee single-shape input.</span>
+    <span class="n">dynamic</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_TORCH_COMPILE_DYNAMIC"</span><span class="p">,</span> <span class="s2">"1"</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">"0"</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"torch.compile enabled (mode=</span><span class="si">%s</span><span class="s2">, dynamic=</span><span class="si">%s</span><span class="s2">)"</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">dynamic</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">network</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="n">dynamic</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="maybe_compile_loss">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_training.maybe_compile_loss">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">maybe_compile_loss</span><span class="p">(</span><span class="n">loss_obj</span><span class="p">,</span> <span class="n">device</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Wrap a loss module with ``torch.compile`` when the env asks for it.</span>
+
+<span class="sd">    Gated on ``MHCFLURRY_TORCH_COMPILE=1`` and a CUDA device — same</span>
+<span class="sd">    criteria as ``maybe_compile_network``. ``MSEWithInequalities``</span>
+<span class="sd">    issues ~10 small elementwise kernels per step in eager mode</span>
+<span class="sd">    (reshape → subtract → compare → cast → multiply → compare → cast →</span>
+<span class="sd">    multiply → square → sum), each with its own launch overhead that</span>
+<span class="sd">    adds up to meaningful wall-clock on A100 with a sub-ms compute</span>
+<span class="sd">    budget. Dynamo fuses those into a couple of kernels and cuts the</span>
+<span class="sd">    loss's share of step time to near-zero.</span>
+
+<span class="sd">    Dispatch via ``MHCFLURRY_TORCH_COMPILE_LOSS_MODE`` (falls back to</span>
+<span class="sd">    ``MHCFLURRY_TORCH_COMPILE_MODE``) so the loss's compile mode can</span>
+<span class="sd">    be tuned independently of the network's — loss ops are tiny and</span>
+<span class="sd">    "reduce-overhead" makes less sense than on the full forward pass.</span>
+
+<span class="sd">    Idempotent: a second call on an already-wrapped loss returns it</span>
+<span class="sd">    unchanged.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">!=</span> <span class="s2">"cuda"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">loss_obj</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_TORCH_COMPILE"</span><span class="p">,</span> <span class="s2">"0"</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">"1"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">loss_obj</span>
+    <span class="c1"># Loss compilation is enabled by default when network compilation is</span>
+    <span class="c1"># enabled. PyTorch 2.4 / Triton 3.0 has an upstream bug where the first</span>
+    <span class="c1"># Triton kernel launched from autograd's backward worker thread can fail</span>
+    <span class="c1"># with ``RuntimeError: Triton Error [CUDA]: invalid device context``.</span>
+    <span class="c1"># Running a tiny CUDA backward in the *training worker process* initializes</span>
+    <span class="c1"># that thread-local CUDA context before the compiled loss backward fires.</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_TORCH_COMPILE_LOSS"</span><span class="p">,</span> <span class="s2">"1"</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">"1"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">loss_obj</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">loss_obj</span><span class="p">,</span> <span class="s2">"_orig_mod"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">loss_obj</span>
+    <span class="n">mode</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+        <span class="s2">"MHCFLURRY_TORCH_COMPILE_LOSS_MODE"</span><span class="p">,</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_TORCH_COMPILE_MODE"</span><span class="p">,</span> <span class="s2">"default"</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">resolve_torchinductor_compile_threads_env</span><span class="p">()</span>
+    <span class="c1"># Loss takes (y_pred, y_true) and optionally sample_weights with</span>
+    <span class="c1"># dynamic-batch shapes that mirror the network's forward. Match the</span>
+    <span class="c1"># network's dynamic/static policy via the same env knob.</span>
+    <span class="n">dynamic</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_TORCH_COMPILE_DYNAMIC"</span><span class="p">,</span> <span class="s2">"1"</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">"0"</span>
+    <span class="n">_warm_cuda_autograd_for_triton</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"torch.compile applied to loss (mode=</span><span class="si">%s</span><span class="s2">, dynamic=</span><span class="si">%s</span><span class="s2">)"</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">dynamic</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">loss_obj</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="n">dynamic</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_warm_cuda_autograd_for_triton</span><span class="p">(</span><span class="n">device</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Initialize CUDA context in autograd's backward thread once per device."""</span>
+    <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">!=</span> <span class="s2">"cuda"</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="n">index</span> <span class="o">=</span> <span class="n">device</span><span class="o">.</span><span class="n">index</span>
+    <span class="k">if</span> <span class="n">index</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">index</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">()</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">_TRITON_AUTOGRAD_WARMED_DEVICES</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="n">device</span><span class="p">):</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">_TRITON_AUTOGRAD_WARMED_DEVICES</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="uncompiled_network">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_training.uncompiled_network">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">uncompiled_network</span><span class="p">(</span><span class="n">network</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the eager module behind ``network``."""</span>
+    <span class="k">return</span> <span class="n">network</span><span class="o">.</span><span class="n">_orig_mod</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">network</span><span class="p">,</span> <span class="s2">"_orig_mod"</span><span class="p">)</span> <span class="k">else</span> <span class="n">network</span></div>
+
+
+
+<div class="viewcode-block" id="validation_forward_network">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_training.validation_forward_network">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">validation_forward_network</span><span class="p">(</span><span class="n">network</span><span class="p">,</span> <span class="n">eager_network</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Choose the module used for validation forward passes during training."""</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_TORCH_COMPILE_VALIDATION"</span><span class="p">,</span> <span class="s2">"0"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"1"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">network</span>
+    <span class="k">return</span> <span class="n">eager_network</span></div>
+
+
+
+<div class="viewcode-block" id="effective_validation_batch_size">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_training.effective_validation_batch_size">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">effective_validation_batch_size</span><span class="p">(</span>
+        <span class="n">device</span><span class="p">,</span>
+        <span class="n">configured_batch_size</span><span class="p">,</span>
+        <span class="n">minibatch_size</span><span class="p">,</span>
+        <span class="n">model</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">num_workers_per_gpu</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">total_rows</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the validation batch size to use for the current device.</span>
+
+<span class="sd">    CUDA validation uses the same live-memory budget as inference. Callers</span>
+<span class="sd">    compute this once per fit and persist it in ``fit_info`` so torch.compile</span>
+<span class="sd">    sees a stable shape across epochs. Explicit configured values are never</span>
+<span class="sd">    changed.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">configured_batch_size</span><span class="p">:</span>
+        <span class="n">configured_batch_size</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">configured_batch_size</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">configured_batch_size</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"validation batch size must be at least 1"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">configured_batch_size</span>
+    <span class="n">device_type</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">device</span><span class="p">,</span> <span class="s2">"type"</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">device_type</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"cuda"</span><span class="p">,</span> <span class="s2">"mps"</span><span class="p">)</span> <span class="ow">and</span> <span class="n">model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.pytorch_sizing</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_prediction_batch_size</span>
+        <span class="k">return</span> <span class="n">compute_prediction_batch_size</span><span class="p">(</span>
+            <span class="n">device</span><span class="p">,</span>
+            <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+            <span class="n">num_workers_per_gpu</span><span class="o">=</span><span class="n">num_workers_per_gpu</span><span class="p">,</span>
+            <span class="n">total_rows</span><span class="o">=</span><span class="n">total_rows</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">device_type</span> <span class="o">==</span> <span class="s2">"cuda"</span><span class="p">:</span>
+        <span class="c1"># Parent-process planning cannot initialize CUDA. Keep a deterministic</span>
+        <span class="c1"># analytic fallback until the worker has a live model and memory view.</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">4</span> <span class="o">*</span> <span class="n">minibatch_size</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">total_rows</span><span class="p">))</span> <span class="k">if</span> <span class="n">total_rows</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">rows</span>
+    <span class="k">return</span> <span class="mi">4</span> <span class="o">*</span> <span class="n">minibatch_size</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

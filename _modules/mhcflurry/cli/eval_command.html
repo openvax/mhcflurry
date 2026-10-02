@@ -1,0 +1,1039 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.cli.eval_command &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.cli.eval_command</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.cli.eval_command</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Evaluation command namespace.</span>
+
+<span class="sd">``mhcflurry eval`` is the semantic home for model comparison, benchmark score</span>
+<span class="sd">generation, and paper-style figures. Historical top-level commands remain</span>
+<span class="sd">available as compatibility entry points:</span>
+
+<span class="sd">* ``mhcflurry eval compare-models`` delegates to ``mhcflurry compare-models``.</span>
+<span class="sd">* ``mhcflurry eval plot-comparison`` delegates to</span>
+<span class="sd">  ``mhcflurry plot-model-comparison``.</span>
+<span class="sd">* ``mhcflurry eval paper-figures render`` delegates to</span>
+<span class="sd">  ``mhcflurry paper-figures``.</span>
+<span class="sd">* ``mhcflurry eval paper-figures score-predictions`` derives reusable AUC/PPV</span>
+<span class="sd">  score tables from saved benchmark prediction tables.</span>
+<span class="sd">* ``mhcflurry eval paper-figures external-predictors`` optionally shells out to</span>
+<span class="sd">  external-predictor runners such as ``mhctools`` to add columns to a canonical</span>
+<span class="sd">  saved benchmark prediction table.</span>
+<span class="sd">* ``mhcflurry eval paper-figures run`` runs compare-models, paper-figures, and</span>
+<span class="sd">  plot-model-comparison as one local evaluation/figure pipeline.</span>
+<span class="sd">* ``mhcflurry eval affinity-candidate-figures`` builds a common held-out</span>
+<span class="sd">  prediction table and paper-figure suite for shortlisted affinity candidates.</span>
+<span class="sd">* ``mhcflurry eval merge-external-predictions`` consolidates aligned</span>
+<span class="sd">  per-sample external-predictor benchmark groups for those figures.</span>
+
+<span class="sd">Future benchmark-prediction and external-predictor registration commands should</span>
+<span class="sd">be added under this namespace rather than as new top-level commands.</span>
+<span class="sd">"""</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shlex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">..common</span><span class="w"> </span><span class="kn">import</span> <span class="n">positive_int_arg</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..common</span><span class="w"> </span><span class="kn">import</span> <span class="n">normalize_sequence_resolved_allele_name</span>
+
+
+<span class="n">EVALUATION_SCRIPTS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"prepare-processing-cohort"</span><span class="p">:</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"scripts/training/prepare_processing_evaluation.py"</span><span class="p">),</span>
+    <span class="s2">"processing-confirmation-analysis"</span><span class="p">:</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"scripts/training/analyze_processing_confirmation.py"</span><span class="p">),</span>
+    <span class="s2">"processing-fold-ensembles"</span><span class="p">:</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"scripts/training/evaluate_processing_fold_ensembles.py"</span><span class="p">),</span>
+    <span class="s2">"processing-recipe-analysis"</span><span class="p">:</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"scripts/training/analyze_processing_recipe.py"</span><span class="p">),</span>
+    <span class="s2">"presentation-percentiles"</span><span class="p">:</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"scripts/training/compare_presentation_percentiles.py"</span><span class="p">),</span>
+    <span class="s2">"presentation-external-predictors"</span><span class="p">:</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"scripts/training/compare_presentation_external_predictors.py"</span><span class="p">),</span>
+    <span class="s2">"processing-ensemble-subsets"</span><span class="p">:</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"scripts/training/evaluate_processing_subsets.py"</span><span class="p">),</span>
+    <span class="s2">"processing-flank-ablation"</span><span class="p">:</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"scripts/training/processing_flank_ablation.py"</span><span class="p">),</span>
+    <span class="s2">"saved-candidate"</span><span class="p">:</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"scripts/training/evaluate_saved_candidate.py"</span><span class="p">),</span>
+    <span class="s2">"collate-figures"</span><span class="p">:</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"scripts/training/collate_experiment_figures.py"</span><span class="p">),</span>
+    <span class="s2">"paired-sample-metrics"</span><span class="p">:</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"scripts/training/paired_sample_metrics.py"</span><span class="p">),</span>
+    <span class="s2">"processing-ensemble"</span><span class="p">:</span> <span class="n">Path</span><span class="p">(</span>
+        <span class="s2">"scripts/training/summarize_processing_ensemble.py"</span><span class="p">),</span>
+    <span class="s2">"presentation-affinity-ensemble"</span><span class="p">:</span> <span class="n">Path</span><span class="p">(</span>
+        <span class="s2">"scripts/training/summarize_presentation_affinity_ensemble.py"</span><span class="p">),</span>
+    <span class="s2">"release-experiment-figures"</span><span class="p">:</span> <span class="n">Path</span><span class="p">(</span>
+        <span class="s2">"scripts/training/render_release_experiment_paper_figures.py"</span><span class="p">),</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="make_parser">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.eval_command.make_parser">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_parser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="s2">"mhcflurry eval"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the lightweight namespace parser used by docs/help tooling."""</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">,</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">RawDescriptionHelpFormatter</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">sub</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_subparsers</span><span class="p">(</span><span class="n">dest</span><span class="o">=</span><span class="s2">"eval_subcommand"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"compare-models"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Compare two model ensembles on data_evaluation."</span><span class="p">,</span>
+        <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"plot-comparison"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Render plots from a compare-models output directory."</span><span class="p">,</span>
+        <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"plot-model-comparison"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Compatibility alias for plot-comparison."</span><span class="p">,</span>
+        <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"affinity-candidate-figures"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Compare shortlisted affinity candidates on one saved cohort."</span><span class="p">,</span>
+        <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"merge-external-predictions"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Consolidate precomputed external benchmark predictions."</span><span class="p">,</span>
+        <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"processing-affinity-control"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Evaluate processing on affinity-controlled risk sets."</span><span class="p">,</span>
+        <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">help_text</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="p">(</span><span class="s2">"prepare-processing-cohort"</span><span class="p">,</span> <span class="s2">"Expand and freeze unique 10:1 processing evaluation negatives."</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"processing-confirmation-analysis"</span><span class="p">,</span> <span class="s2">"Compare paired ranking checkpoints and export a gated processing candidate recipe."</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"processing-fold-ensembles"</span><span class="p">,</span> <span class="s2">"Score specified ensembles within shared held-out folds using cached predictions."</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"processing-recipe-analysis"</span><span class="p">,</span> <span class="s2">"Map paired processing recipe effects from saved development metrics."</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"presentation-percentiles"</span><span class="p">,</span> <span class="s2">"Compare compact percentile curves using cached scores."</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"presentation-external-predictors"</span><span class="p">,</span> <span class="s2">"Compare saved MHCflurry scores with NetMHCpan and MixMHCpred."</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"processing-flank-ablation"</span><span class="p">,</span> <span class="s2">"Test real, masked and shuffled flanks with fixed weights."</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"saved-candidate"</span><span class="p">,</span> <span class="s2">"Evaluate saved full ensembles without retraining."</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"collate-figures"</span><span class="p">,</span> <span class="s2">"Combine annotated experiment figures into a PDF."</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"paired-sample-metrics"</span><span class="p">,</span>
+             <span class="s2">"Estimate paired sample uncertainty from saved metric tables."</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"processing-ensemble"</span><span class="p">,</span>
+             <span class="s2">"Score a fixed ensemble from saved processing predictions."</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"processing-ensemble-subsets"</span><span class="p">,</span>
+             <span class="s2">"Evaluate all fixed-size subsets without held-out selection."</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"presentation-affinity-ensemble"</span><span class="p">,</span>
+             <span class="s2">"Evaluate public/new affinity mixtures from saved predictions."</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"release-experiment-figures"</span><span class="p">,</span>
+             <span class="s2">"Render figures from archived release experiments."</span><span class="p">)):</span>
+        <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="n">help_text</span><span class="p">,</span> <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">paper</span> <span class="o">=</span> <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"paper-figures"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Render or run paper-style evaluation figures."</span><span class="p">,</span>
+        <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">paper_sub</span> <span class="o">=</span> <span class="n">paper</span><span class="o">.</span><span class="n">add_subparsers</span><span class="p">(</span><span class="n">dest</span><span class="o">=</span><span class="s2">"paper_figures_subcommand"</span><span class="p">)</span>
+    <span class="n">paper_sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"render"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Render paper-style figures from saved inputs."</span><span class="p">,</span>
+        <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">paper_sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"run"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Compare models, render paper figures, and write plot PDFs."</span><span class="p">,</span>
+        <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">paper_sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"score-predictions"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Derive reusable score tables from saved predictions."</span><span class="p">,</span>
+        <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">paper_sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"external-predictors"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Add optional external-predictor columns."</span><span class="p">,</span>
+        <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+
+<span class="n">parser</span> <span class="o">=</span> <span class="n">make_parser</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="run_argv">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.eval_command.run_argv">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_argv</span><span class="p">(</span><span class="n">argv</span><span class="p">,</span> <span class="n">prog</span><span class="o">=</span><span class="s2">"mhcflurry eval"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Dispatch ``mhcflurry eval`` subcommands."""</span>
+    <span class="n">argv</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">argv</span> <span class="ow">or</span> <span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"-h"</span><span class="p">,</span> <span class="s2">"--help"</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">format_help</span><span class="p">(</span><span class="n">prog</span><span class="p">))</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="n">subcommand</span> <span class="o">=</span> <span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">rest</span> <span class="o">=</span> <span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+    <span class="k">if</span> <span class="n">subcommand</span> <span class="o">==</span> <span class="s2">"compare-models"</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">compare_models</span>
+        <span class="k">return</span> <span class="n">_run_existing_command</span><span class="p">(</span>
+            <span class="n">compare_models</span><span class="p">,</span> <span class="n">rest</span><span class="p">,</span> <span class="s2">"</span><span class="si">%s</span><span class="s2"> compare-models"</span> <span class="o">%</span> <span class="n">prog</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">subcommand</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"plot-comparison"</span><span class="p">,</span> <span class="s2">"plot-model-comparison"</span><span class="p">):</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot_model_comparison</span>
+        <span class="k">return</span> <span class="n">_run_existing_command</span><span class="p">(</span>
+            <span class="n">plot_model_comparison</span><span class="p">,</span> <span class="n">rest</span><span class="p">,</span> <span class="s2">"</span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">prog</span><span class="p">,</span> <span class="n">subcommand</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">subcommand</span> <span class="o">==</span> <span class="s2">"affinity-candidate-figures"</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">affinity_candidate_figures</span>
+        <span class="k">return</span> <span class="n">affinity_candidate_figures</span><span class="o">.</span><span class="n">run_argv</span><span class="p">(</span>
+            <span class="n">rest</span><span class="p">,</span> <span class="n">prog</span><span class="o">=</span><span class="s2">"</span><span class="si">%s</span><span class="s2"> affinity-candidate-figures"</span> <span class="o">%</span> <span class="n">prog</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">subcommand</span> <span class="o">==</span> <span class="s2">"merge-external-predictions"</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">merge_external_predictions</span>
+        <span class="k">return</span> <span class="n">merge_external_predictions</span><span class="o">.</span><span class="n">run_argv</span><span class="p">(</span>
+            <span class="n">rest</span><span class="p">,</span> <span class="n">prog</span><span class="o">=</span><span class="s2">"</span><span class="si">%s</span><span class="s2"> merge-external-predictions"</span> <span class="o">%</span> <span class="n">prog</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">subcommand</span> <span class="o">==</span> <span class="s2">"processing-affinity-control"</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">processing_affinity_control</span>
+        <span class="k">return</span> <span class="n">processing_affinity_control</span><span class="o">.</span><span class="n">run_argv</span><span class="p">(</span>
+            <span class="n">rest</span><span class="p">,</span> <span class="n">prog</span><span class="o">=</span><span class="s2">"</span><span class="si">%s</span><span class="s2"> processing-affinity-control"</span> <span class="o">%</span> <span class="n">prog</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">subcommand</span> <span class="ow">in</span> <span class="n">EVALUATION_SCRIPTS</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_run_evaluation_script</span><span class="p">(</span><span class="n">subcommand</span><span class="p">,</span> <span class="n">rest</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">subcommand</span> <span class="o">==</span> <span class="s2">"paper-figures"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_run_paper_figures</span><span class="p">(</span><span class="n">rest</span><span class="p">,</span> <span class="s2">"</span><span class="si">%s</span><span class="s2"> paper-figures"</span> <span class="o">%</span> <span class="n">prog</span><span class="p">)</span>
+
+    <span class="n">make_parser</span><span class="p">(</span><span class="n">prog</span><span class="p">)</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+    <span class="k">return</span> <span class="mi">2</span></div>
+
+
+
+<div class="viewcode-block" id="format_help">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.eval_command.format_help">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">format_help</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="s2">"mhcflurry eval"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return a compact help screen for the eval namespace."""</span>
+    <span class="n">lines</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="s2">"usage: </span><span class="si">%s</span><span class="s2"> &lt;subcommand&gt; [args]"</span> <span class="o">%</span> <span class="n">prog</span><span class="p">,</span>
+        <span class="s2">""</span><span class="p">,</span>
+        <span class="s2">"Evaluation and paper-figure workflows."</span><span class="p">,</span>
+        <span class="s2">""</span><span class="p">,</span>
+        <span class="s2">"Subcommands:"</span><span class="p">,</span>
+        <span class="s2">"  compare-models          Compare two model ensembles."</span><span class="p">,</span>
+        <span class="s2">"  saved-candidate         Finish saved candidate evaluation without training."</span><span class="p">,</span>
+        <span class="s2">"  plot-comparison         Render diagnostic plots from compare output."</span><span class="p">,</span>
+        <span class="s2">"  affinity-candidate-figures"</span><span class="p">,</span>
+        <span class="s2">"                          Plot finalists and public on one saved cohort."</span><span class="p">,</span>
+        <span class="s2">"  merge-external-predictions"</span><span class="p">,</span>
+        <span class="s2">"                          Consolidate precomputed external predictions."</span><span class="p">,</span>
+        <span class="s2">"  processing-flank-ablation  Test fixed weights with perturbed external flanks."</span><span class="p">,</span>
+        <span class="s2">"  processing-affinity-control"</span><span class="p">,</span>
+        <span class="s2">"                          Score affinity-controlled processing risk sets."</span><span class="p">,</span>
+        <span class="s2">"  prepare-processing-cohort"</span><span class="p">,</span>
+        <span class="s2">"                          Expand and freeze a shared matched evaluation set."</span><span class="p">,</span>
+        <span class="s2">"  processing-ensemble     Score an ensemble from saved predictions."</span><span class="p">,</span>
+        <span class="s2">"  presentation-percentiles  Compare compact calibration curves and ranking metrics."</span><span class="p">,</span>
+        <span class="s2">"  presentation-external-predictors"</span><span class="p">,</span>
+        <span class="s2">"                          Compare saved scores with NetMHCpan and MixMHCpred."</span><span class="p">,</span>
+        <span class="s2">"  processing-ensemble-subsets  Evaluate every fixed-size ensemble subset."</span><span class="p">,</span>
+        <span class="s2">"  paired-sample-metrics   Bootstrap matched per-sample metric differences."</span><span class="p">,</span>
+        <span class="s2">"  processing-recipe-analysis  Map paired processing hyperparameter effects."</span><span class="p">,</span>
+        <span class="s2">"  processing-fold-ensembles  Compare cached ensembles within shared held-out folds."</span><span class="p">,</span>
+        <span class="s2">"  collate-figures         Combine annotated experiment figures into a PDF."</span><span class="p">,</span>
+        <span class="s2">"  presentation-affinity-ensemble"</span><span class="p">,</span>
+        <span class="s2">"                          Evaluate saved public/new affinity mixtures."</span><span class="p">,</span>
+        <span class="s2">"  release-experiment-figures"</span><span class="p">,</span>
+        <span class="s2">"                          Render archived release experiment figures."</span><span class="p">,</span>
+        <span class="s2">"  paper-figures render    Render paper figures from saved inputs."</span><span class="p">,</span>
+        <span class="s2">"  paper-figures score-predictions"</span><span class="p">,</span>
+        <span class="s2">"                          Derive score tables from saved predictions."</span><span class="p">,</span>
+        <span class="s2">"  paper-figures external-predictors"</span><span class="p">,</span>
+        <span class="s2">"                          Add optional external predictor columns."</span><span class="p">,</span>
+        <span class="s2">"  paper-figures run       Compare, render paper figures, and write PDFs."</span><span class="p">,</span>
+        <span class="s2">""</span><span class="p">,</span>
+        <span class="s2">"Compatibility:"</span><span class="p">,</span>
+        <span class="s2">"  mhcflurry compare-models, mhcflurry plot-model-comparison, and"</span><span class="p">,</span>
+        <span class="s2">"  mhcflurry paper-figures remain supported."</span><span class="p">,</span>
+        <span class="s2">""</span><span class="p">,</span>
+        <span class="s2">"Options:"</span><span class="p">,</span>
+        <span class="s2">"  -h, --help  show this help message and exit"</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_run_existing_command</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">argv</span><span class="p">,</span> <span class="n">prog</span><span class="p">):</span>
+    <span class="n">command_parser</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">make_parser</span><span class="p">()</span>
+    <span class="n">command_parser</span><span class="o">.</span><span class="n">prog</span> <span class="o">=</span> <span class="n">prog</span>
+    <span class="k">return</span> <span class="n">module</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">command_parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_run_evaluation_script</span><span class="p">(</span><span class="n">subcommand</span><span class="p">,</span> <span class="n">argv</span><span class="p">):</span>
+    <span class="n">relative</span> <span class="o">=</span> <span class="n">EVALUATION_SCRIPTS</span><span class="p">[</span><span class="n">subcommand</span><span class="p">]</span>
+    <span class="n">repo_root</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span><span class="o">.</span><span class="n">parents</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">candidate</span> <span class="ow">in</span> <span class="p">(</span><span class="n">repo_root</span> <span class="o">/</span> <span class="n">relative</span><span class="p">,</span> <span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">()</span> <span class="o">/</span> <span class="n">relative</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">candidate</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="n">env</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">env</span><span class="p">[</span><span class="s2">"MHCFLURRY_CLI_PROG"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"mhcflurry eval </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">subcommand</span>
+            <span class="k">return</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">call</span><span class="p">(</span>
+                <span class="p">[</span><span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">candidate</span><span class="p">),</span> <span class="o">*</span><span class="n">argv</span><span class="p">],</span> <span class="n">env</span><span class="o">=</span><span class="n">env</span><span class="p">)</span>
+    <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span>
+        <span class="s2">"Could not find </span><span class="si">%s</span><span class="s2">. This command must be run from a source checkout "</span>
+        <span class="s2">"or editable install."</span> <span class="o">%</span> <span class="n">relative</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_run_paper_figures</span><span class="p">(</span><span class="n">argv</span><span class="p">,</span> <span class="n">prog</span><span class="p">):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">argv</span> <span class="ow">or</span> <span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"-h"</span><span class="p">,</span> <span class="s2">"--help"</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">_format_paper_figures_help</span><span class="p">(</span><span class="n">prog</span><span class="p">))</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="n">subcommand</span> <span class="o">=</span> <span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">subcommand</span> <span class="o">==</span> <span class="s2">"render"</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">paper_figures</span>
+        <span class="k">return</span> <span class="n">_run_existing_command</span><span class="p">(</span>
+            <span class="n">paper_figures</span><span class="p">,</span> <span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="s2">"</span><span class="si">%s</span><span class="s2"> render"</span> <span class="o">%</span> <span class="n">prog</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">subcommand</span> <span class="o">==</span> <span class="s2">"score-predictions"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_run_score_predictions</span><span class="p">(</span>
+            <span class="n">_make_score_predictions_parser</span><span class="p">(</span>
+                <span class="s2">"</span><span class="si">%s</span><span class="s2"> score-predictions"</span> <span class="o">%</span> <span class="n">prog</span><span class="p">)</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]))</span>
+    <span class="k">if</span> <span class="n">subcommand</span> <span class="o">==</span> <span class="s2">"external-predictors"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_run_external_predictors</span><span class="p">(</span>
+            <span class="n">_make_external_predictors_parser</span><span class="p">(</span>
+                <span class="s2">"</span><span class="si">%s</span><span class="s2"> external-predictors"</span> <span class="o">%</span> <span class="n">prog</span><span class="p">)</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]))</span>
+    <span class="k">if</span> <span class="n">subcommand</span> <span class="o">==</span> <span class="s2">"run"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_run_paper_figures_pipeline</span><span class="p">(</span>
+            <span class="n">make_paper_figures_run_parser</span><span class="p">(</span><span class="s2">"</span><span class="si">%s</span><span class="s2"> run"</span> <span class="o">%</span> <span class="n">prog</span><span class="p">)</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span>
+                <span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]))</span>
+    <span class="k">if</span> <span class="n">subcommand</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"-"</span><span class="p">):</span>
+        <span class="c1"># Compatibility shortcut: ``mhcflurry eval paper-figures --out ...``</span>
+        <span class="c1"># behaves like the explicit ``render`` form.</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">paper_figures</span>
+        <span class="k">return</span> <span class="n">_run_existing_command</span><span class="p">(</span><span class="n">paper_figures</span><span class="p">,</span> <span class="n">argv</span><span class="p">,</span> <span class="n">prog</span><span class="p">)</span>
+
+    <span class="n">_make_paper_figures_parser</span><span class="p">(</span><span class="n">prog</span><span class="p">)</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+    <span class="k">return</span> <span class="mi">2</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_make_paper_figures_parser</span><span class="p">(</span><span class="n">prog</span><span class="p">):</span>
+    <span class="n">paper_parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">)</span>
+    <span class="n">sub</span> <span class="o">=</span> <span class="n">paper_parser</span><span class="o">.</span><span class="n">add_subparsers</span><span class="p">(</span><span class="n">dest</span><span class="o">=</span><span class="s2">"paper_figures_subcommand"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s2">"render"</span><span class="p">,</span> <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s2">"score-predictions"</span><span class="p">,</span> <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s2">"external-predictors"</span><span class="p">,</span> <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">sub</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s2">"run"</span><span class="p">,</span> <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">paper_parser</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_format_paper_figures_help</span><span class="p">(</span><span class="n">prog</span><span class="p">):</span>
+    <span class="k">return</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">([</span>
+        <span class="s2">"usage: </span><span class="si">%s</span><span class="s2"> &lt;subcommand&gt; [args]"</span> <span class="o">%</span> <span class="n">prog</span><span class="p">,</span>
+        <span class="s2">""</span><span class="p">,</span>
+        <span class="s2">"Paper-style evaluation figure workflows."</span><span class="p">,</span>
+        <span class="s2">""</span><span class="p">,</span>
+        <span class="s2">"Subcommands:"</span><span class="p">,</span>
+        <span class="s2">"  render  Render figures from saved comparison/scores/prediction inputs."</span><span class="p">,</span>
+        <span class="s2">"  score-predictions"</span><span class="p">,</span>
+        <span class="s2">"          Derive reusable score tables from saved predictions."</span><span class="p">,</span>
+        <span class="s2">"  external-predictors"</span><span class="p">,</span>
+        <span class="s2">"          Add external predictor columns through an optional runner."</span><span class="p">,</span>
+        <span class="s2">"  run     Run compare-models, render paper figures, and write PDFs."</span><span class="p">,</span>
+        <span class="s2">""</span><span class="p">,</span>
+        <span class="s2">"Use '</span><span class="si">%s</span><span class="s2"> render --help', '</span><span class="si">%s</span><span class="s2"> score-predictions --help', "</span>
+        <span class="s2">"'</span><span class="si">%s</span><span class="s2"> external-predictors --help', or '</span><span class="si">%s</span><span class="s2"> run --help' for arguments."</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="n">prog</span><span class="p">,</span> <span class="n">prog</span><span class="p">,</span> <span class="n">prog</span><span class="p">,</span> <span class="n">prog</span><span class="p">),</span>
+    <span class="p">])</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_make_score_predictions_parser</span><span class="p">(</span><span class="n">prog</span><span class="p">):</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Derive reusable notebook-style AUC/PPV score tables from a saved "</span>
+            <span class="s2">"benchmark prediction table. The output can be passed back to "</span>
+            <span class="s2">"paper-figures through --scores-dir."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--kind"</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="p">(</span><span class="s2">"multiallelic"</span><span class="p">,</span> <span class="s2">"monoallelic"</span><span class="p">),</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Benchmark kind. Sets the default grouping column."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--input"</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Saved benchmark prediction table (CSV or CSV.BZ2)."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--out"</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Output CSV path, typically accuracy_scores.multiallelic.csv or "</span>
+            <span class="s2">"accuracy_scores.monoallelic.csv."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--index-column"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Optional grouping column override. Defaults to sample_id for "</span>
+            <span class="s2">"multiallelic and auto-detect for monoallelic."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--external-baselines"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Comma-separated external predictor comparators used for percent "</span>
+            <span class="s2">"change columns. Default matches paper-figures render."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--predictor-info"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Optional predictor_info.csv with predictor and higher_is_better "</span>
+            <span class="s2">"columns for custom score columns."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--predictor-columns"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Optional comma-separated predictor score columns. Without this "</span>
+            <span class="s2">"option, canonical score names and predictors declared in "</span>
+            <span class="s2">"predictor_info.csv are selected. Custom names still require a "</span>
+            <span class="s2">"predictor_info.csv higher_is_better value."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_run_score_predictions</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">paper_figures</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">external_baselines</span><span class="p">:</span>
+        <span class="n">external_baselines</span> <span class="o">=</span> <span class="n">paper_figures</span><span class="o">.</span><span class="n">_parse_external_baselines</span><span class="p">(</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">external_baselines</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">external_baselines</span> <span class="o">=</span> <span class="n">paper_figures</span><span class="o">.</span><span class="n">EXTERNAL_BASELINES</span>
+    <span class="n">index_column</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">index_column</span>
+    <span class="k">if</span> <span class="n">index_column</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">args</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="s2">"multiallelic"</span><span class="p">:</span>
+        <span class="n">index_column</span> <span class="o">=</span> <span class="s2">"sample_id"</span>
+    <span class="n">predictor_info</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">predictor_info</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+        <span class="n">predictor_info</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">predictor_info</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s2">"predictor"</span> <span class="ow">in</span> <span class="n">predictor_info</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">predictor_info</span> <span class="o">=</span> <span class="n">predictor_info</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">"predictor"</span><span class="p">,</span> <span class="n">drop</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">scores</span> <span class="o">=</span> <span class="n">paper_figures</span><span class="o">.</span><span class="n">score_saved_prediction_table</span><span class="p">(</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">input</span><span class="p">,</span>
+        <span class="n">index_column</span><span class="o">=</span><span class="n">index_column</span><span class="p">,</span>
+        <span class="n">kind</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">kind</span><span class="p">,</span>
+        <span class="n">predictor_info</span><span class="o">=</span><span class="n">predictor_info</span><span class="p">,</span>
+        <span class="n">predictor_columns</span><span class="o">=</span><span class="p">(</span>
+            <span class="n">paper_figures</span><span class="o">.</span><span class="n">_parse_predictor_list</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">predictor_columns</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">predictor_columns</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="p">),</span>
+        <span class="n">external_baselines</span><span class="o">=</span><span class="n">external_baselines</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">out</span><span class="p">),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">scores</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Wrote: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">out</span><span class="p">)</span>
+    <span class="k">return</span> <span class="mi">0</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_make_external_predictors_parser</span><span class="p">(</span><span class="n">prog</span><span class="p">):</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Add external predictor columns to a canonical benchmark "</span>
+            <span class="s2">"prediction table by shelling out to optional local predictor "</span>
+            <span class="s2">"runners. The initial runner is mhctools, which keeps NetMHCpan/"</span>
+            <span class="s2">"MixMHCpred execution outside MHCflurry's package dependencies "</span>
+            <span class="s2">"while still providing a maintained one-command adapter for "</span>
+            <span class="s2">"release figure inputs."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--input"</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Canonical benchmark prediction table (CSV or CSV.BZ2)."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--out"</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Output benchmark prediction table with added predictor columns."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--predictor"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"append"</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"RUNNER_PREDICTOR:OUTPUT_COLUMN:FIELD"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"External predictor spec. FIELD is one of score, affinity, or "</span>
+            <span class="s2">"percentile_rank. Example: "</span>
+            <span class="s2">"netmhcpan42-ba:netmhcpan4.2.ba:affinity. May be repeated."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--runner"</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="p">(</span><span class="s2">"mhctools"</span><span class="p">,),</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"mhctools"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"External predictor runner. Only </span><span class="si">%(default)s</span><span class="s2"> is currently "</span>
+            <span class="s2">"implemented."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--mhctools-command"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"mhctools"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"mhctools executable or command prefix. Defaults to </span><span class="si">%(default)s</span><span class="s2">. "</span>
+            <span class="s2">"This command is executed as a subprocess and is not imported."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--peptide-column"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"peptide"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Input peptide column. Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--alleles-column"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Input allele/genotype column. Defaults to hla if present, else "</span>
+            <span class="s2">"allele."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--keep-raw-dir"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Optional directory for raw per-genotype mhctools CSV outputs."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_external_predictor_spec</span><span class="p">(</span><span class="n">spec</span><span class="p">):</span>
+    <span class="n">parts</span> <span class="o">=</span> <span class="n">spec</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">":"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"--predictor must be RUNNER_PREDICTOR:OUTPUT_COLUMN:FIELD, got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span>
+            <span class="n">spec</span><span class="p">)</span>
+    <span class="n">predictor_name</span><span class="p">,</span> <span class="n">output_column</span><span class="p">,</span> <span class="n">field</span> <span class="o">=</span> <span class="p">[</span><span class="n">part</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">parts</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">predictor_name</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">output_column</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Empty predictor name or output column in </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="n">spec</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">field</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"score"</span><span class="p">,</span> <span class="s2">"affinity"</span><span class="p">,</span> <span class="s2">"percentile_rank"</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"FIELD must be score, affinity, or percentile_rank in </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="n">spec</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">predictor_name</span><span class="p">,</span> <span class="n">output_column</span><span class="p">,</span> <span class="n">field</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_split_benchmark_alleles</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+    <span class="n">alleles</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">item</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="sa">r</span><span class="s2">"[,\s]+"</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+        <span class="k">if</span> <span class="n">item</span>
+    <span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">alleles</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Benchmark genotype </span><span class="si">%r</span><span class="s2"> contains no class-I alleles."</span> <span class="o">%</span> <span class="n">value</span>
+        <span class="p">)</span>
+    <span class="n">normalized</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">allele</span> <span class="ow">in</span> <span class="n">alleles</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">canonical</span> <span class="o">=</span> <span class="n">normalize_sequence_resolved_allele_name</span><span class="p">(</span><span class="n">allele</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="c1"># Never pass an unparsed user token through to an external</span>
+            <span class="c1"># predictor. It may interpret the spelling differently or fail</span>
+            <span class="c1"># after a long grouped run; surface the offending genotype now.</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Invalid, ambiguous, or unsupported class-I allele in "</span>
+                <span class="s2">"benchmark genotype </span><span class="si">%r</span><span class="s2">: </span><span class="si">%r</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">)"</span> <span class="o">%</span> <span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">allele</span><span class="p">,</span> <span class="n">error</span><span class="p">)</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
+        <span class="n">normalized</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">canonical</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">normalized</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_best_external_predictor_rows</span><span class="p">(</span><span class="n">raw_df</span><span class="p">,</span> <span class="n">value_field</span><span class="p">):</span>
+    <span class="n">required</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"peptide"</span><span class="p">,</span> <span class="s2">"allele"</span><span class="p">,</span> <span class="n">value_field</span><span class="p">}</span>
+    <span class="n">missing</span> <span class="o">=</span> <span class="n">required</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span><span class="n">raw_df</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">missing</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"mhctools output missing required columns for </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">value_field</span><span class="p">,</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">missing</span><span class="p">))))</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">raw_df</span><span class="p">[[</span><span class="s2">"peptide"</span><span class="p">,</span> <span class="s2">"allele"</span><span class="p">,</span> <span class="n">value_field</span><span class="p">]]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">df</span><span class="p">[</span><span class="n">value_field</span><span class="p">]</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="n">value_field</span><span class="p">],</span> <span class="n">errors</span><span class="o">=</span><span class="s2">"coerce"</span><span class="p">)</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">dropna</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="p">[</span><span class="n">value_field</span><span class="p">])</span>
+    <span class="n">ascending</span> <span class="o">=</span> <span class="n">value_field</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"affinity"</span><span class="p">,</span> <span class="s2">"percentile_rank"</span><span class="p">)</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span>
+        <span class="p">[</span><span class="s2">"peptide"</span><span class="p">,</span> <span class="n">value_field</span><span class="p">],</span>
+        <span class="n">ascending</span><span class="o">=</span><span class="p">[</span><span class="kc">True</span><span class="p">,</span> <span class="n">ascending</span><span class="p">],</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">"mergesort"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">(</span><span class="s2">"peptide"</span><span class="p">,</span> <span class="n">keep</span><span class="o">=</span><span class="s2">"first"</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_run_mhctools_for_group</span><span class="p">(</span>
+        <span class="n">mhctools_command</span><span class="p">,</span> <span class="n">predictor_name</span><span class="p">,</span> <span class="n">alleles</span><span class="p">,</span> <span class="n">peptides</span><span class="p">,</span> <span class="n">out_csv</span><span class="p">):</span>
+    <span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">NamedTemporaryFile</span><span class="p">(</span><span class="s2">"w"</span><span class="p">,</span> <span class="n">suffix</span><span class="o">=</span><span class="s2">".peptides"</span><span class="p">,</span> <span class="n">delete</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+        <span class="n">peptide_file</span> <span class="o">=</span> <span class="n">fd</span><span class="o">.</span><span class="n">name</span>
+        <span class="k">for</span> <span class="n">peptide</span> <span class="ow">in</span> <span class="n">peptides</span><span class="p">:</span>
+            <span class="n">fd</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">"</span><span class="si">%s</span><span class="se">\n</span><span class="s2">"</span> <span class="o">%</span> <span class="n">peptide</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">command</span> <span class="o">=</span> <span class="n">shlex</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">mhctools_command</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span>
+            <span class="s2">"--mhc-predictor"</span><span class="p">,</span> <span class="n">predictor_name</span><span class="p">,</span>
+            <span class="s2">"--mhc-alleles"</span><span class="p">,</span> <span class="s2">","</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">alleles</span><span class="p">),</span>
+            <span class="s2">"--input-peptides-file"</span><span class="p">,</span> <span class="n">peptide_file</span><span class="p">,</span>
+            <span class="s2">"--output-csv"</span><span class="p">,</span> <span class="n">out_csv</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">command</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">peptide_file</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_run_external_predictors</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">runner</span> <span class="o">!=</span> <span class="s2">"mhctools"</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unsupported external predictor runner: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">args</span><span class="o">.</span><span class="n">runner</span><span class="p">)</span>
+    <span class="n">predictor_specs</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">_parse_external_predictor_spec</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">predictor</span>
+    <span class="p">]</span>
+    <span class="n">benchmark</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">input</span><span class="p">)</span>
+    <span class="n">allele_column</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">alleles_column</span>
+    <span class="k">if</span> <span class="n">allele_column</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">allele_column</span> <span class="o">=</span> <span class="s2">"hla"</span> <span class="k">if</span> <span class="s2">"hla"</span> <span class="ow">in</span> <span class="n">benchmark</span><span class="o">.</span><span class="n">columns</span> <span class="k">else</span> <span class="s2">"allele"</span>
+    <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">peptide_column</span><span class="p">,</span> <span class="n">allele_column</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">benchmark</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Input table lacks required column: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">column</span><span class="p">)</span>
+    <span class="n">output_columns</span> <span class="o">=</span> <span class="p">[</span><span class="n">spec</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">predictor_specs</span><span class="p">]</span>
+    <span class="n">generated_columns</span> <span class="o">=</span> <span class="n">output_columns</span> <span class="o">+</span> <span class="p">[</span>
+        <span class="s2">"</span><span class="si">%s</span><span class="s2">_best_allele"</span> <span class="o">%</span> <span class="n">column</span> <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">output_columns</span>
+    <span class="p">]</span>
+    <span class="n">duplicates</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">({</span>
+        <span class="n">column</span> <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">generated_columns</span>
+        <span class="k">if</span> <span class="n">generated_columns</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="n">column</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span>
+    <span class="p">})</span>
+    <span class="k">if</span> <span class="n">duplicates</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Colliding external predictor output column(s): </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">duplicates</span><span class="p">)))</span>
+    <span class="n">collisions</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">benchmark</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">generated_columns</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">collisions</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"External predictor output column(s) would overwrite existing "</span>
+            <span class="s2">"benchmark data: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">collisions</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="n">raw_dir</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">keep_raw_dir</span>
+    <span class="k">if</span> <span class="n">raw_dir</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">raw_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">benchmark</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">grouped</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">allele_value</span><span class="p">,</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span>
+            <span class="n">allele_column</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dropna</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="c1"># Validate every group up front, including missing/blank values that</span>
+        <span class="c1"># pandas groupby would otherwise omit. Reuse the canonical values so</span>
+        <span class="c1"># no raw benchmark token can reach the external predictor.</span>
+        <span class="n">grouped</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">group</span><span class="p">,</span> <span class="n">_split_benchmark_alleles</span><span class="p">(</span><span class="n">allele_value</span><span class="p">)))</span>
+    <span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">()</span> <span class="k">as</span> <span class="n">tmp_dir</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">predictor_num</span><span class="p">,</span> <span class="p">(</span>
+                <span class="n">predictor_name</span><span class="p">,</span> <span class="n">output_column</span><span class="p">,</span> <span class="n">value_field</span><span class="p">,</span>
+        <span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">predictor_specs</span><span class="p">):</span>
+            <span class="n">best_values</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="n">output</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+            <span class="n">best_alleles</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="n">output</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">object</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">group_num</span><span class="p">,</span> <span class="p">(</span><span class="n">group</span><span class="p">,</span> <span class="n">alleles</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">grouped</span><span class="p">):</span>
+                <span class="n">peptides</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">group</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">peptide_column</span><span class="p">]</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">peptides</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">raw_csv</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                    <span class="n">raw_dir</span> <span class="ow">or</span> <span class="n">tmp_dir</span><span class="p">,</span>
+                    <span class="s2">"predictor.</span><span class="si">%04d</span><span class="s2">.group.</span><span class="si">%04d</span><span class="s2">.csv"</span> <span class="o">%</span> <span class="p">(</span>
+                        <span class="n">predictor_num</span><span class="p">,</span> <span class="n">group_num</span><span class="p">))</span>
+                <span class="nb">print</span><span class="p">(</span>
+                    <span class="s2">"Running </span><span class="si">%s</span><span class="s2"> external predictor </span><span class="si">%s</span><span class="s2"> for </span><span class="si">%d</span><span class="s2"> peptides and </span><span class="si">%d</span><span class="s2"> alleles"</span> <span class="o">%</span>
+                    <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">runner</span><span class="p">,</span> <span class="n">predictor_name</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">alleles</span><span class="p">)))</span>
+                <span class="n">_run_mhctools_for_group</span><span class="p">(</span>
+                    <span class="n">args</span><span class="o">.</span><span class="n">mhctools_command</span><span class="p">,</span>
+                    <span class="n">predictor_name</span><span class="p">,</span>
+                    <span class="n">alleles</span><span class="p">,</span>
+                    <span class="n">peptides</span><span class="p">,</span>
+                    <span class="n">raw_csv</span><span class="p">)</span>
+                <span class="n">raw</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">raw_csv</span><span class="p">)</span>
+                <span class="n">best</span> <span class="o">=</span> <span class="n">_best_external_predictor_rows</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="n">value_field</span><span class="p">)</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span>
+                    <span class="s2">"peptide"</span><span class="p">)</span>
+                <span class="n">peptide_series</span> <span class="o">=</span> <span class="n">group</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">peptide_column</span><span class="p">]</span>
+                <span class="n">best_values</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">group</span><span class="o">.</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">peptide_series</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+                    <span class="n">best</span><span class="p">[</span><span class="n">value_field</span><span class="p">])</span>
+                <span class="n">best_alleles</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">group</span><span class="o">.</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">peptide_series</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+                    <span class="n">best</span><span class="p">[</span><span class="s2">"allele"</span><span class="p">])</span>
+            <span class="n">output</span><span class="p">[</span><span class="n">output_column</span><span class="p">]</span> <span class="o">=</span> <span class="n">best_values</span>
+            <span class="n">output</span><span class="p">[</span><span class="s2">"</span><span class="si">%s</span><span class="s2">_best_allele"</span> <span class="o">%</span> <span class="n">output_column</span><span class="p">]</span> <span class="o">=</span> <span class="n">best_alleles</span>
+
+    <span class="n">out</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">out</span><span class="p">),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">output</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Wrote: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">out</span><span class="p">)</span>
+    <span class="k">return</span> <span class="mi">0</span>
+
+
+<div class="viewcode-block" id="make_paper_figures_run_parser">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.eval_command.make_paper_figures_run_parser">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_paper_figures_run_parser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="s2">"mhcflurry eval paper-figures run"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Build the ``eval paper-figures run`` parser."""</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Run the local evaluation-to-figures workflow for a trained model. "</span>
+            <span class="s2">"This composes compare-models, paper-figures, and "</span>
+            <span class="s2">"plot-model-comparison; remote orchestration remains in the release "</span>
+            <span class="s2">"wrapper."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--a"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Candidate model run directory, 'public', or 'public:&lt;release&gt;'."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--b"</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">"public"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Baseline model run directory or public release. Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--a-label"</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Display label for side A."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--b-label"</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Display label for side B."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--out"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Evaluation output directory. compare-models writes here."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--data-dir"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"data_evaluation directory. Defaults to installed data_evaluation."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--release-holdout-dir"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Frozen release-evaluation sample manifests for compare-models."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--include"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"auto"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"compare-models component subset. Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--limit-files"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Smoke-test: only read first N benchmark files."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--scores-dir"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Saved figure-input directory passed to paper-figures."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--multiallelic-predictions"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Saved multiallelic prediction table passed to paper-figures."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--monoallelic-predictions"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Saved monoallelic prediction table passed to paper-figures."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--paper-figures-out"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Dedicated paper-figure output directory. Default: "</span>
+            <span class="s2">"&lt;out&gt;/plots/paper_figures. Cannot be &lt;out&gt;/plots or a "</span>
+            <span class="s2">"diagnostic component directory."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--formats"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"svg,pdf,png"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Paper-figure formats. Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--summary-pdf"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Combined diagnostic PDF. Default: "</span>
+            <span class="s2">"&lt;out&gt;/plots/model_comparison_figures.pdf. Must not be inside "</span>
+            <span class="s2">"the paper-figure or diagnostic component directories."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--candidate-predictor"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Candidate predictor name passed to paper-figures."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--external-baselines"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"External baseline predictor list passed to paper-figures."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--preferred-predictors"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Preferred predictor list passed to paper-figures."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--presentation-panel-predictors"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Presentation panel candidate predictor list passed to paper-figures."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--presentation-panel-baselines"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Presentation panel baseline predictor list passed to paper-figures."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--skip-comparison-plots"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Skip plot-model-comparison after paper figures are rendered."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_run_paper_figures_pipeline</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">compare_models</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">paper_figures</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot_model_comparison</span>
+
+    <span class="n">paper_out</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">paper_figures_out</span> <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span> <span class="s2">"plots"</span><span class="p">,</span> <span class="s2">"paper_figures"</span><span class="p">)</span>
+    <span class="n">summary_pdf</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">summary_pdf</span> <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span> <span class="s2">"plots"</span><span class="p">,</span> <span class="s2">"model_comparison_figures.pdf"</span><span class="p">)</span>
+    <span class="n">_validate_pipeline_paper_inputs</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">skip_comparison_plots</span><span class="p">:</span>
+        <span class="n">plot_model_comparison</span><span class="o">.</span><span class="n">_validate_plot_output_paths</span><span class="p">(</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span> <span class="s2">"plots"</span><span class="p">),</span> <span class="n">paper_out</span><span class="p">,</span> <span class="n">summary_pdf</span><span class="p">)</span>
+
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">compare_argv</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="s2">"--a"</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">a</span><span class="p">,</span>
+        <span class="s2">"--b"</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">b</span><span class="p">,</span>
+        <span class="s2">"--out"</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span>
+        <span class="s2">"--include"</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">include</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">for</span> <span class="n">source</span><span class="p">,</span> <span class="n">flag</span> <span class="ow">in</span> <span class="p">[</span>
+            <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">a_label</span><span class="p">,</span> <span class="s2">"--a-label"</span><span class="p">),</span>
+            <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">b_label</span><span class="p">,</span> <span class="s2">"--b-label"</span><span class="p">),</span>
+            <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">data_dir</span><span class="p">,</span> <span class="s2">"--data-dir"</span><span class="p">),</span>
+            <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">release_holdout_dir</span><span class="p">,</span> <span class="s2">"--release-holdout-dir"</span><span class="p">),</span>
+            <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">limit_files</span><span class="p">,</span> <span class="s2">"--limit-files"</span><span class="p">)]:</span>
+        <span class="k">if</span> <span class="n">source</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">compare_argv</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">flag</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">source</span><span class="p">)])</span>
+    <span class="n">compare_status</span> <span class="o">=</span> <span class="n">compare_models</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+        <span class="n">compare_models</span><span class="o">.</span><span class="n">make_parser</span><span class="p">()</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">compare_argv</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">compare_status</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">compare_status</span>
+
+    <span class="n">paper_argv</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="s2">"--comparison-dir"</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span>
+        <span class="s2">"--out"</span><span class="p">,</span> <span class="n">paper_out</span><span class="p">,</span>
+        <span class="s2">"--formats"</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">formats</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">for</span> <span class="n">source</span><span class="p">,</span> <span class="n">flag</span> <span class="ow">in</span> <span class="p">[</span>
+            <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">scores_dir</span><span class="p">,</span> <span class="s2">"--scores-dir"</span><span class="p">),</span>
+            <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">multiallelic_predictions</span><span class="p">,</span> <span class="s2">"--multiallelic-predictions"</span><span class="p">),</span>
+            <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">monoallelic_predictions</span><span class="p">,</span> <span class="s2">"--monoallelic-predictions"</span><span class="p">),</span>
+            <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">candidate_predictor</span><span class="p">,</span> <span class="s2">"--candidate-predictor"</span><span class="p">),</span>
+            <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">external_baselines</span><span class="p">,</span> <span class="s2">"--external-baselines"</span><span class="p">),</span>
+            <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">preferred_predictors</span><span class="p">,</span> <span class="s2">"--preferred-predictors"</span><span class="p">),</span>
+            <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">presentation_panel_predictors</span><span class="p">,</span>
+             <span class="s2">"--presentation-panel-predictors"</span><span class="p">),</span>
+            <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">presentation_panel_baselines</span><span class="p">,</span>
+             <span class="s2">"--presentation-panel-baselines"</span><span class="p">)]:</span>
+        <span class="k">if</span> <span class="n">source</span><span class="p">:</span>
+            <span class="n">paper_argv</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">flag</span><span class="p">,</span> <span class="n">source</span><span class="p">])</span>
+    <span class="n">paper_status</span> <span class="o">=</span> <span class="n">paper_figures</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+        <span class="n">paper_figures</span><span class="o">.</span><span class="n">make_parser</span><span class="p">()</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">paper_argv</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">paper_status</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">paper_status</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">skip_comparison_plots</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="n">plot_argv</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="s2">"--input"</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span>
+        <span class="s2">"--summary-pdf"</span><span class="p">,</span> <span class="n">summary_pdf</span><span class="p">,</span>
+        <span class="s2">"--paper-figures-out"</span><span class="p">,</span> <span class="n">paper_out</span><span class="p">,</span>
+        <span class="s2">"--include-paper-figures-in-summary-pdf"</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">plot_model_comparison</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+        <span class="n">plot_model_comparison</span><span class="o">.</span><span class="n">make_parser</span><span class="p">()</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">plot_argv</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_validate_pipeline_paper_inputs</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Reject paper inputs that compare-models would clear before rendering."""</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">realpath</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">)</span>
+    <span class="n">cleanup_dirs</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="s2">"training_stats"</span><span class="p">,</span> <span class="s2">"affinity"</span><span class="p">,</span> <span class="s2">"processing"</span><span class="p">,</span> <span class="s2">"presentation"</span><span class="p">,</span>
+            <span class="s2">"plots"</span><span class="p">,</span> <span class="s2">"worker_logs"</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="p">]</span>
+    <span class="n">inputs</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"--scores-dir"</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">scores_dir</span><span class="p">,</span>
+        <span class="s2">"--multiallelic-predictions"</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">multiallelic_predictions</span><span class="p">,</span>
+        <span class="s2">"--monoallelic-predictions"</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">monoallelic_predictions</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="n">conflicts</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">option</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">inputs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">realpath</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">directory</span> <span class="ow">in</span> <span class="n">cleanup_dirs</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">within</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">commonpath</span><span class="p">([</span><span class="n">path</span><span class="p">,</span> <span class="n">directory</span><span class="p">])</span> <span class="o">==</span> <span class="n">directory</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="n">within</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">if</span> <span class="n">within</span><span class="p">:</span>
+                <span class="n">conflicts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"</span><span class="si">%s</span><span class="s2">=</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">option</span><span class="p">,</span> <span class="n">value</span><span class="p">))</span>
+                <span class="k">break</span>
+    <span class="k">if</span> <span class="n">conflicts</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span>
+            <span class="s2">"Paper-figure input path(s) would be deleted when compare-models "</span>
+            <span class="s2">"clears stale outputs under </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">. Move these inputs outside the "</span>
+            <span class="s2">"comparison output directory."</span> <span class="o">%</span> <span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">conflicts</span><span class="p">))</span>
+        <span class="p">)</span>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">run_argv</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

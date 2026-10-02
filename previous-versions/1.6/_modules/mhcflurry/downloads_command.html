@@ -1,0 +1,543 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>mhcflurry.downloads_command &mdash; MHCflurry 1.6.0 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> MHCflurry
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.6.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>mhcflurry.downloads_command</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for mhcflurry.downloads_command</h1><div class="highlight"><pre>
+<span></span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">Download MHCflurry released datasets and trained models.</span>
+
+<span class="sd">Examples</span>
+
+<span class="sd">Fetch the default downloads:</span>
+<span class="sd">    $ mhcflurry-downloads fetch</span>
+
+<span class="sd">Fetch a specific download:</span>
+<span class="sd">    $ mhcflurry-downloads fetch models_class1_pan</span>
+
+<span class="sd">Get the path to a download:</span>
+<span class="sd">    $ mhcflurry-downloads path models_class1_pan</span>
+
+<span class="sd">Get the URL of a download:</span>
+<span class="sd">    $ mhcflurry-downloads url models_class1_pan</span>
+
+<span class="sd">Summarize available and fetched downloads:</span>
+<span class="sd">    $ mhcflurry-downloads info</span>
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="p">(</span>
+    <span class="n">print_function</span><span class="p">,</span>
+    <span class="n">division</span><span class="p">,</span>
+    <span class="n">absolute_import</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">argparse</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">pipes</span> <span class="k">import</span> <span class="n">quote</span>
+<span class="kn">import</span> <span class="nn">errno</span>
+<span class="kn">import</span> <span class="nn">tarfile</span>
+<span class="kn">from</span> <span class="nn">shutil</span> <span class="k">import</span> <span class="n">copyfileobj</span>
+<span class="kn">from</span> <span class="nn">tempfile</span> <span class="k">import</span> <span class="n">NamedTemporaryFile</span>
+<span class="kn">from</span> <span class="nn">tqdm</span> <span class="k">import</span> <span class="n">tqdm</span>
+<span class="n">tqdm</span><span class="o">.</span><span class="n">monitor_interval</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># see https://github.com/tqdm/tqdm/issues/481</span>
+
+<span class="kn">import</span> <span class="nn">posixpath</span>
+<span class="kn">import</span> <span class="nn">pandas</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">urllib.request</span> <span class="k">import</span> <span class="n">urlretrieve</span>
+    <span class="kn">from</span> <span class="nn">urllib.parse</span> <span class="k">import</span> <span class="n">urlsplit</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">urllib</span> <span class="k">import</span> <span class="n">urlretrieve</span>
+    <span class="kn">from</span> <span class="nn">urlparse</span> <span class="k">import</span> <span class="n">urlsplit</span>
+
+<span class="kn">from</span> <span class="nn">.downloads</span> <span class="k">import</span> <span class="p">(</span>
+    <span class="n">get_current_release</span><span class="p">,</span>
+    <span class="n">get_current_release_downloads</span><span class="p">,</span>
+    <span class="n">get_downloads_dir</span><span class="p">,</span>
+    <span class="n">get_path</span><span class="p">,</span>
+    <span class="n">ENVIRONMENT_VARIABLES</span><span class="p">)</span>
+
+<span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+    <span class="n">description</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">,</span>
+    <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">RawDescriptionHelpFormatter</span><span class="p">)</span>
+
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--quiet&quot;</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Output less&quot;</span><span class="p">)</span>
+
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--verbose&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-v&quot;</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Output more&quot;</span><span class="p">)</span>
+
+<span class="n">subparsers</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_subparsers</span><span class="p">(</span><span class="n">dest</span><span class="o">=</span><span class="s2">&quot;subparser_name&quot;</span><span class="p">)</span>
+
+<span class="n">parser_fetch</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;fetch&#39;</span><span class="p">)</span>
+<span class="n">parser_fetch</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s1">&#39;download_name&#39;</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;DOWNLOAD&quot;</span><span class="p">,</span>
+    <span class="n">nargs</span><span class="o">=</span><span class="s2">&quot;*&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Items to download&quot;</span><span class="p">)</span>
+<span class="n">parser_fetch</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--keep&quot;</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Don&#39;t delete archives after they are extracted&quot;</span><span class="p">)</span>
+<span class="n">parser_fetch</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--release&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="n">get_current_release</span><span class="p">(),</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Release to download. Default: </span><span class="si">%(default)s</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">parser_fetch</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;--already-downloaded-dir&quot;</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;DIR&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Don&#39;t download files, get them from DIR&quot;</span><span class="p">)</span>
+
+<span class="n">parser_info</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;info&#39;</span><span class="p">)</span>
+
+<span class="n">parser_path</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;path&#39;</span><span class="p">)</span>
+<span class="n">parser_path</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;download_name&quot;</span><span class="p">,</span>
+    <span class="n">nargs</span><span class="o">=</span><span class="s2">&quot;?&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+
+<span class="n">parser_url</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;url&#39;</span><span class="p">)</span>
+<span class="n">parser_url</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">&quot;download_name&quot;</span><span class="p">,</span>
+    <span class="n">nargs</span><span class="o">=</span><span class="s2">&quot;?&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="run"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads_command.run">[docs]</a><span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]):</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">quiet</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s2">&quot;INFO&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">verbose</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s2">&quot;DEBUG&quot;</span><span class="p">)</span>
+
+    <span class="n">command_functions</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;fetch&quot;</span><span class="p">:</span> <span class="n">fetch_subcommand</span><span class="p">,</span>
+        <span class="s2">&quot;info&quot;</span><span class="p">:</span> <span class="n">info_subcommand</span><span class="p">,</span>
+        <span class="s2">&quot;path&quot;</span><span class="p">:</span> <span class="n">path_subcommand</span><span class="p">,</span>
+        <span class="s2">&quot;url&quot;</span><span class="p">:</span> <span class="n">url_subcommand</span><span class="p">,</span>
+        <span class="kc">None</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">args</span><span class="p">:</span> <span class="n">parser</span><span class="o">.</span><span class="n">print_help</span><span class="p">(),</span>
+    <span class="p">}</span>
+    <span class="n">command_functions</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">subparser_name</span><span class="p">](</span><span class="n">args</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="mkdir_p"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads_command.mkdir_p">[docs]</a><span class="k">def</span> <span class="nf">mkdir_p</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Make directories as needed, similar to mkdir -p in a shell.</span>
+
+<span class="sd">    From:</span>
+<span class="sd">    http://stackoverflow.com/questions/600268/mkdir-p-functionality-in-python</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>  <span class="c1"># Python &gt;2.5</span>
+        <span class="k">if</span> <span class="n">exc</span><span class="o">.</span><span class="n">errno</span> <span class="o">==</span> <span class="n">errno</span><span class="o">.</span><span class="n">EEXIST</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="k">pass</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span></div>
+
+
+<div class="viewcode-block" id="yes_no"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads_command.yes_no">[docs]</a><span class="k">def</span> <span class="nf">yes_no</span><span class="p">(</span><span class="n">boolean</span><span class="p">):</span>
+    <span class="k">return</span> <span class="s2">&quot;YES&quot;</span> <span class="k">if</span> <span class="n">boolean</span> <span class="k">else</span> <span class="s2">&quot;NO&quot;</span></div>
+
+
+<span class="c1"># For progress bar on download. See https://pypi.python.org/pypi/tqdm</span>
+<div class="viewcode-block" id="TqdmUpTo"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads_command.TqdmUpTo">[docs]</a><span class="k">class</span> <span class="nc">TqdmUpTo</span><span class="p">(</span><span class="n">tqdm</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Provides `update_to(n)` which uses `tqdm.update(delta_n)`.&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="TqdmUpTo.update_to"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads_command.TqdmUpTo.update_to">[docs]</a>    <span class="k">def</span> <span class="nf">update_to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">bsize</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">tsize</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        b  : int, optional</span>
+<span class="sd">            Number of blocks transferred so far [default: 1].</span>
+<span class="sd">        bsize  : int, optional</span>
+<span class="sd">            Size of each block (in tqdm units) [default: 1].</span>
+<span class="sd">        tsize  : int, optional</span>
+<span class="sd">            Total size (in tqdm units). If [default: None] remains unchanged.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">tsize</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">total</span> <span class="o">=</span> <span class="n">tsize</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">b</span> <span class="o">*</span> <span class="n">bsize</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">)</span>  <span class="c1"># will also set self.n = b * bsize</span></div></div>
+
+
+<div class="viewcode-block" id="fetch_subcommand"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads_command.fetch_subcommand">[docs]</a><span class="k">def</span> <span class="nf">fetch_subcommand</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">qprint</span><span class="p">(</span><span class="n">msg</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">quiet</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">release</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">&quot;No release defined. This can happen when you are specifying &quot;</span>
+            <span class="s2">&quot;a custom models directory. Specify --release to indicate &quot;</span>
+            <span class="s2">&quot;the release to download.&quot;</span><span class="p">)</span>
+
+    <span class="n">downloads</span> <span class="o">=</span> <span class="n">get_current_release_downloads</span><span class="p">()</span>
+    <span class="n">invalid_download_names</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span>
+        <span class="n">item</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">download_name</span> <span class="k">if</span> <span class="n">item</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">downloads</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">invalid_download_names</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unknown download(s): </span><span class="si">%s</span><span class="s2">. Valid downloads are: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">invalid_download_names</span><span class="p">),</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">downloads</span><span class="p">)))</span>
+
+    <span class="n">items_to_fetch</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">info</span><span class="p">)</span> <span class="ow">in</span> <span class="n">downloads</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">default</span> <span class="o">=</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">download_name</span> <span class="ow">and</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;metadata&#39;</span><span class="p">][</span><span class="s1">&#39;default&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">download_name</span> <span class="ow">and</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;downloaded&#39;</span><span class="p">]:</span>
+            <span class="nb">print</span><span class="p">((</span>
+                <span class="s2">&quot;*&quot;</span> <span class="o">*</span> <span class="mi">40</span> <span class="o">+</span>
+                <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">The requested download &#39;</span><span class="si">%s</span><span class="s2">&#39; has already been downloaded. &quot;</span>
+                <span class="s2">&quot;To re-download this data, first run: </span><span class="se">\n\t</span><span class="si">%s</span><span class="se">\n</span><span class="s2">in a shell &quot;</span>
+                <span class="s2">&quot;and then re-run this command.</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span>
+                <span class="s2">&quot;*&quot;</span> <span class="o">*</span> <span class="mi">40</span><span class="p">)</span> <span class="o">%</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;rm -rf &#39;</span> <span class="o">+</span> <span class="n">quote</span><span class="p">(</span><span class="n">get_path</span><span class="p">(</span><span class="n">name</span><span class="p">))))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;downloaded&#39;</span><span class="p">]</span> <span class="ow">and</span> <span class="p">(</span><span class="n">name</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">download_name</span> <span class="ow">or</span> <span class="n">default</span><span class="p">):</span>
+            <span class="n">items_to_fetch</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+
+    <span class="n">mkdir_p</span><span class="p">(</span><span class="n">get_downloads_dir</span><span class="p">())</span>
+
+    <span class="n">qprint</span><span class="p">(</span><span class="s2">&quot;Fetching </span><span class="si">%d</span><span class="s2">/</span><span class="si">%d</span><span class="s2"> downloads from release </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+        <span class="nb">len</span><span class="p">(</span><span class="n">items_to_fetch</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">downloads</span><span class="p">),</span> <span class="n">args</span><span class="o">.</span><span class="n">release</span><span class="p">))</span>
+    <span class="n">format_string</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%-40s</span><span class="s2">  </span><span class="si">%-20s</span><span class="s2">   </span><span class="si">%-20s</span><span class="s2">  </span><span class="si">%-20s</span><span class="s2"> &quot;</span>
+    <span class="n">qprint</span><span class="p">(</span><span class="n">format_string</span> <span class="o">%</span> <span class="p">(</span>
+        <span class="s2">&quot;DOWNLOAD NAME&quot;</span><span class="p">,</span> <span class="s2">&quot;ALREADY DOWNLOADED?&quot;</span><span class="p">,</span> <span class="s2">&quot;WILL DOWNLOAD NOW?&quot;</span><span class="p">,</span> <span class="s2">&quot;URL&quot;</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">info</span><span class="p">)</span> <span class="ow">in</span> <span class="n">downloads</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">urls</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">[</span><span class="n">info</span><span class="p">[</span><span class="s1">&#39;metadata&#39;</span><span class="p">][</span><span class="s2">&quot;url&quot;</span><span class="p">]]</span>
+            <span class="k">if</span> <span class="s2">&quot;url&quot;</span> <span class="ow">in</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;metadata&#39;</span><span class="p">]</span>
+            <span class="k">else</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;metadata&#39;</span><span class="p">][</span><span class="s2">&quot;part_urls&quot;</span><span class="p">])</span>
+        <span class="n">url_description</span> <span class="o">=</span> <span class="n">urls</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">urls</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">url_description</span> <span class="o">+=</span> <span class="s2">&quot; + </span><span class="si">%d</span><span class="s2"> more parts&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">urls</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">qprint</span><span class="p">(</span><span class="n">format_string</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="n">item</span><span class="p">,</span>
+            <span class="n">yes_no</span><span class="p">(</span><span class="n">info</span><span class="p">[</span><span class="s1">&#39;downloaded&#39;</span><span class="p">]),</span>
+            <span class="n">yes_no</span><span class="p">(</span><span class="n">item</span> <span class="ow">in</span> <span class="n">items_to_fetch</span><span class="p">),</span>
+            <span class="n">url_description</span><span class="p">))</span>
+
+    <span class="c1"># TODO: may want to extract into somewhere temporary and then rename to</span>
+    <span class="c1"># avoid making an incomplete extract if the process is killed.</span>
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">items_to_fetch</span><span class="p">:</span>
+        <span class="n">metadata</span> <span class="o">=</span> <span class="n">downloads</span><span class="p">[</span><span class="n">item</span><span class="p">][</span><span class="s1">&#39;metadata&#39;</span><span class="p">]</span>
+        <span class="n">urls</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">[</span><span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">]]</span> <span class="k">if</span> <span class="s2">&quot;url&quot;</span> <span class="ow">in</span> <span class="n">metadata</span> <span class="k">else</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;part_urls&quot;</span><span class="p">])</span>
+        <span class="n">temp</span> <span class="o">=</span> <span class="n">NamedTemporaryFile</span><span class="p">(</span><span class="n">delete</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">suffix</span><span class="o">=</span><span class="s2">&quot;.tar.bz2&quot;</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">url_num</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">urls</span><span class="p">):</span>
+                <span class="n">delete_downloaded</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">already_downloaded_dir</span><span class="p">:</span>
+                    <span class="n">filename</span> <span class="o">=</span> <span class="n">posixpath</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">urlsplit</span><span class="p">(</span><span class="n">url</span><span class="p">)</span><span class="o">.</span><span class="n">path</span><span class="p">)</span>
+                    <span class="n">downloaded_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                        <span class="n">args</span><span class="o">.</span><span class="n">already_downloaded_dir</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+                    <span class="n">delete_downloaded</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">qprint</span><span class="p">(</span><span class="s2">&quot;Downloading [part </span><span class="si">%d</span><span class="s2">/</span><span class="si">%d</span><span class="s2">]: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                        <span class="n">url_num</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">urls</span><span class="p">),</span> <span class="n">url</span><span class="p">))</span>
+                    <span class="p">(</span><span class="n">downloaded_path</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">=</span> <span class="n">urlretrieve</span><span class="p">(</span>
+                        <span class="n">url</span><span class="p">,</span>
+                        <span class="n">temp</span><span class="o">.</span><span class="n">name</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">urls</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                        <span class="n">reporthook</span><span class="o">=</span><span class="n">TqdmUpTo</span><span class="p">(</span>
+                            <span class="n">unit</span><span class="o">=</span><span class="s1">&#39;B&#39;</span><span class="p">,</span> <span class="n">unit_scale</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">miniters</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">update_to</span><span class="p">)</span>
+                    <span class="n">qprint</span><span class="p">(</span><span class="s2">&quot;Downloaded to: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">quote</span><span class="p">(</span><span class="n">downloaded_path</span><span class="p">))</span>
+
+                <span class="k">if</span> <span class="n">downloaded_path</span> <span class="o">!=</span> <span class="n">temp</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+                    <span class="n">qprint</span><span class="p">(</span><span class="s2">&quot;Copying to: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">temp</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+                    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">downloaded_path</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+                        <span class="n">copyfileobj</span><span class="p">(</span><span class="n">fd</span><span class="p">,</span> <span class="n">temp</span><span class="p">,</span> <span class="n">length</span><span class="o">=</span><span class="mi">64</span><span class="o">*</span><span class="mi">1024</span><span class="o">*</span><span class="mi">1024</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">delete_downloaded</span><span class="p">:</span>
+                        <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">downloaded_path</span><span class="p">)</span>
+
+            <span class="n">temp</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="n">tar</span> <span class="o">=</span> <span class="n">tarfile</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">temp</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">&#39;r:bz2&#39;</span><span class="p">)</span>
+            <span class="n">names</span> <span class="o">=</span> <span class="n">tar</span><span class="o">.</span><span class="n">getnames</span><span class="p">()</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Extracting: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">names</span><span class="p">)</span>
+            <span class="n">bad_names</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">n</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">names</span>
+                <span class="k">if</span> <span class="n">n</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">n</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;..&quot;</span><span class="p">)</span>
+            <span class="p">]</span>
+            <span class="k">if</span> <span class="n">bad_names</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                    <span class="s2">&quot;Archive has suspicious names: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">bad_names</span><span class="p">)</span>
+            <span class="n">result_dir</span> <span class="o">=</span> <span class="n">get_path</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">test_exists</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">result_dir</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">member</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">tar</span><span class="o">.</span><span class="n">getmembers</span><span class="p">(),</span> <span class="n">desc</span><span class="o">=</span><span class="s1">&#39;Extracting&#39;</span><span class="p">):</span>
+                <span class="n">tar</span><span class="o">.</span><span class="n">extractall</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">result_dir</span><span class="p">,</span> <span class="n">members</span><span class="o">=</span><span class="p">[</span><span class="n">member</span><span class="p">])</span>
+            <span class="n">tar</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+            <span class="c1"># Save URLs that were used for this download.</span>
+            <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">&quot;url&quot;</span><span class="p">:</span> <span class="n">urls</span><span class="p">})</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">result_dir</span><span class="p">,</span> <span class="s2">&quot;DOWNLOAD_INFO.csv&quot;</span><span class="p">),</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">qprint</span><span class="p">(</span><span class="s2">&quot;Extracted </span><span class="si">%d</span><span class="s2"> files to: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">names</span><span class="p">),</span> <span class="n">quote</span><span class="p">(</span><span class="n">result_dir</span><span class="p">)))</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">keep</span><span class="p">:</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">temp</span><span class="o">.</span><span class="n">name</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="info_subcommand"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads_command.info_subcommand">[docs]</a><span class="k">def</span> <span class="nf">info_subcommand</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Environment variables&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">variable</span> <span class="ow">in</span> <span class="n">ENVIRONMENT_VARIABLES</span><span class="p">:</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">variable</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">value</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;  </span><span class="si">%-35s</span><span class="s1"> = </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">variable</span><span class="p">,</span> <span class="n">quote</span><span class="p">(</span><span class="n">value</span><span class="p">)))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  </span><span class="si">%-35s</span><span class="s2"> [unset or empty]&quot;</span> <span class="o">%</span> <span class="n">variable</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Configuration&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">exists_string</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="s2">&quot;exists&quot;</span> <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="k">else</span> <span class="s2">&quot;does not exist&quot;</span><span class="p">)</span>
+
+    <span class="n">items</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">(</span><span class="s2">&quot;current release&quot;</span><span class="p">,</span> <span class="n">get_current_release</span><span class="p">(),</span> <span class="s2">&quot;&quot;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;downloads dir&quot;</span><span class="p">,</span>
+            <span class="n">get_downloads_dir</span><span class="p">(),</span>
+            <span class="s2">&quot;[</span><span class="si">%s</span><span class="s2">]&quot;</span> <span class="o">%</span> <span class="n">exists_string</span><span class="p">(</span><span class="n">get_downloads_dir</span><span class="p">())),</span>
+    <span class="p">]</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">extra</span><span class="p">)</span> <span class="ow">in</span> <span class="n">items</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  </span><span class="si">%-35s</span><span class="s2"> = </span><span class="si">%-20s</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">quote</span><span class="p">(</span><span class="n">value</span><span class="p">),</span> <span class="n">extra</span><span class="p">))</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+    <span class="n">downloads</span> <span class="o">=</span> <span class="n">get_current_release_downloads</span><span class="p">()</span>
+
+    <span class="n">format_string</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%-40s</span><span class="s2">  </span><span class="si">%-12s</span><span class="s2">  </span><span class="si">%-12s</span><span class="s2">  </span><span class="si">%-20s</span><span class="s2"> &quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">format_string</span> <span class="o">%</span> <span class="p">(</span><span class="s2">&quot;DOWNLOAD NAME&quot;</span><span class="p">,</span> <span class="s2">&quot;DOWNLOADED?&quot;</span><span class="p">,</span> <span class="s2">&quot;UP TO DATE?&quot;</span><span class="p">,</span> <span class="s2">&quot;URL&quot;</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">info</span><span class="p">)</span> <span class="ow">in</span> <span class="n">downloads</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">urls</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">[</span><span class="n">info</span><span class="p">[</span><span class="s1">&#39;metadata&#39;</span><span class="p">][</span><span class="s2">&quot;url&quot;</span><span class="p">]]</span>
+            <span class="k">if</span> <span class="s2">&quot;url&quot;</span> <span class="ow">in</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;metadata&#39;</span><span class="p">]</span>
+            <span class="k">else</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;metadata&#39;</span><span class="p">][</span><span class="s2">&quot;part_urls&quot;</span><span class="p">])</span>
+        <span class="n">url_description</span> <span class="o">=</span> <span class="n">urls</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">urls</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">url_description</span> <span class="o">+=</span> <span class="s2">&quot; + </span><span class="si">%d</span><span class="s2"> more parts&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">urls</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="n">format_string</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="n">item</span><span class="p">,</span>
+            <span class="n">yes_no</span><span class="p">(</span><span class="n">info</span><span class="p">[</span><span class="s1">&#39;downloaded&#39;</span><span class="p">]),</span>
+            <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;downloaded&#39;</span><span class="p">]</span> <span class="k">else</span> <span class="p">(</span>
+                <span class="s2">&quot;UNKNOWN&quot;</span> <span class="k">if</span> <span class="n">info</span><span class="p">[</span><span class="s1">&#39;up_to_date&#39;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span>
+                <span class="k">else</span> <span class="n">yes_no</span><span class="p">(</span><span class="n">info</span><span class="p">[</span><span class="s1">&#39;up_to_date&#39;</span><span class="p">])</span>
+            <span class="p">),</span>
+            <span class="n">url_description</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="path_subcommand"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads_command.path_subcommand">[docs]</a><span class="k">def</span> <span class="nf">path_subcommand</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Print the local path to a download</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">get_path</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">download_name</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="url_subcommand"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads_command.url_subcommand">[docs]</a><span class="k">def</span> <span class="nf">url_subcommand</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Print the URL(s) for a download</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">downloads</span> <span class="o">=</span> <span class="n">get_current_release_downloads</span><span class="p">()</span>
+    <span class="n">download</span> <span class="o">=</span> <span class="n">downloads</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">download_name</span><span class="p">][</span><span class="s2">&quot;metadata&quot;</span><span class="p">]</span>
+    <span class="n">urls</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">download</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;url&quot;</span><span class="p">):</span>
+        <span class="n">urls</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">download</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">download</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;part_urls&quot;</span><span class="p">):</span>
+        <span class="n">urls</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">download</span><span class="p">[</span><span class="s2">&quot;part_urls&quot;</span><span class="p">])</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">urls</span><span class="p">))</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright Timothy O&#39;Donnell
+      <span class="lastupdated">
+        Last updated on Mar 23, 2020.
+      </span>
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

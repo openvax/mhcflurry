@@ -1,0 +1,915 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.cli.downloads_command &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.cli.downloads_command</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.cli.downloads_command</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""</span>
+<span class="sd">Download MHCflurry released datasets and trained models.</span>
+
+<span class="sd">Examples</span>
+
+<span class="sd">Fetch the default downloads:</span>
+<span class="sd">    $ mhcflurry-downloads fetch</span>
+
+<span class="sd">Fetch a specific download:</span>
+<span class="sd">    $ mhcflurry-downloads fetch models_class1_pan</span>
+
+<span class="sd">Get the path to a download:</span>
+<span class="sd">    $ mhcflurry-downloads path models_class1_pan</span>
+
+<span class="sd">Get the URL of a download:</span>
+<span class="sd">    $ mhcflurry-downloads url models_class1_pan</span>
+
+<span class="sd">Summarize available and fetched downloads:</span>
+<span class="sd">    $ mhcflurry-downloads info</span>
+<span class="sd">"""</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shlex</span><span class="w"> </span><span class="kn">import</span> <span class="n">quote</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">errno</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tarfile</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">textwrap</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">zip_longest</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shutil</span><span class="w"> </span><span class="kn">import</span> <span class="n">copyfileobj</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shutil</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_terminal_size</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tempfile</span><span class="w"> </span><span class="kn">import</span> <span class="n">NamedTemporaryFile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tqdm</span><span class="w"> </span><span class="kn">import</span> <span class="n">tqdm</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">posixpath</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">csv</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">urllib.request</span><span class="w"> </span><span class="kn">import</span> <span class="n">urlretrieve</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">urllib.parse</span><span class="w"> </span><span class="kn">import</span> <span class="n">urlsplit</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">urllib</span><span class="w"> </span><span class="kn">import</span> <span class="n">urlretrieve</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">urlparse</span><span class="w"> </span><span class="kn">import</span> <span class="n">urlsplit</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">..downloads</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">get_current_release</span><span class="p">,</span>
+    <span class="n">get_downloads_metadata</span><span class="p">,</span>
+    <span class="n">get_bundle_description</span><span class="p">,</span>
+    <span class="n">get_bundle_versions</span><span class="p">,</span>
+    <span class="n">get_download_urls</span><span class="p">,</span>
+    <span class="n">resolve_release</span><span class="p">,</span>
+    <span class="n">get_release_downloads</span><span class="p">,</span>
+    <span class="n">get_downloads_dir</span><span class="p">,</span>
+    <span class="n">get_default_class1_models_dir</span><span class="p">,</span>
+    <span class="n">get_default_class1_presentation_models_dir</span><span class="p">,</span>
+    <span class="n">get_default_class1_processing_models_dir</span><span class="p">,</span>
+    <span class="n">get_path</span><span class="p">,</span>
+    <span class="n">ENVIRONMENT_VARIABLES</span><span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..version</span><span class="w"> </span><span class="kn">import</span> <span class="n">__version__</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.help</span><span class="w"> </span><span class="kn">import</span> <span class="n">HelpArgumentParser</span><span class="p">,</span> <span class="n">color_enabled</span>
+
+<span class="n">tqdm</span><span class="o">.</span><span class="n">monitor_interval</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># see https://github.com/tqdm/tqdm/issues/481</span>
+
+<span class="n">parser</span> <span class="o">=</span> <span class="n">HelpArgumentParser</span><span class="p">(</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">"""Browse, download and locate released weights and supporting data.</span>
+
+<span class="s2">Start here:</span>
+<span class="s2">  mhcflurry downloads releases models_class1_presentation</span>
+<span class="s2">  mhcflurry downloads list --kind models</span>
+<span class="s2">  mhcflurry downloads info models_class1_presentation</span>
+<span class="s2">  mhcflurry downloads fetch models_class1_presentation --release 2.2.0</span>
+<span class="s2">  mhcflurry predict INPUT.csv --model-release 2.2.0</span>
+
+<span class="s2">Download releases are catalogue versions, separate from the installed code.</span>
+<span class="s2">Browsing uses the catalogue shipped with this package; no network is required.</span>
+<span class="s2">"""</span><span class="p">)</span>
+
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--quiet"</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Output less"</span><span class="p">)</span>
+
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--verbose"</span><span class="p">,</span>
+    <span class="s2">"-v"</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Output more"</span><span class="p">)</span>
+
+<span class="n">subparsers</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_subparsers</span><span class="p">(</span><span class="n">dest</span><span class="o">=</span><span class="s2">"subparser_name"</span><span class="p">)</span>
+
+<span class="n">parser_fetch</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">'fetch'</span><span class="p">)</span>
+<span class="n">parser_fetch</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s1">'download_name'</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"DOWNLOAD"</span><span class="p">,</span>
+    <span class="n">nargs</span><span class="o">=</span><span class="s2">"*"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Items to download"</span><span class="p">)</span>
+<span class="n">parser_fetch</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--keep"</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Don't delete archives after they are extracted"</span><span class="p">)</span>
+<span class="n">parser_fetch</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--release"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="n">get_current_release</span><span class="p">(),</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Release to download. Default: </span><span class="si">%(default)s</span><span class="s2">"</span><span class="p">)</span>
+<span class="n">parser_fetch</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--already-downloaded-dir"</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"DIR"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Don't download files, get them from DIR"</span><span class="p">)</span>
+
+<span class="n">parser_info</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">'info'</span><span class="p">)</span>
+<span class="n">parser_info</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">'download_name'</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">'?'</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s1">'DOWNLOAD'</span><span class="p">)</span>
+<span class="n">parser_info</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">'--json'</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">'store_true'</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">'Print machine-readable JSON'</span><span class="p">)</span>
+
+<span class="n">parser_list</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">'list'</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">'Browse models and supporting data'</span><span class="p">)</span>
+<span class="n">parser_list</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">'--kind'</span><span class="p">,</span> <span class="n">choices</span><span class="o">=</span><span class="p">(</span><span class="s1">'all'</span><span class="p">,</span> <span class="s1">'models'</span><span class="p">,</span> <span class="s1">'data'</span><span class="p">),</span> <span class="n">default</span><span class="o">=</span><span class="s1">'all'</span><span class="p">)</span>
+<span class="n">parser_list</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">'--json'</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">'store_true'</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">'Print machine-readable JSON'</span><span class="p">)</span>
+
+<span class="n">parser_releases</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">'releases'</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">'List valid catalogue releases'</span><span class="p">)</span>
+<span class="n">parser_releases</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">'download_name'</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">'?'</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s1">'DOWNLOAD'</span><span class="p">)</span>
+<span class="n">parser_releases</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">'--json'</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">'store_true'</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">'Print machine-readable JSON'</span><span class="p">)</span>
+
+<span class="n">parser_path</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">'path'</span><span class="p">)</span>
+<span class="n">parser_path</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"download_name"</span><span class="p">,</span>
+    <span class="n">nargs</span><span class="o">=</span><span class="s2">"?"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s1">''</span><span class="p">)</span>
+
+<span class="n">parser_url</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">'url'</span><span class="p">)</span>
+<span class="n">parser_url</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"download_name"</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">subparser</span> <span class="ow">in</span> <span class="p">(</span><span class="n">parser_info</span><span class="p">,</span> <span class="n">parser_list</span><span class="p">,</span> <span class="n">parser_path</span><span class="p">,</span> <span class="n">parser_url</span><span class="p">):</span>
+    <span class="n">subparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">'--release'</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s1">'RELEASE'</span><span class="p">,</span>
+                          <span class="n">help</span><span class="o">=</span><span class="s1">'Catalogue release (default: configured release)'</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="run">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.downloads_command.run">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]):</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span> <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">verbose</span> <span class="k">else</span>
+                               <span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span> <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">quiet</span> <span class="k">else</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">))</span>
+
+    <span class="n">command_functions</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"fetch"</span><span class="p">:</span> <span class="n">fetch_subcommand</span><span class="p">,</span>
+        <span class="s2">"info"</span><span class="p">:</span> <span class="n">info_subcommand</span><span class="p">,</span>
+        <span class="s2">"list"</span><span class="p">:</span> <span class="n">list_subcommand</span><span class="p">,</span>
+        <span class="s2">"releases"</span><span class="p">:</span> <span class="n">releases_subcommand</span><span class="p">,</span>
+        <span class="s2">"path"</span><span class="p">:</span> <span class="n">path_subcommand</span><span class="p">,</span>
+        <span class="s2">"url"</span><span class="p">:</span> <span class="n">url_subcommand</span><span class="p">,</span>
+        <span class="kc">None</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">args</span><span class="p">:</span> <span class="n">parser</span><span class="o">.</span><span class="n">print_help</span><span class="p">(),</span>
+    <span class="p">}</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">command_functions</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">subparser_name</span><span class="p">](</span><span class="n">args</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">error</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="mkdir_p">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.downloads_command.mkdir_p">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">mkdir_p</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Make directories as needed, similar to mkdir -p in a shell.</span>
+
+<span class="sd">    From:</span>
+<span class="sd">    http://stackoverflow.com/questions/600268/mkdir-p-functionality-in-python</span>
+<span class="sd">    """</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>  <span class="c1"># Python &gt;2.5</span>
+        <span class="k">if</span> <span class="n">exc</span><span class="o">.</span><span class="n">errno</span> <span class="o">==</span> <span class="n">errno</span><span class="o">.</span><span class="n">EEXIST</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="k">pass</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span></div>
+
+
+
+<div class="viewcode-block" id="yes_no">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.downloads_command.yes_no">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">yes_no</span><span class="p">(</span><span class="n">boolean</span><span class="p">):</span>
+    <span class="k">return</span> <span class="s2">"YES"</span> <span class="k">if</span> <span class="n">boolean</span> <span class="k">else</span> <span class="s2">"NO"</span></div>
+
+
+
+<div class="viewcode-block" id="suspicious_tar_member">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.downloads_command.suspicious_tar_member">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">suspicious_tar_member</span><span class="p">(</span><span class="n">member</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return whether a tar member should not be extracted."""</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">member</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">name</span> <span class="ow">or</span> <span class="n">posixpath</span><span class="o">.</span><span class="n">isabs</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">if</span> <span class="s2">".."</span> <span class="ow">in</span> <span class="n">name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"/"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="c1"># Keep a normalized guard for unusual path spellings that still resolve</span>
+    <span class="c1"># above the extraction directory.</span>
+    <span class="n">normalized</span> <span class="o">=</span> <span class="n">posixpath</span><span class="o">.</span><span class="n">normpath</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">normalized</span> <span class="o">==</span> <span class="s2">".."</span> <span class="ow">or</span> <span class="n">normalized</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"../"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">return</span> <span class="n">member</span><span class="o">.</span><span class="n">issym</span><span class="p">()</span> <span class="ow">or</span> <span class="n">member</span><span class="o">.</span><span class="n">islnk</span><span class="p">()</span></div>
+
+
+
+<span class="c1"># For progress bar on download. See https://pypi.python.org/pypi/tqdm</span>
+<div class="viewcode-block" id="TqdmUpTo">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.downloads_command.TqdmUpTo">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TqdmUpTo</span><span class="p">(</span><span class="n">tqdm</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Provides `update_to(n)` which uses `tqdm.update(delta_n)`."""</span>
+<div class="viewcode-block" id="TqdmUpTo.update_to">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.downloads_command.TqdmUpTo.update_to">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">bsize</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">tsize</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        b  : int, optional</span>
+<span class="sd">            Number of blocks transferred so far [default: 1].</span>
+<span class="sd">        bsize  : int, optional</span>
+<span class="sd">            Size of each block (in tqdm units) [default: 1].</span>
+<span class="sd">        tsize  : int, optional</span>
+<span class="sd">            Total size (in tqdm units). If [default: None] remains unchanged.</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="n">tsize</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">total</span> <span class="o">=</span> <span class="n">tsize</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">b</span> <span class="o">*</span> <span class="n">bsize</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">)</span>  <span class="c1"># will also set self.n = b * bsize</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="fetch_subcommand">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.downloads_command.fetch_subcommand">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">fetch_subcommand</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">qprint</span><span class="p">(</span><span class="n">msg</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">quiet</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">release</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">"No release defined. This can happen when you are specifying "</span>
+            <span class="s2">"a custom models directory. Specify --release to indicate "</span>
+            <span class="s2">"the release to download."</span><span class="p">)</span>
+
+    <span class="n">downloads</span> <span class="o">=</span> <span class="n">get_release_downloads</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">release</span><span class="p">)</span>
+    <span class="n">invalid_download_names</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span>
+        <span class="n">item</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">download_name</span> <span class="k">if</span> <span class="n">item</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">downloads</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">invalid_download_names</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unknown download(s): </span><span class="si">%s</span><span class="s2">. Valid downloads are: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">invalid_download_names</span><span class="p">),</span> <span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">downloads</span><span class="p">)))</span>
+
+    <span class="n">items_to_fetch</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">info</span><span class="p">)</span> <span class="ow">in</span> <span class="n">downloads</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">default</span> <span class="o">=</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">download_name</span> <span class="ow">and</span> <span class="n">info</span><span class="p">[</span><span class="s1">'metadata'</span><span class="p">][</span><span class="s1">'default'</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">download_name</span> <span class="ow">and</span> <span class="n">info</span><span class="p">[</span><span class="s1">'downloaded'</span><span class="p">]:</span>
+            <span class="nb">print</span><span class="p">((</span>
+                <span class="s2">"*"</span> <span class="o">*</span> <span class="mi">40</span> <span class="o">+</span>
+                <span class="s2">"</span><span class="se">\n</span><span class="s2">The requested download '</span><span class="si">%s</span><span class="s2">' has already been downloaded. "</span>
+                <span class="s2">"To re-download this data, first run: </span><span class="se">\n\t</span><span class="si">%s</span><span class="se">\n</span><span class="s2">in a shell "</span>
+                <span class="s2">"and then re-run this command.</span><span class="se">\n</span><span class="s2">"</span> <span class="o">+</span>
+                <span class="s2">"*"</span> <span class="o">*</span> <span class="mi">40</span><span class="p">)</span> <span class="o">%</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="s1">'rm -rf '</span> <span class="o">+</span> <span class="n">quote</span><span class="p">(</span>
+                    <span class="n">get_path</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">release</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">release</span><span class="p">))))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">info</span><span class="p">[</span><span class="s1">'downloaded'</span><span class="p">]</span> <span class="ow">and</span> <span class="p">(</span><span class="n">name</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">download_name</span> <span class="ow">or</span> <span class="n">default</span><span class="p">):</span>
+            <span class="n">items_to_fetch</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+
+    <span class="n">mkdir_p</span><span class="p">(</span><span class="n">get_downloads_dir</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">release</span><span class="p">))</span>
+
+    <span class="n">qprint</span><span class="p">(</span><span class="s2">"Fetching </span><span class="si">%d</span><span class="s2">/</span><span class="si">%d</span><span class="s2"> downloads from release </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+        <span class="nb">len</span><span class="p">(</span><span class="n">items_to_fetch</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">downloads</span><span class="p">),</span> <span class="n">args</span><span class="o">.</span><span class="n">release</span><span class="p">))</span>
+    <span class="n">format_string</span> <span class="o">=</span> <span class="s2">"</span><span class="si">%-40s</span><span class="s2">  </span><span class="si">%-20s</span><span class="s2">   </span><span class="si">%-20s</span><span class="s2">  </span><span class="si">%-20s</span><span class="s2"> "</span>
+    <span class="n">qprint</span><span class="p">(</span><span class="n">format_string</span> <span class="o">%</span> <span class="p">(</span>
+        <span class="s2">"DOWNLOAD NAME"</span><span class="p">,</span> <span class="s2">"ALREADY DOWNLOADED?"</span><span class="p">,</span> <span class="s2">"WILL DOWNLOAD NOW?"</span><span class="p">,</span> <span class="s2">"URL"</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">info</span><span class="p">)</span> <span class="ow">in</span> <span class="n">downloads</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">urls</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">[</span><span class="n">info</span><span class="p">[</span><span class="s1">'metadata'</span><span class="p">][</span><span class="s2">"url"</span><span class="p">]]</span>
+            <span class="k">if</span> <span class="s2">"url"</span> <span class="ow">in</span> <span class="n">info</span><span class="p">[</span><span class="s1">'metadata'</span><span class="p">]</span>
+            <span class="k">else</span> <span class="n">info</span><span class="p">[</span><span class="s1">'metadata'</span><span class="p">][</span><span class="s2">"part_urls"</span><span class="p">])</span>
+        <span class="n">url_description</span> <span class="o">=</span> <span class="n">urls</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">urls</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">url_description</span> <span class="o">+=</span> <span class="s2">" + </span><span class="si">%d</span><span class="s2"> more parts"</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">urls</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">qprint</span><span class="p">(</span><span class="n">format_string</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="n">item</span><span class="p">,</span>
+            <span class="n">yes_no</span><span class="p">(</span><span class="n">info</span><span class="p">[</span><span class="s1">'downloaded'</span><span class="p">]),</span>
+            <span class="n">yes_no</span><span class="p">(</span><span class="n">item</span> <span class="ow">in</span> <span class="n">items_to_fetch</span><span class="p">),</span>
+            <span class="n">url_description</span><span class="p">))</span>
+
+    <span class="c1"># TODO: may want to extract into somewhere temporary and then rename to</span>
+    <span class="c1"># avoid making an incomplete extract if the process is killed.</span>
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">items_to_fetch</span><span class="p">:</span>
+        <span class="n">metadata</span> <span class="o">=</span> <span class="n">downloads</span><span class="p">[</span><span class="n">item</span><span class="p">][</span><span class="s1">'metadata'</span><span class="p">]</span>
+        <span class="n">urls</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">[</span><span class="n">metadata</span><span class="p">[</span><span class="s2">"url"</span><span class="p">]]</span> <span class="k">if</span> <span class="s2">"url"</span> <span class="ow">in</span> <span class="n">metadata</span> <span class="k">else</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">"part_urls"</span><span class="p">])</span>
+        <span class="n">temp</span> <span class="o">=</span> <span class="n">NamedTemporaryFile</span><span class="p">(</span><span class="n">delete</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">suffix</span><span class="o">=</span><span class="s2">".tar.bz2"</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">url_num</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">urls</span><span class="p">):</span>
+                <span class="n">delete_downloaded</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">already_downloaded_dir</span><span class="p">:</span>
+                    <span class="n">filename</span> <span class="o">=</span> <span class="n">posixpath</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">urlsplit</span><span class="p">(</span><span class="n">url</span><span class="p">)</span><span class="o">.</span><span class="n">path</span><span class="p">)</span>
+                    <span class="n">downloaded_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                        <span class="n">args</span><span class="o">.</span><span class="n">already_downloaded_dir</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+                    <span class="n">delete_downloaded</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">qprint</span><span class="p">(</span><span class="s2">"Downloading [part </span><span class="si">%d</span><span class="s2">/</span><span class="si">%d</span><span class="s2">]: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                        <span class="n">url_num</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">urls</span><span class="p">),</span> <span class="n">url</span><span class="p">))</span>
+                    <span class="p">(</span><span class="n">downloaded_path</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">=</span> <span class="n">urlretrieve</span><span class="p">(</span>
+                        <span class="n">url</span><span class="p">,</span>
+                        <span class="n">temp</span><span class="o">.</span><span class="n">name</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">urls</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                        <span class="n">reporthook</span><span class="o">=</span><span class="n">TqdmUpTo</span><span class="p">(</span>
+                            <span class="n">unit</span><span class="o">=</span><span class="s1">'B'</span><span class="p">,</span> <span class="n">unit_scale</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">miniters</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                            <span class="n">disable</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">quiet</span><span class="p">)</span><span class="o">.</span><span class="n">update_to</span><span class="p">)</span>
+                    <span class="n">qprint</span><span class="p">(</span><span class="s2">"Downloaded to: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">quote</span><span class="p">(</span><span class="n">downloaded_path</span><span class="p">))</span>
+
+                <span class="k">if</span> <span class="n">downloaded_path</span> <span class="o">!=</span> <span class="n">temp</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+                    <span class="n">qprint</span><span class="p">(</span><span class="s2">"Copying to: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">temp</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+                    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">downloaded_path</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+                        <span class="n">copyfileobj</span><span class="p">(</span><span class="n">fd</span><span class="p">,</span> <span class="n">temp</span><span class="p">,</span> <span class="n">length</span><span class="o">=</span><span class="mi">64</span><span class="o">*</span><span class="mi">1024</span><span class="o">*</span><span class="mi">1024</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">delete_downloaded</span><span class="p">:</span>
+                        <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">downloaded_path</span><span class="p">)</span>
+
+            <span class="n">temp</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="n">tar</span> <span class="o">=</span> <span class="n">tarfile</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">temp</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s1">'r:bz2'</span><span class="p">)</span>
+            <span class="n">members</span> <span class="o">=</span> <span class="n">tar</span><span class="o">.</span><span class="n">getmembers</span><span class="p">()</span>
+            <span class="n">names</span> <span class="o">=</span> <span class="p">[</span><span class="n">member</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">member</span> <span class="ow">in</span> <span class="n">members</span><span class="p">]</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Extracting: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">names</span><span class="p">)</span>
+            <span class="n">bad_names</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">member</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">member</span> <span class="ow">in</span> <span class="n">members</span>
+                <span class="k">if</span> <span class="n">suspicious_tar_member</span><span class="p">(</span><span class="n">member</span><span class="p">)</span>
+            <span class="p">]</span>
+            <span class="k">if</span> <span class="n">bad_names</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                    <span class="s2">"Archive has suspicious names: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">bad_names</span><span class="p">)</span>
+            <span class="n">result_dir</span> <span class="o">=</span> <span class="n">get_path</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">test_exists</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">release</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">release</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">result_dir</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">member</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">members</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s1">'Extracting'</span><span class="p">,</span> <span class="n">disable</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">quiet</span><span class="p">):</span>
+                <span class="n">tar</span><span class="o">.</span><span class="n">extractall</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">result_dir</span><span class="p">,</span> <span class="n">members</span><span class="o">=</span><span class="p">[</span><span class="n">member</span><span class="p">])</span>
+            <span class="n">tar</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+            <span class="c1"># Save URLs that were used for this download.</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">result_dir</span><span class="p">,</span> <span class="s2">"DOWNLOAD_INFO.csv"</span><span class="p">),</span> <span class="s2">"w"</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">""</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+                <span class="n">writer</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">writer</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span>
+                <span class="n">writer</span><span class="o">.</span><span class="n">writerow</span><span class="p">([</span><span class="s2">"url"</span><span class="p">])</span>
+                <span class="n">writer</span><span class="o">.</span><span class="n">writerows</span><span class="p">([</span><span class="n">url</span><span class="p">]</span> <span class="k">for</span> <span class="n">url</span> <span class="ow">in</span> <span class="n">urls</span><span class="p">)</span>
+            <span class="n">qprint</span><span class="p">(</span><span class="s2">"Extracted </span><span class="si">%d</span><span class="s2"> files to: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">names</span><span class="p">),</span> <span class="n">quote</span><span class="p">(</span><span class="n">result_dir</span><span class="p">)))</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">keep</span><span class="p">:</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">temp</span><span class="o">.</span><span class="n">name</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_download_records</span><span class="p">(</span><span class="n">release</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">"all"</span><span class="p">):</span>
+    <span class="n">records</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">downloads</span> <span class="o">=</span> <span class="n">get_release_downloads</span><span class="p">(</span><span class="n">release</span><span class="p">)</span>
+    <span class="n">presentation</span> <span class="o">=</span> <span class="n">downloads</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'models_class1_presentation'</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">info</span> <span class="ow">in</span> <span class="n">downloads</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">description</span> <span class="o">=</span> <span class="n">get_bundle_description</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">kind</span> <span class="o">!=</span> <span class="s2">"all"</span> <span class="ow">and</span> <span class="n">description</span><span class="p">[</span><span class="s2">"kind"</span><span class="p">]</span> <span class="o">!=</span> <span class="n">kind</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">status</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">"not installed"</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">info</span><span class="p">[</span><span class="s2">"downloaded"</span><span class="p">]</span> <span class="k">else</span>
+            <span class="s2">"installed; source unknown"</span> <span class="k">if</span> <span class="n">info</span><span class="p">[</span><span class="s2">"up_to_date"</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span>
+            <span class="s2">"installed; source matches"</span> <span class="k">if</span> <span class="n">info</span><span class="p">[</span><span class="s2">"up_to_date"</span><span class="p">]</span> <span class="k">else</span>
+            <span class="s2">"installed; source differs"</span><span class="p">)</span>
+        <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">release</span><span class="o">=</span><span class="n">release</span><span class="p">,</span> <span class="o">**</span><span class="n">description</span><span class="p">,</span>
+            <span class="n">status</span><span class="o">=</span><span class="n">status</span><span class="p">,</span> <span class="n">downloaded</span><span class="o">=</span><span class="n">info</span><span class="p">[</span><span class="s2">"downloaded"</span><span class="p">],</span>
+            <span class="n">source_matches</span><span class="o">=</span><span class="n">info</span><span class="p">[</span><span class="s2">"up_to_date"</span><span class="p">],</span>
+            <span class="n">path</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">get_path</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">test_exists</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">release</span><span class="o">=</span><span class="n">release</span><span class="p">)),</span>
+            <span class="n">urls</span><span class="o">=</span><span class="n">get_download_urls</span><span class="p">(</span><span class="n">info</span><span class="p">[</span><span class="s2">"metadata"</span><span class="p">]),</span>
+            <span class="n">default</span><span class="o">=</span><span class="n">info</span><span class="p">[</span><span class="s2">"metadata"</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"default"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)))</span>
+        <span class="k">if</span> <span class="n">presentation</span> <span class="ow">and</span> <span class="p">(</span><span class="n">name</span> <span class="o">==</span> <span class="s1">'models_class1_presentation'</span> <span class="ow">or</span>
+                             <span class="n">name</span> <span class="ow">in</span> <span class="n">_PRESENTATION_COMPONENT_DIRS</span><span class="p">):</span>
+            <span class="n">records</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="s1">'presentation_components'</span><span class="p">]</span> <span class="o">=</span> <span class="n">_presentation_components</span><span class="p">(</span>
+                <span class="n">get_path</span><span class="p">(</span><span class="s1">'models_class1_presentation'</span><span class="p">,</span> <span class="s1">'models'</span><span class="p">,</span>
+                         <span class="n">test_exists</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">release</span><span class="o">=</span><span class="n">release</span><span class="p">),</span>
+                <span class="n">name</span><span class="p">,</span> <span class="n">presentation</span><span class="p">[</span><span class="s1">'up_to_date'</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">records</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_find_download</span><span class="p">(</span><span class="n">release</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="n">records</span> <span class="o">=</span> <span class="n">_download_records</span><span class="p">(</span><span class="n">release</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">record</span><span class="p">[</span><span class="s2">"name"</span><span class="p">]</span> <span class="o">==</span> <span class="n">name</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">record</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+        <span class="s2">"Download </span><span class="si">%r</span><span class="s2"> is not in release </span><span class="si">%s</span><span class="s2">. Run 'mhcflurry downloads list "</span>
+        <span class="s2">"--release </span><span class="si">%s</span><span class="s2">' or 'mhcflurry downloads releases </span><span class="si">%s</span><span class="s2">'."</span>
+        <span class="o">%</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">release</span><span class="p">,</span> <span class="n">release</span><span class="p">,</span> <span class="n">name</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_style</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">code</span><span class="p">):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">code</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">color_enabled</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">text</span>
+    <span class="k">return</span> <span class="s2">"</span><span class="se">\033</span><span class="s2">[</span><span class="si">%s</span><span class="s2">m</span><span class="si">%s</span><span class="se">\033</span><span class="s2">[0m"</span> <span class="o">%</span> <span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_heading</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span> <span class="o">+</span> <span class="n">_style</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="s2">"1;36"</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_status_color</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">text</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"—"</span><span class="p">,</span> <span class="s2">"NO"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">"2"</span>
+    <span class="k">if</span> <span class="n">text</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"unknown"</span><span class="p">,</span> <span class="s2">"differs"</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">"?"</span> <span class="ow">in</span> <span class="n">text</span> <span class="ow">or</span> <span class="s2">"!"</span> <span class="ow">in</span> <span class="n">text</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">"33"</span>
+    <span class="k">return</span> <span class="s2">"32"</span>
+
+
+<span class="n">_PRESENTATION_COMPONENT_DIRS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">'models_class1_pan'</span><span class="p">:</span> <span class="p">(</span><span class="s1">'affinity_predictor'</span><span class="p">,),</span>
+    <span class="s1">'models_class1_processing'</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s1">'processing_predictor_with_flanks'</span><span class="p">,</span>
+        <span class="s1">'processing_predictor_without_flanks'</span><span class="p">),</span>
+<span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_presentation_components</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">source_matches</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Inspect component paths without loading weights or verifying integrity."""</span>
+    <span class="n">components</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">bundle</span><span class="p">,</span> <span class="n">directories</span> <span class="ow">in</span> <span class="n">_PRESENTATION_COMPONENT_DIRS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s1">'models_class1_presentation'</span><span class="p">,</span> <span class="n">bundle</span><span class="p">):</span>
+            <span class="k">continue</span>
+        <span class="k">for</span> <span class="n">directory</span> <span class="ow">in</span> <span class="n">directories</span><span class="p">:</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">directory</span><span class="p">))</span>
+            <span class="n">components</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span>
+                <span class="n">name</span><span class="o">=</span><span class="n">directory</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="n">path</span><span class="p">,</span>
+                <span class="n">directory_exists</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+                <span class="n">manifest_exists</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s1">'manifest.csv'</span><span class="p">)),</span>
+                <span class="n">source_matches</span><span class="o">=</span><span class="n">source_matches</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">components</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_print_presentation_components</span><span class="p">(</span><span class="n">components</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Show each component's exact path and limited filesystem checks."""</span>
+    <span class="k">for</span> <span class="n">component</span> <span class="ow">in</span> <span class="n">components</span><span class="p">:</span>
+        <span class="n">status</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'manifest present'</span> <span class="k">if</span> <span class="n">component</span><span class="p">[</span><span class="s1">'manifest_exists'</span><span class="p">]</span> <span class="k">else</span>
+                  <span class="s1">'missing manifest'</span> <span class="k">if</span> <span class="n">component</span><span class="p">[</span><span class="s1">'directory_exists'</span><span class="p">]</span> <span class="k">else</span>
+                  <span class="s1">'not installed'</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">'  </span><span class="si">%s</span><span class="s1">: </span><span class="si">%s</span><span class="s1"> [</span><span class="si">%s</span><span class="s1">]'</span> <span class="o">%</span> <span class="p">(</span><span class="n">component</span><span class="p">[</span><span class="s1">'name'</span><span class="p">],</span> <span class="n">component</span><span class="p">[</span><span class="s1">'path'</span><span class="p">],</span> <span class="n">status</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">'  Presence does not verify model files or imply equivalence to standalone weights.'</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_print_table</span><span class="p">(</span><span class="n">headers</span><span class="p">,</span> <span class="n">rows</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">wrap_columns</span><span class="o">=</span><span class="p">()):</span>
+<span class="w">    </span><span class="sd">"""Align plain cell widths before adding optional terminal color."""</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">rows</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="n">widths</span> <span class="o">=</span> <span class="p">[</span><span class="nb">max</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="p">[</span><span class="n">headers</span><span class="p">,</span> <span class="o">*</span><span class="n">rows</span><span class="p">])</span>
+              <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">headers</span><span class="p">))]</span>
+    <span class="n">available</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">60</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="mi">120</span><span class="p">,</span> <span class="n">get_terminal_size</span><span class="p">()</span><span class="o">.</span><span class="n">columns</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">wrap_columns</span><span class="p">:</span>
+        <span class="n">excess</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">widths</span><span class="p">)</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">widths</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="n">available</span>
+        <span class="k">if</span> <span class="n">excess</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">widths</span><span class="p">[</span><span class="n">column</span><span class="p">]</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">headers</span><span class="p">[</span><span class="n">column</span><span class="p">]),</span> <span class="mi">16</span><span class="p">,</span> <span class="n">widths</span><span class="p">[</span><span class="n">column</span><span class="p">]</span> <span class="o">-</span> <span class="n">excess</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">_style</span><span class="p">(</span><span class="s2">"  "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">ljust</span><span class="p">(</span><span class="n">width</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span><span class="p">,</span> <span class="n">width</span> <span class="ow">in</span>
+                           <span class="nb">zip</span><span class="p">(</span><span class="n">headers</span><span class="p">,</span> <span class="n">widths</span><span class="p">))</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(),</span> <span class="s2">"1;36"</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">:</span>
+        <span class="n">cells</span> <span class="o">=</span> <span class="p">[</span><span class="n">textwrap</span><span class="o">.</span><span class="n">wrap</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">break_long_words</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                               <span class="n">break_on_hyphens</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[</span><span class="s2">""</span><span class="p">]</span>
+                 <span class="k">for</span> <span class="n">value</span><span class="p">,</span> <span class="n">width</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">widths</span><span class="p">)]</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">zip_longest</span><span class="p">(</span><span class="o">*</span><span class="n">cells</span><span class="p">,</span> <span class="n">fillvalue</span><span class="o">=</span><span class="s2">""</span><span class="p">):</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">width</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="n">widths</span><span class="p">)):</span>
+                <span class="n">color</span> <span class="o">=</span> <span class="p">(</span><span class="n">colors</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+                <span class="n">code</span> <span class="o">=</span> <span class="n">color</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="n">color</span><span class="p">)</span> <span class="k">else</span> <span class="n">color</span>
+                <span class="n">cell</span> <span class="o">=</span> <span class="n">value</span> <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">widths</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">value</span><span class="o">.</span><span class="n">ljust</span><span class="p">(</span><span class="n">width</span><span class="p">)</span>
+                <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_style</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">code</span><span class="p">))</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">"  "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output</span><span class="p">)</span><span class="o">.</span><span class="n">rstrip</span><span class="p">())</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_model_versions</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">releases</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Describe archive sources and installed standalone or embedded models."""</span>
+    <span class="n">versions</span> <span class="o">=</span> <span class="n">get_bundle_versions</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+    <span class="n">installed</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">custom</span> <span class="o">=</span> <span class="n">get_current_release</span><span class="p">()</span> <span class="ow">is</span> <span class="kc">None</span>
+    <span class="n">custom_candidates</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">standalone_releases</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">release</span> <span class="k">for</span> <span class="n">version</span> <span class="ow">in</span> <span class="n">versions</span> <span class="k">for</span> <span class="n">release</span> <span class="ow">in</span> <span class="n">version</span><span class="p">[</span><span class="s1">'releases'</span><span class="p">]}</span>
+    <span class="n">presentation_releases</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">{</span><span class="n">release</span> <span class="k">for</span> <span class="n">version</span> <span class="ow">in</span> <span class="n">get_bundle_versions</span><span class="p">(</span><span class="s1">'models_class1_presentation'</span><span class="p">)</span>
+         <span class="k">for</span> <span class="n">release</span> <span class="ow">in</span> <span class="n">version</span><span class="p">[</span><span class="s1">'releases'</span><span class="p">]}</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">_PRESENTATION_COMPONENT_DIRS</span> <span class="k">else</span> <span class="nb">set</span><span class="p">())</span>
+    <span class="n">candidate_releases</span> <span class="o">=</span> <span class="n">standalone_releases</span> <span class="o">|</span> <span class="n">presentation_releases</span>
+
+    <span class="k">for</span> <span class="n">release</span> <span class="ow">in</span> <span class="n">get_downloads_metadata</span><span class="p">()[</span><span class="s1">'releases'</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">release</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">candidate_releases</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">release</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">releases</span><span class="p">:</span>
+            <span class="n">releases</span><span class="p">[</span><span class="n">release</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_release_downloads</span><span class="p">(</span><span class="n">release</span><span class="p">)</span>
+        <span class="n">release_downloads</span> <span class="o">=</span> <span class="n">releases</span><span class="p">[</span><span class="n">release</span><span class="p">]</span>
+        <span class="n">sources</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">standalone</span> <span class="o">=</span> <span class="n">release_downloads</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">standalone</span> <span class="ow">and</span> <span class="n">standalone</span><span class="p">[</span><span class="s1">'downloaded'</span><span class="p">]:</span>
+            <span class="n">sources</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">standalone</span><span class="p">,</span> <span class="s1">''</span><span class="p">))</span>
+        <span class="n">presentation</span> <span class="o">=</span> <span class="n">release_downloads</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'models_class1_presentation'</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">presentation</span> <span class="ow">and</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">_PRESENTATION_COMPONENT_DIRS</span><span class="p">:</span>
+            <span class="n">components</span> <span class="o">=</span> <span class="n">_presentation_components</span><span class="p">(</span><span class="n">get_path</span><span class="p">(</span>
+                <span class="s1">'models_class1_presentation'</span><span class="p">,</span> <span class="s1">'models'</span><span class="p">,</span> <span class="n">test_exists</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                <span class="n">release</span><span class="o">=</span><span class="n">release</span><span class="p">),</span> <span class="n">name</span><span class="p">)</span>
+            <span class="n">present</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">components</span> <span class="k">if</span> <span class="n">item</span><span class="p">[</span><span class="s1">'manifest_exists'</span><span class="p">]]</span>
+            <span class="k">if</span> <span class="n">present</span><span class="p">:</span>
+                <span class="n">suffix</span> <span class="o">=</span> <span class="s1">' via presentation'</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">present</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">components</span><span class="p">):</span>
+                    <span class="n">variant</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'with flanks'</span> <span class="k">if</span> <span class="n">present</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">'name'</span><span class="p">]</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">'_with_flanks'</span><span class="p">)</span>
+                               <span class="k">else</span> <span class="s1">'without flanks'</span><span class="p">)</span>
+                    <span class="n">suffix</span> <span class="o">+=</span> <span class="s1">' (</span><span class="si">%s</span><span class="s1"> only)'</span> <span class="o">%</span> <span class="n">variant</span>
+                <span class="n">sources</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">presentation</span><span class="p">,</span> <span class="n">suffix</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">info</span><span class="p">,</span> <span class="n">suffix</span> <span class="ow">in</span> <span class="n">sources</span><span class="p">:</span>
+            <span class="n">marker</span> <span class="o">=</span> <span class="p">(</span><span class="s2">""</span> <span class="k">if</span> <span class="n">info</span><span class="p">[</span><span class="s1">'up_to_date'</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">True</span> <span class="k">else</span>
+                      <span class="s2">"?"</span> <span class="k">if</span> <span class="n">info</span><span class="p">[</span><span class="s1">'up_to_date'</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">"!"</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">custom</span><span class="p">:</span>
+                <span class="n">custom_candidates</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">suffix</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">release</span><span class="p">,</span> <span class="n">marker</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">installed</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">release</span> <span class="o">+</span> <span class="n">marker</span> <span class="o">+</span> <span class="n">suffix</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">custom</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">suffix</span><span class="p">,</span> <span class="n">candidates</span> <span class="ow">in</span> <span class="n">custom_candidates</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">candidates</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">matching</span> <span class="o">=</span> <span class="nb">next</span><span class="p">((</span><span class="n">release</span> <span class="k">for</span> <span class="n">release</span><span class="p">,</span> <span class="n">marker</span> <span class="ow">in</span> <span class="n">candidates</span>
+                             <span class="k">if</span> <span class="ow">not</span> <span class="n">marker</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">matching</span><span class="p">:</span>
+                <span class="n">installed</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">'custom: '</span> <span class="o">+</span> <span class="n">matching</span> <span class="o">+</span> <span class="n">suffix</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">marker</span> <span class="o">=</span> <span class="s1">'?'</span> <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">marker</span> <span class="o">==</span> <span class="s1">'?'</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">marker</span> <span class="ow">in</span> <span class="n">candidates</span><span class="p">)</span> <span class="k">else</span> <span class="s1">'!'</span>
+                <span class="n">installed</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">'custom'</span> <span class="o">+</span> <span class="n">marker</span> <span class="o">+</span> <span class="n">suffix</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">versions</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">'releases'</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span>
+            <span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">v</span><span class="p">[</span><span class="s1">'releases'</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">versions</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span> <span class="ow">or</span> <span class="s1">'—'</span><span class="p">,</span>
+            <span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">installed</span><span class="p">)</span> <span class="ow">or</span> <span class="s1">'—'</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_print_downloads</span><span class="p">(</span><span class="n">records</span><span class="p">):</span>
+    <span class="n">primary</span> <span class="o">=</span> <span class="p">[</span><span class="n">record</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span> <span class="k">if</span> <span class="n">record</span><span class="p">[</span><span class="s1">'group'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'Prediction models'</span><span class="p">]</span>
+    <span class="n">primary</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">record</span><span class="p">:</span> <span class="n">record</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">'models_class1_presentation'</span><span class="p">)</span>
+    <span class="n">historical</span> <span class="o">=</span> <span class="p">[</span><span class="n">record</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span> <span class="k">if</span> <span class="n">record</span><span class="p">[</span><span class="s1">'group'</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">'Prediction models'</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">primary</span><span class="p">:</span>
+        <span class="n">_heading</span><span class="p">(</span><span class="s1">'Prediction models — latest weights and available versions'</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">primary</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">'name'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'models_class1_presentation'</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">'Recommended: models_class1_presentation (includes affinity and processing).'</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">()</span>
+        <span class="n">releases</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="p">[(</span><span class="n">record</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="s1">' (affinity)'</span> <span class="k">if</span> <span class="n">record</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'models_class1_pan'</span> <span class="k">else</span> <span class="s1">''</span><span class="p">),</span>
+                 <span class="o">*</span><span class="n">_model_versions</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s1">'name'</span><span class="p">],</span> <span class="n">releases</span><span class="p">))</span>
+                <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">primary</span><span class="p">]</span>
+        <span class="n">_print_table</span><span class="p">((</span><span class="s1">'MODEL'</span><span class="p">,</span> <span class="s1">'LATEST'</span><span class="p">,</span> <span class="s1">'OTHER VERSIONS'</span><span class="p">,</span> <span class="s1">'INSTALLED'</span><span class="p">),</span> <span class="n">rows</span><span class="p">,</span>
+                     <span class="n">colors</span><span class="o">=</span><span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="s1">'36'</span><span class="p">,</span> <span class="mi">3</span><span class="p">:</span> <span class="n">_status_color</span><span class="p">},</span> <span class="n">wrap_columns</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Shared archive aliases are grouped under one version; 'releases NAME' lists all."</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"'via presentation' identifies embedded components, not standalone bundle installs."</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="s1">'?'</span> <span class="ow">in</span> <span class="n">row</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="ow">or</span> <span class="s1">'!'</span> <span class="ow">in</span> <span class="n">row</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">'Installed: ? unknown source; ! recorded source differs from that catalogue.'</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">group</span><span class="p">,</span> <span class="n">kind</span> <span class="ow">in</span> <span class="p">((</span><span class="s1">'Historical models'</span><span class="p">,</span> <span class="s1">'models'</span><span class="p">),</span> <span class="p">(</span><span class="s1">'Supporting data'</span><span class="p">,</span> <span class="s1">'data'</span><span class="p">)):</span>
+        <span class="n">items</span> <span class="o">=</span> <span class="p">[</span><span class="n">record</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">historical</span> <span class="k">if</span> <span class="n">record</span><span class="p">[</span><span class="s1">'kind'</span><span class="p">]</span> <span class="o">==</span> <span class="n">kind</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">items</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">_heading</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">items</span><span class="p">:</span>
+            <span class="n">source</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'—'</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">record</span><span class="p">[</span><span class="s1">'downloaded'</span><span class="p">]</span> <span class="k">else</span>
+                      <span class="s1">'unknown'</span> <span class="k">if</span> <span class="n">record</span><span class="p">[</span><span class="s1">'source_matches'</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span>
+                      <span class="s1">'matches'</span> <span class="k">if</span> <span class="n">record</span><span class="p">[</span><span class="s1">'source_matches'</span><span class="p">]</span> <span class="k">else</span> <span class="s1">'differs'</span><span class="p">)</span>
+            <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">record</span><span class="p">[</span><span class="s1">'name'</span><span class="p">],</span> <span class="n">yes_no</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s1">'downloaded'</span><span class="p">]),</span> <span class="n">source</span><span class="p">))</span>
+        <span class="n">_print_table</span><span class="p">((</span><span class="s1">'DOWNLOAD'</span><span class="p">,</span> <span class="s1">'LOCAL'</span><span class="p">,</span> <span class="s1">'SOURCE'</span><span class="p">),</span> <span class="n">rows</span><span class="p">,</span>
+                     <span class="n">colors</span><span class="o">=</span><span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="n">_status_color</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span> <span class="n">_status_color</span><span class="p">})</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Local status checks directories, component manifests and recorded source URLs, not file integrity."</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Details: mhcflurry downloads info NAME | Versions: mhcflurry downloads releases NAME"</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="list_subcommand">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.downloads_command.list_subcommand">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">list_subcommand</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Show a readable catalogue or machine-readable bundle records."""</span>
+    <span class="n">release</span> <span class="o">=</span> <span class="n">resolve_release</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">release</span><span class="p">)</span>
+    <span class="n">records</span> <span class="o">=</span> <span class="n">_download_records</span><span class="p">(</span><span class="n">release</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">kind</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">json</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">release</span><span class="o">=</span><span class="n">release</span><span class="p">,</span> <span class="n">downloads</span><span class="o">=</span><span class="n">records</span><span class="p">),</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+        <span class="k">return</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Download release </span><span class="si">%s</span><span class="s2"> (code </span><span class="si">%s</span><span class="s2">)"</span> <span class="o">%</span> <span class="p">(</span><span class="n">release</span><span class="p">,</span> <span class="n">__version__</span><span class="p">))</span>
+    <span class="n">_print_downloads</span><span class="p">(</span><span class="n">records</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Catalogue directory: "</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">get_downloads_dir</span><span class="p">(</span><span class="n">release</span><span class="p">)))</span></div>
+
+
+
+<div class="viewcode-block" id="releases_subcommand">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.downloads_command.releases_subcommand">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">releases_subcommand</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""List catalogue IDs and group identical sources for an optional bundle."""</span>
+    <span class="n">metadata</span> <span class="o">=</span> <span class="n">get_downloads_metadata</span><span class="p">()</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">download_name</span>
+    <span class="n">versions</span> <span class="o">=</span> <span class="n">get_bundle_versions</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="k">if</span> <span class="n">name</span> <span class="k">else</span> <span class="p">[]</span>
+    <span class="n">records</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">release</span><span class="p">,</span> <span class="n">info</span> <span class="ow">in</span> <span class="n">metadata</span><span class="p">[</span><span class="s1">'releases'</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">names</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">info</span><span class="p">[</span><span class="s1">'downloads'</span><span class="p">]]</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">and</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">names</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span>
+            <span class="n">release</span><span class="o">=</span><span class="n">release</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">release</span> <span class="o">==</span> <span class="n">metadata</span><span class="p">[</span><span class="s1">'current-release'</span><span class="p">],</span>
+            <span class="n">configured</span><span class="o">=</span><span class="n">release</span> <span class="o">==</span> <span class="n">get_current_release</span><span class="p">(),</span>
+            <span class="n">compatible</span><span class="o">=</span><span class="n">info</span><span class="p">[</span><span class="s1">'compatibility-version'</span><span class="p">]</span> <span class="o">==</span> <span class="n">metadata</span><span class="p">[</span><span class="s1">'current-compatibility-version'</span><span class="p">],</span>
+            <span class="n">models</span><span class="o">=</span><span class="p">[</span><span class="n">item</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">names</span> <span class="k">if</span> <span class="n">get_bundle_description</span><span class="p">(</span><span class="n">item</span><span class="p">)[</span><span class="s1">'kind'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'models'</span><span class="p">]))</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">code_version</span><span class="o">=</span><span class="n">__version__</span><span class="p">,</span> <span class="n">default_release</span><span class="o">=</span><span class="n">metadata</span><span class="p">[</span><span class="s1">'current-release'</span><span class="p">],</span>
+                  <span class="n">releases</span><span class="o">=</span><span class="n">records</span><span class="p">,</span> <span class="n">download</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">versions</span><span class="o">=</span><span class="n">versions</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">json</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+        <span class="k">return</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Download releases (separate from code </span><span class="si">%s</span><span class="s2">)"</span> <span class="o">%</span> <span class="n">__version__</span><span class="p">)</span>
+    <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+        <span class="n">types</span> <span class="o">=</span> <span class="p">[</span><span class="n">label</span> <span class="k">for</span> <span class="n">bundle</span><span class="p">,</span> <span class="n">label</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="p">(</span><span class="s1">'models_class1_presentation'</span><span class="p">,</span> <span class="s1">'presentation'</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">'models_class1_pan'</span><span class="p">,</span> <span class="s1">'pan-affinity'</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">'models_class1_processing'</span><span class="p">,</span> <span class="s1">'processing'</span><span class="p">),</span>
+            <span class="p">(</span><span class="s1">'models_class1'</span><span class="p">,</span> <span class="s1">'legacy affinity'</span><span class="p">))</span> <span class="k">if</span> <span class="n">bundle</span> <span class="ow">in</span> <span class="n">record</span><span class="p">[</span><span class="s1">'models'</span><span class="p">]]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">types</span><span class="p">:</span>
+            <span class="n">types</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'legacy affinity'</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">record</span><span class="p">[</span><span class="s1">'default'</span><span class="p">]:</span>
+            <span class="n">types</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">'default'</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">record</span><span class="p">[</span><span class="s1">'configured'</span><span class="p">]:</span>
+            <span class="n">types</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">'configured'</span><span class="p">)</span>
+        <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">((</span>
+            <span class="n">record</span><span class="p">[</span><span class="s1">'release'</span><span class="p">],</span> <span class="s1">'compatible'</span> <span class="k">if</span> <span class="n">record</span><span class="p">[</span><span class="s1">'compatible'</span><span class="p">]</span> <span class="k">else</span> <span class="s1">'incompatible'</span><span class="p">,</span>
+            <span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">types</span><span class="p">)))</span>
+    <span class="n">_print_table</span><span class="p">((</span><span class="s1">'RELEASE'</span><span class="p">,</span> <span class="s1">'FORMAT'</span><span class="p">,</span> <span class="s1">'PREDICTORS / NOTES'</span><span class="p">),</span> <span class="n">rows</span><span class="p">,</span>
+                 <span class="n">colors</span><span class="o">=</span><span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="s1">'36'</span><span class="p">},</span> <span class="n">wrap_columns</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Format compatibility is catalogue metadata, not a test of every archive."</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">name</span><span class="p">:</span>
+        <span class="n">_heading</span><span class="p">(</span><span class="s2">"</span><span class="si">%s</span><span class="s2">: archive sources (shared URLs grouped)"</span> <span class="o">%</span> <span class="n">name</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">version</span> <span class="ow">in</span> <span class="n">versions</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">"  "</span> <span class="o">+</span> <span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">version</span><span class="p">[</span><span class="s1">'releases'</span><span class="p">]))</span>
+            <span class="k">for</span> <span class="n">url</span> <span class="ow">in</span> <span class="n">version</span><span class="p">[</span><span class="s1">'urls'</span><span class="p">]:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">"    "</span> <span class="o">+</span> <span class="n">url</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Filter by bundle: mhcflurry downloads releases models_class1_presentation"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Code 2.1.5, 2.2.0 and 2.2.1 used the 2020 weights in catalogue 2.2.0."</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Archive storage tags such as pre-2.0 are historical locations, not code requirements."</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="info_subcommand">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.downloads_command.info_subcommand">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">info_subcommand</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Show resolved configuration or a bundle's purpose, sources and usage."""</span>
+    <span class="n">release</span> <span class="o">=</span> <span class="n">resolve_release</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">release</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">download_name</span><span class="p">:</span>
+        <span class="n">record</span> <span class="o">=</span> <span class="n">_find_download</span><span class="p">(</span><span class="n">release</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">download_name</span><span class="p">)</span>
+        <span class="n">record</span><span class="p">[</span><span class="s1">'versions'</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_bundle_versions</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s1">'name'</span><span class="p">])</span>
+        <span class="n">fetch</span> <span class="o">=</span> <span class="s2">"mhcflurry downloads fetch </span><span class="si">%s</span><span class="s2"> --release </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s1">'name'</span><span class="p">],</span> <span class="n">release</span><span class="p">)</span>
+        <span class="n">record</span><span class="p">[</span><span class="s1">'fetch_command'</span><span class="p">]</span> <span class="o">=</span> <span class="n">fetch</span>
+        <span class="k">if</span> <span class="n">record</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'models_class1_presentation'</span><span class="p">:</span>
+            <span class="n">record</span><span class="p">[</span><span class="s1">'predict_command'</span><span class="p">]</span> <span class="o">=</span> <span class="s1">'mhcflurry predict INPUT.csv --model-release '</span> <span class="o">+</span> <span class="n">release</span>
+        <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">json</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">record</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+            <span class="k">return</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">_style</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span> <span class="o">+</span> <span class="s2">" — "</span> <span class="o">+</span> <span class="n">release</span><span class="p">,</span> <span class="s1">'1;36'</span><span class="p">))</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s1">'description'</span><span class="p">])</span>
+        <span class="nb">print</span><span class="p">((</span><span class="s1">'Standalone bundle status: '</span> <span class="k">if</span> <span class="n">record</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span> <span class="ow">in</span> <span class="n">_PRESENTATION_COMPONENT_DIRS</span>
+               <span class="k">else</span> <span class="s1">'Status: '</span><span class="p">)</span> <span class="o">+</span> <span class="n">record</span><span class="p">[</span><span class="s1">'status'</span><span class="p">])</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Directory: "</span> <span class="o">+</span> <span class="n">record</span><span class="p">[</span><span class="s1">'path'</span><span class="p">])</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Fetch: "</span> <span class="o">+</span> <span class="n">fetch</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Locate: mhcflurry downloads path </span><span class="si">%s</span><span class="s2"> --release </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s1">'name'</span><span class="p">],</span> <span class="n">release</span><span class="p">))</span>
+        <span class="k">if</span> <span class="s1">'predict_command'</span> <span class="ow">in</span> <span class="n">record</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">"Predict: "</span> <span class="o">+</span> <span class="n">record</span><span class="p">[</span><span class="s1">'predict_command'</span><span class="p">])</span>
+        <span class="k">elif</span> <span class="n">record</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'models_class1_pan'</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">"Predict: mhcflurry predict INPUT.csv --affinity-only --models "</span> <span class="o">+</span>
+                  <span class="n">quote</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s1">'path'</span><span class="p">],</span> <span class="s1">'models.combined'</span><span class="p">)))</span>
+        <span class="k">if</span> <span class="s1">'presentation_components'</span> <span class="ow">in</span> <span class="n">record</span><span class="p">:</span>
+            <span class="n">_heading</span><span class="p">(</span><span class="s1">'Components inside presentation bundle'</span><span class="p">)</span>
+            <span class="n">_print_presentation_components</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s1">'presentation_components'</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">record</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'models_class1_pan'</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s1">'  Default affinity loading can fall back to the default presentation bundle'</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s1">'  when its standalone path is absent and no affinity-path override is set.'</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s1">'  Browsing does not select weights; use --models DIR or --model-release RELEASE.'</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">record</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'models_class1_processing'</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s1">'  Use these paths explicitly to select embedded processing components.'</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s1">'  Standalone processing loading does not fall back to presentation.'</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s1">'  Presentation loading uses these embedded components.'</span><span class="p">)</span>
+            <span class="n">source</span> <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="s1">'presentation_components'</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s1">'source_matches'</span><span class="p">]</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">'  Presentation source URLs: '</span> <span class="o">+</span> <span class="p">(</span>
+                <span class="s1">'match catalogue'</span> <span class="k">if</span> <span class="n">source</span> <span class="ow">is</span> <span class="kc">True</span> <span class="k">else</span>
+                <span class="s1">'differ from catalogue'</span> <span class="k">if</span> <span class="n">source</span> <span class="ow">is</span> <span class="kc">False</span> <span class="k">else</span> <span class="s1">'unknown'</span><span class="p">))</span>
+        <span class="n">_heading</span><span class="p">(</span><span class="s2">"Versions / archive sources (shared URLs grouped)"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">version</span> <span class="ow">in</span> <span class="n">record</span><span class="p">[</span><span class="s1">'versions'</span><span class="p">]:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">"  "</span> <span class="o">+</span> <span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">version</span><span class="p">[</span><span class="s1">'releases'</span><span class="p">]))</span>
+            <span class="k">for</span> <span class="n">url</span> <span class="ow">in</span> <span class="n">version</span><span class="p">[</span><span class="s1">'urls'</span><span class="p">]:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">"    "</span> <span class="o">+</span> <span class="n">url</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Source match compares recorded URLs, not file integrity."</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">defaults</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">presentation</span><span class="o">=</span><span class="n">get_default_class1_presentation_models_dir</span><span class="p">(</span><span class="n">test_exists</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+        <span class="n">affinity</span><span class="o">=</span><span class="n">get_default_class1_models_dir</span><span class="p">(</span><span class="n">test_exists</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+        <span class="n">processing</span><span class="o">=</span><span class="n">get_default_class1_processing_models_dir</span><span class="p">(</span><span class="n">test_exists</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">code_version</span><span class="o">=</span><span class="n">__version__</span><span class="p">,</span>
+        <span class="n">default_release</span><span class="o">=</span><span class="n">get_downloads_metadata</span><span class="p">()[</span><span class="s1">'current-release'</span><span class="p">],</span>
+        <span class="n">configured_release</span><span class="o">=</span><span class="n">get_current_release</span><span class="p">(),</span>
+        <span class="n">catalogue_release</span><span class="o">=</span><span class="n">release</span><span class="p">,</span>
+        <span class="n">downloads_dir</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">get_downloads_dir</span><span class="p">(</span><span class="n">release</span><span class="p">)),</span>
+        <span class="n">default_model_paths</span><span class="o">=</span><span class="p">{</span><span class="n">key</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">value</span><span class="p">),</span> <span class="n">exists</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+                             <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">defaults</span><span class="o">.</span><span class="n">items</span><span class="p">()},</span>
+        <span class="n">default_presentation_components</span><span class="o">=</span><span class="n">_presentation_components</span><span class="p">(</span><span class="n">defaults</span><span class="p">[</span><span class="s1">'presentation'</span><span class="p">]),</span>
+        <span class="n">environment_overrides</span><span class="o">=</span><span class="p">{</span><span class="n">key</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="ow">or</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">ENVIRONMENT_VARIABLES</span><span class="p">},</span>
+        <span class="n">downloads</span><span class="o">=</span><span class="n">_download_records</span><span class="p">(</span><span class="n">release</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">json</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+        <span class="k">return</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Download catalogue </span><span class="si">%s</span><span class="s2"> (code </span><span class="si">%s</span><span class="s2">)"</span> <span class="o">%</span> <span class="p">(</span><span class="n">release</span><span class="p">,</span> <span class="n">__version__</span><span class="p">))</span>
+    <span class="n">_print_downloads</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s1">'downloads'</span><span class="p">])</span>
+    <span class="n">_heading</span><span class="p">(</span><span class="s2">"Resolved configuration"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"  Code version:       "</span> <span class="o">+</span> <span class="n">__version__</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"  Default weights:    "</span> <span class="o">+</span> <span class="n">config</span><span class="p">[</span><span class="s1">'default_release'</span><span class="p">])</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"  Active catalogue:   "</span> <span class="o">+</span> <span class="p">(</span><span class="n">get_current_release</span><span class="p">()</span> <span class="ow">or</span> <span class="s1">'custom unversioned directory'</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"  Browsing catalogue: "</span> <span class="o">+</span> <span class="n">release</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"  Downloads directory: "</span> <span class="o">+</span> <span class="n">config</span><span class="p">[</span><span class="s1">'downloads_dir'</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">verbose</span><span class="p">:</span>
+        <span class="n">_heading</span><span class="p">(</span><span class="s2">"Default prediction paths (before --models / --model-release)"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">kind</span><span class="p">,</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s1">'default_model_paths'</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">"  </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2"> [</span><span class="si">%s</span><span class="s2">]"</span> <span class="o">%</span> <span class="p">(</span><span class="n">kind</span><span class="p">,</span> <span class="n">item</span><span class="p">[</span><span class="s1">'path'</span><span class="p">],</span> <span class="s1">'exists'</span> <span class="k">if</span> <span class="n">item</span><span class="p">[</span><span class="s1">'exists'</span><span class="p">]</span> <span class="k">else</span> <span class="s1">'not installed'</span><span class="p">))</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">'  Affinity can fall back to presentation when its default standalone path is absent'</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">'  and no affinity-path override is set. Standalone processing has no such fallback.'</span><span class="p">)</span>
+        <span class="n">_heading</span><span class="p">(</span><span class="s1">'Components inside default presentation predictor'</span><span class="p">)</span>
+        <span class="n">_print_presentation_components</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s1">'default_presentation_components'</span><span class="p">])</span>
+    <span class="n">overrides</span> <span class="o">=</span> <span class="p">{</span><span class="n">key</span><span class="p">:</span> <span class="n">value</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">config</span><span class="p">[</span><span class="s1">'environment_overrides'</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                 <span class="k">if</span> <span class="n">value</span> <span class="ow">or</span> <span class="n">args</span><span class="o">.</span><span class="n">verbose</span><span class="p">}</span>
+    <span class="k">if</span> <span class="n">overrides</span><span class="p">:</span>
+        <span class="n">_heading</span><span class="p">(</span><span class="s2">"Environment variables (optional overrides)"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">overrides</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">"  </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">quote</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">if</span> <span class="n">value</span> <span class="k">else</span> <span class="s1">'unset; using defaults'</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"  Environment overrides: none"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">verbose</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Full paths and overrides: mhcflurry downloads --verbose info"</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="path_subcommand">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.downloads_command.path_subcommand">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">path_subcommand</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Print a bundle directory or the download root for the selected release."""</span>
+    <span class="n">release</span> <span class="o">=</span> <span class="n">resolve_release</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">release</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">download_name</span><span class="p">:</span>
+        <span class="n">_find_download</span><span class="p">(</span><span class="n">release</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">download_name</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">get_path</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">download_name</span><span class="p">,</span> <span class="n">release</span><span class="o">=</span><span class="n">release</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">get_downloads_dir</span><span class="p">(</span><span class="n">release</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="url_subcommand">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.downloads_command.url_subcommand">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">url_subcommand</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Print every archive URL for a bundle in the selected release."""</span>
+    <span class="n">release</span> <span class="o">=</span> <span class="n">resolve_release</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">release</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">_find_download</span><span class="p">(</span><span class="n">release</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">download_name</span><span class="p">)[</span><span class="s1">'urls'</span><span class="p">]))</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,434 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.device_footprint &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.device_footprint</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.device_footprint</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""</span>
+<span class="sd">Measurement-driven per-worker GPU memory estimates.</span>
+
+<span class="sd">The orchestrator decides how many workers to pack on each GPU from a per-worker</span>
+<span class="sd">VRAM estimate (``device_worker_gb``). Historically that was a static constant in</span>
+<span class="sd">the workload profile (e.g. 24 GB for calibration, 4 GB for training) — a value</span>
+<span class="sd">hand-tuned for one production config that is wrong for jobs / networks of other</span>
+<span class="sd">sizes. This module estimates it instead, from the model architecture (read from</span>
+<span class="sd">``manifest.csv`` — no weights) and the job size, so the worker count adapts.</span>
+
+<span class="sd">Every estimator returns ``None`` whenever it can't read the model or lacks the</span>
+<span class="sd">job size, so the planner falls back to the static profile default. Estimates are</span>
+<span class="sd">deliberately conservative (a safety multiplier + a floor) so we never pack more</span>
+<span class="sd">aggressively than the validated baseline.</span>
+
+<span class="sd">The per-row resident formulas track the genuinely-varying terms: full dataset /</span>
+<span class="sd">peptide-universe row count, the peptide encoding dims (``max_length`` x feature</span>
+<span class="sd">width, which differ by ``vector_encoding_name`` — BLOSUM62=21,</span>
+<span class="sd">physchem/atchley/composite encodings differ), network width, ensemble size, and</span>
+<span class="sd">batch size.</span>
+<span class="sd">"""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">os.path</span><span class="w"> </span><span class="kn">import</span> <span class="n">join</span><span class="p">,</span> <span class="n">exists</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+
+<span class="n">_GIB</span> <span class="o">=</span> <span class="mf">1024.0</span> <span class="o">**</span> <span class="mi">3</span>
+<span class="n">_FLOAT32_BYTES</span> <span class="o">=</span> <span class="mi">4</span>
+
+<span class="c1"># ---- Affinity calibration (cached peptide-stage tensor) --------------------</span>
+<span class="c1"># Fallback peptide-stage width used only when manifest.csv is unreadable so</span>
+<span class="c1"># the true width can't be derived. Deliberately pessimistic: 1024 is ~2.5x the</span>
+<span class="c1"># observed real stage_dim (~400 implied by the ~12 GB anchor below), and</span>
+<span class="c1"># over-estimating VRAM is safe -- it only lowers max_workers_per_gpu, never</span>
+<span class="c1"># oversubscribes the card.</span>
+<span class="n">_CALIBRATION_DEFAULT_STAGE_DIM</span> <span class="o">=</span> <span class="mi">1024</span>
+<span class="n">_CALIBRATION_OVERHEAD_GB</span> <span class="o">=</span> <span class="mf">3.0</span>            <span class="c1"># model weights + activation headroom</span>
+<span class="n">_CALIBRATION_MIN_DEVICE_WORKER_GB</span> <span class="o">=</span> <span class="mf">4.0</span>   <span class="c1"># don't over-pack from a tiny estimate</span>
+<span class="c1"># A merged ensemble without explicit peptide-dense layers expands the raw</span>
+<span class="c1"># peptide vector into a wider fast-path representation than the manifest alone</span>
+<span class="c1"># exposes. The rc14 GCP calibration run measured a 9450-wide stage for a</span>
+<span class="c1"># 10-network BLOSUM62 ensemble (3x the naive 10 * 15 * 21 estimate).</span>
+<span class="n">_CALIBRATION_MERGED_STAGE_FACTOR</span> <span class="o">=</span> <span class="mf">3.0</span>
+
+<span class="c1"># ---- Affinity training -----------------------------------------------------</span>
+<span class="c1"># Peptides are stored device-resident as compact (N, L) int8 indices</span>
+<span class="c1"># (``peptide_amino_acid_encoding_torch``, default True) and embedded to float32</span>
+<span class="c1"># vectors per-batch via a frozen table. So the resident dataset is tiny; the</span>
+<span class="c1"># footprint is dominated by a fixed base + per-batch activations, NOT by dataset</span>
+<span class="c1"># size. The dataset term only matters at extreme row counts.</span>
+<span class="c1">#</span>
+<span class="c1"># Fixed per-worker cost that does NOT scale with the dataset or batch: CUDA</span>
+<span class="c1"># context, torch.compile inductor workspace, model weights + Adam optimizer</span>
+<span class="c1"># state, the embedding table. Calibrated so the release config lands in the</span>
+<span class="c1"># measured ~2 GB band (resident + activation terms are negligible there).</span>
+<span class="n">_TRAINING_BASE_GB</span> <span class="o">=</span> <span class="mf">1.8</span>
+<span class="c1"># Per resident row beyond the peptide: allele index + target + sample weight.</span>
+<span class="n">_TRAINING_PER_ROW_SCALAR_BYTES</span> <span class="o">=</span> <span class="mi">12</span>
+<span class="c1"># The device fit materializes real rows AND a random-negative slice in one</span>
+<span class="c1"># combined buffer (~2x rows). Conservative.</span>
+<span class="n">_TRAINING_RANDOM_NEGATIVE_FACTOR</span> <span class="o">=</span> <span class="mf">2.0</span>
+<span class="c1"># Forward activations + gradients + backward working set, as a multiple of the</span>
+<span class="c1"># single-forward minibatch activation bytes.</span>
+<span class="n">_TRAINING_ACTIVATION_BACKWARD_FACTOR</span> <span class="o">=</span> <span class="mf">3.0</span>
+<span class="n">_PEPTIDE_INDEX_BYTES</span> <span class="o">=</span> <span class="mi">1</span>  <span class="c1"># int8 per position (peptides are always index-encoded)</span>
+<span class="n">_TRAINING_DEFAULT_MINIBATCH</span> <span class="o">=</span> <span class="mi">128</span>
+<span class="n">_TRAINING_DEFAULT_MERGE_WIDTH</span> <span class="o">=</span> <span class="mi">1024</span>      <span class="c1"># when layer widths can't be derived</span>
+<span class="c1"># Applied to the whole estimate; keeps margin over the measured peak.</span>
+<span class="n">_TRAINING_SAFETY_MARGIN</span> <span class="o">=</span> <span class="mf">1.3</span>
+<span class="c1"># Never below the measured steady-state; prevents over-packing vs the baseline.</span>
+<span class="n">_TRAINING_MIN_DEVICE_WORKER_GB</span> <span class="o">=</span> <span class="mf">2.5</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_peptide_vector_encoding_width</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Per-amino-acid feature width of a vector encoding, or None if unknown."""</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">name</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.amino_acid</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_vector_encoding_df</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">get_vector_encoding_df</span><span class="p">(</span><span class="n">name</span><span class="p">)</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_read_manifest</span><span class="p">(</span><span class="n">models_dir</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return ``(num_networks, first_hyperparameters)`` from ``manifest.csv``.</span>
+
+<span class="sd">    Reads only the manifest (no weights). Returns ``None`` if it can't be read.</span>
+<span class="sd">    """</span>
+    <span class="n">manifest_path</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">"manifest.csv"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">exists</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">manifest</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">manifest</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">hyperparameters</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span>
+            <span class="n">manifest</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">"config_json"</span><span class="p">])</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"hyperparameters"</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="n">hyperparameters</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">manifest</span><span class="p">),</span> <span class="mi">1</span><span class="p">),</span> <span class="n">hyperparameters</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_peptide_stage_dim</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Peptide-side activation width: the last peptide dense layer if set, else</span>
+<span class="sd">    the flattened peptide vector encoding (max_length x feature width)."""</span>
+    <span class="n">dense</span> <span class="o">=</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"peptide_dense_layer_sizes"</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">dense</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">dense</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+    <span class="n">encoding</span> <span class="o">=</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"peptide_encoding"</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="n">max_length</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">encoding</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"max_length"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">width</span> <span class="o">=</span> <span class="n">_peptide_vector_encoding_width</span><span class="p">(</span><span class="n">encoding</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"vector_encoding_name"</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">max_length</span> <span class="ow">and</span> <span class="n">width</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">max_length</span> <span class="o">*</span> <span class="n">width</span>
+    <span class="k">return</span> <span class="kc">None</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_peptide_embedded_row_bytes</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Bytes for one peptide's embedded ``(L, V) float32`` representation (the</span>
+<span class="sd">    per-batch activation; peptides are stored resident as int8 indices and</span>
+<span class="sd">    embedded on the fly), or None."""</span>
+    <span class="n">encoding</span> <span class="o">=</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"peptide_encoding"</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="n">max_length</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">encoding</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"max_length"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">width</span> <span class="o">=</span> <span class="n">_peptide_vector_encoding_width</span><span class="p">(</span><span class="n">encoding</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"vector_encoding_name"</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">max_length</span> <span class="ow">and</span> <span class="n">width</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">max_length</span> <span class="o">*</span> <span class="n">width</span> <span class="o">*</span> <span class="n">_FLOAT32_BYTES</span>
+    <span class="k">return</span> <span class="kc">None</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_peptide_resident_row_bytes</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Bytes for one peptide's device-resident encoding, or None.</span>
+
+<span class="sd">    Peptides are always index-encoded: ``L`` int8 bytes (one per position).</span>
+<span class="sd">    """</span>
+    <span class="n">encoding</span> <span class="o">=</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"peptide_encoding"</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="n">max_length</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">encoding</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"max_length"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">max_length</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">max_length</span> <span class="o">*</span> <span class="n">_PEPTIDE_INDEX_BYTES</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_merge_width</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Rough peak hidden-layer width for the activation estimate."""</span>
+    <span class="n">candidates</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"layer_sizes"</span><span class="p">,</span> <span class="s2">"peptide_dense_layer_sizes"</span><span class="p">,</span>
+                <span class="s2">"allele_dense_layer_sizes"</span><span class="p">):</span>
+        <span class="n">candidates</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="p">(</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]))</span>
+    <span class="n">stage</span> <span class="o">=</span> <span class="n">_peptide_stage_dim</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">stage</span><span class="p">:</span>
+        <span class="n">candidates</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">stage</span><span class="p">))</span>
+    <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="n">candidates</span><span class="p">)</span> <span class="k">if</span> <span class="n">candidates</span> <span class="k">else</span> <span class="n">_TRAINING_DEFAULT_MERGE_WIDTH</span>
+
+
+<div class="viewcode-block" id="estimate_affinity_calibration_device_worker_gb">
+<a class="viewcode-back" href="../../api.html#mhcflurry.device_footprint.estimate_affinity_calibration_device_worker_gb">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">estimate_affinity_calibration_device_worker_gb</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">prediction_rows</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Per-worker VRAM (GB) for affinity percentile-rank calibration, or None.</span>
+
+<span class="sd">    Dominant consumer: the cached peptide-stage tensor (peptide-side activations</span>
+<span class="sd">    precomputed for the whole peptide universe and reused across allele</span>
+<span class="sd">    batches), ``~ num_networks x stage_dim x num_peptides x 4``.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">prediction_rows</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">manifest</span> <span class="o">=</span> <span class="n">_read_manifest</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">manifest</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">num_networks</span><span class="p">,</span> <span class="n">hyperparameters</span> <span class="o">=</span> <span class="n">manifest</span>
+    <span class="n">stage_dim</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">_peptide_stage_dim</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">)</span>
+        <span class="ow">or</span> <span class="n">_CALIBRATION_DEFAULT_STAGE_DIM</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"peptide_dense_layer_sizes"</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]):</span>
+        <span class="n">stage_dim</span> <span class="o">*=</span> <span class="n">_CALIBRATION_MERGED_STAGE_FACTOR</span>
+    <span class="n">cache_gb</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">num_networks</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">stage_dim</span><span class="p">)</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">prediction_rows</span><span class="p">)</span>
+        <span class="o">*</span> <span class="n">_FLOAT32_BYTES</span> <span class="o">/</span> <span class="n">_GIB</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="nb">max</span><span class="p">(</span>
+        <span class="n">_CALIBRATION_MIN_DEVICE_WORKER_GB</span><span class="p">,</span>
+        <span class="n">_CALIBRATION_OVERHEAD_GB</span> <span class="o">+</span> <span class="n">cache_gb</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="estimate_affinity_training_device_worker_gb">
+<a class="viewcode-back" href="../../api.html#mhcflurry.device_footprint.estimate_affinity_training_device_worker_gb">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">estimate_affinity_training_device_worker_gb</span><span class="p">(</span>
+        <span class="n">hyperparameters</span><span class="p">,</span> <span class="n">num_rows</span><span class="p">,</span> <span class="n">minibatch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Per-worker VRAM (GB) for device-resident affinity training, or None.</span>
+
+<span class="sd">    Takes the ``hyperparameters`` dict directly (the model doesn't exist yet at</span>
+<span class="sd">    training time — it's read from the hyperparameters YAML the command loaded).</span>
+
+<span class="sd">    Peptides are stored device-resident as compact ``(N, L)`` int8 indices</span>
+<span class="sd">    (default) and embedded per-batch, so unlike calibration the footprint is NOT</span>
+<span class="sd">    dominated by the dataset — it is dominated by a fixed base plus per-batch</span>
+<span class="sd">    activations. The terms:</span>
+
+<span class="sd">      * resident dataset: ``rn_factor x rows x (peptide_index_bytes + scalars)``</span>
+<span class="sd">        — tiny at normal scale (int8), only material at extreme row counts.</span>
+<span class="sd">      * per-batch activations: ``minibatch x (embedded_peptide + merge_width) x 4</span>
+<span class="sd">        x backward_factor`` — the live batch's float32 embedded vectors and</span>
+<span class="sd">        hidden activations. This is what scales with batch size / network width.</span>
+<span class="sd">      * a fixed base (CUDA context + compile workspace + weights + optimizer +</span>
+<span class="sd">        embedding table) that does not scale with either.</span>
+
+<span class="sd">    Forward-only validation is intentionally absent: its batch is selected at</span>
+<span class="sd">    runtime from the same live per-worker budget as inference, after the fixed</span>
+<span class="sd">    tensors represented here have been allocated.</span>
+
+<span class="sd">    A safety multiplier and a floor keep it conservative.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">num_rows</span> <span class="ow">or</span> <span class="n">hyperparameters</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">resident_row_bytes</span> <span class="o">=</span> <span class="n">_peptide_resident_row_bytes</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">)</span>
+    <span class="n">embedded_row_bytes</span> <span class="o">=</span> <span class="n">_peptide_embedded_row_bytes</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">resident_row_bytes</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">embedded_row_bytes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Unknown encoding: the base dominates anyway, so use the floor rather</span>
+        <span class="c1"># than a bogus estimate.</span>
+        <span class="k">return</span> <span class="n">_TRAINING_MIN_DEVICE_WORKER_GB</span>
+
+    <span class="n">minibatch</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">minibatch_size</span> <span class="ow">or</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"minibatch_size"</span><span class="p">)</span>
+                    <span class="ow">or</span> <span class="n">_TRAINING_DEFAULT_MINIBATCH</span><span class="p">)</span>
+    <span class="n">merge_width</span> <span class="o">=</span> <span class="n">_merge_width</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">)</span>
+
+    <span class="n">resident_gb</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">_TRAINING_RANDOM_NEGATIVE_FACTOR</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_rows</span><span class="p">)</span>
+        <span class="o">*</span> <span class="p">(</span><span class="n">resident_row_bytes</span> <span class="o">+</span> <span class="n">_TRAINING_PER_ROW_SCALAR_BYTES</span><span class="p">)</span> <span class="o">/</span> <span class="n">_GIB</span>
+    <span class="p">)</span>
+    <span class="n">activation_gb</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">minibatch</span> <span class="o">*</span> <span class="p">(</span><span class="n">embedded_row_bytes</span> <span class="o">+</span> <span class="n">merge_width</span> <span class="o">*</span> <span class="n">_FLOAT32_BYTES</span><span class="p">)</span>
+        <span class="o">*</span> <span class="n">_TRAINING_ACTIVATION_BACKWARD_FACTOR</span> <span class="o">/</span> <span class="n">_GIB</span>
+    <span class="p">)</span>
+    <span class="n">footprint</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">(</span><span class="n">_TRAINING_BASE_GB</span> <span class="o">+</span> <span class="n">resident_gb</span> <span class="o">+</span> <span class="n">activation_gb</span><span class="p">)</span>
+        <span class="o">*</span> <span class="n">_TRAINING_SAFETY_MARGIN</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="n">_TRAINING_MIN_DEVICE_WORKER_GB</span><span class="p">,</span> <span class="n">footprint</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="estimate_device_worker_gb">
+<a class="viewcode-back" href="../../api.html#mhcflurry.device_footprint.estimate_device_worker_gb">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">estimate_device_worker_gb</span><span class="p">(</span><span class="n">workload_name</span><span class="p">,</span> <span class="n">hints</span><span class="p">,</span> <span class="n">models_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Unified per-worker VRAM (GB) estimate, or None to use the profile default.</span>
+
+<span class="sd">    Dispatches per workload. ``hints`` is a dict that may carry:</span>
+<span class="sd">      * calibration: ``prediction_rows`` (+ ``models_dir`` for the trained model).</span>
+<span class="sd">      * training: ``training_rows``, ``hyperparameters`` (the model isn't trained</span>
+<span class="sd">        yet, so the architecture comes from the hyperparameters dict),</span>
+<span class="sd">        ``minibatch_size``.</span>
+<span class="sd">    """</span>
+    <span class="n">hints</span> <span class="o">=</span> <span class="n">hints</span> <span class="ow">or</span> <span class="p">{}</span>
+    <span class="c1"># Imported lazily to avoid a circular import at module load.</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.workload_planning</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">WORKLOAD_AFFINITY_CALIBRATION</span><span class="p">,</span>
+        <span class="n">WORKLOAD_AFFINITY_TRAINING</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">workload_name</span> <span class="o">==</span> <span class="n">WORKLOAD_AFFINITY_CALIBRATION</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">models_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">estimate_affinity_calibration_device_worker_gb</span><span class="p">(</span>
+            <span class="n">models_dir</span><span class="p">,</span> <span class="n">hints</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"prediction_rows"</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">workload_name</span> <span class="o">==</span> <span class="n">WORKLOAD_AFFINITY_TRAINING</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">estimate_affinity_training_device_worker_gb</span><span class="p">(</span>
+            <span class="n">hints</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"hyperparameters"</span><span class="p">),</span> <span class="n">hints</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"training_rows"</span><span class="p">),</span>
+            <span class="n">minibatch_size</span><span class="o">=</span><span class="n">hints</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"minibatch_size"</span><span class="p">))</span>
+    <span class="k">return</span> <span class="kc">None</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

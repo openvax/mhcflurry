@@ -1,0 +1,498 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.class1_affinity_training_data &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.class1_affinity_training_data</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.class1_affinity_training_data</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Device-resident row space for class-I affinity model training.</span>
+
+<span class="sd">This module is intentionally affinity-specific. It knows about the layout</span>
+<span class="sd">created by :meth:`Class1NeuralNetwork.fit`: random-negative examples, when</span>
+<span class="sd">enabled, are prepended to the real affinity measurements and refreshed once</span>
+<span class="sd">per epoch. Other model families should use their own training-data container</span>
+<span class="sd">instead of inheriting these random-negative semantics.</span>
+<span class="sd">"""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">amino_acid</span>
+
+
+<div class="viewcode-block" id="AffinityDeviceTrainingData">
+<a class="viewcode-back" href="../../api.html#mhcflurry.class1_affinity_training_data.AffinityDeviceTrainingData">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">AffinityDeviceTrainingData</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Device tensors for one affinity-model ``fit()`` call.</span>
+
+<span class="sd">    The affinity fit loop indexes one logical row space:</span>
+
+<span class="sd">    ``[random negative rows | real training rows]``.</span>
+
+<span class="sd">    This container owns the torch tensors for that row space. When random</span>
+<span class="sd">    negatives are present, ``combined_peptide`` and ``combined_allele`` hold</span>
+<span class="sd">    the full row space; ``random_negative_x_*`` and ``x_*`` are views into</span>
+<span class="sd">    those combined buffers. Refilling random-negative peptide rows updates the</span>
+<span class="sd">    next epoch's batches without reallocating or recopying the real-data block.</span>
+
+<span class="sd">    Peptide tensors may be either:</span>
+
+<span class="sd">    * ``(N, L)`` integer amino-acid indices, consumed by the network's torch</span>
+<span class="sd">      embedding path; or</span>
+<span class="sd">    * ``(N, L, V)`` fixed vector encodings, widened to float32 on device when</span>
+<span class="sd">      loaded from compact integer caches.</span>
+<span class="sd">    """</span>
+
+    <span class="n">x_peptide</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span>
+    <span class="n">x_allele</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">y_encoded</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">sample_weights</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">random_negative_x_peptide</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">random_negative_x_allele</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">combined_peptide</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">combined_allele</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">device</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""The torch device holding this row space."""</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_peptide</span><span class="o">.</span><span class="n">device</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">row_count</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Total rows in the logical ``[random negatives | real]`` space."""</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y_encoded</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">random_negative_count</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Number of mutable random-negative rows at the front of the space."""</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">random_negative_x_peptide</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">random_negative_x_peptide</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+<div class="viewcode-block" id="AffinityDeviceTrainingData.from_arrays">
+<a class="viewcode-back" href="../../api.html#mhcflurry.class1_affinity_training_data.AffinityDeviceTrainingData.from_arrays">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_arrays</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">x_peptide</span><span class="p">,</span>
+        <span class="n">x_allele</span><span class="p">,</span>
+        <span class="n">y_encoded</span><span class="p">,</span>
+        <span class="n">sample_weights</span><span class="p">,</span>
+        <span class="n">random_negative_x_peptide_template</span><span class="p">,</span>
+        <span class="n">random_negative_x_allele</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Materialize a device-resident affinity training row space.</span>
+
+<span class="sd">        Parameters mirror the arrays produced by ``Class1NeuralNetwork.fit``.</span>
+<span class="sd">        ``random_negative_x_peptide_template`` provides only shape and dtype</span>
+<span class="sd">        for the mutable random-negative slice; epoch contents are filled via</span>
+<span class="sd">        :meth:`refill_random_negative_peptides`.</span>
+
+<span class="sd">        The returned object is the only data source used by the inner fit loop:</span>
+<span class="sd">        callers ask for batches by row index with :meth:`batch_for_indices`.</span>
+<span class="sd">        """</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_to_device</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+                <span class="n">tensor</span> <span class="o">=</span> <span class="n">value</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">value</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span><span class="p">:</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+                <span class="n">tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">dtype</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">tensor</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">dtype</span><span class="p">:</span>
+                <span class="n">tensor</span> <span class="o">=</span> <span class="n">tensor</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">tensor</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">,</span> <span class="n">non_blocking</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_peptide_to_device</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+            <span class="n">tensor</span> <span class="o">=</span> <span class="n">_to_device</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">if</span> <span class="p">(</span>
+                    <span class="n">tensor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                    <span class="ow">and</span> <span class="n">tensor</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&gt;</span> <span class="mi">2</span>
+                    <span class="ow">and</span> <span class="ow">not</span> <span class="n">tensor</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">is_floating_point</span><span class="p">):</span>
+                <span class="n">tensor</span> <span class="o">=</span> <span class="n">tensor</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">tensor</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_peptide_template_shape_dtype</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+                <span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+                <span class="n">dtype</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">dtype</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+                <span class="n">shape</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">shape</span>
+                <span class="n">dtype</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">empty</span><span class="p">((),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">value</span><span class="o">.</span><span class="n">dtype</span><span class="p">))</span><span class="o">.</span><span class="n">dtype</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                <span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+                <span class="n">dtype</span> <span class="o">=</span> <span class="n">tensor</span><span class="o">.</span><span class="n">dtype</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">2</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">dtype</span><span class="o">.</span><span class="n">is_floating_point</span><span class="p">:</span>
+                <span class="n">dtype</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span>
+            <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">shape</span><span class="p">),</span> <span class="n">dtype</span>
+
+        <span class="n">x_peptide_dev</span> <span class="o">=</span> <span class="n">_peptide_to_device</span><span class="p">(</span><span class="n">x_peptide</span><span class="p">)</span>
+        <span class="n">x_allele_dev</span> <span class="o">=</span> <span class="n">_to_device</span><span class="p">(</span><span class="n">x_allele</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">x_peptide_dev</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"AffinityDeviceTrainingData.from_arrays: x_peptide is required."</span>
+            <span class="p">)</span>
+        <span class="n">num_real</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">x_peptide_dev</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">num_random_negatives</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="n">combined_peptide</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">rn_peptide_view</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">x_peptide_view</span> <span class="o">=</span> <span class="n">x_peptide_dev</span>
+        <span class="k">if</span> <span class="n">random_negative_x_peptide_template</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">rn_shape</span><span class="p">,</span> <span class="n">rn_dtype</span> <span class="o">=</span> <span class="n">_peptide_template_shape_dtype</span><span class="p">(</span>
+                <span class="n">random_negative_x_peptide_template</span>
+            <span class="p">)</span>
+            <span class="n">num_rn</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">rn_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">num_random_negatives</span> <span class="o">=</span> <span class="n">num_rn</span>
+            <span class="k">if</span> <span class="n">x_peptide_dev</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">rn_dtype</span><span class="p">:</span>
+                <span class="n">x_peptide_dev</span> <span class="o">=</span> <span class="n">x_peptide_dev</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">rn_dtype</span><span class="p">)</span>
+            <span class="n">combined_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">num_rn</span> <span class="o">+</span> <span class="n">num_real</span><span class="p">,</span> <span class="o">*</span><span class="n">rn_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+            <span class="k">if</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">x_peptide_dev</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span> <span class="o">!=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">rn_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"AffinityDeviceTrainingData.from_arrays: real and "</span>
+                    <span class="s2">"random-negative peptide tensors disagree on per-row "</span>
+                    <span class="s2">"shape: </span><span class="si">%r</span><span class="s2"> vs </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                        <span class="nb">tuple</span><span class="p">(</span><span class="n">x_peptide_dev</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]),</span>
+                        <span class="nb">tuple</span><span class="p">(</span><span class="n">rn_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]),</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+            <span class="n">combined_peptide</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+                <span class="n">combined_shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">rn_dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span>
+            <span class="p">)</span>
+            <span class="n">rn_peptide_view</span> <span class="o">=</span> <span class="n">combined_peptide</span><span class="p">[:</span><span class="n">num_rn</span><span class="p">]</span>
+            <span class="n">x_peptide_view</span> <span class="o">=</span> <span class="n">combined_peptide</span><span class="p">[</span><span class="n">num_rn</span><span class="p">:]</span>
+            <span class="n">x_peptide_view</span><span class="o">.</span><span class="n">copy_</span><span class="p">(</span><span class="n">x_peptide_dev</span><span class="p">)</span>
+            <span class="c1"># Fill the random-negative slice with the X/pad index (not 0) to</span>
+            <span class="c1"># match encode_random_negatives_on_device, which fills with X_INDEX.</span>
+            <span class="n">rn_peptide_view</span><span class="o">.</span><span class="n">fill_</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">amino_acid</span><span class="o">.</span><span class="n">X_INDEX</span><span class="p">))</span>
+
+        <span class="n">rn_allele_dev</span> <span class="o">=</span> <span class="n">_to_device</span><span class="p">(</span><span class="n">random_negative_x_allele</span><span class="p">)</span>
+        <span class="n">combined_allele</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">rn_allele_view</span> <span class="o">=</span> <span class="n">rn_allele_dev</span>
+        <span class="n">x_allele_view</span> <span class="o">=</span> <span class="n">x_allele_dev</span>
+        <span class="k">if</span> <span class="n">x_allele_dev</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">x_allele_dev</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">!=</span> <span class="n">num_real</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"AffinityDeviceTrainingData.from_arrays: x_allele has </span><span class="si">%d</span><span class="s2"> rows "</span>
+                <span class="s2">"but x_peptide has </span><span class="si">%d</span><span class="s2"> rows."</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="nb">int</span><span class="p">(</span><span class="n">x_allele_dev</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                    <span class="n">num_real</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">num_random_negatives</span> <span class="ow">and</span> <span class="p">(</span><span class="n">x_allele_dev</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="o">!=</span> <span class="p">(</span><span class="n">rn_allele_dev</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"AffinityDeviceTrainingData.from_arrays: real and "</span>
+                <span class="s2">"random-negative allele tensors must either both be present "</span>
+                <span class="s2">"or both be absent."</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">rn_allele_dev</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">x_allele_dev</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="n">rn_allele_dev</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">!=</span> <span class="n">num_random_negatives</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"AffinityDeviceTrainingData.from_arrays: "</span>
+                    <span class="s2">"random_negative_x_allele has </span><span class="si">%d</span><span class="s2"> rows but random-negative "</span>
+                    <span class="s2">"peptide space has </span><span class="si">%d</span><span class="s2"> rows."</span> <span class="o">%</span> <span class="p">(</span>
+                        <span class="nb">int</span><span class="p">(</span><span class="n">rn_allele_dev</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                        <span class="n">num_random_negatives</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="n">rn_allele_dev</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">x_allele_dev</span><span class="o">.</span><span class="n">dtype</span><span class="p">:</span>
+                <span class="n">target_dtype</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">float32</span>
+                    <span class="k">if</span> <span class="p">(</span><span class="n">rn_allele_dev</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">is_floating_point</span>
+                        <span class="ow">or</span> <span class="n">x_allele_dev</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">is_floating_point</span><span class="p">)</span>
+                    <span class="k">else</span> <span class="n">x_allele_dev</span><span class="o">.</span><span class="n">dtype</span>
+                <span class="p">)</span>
+                <span class="n">rn_allele_dev</span> <span class="o">=</span> <span class="n">rn_allele_dev</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">target_dtype</span><span class="p">)</span>
+                <span class="n">x_allele_dev</span> <span class="o">=</span> <span class="n">x_allele_dev</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">target_dtype</span><span class="p">)</span>
+            <span class="n">num_rn_a</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">rn_allele_dev</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">num_real_a</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">x_allele_dev</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">combined_allele</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">num_rn_a</span> <span class="o">+</span> <span class="n">num_real_a</span><span class="p">,</span> <span class="o">*</span><span class="n">rn_allele_dev</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]),</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="n">rn_allele_dev</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+                <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">combined_allele</span><span class="p">[:</span><span class="n">num_rn_a</span><span class="p">]</span><span class="o">.</span><span class="n">copy_</span><span class="p">(</span><span class="n">rn_allele_dev</span><span class="p">)</span>
+            <span class="n">combined_allele</span><span class="p">[</span><span class="n">num_rn_a</span><span class="p">:]</span><span class="o">.</span><span class="n">copy_</span><span class="p">(</span><span class="n">x_allele_dev</span><span class="p">)</span>
+            <span class="n">rn_allele_view</span> <span class="o">=</span> <span class="n">combined_allele</span><span class="p">[:</span><span class="n">num_rn_a</span><span class="p">]</span>
+            <span class="n">x_allele_view</span> <span class="o">=</span> <span class="n">combined_allele</span><span class="p">[</span><span class="n">num_rn_a</span><span class="p">:]</span>
+
+        <span class="n">total_rows</span> <span class="o">=</span> <span class="n">num_random_negatives</span> <span class="o">+</span> <span class="n">num_real</span>
+        <span class="n">y_encoded_dev</span> <span class="o">=</span> <span class="n">_to_device</span><span class="p">(</span><span class="n">y_encoded</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">y_encoded_dev</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"AffinityDeviceTrainingData.from_arrays: y_encoded is required."</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="n">y_encoded_dev</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">!=</span> <span class="n">total_rows</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"AffinityDeviceTrainingData.from_arrays: y_encoded has </span><span class="si">%d</span><span class="s2"> rows "</span>
+                <span class="s2">"but peptide row space has </span><span class="si">%d</span><span class="s2"> rows."</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="nb">int</span><span class="p">(</span><span class="n">y_encoded_dev</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                    <span class="n">total_rows</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="n">sample_weights_dev</span> <span class="o">=</span> <span class="n">_to_device</span><span class="p">(</span><span class="n">sample_weights</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span>
+                <span class="n">sample_weights_dev</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">sample_weights_dev</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">!=</span> <span class="n">total_rows</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"AffinityDeviceTrainingData.from_arrays: sample_weights has "</span>
+                <span class="s2">"</span><span class="si">%d</span><span class="s2"> rows but peptide row space has </span><span class="si">%d</span><span class="s2"> rows."</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="nb">int</span><span class="p">(</span><span class="n">sample_weights_dev</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                    <span class="n">total_rows</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">x_peptide</span><span class="o">=</span><span class="n">x_peptide_view</span><span class="p">,</span>
+            <span class="n">x_allele</span><span class="o">=</span><span class="n">x_allele_view</span><span class="p">,</span>
+            <span class="n">y_encoded</span><span class="o">=</span><span class="n">y_encoded_dev</span><span class="p">,</span>
+            <span class="n">sample_weights</span><span class="o">=</span><span class="n">sample_weights_dev</span><span class="p">,</span>
+            <span class="n">random_negative_x_peptide</span><span class="o">=</span><span class="n">rn_peptide_view</span><span class="p">,</span>
+            <span class="n">random_negative_x_allele</span><span class="o">=</span><span class="n">rn_allele_view</span><span class="p">,</span>
+            <span class="n">combined_peptide</span><span class="o">=</span><span class="n">combined_peptide</span><span class="p">,</span>
+            <span class="n">combined_allele</span><span class="o">=</span><span class="n">combined_allele</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="AffinityDeviceTrainingData.refill_random_negative_peptides">
+<a class="viewcode-back" href="../../api.html#mhcflurry.class1_affinity_training_data.AffinityDeviceTrainingData.refill_random_negative_peptides">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">refill_random_negative_peptides</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">encoded_peptides</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Overwrite the mutable random-negative peptide slice in place.</span>
+
+<span class="sd">        Does nothing when the fit has no random negatives. ``encoded_peptides``</span>
+<span class="sd">        may be a numpy array, CPU tensor, or tensor already on the target device;</span>
+<span class="sd">        dtype is coerced to the existing random-negative slice.</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">random_negative_x_peptide</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="n">encoded_peptides</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+            <span class="n">source</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">random_negative_x_peptide</span><span class="o">.</span><span class="n">copy_</span><span class="p">(</span>
+            <span class="n">source</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">random_negative_x_peptide</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">random_negative_x_peptide</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="AffinityDeviceTrainingData.batch_for_indices">
+<a class="viewcode-back" href="../../api.html#mhcflurry.class1_affinity_training_data.AffinityDeviceTrainingData.batch_for_indices">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">batch_for_indices</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">batch_indices</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return ``(inputs, y_batch, weights_batch)`` for device indices.</span>
+
+<span class="sd">        Hot-path API used by the inner training and validation loops.</span>
+<span class="sd">        ``batch_indices`` must be a torch integer tensor already on</span>
+<span class="sd">        ``self.device``; keeping indices on device lets the fit loop form</span>
+<span class="sd">        batches with ``index_select`` and no per-batch host-to-device</span>
+<span class="sd">        copies. For one-shot use cases that start from a host-side</span>
+<span class="sd">        index array, see :meth:`batch_dict_for_indices`.</span>
+<span class="sd">        """</span>
+        <span class="n">combined_peptide</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">combined_peptide</span>
+        <span class="k">if</span> <span class="n">combined_peptide</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">combined_peptide</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_peptide</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"peptide"</span><span class="p">:</span> <span class="n">combined_peptide</span><span class="o">.</span><span class="n">index_select</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">batch_indices</span><span class="p">)}</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">combined_allele</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">inputs</span><span class="p">[</span><span class="s2">"allele"</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">combined_allele</span><span class="o">.</span><span class="n">index_select</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">batch_indices</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_allele</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">inputs</span><span class="p">[</span><span class="s2">"allele"</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_allele</span><span class="o">.</span><span class="n">index_select</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">batch_indices</span><span class="p">)</span>
+        <span class="n">y_batch</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_encoded</span><span class="o">.</span><span class="n">index_select</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">batch_indices</span><span class="p">)</span>
+        <span class="n">weights_batch</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_weights</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">weights_batch</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_weights</span><span class="o">.</span><span class="n">index_select</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">batch_indices</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">y_batch</span><span class="p">,</span> <span class="n">weights_batch</span></div>
+
+
+<div class="viewcode-block" id="AffinityDeviceTrainingData.batch_dict_for_indices">
+<a class="viewcode-back" href="../../api.html#mhcflurry.class1_affinity_training_data.AffinityDeviceTrainingData.batch_dict_for_indices">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">batch_dict_for_indices</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indices</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return a flat ``{"peptide", "allele", "y", "weight"}`` dict.</span>
+
+<span class="sd">        Convenience wrapper used once per fit, by LSUV/data-dependent</span>
+<span class="sd">        weight init. Unlike :meth:`batch_for_indices`, this accepts</span>
+<span class="sd">        host-side ``indices`` (numpy array, list, or any tensor) and</span>
+<span class="sd">        moves them to the device for you, since the init path is</span>
+<span class="sd">        called outside the hot loop and isn't sensitive to the per-call</span>
+<span class="sd">        host-to-device copy.</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="n">device</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">device</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">indices</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+            <span class="n">indices</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span>
+                <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">indices</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">int64</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">indices</span><span class="o">.</span><span class="n">device</span> <span class="o">!=</span> <span class="n">device</span><span class="p">:</span>
+            <span class="n">indices</span> <span class="o">=</span> <span class="n">indices</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">inputs</span><span class="p">,</span> <span class="n">y_batch</span><span class="p">,</span> <span class="n">weights_batch</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch_for_indices</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span>
+        <span class="n">batch</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"peptide"</span><span class="p">:</span> <span class="n">inputs</span><span class="p">[</span><span class="s2">"peptide"</span><span class="p">],</span> <span class="s2">"y"</span><span class="p">:</span> <span class="n">y_batch</span><span class="p">}</span>
+        <span class="k">if</span> <span class="s2">"allele"</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">:</span>
+            <span class="n">batch</span><span class="p">[</span><span class="s2">"allele"</span><span class="p">]</span> <span class="o">=</span> <span class="n">inputs</span><span class="p">[</span><span class="s2">"allele"</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">weights_batch</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">batch</span><span class="p">[</span><span class="s2">"weight"</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights_batch</span>
+        <span class="k">return</span> <span class="n">batch</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

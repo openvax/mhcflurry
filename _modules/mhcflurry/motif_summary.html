@@ -1,0 +1,463 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.motif_summary &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.motif_summary</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.motif_summary</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""</span>
+<span class="sd">GPU motif-summary helpers used by the fast percentile-rank calibration path.</span>
+
+<span class="sd">These are stateless tensor/numpy routines: given a chunk of predicted IC50s</span>
+<span class="sd">for a set of (allele, peptide) pairs, they reproduce the per-allele</span>
+<span class="sd">``DataFrame(...).drop_duplicates().groupby('length').nsmallest(...)`` motif</span>
+<span class="sd">summary (top-binder amino-acid frequency matrices + length distributions) of</span>
+<span class="sd">the legacy slow path, but vectorized on the calibration device.</span>
+
+<span class="sd">They live in their own module — rather than on</span>
+<span class="sd">:class:`~mhcflurry.class1_affinity_predictor.Class1AffinityPredictor` — because</span>
+<span class="sd">they hold no predictor state and are unit-tested in isolation (see</span>
+<span class="sd">``test/test_calibrate_percentile_ranks_fast.py``). The predictor only</span>
+<span class="sd">orchestrates: it builds the per-worker state once via</span>
+<span class="sd">:func:`prepare_motif_summary_state_gpu` and then calls</span>
+<span class="sd">:func:`motif_summary_chunk_gpu` per allele chunk.</span>
+<span class="sd">"""</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.amino_acid</span><span class="w"> </span><span class="kn">import</span> <span class="n">AMINO_ACID_INDEX</span><span class="p">,</span> <span class="n">AMINO_ACIDS</span>
+
+
+<div class="viewcode-block" id="prepare_motif_summary_state_gpu">
+<a class="viewcode-back" href="../../api.html#mhcflurry.motif_summary.prepare_motif_summary_state_gpu">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">prepare_motif_summary_state_gpu</span><span class="p">(</span><span class="n">encoded_peptides</span><span class="p">,</span> <span class="n">device</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""One-time setup for GPU motif_summary; lifts the per-allele</span>
+<span class="sd">    ``drop_duplicates`` + length-bucket + AA-encoding work out of</span>
+<span class="sd">    the calibrate chunk loop so each chunk is pure tensor math.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict</span>
+<span class="sd">        Device-resident tensors and their unique-peptide count:</span>
+
+<span class="sd">        - ``unique_idx_t``: (n_unique,) long first-occurrence indices into the</span>
+<span class="sd">          full peptide list. Selecting columns from ``ic50_device`` reproduces</span>
+<span class="sd">          ``drop_duplicates('peptide')`` semantics (first row wins).</span>
+<span class="sd">        - ``length_groups``: dict[L] of (n_at_L,) long indices into the unique</span>
+<span class="sd">          peptide axis for peptides of length L.</span>
+<span class="sd">        - ``aa_codes_per_length``: dict[L] of (n_at_L, L) long tensors of amino</span>
+<span class="sd">          acid index codes, matching ``AMINO_ACID_INDEX`` (X = 20).</span>
+<span class="sd">        - ``unique_lengths_t``: (n_unique,) long peptide lengths, used for the</span>
+<span class="sd">          per-allele length distribution.</span>
+<span class="sd">        - ``n_unique``: integer count of unique peptides.</span>
+
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+
+    <span class="n">seqs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">encoded_peptides</span><span class="o">.</span><span class="n">sequences</span><span class="p">)</span>
+    <span class="n">seen</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">unique_idx</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">seqs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">s</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+            <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+            <span class="n">unique_idx</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+    <span class="n">unique_idx</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">unique_idx</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+    <span class="n">unique_seqs</span> <span class="o">=</span> <span class="p">[</span><span class="n">seqs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">unique_idx</span><span class="p">]</span>
+    <span class="n">lengths</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">fromiter</span><span class="p">(</span>
+        <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">unique_seqs</span><span class="p">),</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span>
+        <span class="n">count</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">unique_seqs</span><span class="p">),</span>
+    <span class="p">)</span>
+
+    <span class="n">unique_lengths_t</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">lengths</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">unique_idx_t</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">unique_idx</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="c1"># ASCII -&gt; AA-index lookup so the per-residue encoding is one</span>
+    <span class="c1"># vectorized numpy gather instead of 8M Python ops over 800k</span>
+    <span class="c1"># peptides. Unknown bytes map to X and the X bucket is dropped</span>
+    <span class="c1"># from the final 20-column matrix, matching</span>
+    <span class="c1"># positional_frequency_matrix's treatment of non-common letters.</span>
+    <span class="n">ascii_lut</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span>
+        <span class="mi">256</span><span class="p">,</span> <span class="n">AMINO_ACID_INDEX</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">for</span> <span class="n">letter</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">AMINO_ACID_INDEX</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">letter</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">ascii_lut</span><span class="p">[</span><span class="nb">ord</span><span class="p">(</span><span class="n">letter</span><span class="p">)]</span> <span class="o">=</span> <span class="n">idx</span>
+
+    <span class="n">length_groups</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">aa_codes_per_length</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">L_np</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">lengths</span><span class="p">):</span>
+        <span class="n">L</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">L_np</span><span class="p">)</span>
+        <span class="n">sel</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">lengths</span> <span class="o">==</span> <span class="n">L</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+        <span class="n">n_at_L</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">sel</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">joined</span> <span class="o">=</span> <span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">unique_seqs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">sel</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"ascii"</span><span class="p">)</span>
+        <span class="n">byte_arr</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">frombuffer</span><span class="p">(</span>
+            <span class="n">joined</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">n_at_L</span><span class="p">,</span> <span class="n">L</span><span class="p">)</span>
+        <span class="n">codes</span> <span class="o">=</span> <span class="n">ascii_lut</span><span class="p">[</span><span class="n">byte_arr</span><span class="p">]</span>  <span class="c1"># (n_at_L, L) int64</span>
+        <span class="n">length_groups</span><span class="p">[</span><span class="n">L</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">sel</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">aa_codes_per_length</span><span class="p">[</span><span class="n">L</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span>
+            <span class="n">numpy</span><span class="o">.</span><span class="n">ascontiguousarray</span><span class="p">(</span><span class="n">codes</span><span class="p">),</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"unique_idx_t"</span><span class="p">:</span> <span class="n">unique_idx_t</span><span class="p">,</span>
+        <span class="s2">"length_groups"</span><span class="p">:</span> <span class="n">length_groups</span><span class="p">,</span>
+        <span class="s2">"aa_codes_per_length"</span><span class="p">:</span> <span class="n">aa_codes_per_length</span><span class="p">,</span>
+        <span class="s2">"unique_lengths_t"</span><span class="p">:</span> <span class="n">unique_lengths_t</span><span class="p">,</span>
+        <span class="s2">"n_unique"</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">unique_idx</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+    <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="topk_first_tie_indices">
+<a class="viewcode-back" href="../../api.html#mhcflurry.motif_summary.topk_first_tie_indices">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">topk_first_tie_indices</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">k</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return k smallest column indices per row with pandas tie semantics.</span>
+
+<span class="sd">    ``torch.topk`` is fast but does not promise which entries it</span>
+<span class="sd">    returns when the kth value is tied. Pandas ``Series.nsmallest``</span>
+<span class="sd">    defaults to ``keep='first'``; after ``drop_duplicates('peptide')``,</span>
+<span class="sd">    "first" means lower position on the unique-peptide axis. Keep</span>
+<span class="sd">    the fast ``topk`` path for normal continuous predictions and</span>
+<span class="sd">    repair only rows whose cutoff falls inside an exact tie block.</span>
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">values</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">k</span> <span class="o">&gt;=</span> <span class="n">n</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span>
+            <span class="n">n</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">values</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">values</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="n">n</span><span class="p">)</span>
+
+    <span class="n">top</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">topk</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">largest</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="nb">sorted</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">top_idx</span> <span class="o">=</span> <span class="n">top</span><span class="o">.</span><span class="n">indices</span>
+
+    <span class="n">boundary</span> <span class="o">=</span> <span class="n">top</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">lt_counts</span> <span class="o">=</span> <span class="p">(</span><span class="n">values</span> <span class="o">&lt;</span> <span class="n">boundary</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">eq_counts</span> <span class="o">=</span> <span class="p">(</span><span class="n">values</span> <span class="o">==</span> <span class="n">boundary</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">tie_needed</span> <span class="o">=</span> <span class="n">k</span> <span class="o">-</span> <span class="n">lt_counts</span>
+    <span class="n">tied_cutoff_rows</span> <span class="o">=</span> <span class="n">eq_counts</span> <span class="o">&gt;</span> <span class="n">tie_needed</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">bool</span><span class="p">(</span><span class="n">tied_cutoff_rows</span><span class="o">.</span><span class="n">any</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()):</span>
+        <span class="k">return</span> <span class="n">top_idx</span>
+
+    <span class="n">top_idx</span> <span class="o">=</span> <span class="n">top_idx</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+    <span class="n">row_ids</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span>
+        <span class="n">tied_cutoff_rows</span><span class="p">,</span> <span class="n">as_tuple</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+    <span class="n">row_values</span> <span class="o">=</span> <span class="n">values</span><span class="o">.</span><span class="n">index_select</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">row_ids</span><span class="p">)</span>
+    <span class="n">row_boundary</span> <span class="o">=</span> <span class="n">boundary</span><span class="o">.</span><span class="n">index_select</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">row_ids</span><span class="p">)</span>
+    <span class="n">row_lt</span> <span class="o">=</span> <span class="n">row_values</span> <span class="o">&lt;</span> <span class="n">row_boundary</span>
+    <span class="n">row_eq</span> <span class="o">=</span> <span class="n">row_values</span> <span class="o">==</span> <span class="n">row_boundary</span>
+    <span class="n">row_tie_needed</span> <span class="o">=</span> <span class="n">tie_needed</span><span class="o">.</span><span class="n">index_select</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">row_ids</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">eq_rank</span> <span class="o">=</span> <span class="n">row_eq</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">selected</span> <span class="o">=</span> <span class="n">row_lt</span> <span class="o">|</span> <span class="p">(</span><span class="n">row_eq</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">eq_rank</span> <span class="o">&lt;=</span> <span class="n">row_tie_needed</span><span class="p">))</span>
+    <span class="n">stable_idx</span> <span class="o">=</span> <span class="n">selected</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">as_tuple</span><span class="o">=</span><span class="kc">False</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">row_ids</span><span class="o">.</span><span class="n">numel</span><span class="p">()),</span> <span class="n">k</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">top_idx</span><span class="p">[</span><span class="n">row_ids</span><span class="p">]</span> <span class="o">=</span> <span class="n">stable_idx</span>
+    <span class="k">return</span> <span class="n">top_idx</span></div>
+
+
+
+<div class="viewcode-block" id="motif_summary_chunk_gpu">
+<a class="viewcode-back" href="../../api.html#mhcflurry.motif_summary.motif_summary_chunk_gpu">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">motif_summary_chunk_gpu</span><span class="p">(</span>
+        <span class="n">ic50_device</span><span class="p">,</span>
+        <span class="n">state</span><span class="p">,</span>
+        <span class="n">summary_top_peptide_fractions</span><span class="p">,</span>
+        <span class="n">batch_alleles</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""GPU motif_summary for one allele chunk.</span>
+
+<span class="sd">    Replaces the per-allele</span>
+<span class="sd">    ``DataFrame(...).drop_duplicates().groupby('length').nsmallest(...)``</span>
+<span class="sd">    block in the fast path with vectorized tensor ops:</span>
+
+<span class="sd">    * ``torch.topk(largest=False)`` selects top-k tightest binders</span>
+<span class="sd">      per (allele, length), with a small tie repair to match pandas</span>
+<span class="sd">      ``nsmallest(keep='first')`` at exact cutoff ties.</span>
+<span class="sd">    * AA frequency matrices are computed by gathering precomputed</span>
+<span class="sd">      per-length AA-code tensors and ``scatter_add`` into a one-hot</span>
+<span class="sd">      counts buffer of shape ``(a_size, L, 21)``; pandas only</span>
+<span class="sd">      assembles the final per-row schema.</span>
+<span class="sd">    * Length distributions are ``topk`` over the full</span>
+<span class="sd">      unique-peptide axis followed by a per-row ``scatter_add``</span>
+<span class="sd">      (a row-wise ``bincount``).</span>
+
+<span class="sd">    All math runs on the calibration device; per-batch ``.cpu()``</span>
+<span class="sd">    transfers happen once per (cutoff_fraction, length) at chunk-end</span>
+<span class="sd">    instead of inside the per-allele Python loop, and pandas only</span>
+<span class="sd">    stamps the persistent per-row schema on the consolidated</span>
+<span class="sd">    per-block tensors. Returns ``(freq_matrix_dfs, length_dist_dfs)``</span>
+<span class="sd">    — lists of ``pandas.DataFrame`` matching the legacy slow path's</span>
+<span class="sd">    per-row schema, ready to ``pandas.concat`` once all chunks are</span>
+<span class="sd">    done.</span>
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+
+    <span class="n">a_size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">batch_alleles</span><span class="p">)</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="n">ic50_device</span><span class="o">.</span><span class="n">device</span>
+    <span class="n">count_dtype</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span> <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"mps"</span> <span class="k">else</span> <span class="n">torch</span><span class="o">.</span><span class="n">float64</span>
+    <span class="n">n_unique</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="s2">"n_unique"</span><span class="p">]</span>
+    <span class="c1"># AMINO_ACIDS = COMMON_AMINO_ACIDS_WITH_UNKNOWN keys, alphabetical</span>
+    <span class="c1"># then X — first 20 entries are the BLOSUM62-ordered non-X rows</span>
+    <span class="c1"># the legacy ``positional_frequency_matrix`` returns.</span>
+    <span class="n">aa_columns</span> <span class="o">=</span> <span class="n">AMINO_ACIDS</span><span class="p">[:</span><span class="mi">20</span><span class="p">]</span>
+
+    <span class="n">ic50_unique</span> <span class="o">=</span> <span class="n">ic50_device</span><span class="o">.</span><span class="n">index_select</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">state</span><span class="p">[</span><span class="s2">"unique_idx_t"</span><span class="p">])</span>
+
+    <span class="c1"># Stage 1 (Torch on device): build all freq + length-dist tensors.</span>
+    <span class="c1"># Each entry is (cutoff_fraction, k, L, freq_t (a_size, L, 20)).</span>
+    <span class="n">freq_tensors</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="c1"># Each entry is (cutoff_fraction, k_total, length_fractions_t (a_size, max_len_p1)).</span>
+    <span class="n">length_fraction_tensors</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">cutoff_fraction</span> <span class="ow">in</span> <span class="n">summary_top_peptide_fractions</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">L</span><span class="p">,</span> <span class="n">idx_in_unique</span> <span class="ow">in</span> <span class="n">state</span><span class="p">[</span><span class="s2">"length_groups"</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">n_at_L</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">idx_in_unique</span><span class="o">.</span><span class="n">numel</span><span class="p">())</span>
+            <span class="n">k</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">n_at_L</span> <span class="o">*</span> <span class="n">cutoff_fraction</span><span class="p">),</span> <span class="mi">1</span><span class="p">),</span> <span class="n">n_at_L</span><span class="p">)</span>
+            <span class="n">ic50_L</span> <span class="o">=</span> <span class="n">ic50_unique</span><span class="o">.</span><span class="n">index_select</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">idx_in_unique</span><span class="p">)</span>
+            <span class="n">top_idx</span> <span class="o">=</span> <span class="n">topk_first_tie_indices</span><span class="p">(</span>
+                <span class="n">ic50_L</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span>
+            <span class="p">)</span>  <span class="c1"># (a_size, k)</span>
+            <span class="n">codes</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="s2">"aa_codes_per_length"</span><span class="p">][</span><span class="n">L</span><span class="p">]</span>  <span class="c1"># (n_at_L, L) long</span>
+            <span class="n">selected_codes</span> <span class="o">=</span> <span class="n">codes</span><span class="p">[</span><span class="n">top_idx</span><span class="p">]</span>  <span class="c1"># (a_size, k, L) long</span>
+            <span class="c1"># Permute to (a_size, L, k) so scatter_add packs counts</span>
+            <span class="c1"># along the last (AA) axis. We allocate 21 AA slots to</span>
+            <span class="c1"># absorb X (index 20) and discard the X column at the</span>
+            <span class="c1"># end — this matches the legacy semantics where</span>
+            <span class="c1"># ``positional_frequency_matrix``'s row index excludes X</span>
+            <span class="c1"># while the divisor stays at ``k`` (so positions with</span>
+            <span class="c1"># any X residues sum to &lt;1 across the 20 columns).</span>
+            <span class="n">scatter_dst</span> <span class="o">=</span> <span class="n">selected_codes</span><span class="o">.</span><span class="n">permute</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">counts</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+                <span class="n">a_size</span><span class="p">,</span> <span class="n">L</span><span class="p">,</span> <span class="mi">21</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">count_dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">counts</span><span class="o">.</span><span class="n">scatter_add_</span><span class="p">(</span>
+                <span class="mi">2</span><span class="p">,</span> <span class="n">scatter_dst</span><span class="p">,</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">scatter_dst</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">count_dtype</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">freq_t</span> <span class="o">=</span> <span class="n">counts</span><span class="p">[:,</span> <span class="p">:,</span> <span class="p">:</span><span class="mi">20</span><span class="p">]</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>  <span class="c1"># device tensor</span>
+            <span class="n">freq_tensors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">cutoff_fraction</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">k</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">L</span><span class="p">),</span> <span class="n">freq_t</span><span class="p">),</span>
+            <span class="p">)</span>
+
+        <span class="n">k_total</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">n_unique</span> <span class="o">*</span> <span class="n">cutoff_fraction</span><span class="p">),</span> <span class="mi">1</span><span class="p">),</span> <span class="n">n_unique</span><span class="p">)</span>
+        <span class="n">top_full_idx</span> <span class="o">=</span> <span class="n">topk_first_tie_indices</span><span class="p">(</span>
+            <span class="n">ic50_unique</span><span class="p">,</span> <span class="n">k_total</span><span class="p">,</span>
+        <span class="p">)</span>  <span class="c1"># (a_size, k_total)</span>
+        <span class="n">lengths_per_topk</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="s2">"unique_lengths_t"</span><span class="p">][</span><span class="n">top_full_idx</span><span class="p">]</span>
+        <span class="n">max_len_p1</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s2">"unique_lengths_t"</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">())</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="n">length_counts</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+            <span class="n">a_size</span><span class="p">,</span> <span class="n">max_len_p1</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">count_dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">length_counts</span><span class="o">.</span><span class="n">scatter_add_</span><span class="p">(</span>
+            <span class="mi">1</span><span class="p">,</span> <span class="n">lengths_per_topk</span><span class="p">,</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">lengths_per_topk</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">count_dtype</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="n">length_fractions_t</span> <span class="o">=</span> <span class="n">length_counts</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="n">k_total</span><span class="p">)</span>
+        <span class="n">length_fraction_tensors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">cutoff_fraction</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">k_total</span><span class="p">),</span> <span class="n">length_fractions_t</span><span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Stage 2 (single device→host transfer per logical block): build</span>
+    <span class="c1"># one wide-format pandas DataFrame per (cutoff_fraction, L) in</span>
+    <span class="c1"># one shot — the per-allele Python loop is replaced by a flat</span>
+    <span class="c1"># reshape + numpy.repeat for the allele/position axes.</span>
+    <span class="n">batch_alleles_arr</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">batch_alleles</span><span class="p">)</span>
+
+    <span class="n">freq_matrices</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">cutoff_fraction</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">L</span><span class="p">,</span> <span class="n">freq_t</span> <span class="ow">in</span> <span class="n">freq_tensors</span><span class="p">:</span>
+        <span class="n">freq_arr</span> <span class="o">=</span> <span class="n">freq_t</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>  <span class="c1"># (a_size, L, 20)</span>
+        <span class="n">row_count</span> <span class="o">=</span> <span class="n">a_size</span> <span class="o">*</span> <span class="n">L</span>
+        <span class="n">wide</span> <span class="o">=</span> <span class="n">freq_arr</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">row_count</span><span class="p">,</span> <span class="mi">20</span><span class="p">)</span>
+        <span class="n">row_metadata</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">"allele"</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">batch_alleles_arr</span><span class="p">,</span> <span class="n">L</span><span class="p">),</span>
+                <span class="s2">"length"</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">row_count</span><span class="p">,</span> <span class="n">L</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">int64</span><span class="p">),</span>
+                <span class="s2">"cutoff_fraction"</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">row_count</span><span class="p">,</span> <span class="n">cutoff_fraction</span><span class="p">),</span>
+                <span class="s2">"cutoff_count"</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">row_count</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">int64</span><span class="p">),</span>
+                <span class="s2">"position"</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tile</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">L</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="n">a_size</span><span class="p">),</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">row_metadata</span><span class="p">,</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">wide</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">aa_columns</span><span class="p">)],</span>
+            <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">freq_matrices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+
+    <span class="n">length_dists</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">cutoff_fraction</span><span class="p">,</span> <span class="n">k_total</span><span class="p">,</span> <span class="n">length_fractions_t</span> <span class="ow">in</span> <span class="n">length_fraction_tensors</span><span class="p">:</span>
+        <span class="n">length_fractions</span> <span class="o">=</span> <span class="n">length_fractions_t</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+        <span class="n">a_idx</span><span class="p">,</span> <span class="n">l_idx</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">length_fractions</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">a_idx</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">ld</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+            <span class="s2">"allele"</span><span class="p">:</span> <span class="n">batch_alleles_arr</span><span class="p">[</span><span class="n">a_idx</span><span class="p">],</span>
+            <span class="s2">"cutoff_fraction"</span><span class="p">:</span> <span class="n">cutoff_fraction</span><span class="p">,</span>
+            <span class="s2">"cutoff_count"</span><span class="p">:</span> <span class="n">k_total</span><span class="p">,</span>
+            <span class="s2">"length"</span><span class="p">:</span> <span class="n">l_idx</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">int64</span><span class="p">),</span>
+            <span class="s2">"fraction"</span><span class="p">:</span> <span class="n">length_fractions</span><span class="p">[</span><span class="n">a_idx</span><span class="p">,</span> <span class="n">l_idx</span><span class="p">],</span>
+        <span class="p">})[[</span>
+            <span class="s2">"allele"</span><span class="p">,</span> <span class="s2">"cutoff_fraction"</span><span class="p">,</span> <span class="s2">"cutoff_count"</span><span class="p">,</span>
+            <span class="s2">"length"</span><span class="p">,</span> <span class="s2">"fraction"</span><span class="p">,</span>
+        <span class="p">]]</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span>
+            <span class="p">[</span><span class="s2">"allele"</span><span class="p">,</span> <span class="s2">"cutoff_fraction"</span><span class="p">,</span> <span class="s2">"length"</span><span class="p">]</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">length_dists</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ld</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">freq_matrices</span><span class="p">,</span> <span class="n">length_dists</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

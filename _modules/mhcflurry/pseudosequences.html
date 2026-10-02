@@ -1,0 +1,435 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.pseudosequences &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.pseudosequences</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.pseudosequences</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Class I pseudosequence artifact names and lookup helpers.</span>
+
+<span class="sd">This module is the canonical registry for pseudosequence CSV filenames used by</span>
+<span class="sd">MHCflurry training and model serialization.</span>
+
+<span class="sd">Canonical pseudosequence files:</span>
+
+<span class="sd">* ``pseudosequences.netmhcpan.34aa.csv``: NetMHCpan-derived 34 amino acid</span>
+<span class="sd">  pseudosequences.</span>
+<span class="sd">* ``pseudosequences.mhcflurry.37aa.csv``: MHCflurry-generated 37 amino acid</span>
+<span class="sd">  pseudosequences used by older public pan-allele model bundles.</span>
+<span class="sd">* ``pseudosequences.mhcflurry.39aa.csv``: MHCflurry-generated 39 amino acid</span>
+<span class="sd">  pseudosequences from the aligned full-sequence pipeline.</span>
+
+<span class="sd">Compatibility aliases:</span>
+
+<span class="sd">* ``allele_sequences.csv``: legacy runtime/model artifact filename.</span>
+<span class="sd">* ``class1_pseudosequences.csv``: legacy NetMHCpan 34aa filename.</span>
+<span class="sd">* ``allele_sequences.no_differentiation.csv``: legacy pan-variant experiment</span>
+<span class="sd">  output; not a canonical pseudosequence artifact name.</span>
+
+<span class="sd">Trained model directories should ship the exact pseudosequence CSV used during</span>
+<span class="sd">training. The saved weights depend on both the representation width and the</span>
+<span class="sd">position definition.</span>
+
+<span class="sd">Expected locations:</span>
+
+<span class="sd">* ``downloads-generation/*/pseudosequences.netmhcpan.34aa.csv``: checked-in</span>
+<span class="sd">  generation seed tables.</span>
+<span class="sd">* standalone ``allele_sequences`` download: should contain</span>
+<span class="sd">  ``pseudosequences.mhcflurry.39aa.csv`` plus ``allele_sequences.csv`` as a</span>
+<span class="sd">  compatibility copy.</span>
+<span class="sd">* trained model directories: should contain ``allele_sequences.csv`` and, for</span>
+<span class="sd">  newly-saved models, the matching canonical ``pseudosequences.*.*aa.csv``.</span>
+<span class="sd">"""</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">glob</span><span class="w"> </span><span class="kn">import</span> <span class="n">glob</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">os.path</span><span class="w"> </span><span class="kn">import</span> <span class="n">basename</span><span class="p">,</span> <span class="n">exists</span><span class="p">,</span> <span class="n">join</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+
+
+<span class="n">LEGACY_ALLELE_SEQUENCES_FILENAME</span> <span class="o">=</span> <span class="s2">"allele_sequences.csv"</span>
+<span class="n">LEGACY_CLASS1_PSEUDOSEQUENCES_FILENAME</span> <span class="o">=</span> <span class="s2">"class1_pseudosequences.csv"</span>
+<span class="n">LEGACY_NO_DIFFERENTIATION_FILENAME</span> <span class="o">=</span> <span class="s2">"allele_sequences.no_differentiation.csv"</span>
+<span class="n">PSEUDOSEQUENCE_GLOB</span> <span class="o">=</span> <span class="s2">"pseudosequences.*.*aa.csv"</span>
+
+
+<div class="viewcode-block" id="PseudosequenceDefinition">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pseudosequences.PseudosequenceDefinition">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">PseudosequenceDefinition</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A named pseudosequence CSV definition."""</span>
+
+    <span class="n">source</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">length</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">description</span><span class="p">:</span> <span class="nb">str</span></div>
+
+
+
+<span class="n">PSEUDOSEQUENCE_DEFINITIONS</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">PseudosequenceDefinition</span><span class="p">(</span>
+        <span class="n">source</span><span class="o">=</span><span class="s2">"netmhcpan"</span><span class="p">,</span>
+        <span class="n">length</span><span class="o">=</span><span class="mi">34</span><span class="p">,</span>
+        <span class="n">filename</span><span class="o">=</span><span class="s2">"pseudosequences.netmhcpan.34aa.csv"</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"NetMHCpan-derived 34 amino acid pseudosequences."</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">PseudosequenceDefinition</span><span class="p">(</span>
+        <span class="n">source</span><span class="o">=</span><span class="s2">"mhcflurry"</span><span class="p">,</span>
+        <span class="n">length</span><span class="o">=</span><span class="mi">37</span><span class="p">,</span>
+        <span class="n">filename</span><span class="o">=</span><span class="s2">"pseudosequences.mhcflurry.37aa.csv"</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"MHCflurry-generated 37 amino acid pseudosequences used by older "</span>
+            <span class="s2">"public pan-allele model bundles."</span>
+        <span class="p">),</span>
+    <span class="p">),</span>
+    <span class="n">PseudosequenceDefinition</span><span class="p">(</span>
+        <span class="n">source</span><span class="o">=</span><span class="s2">"mhcflurry"</span><span class="p">,</span>
+        <span class="n">length</span><span class="o">=</span><span class="mi">39</span><span class="p">,</span>
+        <span class="n">filename</span><span class="o">=</span><span class="s2">"pseudosequences.mhcflurry.39aa.csv"</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"MHCflurry-generated 39 amino acid pseudosequences from the "</span>
+            <span class="s2">"aligned full-sequence pipeline."</span>
+        <span class="p">),</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">PSEUDOSEQUENCE_DEFINITIONS_BY_LENGTH</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">definition</span><span class="o">.</span><span class="n">length</span><span class="p">:</span> <span class="n">definition</span>
+    <span class="k">for</span> <span class="n">definition</span> <span class="ow">in</span> <span class="n">PSEUDOSEQUENCE_DEFINITIONS</span>
+<span class="p">}</span>
+
+<span class="n">PSEUDOSEQUENCE_FILENAMES_BY_LENGTH</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">length</span><span class="p">:</span> <span class="n">definition</span><span class="o">.</span><span class="n">filename</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="n">definition</span><span class="p">)</span> <span class="ow">in</span> <span class="n">PSEUDOSEQUENCE_DEFINITIONS_BY_LENGTH</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+<span class="p">}</span>
+
+<span class="n">PSEUDOSEQUENCE_FILENAME_PREFERENCE</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">LEGACY_ALLELE_SEQUENCES_FILENAME</span><span class="p">,</span>
+    <span class="n">PSEUDOSEQUENCE_FILENAMES_BY_LENGTH</span><span class="p">[</span><span class="mi">39</span><span class="p">],</span>
+    <span class="n">PSEUDOSEQUENCE_FILENAMES_BY_LENGTH</span><span class="p">[</span><span class="mi">37</span><span class="p">],</span>
+    <span class="n">PSEUDOSEQUENCE_FILENAMES_BY_LENGTH</span><span class="p">[</span><span class="mi">34</span><span class="p">],</span>
+    <span class="n">LEGACY_CLASS1_PSEUDOSEQUENCES_FILENAME</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">LEGACY_FILENAMES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"allele_sequences"</span><span class="p">:</span> <span class="n">LEGACY_ALLELE_SEQUENCES_FILENAME</span><span class="p">,</span>
+    <span class="s2">"class1_pseudosequences"</span><span class="p">:</span> <span class="n">LEGACY_CLASS1_PSEUDOSEQUENCES_FILENAME</span><span class="p">,</span>
+    <span class="s2">"no_differentiation"</span><span class="p">:</span> <span class="n">LEGACY_NO_DIFFERENTIATION_FILENAME</span><span class="p">,</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="pseudosequence_length">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pseudosequences.pseudosequence_length">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">pseudosequence_length</span><span class="p">(</span><span class="n">allele_to_sequence</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the common pseudosequence length, or ``None`` if ambiguous."""</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">allele_to_sequence</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">lengths</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">sequence</span> <span class="ow">in</span> <span class="n">allele_to_sequence</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">pandas</span><span class="o">.</span><span class="n">isnull</span><span class="p">(</span><span class="n">sequence</span><span class="p">):</span>
+            <span class="k">continue</span>
+        <span class="n">lengths</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">sequence</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">lengths</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">lengths</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+    <span class="k">return</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="pseudosequence_filename_for_length">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pseudosequences.pseudosequence_filename_for_length">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">pseudosequence_filename_for_length</span><span class="p">(</span><span class="n">length</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the canonical pseudosequence filename for a representation length."""</span>
+    <span class="k">if</span> <span class="n">length</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">PSEUDOSEQUENCE_FILENAMES_BY_LENGTH</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">length</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="pseudosequence_filename_for_mapping">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pseudosequences.pseudosequence_filename_for_mapping">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">pseudosequence_filename_for_mapping</span><span class="p">(</span><span class="n">allele_to_sequence</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the canonical pseudosequence filename for a saved mapping."""</span>
+    <span class="k">return</span> <span class="n">pseudosequence_filename_for_length</span><span class="p">(</span>
+        <span class="n">pseudosequence_length</span><span class="p">(</span><span class="n">allele_to_sequence</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="pseudosequence_filename_candidates">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pseudosequences.pseudosequence_filename_candidates">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">pseudosequence_filename_candidates</span><span class="p">(</span><span class="n">models_dir</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Pseudosequence files accepted when loading a saved predictor.</span>
+
+<span class="sd">    ``allele_sequences.csv`` and ``class1_pseudosequences.csv`` are legacy</span>
+<span class="sd">    artifact filenames. The ``pseudosequences.*.*aa.csv`` names make the source</span>
+<span class="sd">    and representation width explicit for newly-generated artifacts.</span>
+<span class="sd">    """</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">filename</span> <span class="ow">in</span> <span class="n">PSEUDOSEQUENCE_FILENAME_PREFERENCE</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">exists</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">filename</span><span class="p">)):</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">glob</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">PSEUDOSEQUENCE_GLOB</span><span class="p">))):</span>
+        <span class="n">filename</span> <span class="o">=</span> <span class="n">basename</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">filename</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="pseudosequence_path">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pseudosequences.pseudosequence_path">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">pseudosequence_path</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="n">fallback_legacy</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the preferred pseudosequence path in ``directory``.</span>
+
+<span class="sd">    When the canonical ``pseudosequences.*.&lt;length&gt;aa.csv`` is absent and</span>
+<span class="sd">    ``fallback_legacy`` is true, returns the legacy</span>
+<span class="sd">    ``allele_sequences.csv`` path and logs a warning so callers don't</span>
+<span class="sd">    silently read a different sequence set than requested.</span>
+<span class="sd">    """</span>
+    <span class="n">filename</span> <span class="o">=</span> <span class="n">pseudosequence_filename_for_length</span><span class="p">(</span><span class="n">length</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">filename</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"No canonical pseudosequence filename for </span><span class="si">%s</span><span class="s2">aa"</span> <span class="o">%</span> <span class="n">length</span><span class="p">)</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">fallback_legacy</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">path</span>
+    <span class="n">legacy_path</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">LEGACY_ALLELE_SEQUENCES_FILENAME</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+        <span class="s2">"Canonical pseudosequence file </span><span class="si">%s</span><span class="s2"> not found in </span><span class="si">%s</span><span class="s2">; falling back to "</span>
+        <span class="s2">"legacy </span><span class="si">%s</span><span class="s2">. The legacy file may carry a different representation "</span>
+        <span class="s2">"width than requested (</span><span class="si">%s</span><span class="s2">aa)."</span><span class="p">,</span>
+        <span class="n">filename</span><span class="p">,</span>
+        <span class="n">directory</span><span class="p">,</span>
+        <span class="n">LEGACY_ALLELE_SEQUENCES_FILENAME</span><span class="p">,</span>
+        <span class="n">length</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">legacy_path</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_run_filename</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="n">filename</span> <span class="o">=</span> <span class="n">pseudosequence_filename_for_length</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">length</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">filename</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="s2">"No canonical pseudosequence filename for </span><span class="si">%s</span><span class="s2">aa"</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">length</span><span class="p">,))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_run_legacy</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">LEGACY_FILENAMES</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">name</span><span class="p">])</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_run_path</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">pseudosequence_path</span><span class="p">(</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">directory</span><span class="p">,</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">length</span><span class="p">,</span>
+        <span class="n">fallback_legacy</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">fallback_legacy</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_run_list</span><span class="p">(</span><span class="n">_args</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">definition</span> <span class="ow">in</span> <span class="n">PSEUDOSEQUENCE_DEFINITIONS</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="si">%s</span><span class="se">\t</span><span class="si">%s</span><span class="se">\t</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="n">definition</span><span class="o">.</span><span class="n">length</span><span class="p">,</span>
+            <span class="n">definition</span><span class="o">.</span><span class="n">source</span><span class="p">,</span>
+            <span class="n">definition</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span>
+        <span class="p">))</span>
+
+
+<div class="viewcode-block" id="main">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pseudosequences.main">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prog</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Command-line access for shell generation scripts."""</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">)</span>
+    <span class="n">subparsers</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_subparsers</span><span class="p">(</span><span class="n">dest</span><span class="o">=</span><span class="s2">"command"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">filename_parser</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"filename"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Print the canonical pseudosequence filename for a length."</span><span class="p">)</span>
+    <span class="n">filename_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--length"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">filename_parser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">_run_filename</span><span class="p">)</span>
+
+    <span class="n">legacy_parser</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"legacy"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Print a legacy compatibility filename."</span><span class="p">)</span>
+    <span class="n">legacy_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"name"</span><span class="p">,</span> <span class="n">choices</span><span class="o">=</span><span class="nb">sorted</span><span class="p">(</span><span class="n">LEGACY_FILENAMES</span><span class="p">))</span>
+    <span class="n">legacy_parser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">_run_legacy</span><span class="p">)</span>
+
+    <span class="n">path_parser</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"path"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Print the preferred pseudosequence path in a directory."</span><span class="p">)</span>
+    <span class="n">path_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--directory"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">path_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--length"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">path_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--fallback-legacy"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Use allele_sequences.csv if the canonical file is absent."</span><span class="p">)</span>
+    <span class="n">path_parser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">_run_path</span><span class="p">)</span>
+
+    <span class="n">list_parser</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"list"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"List canonical pseudosequence definitions."</span><span class="p">)</span>
+    <span class="n">list_parser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">_run_list</span><span class="p">)</span>
+
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">func</span><span class="p">(</span><span class="n">args</span><span class="p">)</span></div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,420 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.parallelism.worker_runtime &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.parallelism.worker_runtime</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.parallelism.worker_runtime</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Worker initialization and error-wrapping helpers."""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">importlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">random</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">traceback</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">multiprocessing.util</span><span class="w"> </span><span class="kn">import</span> <span class="n">Finalize</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">threadpoolctl</span><span class="w"> </span><span class="kn">import</span> <span class="n">threadpool_limits</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">..common</span><span class="w"> </span><span class="kn">import</span> <span class="n">configure_pytorch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..pytorch_sizing</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">CUDA_FREE_BEFORE_CONTEXT_ENV</span><span class="p">,</span>
+    <span class="n">cuda_free_memory_before_context_bytes</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.planning</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolved_int</span>
+
+
+<span class="n">_WORKER_THREADPOOL_LIMITER</span> <span class="o">=</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="install_worker_context">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.install_worker_context">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">install_worker_context</span><span class="p">(</span><span class="n">module_name</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Install one process-wide constant-data mapping for worker functions."""</span>
+    <span class="n">module</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="n">module_name</span><span class="p">)</span>
+    <span class="n">target</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="s2">"WORKER_CONTEXT"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"</span><span class="si">%s</span><span class="s2">.WORKER_CONTEXT must be a dict"</span> <span class="o">%</span> <span class="n">module_name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"worker_context_data is required with worker_context_module"</span>
+        <span class="p">)</span>
+    <span class="c1"># Under fork this may be the exact inherited dictionary. Under spawn it is</span>
+    <span class="c1"># a separately unpickled object that must be installed in the module-level</span>
+    <span class="c1"># dictionary captured by worker function defaults.</span>
+    <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span>
+        <span class="n">target</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="n">target</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">target</span></div>
+
+
+
+<div class="viewcode-block" id="configure_worker_cpu_threads">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.configure_worker_cpu_threads">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">configure_worker_cpu_threads</span><span class="p">(</span><span class="n">num_threads</span><span class="p">,</span> <span class="n">auto_owned</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Apply a fit worker's CPU-thread budget to loaded native runtimes.</span>
+
+<span class="sd">    Forked workers inherit already-initialized BLAS/OpenMP pools, so setting</span>
+<span class="sd">    only environment variables in the parent is insufficient. Keep the</span>
+<span class="sd">    environment synchronized for libraries loaded later and use threadpoolctl</span>
+<span class="sd">    to resize the native pools already present in this process. Caller-owned</span>
+<span class="sd">    OMP/MKL/OpenBLAS settings are authoritative and must not be replaced by a</span>
+<span class="sd">    uniform auto-derived limit.</span>
+<span class="sd">    """</span>
+    <span class="k">global</span> <span class="n">_WORKER_THREADPOOL_LIMITER</span>
+    <span class="k">if</span> <span class="n">num_threads</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">auto_owned</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">num_threads</span> <span class="o">=</span> <span class="n">resolved_int</span><span class="p">(</span><span class="n">num_threads</span><span class="p">,</span> <span class="s2">"cpu_threads_per_worker"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">num_threads</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"cpu_threads_per_worker must be at least 1"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="s2">"OMP_NUM_THREADS"</span><span class="p">,</span> <span class="s2">"MKL_NUM_THREADS"</span><span class="p">,</span> <span class="s2">"OPENBLAS_NUM_THREADS"</span><span class="p">):</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">num_threads</span><span class="p">)</span>
+    <span class="n">_WORKER_THREADPOOL_LIMITER</span> <span class="o">=</span> <span class="n">threadpool_limits</span><span class="p">(</span><span class="n">limits</span><span class="o">=</span><span class="n">num_threads</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">num_threads</span></div>
+
+
+
+<div class="viewcode-block" id="release_initializer_slot">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.release_initializer_slot">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">release_initializer_slot</span><span class="p">(</span><span class="n">slots</span><span class="p">,</span> <span class="n">slot</span><span class="p">,</span> <span class="n">generation</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return a worker's assignment without writing a shutdown pipe."""</span>
+    <span class="k">with</span> <span class="n">slots</span><span class="o">.</span><span class="n">get_lock</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">slots</span><span class="p">[</span><span class="n">slot</span><span class="p">]</span> <span class="o">==</span> <span class="n">generation</span><span class="p">:</span>
+            <span class="n">slots</span><span class="p">[</span><span class="n">slot</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span></div>
+
+
+
+<div class="viewcode-block" id="worker_init_entry_point">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.worker_init_entry_point">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">worker_init_entry_point</span><span class="p">(</span>
+        <span class="n">init_function</span><span class="p">,</span> <span class="n">kwargs_per_process</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sequence</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">shared_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="n">kwargs_per_process</span><span class="p">:</span>
+        <span class="c1"># Arguments travel through normal process startup (shared under fork),</span>
+        <span class="c1"># never a preloaded pipe. Only assignment generations use shared memory.</span>
+        <span class="k">with</span> <span class="n">slots</span><span class="o">.</span><span class="n">get_lock</span><span class="p">():</span>
+            <span class="n">count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">kwargs_per_process</span><span class="p">)</span>
+            <span class="n">start</span> <span class="o">=</span> <span class="n">sequence</span><span class="o">.</span><span class="n">value</span> <span class="o">%</span> <span class="n">count</span>
+            <span class="n">slot</span> <span class="o">=</span> <span class="nb">next</span><span class="p">((</span>
+                <span class="p">(</span><span class="n">start</span> <span class="o">+</span> <span class="n">offset</span><span class="p">)</span> <span class="o">%</span> <span class="n">count</span> <span class="k">for</span> <span class="n">offset</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">count</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">slots</span><span class="p">[(</span><span class="n">start</span> <span class="o">+</span> <span class="n">offset</span><span class="p">)</span> <span class="o">%</span> <span class="n">count</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span>
+            <span class="p">),</span> <span class="n">start</span><span class="p">)</span>
+            <span class="c1"># If a killed worker skipped finalizers, retain the previous</span>
+            <span class="c1"># round-robin fallback. Generations protect a reclaimed slot from</span>
+            <span class="c1"># a late finalizer belonging to its previous owner.</span>
+            <span class="n">sequence</span><span class="o">.</span><span class="n">value</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">generation</span> <span class="o">=</span> <span class="n">sequence</span><span class="o">.</span><span class="n">value</span>
+            <span class="n">slots</span><span class="p">[</span><span class="n">slot</span><span class="p">]</span> <span class="o">=</span> <span class="n">generation</span>
+        <span class="n">kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">kwargs_per_process</span><span class="p">[</span><span class="n">slot</span><span class="p">])</span>
+        <span class="n">Finalize</span><span class="p">(</span>
+            <span class="kc">None</span><span class="p">,</span> <span class="n">release_initializer_slot</span><span class="p">,</span> <span class="p">(</span><span class="n">slots</span><span class="p">,</span> <span class="n">slot</span><span class="p">,</span> <span class="n">generation</span><span class="p">),</span>
+            <span class="n">exitpriority</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Initializing worker with: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">kwargs</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">shared_kwargs</span><span class="p">:</span>
+        <span class="n">overlap</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">kwargs</span><span class="p">)</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">shared_kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">overlap</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Worker initializer arguments supplied as both shared and "</span>
+                <span class="s2">"per-process values: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">overlap</span><span class="p">))</span>
+            <span class="p">)</span>
+        <span class="n">kwargs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">shared_kwargs</span><span class="p">)</span>
+    <span class="n">init_function</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="worker_init">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.worker_init">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">worker_init</span><span class="p">(</span>
+        <span class="n">keras_backend</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">gpu_device_nums</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">worker_log_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_workers_per_gpu</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">cpu_threads_per_worker</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">cpu_threads_per_worker_was_auto</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">worker_context_module</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">worker_context_data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">device_memory_budget_bytes</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">del</span> <span class="n">keras_backend</span>  <span class="c1"># legacy argument retained for API compatibility</span>
+    <span class="k">if</span> <span class="n">worker_log_dir</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">worker_log_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="c1"># Line buffering (buffering=1) ensures every print/traceback flushes</span>
+        <span class="c1"># to disk immediately. Without it, Python defaults to ~8 KB block</span>
+        <span class="c1"># buffering on a regular file, which silently swallows worker</span>
+        <span class="c1"># output if the worker is killed (OOM, signal) before the buffer</span>
+        <span class="c1"># fills. With block buffering, a worker spinning at 99% CPU and</span>
+        <span class="c1"># then OOM-killed leaves a 0-byte LOG file because no flush</span>
+        <span class="c1"># ever fires before the worker dies — line buffering avoids that.</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="n">worker_log_dir</span><span class="p">,</span>
+            <span class="s2">"LOG-worker.</span><span class="si">%d</span><span class="s2">.</span><span class="si">%d</span><span class="s2">.txt"</span> <span class="o">%</span> <span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">(),</span> <span class="nb">int</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()))),</span>
+            <span class="s2">"w"</span><span class="p">,</span> <span class="n">buffering</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">backend</span> <span class="o">==</span> <span class="s2">"gpu"</span> <span class="ow">and</span> <span class="n">gpu_device_nums</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">gpu_device_nums</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">free_before_context</span> <span class="o">=</span> <span class="n">cuda_free_memory_before_context_bytes</span><span class="p">(</span>
+            <span class="n">gpu_device_nums</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">free_before_context</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="n">CUDA_FREE_BEFORE_CONTEXT_ENV</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
+                <span class="n">free_before_context</span><span class="p">)</span>
+
+    <span class="c1"># Each worker needs distinct random numbers</span>
+    <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">()</span>
+    <span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">()</span>
+    <span class="n">cpu_threads_per_worker</span> <span class="o">=</span> <span class="n">configure_worker_cpu_threads</span><span class="p">(</span>
+        <span class="n">cpu_threads_per_worker</span><span class="p">,</span>
+        <span class="n">auto_owned</span><span class="o">=</span><span class="n">cpu_threads_per_worker_was_auto</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">configure_kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"backend"</span><span class="p">:</span> <span class="n">backend</span><span class="p">}</span>
+    <span class="k">if</span> <span class="n">gpu_device_nums</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">configure_kwargs</span><span class="p">[</span><span class="s2">"gpu_device_nums"</span><span class="p">]</span> <span class="o">=</span> <span class="n">gpu_device_nums</span>
+    <span class="k">if</span> <span class="n">cpu_threads_per_worker</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">configure_kwargs</span><span class="p">[</span><span class="s2">"num_threads"</span><span class="p">]</span> <span class="o">=</span> <span class="n">cpu_threads_per_worker</span>
+    <span class="k">if</span> <span class="n">gpu_device_nums</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"WORKER pid=</span><span class="si">%d</span><span class="s2"> assigned GPU devices: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">(),</span> <span class="n">gpu_device_nums</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+    <span class="n">configure_pytorch</span><span class="p">(</span><span class="o">**</span><span class="n">configure_kwargs</span><span class="p">)</span>
+    <span class="c1"># Reseed torch's global RNG too (numpy/random above don't touch it).</span>
+    <span class="c1"># Torch RNG drives weight init and any tensor op without an explicit</span>
+    <span class="c1"># generator; without this, forked workers would share a stream. Seed</span>
+    <span class="c1"># from the freshly-reseeded numpy RNG so the value is per-worker</span>
+    <span class="c1"># distinct. Done after configure_pytorch so any visible CUDA device is</span>
+    <span class="c1"># seeded; a no-op for CUDA generators when the worker is CPU-pinned.</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span> <span class="o">**</span> <span class="mi">31</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)))</span>
+    <span class="c1"># Install model/data context only after the worker's runtime and GPU</span>
+    <span class="c1"># assignment are configured. This keeps context initialization from</span>
+    <span class="c1"># accidentally creating runtime state against the parent's device view.</span>
+    <span class="k">if</span> <span class="n">worker_context_module</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">install_worker_context</span><span class="p">(</span><span class="n">worker_context_module</span><span class="p">,</span> <span class="n">worker_context_data</span><span class="p">)</span>
+    <span class="c1"># Propagate workers-per-GPU into the process env so auto-sized</span>
+    <span class="c1"># batching (Class1NeuralNetwork.predict / fit's</span>
+    <span class="c1"># check_training_batch_fits) can partition VRAM correctly when</span>
+    <span class="c1"># multiple fit()/predict() calls are co-resident on one GPU.</span>
+    <span class="k">if</span> <span class="n">max_workers_per_gpu</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"MHCFLURRY_MAX_WORKERS_PER_GPU"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
+            <span class="n">resolved_int</span><span class="p">(</span><span class="n">max_workers_per_gpu</span><span class="p">,</span> <span class="s2">"max_workers_per_gpu"</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">device_memory_budget_bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">backend</span> <span class="o">==</span> <span class="s2">"gpu"</span><span class="p">:</span>
+        <span class="n">device_memory_budget_bytes</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">device_memory_budget_bytes</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">device_memory_budget_bytes</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"device_memory_budget_bytes must be non-negative"</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"MHCFLURRY_DEVICE_MEMORY_BUDGET_BYTES"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
+            <span class="n">device_memory_budget_bytes</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># Solution suggested in https://bugs.python.org/issue13831</span>
+<div class="viewcode-block" id="WrapException">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.WrapException">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">WrapException</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Add traceback info to exception so exceptions raised in worker processes</span>
+<span class="sd">    can still show traceback info when re-raised in the parent.</span>
+<span class="sd">    """</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">exc_tb</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">exception</span> <span class="o">=</span> <span class="n">exc_value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">formatted</span> <span class="o">=</span> <span class="s1">''</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">traceback</span><span class="o">.</span><span class="n">format_exception</span><span class="p">(</span><span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">))</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s1">'</span><span class="si">%s</span><span class="se">\n</span><span class="s1">Original traceback:</span><span class="se">\n</span><span class="si">%s</span><span class="s1">'</span> <span class="o">%</span> <span class="p">(</span><span class="ne">Exception</span><span class="o">.</span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">formatted</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="call_wrapped">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.call_wrapped">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">call_wrapped</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Run function on args and kwargs and return result, wrapping any exception</span>
+<span class="sd">    raised in a WrapException.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    function : arbitrary function</span>
+
+<span class="sd">    Any other arguments provided are passed to the function.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    object</span>
+<span class="sd">    """</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">function</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">WrapException</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="call_wrapped_kwargs">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.call_wrapped_kwargs">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">call_wrapped_kwargs</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Invoke function on given kwargs and return result, wrapping any exception</span>
+<span class="sd">    raised in a WrapException.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    function : arbitrary function</span>
+<span class="sd">    kwargs : dict</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    object</span>
+
+<span class="sd">    Result of calling ``function(**kwargs)``.</span>
+
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="n">call_wrapped</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

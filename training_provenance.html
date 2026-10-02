@@ -1,0 +1,276 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Auditing training-sample overlap &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Maintainer workflows" href="maintainers.html" />
+    <link rel="prev" title="Percentile calibration for all predictors" href="shared_percent_rank_transforms.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Auditing training-sample overlap</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#preserve-lineage-during-new-training">Preserve lineage during new training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#audit-every-compared-model-together">Audit every compared model together</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#inventory-and-identity-formats">Inventory and identity formats</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Auditing training-sample overlap</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/training_provenance.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="auditing-training-sample-overlap">
+<h1>Auditing training-sample overlap<a class="headerlink" href="#auditing-training-sample-overlap" title="Link to this heading"></a></h1>
+<p>Zero peptide–MHC overlap does <strong>not</strong> establish biological-sample separation:
+other peptides from the same specimen may have contributed to training or model
+selection. The historical affinity bundles lack enough sample provenance to
+certify this separation. Upgrading the code cannot reconstruct those identities.
+External predictors’ training overlap also remains uncertified without their
+complete lineage. Existing benchmark results retain these limitations.</p>
+<section id="preserve-lineage-during-new-training">
+<h2>Preserve lineage during new training<a class="headerlink" href="#preserve-lineage-during-new-training" title="Link to this heading"></a></h2>
+<p>New affinity curation adds <code class="docutils literal notranslate"><span class="pre">source_provenance</span></code>, a JSON array of source records.
+Each record preserves available study, sample and assay IDs, the raw input
+file’s SHA-256, and its zero-based row index after parsing the CSV header.
+Deduplication unions every contributing record while retaining the previous
+measurement, row order and weighting. Reassignment, training metadata and
+selection metadata retain this column. Archive the original sources as well:
+hashes and row indices identify evidence; they do not replace it.</p>
+<p>Missing IDs remain unknown. An assay ID is not a biological sample ID.
+<code class="docutils literal notranslate"><span class="pre">complete</span></code> on a source record means contributor retention, not known specimen
+identity. Historical deduplicated tables must not be relabeled as complete
+sample tables merely because one study or sample can be recovered.</p>
+<p>New release-holdout policies also write <code class="docutils literal notranslate"><span class="pre">affinity_source_samples.csv</span></code>, containing
+the union of monoallelic and selected presentation evaluation samples. The
+affinity preparation script applies it in addition to the pMHC exclusions.
+Direct use is:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span>class1-reassign-mass-spec-training-data<span class="w"> </span>curated.csv<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--exclude-pmhcs<span class="w"> </span>holdout/affinity_pmhcs.csv<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--exclude-source-samples<span class="w"> </span>holdout/affinity_source_samples.csv<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--sample-aliases<span class="w"> </span>specimen_aliases.csv<span class="w"> </span>--out-csv<span class="w"> </span>training.csv
+</pre></div>
+</div>
+<p>Any overlapping contributor removes the entire measurement. If training has a
+known study but no sample identity, the whole matching study is excluded. An
+exclusion lacking a study conservatively matches its sample ID in every study.
+Unresolvable training rows remain explicitly unresolved; retaining them cannot
+support a verified-disjoint claim. The ordinary <code class="docutils literal notranslate"><span class="pre">release-holdout</span> <span class="pre">validate</span></code>
+command checks the recorded exclusions and labels whole-sample proof unresolved.
+Old policy files remain readable with their original, narrower scope.</p>
+</section>
+<section id="audit-every-compared-model-together">
+<h2>Audit every compared model together<a class="headerlink" href="#audit-every-compared-model-together" title="Link to this heading"></a></h2>
+<p>Freeze one cohort and inventory every compared MHCflurry model, including
+affinity, processing and presentation components. Inventory all biological
+sources used for pretraining, training, stopping/development and ensemble
+selection, including the lineage of any teacher used to generate synthetic
+pretraining targets. An empty stage list explicitly means that stage used no
+data; it does not mean its data are unavailable.</p>
+<p>Run the audit before claiming sample-disjoint evaluation:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span>train<span class="w"> </span>release-holdout<span class="w"> </span>audit-samples<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--inventory<span class="w"> </span>lineage.json<span class="w"> </span>--cohort<span class="w"> </span>frozen_cohort.csv.gz<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--sample-metadata<span class="w"> </span>cohort_studies.csv<span class="w"> </span>--aliases<span class="w"> </span>specimen_aliases.csv<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--out-dir<span class="w"> </span>results/sample_audit
+</pre></div>
+</div>
+<p>The output directory must be new. The command writes <code class="docutils literal notranslate"><span class="pre">sample_audit.csv</span></code>,
+<code class="docutils literal notranslate"><span class="pre">sample_disjointness.json</span></code> and <code class="docutils literal notranslate"><span class="pre">cohort.csv.gz</span></code>, with hashes, sample/row/label
+counts, and reasons for overlap or uncertainty. It fails if any input sample is
+overlapping or unresolved against any inventoried MHCflurry model. Use
+<code class="docutils literal notranslate"><span class="pre">--report-only</span></code> to inspect incomplete historical evidence without that exit
+failure. External evidence has a separate status and does not silently become
+verified when MHCflurry passes.</p>
+<p>The JSON also records the generating function and arguments, package/source
+hashes and Python/pandas versions. The audit is deterministic and uses no random
+seed. Freeze the inventory and source files while it runs.</p>
+<p>The exported cohort contains only samples verified against <strong>all</strong> inventoried
+MHCflurry models. Use that one cohort for every comparator, retaining all its
+positive and negative rows. Disclose changed counts and hashes; never filter
+each predictor independently. Recheck peptide–MHC overlap separately. A benchmark
+already used for development remains a regression benchmark, even after overlap
+filtering; use an untouched confirmation cohort for new generalization claims.</p>
+</section>
+<section id="inventory-and-identity-formats">
+<h2>Inventory and identity formats<a class="headerlink" href="#inventory-and-identity-formats" title="Link to this heading"></a></h2>
+<p>This example describes one affinity-only model. A full presentation model uses
+<code class="docutils literal notranslate"><span class="pre">&quot;kind&quot;:</span> <span class="pre">&quot;presentation&quot;</span></code> and requires <code class="docutils literal notranslate"><span class="pre">affinity</span></code>, <code class="docutils literal notranslate"><span class="pre">processing</span></code> and <code class="docutils literal notranslate"><span class="pre">presentation</span></code>
+component entries. Add every compared release as a separate model. External
+models use <code class="docutils literal notranslate"><span class="pre">&quot;kind&quot;:</span> <span class="pre">&quot;external&quot;</span></code>; unavailable components/artifacts yield an
+explicit unresolved result.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"schema_version"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"identity_review"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Describe the reviewed study namespaces, specimen aliases and shared specimens here."</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"models"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span>
+<span class="w">    </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"candidate-affinity"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"affinity"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"artifacts"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"affinity-model-bundle.tar.bz2"</span><span class="p">],</span>
+<span class="w">    </span><span class="nt">"components"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"affinity"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"complete"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"evidence"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Describe how these files cover this model's complete lineage."</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"pretraining"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">        </span><span class="nt">"training"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"train_data.csv.bz2"</span><span class="p">}],</span>
+<span class="w">        </span><span class="nt">"development"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">        </span><span class="nt">"selection"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"model_selection_data.csv.bz2"</span><span class="p">}]</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Paths are relative to the inventory file. Include an immutable model archive or
+all model files in <code class="docutils literal notranslate"><span class="pre">artifacts</span></code>; their hashes bind the report to those weights.
+The tool verifies the supplied files, not the truth of a completeness declaration.
+Supply review evidence and leave <code class="docutils literal notranslate"><span class="pre">complete:</span> <span class="pre">false</span></code> when any lineage is missing.</p>
+<p>Data entries default to the <code class="docutils literal notranslate"><span class="pre">source_provenance</span></code> column. For reviewed raw sample
+tables, an entry may instead specify <code class="docutils literal notranslate"><span class="pre">&quot;identity_mode&quot;:</span> <span class="pre">&quot;sample_table&quot;</span></code>, with
+<code class="docutils literal notranslate"><span class="pre">&quot;study_column&quot;:</span> <span class="pre">&quot;pmid&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">&quot;sample_column&quot;:</span> <span class="pre">&quot;sample_id&quot;</span></code> (defaults:
+<code class="docutils literal notranslate"><span class="pre">study_id</span></code> and <code class="docutils literal notranslate"><span class="pre">sample_id</span></code>). This mode is unsuitable for historical affinity
+tables that already discarded contributors.</p>
+<p><code class="docutils literal notranslate"><span class="pre">cohort_studies.csv</span></code> has <code class="docutils literal notranslate"><span class="pre">study_id,sample_id</span></code> columns; it is optional if the cohort
+already has both. Numeric study IDs mean PubMed IDs and normalize to <code class="docutils literal notranslate"><span class="pre">pmid:ID</span></code>.
+Other study IDs need explicit namespaces and reviewed correspondence. Sample
+IDs retain leading zeroes. Alias CSV columns, in order, are
+<code class="docutils literal notranslate"><span class="pre">study_id,sample_id,canonical_study_id,canonical_sample_id</span></code>. Blank sample IDs on
+both sides map a study alias; filled IDs map a shared specimen, including across
+studies. Conflicting mappings and cycles are errors. Different spelling or a
+different publication is not sufficient evidence of a different specimen.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="shared_percent_rank_transforms.html" class="btn btn-neutral float-left" title="Percentile calibration for all predictors" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="maintainers.html" class="btn btn-neutral float-right" title="Maintainer workflows" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

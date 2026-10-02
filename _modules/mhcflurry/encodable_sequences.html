@@ -1,0 +1,676 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.encodable_sequences &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.encodable_sequences</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.encodable_sequences</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""</span>
+<span class="sd">Class for encoding variable-length peptides to fixed-size numerical matrices</span>
+<span class="sd">"""</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">amino_acid</span>
+
+
+<div class="viewcode-block" id="EncodingError">
+<a class="viewcode-back" href="../../api.html#mhcflurry.encodable_sequences.EncodingError">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">EncodingError</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Exception raised when peptides cannot be encoded</span>
+<span class="sd">    """</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="n">supported_peptide_lengths</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">supported_peptide_lengths</span> <span class="o">=</span> <span class="n">supported_peptide_lengths</span>
+        <span class="ne">ValueError</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">message</span> <span class="o">+</span> <span class="s2">" Supported lengths: </span><span class="si">%s</span><span class="s2"> - </span><span class="si">%s</span><span class="s2">."</span> <span class="o">%</span> <span class="n">supported_peptide_lengths</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="EncodableSequences">
+<a class="viewcode-back" href="../../api.html#mhcflurry.encodable_sequences.EncodableSequences">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">EncodableSequences</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Class for encoding variable-length peptides to fixed-size numerical matrices</span>
+
+<span class="sd">    This class caches various encodings of a list of sequences.</span>
+
+<span class="sd">    In practice this is used only for peptides. To encode MHC allele sequences,</span>
+<span class="sd">    see AlleleEncoding.</span>
+<span class="sd">    """</span>
+    <span class="n">unknown_character</span> <span class="o">=</span> <span class="s2">"X"</span>
+
+<div class="viewcode-block" id="EncodableSequences.create">
+<a class="viewcode-back" href="../../api.html#mhcflurry.encodable_sequences.EncodableSequences.create">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create</span><span class="p">(</span><span class="n">klass</span><span class="p">,</span> <span class="n">sequences</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Factory that returns an EncodableSequences given a list of</span>
+<span class="sd">        strings. As a convenience, you can also pass it an EncodableSequences</span>
+<span class="sd">        instance, in which case the object is returned unchanged.</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sequences</span><span class="p">,</span> <span class="n">klass</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">sequences</span>
+        <span class="k">return</span> <span class="n">klass</span><span class="p">(</span><span class="n">sequences</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sequences</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">sequences</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Sequence of strings is required"</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sequences</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">sequences</span><span class="p">)</span>
+        <span class="n">lengths</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">object_</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_length</span> <span class="o">=</span> <span class="n">lengths</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_length</span> <span class="o">=</span> <span class="n">lengths</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fixed_sequence_length</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fixed_sequence_length</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">)</span>
+
+<div class="viewcode-block" id="EncodableSequences.variable_length_to_fixed_length_categorical">
+<a class="viewcode-back" href="../../api.html#mhcflurry.encodable_sequences.EncodableSequences.variable_length_to_fixed_length_categorical">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">variable_length_to_fixed_length_categorical</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">alignment_method</span><span class="o">=</span><span class="s2">"pad_middle"</span><span class="p">,</span>
+            <span class="n">left_edge</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+            <span class="n">right_edge</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+            <span class="n">max_length</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
+            <span class="n">trim</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">allow_unsupported_amino_acids</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Encode variable-length sequences to a fixed-size index-encoded (integer)</span>
+<span class="sd">        matrix.</span>
+
+<span class="sd">        See `sequences_to_fixed_length_index_encoded_array` for details.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        alignment_method : string</span>
+<span class="sd">            One of "pad_middle", "left_pad_right_pad",</span>
+<span class="sd">            "left_pad_centered_right_pad", "left_pad", or "right_pad"</span>
+<span class="sd">        left_edge : int, size of fixed-position left side</span>
+<span class="sd">            Only relevant for pad_middle alignment method</span>
+<span class="sd">        right_edge : int, size of the fixed-position right side</span>
+<span class="sd">            Only relevant for pad_middle alignment method</span>
+<span class="sd">        max_length : maximum supported peptide length</span>
+<span class="sd">        trim : bool</span>
+<span class="sd">            If True, longer sequences will be trimmed to fit the maximum</span>
+<span class="sd">            supported length. Not supported for all alignment methods.</span>
+<span class="sd">        allow_unsupported_amino_acids : bool</span>
+<span class="sd">            If True, non-canonical amino acids will be replaced with the X</span>
+<span class="sd">            character before encoding.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.array of integers with shape (num sequences, encoded length)</span>
+
+<span class="sd">        For pad_middle, left_pad and right_pad, the encoded length is max_length.</span>
+<span class="sd">        For left_pad_right_pad it is 2 * max_length; for</span>
+<span class="sd">        left_pad_centered_right_pad it is 3 * max_length.</span>
+<span class="sd">        """</span>
+
+        <span class="n">cache_key</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">"fixed_length_categorical"</span><span class="p">,</span>
+            <span class="n">alignment_method</span><span class="p">,</span>
+            <span class="n">left_edge</span><span class="p">,</span>
+            <span class="n">right_edge</span><span class="p">,</span>
+            <span class="n">max_length</span><span class="p">,</span>
+            <span class="n">trim</span><span class="p">,</span>
+            <span class="n">allow_unsupported_amino_acids</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">cache_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">:</span>
+            <span class="n">fixed_length_sequences</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">sequences_to_fixed_length_index_encoded_array</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">,</span>
+                    <span class="n">alignment_method</span><span class="o">=</span><span class="n">alignment_method</span><span class="p">,</span>
+                    <span class="n">left_edge</span><span class="o">=</span><span class="n">left_edge</span><span class="p">,</span>
+                    <span class="n">right_edge</span><span class="o">=</span><span class="n">right_edge</span><span class="p">,</span>
+                    <span class="n">max_length</span><span class="o">=</span><span class="n">max_length</span><span class="p">,</span>
+                    <span class="n">trim</span><span class="o">=</span><span class="n">trim</span><span class="p">,</span>
+                    <span class="n">allow_unsupported_amino_acids</span><span class="o">=</span><span class="n">allow_unsupported_amino_acids</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">fixed_length_sequences</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="EncodableSequences.variable_length_to_fixed_length_vector_encoding">
+<a class="viewcode-back" href="../../api.html#mhcflurry.encodable_sequences.EncodableSequences.variable_length_to_fixed_length_vector_encoding">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">variable_length_to_fixed_length_vector_encoding</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">vector_encoding_name</span><span class="p">,</span>
+            <span class="n">alignment_method</span><span class="o">=</span><span class="s2">"pad_middle"</span><span class="p">,</span>
+            <span class="n">left_edge</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+            <span class="n">right_edge</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+            <span class="n">max_length</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
+            <span class="n">trim</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">allow_unsupported_amino_acids</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Encode variable-length sequences to a fixed-size matrix. Amino acids</span>
+<span class="sd">        are encoded as specified by the vector_encoding_name argument.</span>
+
+<span class="sd">        DEPRECATED (scheduled for removal): the dense ``(N, L, V)`` peptide/</span>
+<span class="sd">        sequence vector path has been retired — models always index-encode</span>
+<span class="sd">        peptides ((N, L) int8) and embed on device. This method has no</span>
+<span class="sd">        production caller; it is retained only for benchmark/encoding-cache</span>
+<span class="sd">        tests and will be removed once those migrate to the categorical path.</span>
+<span class="sd">        Use ``variable_length_to_fixed_length_categorical`` instead.</span>
+
+<span class="sd">        See `sequences_to_fixed_length_index_encoded_array` for details.</span>
+
+<span class="sd">        See also: variable_length_to_fixed_length_categorical.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        vector_encoding_name : string</span>
+<span class="sd">            How to represent amino acids. Registered names include</span>
+<span class="sd">            "BLOSUM62", "one-hot", "PMBEC", "contact", "physchem", and</span>
+<span class="sd">            "atchley"; ``+``-joined composites such as</span>
+<span class="sd">            "BLOSUM62+physchem" are also accepted. Add the ``:minmax``</span>
+<span class="sd">            suffix to a component to scale its non-X values to [-1, 1],</span>
+<span class="sd">            for example "PMBEC:minmax+contact:minmax".</span>
+<span class="sd">        alignment_method : string</span>
+<span class="sd">            One of "pad_middle", "left_pad_right_pad",</span>
+<span class="sd">            "left_pad_centered_right_pad", "left_pad", or "right_pad"</span>
+<span class="sd">        left_edge : int</span>
+<span class="sd">            Size of fixed-position left side.</span>
+<span class="sd">            Only relevant for pad_middle alignment method</span>
+<span class="sd">        right_edge : int</span>
+<span class="sd">            Size of the fixed-position right side.</span>
+<span class="sd">            Only relevant for pad_middle alignment method</span>
+<span class="sd">        max_length : int</span>
+<span class="sd">            Maximum supported peptide length</span>
+<span class="sd">        trim : bool</span>
+<span class="sd">            If True, longer sequences will be trimmed to fit the maximum</span>
+<span class="sd">            supported length. Not supported for all alignment methods.</span>
+<span class="sd">        allow_unsupported_amino_acids : bool</span>
+<span class="sd">            If True, non-canonical amino acids will be replaced with the X</span>
+<span class="sd">            character before encoding.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.array with shape (num sequences, encoded length, m)</span>
+
+<span class="sd">        where</span>
+<span class="sd">            - m is the vector encoding length (usually 21).</span>
+<span class="sd">            - encoded length is max_length if alignment_method is pad_middle;</span>
+<span class="sd">              2 * max_length for left_pad_right_pad and 3 * max_length</span>
+<span class="sd">              for left_pad_centered_right_pad; left_pad/right_pad use max_length.</span>
+<span class="sd">        """</span>
+        <span class="n">cache_key</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">"fixed_length_vector_encoding"</span><span class="p">,</span>
+            <span class="n">vector_encoding_name</span><span class="p">,</span>
+            <span class="n">alignment_method</span><span class="p">,</span>
+            <span class="n">left_edge</span><span class="p">,</span>
+            <span class="n">right_edge</span><span class="p">,</span>
+            <span class="n">max_length</span><span class="p">,</span>
+            <span class="n">trim</span><span class="p">,</span>
+            <span class="n">allow_unsupported_amino_acids</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">cache_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">:</span>
+            <span class="n">fixed_length_sequences</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">sequences_to_fixed_length_index_encoded_array</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">,</span>
+                    <span class="n">alignment_method</span><span class="o">=</span><span class="n">alignment_method</span><span class="p">,</span>
+                    <span class="n">left_edge</span><span class="o">=</span><span class="n">left_edge</span><span class="p">,</span>
+                    <span class="n">right_edge</span><span class="o">=</span><span class="n">right_edge</span><span class="p">,</span>
+                    <span class="n">max_length</span><span class="o">=</span><span class="n">max_length</span><span class="p">,</span>
+                    <span class="n">trim</span><span class="o">=</span><span class="n">trim</span><span class="p">,</span>
+                    <span class="n">allow_unsupported_amino_acids</span><span class="o">=</span><span class="n">allow_unsupported_amino_acids</span><span class="p">))</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">fixed_vectors_encoding</span><span class="p">(</span>
+                <span class="n">fixed_length_sequences</span><span class="p">,</span>
+                <span class="n">amino_acid</span><span class="o">.</span><span class="n">get_vector_encoding_df</span><span class="p">(</span><span class="n">vector_encoding_name</span><span class="p">))</span>
+            <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="EncodableSequences.sequences_to_fixed_length_index_encoded_array">
+<a class="viewcode-back" href="../../api.html#mhcflurry.encodable_sequences.EncodableSequences.sequences_to_fixed_length_index_encoded_array">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sequences_to_fixed_length_index_encoded_array</span><span class="p">(</span>
+            <span class="n">klass</span><span class="p">,</span>
+            <span class="n">sequences</span><span class="p">,</span>
+            <span class="n">alignment_method</span><span class="o">=</span><span class="s2">"pad_middle"</span><span class="p">,</span>
+            <span class="n">left_edge</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+            <span class="n">right_edge</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+            <span class="n">max_length</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
+            <span class="n">trim</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">allow_unsupported_amino_acids</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Encode variable-length sequences to a fixed-size index-encoded (integer)</span>
+<span class="sd">        matrix.</span>
+
+<span class="sd">        How variable length sequences get mapped to fixed length is set by the</span>
+<span class="sd">        "alignment_method" argument. Supported alignment methods are:</span>
+
+<span class="sd">            pad_middle</span>
+<span class="sd">                Encoding designed for preserving the anchor positions of class</span>
+<span class="sd">                I peptides. This is what is used in allele-specific models.</span>
+
+<span class="sd">                Each string must be of length at least left_edge + right_edge</span>
+<span class="sd">                and at most max_length. The first left_edge characters in the</span>
+<span class="sd">                input always map to the first left_edge characters in the</span>
+<span class="sd">                output. Similarly for the last right_edge characters. The</span>
+<span class="sd">                middle characters are filled in based on the length, with the</span>
+<span class="sd">                X character filling in the blanks.</span>
+
+<span class="sd">                Example:</span>
+
+<span class="sd">                AAAACDDDD -&gt; AAAAXXXCXXXDDDD</span>
+
+<span class="sd">            left_pad_centered_right_pad</span>
+<span class="sd">                Encoding that makes no assumptions on anchor positions but is</span>
+<span class="sd">                3x larger than pad_middle, since it duplicates the peptide</span>
+<span class="sd">                (left aligned + centered + right aligned). This is what is used</span>
+<span class="sd">                for the pan-allele models.</span>
+
+<span class="sd">                Example:</span>
+
+<span class="sd">                AAAACDDDD -&gt; AAAACDDDDXXXXXXXXXAAAACDDDDXXXXXXXXXAAAACDDDD</span>
+
+<span class="sd">            left_pad_right_pad</span>
+<span class="sd">                Same as left_pad_centered_right_pad but only includes left-</span>
+<span class="sd">                and right-padded peptide.</span>
+
+<span class="sd">                Example:</span>
+
+<span class="sd">                AAAACDDDD -&gt; AAAACDDDDXXXXXXXXXXXXAAAACDDDD</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        sequences : list of string</span>
+<span class="sd">        alignment_method : string</span>
+<span class="sd">            One of "pad_middle", "left_pad_right_pad",</span>
+<span class="sd">            "left_pad_centered_right_pad", "left_pad", or "right_pad"</span>
+<span class="sd">        left_edge : int</span>
+<span class="sd">            Size of fixed-position left side.</span>
+<span class="sd">            Only relevant for pad_middle alignment method</span>
+<span class="sd">        right_edge : int</span>
+<span class="sd">            Size of the fixed-position right side.</span>
+<span class="sd">            Only relevant for pad_middle alignment method</span>
+<span class="sd">        max_length : int</span>
+<span class="sd">            maximum supported peptide length</span>
+<span class="sd">        trim : bool</span>
+<span class="sd">            If True, longer sequences will be trimmed to fit the maximum</span>
+<span class="sd">            supported length. Not supported for all alignment methods.</span>
+<span class="sd">        allow_unsupported_amino_acids : bool</span>
+<span class="sd">            If True, non-canonical amino acids will be replaced with the X</span>
+<span class="sd">            character before encoding.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.array of integers with shape (num sequences, encoded length)</span>
+
+<span class="sd">        For pad_middle, the encoded length is max_length. For left_pad_right_pad,</span>
+<span class="sd">        it's 2 * max_length. For left_pad_centered_right_pad, it's</span>
+<span class="sd">        3 * max_length.</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="n">allow_unsupported_amino_acids</span><span class="p">:</span>
+            <span class="n">fill_value</span> <span class="o">=</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">AMINO_ACID_INDEX</span><span class="p">[</span><span class="s1">'X'</span><span class="p">]</span>
+
+            <span class="k">def</span><span class="w"> </span><span class="nf">get_amino_acid_index</span><span class="p">(</span><span class="n">a</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">AMINO_ACID_INDEX</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">get_amino_acid_index</span> <span class="o">=</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">AMINO_ACID_INDEX</span><span class="o">.</span><span class="fm">__getitem__</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">alignment_method</span> <span class="o">==</span> <span class="s1">'pad_middle'</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">trim</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"trim not supported"</span><span class="p">)</span>
+
+            <span class="c1"># Result array is int32, filled with X (null amino acid) value.</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span>
+                <span class="n">fill_value</span><span class="o">=</span><span class="n">amino_acid</span><span class="o">.</span><span class="n">AMINO_ACID_INDEX</span><span class="p">[</span><span class="s1">'X'</span><span class="p">],</span>
+                <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">sequences</span><span class="p">),</span> <span class="n">max_length</span><span class="p">),</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="s2">"int32"</span><span class="p">)</span>
+
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"peptide"</span><span class="p">:</span> <span class="n">sequences</span><span class="p">},</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">object_</span><span class="p">)</span>
+            <span class="n">df</span><span class="p">[</span><span class="s2">"length"</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span>
+
+            <span class="n">middle_length</span> <span class="o">=</span> <span class="n">max_length</span> <span class="o">-</span> <span class="n">left_edge</span> <span class="o">-</span> <span class="n">right_edge</span>
+            <span class="n">min_length</span> <span class="o">=</span> <span class="n">left_edge</span> <span class="o">+</span> <span class="n">right_edge</span>
+
+            <span class="c1"># For efficiency we handle each supported peptide length using bulk</span>
+            <span class="c1"># array operations.</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="n">sub_df</span><span class="p">)</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"length"</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">length</span> <span class="o">&lt;</span> <span class="n">min_length</span> <span class="ow">or</span> <span class="n">length</span> <span class="o">&gt;</span> <span class="n">max_length</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">EncodingError</span><span class="p">(</span>
+                        <span class="s2">"Sequence '</span><span class="si">%s</span><span class="s2">' (length </span><span class="si">%d</span><span class="s2">) unsupported. There are </span><span class="si">%d</span><span class="s2"> "</span>
+                        <span class="s2">"total peptides with this length."</span> <span class="o">%</span> <span class="p">(</span>
+                            <span class="n">sub_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">peptide</span><span class="p">,</span>
+                            <span class="n">length</span><span class="p">,</span>
+                            <span class="nb">len</span><span class="p">(</span><span class="n">sub_df</span><span class="p">)),</span> <span class="n">supported_peptide_lengths</span><span class="o">=</span><span class="p">(</span>
+                                <span class="n">min_length</span><span class="p">,</span> <span class="n">max_length</span><span class="p">))</span>
+
+                <span class="c1"># Array of shape (num peptides, length) giving fixed-length</span>
+                <span class="c1"># amino acid encoding each peptide of the current length.</span>
+                <span class="n">fixed_length_sequences</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span>
+                    <span class="n">sub_df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+                        <span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
+                            <span class="n">get_amino_acid_index</span><span class="p">(</span><span class="n">char</span><span class="p">)</span> <span class="k">for</span> <span class="n">char</span> <span class="ow">in</span> <span class="n">s</span>
+                        <span class="p">]))</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+
+                <span class="n">num_null</span> <span class="o">=</span> <span class="n">max_length</span> <span class="o">-</span> <span class="n">length</span>
+                <span class="n">num_null_left</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">num_null</span> <span class="o">/</span> <span class="mi">2</span><span class="p">))</span>
+                <span class="n">num_middle_filled</span> <span class="o">=</span> <span class="n">middle_length</span> <span class="o">-</span> <span class="n">num_null</span>
+                <span class="n">middle_start</span> <span class="o">=</span> <span class="n">left_edge</span> <span class="o">+</span> <span class="n">num_null_left</span>
+
+                <span class="c1"># Set left edge</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">sub_df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="p">:</span><span class="n">left_edge</span><span class="p">]</span> <span class="o">=</span> <span class="n">fixed_length_sequences</span><span class="p">[</span>
+                    <span class="p">:,</span> <span class="p">:</span><span class="n">left_edge</span>
+                <span class="p">]</span>
+
+                <span class="c1"># Set middle.</span>
+                <span class="n">result</span><span class="p">[</span>
+                    <span class="n">sub_df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span>
+                    <span class="n">middle_start</span> <span class="p">:</span> <span class="n">middle_start</span> <span class="o">+</span> <span class="n">num_middle_filled</span>
+                <span class="p">]</span> <span class="o">=</span> <span class="n">fixed_length_sequences</span><span class="p">[</span>
+                    <span class="p">:,</span> <span class="n">left_edge</span> <span class="p">:</span> <span class="n">left_edge</span> <span class="o">+</span> <span class="n">num_middle_filled</span>
+                <span class="p">]</span>
+
+                <span class="c1"># Set right edge.</span>
+                <span class="n">result</span><span class="p">[</span>
+                    <span class="n">sub_df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span>
+                    <span class="o">-</span><span class="n">right_edge</span><span class="p">:</span>
+                <span class="p">]</span> <span class="o">=</span> <span class="n">fixed_length_sequences</span><span class="p">[:,</span> <span class="o">-</span><span class="n">right_edge</span><span class="p">:]</span>
+        <span class="k">elif</span> <span class="n">alignment_method</span> <span class="o">==</span> <span class="s2">"left_pad_right_pad"</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">trim</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"trim not supported"</span><span class="p">)</span>
+
+            <span class="c1"># We arbitrarily set a minimum length of 5, although this encoding</span>
+            <span class="c1"># could handle smaller peptides.</span>
+            <span class="n">min_length</span> <span class="o">=</span> <span class="mi">5</span>
+
+            <span class="c1"># Result array is int32, filled with X (null amino acid) value.</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span>
+                <span class="n">fill_value</span><span class="o">=</span><span class="n">amino_acid</span><span class="o">.</span><span class="n">AMINO_ACID_INDEX</span><span class="p">[</span><span class="s1">'X'</span><span class="p">],</span>
+                <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">sequences</span><span class="p">),</span> <span class="n">max_length</span> <span class="o">*</span> <span class="mi">2</span><span class="p">),</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="s2">"int32"</span><span class="p">)</span>
+
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"peptide"</span><span class="p">:</span> <span class="n">sequences</span><span class="p">},</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">object_</span><span class="p">)</span>
+
+            <span class="c1"># For efficiency we handle each supported peptide length using bulk</span>
+            <span class="c1"># array operations.</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="n">sub_df</span><span class="p">)</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()):</span>
+                <span class="k">if</span> <span class="n">length</span> <span class="o">&lt;</span> <span class="n">min_length</span> <span class="ow">or</span> <span class="n">length</span> <span class="o">&gt;</span> <span class="n">max_length</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">EncodingError</span><span class="p">(</span>
+                        <span class="s2">"Sequence '</span><span class="si">%s</span><span class="s2">' (length </span><span class="si">%d</span><span class="s2">) unsupported. There are </span><span class="si">%d</span><span class="s2"> "</span>
+                        <span class="s2">"total peptides with this length."</span> <span class="o">%</span> <span class="p">(</span>
+                            <span class="n">sub_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">peptide</span><span class="p">,</span>
+                            <span class="n">length</span><span class="p">,</span>
+                            <span class="nb">len</span><span class="p">(</span><span class="n">sub_df</span><span class="p">)),</span> <span class="n">supported_peptide_lengths</span><span class="o">=</span><span class="p">(</span>
+                                <span class="n">min_length</span><span class="p">,</span> <span class="n">max_length</span><span class="p">))</span>
+
+                <span class="c1"># Array of shape (num peptides, length) giving fixed-length</span>
+                <span class="c1"># amino acid encoding each peptide of the current length.</span>
+                <span class="n">fixed_length_sequences</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">sub_df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+                    <span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
+                        <span class="n">get_amino_acid_index</span><span class="p">(</span><span class="n">char</span><span class="p">)</span> <span class="k">for</span> <span class="n">char</span> <span class="ow">in</span> <span class="n">s</span>
+                    <span class="p">]))</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+
+                <span class="c1"># Set left edge</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">sub_df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="p">:</span><span class="n">length</span><span class="p">]</span> <span class="o">=</span> <span class="n">fixed_length_sequences</span>
+
+                <span class="c1"># Set right edge.</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">sub_df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="o">-</span><span class="n">length</span><span class="p">:]</span> <span class="o">=</span> <span class="n">fixed_length_sequences</span>
+        <span class="k">elif</span> <span class="n">alignment_method</span> <span class="o">==</span> <span class="s2">"left_pad_centered_right_pad"</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">trim</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"trim not supported"</span><span class="p">)</span>
+
+            <span class="c1"># We arbitrarily set a minimum length of 5, although this encoding</span>
+            <span class="c1"># could handle smaller peptides.</span>
+            <span class="n">min_length</span> <span class="o">=</span> <span class="mi">5</span>
+
+            <span class="c1"># Result array is int32, filled with X (null amino acid) value.</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span>
+                <span class="n">fill_value</span><span class="o">=</span><span class="n">amino_acid</span><span class="o">.</span><span class="n">AMINO_ACID_INDEX</span><span class="p">[</span><span class="s1">'X'</span><span class="p">],</span>
+                <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">sequences</span><span class="p">),</span> <span class="n">max_length</span> <span class="o">*</span> <span class="mi">3</span><span class="p">),</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="s2">"int32"</span><span class="p">)</span>
+
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"peptide"</span><span class="p">:</span> <span class="n">sequences</span><span class="p">},</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">object_</span><span class="p">)</span>
+
+            <span class="c1"># For efficiency we handle each supported peptide length using bulk</span>
+            <span class="c1"># array operations.</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="n">sub_df</span><span class="p">)</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()):</span>
+                <span class="k">if</span> <span class="n">length</span> <span class="o">&lt;</span> <span class="n">min_length</span> <span class="ow">or</span> <span class="n">length</span> <span class="o">&gt;</span> <span class="n">max_length</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">EncodingError</span><span class="p">(</span>
+                        <span class="s2">"Sequence '</span><span class="si">%s</span><span class="s2">' (length </span><span class="si">%d</span><span class="s2">) unsupported. There are </span><span class="si">%d</span><span class="s2"> "</span>
+                        <span class="s2">"total peptides with this length."</span> <span class="o">%</span> <span class="p">(</span>
+                            <span class="n">sub_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">peptide</span><span class="p">,</span>
+                            <span class="n">length</span><span class="p">,</span>
+                            <span class="nb">len</span><span class="p">(</span><span class="n">sub_df</span><span class="p">)),</span> <span class="n">supported_peptide_lengths</span><span class="o">=</span><span class="p">(</span>
+                                <span class="n">min_length</span><span class="p">,</span> <span class="n">max_length</span><span class="p">))</span>
+
+                <span class="c1"># Array of shape (num peptides, length) giving fixed-length</span>
+                <span class="c1"># amino acid encoding each peptide of the current length.</span>
+                <span class="n">fixed_length_sequences</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">sub_df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+                    <span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
+                        <span class="n">get_amino_acid_index</span><span class="p">(</span><span class="n">char</span><span class="p">)</span> <span class="k">for</span> <span class="n">char</span> <span class="ow">in</span> <span class="n">s</span>
+                    <span class="p">]))</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+
+                <span class="c1"># Set left edge</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">sub_df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="p">:</span><span class="n">length</span><span class="p">]</span> <span class="o">=</span> <span class="n">fixed_length_sequences</span>
+
+                <span class="c1"># Set right edge.</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">sub_df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="o">-</span><span class="n">length</span><span class="p">:]</span> <span class="o">=</span> <span class="n">fixed_length_sequences</span>
+
+                <span class="c1"># Set center.</span>
+                <span class="n">center_left_padding</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+                    <span class="n">math</span><span class="o">.</span><span class="n">floor</span><span class="p">((</span><span class="n">max_length</span> <span class="o">-</span> <span class="n">length</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span><span class="p">))</span>
+                <span class="n">center_left_offset</span> <span class="o">=</span> <span class="n">max_length</span> <span class="o">+</span> <span class="n">center_left_padding</span>
+                <span class="n">result</span><span class="p">[</span>
+                    <span class="n">sub_df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span>
+                    <span class="n">center_left_offset</span> <span class="p">:</span> <span class="n">center_left_offset</span> <span class="o">+</span> <span class="n">length</span>
+                <span class="p">]</span> <span class="o">=</span> <span class="n">fixed_length_sequences</span>
+        <span class="k">elif</span> <span class="n">alignment_method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"right_pad"</span><span class="p">,</span> <span class="s2">"left_pad"</span><span class="p">):</span>
+            <span class="n">min_length</span> <span class="o">=</span> <span class="mi">1</span>
+
+            <span class="c1"># Result array is int32, filled with X (null amino acid) value.</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span>
+                <span class="n">fill_value</span><span class="o">=</span><span class="n">amino_acid</span><span class="o">.</span><span class="n">AMINO_ACID_INDEX</span><span class="p">[</span><span class="s1">'X'</span><span class="p">],</span>
+                <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">sequences</span><span class="p">),</span> <span class="n">max_length</span><span class="p">),</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="s2">"int32"</span><span class="p">)</span>
+
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"peptide"</span><span class="p">:</span> <span class="n">sequences</span><span class="p">},</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">object_</span><span class="p">)</span>
+
+            <span class="c1"># For efficiency we handle each supported peptide length using bulk</span>
+            <span class="c1"># array operations.</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="n">sub_df</span><span class="p">)</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()):</span>
+                <span class="k">if</span> <span class="n">length</span> <span class="o">&lt;</span> <span class="n">min_length</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="n">trim</span> <span class="ow">and</span> <span class="n">length</span> <span class="o">&gt;</span> <span class="n">max_length</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="n">EncodingError</span><span class="p">(</span>
+                        <span class="s2">"Sequence '</span><span class="si">%s</span><span class="s2">' (length </span><span class="si">%d</span><span class="s2">) unsupported. There are </span><span class="si">%d</span><span class="s2"> "</span>
+                        <span class="s2">"total peptides with this length."</span> <span class="o">%</span> <span class="p">(</span>
+                            <span class="n">sub_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">peptide</span><span class="p">,</span>
+                            <span class="n">length</span><span class="p">,</span>
+                            <span class="nb">len</span><span class="p">(</span><span class="n">sub_df</span><span class="p">)),</span> <span class="n">supported_peptide_lengths</span><span class="o">=</span><span class="p">(</span>
+                                <span class="n">min_length</span><span class="p">,</span> <span class="n">max_length</span><span class="p">))</span>
+
+                <span class="n">peptides</span> <span class="o">=</span> <span class="n">sub_df</span><span class="o">.</span><span class="n">peptide</span>
+                <span class="k">if</span> <span class="n">length</span> <span class="o">&gt;</span> <span class="n">max_length</span><span class="p">:</span>
+                    <span class="c1"># Trim.</span>
+                    <span class="k">if</span> <span class="n">alignment_method</span> <span class="o">==</span> <span class="s2">"right_pad"</span><span class="p">:</span>
+                        <span class="n">peptides</span> <span class="o">=</span> <span class="n">peptides</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">max_length</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">peptides</span> <span class="o">=</span> <span class="n">peptides</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">slice</span><span class="p">(</span><span class="n">length</span> <span class="o">-</span> <span class="n">max_length</span><span class="p">)</span>
+
+                <span class="c1"># Array of shape (num peptides, length) giving fixed-length</span>
+                <span class="c1"># amino acid encoding each peptide of the current length.</span>
+                <span class="n">fixed_length_sequences</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">peptides</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+                    <span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
+                        <span class="n">get_amino_acid_index</span><span class="p">(</span><span class="n">char</span><span class="p">)</span> <span class="k">for</span> <span class="n">char</span> <span class="ow">in</span> <span class="n">s</span>
+                    <span class="p">]))</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">alignment_method</span> <span class="o">==</span> <span class="s2">"right_pad"</span><span class="p">:</span>
+                    <span class="c1"># Left align (i.e. pad right): set left edge</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">sub_df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="p">:</span><span class="n">length</span><span class="p">]</span> <span class="o">=</span> <span class="n">fixed_length_sequences</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># Right align: set right edge.</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">sub_df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="o">-</span><span class="n">length</span><span class="p">:]</span> <span class="o">=</span> <span class="n">fixed_length_sequences</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+                <span class="s2">"Unsupported alignment method: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">alignment_method</span><span class="p">)</span>
+
+
+        <span class="k">return</span> <span class="n">result</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

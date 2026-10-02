@@ -1,0 +1,746 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.class1_training &mdash; MHCflurry 2.3.13 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=4d7a031b"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.class1_training</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.class1_training</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Training and validation helpers for class I neural networks."""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">multiprocessing</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.regression_target</span><span class="w"> </span><span class="kn">import</span> <span class="n">from_ic50</span>
+
+
+<div class="viewcode-block" id="validation_split_counts">
+<a class="viewcode-back" href="../../api.html#mhcflurry.class1_training.validation_split_counts">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">validation_split_counts</span><span class="p">(</span><span class="n">total_rows</span><span class="p">,</span> <span class="n">validation_split</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return train/validation row counts using Keras split semantics.</span>
+
+<span class="sd">    Keras assigns the last rows to validation and computes the boundary as</span>
+<span class="sd">    ``floor(total_rows * (1 - validation_split))``. Computing validation rows</span>
+<span class="sd">    first is not equivalent for row counts that are not exact multiples of the</span>
+<span class="sd">    split denominator.</span>
+<span class="sd">    """</span>
+    <span class="n">total_rows</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">total_rows</span><span class="p">)</span>
+    <span class="n">validation_split</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">validation_split</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">total_rows</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"total_rows must be non-negative"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="mf">0.0</span> <span class="o">&lt;=</span> <span class="n">validation_split</span> <span class="o">&lt;</span> <span class="mf">1.0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"validation_split must be in [0, 1)"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">validation_split</span> <span class="o">==</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">total_rows</span><span class="p">,</span> <span class="mi">0</span>
+
+    <span class="n">train_rows</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">total_rows</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">validation_split</span><span class="p">)))</span>
+    <span class="n">validation_rows</span> <span class="o">=</span> <span class="n">total_rows</span> <span class="o">-</span> <span class="n">train_rows</span>
+    <span class="k">if</span> <span class="n">train_rows</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">validation_rows</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"validation_split=</span><span class="si">%s</span><span class="s2"> leaves </span><span class="si">%d</span><span class="s2"> training rows and </span><span class="si">%d</span><span class="s2"> validation "</span>
+            <span class="s2">"rows from </span><span class="si">%d</span><span class="s2"> total rows"</span>
+            <span class="o">%</span> <span class="p">(</span><span class="n">validation_split</span><span class="p">,</span> <span class="n">train_rows</span><span class="p">,</span> <span class="n">validation_rows</span><span class="p">,</span> <span class="n">total_rows</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">train_rows</span><span class="p">,</span> <span class="n">validation_rows</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_identity_collate</span><span class="p">(</span><span class="n">sample</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return a pre-batched sample unchanged."""</span>
+    <span class="k">return</span> <span class="n">sample</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_materialize_repeated_peptide_batch</span><span class="p">(</span><span class="n">batch</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return ``batch`` with compact repeated-peptide input expanded.</span>
+
+<span class="sd">    Pretrain batches can carry each unique peptide encoding once plus a</span>
+<span class="sd">    ``peptide_repeat_count`` telling the training forward path to form the</span>
+<span class="sd">    peptide × allele batch on device. LSUV/data-dependent initialization still</span>
+<span class="sd">    expects ordinary row-aligned numpy arrays, so materialize that rare</span>
+<span class="sd">    one-batch path here.</span>
+<span class="sd">    """</span>
+    <span class="n">repeat_count</span> <span class="o">=</span> <span class="n">batch</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"peptide_repeat_count"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">repeat_count</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">batch</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
+    <span class="n">result</span><span class="p">[</span><span class="s2">"peptide"</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span>
+        <span class="n">result</span><span class="p">[</span><span class="s2">"peptide"</span><span class="p">],</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">repeat_count</span><span class="p">),</span>
+        <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">del</span> <span class="n">result</span><span class="p">[</span><span class="s2">"peptide_repeat_count"</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">_StreamingBatchIterableDataset</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">IterableDataset</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""IterableDataset backing ``fit_streaming_batches``.</span>
+
+<span class="sd">    Supports two input formats:</span>
+<span class="sd">    - Legacy raw tuples: ``(alleles, peptides, affinities)``</span>
+<span class="sd">    - Pre-encoded tuples: ``(x_dict, y)``</span>
+
+<span class="sd">    The pre-encoded path is what allows worker-side prefetch in</span>
+<span class="sd">    pretraining: the dataset can be pickled into spawned workers without</span>
+<span class="sd">    serializing the full ``Class1NeuralNetwork`` instance.</span>
+
+<span class="sd">    Picklability contract</span>
+<span class="sd">    ---------------------</span>
+<span class="sd">    When ``num_workers&gt;0``, PyTorch's DataLoader pickles the dataset via</span>
+<span class="sd">    ``ForkingPickler`` to ship it to each spawned worker. Two classes of</span>
+<span class="sd">    attributes would break that:</span>
+
+<span class="sd">    - Live generator objects (from ``generator=iter(...)``). Generators</span>
+<span class="sd">      are intrinsically unpicklable.</span>
+<span class="sd">    - Bound methods of ``Class1NeuralNetwork`` (``peptides_to_network_input``,</span>
+<span class="sd">      ``allele_encoding_to_network_input``). Pickling a bound method</span>
+<span class="sd">      pickles ``self``, i.e. the entire network.</span>
+
+<span class="sd">    We sidestep both by dropping those references whenever they're</span>
+<span class="sd">    redundant: the factory path never reads ``self.generator`` (always</span>
+<span class="sd">    fresh-instantiates per worker), and the pre-encoded path never reads</span>
+<span class="sd">    the ``*_to_input`` callbacks. The live-generator / raw-tuple path is</span>
+<span class="sd">    single-process by construction — the downgrade lives in</span>
+<span class="sd">    ``fit_streaming_batches`` — so zeroing these out doesn't remove any</span>
+<span class="sd">    functionality.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">generator</span><span class="p">,</span>
+        <span class="n">generator_factory</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">source_batches_are_encoded</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">allele_encoding_to_input</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">peptides_to_network_input</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="c1"># Factory takes precedence: every call to ``_iter_source`` will</span>
+        <span class="c1"># invoke the factory and ignore ``self.generator``, so don't</span>
+        <span class="c1"># retain the live (unpicklable) generator object.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">generator</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">generator_factory</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">generator</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">generator_factory</span> <span class="o">=</span> <span class="n">generator_factory</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">source_batches_are_encoded</span> <span class="o">=</span> <span class="n">source_batches_are_encoded</span>
+        <span class="c1"># Pre-encoded batches never consume these callbacks. Drop them</span>
+        <span class="c1"># to keep ``ForkingPickler`` from dragging the whole</span>
+        <span class="c1"># ``Class1NeuralNetwork`` instance into every spawned worker.</span>
+        <span class="k">if</span> <span class="n">source_batches_are_encoded</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">allele_encoding_to_input</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">peptides_to_network_input</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">allele_encoding_to_input</span> <span class="o">=</span> <span class="n">allele_encoding_to_input</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">peptides_to_network_input</span> <span class="o">=</span> <span class="n">peptides_to_network_input</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_iter_source</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">worker_info</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">get_worker_info</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">generator_factory</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">worker_id</span> <span class="o">=</span> <span class="n">worker_info</span><span class="o">.</span><span class="n">id</span> <span class="k">if</span> <span class="n">worker_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+            <span class="n">num_workers</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">worker_info</span><span class="o">.</span><span class="n">num_workers</span> <span class="k">if</span> <span class="n">worker_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">1</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">generator_factory</span><span class="p">(</span>
+                <span class="n">worker_id</span><span class="o">=</span><span class="n">worker_id</span><span class="p">,</span>
+                <span class="n">num_workers</span><span class="o">=</span><span class="n">num_workers</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">worker_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"fit_streaming_batches with DataLoader workers requires a "</span>
+                <span class="s2">"picklable generator_factory."</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">generator</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_normalize_item</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_batches_are_encoded</span><span class="p">:</span>
+            <span class="n">x_dict</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">item</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">peptides_to_network_input</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"peptides_to_network_input is required for raw "</span>
+                    <span class="s2">"fit_streaming_batches batches."</span>
+                <span class="p">)</span>
+            <span class="n">alleles</span><span class="p">,</span> <span class="n">peptides</span><span class="p">,</span> <span class="n">affinities</span> <span class="o">=</span> <span class="n">item</span>
+            <span class="n">allele_input</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_encoding_to_input</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">allele_input</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">allele_encoding_to_input</span><span class="p">(</span><span class="n">alleles</span><span class="p">)</span>
+            <span class="n">x_dict</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">"peptide"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">peptides_to_network_input</span><span class="p">(</span><span class="n">peptides</span><span class="p">),</span>
+            <span class="p">}</span>
+            <span class="k">if</span> <span class="n">allele_input</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">x_dict</span><span class="p">[</span><span class="s2">"allele"</span><span class="p">]</span> <span class="o">=</span> <span class="n">allele_input</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">from_ic50</span><span class="p">(</span><span class="n">affinities</span><span class="p">)</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">x_dict</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">y</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">:</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">result</span><span class="p">[</span><span class="s2">"y"</span><span class="p">]</span> <span class="o">=</span> <span class="n">y</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_iter_source</span><span class="p">():</span>
+            <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">_normalize_item</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_batch_value_to_device</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">non_blocking</span><span class="p">,</span> <span class="n">cast_float</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Move a batch value (numpy array or tensor) to ``device``.</span>
+
+<span class="sd">    When ``cast_float=True`` and the source is float64, cast to float32 on</span>
+<span class="sd">    the CPU *before* transfer. MPS refuses to host float64 tensors, and</span>
+<span class="sd">    transferring fp64 just to narrow it on-device wastes bandwidth anyway.</span>
+<span class="sd">    int8 / float32 inputs skip the CPU-side cast so the pattern of shipping</span>
+<span class="sd">    compact int encodings and widening on the torch device stays intact.</span>
+
+<span class="sd">    When ``cast_float=False`` the value is shipped through in its source</span>
+<span class="sd">    dtype — used by the device-side fixed peptide encoding path where</span>
+<span class="sd">    peptide tensors are (N, L) int indices that get widened to (N, L, V)</span>
+<span class="sd">    fp32 via embedding lookup inside the network's forward pass.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">torch_from_numpy</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">cast_float</span> <span class="ow">and</span> <span class="n">value</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">,</span> <span class="n">non_blocking</span><span class="o">=</span><span class="n">non_blocking</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">cast_float</span><span class="p">:</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<div class="viewcode-block" id="torch_from_numpy">
+<a class="viewcode-back" href="../../api.html#mhcflurry.class1_training.torch_from_numpy">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">torch_from_numpy</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="o">.</span><span class="n">flags</span><span class="o">.</span><span class="n">writeable</span><span class="p">:</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_timing_enabled</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Return True when fine-grained training timing is enabled."""</span>
+    <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_ENABLE_TIMING"</span><span class="p">,</span> <span class="s2">"0"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"1"</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_timing_synchronize</span><span class="p">(</span><span class="n">device</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Synchronize asynchronous device work for accurate wall timing."""</span>
+    <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"cuda"</span><span class="p">:</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"mps"</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">torch</span><span class="p">,</span> <span class="s2">"mps"</span><span class="p">):</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">mps</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_timing_start</span><span class="p">(</span><span class="n">device</span><span class="p">,</span> <span class="n">enabled</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">enabled</span><span class="p">:</span>
+        <span class="n">_timing_synchronize</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_timing_stop</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">enabled</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">enabled</span><span class="p">:</span>
+        <span class="n">_timing_synchronize</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_move_fit_batch_to_device</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">non_blocking</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Move a training batch dict to ``device``.</span>
+
+<span class="sd">    When ``batch["peptide"]`` is a 2D integer array the torch-side fixed</span>
+<span class="sd">    peptide encoding path is active — keep it as int so the network's</span>
+<span class="sd">    embedding lookup can consume it. A 3D integer array is a compact</span>
+<span class="sd">    vector-encoded cache payload; still widen that to fp32 on device.</span>
+<span class="sd">    Float arrays flow through as before.</span>
+<span class="sd">    """</span>
+    <span class="n">peptide_source</span> <span class="o">=</span> <span class="n">batch</span><span class="p">[</span><span class="s2">"peptide"</span><span class="p">]</span>
+    <span class="n">peptide_repeat_count</span> <span class="o">=</span> <span class="n">batch</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"peptide_repeat_count"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">peptide_source</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+        <span class="n">_peptide_is_indices</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">peptide_source</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">2</span>
+            <span class="ow">and</span> <span class="n">numpy</span><span class="o">.</span><span class="n">issubdtype</span><span class="p">(</span><span class="n">peptide_source</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">integer</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">_peptide_is_indices</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="nb">hasattr</span><span class="p">(</span><span class="n">peptide_source</span><span class="p">,</span> <span class="s2">"dim"</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="n">peptide_source</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span>
+            <span class="ow">and</span> <span class="n">peptide_source</span><span class="o">.</span><span class="n">dtype</span> <span class="ow">in</span> <span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int16</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+    <span class="n">peptide_batch</span> <span class="o">=</span> <span class="n">_batch_value_to_device</span><span class="p">(</span>
+        <span class="n">peptide_source</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">,</span>
+        <span class="n">non_blocking</span><span class="o">=</span><span class="n">non_blocking</span><span class="p">,</span>
+        <span class="n">cast_float</span><span class="o">=</span><span class="ow">not</span> <span class="n">_peptide_is_indices</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">y_batch</span> <span class="o">=</span> <span class="n">_batch_value_to_device</span><span class="p">(</span>
+        <span class="n">batch</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span>
+        <span class="n">device</span><span class="p">,</span>
+        <span class="n">non_blocking</span><span class="o">=</span><span class="n">non_blocking</span><span class="p">,</span>
+        <span class="n">cast_float</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">inputs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"peptide"</span><span class="p">:</span> <span class="n">peptide_batch</span><span class="p">}</span>
+    <span class="k">if</span> <span class="n">peptide_repeat_count</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">inputs</span><span class="p">[</span><span class="s2">"peptide_repeat_count"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">peptide_repeat_count</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">"allele"</span> <span class="ow">in</span> <span class="n">batch</span><span class="p">:</span>
+        <span class="n">inputs</span><span class="p">[</span><span class="s2">"allele"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_batch_value_to_device</span><span class="p">(</span>
+            <span class="n">batch</span><span class="p">[</span><span class="s2">"allele"</span><span class="p">],</span>
+            <span class="n">device</span><span class="p">,</span>
+            <span class="n">non_blocking</span><span class="o">=</span><span class="n">non_blocking</span><span class="p">,</span>
+            <span class="n">cast_float</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="n">weights_batch</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="s2">"weight"</span> <span class="ow">in</span> <span class="n">batch</span><span class="p">:</span>
+        <span class="n">weights_batch</span> <span class="o">=</span> <span class="n">_batch_value_to_device</span><span class="p">(</span>
+            <span class="n">batch</span><span class="p">[</span><span class="s2">"weight"</span><span class="p">],</span>
+            <span class="n">device</span><span class="p">,</span>
+            <span class="n">non_blocking</span><span class="o">=</span><span class="n">non_blocking</span><span class="p">,</span>
+            <span class="n">cast_float</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">y_batch</span><span class="p">,</span> <span class="n">weights_batch</span><span class="p">)</span>
+
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_sync_mean_loss</span><span class="p">(</span><span class="n">losses</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">timing_enabled</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return mean detached loss with one device sync plus sync timing."""</span>
+    <span class="n">loss_sync_start</span> <span class="o">=</span> <span class="n">_timing_start</span><span class="p">(</span><span class="n">device</span><span class="p">,</span> <span class="n">timing_enabled</span><span class="p">)</span>
+    <span class="n">train_loss</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">losses</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">losses</span> <span class="k">else</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"nan"</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">loss_sync_time</span> <span class="o">=</span> <span class="n">_timing_stop</span><span class="p">(</span><span class="n">loss_sync_start</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">timing_enabled</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">train_loss</span><span class="p">,</span> <span class="n">loss_sync_time</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_validation_interval_from_hyperparameters</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return normalized validation interval for both training paths."""</span>
+    <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"validation_interval"</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">1</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_early_stop_reached</span><span class="p">(</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">epoch_index</span><span class="p">,</span>
+    <span class="n">min_val_loss_epoch</span><span class="p">,</span>
+    <span class="n">patience</span><span class="p">,</span>
+    <span class="n">min_epochs</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+    <span class="n">early_stopping</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Shared early-stopping decision using zero-based epoch indices.</span>
+
+<span class="sd">    With ``strict=True`` (the affinity ``fit()`` path) training stops the</span>
+<span class="sd">    first epoch *strictly after* ``max(min_val_loss_epoch + patience,</span>
+<span class="sd">    min_epochs - 1)`` — i.e. ``patience`` no-improvement epochs followed by</span>
+<span class="sd">    one more before stopping. This matches the pre-2.3.0 ``fit()`` condition</span>
+<span class="sd">    ``epoch &gt; min_val_loss_iteration + patience``.</span>
+
+<span class="sd">    With ``strict=False`` (the streaming pretrain path) training stops *at*</span>
+<span class="sd">    that threshold, reproducing the pre-2.3.0 streaming condition</span>
+<span class="sd">    ``epoch &gt;= min_val_loss_iteration + patience`` (which used one-based</span>
+<span class="sd">    epochs). Keeping the streaming path inclusive means pretrained base</span>
+<span class="sd">    weights reproduce historical runs rather than training one extra epoch.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">early_stopping</span> <span class="ow">or</span> <span class="n">min_val_loss_epoch</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="n">threshold</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">min_val_loss_epoch</span><span class="p">)</span> <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">patience</span><span class="p">),</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">min_epochs</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">strict</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">epoch_index</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">threshold</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">epoch_index</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">threshold</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_should_validate_epoch</span><span class="p">(</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">validation_enabled</span><span class="p">,</span>
+    <span class="n">epoch_index</span><span class="p">,</span>
+    <span class="n">max_epochs</span><span class="p">,</span>
+    <span class="n">validation_interval</span><span class="p">,</span>
+    <span class="n">early_stopping</span><span class="p">,</span>
+    <span class="n">min_val_loss_epoch</span><span class="p">,</span>
+    <span class="n">patience</span><span class="p">,</span>
+    <span class="n">min_epochs</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+    <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Shared validation cadence for fit() and fit_streaming_batches().</span>
+
+<span class="sd">    ``strict`` is forwarded to :func:`_early_stop_reached` so the "validate on</span>
+<span class="sd">    the epoch we're about to stop" rule uses the same inclusive/exclusive</span>
+<span class="sd">    threshold as the caller's break condition.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">validation_enabled</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="n">is_last_epoch</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">epoch_index</span><span class="p">)</span> <span class="o">==</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_epochs</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="n">patience_would_trigger</span> <span class="o">=</span> <span class="n">_early_stop_reached</span><span class="p">(</span>
+        <span class="n">epoch_index</span><span class="o">=</span><span class="n">epoch_index</span><span class="p">,</span>
+        <span class="n">min_val_loss_epoch</span><span class="o">=</span><span class="n">min_val_loss_epoch</span><span class="p">,</span>
+        <span class="n">patience</span><span class="o">=</span><span class="n">patience</span><span class="p">,</span>
+        <span class="n">min_epochs</span><span class="o">=</span><span class="n">min_epochs</span><span class="p">,</span>
+        <span class="n">early_stopping</span><span class="o">=</span><span class="n">early_stopping</span><span class="p">,</span>
+        <span class="n">strict</span><span class="o">=</span><span class="n">strict</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">epoch_index</span><span class="p">)</span> <span class="o">%</span> <span class="nb">int</span><span class="p">(</span><span class="n">validation_interval</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span>
+        <span class="ow">or</span> <span class="n">is_last_epoch</span>
+        <span class="ow">or</span> <span class="n">patience_would_trigger</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_carry_forward_validation_loss</span><span class="p">(</span><span class="n">fit_info</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Keep val_loss aligned with epochs when validation is skipped."""</span>
+    <span class="k">return</span> <span class="n">fit_info</span><span class="p">[</span><span class="s2">"val_loss"</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="n">fit_info</span><span class="p">[</span><span class="s2">"val_loss"</span><span class="p">]</span> <span class="k">else</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"nan"</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_update_min_validation_loss</span><span class="p">(</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">val_loss</span><span class="p">,</span>
+    <span class="n">epoch_index</span><span class="p">,</span>
+    <span class="n">min_val_loss</span><span class="p">,</span>
+    <span class="n">min_val_loss_epoch</span><span class="p">,</span>
+    <span class="n">min_delta</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Update min validation state after a measured validation epoch."""</span>
+    <span class="k">if</span> <span class="n">min_val_loss</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">val_loss</span> <span class="o">&lt;</span> <span class="n">min_val_loss</span> <span class="o">-</span> <span class="n">min_delta</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">val_loss</span><span class="p">,</span> <span class="n">epoch_index</span>
+    <span class="k">return</span> <span class="n">min_val_loss</span><span class="p">,</span> <span class="n">min_val_loss_epoch</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_effective_num_workers</span><span class="p">(</span><span class="n">num_workers</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Downgrade ``num_workers`` to 0 when running inside a daemon process.</span>
+
+<span class="sd">    Safety net for DataLoader's ``num_workers&gt;0`` path, which requires</span>
+<span class="sd">    spawning child processes — forbidden from daemon parents. mhcflurry's</span>
+<span class="sd">    training orchestrator switched to ``NonDaemonPool`` (see</span>
+<span class="sd">    ``mhcflurry.parallelism``) so in production Pool workers are now</span>
+<span class="sd">    non-daemonic and this downgrade does NOT fire. It remains as</span>
+<span class="sd">    defense-in-depth for:</span>
+
+<span class="sd">      - External callers that wrap ``Class1NeuralNetwork.fit`` in a</span>
+<span class="sd">        daemonic process of their own (e.g. ``ProcessPoolExecutor`` is</span>
+<span class="sd">        non-daemon by default but ``multiprocessing.Pool`` without the</span>
+<span class="sd">        NonDaemonPool subclass is daemonic).</span>
+<span class="sd">      - Test suites that explicitly construct daemon subprocesses (our</span>
+<span class="sd">        own ``test_dataloader_num_workers_downgrades_in_daemon_context``</span>
+<span class="sd">        exercises this path).</span>
+
+<span class="sd">    Emits a ``DeprecationWarning`` — it's worth knowing if this fires,</span>
+<span class="sd">    since it means the caller is running in a daemon context and</span>
+<span class="sd">    DataLoader prefetch is silently disabled. Use ``warnings.filterwarnings``</span>
+<span class="sd">    to silence if intentional.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">num_workers</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">current_process</span><span class="p">()</span><span class="o">.</span><span class="n">daemon</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"dataloader_num_workers=</span><span class="si">{</span><span class="n">num_workers</span><span class="si">}</span><span class="s2"> requested from a daemon "</span>
+            <span class="sa">f</span><span class="s2">"process; downgrading to 0 because daemon processes cannot "</span>
+            <span class="sa">f</span><span class="s2">"spawn children. If this is mhcflurry's Pool worker, switch "</span>
+            <span class="sa">f</span><span class="s2">"to NonDaemonPool (mhcflurry/parallelism); if it's "</span>
+            <span class="sa">f</span><span class="s2">"your own caller, use a non-daemonic executor or accept the "</span>
+            <span class="sa">f</span><span class="s2">"downgrade (set dataloader_num_workers=0 explicitly to silence)."</span><span class="p">,</span>
+            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="k">return</span> <span class="n">num_workers</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_make_streaming_batch_dataloader</span><span class="p">(</span>
+    <span class="n">dataset</span><span class="p">,</span>
+    <span class="n">num_workers</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Construct a DataLoader for ``fit_streaming_batches``.</span>
+
+<span class="sd">    The dataset already yields complete batches, so automatic batching is</span>
+<span class="sd">    disabled (``batch_size=None``) and we keep the payload as numpy</span>
+<span class="sd">    arrays via ``_identity_collate``. That avoids worker-side tensor</span>
+<span class="sd">    materialization and keeps the worker path picklable for spawned</span>
+<span class="sd">    subprocesses.</span>
+<span class="sd">    """</span>
+    <span class="n">effective_workers</span> <span class="o">=</span> <span class="n">_effective_num_workers</span><span class="p">(</span><span class="n">num_workers</span><span class="p">)</span>
+    <span class="n">kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">dataset</span><span class="o">=</span><span class="n">dataset</span><span class="p">,</span>
+        <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">num_workers</span><span class="o">=</span><span class="n">effective_workers</span><span class="p">,</span>
+        <span class="n">collate_fn</span><span class="o">=</span><span class="n">_identity_collate</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">effective_workers</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">"multiprocessing_context"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"spawn"</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">"prefetch_factor"</span><span class="p">]</span> <span class="o">=</span> <span class="mi">2</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_batched_validation_loss</span><span class="p">(</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">network</span><span class="p">,</span>
+    <span class="n">eager_network</span><span class="p">,</span>
+    <span class="n">val_peptide</span><span class="p">,</span>
+    <span class="n">val_allele</span><span class="p">,</span>
+    <span class="n">val_y</span><span class="p">,</span>
+    <span class="n">val_weights</span><span class="p">,</span>
+    <span class="n">loss_obj</span><span class="p">,</span>
+    <span class="n">batch_size</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Compute validation loss with a fixed-size fast path and eager tail path.</span>
+
+<span class="sd">    Every ``network(inputs)`` call inside this helper sees the same</span>
+<span class="sd">    shape (``batch_size``), so GPU validation stays memory-bounded and</span>
+<span class="sd">    optional compiled-validation paths can specialize once and reuse.</span>
+<span class="sd">    That matters for H100 and A100 training where single-shot forward</span>
+<span class="sd">    passes over the full validation set (up to ~185K rows for pan-allele</span>
+<span class="sd">    training) were eating 15+ GB of VRAM per worker.</span>
+
+<span class="sd">    Semantics: iterate ``val_peptide`` in ``batch_size``-row chunks and</span>
+<span class="sd">    return the exact mean validation loss across all rows. Full-size</span>
+<span class="sd">    batches run through ``network`` (typically compiled); any short tail</span>
+<span class="sd">    batch runs through ``eager_network`` to avoid recompiling on an odd</span>
+<span class="sd">    shape.</span>
+
+<span class="sd">    Losses with additive numerator/denominator terms accumulate those terms</span>
+<span class="sd">    across batches, preserving the exact global reduction for inequality and</span>
+<span class="sd">    weighted losses. Cross-example losses still fall back to single-shot</span>
+<span class="sd">    computation because samples genuinely couple within the loss.</span>
+
+<span class="sd">    Returns a Python float (already detached from autograd).</span>
+<span class="sd">    """</span>
+    <span class="n">n_val</span> <span class="o">=</span> <span class="n">val_peptide</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">n_val</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"nan"</span><span class="p">)</span>
+
+    <span class="c1"># A compiled loss keeps its additive reduction helper on the original</span>
+    <span class="c1"># module; use it directly for validation aggregation.</span>
+    <span class="n">reduction_loss</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">loss_obj</span><span class="p">,</span> <span class="s2">"_orig_mod"</span><span class="p">,</span> <span class="n">loss_obj</span><span class="p">)</span>
+    <span class="n">reduction_terms</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span>
+        <span class="n">reduction_loss</span><span class="p">,</span> <span class="s2">"loss_numerator_and_denominator"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">needs_single_shot</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="ow">not</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">reduction_loss</span><span class="p">,</span> <span class="s2">"supports_independent_samples"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="ow">or</span> <span class="p">(</span><span class="n">val_weights</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">reduction_terms</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">needs_single_shot</span><span class="p">:</span>
+        <span class="c1"># Cross-example and unknown weighted reductions are not decomposable.</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"peptide"</span><span class="p">:</span> <span class="n">val_peptide</span><span class="p">}</span>
+        <span class="k">if</span> <span class="n">val_allele</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">inputs</span><span class="p">[</span><span class="s2">"allele"</span><span class="p">]</span> <span class="o">=</span> <span class="n">val_allele</span>
+        <span class="n">preds</span> <span class="o">=</span> <span class="n">eager_network</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+        <span class="n">batch_loss</span> <span class="o">=</span> <span class="n">loss_obj</span><span class="p">(</span><span class="n">preds</span><span class="p">,</span> <span class="n">val_y</span><span class="p">,</span> <span class="n">sample_weights</span><span class="o">=</span><span class="n">val_weights</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">batch_loss</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+
+    <span class="n">n_full</span> <span class="o">=</span> <span class="p">(</span><span class="n">n_val</span> <span class="o">//</span> <span class="n">batch_size</span><span class="p">)</span> <span class="o">*</span> <span class="n">batch_size</span>
+    <span class="n">numerator_accum</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">denominator_accum</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">loss_accum</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">weight_accum</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="k">for</span> <span class="n">start</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_full</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">):</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">batch_size</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"peptide"</span><span class="p">:</span> <span class="n">val_peptide</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">]}</span>
+        <span class="k">if</span> <span class="n">val_allele</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">inputs</span><span class="p">[</span><span class="s2">"allele"</span><span class="p">]</span> <span class="o">=</span> <span class="n">val_allele</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">]</span>
+        <span class="n">preds</span> <span class="o">=</span> <span class="n">network</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+        <span class="n">weights_slice</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">val_weights</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">]</span> <span class="k">if</span> <span class="n">val_weights</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">reduction_terms</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">numerator</span><span class="p">,</span> <span class="n">denominator</span> <span class="o">=</span> <span class="n">reduction_terms</span><span class="p">(</span>
+                <span class="n">preds</span><span class="p">,</span> <span class="n">val_y</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">],</span> <span class="n">sample_weights</span><span class="o">=</span><span class="n">weights_slice</span><span class="p">)</span>
+            <span class="n">numerator_accum</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">numerator</span> <span class="k">if</span> <span class="n">numerator_accum</span> <span class="ow">is</span> <span class="kc">None</span>
+                <span class="k">else</span> <span class="n">numerator_accum</span> <span class="o">+</span> <span class="n">numerator</span>
+            <span class="p">)</span>
+            <span class="n">denominator_accum</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">denominator</span> <span class="k">if</span> <span class="n">denominator_accum</span> <span class="ow">is</span> <span class="kc">None</span>
+                <span class="k">else</span> <span class="n">denominator_accum</span> <span class="o">+</span> <span class="n">denominator</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">batch_loss</span> <span class="o">=</span> <span class="n">loss_obj</span><span class="p">(</span>
+                <span class="n">preds</span><span class="p">,</span> <span class="n">val_y</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">],</span> <span class="n">sample_weights</span><span class="o">=</span><span class="n">weights_slice</span>
+            <span class="p">)</span>
+            <span class="n">loss_accum</span> <span class="o">+=</span> <span class="n">batch_loss</span><span class="o">.</span><span class="n">item</span><span class="p">()</span> <span class="o">*</span> <span class="n">batch_size</span>
+            <span class="n">weight_accum</span> <span class="o">+=</span> <span class="n">batch_size</span>
+    <span class="k">if</span> <span class="n">n_full</span> <span class="o">&lt;</span> <span class="n">n_val</span><span class="p">:</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"peptide"</span><span class="p">:</span> <span class="n">val_peptide</span><span class="p">[</span><span class="n">n_full</span><span class="p">:</span><span class="n">n_val</span><span class="p">]}</span>
+        <span class="k">if</span> <span class="n">val_allele</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">inputs</span><span class="p">[</span><span class="s2">"allele"</span><span class="p">]</span> <span class="o">=</span> <span class="n">val_allele</span><span class="p">[</span><span class="n">n_full</span><span class="p">:</span><span class="n">n_val</span><span class="p">]</span>
+        <span class="n">tail_predictions</span> <span class="o">=</span> <span class="n">eager_network</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+        <span class="n">tail_size</span> <span class="o">=</span> <span class="n">n_val</span> <span class="o">-</span> <span class="n">n_full</span>
+        <span class="n">weights_slice</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">val_weights</span><span class="p">[</span><span class="n">n_full</span><span class="p">:</span><span class="n">n_val</span><span class="p">]</span> <span class="k">if</span> <span class="n">val_weights</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">reduction_terms</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">numerator</span><span class="p">,</span> <span class="n">denominator</span> <span class="o">=</span> <span class="n">reduction_terms</span><span class="p">(</span>
+                <span class="n">tail_predictions</span><span class="p">,</span>
+                <span class="n">val_y</span><span class="p">[</span><span class="n">n_full</span><span class="p">:</span><span class="n">n_val</span><span class="p">],</span>
+                <span class="n">sample_weights</span><span class="o">=</span><span class="n">weights_slice</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">numerator_accum</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">numerator</span> <span class="k">if</span> <span class="n">numerator_accum</span> <span class="ow">is</span> <span class="kc">None</span>
+                <span class="k">else</span> <span class="n">numerator_accum</span> <span class="o">+</span> <span class="n">numerator</span>
+            <span class="p">)</span>
+            <span class="n">denominator_accum</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">denominator</span> <span class="k">if</span> <span class="n">denominator_accum</span> <span class="ow">is</span> <span class="kc">None</span>
+                <span class="k">else</span> <span class="n">denominator_accum</span> <span class="o">+</span> <span class="n">denominator</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">tail_loss</span> <span class="o">=</span> <span class="n">loss_obj</span><span class="p">(</span>
+                <span class="n">tail_predictions</span><span class="p">,</span>
+                <span class="n">val_y</span><span class="p">[</span><span class="n">n_full</span><span class="p">:</span><span class="n">n_val</span><span class="p">],</span>
+                <span class="n">sample_weights</span><span class="o">=</span><span class="n">weights_slice</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">loss_accum</span> <span class="o">+=</span> <span class="n">tail_loss</span><span class="o">.</span><span class="n">item</span><span class="p">()</span> <span class="o">*</span> <span class="n">tail_size</span>
+            <span class="n">weight_accum</span> <span class="o">+=</span> <span class="n">tail_size</span>
+    <span class="k">if</span> <span class="n">numerator_accum</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">numerator_accum</span> <span class="o">/</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="n">denominator_accum</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">loss_accum</span> <span class="o">/</span> <span class="n">weight_accum</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 02, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
