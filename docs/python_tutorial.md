@@ -8,9 +8,9 @@ themselves.
 
 ## Loading a predictor
 
-Calling `load()` without a path uses
-the downloaded release model (see {ref}`downloading`); pass a model directory
-to load a custom predictor.
+`Class1PresentationPredictor.load()` without a path uses the downloaded
+release model (see {ref}`downloading`); pass a model directory to load a custom
+predictor.
 
 ```{doctest}
 >>> from mhcflurry import Class1PresentationPredictor
@@ -23,7 +23,7 @@ True
 
 {meth}`~mhcflurry.Class1PresentationPredictor.predict` returns a
 {class}`pandas.DataFrame` with binding affinity, processing, and presentation
-predictions:
+predictions, whose values depend on the loaded model release:
 
 ```{doctest}
 >>> predictions = predictor.predict(

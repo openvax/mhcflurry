@@ -7,8 +7,8 @@
 
 ## Download models
 
-The presentation bundle includes the binding-affinity and antigen-processing
-components:
+Download the presentation bundle, which includes the binding-affinity and
+antigen-processing components:
 
 ```shell
 $ mhcflurry downloads fetch models_class1_presentation

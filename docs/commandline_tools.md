@@ -1,10 +1,11 @@
 # Command-line reference
 
-Workflow namespaces with many specialized subcommands (`mhcflurry eval`,
-`mhcflurry train`, `mhcflurry pseudosequences`) list their subcommands here; run
-a subcommand's `--help` for its options. Run `mhcflurry <command> --help` for
-the same information in a terminal; set `NO_COLOR=1` to disable colored help. Historical `mhcflurry-*`
-script names remain available; see {doc}`configuration`.
+For each command documented here, `mhcflurry <command> --help` shows the same
+options in a terminal; set `NO_COLOR=1` to disable colored help. The specialized
+`mhcflurry eval` and `mhcflurry train` subcommands, and the `mhcflurry
+pseudosequences` subcommands, are listed without their options; run the
+subcommand's `--help` for those. Historical `mhcflurry-*` script names remain
+available; see {doc}`configuration`.
 
 ## Prediction and data
 
@@ -96,9 +97,8 @@ See {doc}`evaluation` for the workflow and output layout.
 
 ### Metrics and figures
 
-The shorter `mhcflurry compare-models`,
-`mhcflurry plot-model-comparison`, and `mhcflurry paper-figures` forms remain
-available for existing scripts.
+Existing scripts can keep using the shortcuts `mhcflurry compare-models`,
+`mhcflurry plot-model-comparison`, and `mhcflurry paper-figures`.
 
 ```{eval-rst}
 .. _ref-mhcflurry-compare-models:
@@ -147,8 +147,8 @@ options.
 ## Helpers
 
 These commands support release training and data preparation rather than
-prediction. The generated
-hyperparameter grids feed the maintained training scripts; see the
+prediction. The grids from `class1-generate-training-hyperparameters` feed the
+maintained training scripts; see the
 [training pipeline README](https://github.com/openvax/mhcflurry/tree/master/scripts/training)
 for how each grid is used. {doc}`training_provenance` shows how the mass-spec
 reassignment command excludes evaluation peptide–MHC pairs and source samples.

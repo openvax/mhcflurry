@@ -28,6 +28,11 @@ presentation.
 - {doc}`configuration` covers hardware autosizing, environment overrides, and
   reproducibility.
 
+## Advanced topics
+
+- {doc}`shared_percent_rank_transforms` explains custom percentile calibration.
+- {doc}`training_provenance` audits training-sample overlap between models.
+
 Contributors and release maintainers can start with {doc}`maintainers`.
 
 ```{toctree}

@@ -1,7 +1,8 @@
 # Training models
 
 Train a model when you have new measurements, need a controlled experiment, or
-are preparing a release.
+are preparing a release, and evaluate it on held-out data before drawing
+conclusions from it.
 
 ## Choose a workflow
 
@@ -119,9 +120,9 @@ workflow handles affinity and presentation; standalone processing calibration
 is explicit. See {doc}`shared_percent_rank_transforms` for reference requirements
 and preserving previous calibrations for comparisons.
 
-## Processing training data
+## Antigen-processing training data
 
-Like the release workflow, these commands need a source checkout.
+The commands below need a source checkout, like the release workflow.
 
 New processing training and model selection require affinity/length-matched
 hit/decoy risk sets. Generate them with the maintained command:
