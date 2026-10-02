@@ -1,10 +1,10 @@
 # Command-line reference
 
 For each command documented here, `mhcflurry <command> --help` shows the same
-options in a terminal; set `NO_COLOR=1` to disable colored help. The specialized
+options in a terminal; set `NO_COLOR=1` to disable colored help. Other
 `mhcflurry eval` and `mhcflurry train` subcommands, and the `mhcflurry
-pseudosequences` subcommands, are listed without their options; run the
-subcommand's `--help` for those. Historical `mhcflurry-*` script names remain
+pseudosequences` subcommands, appear only in the namespace listings below; run
+the subcommand's `--help` for their options. Historical `mhcflurry-*` script names remain
 available; see {doc}`configuration`.
 
 ## Prediction and data
@@ -137,8 +137,7 @@ and external-predictor comparisons.
 
 `mhcflurry train` groups the release pipeline and research workflows used to
 produce the published models. Most need a source checkout; see
-{doc}`training` and {doc}`maintainers`. Run the subcommand's `--help` for its
-options.
+{doc}`training` and {doc}`maintainers`.
 
 ```{command-output} mhcflurry train --help
 :nostderr:

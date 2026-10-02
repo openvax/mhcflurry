@@ -2,8 +2,8 @@
 
 # API Documentation
 
-For calibration-specific examples and compatibility, see
-{doc}`shared_percent_rank_transforms`.
+For worked examples, see {doc}`python_tutorial`; for calibration-specific
+examples and compatibility, see {doc}`shared_percent_rank_transforms`.
 
 The compatibility module `mhcflurry.local_parallelism` re-exports the
 canonical {mod}`mhcflurry.parallelism` API. Its identical members are documented

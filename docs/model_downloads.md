@@ -107,8 +107,9 @@ software versions, NetMHCpan BA/EL outputs, and MixMHCpred on identical rows.
 ## Older allele-specific models
 
 MHCflurry still distributes the allele-specific predictors described in the
-2018 paper and keeps them for reproducing earlier results. They are a separate,
-affinity-only bundle selected with `--models` rather than `--model-release`:
+2018 paper for reproducing earlier results; for new work, use the current
+presentation bundle. They are a separate, affinity-only bundle selected with
+`--models` rather than `--model-release`:
 
 ```shell
 mhcflurry downloads fetch models_class1
