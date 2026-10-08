@@ -82,6 +82,8 @@ def make_parser(prog="mhcflurry eval"):
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     sub = parser.add_subparsers(dest="eval_subcommand", required=True)
+    sub.add_parser("allele-capabilities", help="Report model-bound allele execution and evidence.", add_help=False)
+    sub.add_parser("dla", help="Audit the 2026 DLA observations and exploratory scores.", add_help=False)
     sub.add_parser(
         "compare-models",
         help="Compare two model ensembles on data_evaluation.",
@@ -174,6 +176,12 @@ def run_argv(argv, prog="mhcflurry eval"):
 
     subcommand = argv[0]
     rest = argv[1:]
+    if subcommand == "allele-capabilities":
+        from .. import allele_capabilities
+        return allele_capabilities.run_argv(rest, prog="%s allele-capabilities" % prog)
+    if subcommand == "dla":
+        from .. import dla_evaluation
+        return dla_evaluation.run_argv(rest, prog="%s dla" % prog)
     if subcommand == "compare-models":
         from . import compare_models
         return _run_existing_command(
@@ -211,6 +219,8 @@ def format_help(prog="mhcflurry eval"):
         "Evaluation and paper-figure workflows.",
         "",
         "Subcommands:",
+        "  allele-capabilities     Report model-bound allele support and evidence.",
+        "  dla                     Audit 2026 DLA observations with fixed weights.",
         "  compare-models          Compare two model ensembles.",
         "  saved-candidate         Finish saved candidate evaluation without training.",
         "  plot-comparison         Render diagnostic plots from compare output.",

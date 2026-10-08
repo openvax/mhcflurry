@@ -58,6 +58,10 @@ models' training, development and selection lineage. Peptide–MHC exclusion alo
 does not prove this. See {doc}`training_provenance` for the audit command,
 shared-cohort export, and limitations of historical and external evidence.
 
+For canine DLA evidence, see {doc}`dla_validation`. The `eval allele-capabilities`
+and `eval dla` commands bind their reports to exact model files and keep
+executable predictions separate from independently validated performance.
+
 ## Paper-style figures
 
 For an already-trained local model, compose comparison, diagnostics, and any

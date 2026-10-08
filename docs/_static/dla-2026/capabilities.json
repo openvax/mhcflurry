@@ -1,0 +1,3691 @@
+{
+  "capabilities": [
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*003:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 8,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*003:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "d772e61498fd185d6e351d020f3edbad75b50cd26c338fe4453a36988e81a9fe",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*003:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*003:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*003:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 9,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*003:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "d772e61498fd185d6e351d020f3edbad75b50cd26c338fe4453a36988e81a9fe",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*003:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*003:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*003:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 10,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*003:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "d772e61498fd185d6e351d020f3edbad75b50cd26c338fe4453a36988e81a9fe",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*003:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*003:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*003:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 11,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*003:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "d772e61498fd185d6e351d020f3edbad75b50cd26c338fe4453a36988e81a9fe",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*003:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*003:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*003:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 12,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*003:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "d772e61498fd185d6e351d020f3edbad75b50cd26c338fe4453a36988e81a9fe",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*003:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*003:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*003:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 13,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*003:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "d772e61498fd185d6e351d020f3edbad75b50cd26c338fe4453a36988e81a9fe",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*003:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*003:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*003:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 14,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*003:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "d772e61498fd185d6e351d020f3edbad75b50cd26c338fe4453a36988e81a9fe",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*003:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*003:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*003:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 15,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*003:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "d772e61498fd185d6e351d020f3edbad75b50cd26c338fe4453a36988e81a9fe",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*003:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*003:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*004:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 8,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*004:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "9012876fdfc79c002877d382d26fe79180036f3b09a37da3ae09d45fe8bb2993",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*004:02",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*004:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*004:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 9,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*004:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "9012876fdfc79c002877d382d26fe79180036f3b09a37da3ae09d45fe8bb2993",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*004:02",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*004:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*004:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 10,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*004:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "9012876fdfc79c002877d382d26fe79180036f3b09a37da3ae09d45fe8bb2993",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*004:02",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*004:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*004:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 11,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*004:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "9012876fdfc79c002877d382d26fe79180036f3b09a37da3ae09d45fe8bb2993",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*004:02",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*004:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*004:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 12,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*004:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "9012876fdfc79c002877d382d26fe79180036f3b09a37da3ae09d45fe8bb2993",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*004:02",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*004:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*004:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 13,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*004:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "9012876fdfc79c002877d382d26fe79180036f3b09a37da3ae09d45fe8bb2993",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*004:02",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*004:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*004:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 14,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*004:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "9012876fdfc79c002877d382d26fe79180036f3b09a37da3ae09d45fe8bb2993",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*004:02",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*004:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*004:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 15,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*004:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "9012876fdfc79c002877d382d26fe79180036f3b09a37da3ae09d45fe8bb2993",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*004:02",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*004:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*006:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 8,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*006:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "f8a00ab68034b5513df652a8b6c1750895dca36808bea3d7994cb4159db05bdb",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*006:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*006:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*006:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 9,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*006:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "f8a00ab68034b5513df652a8b6c1750895dca36808bea3d7994cb4159db05bdb",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*006:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*006:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*006:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 10,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*006:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "f8a00ab68034b5513df652a8b6c1750895dca36808bea3d7994cb4159db05bdb",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*006:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*006:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*006:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 11,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*006:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "f8a00ab68034b5513df652a8b6c1750895dca36808bea3d7994cb4159db05bdb",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*006:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*006:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*006:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 12,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*006:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "f8a00ab68034b5513df652a8b6c1750895dca36808bea3d7994cb4159db05bdb",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*006:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*006:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*006:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 13,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*006:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "f8a00ab68034b5513df652a8b6c1750895dca36808bea3d7994cb4159db05bdb",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*006:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*006:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*006:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 14,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*006:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "f8a00ab68034b5513df652a8b6c1750895dca36808bea3d7994cb4159db05bdb",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*006:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*006:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*006:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 15,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*006:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "f8a00ab68034b5513df652a8b6c1750895dca36808bea3d7994cb4159db05bdb",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*006:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*006:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*012:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 8,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*012:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "998e226c60b195a6d6374a9f749636cf28ce6217d0e96b10c143ff14d145de57",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*012:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*012:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*012:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 9,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*012:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "998e226c60b195a6d6374a9f749636cf28ce6217d0e96b10c143ff14d145de57",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*012:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*012:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*012:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 10,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*012:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "998e226c60b195a6d6374a9f749636cf28ce6217d0e96b10c143ff14d145de57",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*012:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*012:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*012:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 11,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*012:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "998e226c60b195a6d6374a9f749636cf28ce6217d0e96b10c143ff14d145de57",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*012:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*012:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*012:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 12,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*012:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "998e226c60b195a6d6374a9f749636cf28ce6217d0e96b10c143ff14d145de57",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*012:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*012:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*012:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 13,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*012:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "998e226c60b195a6d6374a9f749636cf28ce6217d0e96b10c143ff14d145de57",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*012:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*012:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*012:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 14,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*012:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "998e226c60b195a6d6374a9f749636cf28ce6217d0e96b10c143ff14d145de57",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*012:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*012:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*012:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 15,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*012:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "998e226c60b195a6d6374a9f749636cf28ce6217d0e96b10c143ff14d145de57",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*012:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*012:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*017:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 8,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*017:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "0237006ed149593487ec39a17a0836d8201a2fb5e4df7dda4daa95690f517ff4",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*017:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*017:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*017:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 9,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*017:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "0237006ed149593487ec39a17a0836d8201a2fb5e4df7dda4daa95690f517ff4",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*017:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*017:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*017:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 10,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*017:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "0237006ed149593487ec39a17a0836d8201a2fb5e4df7dda4daa95690f517ff4",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*017:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*017:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*017:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 11,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*017:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "0237006ed149593487ec39a17a0836d8201a2fb5e4df7dda4daa95690f517ff4",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*017:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*017:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*017:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 12,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*017:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "0237006ed149593487ec39a17a0836d8201a2fb5e4df7dda4daa95690f517ff4",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*017:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*017:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*017:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 13,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*017:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "0237006ed149593487ec39a17a0836d8201a2fb5e4df7dda4daa95690f517ff4",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*017:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*017:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*017:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 14,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*017:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "0237006ed149593487ec39a17a0836d8201a2fb5e4df7dda4daa95690f517ff4",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*017:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*017:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*017:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 15,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*017:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "0237006ed149593487ec39a17a0836d8201a2fb5e4df7dda4daa95690f517ff4",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*017:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*017:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*501:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 8,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*501:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "c0501e4f1cd72167ded7e841d2a81feec8d6bc09c45af202afd1658827d97750",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*501:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*501:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*501:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 9,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*501:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "c0501e4f1cd72167ded7e841d2a81feec8d6bc09c45af202afd1658827d97750",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*501:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*501:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*501:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 10,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*501:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "c0501e4f1cd72167ded7e841d2a81feec8d6bc09c45af202afd1658827d97750",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*501:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*501:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*501:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 11,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*501:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "c0501e4f1cd72167ded7e841d2a81feec8d6bc09c45af202afd1658827d97750",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*501:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*501:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*501:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 12,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*501:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "c0501e4f1cd72167ded7e841d2a81feec8d6bc09c45af202afd1658827d97750",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*501:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*501:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*501:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 13,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*501:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "c0501e4f1cd72167ded7e841d2a81feec8d6bc09c45af202afd1658827d97750",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*501:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*501:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*501:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 14,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*501:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "c0501e4f1cd72167ded7e841d2a81feec8d6bc09c45af202afd1658827d97750",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*501:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*501:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*501:01",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 15,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*501:01",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "c0501e4f1cd72167ded7e841d2a81feec8d6bc09c45af202afd1658827d97750",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*501:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*501:01",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*501:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 8,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*501:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "c0501e4f1cd72167ded7e841d2a81feec8d6bc09c45af202afd1658827d97750",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*501:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*501:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*501:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 9,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*501:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "c0501e4f1cd72167ded7e841d2a81feec8d6bc09c45af202afd1658827d97750",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*501:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*501:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*501:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 10,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*501:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "c0501e4f1cd72167ded7e841d2a81feec8d6bc09c45af202afd1658827d97750",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*501:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*501:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*501:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 11,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*501:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "c0501e4f1cd72167ded7e841d2a81feec8d6bc09c45af202afd1658827d97750",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*501:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*501:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*501:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 12,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*501:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "c0501e4f1cd72167ded7e841d2a81feec8d6bc09c45af202afd1658827d97750",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*501:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*501:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*501:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 13,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*501:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "c0501e4f1cd72167ded7e841d2a81feec8d6bc09c45af202afd1658827d97750",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*501:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*501:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*501:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 14,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*501:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "c0501e4f1cd72167ded7e841d2a81feec8d6bc09c45af202afd1658827d97750",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*501:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*501:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    },
+    {
+      "affinity_length_supported": true,
+      "allele_status": "supported",
+      "canonical_allele": "DLA-88*501:02",
+      "context": "without_flanks",
+      "empirical_validation": {
+        "binding": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "presentation": {
+          "provenance": null,
+          "status": "unknown"
+        },
+        "processing": {
+          "provenance": null,
+          "status": "unknown"
+        }
+      },
+      "length": 15,
+      "mhc_species": "Canis sp.",
+      "model_allele": "DLA-88*501:02",
+      "model_input_sequence_length": 39,
+      "model_input_sequence_sha256": "c0501e4f1cd72167ded7e841d2a81feec8d6bc09c45af202afd1658827d97750",
+      "percentile_calibration": {
+        "binding": {
+          "available": true,
+          "model_allele": "DLA-88*501:01",
+          "reference_population": null
+        },
+        "presentation": {
+          "available": true,
+          "reference_population": null
+        },
+        "processing": {
+          "available": false,
+          "reference_population": null
+        }
+      },
+      "requested_allele": "DLA-88*501:02",
+      "support_basis": "model configuration; not an execution test",
+      "supported": {
+        "binding": true,
+        "presentation": true,
+        "processing": true
+      }
+    }
+  ],
+  "configuration": {
+    "alleles": [
+      "DLA-88*003:02",
+      "DLA-88*004:02",
+      "DLA-88*006:01",
+      "DLA-88*012:01",
+      "DLA-88*017:01",
+      "DLA-88*501:01",
+      "DLA-88*501:02"
+    ],
+    "context": "without_flanks",
+    "lengths": [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "random_seed": null
+  },
+  "exploratory_evaluation": {
+    "held_out_eligible_samples": 0,
+    "report": "report.json",
+    "sha256": "2549a1fc87f065ae01ac708a73fd605bed328df5b79d6d7a95b0f7753191c92c",
+    "status": "exploratory_only",
+    "study": "pmid:42199926"
+  },
+  "generator": {
+    "dependencies": {
+      "mhcgnomes": "3.33.6",
+      "numpy": "2.4.1",
+      "pandas": "3.0.0",
+      "torch": "2.10.0"
+    },
+    "mhcflurry": "2.3.14",
+    "python": "3.12.6",
+    "source_files": {
+      "allele_capabilities.py": "bda5b3c405b4dee9b0fb412f94ec979eb44601a4a9feaa993f2dde02aecf49e8",
+      "class1_affinity_predictor.py": "df832aaa0b9b32afa9422de2a06a625cd9ae0f7a14965c56f7cedbaf9dca9666",
+      "class1_presentation_predictor.py": "68f2799ee393e3c8269d249141854131bd5b1fcd48e1395f37ba6c727b88f9bf",
+      "class1_processing_predictor.py": "247534495d2747a62f397d6d21af4a5f4c1479b1a4a45001197ce3263d85d6e6",
+      "common.py": "59245625f3faaa639f742be3c96c62f16017f449a30ce68571a1eb0ed0adb436",
+      "dla_evaluation.py": "85bd15f98fd0c8a5b61db679fe92efde07b168ea15ea0f920dbca8b2d8f63f14",
+      "sample_disjointness.py": "72675b8f81123ff645abaf7194386e881783f9e29ea772e1037c94670a9121d4",
+      "training_provenance.py": "a4f6c2ce8f017fb7f6ce55a444c49eb2132386c0a0d85dcc5ebe9237387753ef"
+    },
+    "source_sha256": "bda5b3c405b4dee9b0fb412f94ec979eb44601a4a9feaa993f2dde02aecf49e8"
+  },
+  "limitations": [
+    "Support describes configuration; empirical validation remains unknown.",
+    "Model input sequences may be pseudosequences, not full-length proteins.",
+    "Bundled tables do not establish complete lineage or experimental host species.",
+    "Calibration transforms do not identify their reference population or validate canine calibration."
+  ],
+  "model": {
+    "files": {
+      "GENERATE.sh": "e56b514caa224e38258c633f2f611a475ba814b93e0965724d127b16bf9b3238",
+      "affinity_predictor/allele_sequences.csv": "0967249e8d73dc06a675ecfafae71f03f90d13a274bb1c0122140d22d521df8a",
+      "affinity_predictor/info.txt": "ebee03e6c88ed6ed768953196dd48e3c1e410abd72ce5729867410776a965ad6",
+      "affinity_predictor/manifest.csv": "5e749c5b9da19ee2b0467aa2486b447a9e2971b13f7954a803f75f93fc12d56e",
+      "affinity_predictor/percent_ranks.json": "9cb4ee611dfce6b7f8c3365bd420546ef4f05e91af3e18ef58abec4dbd30df2b",
+      "affinity_predictor/pseudosequences.mhcflurry.39aa.csv": "80bcdf5c250ce9954524b7bffccf80f030add9e9a090dd61bed0380f55652980",
+      "affinity_predictor/weights_PAN-CLASS1-1-023e475ab69a6b2e.npz": "842afffc5d56629608adf61508a5693787a09345216dd361a353476ef7f60565",
+      "affinity_predictor/weights_PAN-CLASS1-1-21872705eecbad28.npz": "c804b5a4945df017d6c85160c51a51b49014cc435cae8cb97d7df11fa48f7e19",
+      "affinity_predictor/weights_PAN-CLASS1-1-5c21c209aa71dcbe.npz": "fc3c2ca844fdcbd37af9f46e9ef818d91fd9ba30b46d75999ecb05de665900c7",
+      "affinity_predictor/weights_PAN-CLASS1-1-5e8cfd8467919f6a.npz": "8d500ec31eeb23e15bef14e913256a78fb9dca7aecd80ddff74876e601619e3f",
+      "affinity_predictor/weights_PAN-CLASS1-1-a1852d5c4dd657ba.npz": "fd9599b56c8aab097377e803b55d5f8d3ffc0bf3150521ffaa0ee6d97ea646f2",
+      "affinity_predictor/weights_PAN-CLASS1-1-b8cfcfd3e5868e3d.npz": "64580b7f7ae5d1178c88f47108cd309f2ddd140f23d080070344fc13733dc221",
+      "affinity_predictor/weights_PAN-CLASS1-1-c734d88715df1670.npz": "2aa1a0f6493ab89718e1a1da789864aa1195ca3db0805ab07c5265b0959dc664",
+      "affinity_predictor/weights_PAN-CLASS1-1-e7ade34181bb9774.npz": "57ce2368b733ec79ef5bd2014e59dbae2c8e8e6878ad720e46f63ef74d533312",
+      "affinity_predictor/weights_PAN-CLASS1-1-edb7484c5406eaca.npz": "8a8d098b259fdc8d44647748d80543208e084b2fc34924a21667592efae02856",
+      "affinity_predictor/weights_PAN-CLASS1-1-f38e10af5757cedc.npz": "6bdb3ed4ecf0a4d9e1fe525fc1e29eac03740c2a5d943d65fb40d3afa3231d18",
+      "affinity_predictor/weights_PAN-CLASS1-1-f54dfdc7a7f34534.npz": "72fd23175ee80150e7aa4c2b3a539747f54fc33972fac5c5fcfb1790cd639821",
+      "affinity_predictor_train_data.csv.bz2": "da310aad1251ea225af7f8e9330266fb13bc7aee4b67e4dfd55c3aff55bc7468",
+      "inference_export.json": "d262b457324fab4a55e32fec7c03fb557f7207428584c1bbece4e00f97bac11b",
+      "info.txt": "bf943067a3cec7faf51b5d0bc9d25dbee3f470d7f3ab0286ec6756d16687383e",
+      "percent_ranks.json": "39e53c5ea6ad30d19f59b9822e47832d8b154cd8b28d5a8cab365540fb40e233",
+      "processing_predictor_no_flank_train_data.csv.bz2": "77a1ae374699083b72bf668ea683ccfb6ef7234a876d1971cd3e72c19605c870",
+      "processing_predictor_with_flanks/info.txt": "f4cd17561199ff17cfbca9c0d12916a83ea2b417837ab07d092551437a4d64bf",
+      "processing_predictor_with_flanks/manifest.csv": "57d305002b9924375a9e399684f9e7e6dc08ca6b5af40486d92575e09cc76a7e",
+      "processing_predictor_with_flanks/weights_CLEAVAGE-CLASSI-0-8ad35a033762a838.npz": "7acbffb7a61d613bf82540ed106d049f32910a77173b33e828f34d0b0dc0e81f",
+      "processing_predictor_with_flanks/weights_CLEAVAGE-CLASSI-1-9192668617f23d74.npz": "c82a5f95ee7e206265467d9bdfab92daa84535b3e6319a0cfa613048ebd07898",
+      "processing_predictor_with_flanks/weights_CLEAVAGE-CLASSI-2-1e4fb6ad31df3e22.npz": "1868756ee5f729f5fdf96276036bab5c7bf4205478717d6d720c8a80e618f24f",
+      "processing_predictor_with_flanks/weights_CLEAVAGE-CLASSI-3-8bc0e3428d0e5cf2.npz": "305a7085814fc24f849ac556710f723b78dcd97cf3fe3f30b8bde9be7fe87cf3",
+      "processing_predictor_with_flanks/weights_CLEAVAGE-CLASSI-4-75375b3a41044ed1.npz": "dc134e9b4774adc8117c9d505a055b3550c18454c829b29f6ab12563398c08e5",
+      "processing_predictor_with_flanks/weights_CLEAVAGE-CLASSI-5-76db7593e8038320.npz": "058a0b4409b6f25347a48c4bfa410e98d25d937c4182658ec1967caa37652094",
+      "processing_predictor_with_flanks/weights_CLEAVAGE-CLASSI-6-658c7b4255f233d8.npz": "c5182c629bd4928d00b01ceb58c19c5fa0d6a555fe2e4ea61c4eca17a73b40ec",
+      "processing_predictor_with_flanks/weights_CLEAVAGE-CLASSI-7-4536fc3d6ab474bd.npz": "fecc6950b92f07a022baf2214edfe05877af803ea94b515e8003e889601ed871",
+      "processing_predictor_with_flanks_train_data.csv.bz2": "2431ef4636bb0862136aaade1882dd53d5c0409d4707f6129c318045bebdb46d",
+      "processing_predictor_without_flanks/info.txt": "f4cd17561199ff17cfbca9c0d12916a83ea2b417837ab07d092551437a4d64bf",
+      "processing_predictor_without_flanks/manifest.csv": "93a2ed30e31a905cc30eefdbfea38743fdfa0265857569d5d39d4accb0f4c35f",
+      "processing_predictor_without_flanks/weights_CLEAVAGE-CLASSI-0-cc22ef7c55f2731b.npz": "ffc2e34d1970054886dee3a8ba1455f5d901c7fdf9bad0cb0dc1749fb2116b4a",
+      "processing_predictor_without_flanks/weights_CLEAVAGE-CLASSI-1-64371e63390e16fe.npz": "977aae98fd2bd8d56cb24b0bd4d19323d15da512419f6824ac4048ddd6ae0517",
+      "processing_predictor_without_flanks/weights_CLEAVAGE-CLASSI-2-3b5d5a81459aef7a.npz": "28bab3620e5ca4b64510a5198a121cb37bcebd92b5e4921262bfeb8a3f204b2c",
+      "processing_predictor_without_flanks/weights_CLEAVAGE-CLASSI-3-d3a2e835a1e6756e.npz": "21c310755e0a2fa8c5b684b40f63179bf897f20f07ecd15962f2ca60346d2375",
+      "processing_predictor_without_flanks/weights_CLEAVAGE-CLASSI-4-65673d67bc4de23d.npz": "98dfda6df43ff0753681588a4b089db0f0566589f755fe98161aab0fe3ab9d4c",
+      "processing_predictor_without_flanks/weights_CLEAVAGE-CLASSI-5-8ef6d765fb1b4b27.npz": "9e89488c5787d72fd0a1d8463138e85e1b4278c5225fc2229f3bc048af64c2a5",
+      "processing_predictor_without_flanks/weights_CLEAVAGE-CLASSI-6-0746724132d39a58.npz": "39cde64d0df86661ec46166b68010968e64e0263c0fdf9cbe9b0fa16c8a61021",
+      "processing_predictor_without_flanks/weights_CLEAVAGE-CLASSI-7-94cc1cdf0256677d.npz": "dc9be1251c79b6588e9288f38f9f7f75ad6d80eab5d33b6236c751d61e1ebd6b",
+      "weights.csv": "ce91f12e0d6f437ed5477d55fd9df81bef6bdb5a70344be8c6a9f71bd83402fd"
+    },
+    "sha256": "7bcbbd0846a0642c67b367ed51320f92ff747f6f15c2fec8251bd07f678a37bd"
+  },
+  "schema_version": 1,
+  "training_evidence": {
+    "affinity": {
+      "allele_length_rows": [
+        {
+          "allele": "DLA-88*003:02",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 15,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 15,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 15,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 15,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 15,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 8,
+          "rows": 159
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 9,
+          "rows": 1223
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 10,
+          "rows": 302
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 11,
+          "rows": 214
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 12,
+          "rows": 56
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 13,
+          "rows": 9
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 15,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 15,
+          "rows": 0
+        }
+      ],
+      "allele_rows": {
+        "DLA-88*003:02": 0,
+        "DLA-88*004:02": 0,
+        "DLA-88*006:01": 0,
+        "DLA-88*012:01": 0,
+        "DLA-88*017:01": 0,
+        "DLA-88*501:01": 1963,
+        "DLA-88*501:02": 0
+      },
+      "path": "affinity_predictor_train_data.csv.bz2",
+      "scope": "bundled table only; all labels; not complete model lineage",
+      "sha256": "da310aad1251ea225af7f8e9330266fb13bc7aee4b67e4dfd55c3aff55bc7468",
+      "source_provenance_present": false,
+      "species_strata": [
+        {
+          "allele": "DLA-88*501:01",
+          "host_species": null,
+          "length": 8,
+          "rows": 159,
+          "source_species": null
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "host_species": null,
+          "length": 9,
+          "rows": 1223,
+          "source_species": null
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "host_species": null,
+          "length": 10,
+          "rows": 302,
+          "source_species": null
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "host_species": null,
+          "length": 11,
+          "rows": 214,
+          "source_species": null
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "host_species": null,
+          "length": 12,
+          "rows": 56,
+          "source_species": null
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "host_species": null,
+          "length": 13,
+          "rows": 9,
+          "source_species": null
+        }
+      ],
+      "status": "available",
+      "total_rows": 811134,
+      "unresolved_allele_rows": 0
+    },
+    "processing_with_flanks": {
+      "allele_length_rows": [
+        {
+          "allele": "DLA-88*003:02",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 15,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 15,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 15,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 15,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 15,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 15,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 15,
+          "rows": 0
+        }
+      ],
+      "allele_rows": {
+        "DLA-88*003:02": 0,
+        "DLA-88*004:02": 0,
+        "DLA-88*006:01": 0,
+        "DLA-88*012:01": 0,
+        "DLA-88*017:01": 0,
+        "DLA-88*501:01": 0,
+        "DLA-88*501:02": 0
+      },
+      "path": "processing_predictor_with_flanks_train_data.csv.bz2",
+      "scope": "bundled table only; all labels; not complete model lineage",
+      "sha256": "2431ef4636bb0862136aaade1882dd53d5c0409d4707f6129c318045bebdb46d",
+      "source_provenance_present": false,
+      "species_strata": [],
+      "status": "available",
+      "total_rows": 399392,
+      "unresolved_allele_rows": 0
+    },
+    "processing_without_flanks": {
+      "allele_length_rows": [
+        {
+          "allele": "DLA-88*003:02",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*003:02",
+          "length": 15,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*004:02",
+          "length": 15,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*006:01",
+          "length": 15,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*012:01",
+          "length": 15,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*017:01",
+          "length": 15,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:01",
+          "length": 15,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 8,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 9,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 10,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 11,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 12,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 13,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 14,
+          "rows": 0
+        },
+        {
+          "allele": "DLA-88*501:02",
+          "length": 15,
+          "rows": 0
+        }
+      ],
+      "allele_rows": {
+        "DLA-88*003:02": 0,
+        "DLA-88*004:02": 0,
+        "DLA-88*006:01": 0,
+        "DLA-88*012:01": 0,
+        "DLA-88*017:01": 0,
+        "DLA-88*501:01": 0,
+        "DLA-88*501:02": 0
+      },
+      "path": "processing_predictor_no_flank_train_data.csv.bz2",
+      "scope": "bundled table only; all labels; not complete model lineage",
+      "sha256": "77a1ae374699083b72bf668ea683ccfb6ef7234a876d1971cd3e72c19605c870",
+      "source_provenance_present": false,
+      "species_strata": [],
+      "status": "available",
+      "total_rows": 399392,
+      "unresolved_allele_rows": 0
+    }
+  }
+}

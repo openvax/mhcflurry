@@ -15,6 +15,8 @@ presentation.
   older release.
 - {doc}`release_model_evaluation` compares the released weights with other
   predictors on identical data.
+- {doc}`dla_validation` reports DLA support, training evidence and the limits
+  of the exploratory canine evaluation.
 
 ## Training your own models
 
@@ -74,6 +76,7 @@ configuration
 
 shared_percent_rank_transforms
 training_provenance
+dla_validation
 ```
 
 ```{toctree}
