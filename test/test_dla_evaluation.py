@@ -160,6 +160,21 @@ def test_bootstrap_uses_dogs_and_deduplicates_antibody_captures():
     assert stat["percentile_95_ci"] == [1., 3.]
 
 
+@pytest.mark.parametrize("missing", ["processing", "presentation"])
+def test_missing_components_are_not_reported_as_unsupported_lengths(predictor, monkeypatch, missing):
+    monkeypatch.setattr(predictor.affinity_predictor, "predict",
+                        lambda peptides, allele: numpy.full(len(peptides), 50.))
+    predictor.processing_predictor_without_flanks.predict = lambda peptides: numpy.full(len(peptides), .3)
+    if missing == "processing":
+        predictor.processing_predictor_without_flanks = None
+    else:
+        predictor.weights_dataframe = None
+    scored = score_observations(predictor, observations().iloc[:1])
+    assert scored.affinity_status.iloc[0] == "executed"
+    assert scored.presentation_score.isna().all()
+    assert scored.presentation_score_status.iloc[0] == "component_unavailable"
+
+
 def test_historical_recipe_never_exports_unresolved_samples(tmp_path, predictor, monkeypatch):
     models = tmp_path / "models"
     models.mkdir()

@@ -175,8 +175,11 @@ def score_observations(predictor, frame):
         scored.loc[binding.index, "affinity_status"] = "executed"
         scored.loc[binding.index, "predicted_best_allele"] = numpy.asarray(keys)[matrix.argmin(axis=0)]
         presentation = binding.loc[scored.loc[binding.index, "processing_score"].notna()]
-        if (len(presentation) and predictor.weights_dataframe is not None
-                and "without_flanks" in predictor.weights_dataframe.index):
+        has_presentation = (processing is not None and predictor.weights_dataframe is not None
+                            and "without_flanks" in predictor.weights_dataframe.index)
+        if not has_presentation:
+            scored.loc[binding.index, "presentation_score_status"] = "component_unavailable"
+        elif len(presentation):
             output = predictor.predict(presentation.peptide.tolist(), alleles=keys,
                                        include_affinity_percentile=False, verbose=0)
             values = output.presentation_score.to_numpy()
@@ -184,8 +187,6 @@ def score_observations(predictor, frame):
                 raise ValueError("Nonfinite presentation predictions")
             scored.loc[presentation.index, "presentation_score"] = values
             scored.loc[presentation.index, "presentation_score_status"] = "executed"
-        else:
-            scored.loc[presentation.index, "presentation_score_status"] = "component_unavailable"
     return scored
 
 
