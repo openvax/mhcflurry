@@ -1,0 +1,385 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.percentile_calibration &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.percentile_calibration</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.percentile_calibration</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Shared method selection and persistence for predictor percentile ranks."""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">hashlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">uuid</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.compact_percent_rank_transform</span><span class="w"> </span><span class="kn">import</span> <span class="n">CompactPercentRankTransform</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.histogram_percent_rank_transform</span><span class="w"> </span><span class="kn">import</span> <span class="n">HistogramPercentRankTransform</span>
+
+
+<div class="viewcode-block" id="calibration_method">
+<a class="viewcode-back" href="../../api.html#mhcflurry.percentile_calibration.calibration_method">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">calibration_method</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="n">bins</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Resolve the default without changing historical explicit-bin calls."""</span>
+    <span class="k">if</span> <span class="n">method</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="s2">"histogram"</span> <span class="k">if</span> <span class="n">bins</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">"compact"</span>
+    <span class="k">if</span> <span class="n">method</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"histogram"</span><span class="p">,</span> <span class="s2">"compact"</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Percentile method must be 'histogram' or 'compact'"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">"compact"</span> <span class="ow">and</span> <span class="n">bins</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Histogram bins cannot be combined with compact calibration"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">method</span></div>
+
+
+
+<div class="viewcode-block" id="factorize_calibration_groups">
+<a class="viewcode-back" href="../../api.html#mhcflurry.percentile_calibration.factorize_calibration_groups">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">factorize_calibration_groups</span><span class="p">(</span><span class="n">groups</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return ``(inverse, group_count)`` codes reusable across aligned fits.</span>
+
+<span class="sd">    Calibrating many alleles against one peptide reference repeats the same</span>
+<span class="sd">    grouping. Factorize it once and pass the result as ``group_codes``; the</span>
+<span class="sd">    fitted transforms are identical to passing ``groups`` each time.</span>
+<span class="sd">    """</span>
+    <span class="n">unique</span><span class="p">,</span> <span class="n">inverse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">groups</span><span class="p">),</span> <span class="n">return_inverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">inverse</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">unique</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="fit_percent_rank_transform">
+<a class="viewcode-back" href="../../api.html#mhcflurry.percentile_calibration.fit_percent_rank_transform">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">fit_percent_rank_transform</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                               <span class="n">score_transform</span><span class="o">=</span><span class="s2">"logit"</span><span class="p">,</span> <span class="n">survival</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                               <span class="n">max_knots</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span> <span class="n">groups</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">group_codes</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Fit a histogram or a label-free, validation-selected compact curve.</span>
+
+<span class="sd">    Compact fitting starts with 64 knots. A deterministic 80/20 background</span>
+<span class="sd">    split permits 128 only for a meaningful reduction in cutoff-mass error.</span>
+<span class="sd">    Groups (normally peptides) cannot cross that split. The selected budget</span>
+<span class="sd">    is refitted on the full reference; no evaluation labels are accepted.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    values : one-dimensional sequence of float</span>
+<span class="sd">        Independent reference scores, not case/control labels.</span>
+<span class="sd">    method : {"compact", "histogram"}, optional</span>
+<span class="sd">        Compact unless explicit bins select histogram. Compact plus bins is</span>
+<span class="sd">        invalid. This low-level helper requires bins for histogram fitting.</span>
+<span class="sd">    bins : int or sequence, optional</span>
+<span class="sd">        Histogram bin definition, forwarded without changing its semantics.</span>
+<span class="sd">    score_transform : {"logit", "log"}</span>
+<span class="sd">        Compact input coordinate: log for positive affinity IC50, logit for</span>
+<span class="sd">        probability-valued processing/presentation scores.</span>
+<span class="sd">    survival : bool, default False</span>
+<span class="sd">        Percentile direction for budget validation: True for upper-tail</span>
+<span class="sd">        processing/presentation ranks, False for affinity CDF ranks. This</span>
+<span class="sd">        does not change the returned transform's default direction; pass</span>
+<span class="sd">        survival=True explicitly when evaluating upper-tail percentiles.</span>
+<span class="sd">    max_knots : {64, 128}, default 128</span>
+<span class="sd">        Compact ceiling. Fit 64 unless held-out cutoff-mass error improves</span>
+<span class="sd">        beyond max(0.01, 10% of the better error). Ignored for histograms.</span>
+<span class="sd">    groups : sequence, optional</span>
+<span class="sd">        Aligned identities that must not cross the selection split. If absent,</span>
+<span class="sd">        each row is a separate group. Selection uses fixed seed 403, requires</span>
+<span class="sd">        at least 1,000 groups and two cutoffs with ten expected observations.</span>
+<span class="sd">    group_codes : tuple of (array of int, int), optional</span>
+<span class="sd">        Precomputed ``factorize_calibration_groups(groups)`` for the same</span>
+<span class="sd">        aligned reference rows. Mutually exclusive with ``groups``.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    HistogramPercentRankTransform or CompactPercentRankTransform</span>
+<span class="sd">        Fitted transform. Compact ``selection`` metadata records the decision</span>
+<span class="sd">        and available reference-validation diagnostics.</span>
+<span class="sd">    """</span>
+    <span class="n">method</span> <span class="o">=</span> <span class="n">calibration_method</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="n">bins</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">"histogram"</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">bins</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Histogram fitting requires bins"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">HistogramPercentRankTransform</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">bins</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">max_knots</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">128</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"max_knots must be 64 or 128"</span><span class="p">)</span>
+    <span class="n">values</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">groups</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">group_codes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Pass calibration groups or group_codes, not both"</span><span class="p">)</span>
+    <span class="c1"># Validate even references too small for a split.</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">CompactPercentRankTransform</span><span class="p">(</span><span class="n">score_transform</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="mi">64</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">group_codes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">inverse</span><span class="p">,</span> <span class="n">group_count</span> <span class="o">=</span> <span class="n">group_codes</span>
+        <span class="n">inverse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">inverse</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">inverse</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">values</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Calibration groups must align with reference scores"</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">groups</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">inverse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">values</span><span class="p">))</span>
+        <span class="n">group_count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">groups</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">groups</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">groups</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">values</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Calibration groups must align with reference scores"</span><span class="p">)</span>
+        <span class="n">unique</span><span class="p">,</span> <span class="n">inverse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">groups</span><span class="p">,</span> <span class="n">return_inverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">group_count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">unique</span><span class="p">)</span>
+    <span class="n">selected</span> <span class="o">=</span> <span class="mi">64</span>
+    <span class="n">diagnostics</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">selected_knots</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span> <span class="n">max_knots</span><span class="o">=</span><span class="n">max_knots</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">403</span><span class="p">,</span>
+                       <span class="n">reference_count</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">values</span><span class="p">),</span> <span class="n">group_count</span><span class="o">=</span><span class="n">group_count</span><span class="p">,</span>
+                       <span class="n">reference_sha256</span><span class="o">=</span><span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">(</span><span class="n">values</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">"&lt;f8"</span><span class="p">)</span><span class="o">.</span><span class="n">tobytes</span><span class="p">())</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">(),</span>
+                       <span class="n">reason</span><span class="o">=</span><span class="s2">"64 knots retained; no validation evidence for 128"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">max_knots</span> <span class="o">==</span> <span class="mi">128</span> <span class="ow">and</span> <span class="n">group_count</span> <span class="o">&gt;=</span> <span class="mi">1000</span><span class="p">:</span>
+        <span class="n">shuffled</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">403</span><span class="p">)</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span><span class="n">group_count</span><span class="p">)</span>
+        <span class="n">validation_groups</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">group_count</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+        <span class="n">validation_groups</span><span class="p">[</span><span class="n">shuffled</span><span class="p">[:</span><span class="n">group_count</span> <span class="o">//</span> <span class="mi">5</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">validation</span> <span class="o">=</span> <span class="n">validation_groups</span><span class="p">[</span><span class="n">inverse</span><span class="p">]</span>
+        <span class="n">fit_values</span><span class="p">,</span> <span class="n">validation_values</span> <span class="o">=</span> <span class="n">values</span><span class="p">[</span><span class="o">~</span><span class="n">validation</span><span class="p">],</span> <span class="n">values</span><span class="p">[</span><span class="n">validation</span><span class="p">]</span>
+        <span class="c1"># Avoid trying to validate cutoffs supported by fewer than ten scores.</span>
+        <span class="n">cutoffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">.03</span><span class="p">,</span> <span class="mf">.1</span><span class="p">,</span> <span class="mf">.3</span><span class="p">,</span> <span class="mf">1.</span><span class="p">,</span> <span class="mf">3.</span><span class="p">,</span> <span class="mf">10.</span><span class="p">])</span>
+        <span class="n">cutoffs</span> <span class="o">=</span> <span class="n">cutoffs</span><span class="p">[</span><span class="n">cutoffs</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">validation_values</span><span class="p">)</span> <span class="o">/</span> <span class="mi">100</span> <span class="o">&gt;=</span> <span class="mi">10</span><span class="p">]</span>
+        <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">cutoffs</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">fit_values</span><span class="p">))</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="p">):</span>
+            <span class="n">errors</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">budget</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">128</span><span class="p">):</span>
+                <span class="n">trial</span> <span class="o">=</span> <span class="n">CompactPercentRankTransform</span><span class="p">(</span><span class="n">score_transform</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">fit_values</span><span class="p">,</span> <span class="n">budget</span><span class="p">)</span>
+                <span class="n">ranks</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">trial</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">validation_values</span><span class="p">,</span> <span class="n">survival</span><span class="o">=</span><span class="n">survival</span><span class="p">))</span>
+                <span class="n">counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">searchsorted</span><span class="p">(</span><span class="n">ranks</span><span class="p">,</span> <span class="n">cutoffs</span><span class="p">,</span> <span class="n">side</span><span class="o">=</span><span class="s2">"right"</span><span class="p">)</span>
+                <span class="n">observed</span> <span class="o">=</span> <span class="mi">100</span> <span class="o">*</span> <span class="p">(</span><span class="n">counts</span> <span class="o">+</span> <span class="mf">.5</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">ranks</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="n">errors</span><span class="p">[</span><span class="n">budget</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">observed</span> <span class="o">/</span> <span class="n">cutoffs</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)))</span>
+            <span class="n">tolerance</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mf">.01</span><span class="p">,</span> <span class="mf">.1</span> <span class="o">*</span> <span class="nb">min</span><span class="p">(</span><span class="n">errors</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+            <span class="k">if</span> <span class="n">errors</span><span class="p">[</span><span class="mi">64</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">errors</span><span class="p">[</span><span class="mi">128</span><span class="p">]</span> <span class="o">+</span> <span class="n">tolerance</span><span class="p">:</span>
+                <span class="n">selected</span> <span class="o">=</span> <span class="mi">128</span>
+                <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="mi">128</span><span class="p">)</span>
+            <span class="n">diagnostics</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+                <span class="n">selected_knots</span><span class="o">=</span><span class="n">selected</span><span class="p">,</span> <span class="n">fit_count</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">fit_values</span><span class="p">),</span>
+                <span class="n">validation_count</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">validation_values</span><span class="p">),</span> <span class="n">cutoffs</span><span class="o">=</span><span class="n">cutoffs</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+                <span class="n">validation_mask_sha256</span><span class="o">=</span><span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">(</span><span class="n">validation</span><span class="o">.</span><span class="n">tobytes</span><span class="p">())</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">(),</span>
+                <span class="n">rms_log10_error</span><span class="o">=</span><span class="n">errors</span><span class="p">,</span> <span class="n">tolerance</span><span class="o">=</span><span class="n">tolerance</span><span class="p">,</span>
+                <span class="n">reason</span><span class="o">=</span><span class="s2">"128 improves validation beyond tolerance"</span> <span class="k">if</span> <span class="n">selected</span> <span class="o">==</span> <span class="mi">128</span>
+                <span class="k">else</span> <span class="s2">"64 is within validation tolerance"</span><span class="p">)</span>
+    <span class="n">diagnostics</span><span class="p">[</span><span class="s2">"actual_knots"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">selection</span> <span class="o">=</span> <span class="n">diagnostics</span>
+    <span class="k">return</span> <span class="n">model</span></div>
+
+
+
+<div class="viewcode-block" id="save_percent_rank_transforms">
+<a class="viewcode-back" href="../../api.html#mhcflurry.percentile_calibration.save_percent_rank_transforms">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_percent_rank_transforms</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">transforms</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Save calibrations with atomic replacement of the target file.</span>
+
+<span class="sd">    CSV is retained when all histograms share an edge grid. JSON is authoritative</span>
+<span class="sd">    for compact, mixed, or differing-grid collections. Remove the old</span>
+<span class="sd">    alternate calibration only after its replacement is successfully written.</span>
+<span class="sd">    An empty collection leaves existing calibration files untouched, as</span>
+<span class="sd">    historical saves did, so an uncalibrated or incremental save cannot erase</span>
+<span class="sd">    a calibration. Files get ordinary umask permissions. Neural-network files</span>
+<span class="sd">    are never touched. This does not make the entire model-directory save a</span>
+<span class="sd">    transaction across multiple files.</span>
+<span class="sd">    """</span>
+    <span class="n">directory</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span>
+    <span class="n">csv_path</span><span class="p">,</span> <span class="n">json_path</span> <span class="o">=</span> <span class="n">directory</span> <span class="o">/</span> <span class="s2">"percent_ranks.csv"</span><span class="p">,</span> <span class="n">directory</span> <span class="o">/</span> <span class="s2">"percent_ranks.json"</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">transforms</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="n">histogram_only</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">transforms</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span>
+        <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">HistogramPercentRankTransform</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">transforms</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+    <span class="n">series</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">t</span><span class="o">.</span><span class="n">to_series</span><span class="p">()</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">transforms</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span> <span class="k">if</span> <span class="n">histogram_only</span> <span class="k">else</span> <span class="p">{}</span>
+    <span class="c1"># Historical CSV requires identical edges for all distributions.</span>
+    <span class="n">same_edges</span> <span class="o">=</span> <span class="n">histogram_only</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">equal_nan</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">series</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+    <span class="n">target</span><span class="p">,</span> <span class="n">alternate</span> <span class="o">=</span> <span class="p">(</span><span class="n">csv_path</span><span class="p">,</span> <span class="n">json_path</span><span class="p">)</span> <span class="k">if</span> <span class="n">same_edges</span> <span class="k">else</span> <span class="p">(</span><span class="n">json_path</span><span class="p">,</span> <span class="n">csv_path</span><span class="p">)</span>
+    <span class="c1"># Let the kernel apply this process's umask. mkstemp would force</span>
+    <span class="c1"># owner-only mode, and reading the umask to undo that would race other</span>
+    <span class="c1"># threads, since the umask is process-global. os.replace keeps the mode.</span>
+    <span class="n">temp</span> <span class="o">=</span> <span class="n">directory</span> <span class="o">/</span> <span class="p">(</span><span class="s2">".percent-ranks-</span><span class="si">%d</span><span class="s2">-</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">(),</span> <span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">()</span><span class="o">.</span><span class="n">hex</span><span class="p">))</span>
+    <span class="n">descriptor</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">temp</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">O_WRONLY</span> <span class="o">|</span> <span class="n">os</span><span class="o">.</span><span class="n">O_CREAT</span> <span class="o">|</span> <span class="n">os</span><span class="o">.</span><span class="n">O_EXCL</span><span class="p">,</span> <span class="mo">0o666</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">os</span><span class="o">.</span><span class="n">fdopen</span><span class="p">(</span><span class="n">descriptor</span><span class="p">,</span> <span class="s2">"w"</span><span class="p">)</span> <span class="k">as</span> <span class="n">stream</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">same_edges</span><span class="p">:</span>
+                <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">series</span><span class="p">)</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">index_label</span><span class="o">=</span><span class="s2">"bin"</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="nb">format</span><span class="o">=</span><span class="s2">"mhcflurry-percent-ranks-v1"</span><span class="p">,</span> <span class="n">transforms</span><span class="o">=</span><span class="p">{</span>
+                    <span class="n">name</span><span class="p">:</span> <span class="n">t</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">transforms</span><span class="o">.</span><span class="n">items</span><span class="p">()}),</span> <span class="n">stream</span><span class="p">,</span>
+                    <span class="n">allow_nan</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+            <span class="n">stream</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">fsync</span><span class="p">(</span><span class="n">stream</span><span class="o">.</span><span class="n">fileno</span><span class="p">())</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">temp</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
+        <span class="n">alternate</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">missing_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">temp</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">missing_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="load_percent_rank_transforms">
+<a class="viewcode-back" href="../../api.html#mhcflurry.percentile_calibration.load_percent_rank_transforms">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_percent_rank_transforms</span><span class="p">(</span><span class="n">models_dir</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Read new calibrations or historical CSV without refitting either."""</span>
+    <span class="n">directory</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span>
+    <span class="n">json_path</span><span class="p">,</span> <span class="n">csv_path</span> <span class="o">=</span> <span class="n">directory</span> <span class="o">/</span> <span class="s2">"percent_ranks.json"</span><span class="p">,</span> <span class="n">directory</span> <span class="o">/</span> <span class="s2">"percent_ranks.csv"</span>
+    <span class="n">use_json</span> <span class="o">=</span> <span class="n">json_path</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">json_path</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">and</span> <span class="n">csv_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="c1"># A save replaces its target and only then removes the alternate format,</span>
+        <span class="c1"># so both existing means it was interrupted. Load the newer file and</span>
+        <span class="c1"># warn: refusing would make the whole predictor directory unreadable.</span>
+        <span class="n">use_json</span> <span class="o">=</span> <span class="n">json_path</span><span class="o">.</span><span class="n">stat</span><span class="p">()</span><span class="o">.</span><span class="n">st_mtime</span> <span class="o">&gt;=</span> <span class="n">csv_path</span><span class="o">.</span><span class="n">stat</span><span class="p">()</span><span class="o">.</span><span class="n">st_mtime</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">"Both percent_ranks.json and percent_ranks.csv exist in </span><span class="si">%s</span><span class="s2">; an interrupted "</span>
+            <span class="s2">"calibration save left </span><span class="si">%s</span><span class="s2"> behind. Loading the newer file; remove the stale "</span>
+            <span class="s2">"one or recalibrate."</span> <span class="o">%</span> <span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="p">(</span><span class="n">csv_path</span> <span class="k">if</span> <span class="n">use_json</span> <span class="k">else</span> <span class="n">json_path</span><span class="p">)</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">use_json</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">json_path</span><span class="o">.</span><span class="n">open</span><span class="p">()</span> <span class="k">as</span> <span class="n">stream</span><span class="p">:</span>
+            <span class="n">payload</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"format"</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">"mhcflurry-percent-ranks-v1"</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unsupported percentile collection format"</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="n">payload</span><span class="p">[</span><span class="s2">"transforms"</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">implementation</span> <span class="o">=</span> <span class="p">(</span><span class="n">HistogramPercentRankTransform</span>
+                              <span class="k">if</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"format"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"histogram-cdf-v1"</span>
+                              <span class="k">else</span> <span class="n">CompactPercentRankTransform</span><span class="p">)</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">implementation</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">directory</span> <span class="o">/</span> <span class="s2">"percent_ranks.csv"</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="n">frame</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">directory</span> <span class="o">/</span> <span class="s2">"percent_ranks.csv"</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">HistogramPercentRankTransform</span><span class="o">.</span><span class="n">from_series</span><span class="p">(</span><span class="n">frame</span><span class="p">[</span><span class="n">name</span><span class="p">])</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">frame</span><span class="p">}</span>
+    <span class="k">return</span> <span class="p">{}</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

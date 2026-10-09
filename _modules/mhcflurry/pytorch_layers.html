@@ -1,0 +1,358 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.pytorch_layers &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.pytorch_layers</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.pytorch_layers</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""</span>
+<span class="sd">PyTorch custom layers for mhcflurry.</span>
+<span class="sd">"""</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn.functional</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">F</span>
+
+
+<div class="viewcode-block" id="get_activation">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_layers.get_activation">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_activation</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Map activation name string to a PyTorch activation function.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    name : str</span>
+<span class="sd">        Activation name: "tanh", "sigmoid", "relu", "silu"/"swish",</span>
+<span class="sd">        "gelu", "linear", or ""</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    callable or None</span>
+<span class="sd">        Activation function, or None for no activation</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">name</span> <span class="ow">or</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">"linear"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">"tanh"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">tanh</span>
+    <span class="k">elif</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">"sigmoid"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">sigmoid</span>
+    <span class="k">elif</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">"relu"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">F</span><span class="o">.</span><span class="n">relu</span>
+    <span class="k">elif</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"silu"</span><span class="p">,</span> <span class="s2">"swish"</span><span class="p">}:</span>
+        <span class="k">return</span> <span class="n">F</span><span class="o">.</span><span class="n">silu</span>
+    <span class="k">elif</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">"gelu"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">F</span><span class="o">.</span><span class="n">gelu</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown activation: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="KerasBatchNorm1d">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_layers.KerasBatchNorm1d">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">KerasBatchNorm1d</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm1d</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""BatchNorm1d with Keras-compatible running-statistics updates.</span>
+
+<span class="sd">    PyTorch normalizes with the biased batch variance but updates</span>
+<span class="sd">    ``running_var`` with an unbiased estimate. Keras uses the biased population</span>
+<span class="sd">    variance for both. ``momentum`` retains PyTorch's new-batch-coefficient</span>
+<span class="sd">    convention so ``0.01`` corresponds to Keras ``momentum=0.99``.</span>
+
+<span class="sd">    Supports both ``(batch, features)`` dense outputs and</span>
+<span class="sd">    ``(batch, channels, positions)`` sequence outputs. In the sequence case,</span>
+<span class="sd">    statistics are accumulated over batch and position, matching Keras</span>
+<span class="sd">    ``BatchNormalization(axis=-1)`` on the equivalent channels-last tensor.</span>
+<span class="sd">    """</span>
+
+<div class="viewcode-block" id="KerasBatchNorm1d.forward">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_layers.KerasBatchNorm1d.forward">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inputs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_input_dim</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">inputs</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">reduction_dims</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,)</span>
+            <span class="n">broadcast_shape</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">inputs</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">reduction_dims</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+            <span class="n">broadcast_shape</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"KerasBatchNorm1d supports 2D dense or 3D sequence outputs; "</span>
+                <span class="s2">"got shape </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="o">.</span><span class="n">shape</span><span class="p">),)</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">training</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">track_running_stats</span><span class="p">:</span>
+            <span class="n">mean</span> <span class="o">=</span> <span class="n">inputs</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="n">reduction_dims</span><span class="p">)</span>
+            <span class="n">variance</span> <span class="o">=</span> <span class="n">inputs</span><span class="o">.</span><span class="n">var</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="n">reduction_dims</span><span class="p">,</span> <span class="n">unbiased</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">training</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">track_running_stats</span><span class="p">:</span>
+                <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">num_batches_tracked</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">running_mean</span><span class="o">.</span><span class="n">lerp_</span><span class="p">(</span><span class="n">mean</span><span class="o">.</span><span class="n">detach</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">momentum</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">running_var</span><span class="o">.</span><span class="n">lerp_</span><span class="p">(</span><span class="n">variance</span><span class="o">.</span><span class="n">detach</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">momentum</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">mean</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">running_mean</span>
+            <span class="n">variance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">running_var</span>
+
+        <span class="n">mean</span> <span class="o">=</span> <span class="n">mean</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">broadcast_shape</span><span class="p">)</span>
+        <span class="n">variance</span> <span class="o">=</span> <span class="n">variance</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">broadcast_shape</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">(</span><span class="n">inputs</span> <span class="o">-</span> <span class="n">mean</span><span class="p">)</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">rsqrt</span><span class="p">(</span><span class="n">variance</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">eps</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">affine</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">result</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">broadcast_shape</span><span class="p">)</span> <span class="o">+</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">broadcast_shape</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="LocallyConnected1D">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_layers.LocallyConnected1D">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LocallyConnected1D</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    A locally connected 1D layer (unshared convolution).</span>
+
+<span class="sd">    Unlike Conv1D, this layer uses different filter weights at each position</span>
+<span class="sd">    in the input sequence. This is equivalent to Keras' LocallyConnected1D.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    in_channels : int</span>
+<span class="sd">        Number of input channels</span>
+<span class="sd">    out_channels : int</span>
+<span class="sd">        Number of output channels (filters)</span>
+<span class="sd">    input_length : int</span>
+<span class="sd">        Length of the input sequence</span>
+<span class="sd">    kernel_size : int</span>
+<span class="sd">        Size of the convolution kernel</span>
+<span class="sd">    activation : str</span>
+<span class="sd">        Activation function name</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">in_channels</span><span class="p">,</span> <span class="n">out_channels</span><span class="p">,</span> <span class="n">input_length</span><span class="p">,</span> <span class="n">kernel_size</span><span class="p">,</span>
+                 <span class="n">activation</span><span class="o">=</span><span class="s2">"tanh"</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">LocallyConnected1D</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">in_channels</span> <span class="o">=</span> <span class="n">in_channels</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">out_channels</span> <span class="o">=</span> <span class="n">out_channels</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">input_length</span> <span class="o">=</span> <span class="n">input_length</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kernel_size</span> <span class="o">=</span> <span class="n">kernel_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">activation_name</span> <span class="o">=</span> <span class="n">activation</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_length</span> <span class="o">=</span> <span class="n">input_length</span> <span class="o">-</span> <span class="n">kernel_size</span> <span class="o">+</span> <span class="mi">1</span>
+
+        <span class="c1"># Weight shape: (output_length, out_channels, in_channels * kernel_size)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">weight</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_length</span><span class="p">,</span> <span class="n">out_channels</span><span class="p">,</span> <span class="n">in_channels</span> <span class="o">*</span> <span class="n">kernel_size</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="c1"># Bias shape: (output_length, out_channels)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bias</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_length</span><span class="p">,</span> <span class="n">out_channels</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_activation</span> <span class="o">=</span> <span class="n">get_activation</span><span class="p">(</span><span class="n">activation</span><span class="p">)</span>
+
+        <span class="c1"># Match Keras LocallyConnected1D GlorotUniform. Keras computes fan-in</span>
+        <span class="c1"># and fan-out on its (output_length, flattened_input, filters) kernel;</span>
+        <span class="c1"># applying torch's generic 3D fan calculation to our transposed storage</span>
+        <span class="c1"># would use different fan values.</span>
+        <span class="n">flattened_input</span> <span class="o">=</span> <span class="n">in_channels</span> <span class="o">*</span> <span class="n">kernel_size</span>
+        <span class="n">fan_in</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_length</span> <span class="o">*</span> <span class="n">flattened_input</span>
+        <span class="n">fan_out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_length</span> <span class="o">*</span> <span class="n">out_channels</span>
+        <span class="n">bound</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mf">6.0</span> <span class="o">/</span> <span class="p">(</span><span class="n">fan_in</span> <span class="o">+</span> <span class="n">fan_out</span><span class="p">))</span>
+        <span class="n">nn</span><span class="o">.</span><span class="n">init</span><span class="o">.</span><span class="n">uniform_</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">weight</span><span class="p">,</span> <span class="o">-</span><span class="n">bound</span><span class="p">,</span> <span class="n">bound</span><span class="p">)</span>
+
+<div class="viewcode-block" id="LocallyConnected1D.forward">
+<a class="viewcode-back" href="../../api.html#mhcflurry.pytorch_layers.LocallyConnected1D.forward">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Forward pass.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        x : torch.Tensor</span>
+<span class="sd">            Input tensor of shape (batch, sequence_length, in_channels)</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        torch.Tensor</span>
+<span class="sd">            Output tensor of shape (batch, output_length, out_channels)</span>
+<span class="sd">        """</span>
+        <span class="n">batch_size</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="c1"># Use unfold to extract patches and match Keras flatten order.</span>
+        <span class="c1"># x_unfolded shape: (batch, output_length, in_channels, kernel_size)</span>
+        <span class="n">x_unfolded</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">unfold</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">kernel_size</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="c1"># Keras flattens patches with kernel positions first, then channels.</span>
+        <span class="n">x_unfolded</span> <span class="o">=</span> <span class="n">x_unfolded</span><span class="o">.</span><span class="n">permute</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="c1"># Reshape to (batch, output_length, kernel_size * in_channels)</span>
+        <span class="n">x_unfolded</span> <span class="o">=</span> <span class="n">x_unfolded</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>
+            <span class="n">batch_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_length</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">kernel_size</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">in_channels</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Apply locally connected weights via einsum</span>
+        <span class="c1"># x_unfolded: (batch, output_length, in_channels * kernel_size)</span>
+        <span class="c1"># weight: (output_length, out_channels, in_channels * kernel_size)</span>
+        <span class="c1"># result: (batch, output_length, out_channels)</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">'boi,ofi-&gt;bof'</span><span class="p">,</span> <span class="n">x_unfolded</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">weight</span><span class="p">)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">bias</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_activation</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_activation</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">output</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

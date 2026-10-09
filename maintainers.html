@@ -1,0 +1,227 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Maintainer workflows &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=86f393d6"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Testing" href="testing.html" />
+    <link rel="prev" title="DLA evidence and canine evaluation" href="dla_validation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Maintainer workflows</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#contributing-and-verification">Contributing and verification</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#training-and-model-releases">Training and model releases</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#training-internals">Training internals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#controlled-experiments">Controlled experiments</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Maintainer workflows</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/maintainers.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="maintainer-workflows">
+<h1>Maintainer workflows<a class="headerlink" href="#maintainer-workflows" title="Link to this heading"></a></h1>
+<section id="contributing-and-verification">
+<h2>Contributing and verification<a class="headerlink" href="#contributing-and-verification" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Read the <a class="reference external" href="https://github.com/openvax/mhcflurry/blob/master/CONTRIBUTING.md">contribution guide</a>
+before opening a pull request.</p></li>
+<li><p>Use <a class="reference internal" href="testing.html"><span class="doc">Testing</span></a> for the fast local loop and full verification commands.</p></li>
+<li><p>Use <a class="reference internal" href="development.html"><span class="doc">Development</span></a> for internal API and compatibility-shim conventions.</p></li>
+<li><p>Use <a class="reference internal" href="orchestrator.html"><span class="doc">Orchestrator architecture</span></a> when changing worker processes, hardware planning, or
+training data residency.</p></li>
+</ul>
+</section>
+<section id="training-and-model-releases">
+<h2>Training and model releases<a class="headerlink" href="#training-and-model-releases" title="Link to this heading"></a></h2>
+<p>Maintained operational documentation lives next to the scripts it describes:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://github.com/openvax/mhcflurry/tree/master/scripts/training">Training pipeline</a></p></li>
+<li><p><a class="reference external" href="https://github.com/openvax/mhcflurry/tree/master/scripts/release">Release, synchronization, and deployment</a></p></li>
+<li><p><a class="reference external" href="https://github.com/openvax/mhcflurry/tree/master/downloads-generation">Generated model and data bundles</a></p></li>
+<li><p><a class="reference internal" href="release_training_recipe.html"><span class="doc">Release training recipe</span></a> records the data and component settings used
+for the published 2.3.0 weights.</p></li>
+<li><p><a class="reference internal" href="release_neural_hyperparameter_audit.html"><span class="doc">Neural training semantics</span></a> explains framework equations and compatibility choices.</p></li>
+<li><p><a class="reference internal" href="final_230_candidate_experiment.html"><span class="doc">Reproduce the 2.3.0 model training</span></a> reruns the recorded 2.3.0 recipe from a
+clean checkout. A new fit need not reproduce the original training
+trajectory.</p></li>
+</ul>
+<p>The public release entry point is:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span>train<span class="w"> </span>pan-allele-release<span class="w"> </span>--help
+</pre></div>
+</div>
+<p>It coordinates training, evaluation, plots, remote artifact synchronization,
+and optional deployment. Deployment is never enabled by default.</p>
+</section>
+<section id="training-internals">
+<h2>Training internals<a class="headerlink" href="#training-internals" title="Link to this heading"></a></h2>
+<p>These pages specify current behavior of the training and evaluation pipeline.
+Read <a class="reference internal" href="release_training_recipe.html"><span class="doc">Release training recipe</span></a> first for the component definitions the
+others reference.</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="affinity_dual_checkpoint_workflow.html"><span class="doc">Affinity checkpoint comparison</span></a> covers <code class="docutils literal notranslate"><span class="pre">--save-all-checkpoints</span></code> and
+comparing terminal against minimum-validation-loss weights.</p></li>
+<li><p><a class="reference internal" href="processing_preparation_acceleration.html"><span class="doc">Processing data preparation</span></a> describes how <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">train</span> <span class="pre">processing-data</span></code> builds affinity-matched negatives with resumable artifacts.</p></li>
+<li><p><a class="reference internal" href="probabilistic_processing_matching.html"><span class="doc">Processing negative matching</span></a> specifies the seeded
+without-replacement negative-matching contract.</p></li>
+<li><p><a class="reference internal" href="presentation_percentile_calibration.html"><span class="doc">Presentation percentile calibration</span></a> documents the shared
+<code class="docutils literal notranslate"><span class="pre">CompactPercentRankTransform</span></code> budget for presentation calibration.</p></li>
+<li><p><a class="reference internal" href="saved_candidate_evaluation.html"><span class="doc">Evaluate saved model runs</span></a> evaluates a completed training run with
+<code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">eval</span> <span class="pre">saved-candidate</span></code>, without retraining.</p></li>
+</ul>
+</section>
+<section id="controlled-experiments">
+<h2>Controlled experiments<a class="headerlink" href="#controlled-experiments" title="Link to this heading"></a></h2>
+<p>These pages define controlled comparisons: the question, the fixed controls,
+and the commands that run them.</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="processing_cleavage_boundary_experiment.html"><span class="doc">Cleavage-boundary processing models</span></a> asks whether boundary-spanning
+sequence context adds signal after controlling for binding affinity.</p></li>
+<li><p><a class="reference internal" href="processing_kernel_sweep.html"><span class="doc">Processing kernel-width experiment</span></a> sweeps kernel widths across the legacy flank
+CNN and the boundary-branch architecture.</p></li>
+<li><p><a class="reference internal" href="processing_hyperparameter_campaign.html"><span class="doc">Processing hyperparameter campaign</span></a> compares processing-specific
+training recipes rather than assuming affinity’s settings transfer.</p></li>
+<li><p><a class="reference internal" href="exact_public_data_experiment.html"><span class="doc">Replaying historical processing data</span></a> replays historical processing data against
+the actual public affinity weights.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="dla_validation.html" class="btn btn-neutral float-left" title="DLA evidence and canine evaluation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="testing.html" class="btn btn-neutral float-right" title="Testing" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

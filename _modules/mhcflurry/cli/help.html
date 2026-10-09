@@ -1,0 +1,242 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.cli.help &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.cli.help</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.cli.help</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Readable argparse help with optional terminal styling."""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+
+
+<span class="n">_OPTION</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">"(?&lt;![\w-])(--[a-zA-Z][\w-]*|-[a-zA-Z])\b"</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="color_enabled">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.help.color_enabled">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">color_enabled</span><span class="p">(</span><span class="n">stream</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return whether the destination supports optional terminal styling."""</span>
+    <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span>
+        <span class="nb">getattr</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="s2">"isatty"</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="kc">False</span><span class="p">)()</span>
+        <span class="ow">and</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"NO_COLOR"</span><span class="p">)</span>
+        <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"TERM"</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">"dumb"</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="style_help">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.help.style_help">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">style_help</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Style headings and flags only when writing to a color-capable terminal."""</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">color_enabled</span><span class="p">(</span><span class="n">stream</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">text</span>
+
+    <span class="n">lines</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">text</span><span class="o">.</span><span class="n">splitlines</span><span class="p">(</span><span class="n">keepends</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">rstrip</span><span class="p">()</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">":"</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">line</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">isspace</span><span class="p">():</span>
+            <span class="n">line</span> <span class="o">=</span> <span class="s2">"</span><span class="se">\033</span><span class="s2">[1;36m"</span> <span class="o">+</span> <span class="n">line</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\033</span><span class="s2">[0m</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">line</span> <span class="o">=</span> <span class="n">_OPTION</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="k">lambda</span> <span class="n">match</span><span class="p">:</span> <span class="s2">"</span><span class="se">\033</span><span class="s2">[36m"</span> <span class="o">+</span> <span class="n">match</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\033</span><span class="s2">[0m"</span><span class="p">,</span> <span class="n">line</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"usage:"</span><span class="p">):</span>
+                <span class="n">line</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"usage:"</span><span class="p">,</span> <span class="s2">"</span><span class="se">\033</span><span class="s2">[1musage:</span><span class="se">\033</span><span class="s2">[0m"</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+    <span class="k">return</span> <span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="HelpFormatter">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.help.HelpFormatter">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">HelpFormatter</span><span class="p">(</span><span class="n">argparse</span><span class="o">.</span><span class="n">RawDescriptionHelpFormatter</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Limit reading width and separate options without adding table borders."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prog</span><span class="p">):</span>
+        <span class="n">width</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">40</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="n">shutil</span><span class="o">.</span><span class="n">get_terminal_size</span><span class="p">()</span><span class="o">.</span><span class="n">columns</span> <span class="o">-</span> <span class="mi">2</span><span class="p">))</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">prog</span><span class="p">,</span> <span class="n">max_help_position</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="n">width</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_split_lines</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="n">width</span><span class="p">):</span>
+        <span class="c1"># RST literals are useful in generated docs but noisy in terminal help.</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_split_lines</span><span class="p">(</span><span class="n">text</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"``"</span><span class="p">,</span> <span class="s2">""</span><span class="p">),</span> <span class="n">width</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_format_action</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">action</span><span class="p">):</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_format_action</span><span class="p">(</span><span class="n">action</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">text</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span> <span class="k">if</span> <span class="n">text</span> <span class="k">else</span> <span class="n">text</span></div>
+
+
+
+<div class="viewcode-block" id="HelpArgumentParser">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.help.HelpArgumentParser">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">HelpArgumentParser</span><span class="p">(</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Keep format_help() plain; add color only when printing to a terminal."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"formatter_class"</span><span class="p">,</span> <span class="n">HelpFormatter</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span> <span class="o">&gt;=</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">14</span><span class="p">):</span>
+            <span class="c1"># Apply the same styling on all supported Python versions.</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s2">"color"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+<div class="viewcode-block" id="HelpArgumentParser.print_help">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.help.HelpArgumentParser.print_help">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">print_help</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">stream</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span> <span class="k">if</span> <span class="n">file</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">file</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_print_message</span><span class="p">(</span><span class="n">style_help</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">format_help</span><span class="p">(),</span> <span class="n">stream</span><span class="p">),</span> <span class="n">stream</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

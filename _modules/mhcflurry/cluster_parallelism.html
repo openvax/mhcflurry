@@ -1,0 +1,611 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.cluster_parallelism &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.cluster_parallelism</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.cluster_parallelism</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""</span>
+<span class="sd">Simple, relatively naive parallel map implementation for HPC clusters.</span>
+
+<span class="sd">Used for training MHCflurry models.</span>
+<span class="sd">"""</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pickle</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shlex</span><span class="w"> </span><span class="kn">import</span> <span class="n">quote</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.parallelism</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">call_wrapped_kwargs</span><span class="p">,</span>
+    <span class="n">configure_cluster_worker_torch_compile_threads</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.class1_affinity_predictor</span><span class="w"> </span><span class="kn">import</span> <span class="n">Class1AffinityPredictor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">install_sigusr1_stack_trace_handler</span>
+
+
+<div class="viewcode-block" id="add_cluster_parallelism_args">
+<a class="viewcode-back" href="../../api.html#mhcflurry.cluster_parallelism.add_cluster_parallelism_args">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">add_cluster_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Add commandline arguments controlling cluster parallelism to an argparse</span>
+<span class="sd">    ArgumentParser.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    parser : argparse.ArgumentParser</span>
+<span class="sd">    """</span>
+    <span class="n">group</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_argument_group</span><span class="p">(</span><span class="s2">"Cluster parallelism"</span><span class="p">)</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--cluster-parallelism"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">)</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--cluster-submit-command"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s1">'sh'</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Default: </span><span class="si">%(default)s</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--cluster-results-workdir"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s1">'./cluster-workdir'</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Default: </span><span class="si">%(default)s</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--additional-complete-file"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s1">'STDERR'</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Additional file to monitor for job completion. Default: </span><span class="si">%(default)s</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s1">'--cluster-script-prefix-path'</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s1">'--cluster-max-retries'</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"How many times to rerun failing jobs. Default: </span><span class="si">%(default)s</span><span class="s2">"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="cluster_results_from_args">
+<a class="viewcode-back" href="../../api.html#mhcflurry.cluster_parallelism.cluster_results_from_args">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cluster_results_from_args</span><span class="p">(</span>
+        <span class="n">args</span><span class="p">,</span>
+        <span class="n">work_function</span><span class="p">,</span>
+        <span class="n">work_items</span><span class="p">,</span>
+        <span class="n">constant_data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">input_serialization_method</span><span class="o">=</span><span class="s2">"pickle"</span><span class="p">,</span>
+        <span class="n">result_serialization_method</span><span class="o">=</span><span class="s2">"pickle"</span><span class="p">,</span>
+        <span class="n">clear_constant_data</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Parallel map configurable using commandline arguments. See the</span>
+<span class="sd">    cluster_results() function for docs.</span>
+
+<span class="sd">    The `args` parameter should be an argparse.Namespace from an argparse parser</span>
+<span class="sd">    generated using the add_cluster_parallelism_args() function.</span>
+
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    args : argparse.Namespace</span>
+<span class="sd">        Parsed cluster configuration.</span>
+<span class="sd">    work_function : callable</span>
+<span class="sd">        Function called with each item's keyword arguments and constant_data.</span>
+<span class="sd">    work_items : iterable of dict</span>
+<span class="sd">        Keyword arguments for each work item.</span>
+<span class="sd">    constant_data : object, optional</span>
+<span class="sd">        Shared input made available to each job.</span>
+<span class="sd">    input_serialization_method : str</span>
+<span class="sd">        Input serializer: 'pickle' or 'dill'.</span>
+<span class="sd">    result_serialization_method : str</span>
+<span class="sd">        Result serializer: 'pickle' or 'save_predictor'.</span>
+<span class="sd">    clear_constant_data : bool</span>
+<span class="sd">        Clear the shared-input dictionary after serialization to free memory.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    generator</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="n">cluster_results</span><span class="p">(</span>
+        <span class="n">work_function</span><span class="o">=</span><span class="n">work_function</span><span class="p">,</span>
+        <span class="n">work_items</span><span class="o">=</span><span class="n">work_items</span><span class="p">,</span>
+        <span class="n">constant_data</span><span class="o">=</span><span class="n">constant_data</span><span class="p">,</span>
+        <span class="n">submit_command</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">cluster_submit_command</span><span class="p">,</span>
+        <span class="n">results_workdir</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">cluster_results_workdir</span><span class="p">,</span>
+        <span class="n">additional_complete_file</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">additional_complete_file</span><span class="p">,</span>
+        <span class="n">script_prefix_path</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">cluster_script_prefix_path</span><span class="p">,</span>
+        <span class="n">input_serialization_method</span><span class="o">=</span><span class="n">input_serialization_method</span><span class="p">,</span>
+        <span class="n">result_serialization_method</span><span class="o">=</span><span class="n">result_serialization_method</span><span class="p">,</span>
+        <span class="n">max_retries</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">cluster_max_retries</span><span class="p">,</span>
+        <span class="n">clear_constant_data</span><span class="o">=</span><span class="n">clear_constant_data</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="cluster_results">
+<a class="viewcode-back" href="../../api.html#mhcflurry.cluster_parallelism.cluster_results">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cluster_results</span><span class="p">(</span>
+        <span class="n">work_function</span><span class="p">,</span>
+        <span class="n">work_items</span><span class="p">,</span>
+        <span class="n">constant_data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">submit_command</span><span class="o">=</span><span class="s2">"sh"</span><span class="p">,</span>
+        <span class="n">results_workdir</span><span class="o">=</span><span class="s2">"./cluster-workdir"</span><span class="p">,</span>
+        <span class="n">additional_complete_file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">script_prefix_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">input_serialization_method</span><span class="o">=</span><span class="s2">"pickle"</span><span class="p">,</span>
+        <span class="n">result_serialization_method</span><span class="o">=</span><span class="s2">"pickle"</span><span class="p">,</span>
+        <span class="n">max_retries</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+        <span class="n">clear_constant_data</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Parallel map on an HPC cluster.</span>
+
+<span class="sd">    Returns [work_function(item) for item in work_items] where each invocation</span>
+<span class="sd">    of work_function is performed as a separate HPC cluster job. Results are</span>
+<span class="sd">    yielded as completed jobs are observed, not in input order.</span>
+
+<span class="sd">    Optionally, "constant data" can be specified, which will be passed to</span>
+<span class="sd">    each work_function() invocation as a keyword argument called constant_data.</span>
+<span class="sd">    This data is serialized once and all workers read it from the same source,</span>
+<span class="sd">    which is more efficient than serializing it separately for each worker.</span>
+
+<span class="sd">    Each worker's input is serialized to a shared NFS directory and the</span>
+<span class="sd">    submit_command is used to launch a job to process that input. The shared</span>
+<span class="sd">    filesystem is polled occasionally to watch for results, which are fed back</span>
+<span class="sd">    to the user.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    work_function : A -&gt; B</span>
+<span class="sd">    work_items : list of A</span>
+<span class="sd">    constant_data : object</span>
+<span class="sd">    submit_command : string</span>
+<span class="sd">        For running on LSF, we use "bsub" here.</span>
+<span class="sd">    results_workdir : string</span>
+<span class="sd">        Path to NFS shared directory where inputs and results can be written</span>
+<span class="sd">    script_prefix_path : string</span>
+<span class="sd">        Path to script that will be invoked to run each worker. A line calling</span>
+<span class="sd">        the _mhcflurry-cluster-worker-entry-point command will be appended to</span>
+<span class="sd">        the contents of this file.</span>
+<span class="sd">    result_serialization_method : string, one of "pickle" or "save_predictor"</span>
+<span class="sd">        The "save_predictor" works only when the return type of work_function</span>
+<span class="sd">        is Class1AffinityPredictor</span>
+<span class="sd">    input_serialization_method : str</span>
+<span class="sd">        Input/context serialization format (pickle or dill).</span>
+<span class="sd">    additional_complete_file : str, optional</span>
+<span class="sd">        Alternative worker-completion marker, relative to the job directory.</span>
+<span class="sd">        Its presence also triggers result/error inspection.</span>
+<span class="sd">    max_retries : int</span>
+<span class="sd">        How many times to attempt to re-launch a failed worker</span>
+<span class="sd">    clear_constant_data : bool</span>
+<span class="sd">        If True, the constant data dict is cleared on the launching host after</span>
+<span class="sd">        it is serialized to disk.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    generator of B</span>
+<span class="sd">    """</span>
+
+    <span class="k">if</span> <span class="n">input_serialization_method</span> <span class="o">==</span> <span class="s2">"dill"</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">dill</span>
+        <span class="n">input_serialization_module</span> <span class="o">=</span> <span class="n">dill</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="n">input_serialization_method</span> <span class="o">==</span> <span class="s2">"pickle"</span>
+        <span class="n">input_serialization_module</span> <span class="o">=</span> <span class="n">pickle</span>
+
+    <span class="n">constant_payload</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">'constant_data'</span><span class="p">:</span> <span class="n">constant_data</span><span class="p">,</span>
+        <span class="s1">'function'</span><span class="p">:</span> <span class="n">work_function</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">results_workdir</span><span class="p">):</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">results_workdir</span><span class="p">)</span>
+
+    <span class="n">work_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">results_workdir</span><span class="p">),</span>
+        <span class="nb">str</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">())))</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">work_dir</span><span class="p">)</span>
+
+    <span class="n">constant_payload_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+        <span class="n">work_dir</span><span class="p">,</span>
+        <span class="s2">"global_data."</span> <span class="o">+</span> <span class="n">input_serialization_method</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">constant_payload_path</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+        <span class="n">input_serialization_module</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span>
+            <span class="n">constant_payload</span><span class="p">,</span>
+            <span class="n">fd</span><span class="p">,</span>
+            <span class="n">protocol</span><span class="o">=</span><span class="n">input_serialization_module</span><span class="o">.</span><span class="n">HIGHEST_PROTOCOL</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Wrote:"</span><span class="p">,</span> <span class="n">constant_payload_path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">clear_constant_data</span><span class="p">:</span>
+        <span class="n">constant_data</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Cleared constant data to free up memory."</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">script_prefix_path</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">script_prefix_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+            <span class="n">script_prefix</span> <span class="o">=</span> <span class="n">fd</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">script_prefix</span> <span class="o">=</span> <span class="s2">"#!/bin/bash"</span>
+
+    <span class="n">result_items</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">work_items</span><span class="p">):</span>
+        <span class="n">item_workdir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="n">work_dir</span><span class="p">,</span> <span class="s2">"work-item.</span><span class="si">%03d</span><span class="s2">-of-</span><span class="si">%03d</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">work_items</span><span class="p">)))</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">item_workdir</span><span class="p">)</span>
+
+        <span class="n">item_data_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="n">item_workdir</span><span class="p">,</span> <span class="s2">"data."</span> <span class="o">+</span> <span class="n">input_serialization_method</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">item_data_path</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+            <span class="n">input_serialization_module</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span>
+                <span class="n">item</span><span class="p">,</span> <span class="n">fd</span><span class="p">,</span> <span class="n">protocol</span><span class="o">=</span><span class="n">input_serialization_module</span><span class="o">.</span><span class="n">HIGHEST_PROTOCOL</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Wrote:"</span><span class="p">,</span> <span class="n">item_data_path</span><span class="p">)</span>
+
+        <span class="n">item_result_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">item_workdir</span><span class="p">,</span> <span class="s2">"result"</span><span class="p">)</span>
+        <span class="n">item_error_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">item_workdir</span><span class="p">,</span> <span class="s2">"error.pkl"</span><span class="p">)</span>
+        <span class="n">item_finished_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">item_workdir</span><span class="p">,</span> <span class="s2">"COMPLETE"</span><span class="p">)</span>
+
+        <span class="n">item_script_pieces</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">script_prefix</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">work_item_num</span><span class="o">=</span><span class="n">i</span><span class="p">,</span> <span class="n">work_dir</span><span class="o">=</span><span class="n">item_workdir</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="n">worker_command</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="s2">"MHCFLURRY_CLUSTER_WORKER_COMMAND"</span><span class="p">,</span>
+            <span class="s2">"_mhcflurry-cluster-worker-entry-point"</span>
+        <span class="p">)</span>
+        <span class="n">item_script_pieces</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">" "</span><span class="o">.</span><span class="n">join</span><span class="p">([</span>
+            <span class="n">worker_command</span><span class="p">,</span>
+            <span class="s2">"--constant-data"</span><span class="p">,</span> <span class="n">quote</span><span class="p">(</span><span class="n">constant_payload_path</span><span class="p">),</span>
+            <span class="s2">"--worker-data"</span><span class="p">,</span> <span class="n">quote</span><span class="p">(</span><span class="n">item_data_path</span><span class="p">),</span>
+            <span class="s2">"--result-out"</span><span class="p">,</span> <span class="n">quote</span><span class="p">(</span><span class="n">item_result_path</span><span class="p">),</span>
+            <span class="s2">"--error-out"</span><span class="p">,</span> <span class="n">quote</span><span class="p">(</span><span class="n">item_error_path</span><span class="p">),</span>
+            <span class="s2">"--complete-dir"</span><span class="p">,</span> <span class="n">quote</span><span class="p">(</span><span class="n">item_finished_path</span><span class="p">),</span>
+            <span class="s2">"--input-serialization-method"</span><span class="p">,</span> <span class="n">input_serialization_method</span><span class="p">,</span>
+            <span class="s2">"--result-serialization-method"</span><span class="p">,</span> <span class="n">result_serialization_method</span><span class="p">,</span>
+        <span class="p">]))</span>
+        <span class="n">item_script</span> <span class="o">=</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">item_script_pieces</span><span class="p">)</span>
+        <span class="n">item_script_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="n">item_workdir</span><span class="p">,</span>
+            <span class="s2">"run.</span><span class="si">%d</span><span class="s2">.sh"</span> <span class="o">%</span> <span class="n">i</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">item_script_path</span><span class="p">,</span> <span class="s2">"w"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+            <span class="n">fd</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">item_script</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Wrote:"</span><span class="p">,</span> <span class="n">item_script_path</span><span class="p">)</span>
+
+        <span class="n">launch_command</span> <span class="o">=</span> <span class="s2">" "</span><span class="o">.</span><span class="n">join</span><span class="p">([</span>
+            <span class="n">submit_command</span><span class="p">,</span> <span class="s2">"&lt;"</span><span class="p">,</span> <span class="n">quote</span><span class="p">(</span><span class="n">item_script_path</span><span class="p">)</span>
+        <span class="p">])</span>
+        <span class="n">subprocess</span><span class="o">.</span><span class="n">check_call</span><span class="p">(</span><span class="n">launch_command</span><span class="p">,</span> <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Invoked"</span><span class="p">,</span> <span class="n">launch_command</span><span class="p">)</span>
+
+        <span class="n">result_items</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s1">'work_dir'</span><span class="p">:</span> <span class="n">item_workdir</span><span class="p">,</span>
+            <span class="s1">'finished_path'</span><span class="p">:</span> <span class="n">item_finished_path</span><span class="p">,</span>
+            <span class="s1">'result_path'</span><span class="p">:</span> <span class="n">item_result_path</span><span class="p">,</span>
+            <span class="s1">'error_path'</span><span class="p">:</span> <span class="n">item_error_path</span><span class="p">,</span>
+            <span class="s1">'retry_num'</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s1">'launch_command'</span><span class="p">:</span> <span class="n">launch_command</span><span class="p">,</span>
+        <span class="p">})</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">result_generator</span><span class="p">():</span>
+        <span class="n">additional_complete_file_path</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="k">while</span> <span class="n">result_items</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">"[</span><span class="si">%0.1f</span><span class="s2"> sec elapsed] waiting on </span><span class="si">%d</span><span class="s2"> / </span><span class="si">%d</span><span class="s2"> items."</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">result_items</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">work_items</span><span class="p">)))</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="n">result_item</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">result_items</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">additional_complete_file</span><span class="p">:</span>
+                        <span class="n">additional_complete_file_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                            <span class="n">d</span><span class="p">[</span><span class="s1">'work_dir'</span><span class="p">],</span> <span class="n">additional_complete_file</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="s1">'finished_path'</span><span class="p">]):</span>
+                        <span class="n">result_item</span> <span class="o">=</span> <span class="n">d</span>
+                        <span class="k">break</span>
+                    <span class="k">if</span> <span class="n">additional_complete_file</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span>
+                            <span class="n">additional_complete_file_path</span><span class="p">):</span>
+                        <span class="n">result_item</span> <span class="o">=</span> <span class="n">d</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s2">"Exists"</span><span class="p">,</span> <span class="n">additional_complete_file_path</span><span class="p">)</span>
+                        <span class="k">break</span>
+
+                <span class="k">if</span> <span class="n">result_item</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">60</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">result_items</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">result_item</span><span class="p">)</span>
+                    <span class="k">break</span>
+
+            <span class="n">complete_dir</span> <span class="o">=</span> <span class="n">result_item</span><span class="p">[</span><span class="s1">'finished_path'</span><span class="p">]</span>
+            <span class="n">result_path</span> <span class="o">=</span> <span class="n">result_item</span><span class="p">[</span><span class="s1">'result_path'</span><span class="p">]</span>
+            <span class="n">error_path</span> <span class="o">=</span> <span class="n">result_item</span><span class="p">[</span><span class="s1">'error_path'</span><span class="p">]</span>
+            <span class="n">retry_num</span> <span class="o">=</span> <span class="n">result_item</span><span class="p">[</span><span class="s1">'retry_num'</span><span class="p">]</span>
+            <span class="n">launch_command</span> <span class="o">=</span> <span class="n">result_item</span><span class="p">[</span><span class="s1">'launch_command'</span><span class="p">]</span>
+
+            <span class="nb">print</span><span class="p">(</span><span class="s2">"[</span><span class="si">%0.1f</span><span class="s2"> sec elapsed] processing item </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span><span class="p">,</span> <span class="n">result_item</span><span class="p">))</span>
+
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">error_path</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">result_path</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">error_path</span><span class="p">):</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="s2">"Error path exists"</span><span class="p">,</span> <span class="n">error_path</span><span class="p">)</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">error_path</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+                            <span class="n">exception</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="n">exception</span><span class="p">)</span>
+                    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                        <span class="n">exception</span> <span class="o">=</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                            <span class="s2">"Error, but couldn't read error path: </span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                                <span class="nb">type</span><span class="p">(</span><span class="n">e</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">exception</span> <span class="o">=</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"Error, but no exception saved"</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">result_path</span><span class="p">):</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="s2">"Result path does NOT exist"</span><span class="p">,</span> <span class="n">result_path</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">retry_num</span> <span class="o">&lt;</span> <span class="n">max_retries</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="s2">"Relaunching"</span><span class="p">,</span> <span class="n">launch_command</span><span class="p">)</span>
+                    <span class="n">attempt_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                        <span class="n">result_item</span><span class="p">[</span><span class="s1">'work_dir'</span><span class="p">],</span> <span class="s2">"attempt.</span><span class="si">%d</span><span class="s2">"</span> <span class="o">%</span> <span class="n">retry_num</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">complete_dir</span><span class="p">):</span>
+                        <span class="n">shutil</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="n">complete_dir</span><span class="p">,</span> <span class="n">attempt_dir</span><span class="p">)</span>  <span class="c1"># directory</span>
+                    <span class="k">if</span> <span class="n">additional_complete_file</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span>
+                            <span class="n">additional_complete_file_path</span><span class="p">):</span>
+                        <span class="n">shutil</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="n">additional_complete_file_path</span><span class="p">,</span> <span class="n">attempt_dir</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">error_path</span><span class="p">):</span>
+                        <span class="n">shutil</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="n">error_path</span><span class="p">,</span> <span class="n">attempt_dir</span><span class="p">)</span>
+                    <span class="n">subprocess</span><span class="o">.</span><span class="n">check_call</span><span class="p">(</span><span class="n">launch_command</span><span class="p">,</span> <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="s2">"Invoked"</span><span class="p">,</span> <span class="n">launch_command</span><span class="p">)</span>
+                    <span class="n">result_item</span><span class="p">[</span><span class="s1">'retry_num'</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="n">result_items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result_item</span><span class="p">)</span>
+                    <span class="k">continue</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="s2">"Max retries exceeded"</span><span class="p">,</span> <span class="n">max_retries</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="n">exception</span>
+
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">result_path</span><span class="p">):</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">"Result path exists"</span><span class="p">,</span> <span class="n">result_path</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">result_serialization_method</span> <span class="o">==</span> <span class="s2">"save_predictor"</span><span class="p">:</span>
+                    <span class="n">result</span> <span class="o">=</span> <span class="n">Class1AffinityPredictor</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">result_path</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">result_serialization_method</span> <span class="o">==</span> <span class="s2">"pickle"</span><span class="p">:</span>
+                    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">result_path</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+                        <span class="n">result</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="s2">"Unsupported serialization method"</span><span class="p">,</span>
+                        <span class="n">result_serialization_method</span><span class="p">)</span>
+
+                <span class="k">yield</span> <span class="n">result</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"Results do not exist"</span><span class="p">,</span> <span class="n">result_path</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">result_generator</span><span class="p">()</span></div>
+
+
+
+<span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+    <span class="n">usage</span><span class="o">=</span><span class="s2">"Entry point for cluster workers"</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--constant-data"</span><span class="p">,</span>
+    <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--worker-data"</span><span class="p">,</span>
+    <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--result-out"</span><span class="p">,</span>
+    <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--error-out"</span><span class="p">,</span>
+    <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--complete-dir"</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--input-serialization-method"</span><span class="p">,</span>
+    <span class="n">choices</span><span class="o">=</span><span class="p">(</span><span class="s2">"pickle"</span><span class="p">,</span> <span class="s2">"dill"</span><span class="p">),</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">"pickle"</span><span class="p">)</span>
+<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--result-serialization-method"</span><span class="p">,</span>
+    <span class="n">choices</span><span class="o">=</span><span class="p">(</span><span class="s2">"pickle"</span><span class="p">,</span> <span class="s2">"save_predictor"</span><span class="p">),</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">"pickle"</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="worker_entry_point">
+<a class="viewcode-back" href="../../api.html#mhcflurry.cluster_parallelism.worker_entry_point">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">worker_entry_point</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Entry point for the worker command.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    argv : list of string</span>
+<span class="sd">    """</span>
+    <span class="n">install_sigusr1_stack_trace_handler</span><span class="p">()</span>
+
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">input_serialization_method</span> <span class="o">==</span> <span class="s2">"dill"</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">dill</span>
+        <span class="n">input_serialization_module</span> <span class="o">=</span> <span class="n">dill</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="n">args</span><span class="o">.</span><span class="n">input_serialization_method</span> <span class="o">==</span> <span class="s2">"pickle"</span>
+        <span class="n">input_serialization_module</span> <span class="o">=</span> <span class="n">pickle</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">constant_data</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+        <span class="n">constant_payload</span> <span class="o">=</span> <span class="n">input_serialization_module</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">worker_data</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+        <span class="n">worker_data</span> <span class="o">=</span> <span class="n">input_serialization_module</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span>
+
+    <span class="n">kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">worker_data</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">constant_payload</span><span class="p">[</span><span class="s1">'constant_data'</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s1">'constant_data'</span><span class="p">]</span> <span class="o">=</span> <span class="n">constant_payload</span><span class="p">[</span><span class="s1">'constant_data'</span><span class="p">]</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">configure_cluster_worker_torch_compile_threads</span><span class="p">()</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">call_wrapped_kwargs</span><span class="p">(</span><span class="n">constant_payload</span><span class="p">[</span><span class="s1">'function'</span><span class="p">],</span> <span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">result_serialization_method</span> <span class="o">==</span> <span class="s1">'save_predictor'</span><span class="p">:</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">result_out</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">result_out</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+                <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">fd</span><span class="p">,</span> <span class="n">pickle</span><span class="o">.</span><span class="n">HIGHEST_PROTOCOL</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Wrote:"</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">result_out</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Exception: "</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">error_out</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+            <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">fd</span><span class="p">,</span> <span class="n">pickle</span><span class="o">.</span><span class="n">HIGHEST_PROTOCOL</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Wrote:"</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">error_out</span><span class="p">)</span>
+        <span class="k">raise</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">complete_dir</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">complete_dir</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">"Created: "</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">complete_dir</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,282 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.processing_initialization &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.processing_initialization</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.processing_initialization</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Explicit hidden-layer initialization for processing recipe experiments.</span>
+
+<span class="sd">LSUV follows orthogonal initialization with sequential variance adjustment</span>
+<span class="sd">(Mishkin and Matas, https://arxiv.org/abs/1511.06422). Scalar processing heads</span>
+<span class="sd">and the final aggregation/gating weights are deliberately not reinitialized.</span>
+<span class="sd">"""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.data_dependent_weights_initialization</span><span class="w"> </span><span class="kn">import</span> <span class="n">svd_orthonormal</span>
+
+
+<span class="n">METHODS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"none"</span><span class="p">,</span> <span class="s2">"orthogonal"</span><span class="p">,</span> <span class="s2">"lsuv_pre"</span><span class="p">,</span> <span class="s2">"lsuv_post"</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="processing_hidden_layers">
+<a class="viewcode-back" href="../../api.html#mhcflurry.processing_initialization.processing_hidden_layers">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">processing_hidden_layers</span><span class="p">(</span><span class="n">model</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return eligible named affine layers in the actual forward order."""</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">model</span><span class="o">.</span><span class="n">cleavage_boundary_enabled</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">+=</span> <span class="p">[(</span><span class="s2">"n_boundary_hidden"</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">n_boundary_hidden</span><span class="p">),</span>
+                   <span class="p">(</span><span class="s2">"c_boundary_hidden"</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">c_boundary_hidden</span><span class="p">)]</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s2">"conv1"</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">conv1</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">prefix</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"n_flank_post_convs"</span><span class="p">,</span> <span class="s2">"c_flank_post_convs"</span><span class="p">):</span>
+        <span class="n">result</span> <span class="o">+=</span> <span class="p">[(</span><span class="s2">"</span><span class="si">%s</span><span class="s2">.</span><span class="si">%d</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">prefix</span><span class="p">,</span> <span class="n">index</span><span class="p">),</span> <span class="n">layer</span><span class="p">)</span>
+                   <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">layer</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">prefix</span><span class="p">)[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])]</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="processing_activation_variance">
+<a class="viewcode-back" href="../../api.html#mhcflurry.processing_initialization.processing_activation_variance">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">processing_activation_variance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">layer</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">post_activation</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Measure a hidden output, excluding positions beyond each input sequence.</span>
+
+<span class="sd">    Post-activation means the configured activation immediately after the</span>
+<span class="sd">    affine layer, before any normalization/dropout. Missing-context X tokens</span>
+<span class="sd">    inside configured windows are included; maximum-length tail padding is not.</span>
+<span class="sd">    The caller owns eval mode. Hooks are removed even if forward fails.</span>
+<span class="sd">    """</span>
+    <span class="n">captured</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">capture</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">output</span><span class="p">):</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">conv_activation</span><span class="p">(</span><span class="n">output</span><span class="p">)</span> <span class="k">if</span> <span class="n">post_activation</span> <span class="k">else</span> <span class="n">output</span>
+        <span class="k">if</span> <span class="n">value</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">lengths</span> <span class="o">=</span> <span class="n">inputs</span><span class="p">[</span><span class="s2">"peptide_length"</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">model</span><span class="o">.</span><span class="n">cleavage_boundary_enabled</span><span class="p">:</span>
+                <span class="n">lengths</span> <span class="o">=</span> <span class="n">lengths</span> <span class="o">+</span> <span class="n">model</span><span class="o">.</span><span class="n">n_flank_length</span> <span class="o">+</span> <span class="n">model</span><span class="o">.</span><span class="n">c_flank_length</span>
+            <span class="n">positions</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">value</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+            <span class="n">mask</span> <span class="o">=</span> <span class="n">positions</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">lengths</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)[</span><span class="n">mask</span><span class="p">]</span>
+        <span class="n">captured</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">var</span><span class="p">(</span><span class="n">unbiased</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">())</span>
+
+    <span class="n">handle</span> <span class="o">=</span> <span class="n">layer</span><span class="o">.</span><span class="n">register_forward_hook</span><span class="p">(</span><span class="n">capture</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="n">model</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">handle</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">captured</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">captured</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Initialization requires exactly one finite hidden-layer output"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">captured</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="initialize_processing_network">
+<a class="viewcode-back" href="../../api.html#mhcflurry.processing_initialization.initialize_processing_network">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">initialize_processing_network</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"none"</span><span class="p">,</span> <span class="n">margin</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">max_iter</span><span class="o">=</span><span class="mi">32</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Initialize eligible hidden layers, with auditable pre/post-LSUV results.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    model : Class1ProcessingModel</span>
+<span class="sd">        Fresh eager network. Output/scalar-head parameters remain untouched.</span>
+<span class="sd">    inputs : dict</span>
+<span class="sd">        Fixed calibration batch containing training rows only, on model device.</span>
+<span class="sd">    method : {"none", "orthogonal", "lsuv_pre", "lsuv_post"}</span>
+<span class="sd">        Explicit initialization policy. None is an exact no-op, including RNG.</span>
+<span class="sd">    margin : float</span>
+<span class="sd">        Maximum absolute deviation of the measured variance from one.</span>
+<span class="sd">    max_iter : int</span>
+<span class="sd">        Maximum scaling iterations per layer; failure is explicit.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict</span>
+<span class="sd">        Effective policy, variance mask, and per-layer initialization diagnostics.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">method</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">METHODS</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unknown processing initialization method: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">method</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="mi">0</span> <span class="o">&lt;</span> <span class="n">margin</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">max_iter</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Invalid processing LSUV margin or iteration limit"</span><span class="p">)</span>
+    <span class="n">report</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"method"</span><span class="p">:</span> <span class="n">method</span><span class="p">,</span> <span class="s2">"layers"</span><span class="p">:</span> <span class="p">[],</span> <span class="s2">"variance_mask"</span><span class="p">:</span> <span class="s2">"configured_context_without_tail_padding"</span><span class="p">}</span>
+    <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">"none"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">report</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">inputs</span><span class="p">[</span><span class="s2">"peptide_length"</span><span class="p">]):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Initialization requires a nonempty training calibration batch"</span><span class="p">)</span>
+    <span class="n">training_states</span> <span class="o">=</span> <span class="p">[(</span><span class="n">module</span><span class="p">,</span> <span class="n">module</span><span class="o">.</span><span class="n">training</span><span class="p">)</span> <span class="k">for</span> <span class="n">module</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">modules</span><span class="p">()]</span>
+    <span class="n">original</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">value</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">processing_hidden_layers</span><span class="p">(</span><span class="n">model</span><span class="p">):</span>
+            <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+                <span class="n">weight</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">svd_orthonormal</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">shape</span><span class="p">)),</span>
+                                         <span class="n">device</span><span class="o">=</span><span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+                <span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">copy_</span><span class="p">(</span><span class="n">weight</span><span class="p">)</span>
+            <span class="n">record</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"layer"</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span> <span class="s2">"iterations"</span><span class="p">:</span> <span class="mi">0</span><span class="p">}</span>
+            <span class="k">if</span> <span class="n">method</span> <span class="o">!=</span> <span class="s2">"orthogonal"</span><span class="p">:</span>
+                <span class="n">variance</span> <span class="o">=</span> <span class="n">processing_activation_variance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">layer</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">"lsuv_post"</span><span class="p">)</span>
+                <span class="n">record</span><span class="p">[</span><span class="s2">"initial_variance"</span><span class="p">]</span> <span class="o">=</span> <span class="n">variance</span>
+                <span class="k">while</span> <span class="nb">abs</span><span class="p">(</span><span class="n">variance</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">margin</span> <span class="ow">and</span> <span class="n">record</span><span class="p">[</span><span class="s2">"iterations"</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">max_iter</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">variance</span> <span class="o">&lt;</span> <span class="mf">1e-14</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Degenerate processing LSUV output: "</span> <span class="o">+</span> <span class="n">name</span><span class="p">)</span>
+                    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+                        <span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">mul_</span><span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">variance</span><span class="p">))</span>
+                    <span class="n">variance</span> <span class="o">=</span> <span class="n">processing_activation_variance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">layer</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">"lsuv_post"</span><span class="p">)</span>
+                    <span class="n">record</span><span class="p">[</span><span class="s2">"iterations"</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="n">record</span><span class="p">[</span><span class="s2">"final_variance"</span><span class="p">]</span> <span class="o">=</span> <span class="n">variance</span>
+                <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">variance</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">margin</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Processing LSUV did not converge: </span><span class="si">%s</span><span class="s2"> variance=</span><span class="si">%g</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">variance</span><span class="p">))</span>
+            <span class="n">report</span><span class="p">[</span><span class="s2">"layers"</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="c1"># A rejected initialization must not leave a partially transformed model.</span>
+        <span class="n">model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">original</span><span class="p">)</span>
+        <span class="k">raise</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">module</span><span class="p">,</span> <span class="n">training</span> <span class="ow">in</span> <span class="n">training_states</span><span class="p">:</span>
+            <span class="n">module</span><span class="o">.</span><span class="n">training</span> <span class="o">=</span> <span class="n">training</span>
+    <span class="k">return</span> <span class="n">report</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

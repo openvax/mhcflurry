@@ -1,0 +1,426 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Percentile calibration for all predictors &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=86f393d6"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Auditing training-sample overlap" href="training_provenance.html" />
+    <link rel="prev" title="Configuration and performance" href="configuration.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Percentile calibration for all predictors</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#what-a-percentile-means">What a percentile means</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#functional-form-what-the-knots-store">Functional form: what the knots store</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#choosing-64-versus-128">Choosing 64 versus 128</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#python-examples">Python examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#calibration-commands-and-reference-policy">Calibration commands and reference policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#saved-formats-and-compatibility">Saved formats and compatibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#numerical-limits-and-interpretation">Numerical limits and interpretation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Percentile calibration for all predictors</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/shared_percent_rank_transforms.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="percentile-calibration-for-all-predictors">
+<h1>Percentile calibration for all predictors<a class="headerlink" href="#percentile-calibration-for-all-predictors" title="Link to this heading"></a></h1>
+<p>Affinity, processing, and presentation share two implementations:
+<a class="reference internal" href="api.html#mhcflurry.HistogramPercentRankTransform" title="mhcflurry.HistogramPercentRankTransform"><code class="xref py py-class docutils literal notranslate"><span class="pre">HistogramPercentRankTransform</span></code></a> preserves the historical
+histogram lookup; <a class="reference internal" href="api.html#mhcflurry.CompactPercentRankTransform" title="mhcflurry.CompactPercentRankTransform"><code class="xref py py-class docutils literal notranslate"><span class="pre">CompactPercentRankTransform</span></code></a> uses a
+continuous, compact approximation to the reference distribution.</p>
+<p>New predictor calibration defaults to compact, starting with <strong>64 knots</strong> and
+allowing <strong>128 only when background validation justifies it</strong>. Loading an
+existing predictor preserves its saved calibration, including public models.
+Calibration changes neither neural-network weights nor raw prediction scores.</p>
+<section id="what-a-percentile-means">
+<h2>What a percentile means<a class="headerlink" href="#what-a-percentile-means" title="Link to this heading"></a></h2>
+<p>Predictor <code class="docutils literal notranslate"><span class="pre">percentile_ranks(...)</span></code> methods return values from 0 to 100, with
+<strong>lower always meaning stronger</strong>. A percentile estimates how frequently the
+chosen background produces an equally strong or stronger score. It is not a
+probability that a peptide binds, is processed, or is presented.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Predictor</p></th>
+<th class="head"><p>Raw score and direction</p></th>
+<th class="head"><p>Compact input coordinate</p></th>
+<th class="head"><p>Low-level transform call</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Affinity</p></td>
+<td><p>IC50 in nM; lower is stronger</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">log(IC50)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">transform(ic50)</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Processing</p></td>
+<td><p>Score in [0, 1]; higher is stronger</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">logit(score)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">transform(scores,</span> <span class="pre">survival=True)</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Presentation</p></td>
+<td><p>Score in [0, 1]; higher is stronger</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">logit(score)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">transform(scores,</span> <span class="pre">survival=True)</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>Affinity calibration is per allele, with existing sequence-equivalent allele
+lookup retained. Processing and presentation each store one score distribution
+per predictor. A processing percentile is not an affinity percentile, and a
+presentation percentile is not an average of its component percentiles.</p>
+</section>
+<section id="functional-form-what-the-knots-store">
+<h2>Functional form: what the knots store<a class="headerlink" href="#functional-form-what-the-knots-store" title="Link to this heading"></a></h2>
+<p>For each distinct background score <code class="docutils literal notranslate"><span class="pre">v</span></code>, the compact fit computes the midrank
+survival probability, assigning half the tied reference mass to either side:</p>
+<div class="math notranslate nohighlight">
+\[S(v) = \frac{\#\{v_j &gt; v\} + \tfrac12\#\{v_j = v\}}{N}.\]</div>
+<p>Each knot stores a pair <code class="docutils literal notranslate"><span class="pre">(x_i,</span> <span class="pre">y_i)</span></code>: the transformed raw score and
+<code class="docutils literal notranslate"><span class="pre">logit(S(v_i))</span></code>. Logarithms are natural logarithms; <code class="docutils literal notranslate"><span class="pre">logit(p)</span> <span class="pre">=</span> <span class="pre">log(p</span> <span class="pre">/</span> <span class="pre">(1-p))</span></code>.
+Between adjacent knots the ordinate is <strong>linear</strong>:</p>
+<div class="math notranslate nohighlight">
+\[y(x) = y_i + \frac{x-x_i}{x_{i+1}-x_i}(y_{i+1}-y_i),
+\qquad x_i \leq x \leq x_{i+1}.\]</div>
+<p>With <code class="docutils literal notranslate"><span class="pre">sigmoid(z)</span> <span class="pre">=</span> <span class="pre">1</span> <span class="pre">/</span> <span class="pre">(1</span> <span class="pre">+</span> <span class="pre">exp(-z))</span></code>, the two directions are:</p>
+<div class="math notranslate nohighlight">
+\[P_{\mathrm{processing/presentation}}(v) = 100\,\operatorname{sigmoid}(y(x(v))),
+\qquad
+P_{\mathrm{affinity}}(v) = 100\,\operatorname{sigmoid}(-y(x(v))).\]</div>
+<p>The implementation evaluates each direction directly; it does not obtain a
+tiny upper-tail percentile by subtracting an already rounded CDF from 100.
+This is a continuous, piecewise-linear curve in transformed coordinates, not
+a histogram, a cubic spline, or a new neural network. Its slope can change at
+a knot, so it is not generally differentiable there.</p>
+<p>The fit keeps both endpoints and repeatedly adds the reference point with the
+largest absolute interpolation error in <code class="docutils literal notranslate"><span class="pre">y</span></code>. Equal errors choose the earliest
+source index. It stops at the budget, or earlier if there are too few distinct
+coordinates or all remaining errors are at most <code class="docutils literal notranslate"><span class="pre">1e-12</span></code>. Thus 64 is a knot
+<strong>budget</strong>, not a requirement to store 64 redundant points. Storage is two
+coordinates per knot, two extrapolation slopes, and reference/selection metadata.</p>
+<p>Outside the reference range, a line anchored at the corresponding endpoint
+continues the curve. Its slope is fitted using up to 32 distinct reference
+coordinates nearest that endpoint, rather than just the last knot interval.
+Those extrapolated percentiles are model-based estimates: continuity does not
+establish the accuracy of frequencies in a sparsely observed tail.</p>
+</section>
+<section id="choosing-64-versus-128">
+<h2>Choosing 64 versus 128<a class="headerlink" href="#choosing-64-versus-128" title="Link to this heading"></a></h2>
+<p>There are two distinct APIs:</p>
+<ul class="simple">
+<li><p>Low-level <code class="docutils literal notranslate"><span class="pre">CompactPercentRankTransform(...).fit(scores,</span> <span class="pre">num_knots=64)</span></code> fits
+the specified budget directly, without automatic selection.</p></li>
+<li><p>Predictor <code class="docutils literal notranslate"><span class="pre">calibrate_percentile_ranks(...,</span> <span class="pre">max_knots=128)</span></code> and the shared
+<code class="docutils literal notranslate"><span class="pre">fit_percent_rank_transform</span></code> helper start with 64 and may select 128.
+<strong>The default value 128 is a ceiling, not a starting size.</strong></p></li>
+</ul>
+<p>The automatic rule uses background scores only, never evaluation labels:</p>
+<ol class="arabic simple">
+<li><p>With at least 1,000 groups, hold out one fifth of the groups using a fixed
+selection seed of <strong>403</strong>. Peptide identities define groups in the affinity
+APIs and calibration commands. Processing/presentation score-only APIs use
+rows unless the caller supplies <code class="docutils literal notranslate"><span class="pre">groups</span></code>; pass identities when rows repeat.</p></li>
+<li><p>Compare 64- and 128-knot fits on the remaining groups. Evaluate percentile
+cutoffs <strong>0.03, 0.1, 0.3, 1, 3, and 10 percent</strong>, retaining only cutoffs with
+at least ten expected validation observations. At least two cutoffs and
+two distinct fitting scores are required; otherwise retain 64.</p></li>
+<li><p>For a cutoff <code class="docutils literal notranslate"><span class="pre">q</span></code>, let <code class="docutils literal notranslate"><span class="pre">c_q</span></code> count validation percentiles at or below <code class="docutils literal notranslate"><span class="pre">q</span></code> and
+<code class="docutils literal notranslate"><span class="pre">M</span></code> be the validation row count. The smoothed observed percentage is
+<code class="docutils literal notranslate"><span class="pre">100</span> <span class="pre">*</span> <span class="pre">(c_q</span> <span class="pre">+</span> <span class="pre">0.5)</span> <span class="pre">/</span> <span class="pre">(M</span> <span class="pre">+</span> <span class="pre">1)</span></code>. For each budget, <code class="docutils literal notranslate"><span class="pre">E</span></code> is the root-mean-square
+of <code class="docutils literal notranslate"><span class="pre">log10(observed_percentage</span> <span class="pre">/</span> <span class="pre">q)</span></code> over the eligible cutoffs.</p></li>
+<li><p>Select 128 only if <code class="docutils literal notranslate"><span class="pre">E64</span> <span class="pre">&gt;</span> <span class="pre">E128</span> <span class="pre">+</span> <span class="pre">max(0.01,</span> <span class="pre">0.1</span> <span class="pre">*</span> <span class="pre">min(E64,</span> <span class="pre">E128))</span></code>.
+Fit the selected budget on the complete background.</p></li>
+</ol>
+<p>Setting <code class="docutils literal notranslate"><span class="pre">max_knots=64</span></code> disables escalation. Fewer than 1,000 groups also retain
+64. This is a predeclared practical tolerance, not a statistical significance
+test or a guarantee of accuracy at every percentile.</p>
+<p>The compact transform’s <code class="docutils literal notranslate"><span class="pre">selection</span></code> dictionary records the selected budget,
+actual knot count, reason, seed, reference count/hash, and—when comparison is
+possible—validation counts, split-mask hash, cutoffs, errors, and tolerance.
+The fixed selection seed is separate from the CLI <code class="docutils literal notranslate"><span class="pre">--random-seed</span></code> (default 42),
+which governs generation of calibration peptides and MHC allele sets.</p>
+</section>
+<section id="python-examples">
+<h2>Python examples<a class="headerlink" href="#python-examples" title="Link to this heading"></a></h2>
+<p>These small synthetic arrays illustrate the API, not a suitable release
+calibration background. Both classes use instance <code class="docutils literal notranslate"><span class="pre">fit</span></code>, return <code class="docutils literal notranslate"><span class="pre">self</span></code>, and
+support <code class="docutils literal notranslate"><span class="pre">to_dict</span></code>/<code class="docutils literal notranslate"><span class="pre">from_dict</span></code> serialization.</p>
+<div class="highlight-pycon notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">mhcflurry</span><span class="w"> </span><span class="kn">import</span> <span class="n">HistogramPercentRankTransform</span><span class="p">,</span> <span class="n">CompactPercentRankTransform</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">mhcflurry.percent_rank_transform</span><span class="w"> </span><span class="kn">import</span> <span class="n">PercentRankTransform</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">PercentRankTransform</span> <span class="ow">is</span> <span class="n">HistogramPercentRankTransform</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">background_ic50</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.</span><span class="p">,</span> <span class="mf">10.</span><span class="p">,</span> <span class="mf">100.</span><span class="p">,</span> <span class="mf">1000.</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">affinity_curve</span> <span class="o">=</span> <span class="n">CompactPercentRankTransform</span><span class="p">(</span><span class="n">score_transform</span><span class="o">=</span><span class="s2">"log"</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">background_ic50</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">affinity_curve</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">background_ic50</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+<span class="go">[12.5, 37.5, 62.5, 87.5]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">probability_curve</span> <span class="o">=</span> <span class="n">CompactPercentRankTransform</span><span class="p">(</span><span class="n">score_transform</span><span class="o">=</span><span class="s2">"logit"</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">([</span><span class="mf">.1</span><span class="p">,</span> <span class="mf">.1</span><span class="p">,</span> <span class="mf">.2</span><span class="p">,</span> <span class="mf">.9</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">probability_curve</span><span class="o">.</span><span class="n">transform</span><span class="p">([</span><span class="mf">.1</span><span class="p">,</span> <span class="mf">.2</span><span class="p">,</span> <span class="mf">.9</span><span class="p">],</span> <span class="n">survival</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+<span class="go">[75.0, 37.5, 12.5]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">restored</span> <span class="o">=</span> <span class="n">CompactPercentRankTransform</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">probability_curve</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">np</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span><span class="n">restored</span><span class="o">.</span><span class="n">transform</span><span class="p">([</span><span class="mf">.2</span><span class="p">,</span> <span class="mf">.8</span><span class="p">]),</span> <span class="n">probability_curve</span><span class="o">.</span><span class="n">transform</span><span class="p">([</span><span class="mf">.2</span><span class="p">,</span> <span class="mf">.8</span><span class="p">]))</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">histogram</span> <span class="o">=</span> <span class="n">HistogramPercentRankTransform</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">background_ic50</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="p">[</span><span class="mf">1.</span><span class="p">,</span> <span class="mf">10.</span><span class="p">,</span> <span class="mf">100.</span><span class="p">,</span> <span class="mf">1000.</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">np</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span><span class="n">histogram</span><span class="o">.</span><span class="n">transform</span><span class="p">([</span><span class="mf">5.</span><span class="p">,</span> <span class="mf">50.</span><span class="p">],</span> <span class="n">survival</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span> <span class="mi">100</span> <span class="o">-</span> <span class="n">histogram</span><span class="o">.</span><span class="n">transform</span><span class="p">([</span><span class="mf">5.</span><span class="p">,</span> <span class="mf">50.</span><span class="p">]))</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<p>For predictor calibration, affinity takes background <strong>peptides</strong> and performs
+inference; processing and presentation take already computed background
+<strong>scores</strong>. Their <code class="docutils literal notranslate"><span class="pre">percentile_ranks</span></code> methods all take raw scores:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Assume independently prepared backgrounds and loaded predictor instances.</span>
+<span class="n">affinity_predictor</span><span class="o">.</span><span class="n">calibrate_percentile_ranks</span><span class="p">(</span>
+    <span class="n">peptides</span><span class="o">=</span><span class="n">background_peptides</span><span class="p">,</span> <span class="n">alleles</span><span class="o">=</span><span class="n">calibration_alleles</span><span class="p">,</span>
+    <span class="n">method</span><span class="o">=</span><span class="s2">"compact"</span><span class="p">,</span> <span class="n">max_knots</span><span class="o">=</span><span class="mi">128</span><span class="p">)</span>
+<span class="n">affinity_percentiles</span> <span class="o">=</span> <span class="n">affinity_predictor</span><span class="o">.</span><span class="n">percentile_ranks</span><span class="p">(</span><span class="n">query_ic50</span><span class="p">,</span> <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">)</span>
+
+<span class="n">processing_predictor</span><span class="o">.</span><span class="n">calibrate_percentile_ranks</span><span class="p">(</span>
+    <span class="n">background_processing_scores</span><span class="p">,</span> <span class="n">groups</span><span class="o">=</span><span class="n">background_peptides</span><span class="p">,</span>
+    <span class="n">method</span><span class="o">=</span><span class="s2">"compact"</span><span class="p">,</span> <span class="n">max_knots</span><span class="o">=</span><span class="mi">128</span><span class="p">)</span>
+<span class="n">processing_percentiles</span> <span class="o">=</span> <span class="n">processing_predictor</span><span class="o">.</span><span class="n">percentile_ranks</span><span class="p">(</span><span class="n">query_processing_scores</span><span class="p">)</span>
+
+<span class="n">presentation_predictor</span><span class="o">.</span><span class="n">calibrate_percentile_ranks</span><span class="p">(</span>
+    <span class="n">background_presentation_scores</span><span class="p">,</span> <span class="n">groups</span><span class="o">=</span><span class="n">background_peptide_per_score</span><span class="p">,</span>
+    <span class="n">method</span><span class="o">=</span><span class="s2">"compact"</span><span class="p">,</span> <span class="n">max_knots</span><span class="o">=</span><span class="mi">128</span><span class="p">)</span>
+<span class="n">presentation_percentiles</span> <span class="o">=</span> <span class="n">presentation_predictor</span><span class="o">.</span><span class="n">percentile_ranks</span><span class="p">(</span><span class="n">query_presentation_scores</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Processing’s raw <code class="docutils literal notranslate"><span class="pre">predict</span></code>/<code class="docutils literal notranslate"><span class="pre">predict_to_dataframe</span></code> outputs are unchanged; call
+<code class="docutils literal notranslate"><span class="pre">percentile_ranks</span></code> explicitly. An uncalibrated processing predictor raises by
+default; <code class="docutils literal notranslate"><span class="pre">throw=False</span></code> warns and returns NaNs. Do not assume historical public
+processing models include a calibration merely because the API now exists.</p>
+<p>Use <code class="docutils literal notranslate"><span class="pre">method=&quot;histogram&quot;</span></code> to explicitly request histogram calibration. Supplying
+<code class="docutils literal notranslate"><span class="pre">bins</span></code> also selects it when <code class="docutils literal notranslate"><span class="pre">method</span></code> is omitted; <code class="docutils literal notranslate"><span class="pre">method=&quot;compact&quot;</span></code> plus <code class="docutils literal notranslate"><span class="pre">bins</span></code>
+is rejected. Exact historical reproduction requires the original reference
+and bin edges, not just the histogram class name. In particular, the current
+presentation histogram default uses the later tail-adaptive bin policy, not
+necessarily the grid in an older public artifact.</p>
+<p><code class="docutils literal notranslate"><span class="pre">CompactPresentationPercentiles</span></code> is only an adapter for the original experiment:
+it retains its historical classmethod fit and upper-tail default. New code
+should use the generic class and specify <code class="docutils literal notranslate"><span class="pre">survival=True</span></code> where appropriate.</p>
+</section>
+<section id="calibration-commands-and-reference-policy">
+<h2>Calibration commands and reference policy<a class="headerlink" href="#calibration-commands-and-reference-policy" title="Link to this heading"></a></h2>
+<p>The command writes <strong>in place</strong>. Point it at a separately preserved candidate
+copy, not a public baseline or the only copy of an earlier calibration.
+These are command templates; retain the original release’s reference policy,
+sample count, amino-acid distribution, seed, and MHC allele set sampling for a
+controlled recalibration. Omitted affinity/presentation reference-generation
+options use CLI defaults, which need not match a release’s recipe.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span>calibrate-percentile-ranks<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--models-dir<span class="w"> </span>candidate-affinity-copy<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--predictor-kind<span class="w"> </span>class1_affinity<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--percentile-method<span class="w"> </span>compact<span class="w"> </span>--max-percentile-knots<span class="w"> </span><span class="m">128</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--random-seed<span class="w"> </span><span class="m">42</span><span class="w"> </span>--num-jobs<span class="w"> </span><span class="m">0</span>
+
+mhcflurry<span class="w"> </span>calibrate-percentile-ranks<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--models-dir<span class="w"> </span>candidate-processing-copy<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--predictor-kind<span class="w"> </span>class1_processing<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--processing-reference-data<span class="w"> </span>independent_background.csv<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--percentile-method<span class="w"> </span>compact<span class="w"> </span>--max-percentile-knots<span class="w"> </span><span class="m">128</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--num-jobs<span class="w"> </span><span class="m">0</span>
+
+mhcflurry<span class="w"> </span>calibrate-percentile-ranks<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--models-dir<span class="w"> </span>candidate-presentation-copy<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--predictor-kind<span class="w"> </span>class1_presentation<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--percentile-method<span class="w"> </span>compact<span class="w"> </span>--max-percentile-knots<span class="w"> </span><span class="m">128</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--random-seed<span class="w"> </span><span class="m">42</span><span class="w"> </span>--num-jobs<span class="w"> </span><span class="m">0</span>
+</pre></div>
+</div>
+<p>Processing requires an explicit independent background CSV with <code class="docutils literal notranslate"><span class="pre">peptide</span></code> and,
+for flanked ensembles, <code class="docutils literal notranslate"><span class="pre">n_flank</span></code> and <code class="docutils literal notranslate"><span class="pre">c_flank</span></code>. Empty flank cells mean missing
+context. Use the same ensemble and context policy as at prediction time; the
+command does not fabricate flanks or generate a processing reference from
+<code class="docutils literal notranslate"><span class="pre">--num-peptides-per-length</span></code>. It currently supports <code class="docutils literal notranslate"><span class="pre">--num-jobs</span> <span class="pre">0</span></code> only and
+retains inputs and raw scores in <code class="docutils literal notranslate"><span class="pre">percent_rank_reference.npz</span></code>.</p>
+<p>Affinity/presentation commands generate background predictions from their
+configured reference policy; unlike the processing command, they do <strong>not</strong>
+automatically retain a raw reference-score archive. Preserve those predictions
+separately when needed for calibration plots/reanalysis. Retain model hashes,
+reference inputs, the command, transform files, and held-out prediction tables
+with joinable sample/peptide/allele identifiers for all comparisons.</p>
+<p>Affinity <code class="docutils literal notranslate"><span class="pre">--only-missing</span></code> fills gaps, including sequence-equivalent lookup;
+it does not convert existing histogram calibrations to compact. For an
+intentional conversion of all requested alleles, omit that flag on a copy.</p>
+</section>
+<section id="saved-formats-and-compatibility">
+<h2>Saved formats and compatibility<a class="headerlink" href="#saved-formats-and-compatibility" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Historical <code class="docutils literal notranslate"><span class="pre">percent_ranks.csv</span></code> loads through the histogram implementation,
+without refitting. <code class="docutils literal notranslate"><span class="pre">PercentRankTransform</span></code> remains an import/pickle alias.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">percent_ranks.json</span></code> stores versioned compact or mixed collections, including
+different knots per allele. All-histogram collections use CSV when their
+edges match; different histogram grids also require JSON.</p></li>
+<li><p>Saving replaces the target calibration file and removes its alternate
+format only after successful replacement. Saving an empty collection removes
+saved calibration. Loading prefers JSON if both files are present; it does
+not fall back to CSV if the JSON is invalid.</p></li>
+<li><p>Older software cannot interpret compact JSON calibration. Do not expect
+percentile-dependent prediction to work there merely because the network
+weight files remain readable. Preserve original artifacts for old clients.</p></li>
+</ul>
+<p>Changing ensemble members or weights requires new calibration. Keep raw-score
+performance comparisons separate from percentile-mapping comparisons.</p>
+</section>
+<section id="numerical-limits-and-interpretation">
+<h2>Numerical limits and interpretation<a class="headerlink" href="#numerical-limits-and-interpretation" title="Link to this heading"></a></h2>
+<p>Compact fitting requires a finite, nonconstant reference. Log coordinates
+require positive scores; logit coordinates require scores in [0, 1]. Exact
+zero and one use the nearest interior float64 values for taking logits.
+Transform calls propagate NaNs but reject infinities and out-of-domain scores.
+The histogram implementation retains its historical input/boundary behavior.</p>
+<p>Compact interpolation is monotone within one distribution, avoiding the
+deliberate step ties introduced by histograms. It cannot recover ties already
+present in raw scores or remove floating-point rounding. Extreme percentiles
+can still underflow to zero or approach 100 without distinguishable digits;
+<code class="docutils literal notranslate"><span class="pre">log_percentiles(scores,</span> <span class="pre">survival=...)</span></code> retains tiny-tail information before
+exponentiation, but does not validate extrapolated frequencies.</p>
+<p>Monotonic mapping preserves ordering within a shared calibration distribution,
+subject to those numerical limits. Combining allele-specific calibrations can
+change ordering <strong>across</strong> alleles. Better percentile resolution is not an
+improvement in the neural network’s raw ranking ability, and calibration is
+not a substitute for held-out affinity/processing/presentation evaluation.</p>
+<p>See <a class="reference internal" href="presentation_percentile_calibration.html"><span class="doc">Presentation percentile calibration</span></a> for the archived presentation
+comparison and its distinct 60/20/20 experimental validation design.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="configuration.html" class="btn btn-neutral float-left" title="Configuration and performance" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="training_provenance.html" class="btn btn-neutral float-right" title="Auditing training-sample overlap" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

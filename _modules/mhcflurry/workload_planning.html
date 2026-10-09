@@ -1,0 +1,1262 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.workload_planning &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.workload_planning</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.workload_planning</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Central workload planning for local GPU/CPU orchestration."""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">zipfile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.memory_budget</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">GIB</span><span class="p">,</span>
+    <span class="n">HOST_MIN_RESERVE_BYTES</span><span class="p">,</span>
+    <span class="n">usable_memory_bytes</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<span class="n">HOST_RAM_PER_DATALOADER_CHILD_GB</span> <span class="o">=</span> <span class="mf">0.5</span>
+<span class="n">DEVICE_RUNTIME_BASE_GB</span> <span class="o">=</span> <span class="mf">1.5</span>
+<span class="n">MODEL_TENSOR_SAFETY_FACTOR</span> <span class="o">=</span> <span class="mf">1.2</span>
+
+
+<div class="viewcode-block" id="env_float">
+<a class="viewcode-back" href="../../api.html#mhcflurry.workload_planning.env_float">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">env_float</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">default</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Read ``name`` from the environment as float, falling back to ``default``.</span>
+
+<span class="sd">    ``bounds`` is an optional ``(low, high)`` tuple; either side may be</span>
+<span class="sd">    ``None``. Both endpoints are inclusive. Bad values are reported with the</span>
+<span class="sd">    offending variable name so users don't get a bare ``ValueError``.</span>
+<span class="sd">    """</span>
+    <span class="n">raw</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">raw</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">):</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">default</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Environment variable </span><span class="si">%s</span><span class="s2">=</span><span class="si">%r</span><span class="s2"> is not a valid float: </span><span class="si">%s</span><span class="s2">"</span>
+                <span class="o">%</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">raw</span><span class="p">,</span> <span class="n">exc</span><span class="p">)</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Environment variable </span><span class="si">%s</span><span class="s2">=</span><span class="si">%r</span><span class="s2"> must be finite"</span>
+            <span class="o">%</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">raw</span> <span class="k">if</span> <span class="n">raw</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span> <span class="k">else</span> <span class="n">value</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">bounds</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">low</span><span class="p">,</span> <span class="n">high</span> <span class="o">=</span> <span class="n">bounds</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">low</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="n">low</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span>
+                <span class="n">high</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">value</span> <span class="o">&gt;</span> <span class="n">high</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Environment variable </span><span class="si">%s</span><span class="s2">=</span><span class="si">%r</span><span class="s2"> is outside allowed range </span><span class="si">%s</span><span class="s2">"</span>
+                <span class="o">%</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">raw</span> <span class="k">if</span> <span class="n">raw</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span> <span class="k">else</span> <span class="n">value</span><span class="p">,</span> <span class="n">bounds</span><span class="p">)</span>
+            <span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span></div>
+
+
+
+<div class="viewcode-block" id="env_int">
+<a class="viewcode-back" href="../../api.html#mhcflurry.workload_planning.env_int">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">env_int</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">default</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Read ``name`` from the environment as int, falling back to ``default``.</span>
+
+<span class="sd">    Bad values surface with the offending variable name. ``bounds`` works the</span>
+<span class="sd">    same as :func:`env_float`.</span>
+<span class="sd">    """</span>
+    <span class="n">raw</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">raw</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">):</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">default</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Environment variable </span><span class="si">%s</span><span class="s2">=</span><span class="si">%r</span><span class="s2"> is not a valid int: </span><span class="si">%s</span><span class="s2">"</span>
+                <span class="o">%</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">raw</span><span class="p">,</span> <span class="n">exc</span><span class="p">)</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+    <span class="k">if</span> <span class="n">bounds</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">low</span><span class="p">,</span> <span class="n">high</span> <span class="o">=</span> <span class="n">bounds</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">low</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="n">low</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span>
+                <span class="n">high</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">value</span> <span class="o">&gt;</span> <span class="n">high</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Environment variable </span><span class="si">%s</span><span class="s2">=</span><span class="si">%r</span><span class="s2"> is outside allowed range </span><span class="si">%s</span><span class="s2">"</span>
+                <span class="o">%</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">raw</span> <span class="k">if</span> <span class="n">raw</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span> <span class="k">else</span> <span class="n">value</span><span class="p">,</span> <span class="n">bounds</span><span class="p">)</span>
+            <span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span></div>
+
+
+<span class="n">WORKLOAD_GENERIC</span> <span class="o">=</span> <span class="s2">"generic"</span>
+<span class="n">WORKLOAD_AFFINITY_TRAINING</span> <span class="o">=</span> <span class="s2">"affinity_training"</span>
+<span class="n">WORKLOAD_AFFINITY_INFERENCE</span> <span class="o">=</span> <span class="s2">"affinity_inference"</span>
+<span class="n">WORKLOAD_AFFINITY_SELECTION</span> <span class="o">=</span> <span class="s2">"affinity_selection"</span>
+<span class="n">WORKLOAD_AFFINITY_CALIBRATION</span> <span class="o">=</span> <span class="s2">"affinity_calibration"</span>
+<span class="n">WORKLOAD_PROCESSING_DATA</span> <span class="o">=</span> <span class="s2">"processing_data"</span>
+<span class="n">WORKLOAD_PROCESSING_TRAINING</span> <span class="o">=</span> <span class="s2">"processing_training"</span>
+<span class="n">WORKLOAD_PROCESSING_INFERENCE</span> <span class="o">=</span> <span class="s2">"processing_inference"</span>
+<span class="n">WORKLOAD_PROCESSING_SELECTION</span> <span class="o">=</span> <span class="s2">"processing_selection"</span>
+<span class="n">WORKLOAD_PRESENTATION_TRAINING</span> <span class="o">=</span> <span class="s2">"presentation_training"</span>
+<span class="n">WORKLOAD_PRESENTATION_CALIBRATION</span> <span class="o">=</span> <span class="s2">"presentation_calibration"</span>
+<span class="n">WORKLOAD_PRESENTATION_INFERENCE</span> <span class="o">=</span> <span class="s2">"presentation_inference"</span>
+
+
+<div class="viewcode-block" id="WorkloadProfile">
+<a class="viewcode-back" href="../../api.html#mhcflurry.workload_planning.WorkloadProfile">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">WorkloadProfile</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Policy defaults for one workload family."""</span>
+
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">device_worker_gb</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>
+    <span class="n">data_pressure_start_gb</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">data_pressure_factor</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">data_pressure_cap_gb</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">host_worker_gb</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.0</span>
+    <span class="n">host_data_multiplier</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">host_data_cap_gb</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">32.0</span>
+    <span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span></div>
+
+
+
+<div class="viewcode-block" id="LocalParallelismPlan">
+<a class="viewcode-back" href="../../api.html#mhcflurry.workload_planning.LocalParallelismPlan">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">LocalParallelismPlan</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Resolved local orchestration plan.</span>
+
+<span class="sd">    This is the single object readers need to understand: it records the</span>
+<span class="sd">    workload, hardware facts, CLI overrides, planner estimates, and final</span>
+<span class="sd">    values that get written back onto argparse ``args``.</span>
+<span class="sd">    """</span>
+
+    <span class="n">workload_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">backend</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">gpus</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">gpus_was_auto</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">max_workers_per_gpu</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">max_workers_per_gpu_was_auto</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">num_jobs</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">num_jobs_was_auto</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">dataloader_num_workers</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">dataloader_num_workers_was_auto</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">random_negative_pool_epochs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+    <span class="n">random_negative_pool_epochs_was_auto</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">torch_compile</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">torch_compile_loss</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">matmul_precision</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">enable_timing</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">capacity</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">device_worker_gb</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>
+    <span class="n">data_pressure_gb</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">host_worker_gb</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">host_memory_total_gb</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>
+    <span class="n">host_memory_available_gb</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>
+    <span class="n">host_memory_source</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">host_memory_num_jobs_cap</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+    <span class="n">cli_overrides</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">warnings</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">hints</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">],</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">warmup_device_peak_gb</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">warmup_host_peak_gb</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">cpu_threads_per_worker</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">cpu_threads_per_worker_was_auto</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="c1"># Append new fields to preserve positional compatibility for callers that</span>
+    <span class="c1"># construct this public diagnostic dataclass directly.</span>
+    <span class="n">device_memory_available_gb</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">device_memory_budget_gb</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">device_worker</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">"</span><span class="si">%.1f</span><span class="s2">"</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">device_worker_gb</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">device_worker_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="k">else</span> <span class="s2">"default"</span>
+        <span class="p">)</span>
+        <span class="n">host_available</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">"</span><span class="si">%.1f</span><span class="s2"> GB"</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">host_memory_available_gb</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">host_memory_available_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="k">else</span> <span class="s2">"unknown"</span>
+        <span class="p">)</span>
+        <span class="n">device_budget</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">"</span><span class="si">%.1f</span><span class="s2"> GB"</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">device_memory_budget_gb</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">device_memory_budget_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="k">else</span> <span class="s2">"unknown"</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="s2">"LocalParallelismPlan("</span>
+            <span class="s2">"workload=</span><span class="si">%s</span><span class="s2">, backend=</span><span class="si">%s</span><span class="s2">, jobs=</span><span class="si">%d</span><span class="s2">, gpus=</span><span class="si">%d</span><span class="s2">, workers/gpu=</span><span class="si">%d</span><span class="s2">, "</span>
+            <span class="s2">"dataloader_workers=</span><span class="si">%d</span><span class="s2">, device_worker_gb=</span><span class="si">%s</span><span class="s2">, device_budget=</span><span class="si">%s</span><span class="s2">, "</span>
+            <span class="s2">"host_worker_gb=</span><span class="si">%.1f</span><span class="s2">, host_available=</span><span class="si">%s</span><span class="s2"> from </span><span class="si">%s</span><span class="s2">, "</span>
+            <span class="s2">"warmup_device_peak_gb=</span><span class="si">%s</span><span class="s2">, warmup_host_peak_gb=</span><span class="si">%s</span><span class="s2">, "</span>
+            <span class="s2">"cpu_threads_per_worker=</span><span class="si">%s</span><span class="s2"> [</span><span class="si">%s</span><span class="s2">])"</span>
+            <span class="o">%</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">workload_name</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">backend</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">num_jobs</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">gpus</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">max_workers_per_gpu</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">dataloader_num_workers</span><span class="p">,</span>
+                <span class="n">device_worker</span><span class="p">,</span>
+                <span class="n">device_budget</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">host_worker_gb</span><span class="p">,</span>
+                <span class="n">host_available</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">host_memory_source</span><span class="p">,</span>
+                <span class="p">(</span>
+                    <span class="s2">"</span><span class="si">%.1f</span><span class="s2">"</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">warmup_device_peak_gb</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">warmup_device_peak_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">"none"</span>
+                <span class="p">),</span>
+                <span class="p">(</span>
+                    <span class="s2">"</span><span class="si">%.1f</span><span class="s2">"</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">warmup_host_peak_gb</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">warmup_host_peak_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">"none"</span>
+                <span class="p">),</span>
+                <span class="p">(</span>
+                    <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cpu_threads_per_worker</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cpu_threads_per_worker</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">"none"</span>
+                <span class="p">),</span>
+                <span class="p">(</span>
+                    <span class="s2">"auto"</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cpu_threads_per_worker_was_auto</span>
+                    <span class="k">else</span> <span class="s2">"environment"</span>
+                <span class="p">),</span>
+            <span class="p">)</span>
+        <span class="p">)</span></div>
+
+
+
+<span class="n">WORKLOAD_PROFILES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">WORKLOAD_GENERIC</span><span class="p">:</span> <span class="n">WorkloadProfile</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">WORKLOAD_GENERIC</span><span class="p">,</span>
+        <span class="n">device_worker_gb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">host_worker_gb</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Fallback plan; preserves global auto_max_workers defaults."</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">WORKLOAD_AFFINITY_TRAINING</span><span class="p">:</span> <span class="n">WorkloadProfile</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">WORKLOAD_AFFINITY_TRAINING</span><span class="p">,</span>
+        <span class="n">device_worker_gb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">data_pressure_start_gb</span><span class="o">=</span><span class="mf">4.0</span><span class="p">,</span>
+        <span class="n">data_pressure_factor</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span>
+        <span class="n">data_pressure_cap_gb</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">host_worker_gb</span><span class="o">=</span><span class="mf">3.0</span><span class="p">,</span>
+        <span class="n">host_data_multiplier</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Pan-allele affinity training and fine-tuning."</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">WORKLOAD_AFFINITY_INFERENCE</span><span class="p">:</span> <span class="n">WorkloadProfile</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">WORKLOAD_AFFINITY_INFERENCE</span><span class="p">,</span>
+        <span class="n">device_worker_gb</span><span class="o">=</span><span class="mf">4.0</span><span class="p">,</span>
+        <span class="n">data_pressure_start_gb</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">data_pressure_factor</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span>
+        <span class="n">data_pressure_cap_gb</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">host_worker_gb</span><span class="o">=</span><span class="mf">3.0</span><span class="p">,</span>
+        <span class="n">host_data_multiplier</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Affinity predictor inference."</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">WORKLOAD_AFFINITY_SELECTION</span><span class="p">:</span> <span class="n">WorkloadProfile</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">WORKLOAD_AFFINITY_SELECTION</span><span class="p">,</span>
+        <span class="n">device_worker_gb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">host_worker_gb</span><span class="o">=</span><span class="mf">3.0</span><span class="p">,</span>
+        <span class="n">host_data_multiplier</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Affinity model selection / held-out scoring."</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">WORKLOAD_AFFINITY_CALIBRATION</span><span class="p">:</span> <span class="n">WorkloadProfile</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">WORKLOAD_AFFINITY_CALIBRATION</span><span class="p">,</span>
+        <span class="n">device_worker_gb</span><span class="o">=</span><span class="mf">24.0</span><span class="p">,</span>
+        <span class="n">host_worker_gb</span><span class="o">=</span><span class="mf">4.0</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Affinity percentile-rank calibration."</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">WORKLOAD_PROCESSING_DATA</span><span class="p">:</span> <span class="n">WorkloadProfile</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">WORKLOAD_PROCESSING_DATA</span><span class="p">,</span>
+        <span class="n">device_worker_gb</span><span class="o">=</span><span class="mf">8.0</span><span class="p">,</span>
+        <span class="n">data_pressure_start_gb</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">data_pressure_factor</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+        <span class="n">data_pressure_cap_gb</span><span class="o">=</span><span class="mf">4.0</span><span class="p">,</span>
+        <span class="n">host_worker_gb</span><span class="o">=</span><span class="mf">4.0</span><span class="p">,</span>
+        <span class="n">host_data_multiplier</span><span class="o">=</span><span class="mf">0.10</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Processing training-data generation."</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">WORKLOAD_PROCESSING_TRAINING</span><span class="p">:</span> <span class="n">WorkloadProfile</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">WORKLOAD_PROCESSING_TRAINING</span><span class="p">,</span>
+        <span class="n">device_worker_gb</span><span class="o">=</span><span class="mf">8.0</span><span class="p">,</span>
+        <span class="n">data_pressure_start_gb</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">data_pressure_factor</span><span class="o">=</span><span class="mf">0.10</span><span class="p">,</span>
+        <span class="n">data_pressure_cap_gb</span><span class="o">=</span><span class="mf">8.0</span><span class="p">,</span>
+        <span class="n">host_worker_gb</span><span class="o">=</span><span class="mf">4.0</span><span class="p">,</span>
+        <span class="n">host_data_multiplier</span><span class="o">=</span><span class="mf">0.15</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Processing Conv1d training."</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">WORKLOAD_PROCESSING_INFERENCE</span><span class="p">:</span> <span class="n">WorkloadProfile</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">WORKLOAD_PROCESSING_INFERENCE</span><span class="p">,</span>
+        <span class="c1"># Four 8 GB workers fit arithmetically on an A100-40GB after the</span>
+        <span class="c1"># shared reserve, but the release processing ensemble can cross that</span>
+        <span class="c1"># envelope when four convolution workspaces peak concurrently.  The</span>
+        <span class="c1"># 10 GB resident-workload floor was established from the release</span>
+        <span class="c1"># holdout failure at the 5-aa condition after ten prior comparisons.</span>
+        <span class="n">device_worker_gb</span><span class="o">=</span><span class="mf">10.0</span><span class="p">,</span>
+        <span class="n">data_pressure_start_gb</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">data_pressure_factor</span><span class="o">=</span><span class="mf">0.03</span><span class="p">,</span>
+        <span class="n">data_pressure_cap_gb</span><span class="o">=</span><span class="mf">4.0</span><span class="p">,</span>
+        <span class="n">host_worker_gb</span><span class="o">=</span><span class="mf">4.0</span><span class="p">,</span>
+        <span class="n">host_data_multiplier</span><span class="o">=</span><span class="mf">0.03</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Processing predictor inference with convolution peaks."</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">WORKLOAD_PROCESSING_SELECTION</span><span class="p">:</span> <span class="n">WorkloadProfile</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">WORKLOAD_PROCESSING_SELECTION</span><span class="p">,</span>
+        <span class="n">device_worker_gb</span><span class="o">=</span><span class="mf">8.0</span><span class="p">,</span>
+        <span class="n">data_pressure_start_gb</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">data_pressure_factor</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+        <span class="n">data_pressure_cap_gb</span><span class="o">=</span><span class="mf">4.0</span><span class="p">,</span>
+        <span class="n">host_worker_gb</span><span class="o">=</span><span class="mf">4.0</span><span class="p">,</span>
+        <span class="n">host_data_multiplier</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Processing model selection / AUC scoring."</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">WORKLOAD_PRESENTATION_TRAINING</span><span class="p">:</span> <span class="n">WorkloadProfile</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">WORKLOAD_PRESENTATION_TRAINING</span><span class="p">,</span>
+        <span class="n">device_worker_gb</span><span class="o">=</span><span class="mf">16.0</span><span class="p">,</span>
+        <span class="n">data_pressure_start_gb</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">data_pressure_factor</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+        <span class="n">data_pressure_cap_gb</span><span class="o">=</span><span class="mf">6.0</span><span class="p">,</span>
+        <span class="n">host_worker_gb</span><span class="o">=</span><span class="mf">6.0</span><span class="p">,</span>
+        <span class="n">host_data_multiplier</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Presentation feature generation and model fitting."</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">WORKLOAD_PRESENTATION_CALIBRATION</span><span class="p">:</span> <span class="n">WorkloadProfile</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">WORKLOAD_PRESENTATION_CALIBRATION</span><span class="p">,</span>
+        <span class="n">device_worker_gb</span><span class="o">=</span><span class="mf">24.0</span><span class="p">,</span>
+        <span class="n">data_pressure_start_gb</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">data_pressure_factor</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+        <span class="n">data_pressure_cap_gb</span><span class="o">=</span><span class="mf">6.0</span><span class="p">,</span>
+        <span class="n">host_worker_gb</span><span class="o">=</span><span class="mf">6.0</span><span class="p">,</span>
+        <span class="n">host_data_multiplier</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Presentation percentile-rank calibration."</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">WORKLOAD_PRESENTATION_INFERENCE</span><span class="p">:</span> <span class="n">WorkloadProfile</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">WORKLOAD_PRESENTATION_INFERENCE</span><span class="p">,</span>
+        <span class="n">device_worker_gb</span><span class="o">=</span><span class="mf">16.0</span><span class="p">,</span>
+        <span class="n">data_pressure_start_gb</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">data_pressure_factor</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+        <span class="n">data_pressure_cap_gb</span><span class="o">=</span><span class="mf">6.0</span><span class="p">,</span>
+        <span class="n">host_worker_gb</span><span class="o">=</span><span class="mf">6.0</span><span class="p">,</span>
+        <span class="n">host_data_multiplier</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Presentation predictor inference."</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="get_workload_profile">
+<a class="viewcode-back" href="../../api.html#mhcflurry.workload_planning.get_workload_profile">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_workload_profile</span><span class="p">(</span><span class="n">workload_name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return a workload profile, falling back to generic for unknown names."""</span>
+    <span class="k">return</span> <span class="n">WORKLOAD_PROFILES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">workload_name</span><span class="p">,</span> <span class="n">WORKLOAD_PROFILES</span><span class="p">[</span><span class="n">WORKLOAD_GENERIC</span><span class="p">])</span></div>
+
+
+
+<div class="viewcode-block" id="path_size_bytes">
+<a class="viewcode-back" href="../../api.html#mhcflurry.workload_planning.path_size_bytes">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">path_size_bytes</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Best-effort file size lookup for planner hints."""</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getsize</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="model_artifact_size_bytes">
+<a class="viewcode-back" href="../../api.html#mhcflurry.workload_planning.model_artifact_size_bytes">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">model_artifact_size_bytes</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Best-effort uncompressed bytes for a model file or directory.</span>
+
+<span class="sd">    NumPy ``.npz`` weights are ZIP containers, so their on-disk size can be</span>
+<span class="sd">    much smaller than their resident parameter tensors. Summing ZIP member</span>
+<span class="sd">    sizes gives the planner a closer parameter-byte input without importing</span>
+<span class="sd">    torch or loading a predictor in the parent process.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">paths</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">root</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">filenames</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="n">paths</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">filenames</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="n">total</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">found</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">for</span> <span class="n">filename</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">is_zipfile</span><span class="p">(</span><span class="n">filename</span><span class="p">):</span>
+                <span class="k">with</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">ZipFile</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span> <span class="k">as</span> <span class="n">archive</span><span class="p">:</span>
+                    <span class="n">total</span> <span class="o">+=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">info</span><span class="o">.</span><span class="n">file_size</span> <span class="k">for</span> <span class="n">info</span> <span class="ow">in</span> <span class="n">archive</span><span class="o">.</span><span class="n">infolist</span><span class="p">())</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">total</span> <span class="o">+=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getsize</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+            <span class="n">found</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">BadZipFile</span><span class="p">):</span>
+            <span class="k">continue</span>
+    <span class="k">return</span> <span class="n">total</span> <span class="k">if</span> <span class="n">found</span> <span class="k">else</span> <span class="kc">None</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_memory_info</span><span class="p">(</span><span class="n">total_gb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">available_gb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">"unknown"</span><span class="p">):</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"total_gb"</span><span class="p">:</span> <span class="n">total_gb</span><span class="p">,</span>
+        <span class="s2">"available_gb"</span><span class="p">:</span> <span class="n">available_gb</span><span class="p">,</span>
+        <span class="s2">"source"</span><span class="p">:</span> <span class="n">source</span><span class="p">,</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_memory_env_override</span><span class="p">():</span>
+    <span class="n">total_raw</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_SYSTEM_RAM_GB"</span><span class="p">)</span>
+    <span class="n">available_raw</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">total_raw</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span> <span class="ow">and</span> <span class="n">available_raw</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">_memory_info</span><span class="p">(</span>
+        <span class="n">total_gb</span><span class="o">=</span><span class="n">env_float</span><span class="p">(</span>
+            <span class="s2">"MHCFLURRY_SYSTEM_RAM_GB"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">total_raw</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">available_gb</span><span class="o">=</span><span class="n">env_float</span><span class="p">(</span>
+            <span class="s2">"MHCFLURRY_SYSTEM_AVAILABLE_RAM_GB"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">available_raw</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">source</span><span class="o">=</span><span class="s2">"env"</span><span class="p">,</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_linux_memory_info_gb</span><span class="p">():</span>
+    <span class="n">values</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"/proc/meminfo"</span><span class="p">,</span> <span class="s2">"r"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">fh</span><span class="p">:</span>
+                <span class="n">key</span><span class="p">,</span> <span class="n">rest</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">":"</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"MemTotal"</span><span class="p">,</span> <span class="s2">"MemAvailable"</span><span class="p">):</span>
+                    <span class="n">parts</span> <span class="o">=</span> <span class="n">rest</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+                    <span class="n">values</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">IndexError</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">values</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_linux_cgroup_memory_info_gb</span><span class="p">()</span>
+    <span class="n">host</span> <span class="o">=</span> <span class="n">_memory_info</span><span class="p">(</span>
+        <span class="n">total_gb</span><span class="o">=</span><span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MemTotal"</span><span class="p">),</span>
+        <span class="n">available_gb</span><span class="o">=</span><span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MemAvailable"</span><span class="p">),</span>
+        <span class="n">source</span><span class="o">=</span><span class="s2">"/proc/meminfo"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">cgroup</span> <span class="o">=</span> <span class="n">_linux_cgroup_memory_info_gb</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">cgroup</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">host</span>
+    <span class="n">host_total</span> <span class="o">=</span> <span class="n">host</span><span class="p">[</span><span class="s2">"total_gb"</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">host_total</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">cgroup</span><span class="p">[</span><span class="s2">"total_gb"</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">host_total</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">host</span>
+    <span class="k">return</span> <span class="n">cgroup</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_read_cgroup_memory_value</span><span class="p">(</span><span class="n">paths</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">"r"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+                <span class="n">raw</span> <span class="o">=</span> <span class="n">fh</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">raw</span> <span class="ow">or</span> <span class="n">raw</span> <span class="o">==</span> <span class="s2">"max"</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">continue</span>
+    <span class="k">return</span> <span class="kc">None</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_linux_cgroup_memory_info_gb</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Return the container memory budget when a finite cgroup limit exists."""</span>
+    <span class="n">limit</span> <span class="o">=</span> <span class="n">_read_cgroup_memory_value</span><span class="p">((</span>
+        <span class="s2">"/sys/fs/cgroup/memory.max"</span><span class="p">,</span>
+        <span class="s2">"/sys/fs/cgroup/memory/memory.limit_in_bytes"</span><span class="p">,</span>
+    <span class="p">))</span>
+    <span class="c1"># Cgroup v1 represents an unlimited controller with a huge near-int64</span>
+    <span class="c1"># sentinel. It is not a usable machine-memory estimate.</span>
+    <span class="k">if</span> <span class="n">limit</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">limit</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">limit</span> <span class="o">&gt;=</span> <span class="mi">2</span> <span class="o">**</span> <span class="mi">60</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">current</span> <span class="o">=</span> <span class="n">_read_cgroup_memory_value</span><span class="p">((</span>
+        <span class="s2">"/sys/fs/cgroup/memory.current"</span><span class="p">,</span>
+        <span class="s2">"/sys/fs/cgroup/memory/memory.usage_in_bytes"</span><span class="p">,</span>
+    <span class="p">))</span>
+    <span class="n">available</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">current</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">max</span><span class="p">(</span><span class="n">limit</span> <span class="o">-</span> <span class="n">current</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_memory_info</span><span class="p">(</span>
+        <span class="n">total_gb</span><span class="o">=</span><span class="n">limit</span> <span class="o">/</span> <span class="n">GIB</span><span class="p">,</span>
+        <span class="n">available_gb</span><span class="o">=</span><span class="n">available</span> <span class="o">/</span> <span class="n">GIB</span> <span class="k">if</span> <span class="n">available</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">source</span><span class="o">=</span><span class="s2">"cgroup"</span><span class="p">,</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_macos_memory_info_gb</span><span class="p">():</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">total_bytes</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span>
+            <span class="p">[</span><span class="s2">"sysctl"</span><span class="p">,</span> <span class="s2">"-n"</span><span class="p">,</span> <span class="s2">"hw.memsize"</span><span class="p">],</span>
+            <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+    <span class="k">except</span> <span class="p">(</span>
+            <span class="ne">OSError</span><span class="p">,</span>
+            <span class="n">subprocess</span><span class="o">.</span><span class="n">CalledProcessError</span><span class="p">,</span>
+            <span class="n">subprocess</span><span class="o">.</span><span class="n">TimeoutExpired</span><span class="p">,</span>
+            <span class="ne">ValueError</span><span class="p">):</span>
+        <span class="n">total_bytes</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span>
+            <span class="p">[</span><span class="s2">"vm_stat"</span><span class="p">],</span>
+            <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">"ignore"</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span>
+            <span class="ne">OSError</span><span class="p">,</span>
+            <span class="n">subprocess</span><span class="o">.</span><span class="n">CalledProcessError</span><span class="p">,</span>
+            <span class="n">subprocess</span><span class="o">.</span><span class="n">TimeoutExpired</span><span class="p">):</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="s2">""</span>
+
+    <span class="n">page_size</span> <span class="o">=</span> <span class="mi">4096</span>
+    <span class="n">first_line</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">output</span> <span class="k">else</span> <span class="s2">""</span>
+    <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">"page size of (\d+) bytes"</span><span class="p">,</span> <span class="n">first_line</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+        <span class="n">page_size</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+
+    <span class="n">pages</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()[</span><span class="mi">1</span><span class="p">:]:</span>
+        <span class="k">if</span> <span class="s2">":"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">":"</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">pages</span><span class="p">[</span><span class="n">key</span><span class="o">.</span><span class="n">strip</span><span class="p">()]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">"."</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">continue</span>
+    <span class="n">available_page_names</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">"Pages free"</span><span class="p">,</span> <span class="s2">"Pages inactive"</span><span class="p">,</span> <span class="s2">"Pages speculative"</span><span class="p">)</span>
+    <span class="n">available_pages</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+        <span class="n">pages</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">available_page_names</span><span class="p">)</span>
+    <span class="n">available_bytes</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">available_pages</span> <span class="o">*</span> <span class="n">page_size</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">name</span> <span class="ow">in</span> <span class="n">pages</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">available_page_names</span><span class="p">)</span>
+        <span class="k">else</span> <span class="kc">None</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">total_bytes</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">available_bytes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">_memory_info</span><span class="p">(</span>
+        <span class="n">total_gb</span><span class="o">=</span><span class="n">total_bytes</span> <span class="o">/</span> <span class="n">GIB</span> <span class="k">if</span> <span class="n">total_bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">available_gb</span><span class="o">=</span><span class="p">(</span>
+            <span class="n">available_bytes</span> <span class="o">/</span> <span class="n">GIB</span> <span class="k">if</span> <span class="n">available_bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="p">),</span>
+        <span class="n">source</span><span class="o">=</span><span class="s2">"vm_stat"</span><span class="p">,</span>
+    <span class="p">)</span>
+
+
+<div class="viewcode-block" id="system_memory_info_gb">
+<a class="viewcode-back" href="../../api.html#mhcflurry.workload_planning.system_memory_info_gb">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">system_memory_info_gb</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Return host memory totals without importing heavy optional packages."""</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">_memory_env_override</span><span class="p">()</span>
+        <span class="ow">or</span> <span class="n">_linux_memory_info_gb</span><span class="p">()</span>
+        <span class="ow">or</span> <span class="n">_macos_memory_info_gb</span><span class="p">()</span>
+        <span class="ow">or</span> <span class="n">_memory_info</span><span class="p">()</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="available_or_total_memory_gb">
+<a class="viewcode-back" href="../../api.html#mhcflurry.workload_planning.available_or_total_memory_gb">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">available_or_total_memory_gb</span><span class="p">(</span><span class="n">memory</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return available RAM when measured, including a valid zero value."""</span>
+    <span class="n">available_gb</span> <span class="o">=</span> <span class="n">memory</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"available_gb"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">available_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">available_gb</span>
+    <span class="k">return</span> <span class="n">memory</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"total_gb"</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="normalize_workload_hints">
+<a class="viewcode-back" href="../../api.html#mhcflurry.workload_planning.normalize_workload_hints">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">normalize_workload_hints</span><span class="p">(</span><span class="n">hints</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">extra_hints</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Merge workload hints, dropping unset additions.</span>
+
+<span class="sd">    Explicit keyword additions replace same-named values from ``hints``. This</span>
+<span class="sd">    is the normalization boundary shared by workload estimation and local</span>
+<span class="sd">    parallelism planning.</span>
+<span class="sd">    """</span>
+    <span class="n">values</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="n">hints</span><span class="p">:</span>
+        <span class="n">values</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">hints</span><span class="p">))</span>
+    <span class="n">values</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="ow">in</span> <span class="n">extra_hints</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">v</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">})</span>
+    <span class="k">return</span> <span class="n">values</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_finite_nonnegative_hint</span><span class="p">(</span><span class="n">hints</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return a numeric planning hint or fail before capacity arithmetic."""</span>
+    <span class="n">raw</span> <span class="o">=</span> <span class="n">hints</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">raw</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Workload hint </span><span class="si">%s</span><span class="s2"> must be a finite non-negative number; got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span>
+            <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">raw</span><span class="p">)</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="ow">or</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Workload hint </span><span class="si">%s</span><span class="s2"> must be a finite non-negative number; got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span>
+            <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">raw</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<div class="viewcode-block" id="estimate_workload_memory">
+<a class="viewcode-back" href="../../api.html#mhcflurry.workload_planning.estimate_workload_memory">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">estimate_workload_memory</span><span class="p">(</span><span class="n">workload_name</span><span class="o">=</span><span class="n">WORKLOAD_GENERIC</span><span class="p">,</span> <span class="n">hints</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Estimate device and host memory for a workload."""</span>
+    <span class="n">hints</span> <span class="o">=</span> <span class="n">normalize_workload_hints</span><span class="p">(</span><span class="n">hints</span><span class="p">)</span>
+    <span class="n">profile</span> <span class="o">=</span> <span class="n">get_workload_profile</span><span class="p">(</span><span class="n">workload_name</span><span class="p">)</span>
+    <span class="n">notes</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">data_bytes</span> <span class="o">=</span> <span class="n">_finite_nonnegative_hint</span><span class="p">(</span><span class="n">hints</span><span class="p">,</span> <span class="s2">"data_bytes"</span><span class="p">)</span> <span class="ow">or</span> <span class="mf">0.0</span>
+    <span class="n">model_bytes</span> <span class="o">=</span> <span class="n">_finite_nonnegative_hint</span><span class="p">(</span><span class="n">hints</span><span class="p">,</span> <span class="s2">"model_bytes"</span><span class="p">)</span>
+    <span class="n">data_gb</span> <span class="o">=</span> <span class="n">data_bytes</span> <span class="o">/</span> <span class="n">GIB</span>
+    <span class="n">workload_env</span> <span class="o">=</span> <span class="s2">"MHCFLURRY_WORKLOAD_</span><span class="si">%s</span><span class="s2">_PER_WORKER_GB"</span> <span class="o">%</span> <span class="p">(</span>
+        <span class="n">profile</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"-"</span><span class="p">,</span> <span class="s2">"_"</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">workload_env</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">):</span>
+        <span class="n">device_worker_gb</span> <span class="o">=</span> <span class="n">env_float</span><span class="p">(</span><span class="n">workload_env</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+        <span class="n">notes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"env override"</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">hints</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"per_worker_gb"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">device_worker_gb</span> <span class="o">=</span> <span class="n">_finite_nonnegative_hint</span><span class="p">(</span><span class="n">hints</span><span class="p">,</span> <span class="s2">"per_worker_gb"</span><span class="p">)</span>
+        <span class="n">notes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"command estimate"</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">device_worker_gb</span> <span class="o">=</span> <span class="n">profile</span><span class="o">.</span><span class="n">device_worker_gb</span>
+        <span class="k">if</span> <span class="n">device_worker_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">notes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"profile default"</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">model_bytes</span><span class="p">:</span>
+        <span class="n">artifact_worker_gb</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">DEVICE_RUNTIME_BASE_GB</span>
+            <span class="o">+</span> <span class="nb">float</span><span class="p">(</span><span class="n">model_bytes</span><span class="p">)</span> <span class="o">/</span> <span class="n">GIB</span> <span class="o">*</span> <span class="n">MODEL_TENSOR_SAFETY_FACTOR</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">device_worker_gb</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">artifact_worker_gb</span> <span class="o">&gt;</span> <span class="n">device_worker_gb</span><span class="p">:</span>
+            <span class="c1"># Artifact size is a resident-memory floor, not a replacement for</span>
+            <span class="c1"># the workload profile. An elastic batch can shrink transient</span>
+            <span class="c1"># activations, but it cannot shrink CUDA contexts, model state, or</span>
+            <span class="c1"># the other predictors held by a composite workload. Analytic</span>
+            <span class="c1"># command estimates and expert env overrides remain authoritative;</span>
+            <span class="c1"># unlike raw artifact size, they describe a complete worker.</span>
+            <span class="n">device_worker_gb</span> <span class="o">=</span> <span class="n">artifact_worker_gb</span>
+            <span class="n">notes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"uncompressed model artifact floor"</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">hints</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"elastic_batch"</span><span class="p">):</span>
+            <span class="n">notes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"elastic batches retain resident workload floor"</span><span class="p">)</span>
+
+    <span class="n">data_pressure_gb</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="k">if</span> <span class="n">data_bytes</span> <span class="ow">and</span> <span class="n">device_worker_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">data_gb</span> <span class="o">&gt;</span> <span class="n">profile</span><span class="o">.</span><span class="n">data_pressure_start_gb</span><span class="p">:</span>
+            <span class="n">data_pressure_gb</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>
+                <span class="n">profile</span><span class="o">.</span><span class="n">data_pressure_cap_gb</span><span class="p">,</span>
+                <span class="p">(</span><span class="n">data_gb</span> <span class="o">-</span> <span class="n">profile</span><span class="o">.</span><span class="n">data_pressure_start_gb</span><span class="p">)</span>
+                <span class="o">*</span> <span class="n">profile</span><span class="o">.</span><span class="n">data_pressure_factor</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">data_pressure_gb</span><span class="p">:</span>
+                <span class="n">device_worker_gb</span> <span class="o">+=</span> <span class="n">data_pressure_gb</span>
+                <span class="n">notes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"data pressure </span><span class="si">%.2f</span><span class="s2"> GB"</span> <span class="o">%</span> <span class="n">data_pressure_gb</span><span class="p">)</span>
+
+    <span class="n">host_worker_gb</span> <span class="o">=</span> <span class="n">profile</span><span class="o">.</span><span class="n">host_worker_gb</span>
+    <span class="k">if</span> <span class="n">data_gb</span> <span class="ow">and</span> <span class="n">profile</span><span class="o">.</span><span class="n">host_data_multiplier</span><span class="p">:</span>
+        <span class="n">host_worker_gb</span> <span class="o">+=</span> <span class="nb">min</span><span class="p">(</span>
+            <span class="n">profile</span><span class="o">.</span><span class="n">host_data_cap_gb</span><span class="p">,</span>
+            <span class="n">data_gb</span> <span class="o">*</span> <span class="n">profile</span><span class="o">.</span><span class="n">host_data_multiplier</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"workload_name"</span><span class="p">:</span> <span class="n">profile</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+        <span class="s2">"device_worker_gb"</span><span class="p">:</span> <span class="n">device_worker_gb</span><span class="p">,</span>
+        <span class="s2">"host_worker_gb"</span><span class="p">:</span> <span class="n">host_worker_gb</span><span class="p">,</span>
+        <span class="s2">"data_pressure_gb"</span><span class="p">:</span> <span class="n">data_pressure_gb</span><span class="p">,</span>
+        <span class="s2">"hints"</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">hints</span><span class="o">.</span><span class="n">items</span><span class="p">())),</span>
+        <span class="s2">"notes"</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">notes</span><span class="p">),</span>
+    <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="host_memory_num_jobs_cap">
+<a class="viewcode-back" href="../../api.html#mhcflurry.workload_planning.host_memory_num_jobs_cap">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">host_memory_num_jobs_cap</span><span class="p">(</span>
+        <span class="n">memory</span><span class="p">,</span>
+        <span class="n">host_worker_gb</span><span class="p">,</span>
+        <span class="n">dataloader_num_workers</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">safety_fraction</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return worker cap from currently available host memory."""</span>
+    <span class="n">available_gb</span> <span class="o">=</span> <span class="n">available_or_total_memory_gb</span><span class="p">(</span><span class="n">memory</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">available_gb</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">worker_gb</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="nb">float</span><span class="p">(</span><span class="n">host_worker_gb</span><span class="p">)</span>
+        <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">dataloader_num_workers</span><span class="p">)</span> <span class="o">*</span> <span class="n">HOST_RAM_PER_DATALOADER_CHILD_GB</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">worker_gb</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">safety_fraction</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">raw_fraction</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="s2">"MHCFLURRY_AUTO_HOST_MEMORY_SAFETY_FRACTION"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">raw_fraction</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">):</span>
+            <span class="n">safety_fraction</span> <span class="o">=</span> <span class="n">env_float</span><span class="p">(</span>
+                <span class="s2">"MHCFLURRY_AUTO_HOST_MEMORY_SAFETY_FRACTION"</span><span class="p">,</span>
+                <span class="n">raw_fraction</span><span class="p">,</span>
+                <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span>
+            <span class="p">)</span>
+    <span class="k">if</span> <span class="n">safety_fraction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">usable_gb</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">available_gb</span><span class="p">)</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="n">safety_fraction</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">usable_gb</span> <span class="o">=</span> <span class="n">usable_memory_bytes</span><span class="p">(</span>
+            <span class="nb">float</span><span class="p">(</span><span class="n">available_gb</span><span class="p">)</span> <span class="o">*</span> <span class="n">GIB</span><span class="p">,</span>
+            <span class="n">min_reserve_bytes</span><span class="o">=</span><span class="n">HOST_MIN_RESERVE_BYTES</span><span class="p">,</span>
+        <span class="p">)</span> <span class="o">/</span> <span class="n">GIB</span>
+    <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">usable_gb</span> <span class="o">/</span> <span class="n">worker_gb</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="is_auto_value">
+<a class="viewcode-back" href="../../api.html#mhcflurry.workload_planning.is_auto_value">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">is_auto_value</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return whether a CLI/programmatic sizing value delegates to auto."""</span>
+    <span class="k">return</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"auto"</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_clip_auto_num_jobs_to_host_memory</span><span class="p">(</span>
+        <span class="n">num_jobs</span><span class="p">,</span> <span class="n">max_workers_per_gpu</span><span class="p">,</span> <span class="n">num_gpus</span><span class="p">,</span> <span class="n">was_auto_mwpg</span><span class="p">,</span>
+        <span class="n">memory</span><span class="p">,</span> <span class="n">memory_plan</span><span class="p">,</span> <span class="n">warnings</span><span class="p">,</span> <span class="n">dataloader_num_workers</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Clamp an auto-resolved ``num_jobs`` to what host RAM can support.</span>
+
+<span class="sd">    Returns ``(num_jobs, max_workers_per_gpu, host_cap)``. ``host_cap`` is</span>
+<span class="sd">    ``None`` when no clamp was applied (the input fit within memory); when a</span>
+<span class="sd">    clamp happens it is the host-memory worker cap, which equals the returned</span>
+<span class="sd">    ``num_jobs``. Callers use a non-None ``host_cap`` to report capacity as the</span>
+<span class="sd">    clamped worker count rather than re-deriving it from the (ceil-rounded)</span>
+<span class="sd">    ``max_workers_per_gpu``.</span>
+<span class="sd">    """</span>
+    <span class="n">cap</span> <span class="o">=</span> <span class="n">host_memory_num_jobs_cap</span><span class="p">(</span>
+        <span class="n">memory</span><span class="p">,</span>
+        <span class="n">memory_plan</span><span class="p">[</span><span class="s2">"host_worker_gb"</span><span class="p">],</span>
+        <span class="n">dataloader_num_workers</span><span class="o">=</span><span class="n">dataloader_num_workers</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">cap</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">cap</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">num_jobs</span><span class="p">,</span> <span class="n">max_workers_per_gpu</span><span class="p">,</span> <span class="kc">None</span>
+    <span class="n">worker_gb</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">memory_plan</span><span class="p">[</span><span class="s2">"host_worker_gb"</span><span class="p">]</span>
+        <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">dataloader_num_workers</span><span class="p">)</span> <span class="o">*</span> <span class="n">HOST_RAM_PER_DATALOADER_CHILD_GB</span>
+    <span class="p">)</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+        <span class="s2">"auto num_jobs capped from </span><span class="si">%d</span><span class="s2"> to </span><span class="si">%d</span><span class="s2"> by available host memory "</span>
+        <span class="s2">"(</span><span class="si">%.1f</span><span class="s2"> GB from </span><span class="si">%s</span><span class="s2">, workload=</span><span class="si">%s</span><span class="s2">, </span><span class="si">%.1f</span><span class="s2"> GB/worker)"</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">),</span>
+            <span class="n">cap</span><span class="p">,</span>
+            <span class="n">available_or_total_memory_gb</span><span class="p">(</span><span class="n">memory</span><span class="p">),</span>
+            <span class="n">memory</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"source"</span><span class="p">),</span>
+            <span class="n">memory_plan</span><span class="p">[</span><span class="s2">"workload_name"</span><span class="p">],</span>
+            <span class="n">worker_gb</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">num_jobs</span> <span class="o">=</span> <span class="n">cap</span>
+    <span class="k">if</span> <span class="n">was_auto_mwpg</span> <span class="ow">and</span> <span class="n">num_gpus</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">max_workers_per_gpu</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">)</span> <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">num_jobs</span><span class="p">,</span> <span class="n">max_workers_per_gpu</span><span class="p">,</span> <span class="n">cap</span>
+
+
+<span class="c1"># Free VRAM below this multiple of the per-worker estimate is flagged as</span>
+<span class="c1"># "way below safe operating range" — the auto batch-sizer can still shrink to</span>
+<span class="c1"># fit, but the margin for a worker's minimum working set is thin.</span>
+<span class="n">_CAPACITY_VRAM_SAFE_FRACTION</span> <span class="o">=</span> <span class="mf">1.0</span>
+<span class="c1"># Free VRAM this many times larger on the biggest GPU than the smallest is</span>
+<span class="c1"># flagged as heterogeneous (the plan sizes everything to the smallest card).</span>
+<span class="n">_CAPACITY_VRAM_HETEROGENEITY_RATIO</span> <span class="o">=</span> <span class="mf">1.5</span>
+
+
+<div class="viewcode-block" id="capacity_warnings">
+<a class="viewcode-back" href="../../api.html#mhcflurry.workload_planning.capacity_warnings">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">capacity_warnings</span><span class="p">(</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">workload_name</span><span class="p">,</span>
+        <span class="n">backend</span><span class="p">,</span>
+        <span class="n">gpus</span><span class="p">,</span>
+        <span class="n">num_jobs</span><span class="p">,</span>
+        <span class="n">per_gpu_free_vram_gb</span><span class="p">,</span>
+        <span class="n">device_worker_gb</span><span class="p">,</span>
+        <span class="n">available_ram_gb</span><span class="p">,</span>
+        <span class="n">host_worker_gb</span><span class="p">,</span>
+        <span class="n">cpu_count</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Compare a resolved plan against measured machine capacity.</span>
+
+<span class="sd">    Returns a list of human-readable warning strings for resources that are</span>
+<span class="sd">    below a safe operating range (small / uneven / undetectable GPU VRAM,</span>
+<span class="sd">    host RAM below the per-worker estimate, more workers than CPUs). Pure: no</span>
+<span class="sd">    I/O and no side effects — the caller decides how to surface the strings.</span>
+<span class="sd">    All measured inputs may be ``None`` when detection failed; each check is</span>
+<span class="sd">    skipped when its inputs are missing.</span>
+<span class="sd">    """</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">gpu_backend</span> <span class="o">=</span> <span class="n">backend</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"auto"</span><span class="p">,</span> <span class="s2">"gpu"</span><span class="p">)</span> <span class="ow">and</span> <span class="n">gpus</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">gpus</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+
+    <span class="k">if</span> <span class="n">gpu_backend</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">per_gpu_free_vram_gb</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="s2">"could not detect free GPU VRAM (nvidia-smi unavailable and no "</span>
+                <span class="s2">"MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB override); "</span>
+                <span class="s2">"worker and batch sizing fall back to conservative defaults — "</span>
+                <span class="s2">"pin --max-workers-per-gpu / the batch-size flags if you OOM."</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">free</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">g</span><span class="p">)</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">per_gpu_free_vram_gb</span> <span class="k">if</span> <span class="n">g</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">free</span> <span class="ow">and</span> <span class="n">device_worker_gb</span><span class="p">:</span>
+                <span class="n">min_free</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">free</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">min_free</span> <span class="o">&lt;</span> <span class="n">_CAPACITY_VRAM_SAFE_FRACTION</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="n">device_worker_gb</span><span class="p">):</span>
+                    <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="s2">"free GPU VRAM is below the per-worker estimate for "</span>
+                        <span class="s2">"workload </span><span class="si">%r</span><span class="s2">: smallest free </span><span class="si">%.1f</span><span class="s2"> GB vs ~</span><span class="si">%.1f</span><span class="s2"> GB/worker. "</span>
+                        <span class="s2">"The auto batch-sizer shrinks batches to fit, but "</span>
+                        <span class="s2">"throughput drops and a worker can OOM if its minimum "</span>
+                        <span class="s2">"working set exceeds free VRAM — reduce the batch-size "</span>
+                        <span class="s2">"flags or use a larger GPU."</span>
+                        <span class="o">%</span> <span class="p">(</span><span class="n">workload_name</span><span class="p">,</span> <span class="n">min_free</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="n">device_worker_gb</span><span class="p">)))</span>
+                <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">free</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">min_free</span> <span class="o">&gt;</span> <span class="mi">0</span>
+                        <span class="ow">and</span> <span class="nb">max</span><span class="p">(</span><span class="n">free</span><span class="p">)</span> <span class="o">/</span> <span class="n">min_free</span> <span class="o">&gt;=</span> <span class="n">_CAPACITY_VRAM_HETEROGENEITY_RATIO</span><span class="p">):</span>
+                    <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="s2">"free GPU VRAM is uneven across GPUs (</span><span class="si">%s</span><span class="s2"> GB); the plan "</span>
+                        <span class="s2">"sizes every GPU to the smallest (</span><span class="si">%.1f</span><span class="s2"> GB), "</span>
+                        <span class="s2">"underutilizing the larger card(s)."</span>
+                        <span class="o">%</span> <span class="p">(</span><span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">"</span><span class="si">%.0f</span><span class="s2">"</span> <span class="o">%</span> <span class="n">g</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">free</span><span class="p">),</span> <span class="n">min_free</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">num_jobs</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">available_ram_gb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">host_worker_gb</span><span class="p">):</span>
+        <span class="n">needed</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">host_worker_gb</span><span class="p">)</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">float</span><span class="p">(</span><span class="n">available_ram_gb</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">needed</span><span class="p">:</span>
+            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="s2">"available host RAM (</span><span class="si">%.0f</span><span class="s2"> GB) is below the ~</span><span class="si">%.0f</span><span class="s2"> GB estimate "</span>
+                <span class="s2">"for </span><span class="si">%d</span><span class="s2"> workers (~</span><span class="si">%.1f</span><span class="s2"> GB each); workers may be OOM-killed "</span>
+                <span class="s2">"under memory pressure — reduce --num-jobs."</span>
+                <span class="o">%</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">available_ram_gb</span><span class="p">),</span> <span class="n">needed</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">),</span>
+                   <span class="nb">float</span><span class="p">(</span><span class="n">host_worker_gb</span><span class="p">)))</span>
+
+    <span class="k">if</span> <span class="n">num_jobs</span> <span class="ow">and</span> <span class="n">cpu_count</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="nb">int</span><span class="p">(</span><span class="n">cpu_count</span><span class="p">):</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="s2">"planned </span><span class="si">%d</span><span class="s2"> worker processes exceed detected CPUs (</span><span class="si">%d</span><span class="s2">); workers "</span>
+            <span class="s2">"will contend for cores — consider --num-jobs &lt;= </span><span class="si">%d</span><span class="s2">."</span>
+            <span class="o">%</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">cpu_count</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">cpu_count</span><span class="p">)))</span>
+
+    <span class="k">return</span> <span class="n">out</span></div>
+
+
+
+<div class="viewcode-block" id="plan_local_parallelism">
+<a class="viewcode-back" href="../../api.html#mhcflurry.workload_planning.plan_local_parallelism">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">plan_local_parallelism</span><span class="p">(</span>
+        <span class="n">args</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">workload_name</span><span class="o">=</span><span class="n">WORKLOAD_GENERIC</span><span class="p">,</span>
+        <span class="n">workload_hints</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">per_worker_gb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">cap_auto_num_jobs</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">normalize_backend</span><span class="p">,</span>
+        <span class="n">detect_num_cuda_devices</span><span class="p">,</span>
+        <span class="n">auto_max_workers_per_gpu</span><span class="p">,</span>
+        <span class="n">auto_num_jobs</span><span class="p">,</span>
+        <span class="n">resolve_dataloader_num_workers</span><span class="p">,</span>
+        <span class="n">auto_random_negative_pool_epochs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Resolve all local-parallelism CLI flags into a plan.</span>
+
+<span class="sd">    Explicit CLI values override planner estimates. For explicit values that</span>
+<span class="sd">    exceed estimated capacity, the planner records a warning and still returns</span>
+<span class="sd">    the explicit value.</span>
+<span class="sd">    """</span>
+    <span class="n">hints</span> <span class="o">=</span> <span class="n">normalize_workload_hints</span><span class="p">(</span>
+        <span class="n">workload_hints</span><span class="p">,</span>
+        <span class="n">per_worker_gb</span><span class="o">=</span><span class="n">per_worker_gb</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">memory_plan</span> <span class="o">=</span> <span class="n">estimate_workload_memory</span><span class="p">(</span><span class="n">workload_name</span><span class="p">,</span> <span class="n">hints</span><span class="p">)</span>
+    <span class="n">memory</span> <span class="o">=</span> <span class="n">system_memory_info_gb</span><span class="p">()</span>
+    <span class="n">warnings</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">cli_overrides</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="n">backend_raw</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"backend"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">"auto"</span>
+    <span class="n">backend</span> <span class="o">=</span> <span class="n">normalize_backend</span><span class="p">(</span><span class="n">backend_raw</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">backend_raw</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"auto"</span><span class="p">,</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="n">cli_overrides</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"backend"</span><span class="p">)</span>
+
+    <span class="n">gpus_raw</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"gpus"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">gpus_was_auto</span> <span class="o">=</span> <span class="n">gpus_raw</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">backend</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"auto"</span><span class="p">,</span> <span class="s2">"gpu"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">gpus_was_auto</span><span class="p">:</span>
+        <span class="n">gpus</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">detect_num_cuda_devices</span><span class="p">())</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">gpus</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">gpus_raw</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">gpus_raw</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">cli_overrides</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"gpus"</span><span class="p">)</span>
+
+    <span class="n">mwpg_raw</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"max_workers_per_gpu"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">mwpg_was_auto</span> <span class="o">=</span> <span class="n">is_auto_value</span><span class="p">(</span><span class="n">mwpg_raw</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">mwpg_was_auto</span><span class="p">:</span>
+        <span class="n">max_workers_per_gpu</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">auto_max_workers_per_gpu</span><span class="p">(</span>
+            <span class="n">num_jobs</span><span class="o">=</span><span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"num_jobs"</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">num_gpus</span><span class="o">=</span><span class="n">gpus</span><span class="p">,</span>
+            <span class="n">backend</span><span class="o">=</span><span class="n">backend</span><span class="p">,</span>
+            <span class="n">per_worker_gb</span><span class="o">=</span><span class="n">memory_plan</span><span class="p">[</span><span class="s2">"device_worker_gb"</span><span class="p">],</span>
+        <span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">max_workers_per_gpu</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">mwpg_raw</span><span class="p">)</span>
+        <span class="n">cli_overrides</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"max_workers_per_gpu"</span><span class="p">)</span>
+
+    <span class="n">capacity</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">auto_num_jobs</span><span class="p">(</span><span class="n">gpus</span><span class="p">,</span> <span class="n">max_workers_per_gpu</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">backend</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"auto"</span><span class="p">,</span> <span class="s2">"gpu"</span><span class="p">)</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="p">)</span>
+    <span class="n">num_jobs_raw</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"num_jobs"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">)</span>
+    <span class="n">num_jobs_was_auto</span> <span class="o">=</span> <span class="n">is_auto_value</span><span class="p">(</span><span class="n">num_jobs_raw</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">num_jobs_was_auto</span><span class="p">:</span>
+        <span class="n">num_jobs</span> <span class="o">=</span> <span class="n">capacity</span>
+        <span class="k">if</span> <span class="n">cap_auto_num_jobs</span> <span class="ow">and</span> <span class="n">num_jobs</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">num_jobs</span><span class="p">,</span> <span class="n">max_workers_per_gpu</span><span class="p">,</span> <span class="n">host_cap</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">_clip_auto_num_jobs_to_host_memory</span><span class="p">(</span>
+                    <span class="n">num_jobs</span><span class="p">,</span>
+                    <span class="n">max_workers_per_gpu</span><span class="p">,</span>
+                    <span class="n">gpus</span><span class="p">,</span>
+                    <span class="n">mwpg_was_auto</span><span class="p">,</span>
+                    <span class="n">memory</span><span class="p">,</span>
+                    <span class="n">memory_plan</span><span class="p">,</span>
+                    <span class="n">warnings</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">host_cap</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">backend</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"auto"</span><span class="p">,</span> <span class="s2">"gpu"</span><span class="p">):</span>
+                <span class="c1"># Host memory is now the binding constraint, so report the</span>
+                <span class="c1"># clamped worker count as capacity. Recomputing</span>
+                <span class="c1"># gpus * ceil(num_jobs / gpus) here would over-report (e.g.</span>
+                <span class="c1"># num_jobs=5 on 2 GPUs -&gt; mwpg=3 -&gt; capacity=6 &gt; num_jobs).</span>
+                <span class="n">capacity</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">num_jobs</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs_raw</span><span class="p">)</span>
+        <span class="n">cli_overrides</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"num_jobs"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">cap_auto_num_jobs</span> <span class="ow">and</span> <span class="n">capacity</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">num_jobs</span> <span class="o">&gt;</span> <span class="n">capacity</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="s2">"explicit num_jobs=</span><span class="si">%d</span><span class="s2"> exceeds GPU capacity estimate </span><span class="si">%d</span><span class="s2">; "</span>
+                <span class="s2">"honoring CLI override"</span> <span class="o">%</span> <span class="p">(</span><span class="n">num_jobs</span><span class="p">,</span> <span class="n">capacity</span><span class="p">)</span>
+            <span class="p">)</span>
+
+    <span class="n">cpu_count</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">cap_auto_num_jobs</span> <span class="ow">and</span> <span class="n">cpu_count</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="nb">int</span><span class="p">(</span><span class="n">cpu_count</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">num_jobs_was_auto</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="s2">"auto num_jobs capped from </span><span class="si">%d</span><span class="s2"> to </span><span class="si">%d</span><span class="s2"> by available CPUs"</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">cpu_count</span><span class="p">)))</span>
+            <span class="n">num_jobs</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">cpu_count</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">mwpg_was_auto</span> <span class="ow">and</span> <span class="n">gpus</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">max_workers_per_gpu</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+                    <span class="mi">1</span><span class="p">,</span> <span class="p">(</span><span class="n">num_jobs</span> <span class="o">+</span> <span class="n">gpus</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="n">gpus</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">backend</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"auto"</span><span class="p">,</span> <span class="s2">"gpu"</span><span class="p">):</span>
+                <span class="n">capacity</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="s2">"explicit num_jobs=</span><span class="si">%d</span><span class="s2"> exceeds detected CPUs=</span><span class="si">%d</span><span class="s2">; honoring "</span>
+                <span class="s2">"CLI override"</span> <span class="o">%</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">cpu_count</span><span class="p">)))</span>
+
+    <span class="n">work_item_cap</span> <span class="o">=</span> <span class="n">hints</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"num_work_items"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">work_item_cap</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">workload_name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">"_inference"</span><span class="p">):</span>
+        <span class="n">work_item_cap</span> <span class="o">=</span> <span class="n">hints</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"prediction_rows"</span><span class="p">)</span> <span class="ow">or</span> <span class="n">hints</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"num_rows"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">work_item_cap</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">work_item_cap</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">work_item_cap</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span>
+            <span class="n">cap_auto_num_jobs</span>
+            <span class="ow">and</span> <span class="n">num_jobs_was_auto</span>
+            <span class="ow">and</span> <span class="n">work_item_cap</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">work_item_cap</span><span class="p">):</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="s2">"auto num_jobs capped from </span><span class="si">%d</span><span class="s2"> to </span><span class="si">%d</span><span class="s2"> by available work items"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">),</span> <span class="n">work_item_cap</span><span class="p">))</span>
+        <span class="n">num_jobs</span> <span class="o">=</span> <span class="n">work_item_cap</span>
+        <span class="k">if</span> <span class="n">mwpg_was_auto</span> <span class="ow">and</span> <span class="n">gpus</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">max_workers_per_gpu</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+                <span class="mi">1</span><span class="p">,</span> <span class="p">(</span><span class="n">num_jobs</span> <span class="o">+</span> <span class="n">gpus</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="n">gpus</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">backend</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"auto"</span><span class="p">,</span> <span class="s2">"gpu"</span><span class="p">):</span>
+            <span class="n">capacity</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">)</span>
+
+    <span class="n">dataloader_fit_workers</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">))</span>
+    <span class="k">if</span> <span class="p">(</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span>
+            <span class="ow">and</span> <span class="n">gpus</span> <span class="o">&gt;</span> <span class="mi">0</span>
+            <span class="ow">and</span> <span class="n">backend</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"auto"</span><span class="p">,</span> <span class="s2">"gpu"</span><span class="p">)):</span>
+        <span class="c1"># An explicit serial run can still execute one fit on an accelerator.</span>
+        <span class="n">dataloader_fit_workers</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">effective_fit_workers</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">))</span>
+
+    <span class="n">dl_raw</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"dataloader_num_workers"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">)</span>
+    <span class="n">dl_was_auto</span> <span class="o">=</span> <span class="n">is_auto_value</span><span class="p">(</span><span class="n">dl_raw</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">dl_was_auto</span><span class="p">:</span>
+        <span class="n">dataloader_num_workers</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">resolve_dataloader_num_workers</span><span class="p">(</span>
+            <span class="n">dl_raw</span><span class="p">,</span>
+            <span class="n">num_fit_workers</span><span class="o">=</span><span class="n">dataloader_fit_workers</span><span class="p">,</span>
+            <span class="n">ram_gb</span><span class="o">=</span><span class="n">available_or_total_memory_gb</span><span class="p">(</span><span class="n">memory</span><span class="p">),</span>
+        <span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">dataloader_num_workers</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">dl_raw</span><span class="p">)</span>
+        <span class="n">cli_overrides</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"dataloader_num_workers"</span><span class="p">)</span>
+
+    <span class="n">torch_compile</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"torch_compile"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">torch_compile</span> <span class="o">!=</span> <span class="s2">"auto"</span><span class="p">:</span>
+        <span class="n">cli_overrides</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"torch_compile"</span><span class="p">)</span>
+    <span class="n">torch_compile_loss</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"torch_compile_loss"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">torch_compile_loss</span> <span class="o">!=</span> <span class="s2">"auto"</span><span class="p">:</span>
+        <span class="n">cli_overrides</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"torch_compile_loss"</span><span class="p">)</span>
+    <span class="n">matmul_precision</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"matmul_precision"</span><span class="p">,</span> <span class="s2">"none"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">matmul_precision</span> <span class="o">!=</span> <span class="s2">"none"</span><span class="p">:</span>
+        <span class="n">cli_overrides</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"matmul_precision"</span><span class="p">)</span>
+    <span class="n">enable_timing</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"enable_timing"</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">enable_timing</span><span class="p">:</span>
+        <span class="n">cli_overrides</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"enable_timing"</span><span class="p">)</span>
+
+    <span class="n">host_worker_gb</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">memory_plan</span><span class="p">[</span><span class="s2">"host_worker_gb"</span><span class="p">]</span>
+        <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">dataloader_num_workers</span><span class="p">)</span> <span class="o">*</span> <span class="n">HOST_RAM_PER_DATALOADER_CHILD_GB</span>
+    <span class="p">)</span>
+    <span class="n">host_memory_cap</span> <span class="o">=</span> <span class="n">host_memory_num_jobs_cap</span><span class="p">(</span>
+        <span class="n">memory</span><span class="p">,</span>
+        <span class="n">memory_plan</span><span class="p">[</span><span class="s2">"host_worker_gb"</span><span class="p">],</span>
+        <span class="n">dataloader_num_workers</span><span class="o">=</span><span class="n">dataloader_num_workers</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">host_memory_cap</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">(</span>
+                <span class="n">cap_auto_num_jobs</span>
+                <span class="ow">and</span> <span class="n">num_jobs_was_auto</span>
+                <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">host_memory_cap</span><span class="p">):</span>
+            <span class="n">num_jobs</span><span class="p">,</span> <span class="n">max_workers_per_gpu</span><span class="p">,</span> <span class="n">host_cap</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">_clip_auto_num_jobs_to_host_memory</span><span class="p">(</span>
+                    <span class="n">num_jobs</span><span class="p">,</span>
+                    <span class="n">max_workers_per_gpu</span><span class="p">,</span>
+                    <span class="n">gpus</span><span class="p">,</span>
+                    <span class="n">mwpg_was_auto</span><span class="p">,</span>
+                    <span class="n">memory</span><span class="p">,</span>
+                    <span class="n">memory_plan</span><span class="p">,</span>
+                    <span class="n">warnings</span><span class="p">,</span>
+                    <span class="n">dataloader_num_workers</span><span class="o">=</span><span class="n">dataloader_num_workers</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">host_cap</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">backend</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"auto"</span><span class="p">,</span> <span class="s2">"gpu"</span><span class="p">):</span>
+                <span class="c1"># Host memory is now the binding constraint, so report the</span>
+                <span class="c1"># clamped worker count as capacity. Recomputing</span>
+                <span class="c1"># gpus * ceil(num_jobs / gpus) here would over-report (e.g.</span>
+                <span class="c1"># num_jobs=5 on 2 GPUs -&gt; mwpg=3 -&gt; capacity=6 &gt; num_jobs).</span>
+                <span class="n">capacity</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">)</span>
+            <span class="n">effective_fit_workers</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">))</span>
+            <span class="n">host_memory_cap</span> <span class="o">=</span> <span class="n">host_memory_num_jobs_cap</span><span class="p">(</span>
+                <span class="n">memory</span><span class="p">,</span>
+                <span class="n">memory_plan</span><span class="p">[</span><span class="s2">"host_worker_gb"</span><span class="p">],</span>
+                <span class="n">dataloader_num_workers</span><span class="o">=</span><span class="n">dataloader_num_workers</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="p">(</span><span class="ow">not</span> <span class="n">num_jobs_was_auto</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">host_memory_cap</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="s2">"explicit num_jobs=</span><span class="si">%d</span><span class="s2"> exceeds host-memory estimate </span><span class="si">%d</span><span class="s2">; "</span>
+                <span class="s2">"honoring CLI override"</span> <span class="o">%</span> <span class="p">(</span><span class="n">num_jobs</span><span class="p">,</span> <span class="n">host_memory_cap</span><span class="p">)</span>
+            <span class="p">)</span>
+
+    <span class="n">rn_raw</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"random_negative_pool_epochs"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">)</span>
+    <span class="n">rn_was_auto</span> <span class="o">=</span> <span class="n">is_auto_value</span><span class="p">(</span><span class="n">rn_raw</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">rn_was_auto</span><span class="p">:</span>
+        <span class="n">random_negative_pool_epochs</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">auto_random_negative_pool_epochs</span><span class="p">(</span>
+            <span class="n">num_random_negatives</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">peptide_max_length</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">num_workers</span><span class="o">=</span><span class="n">effective_fit_workers</span><span class="p">,</span>
+            <span class="n">ram_gb</span><span class="o">=</span><span class="n">available_or_total_memory_gb</span><span class="p">(</span><span class="n">memory</span><span class="p">),</span>
+            <span class="n">base_worker_gb</span><span class="o">=</span><span class="n">host_worker_gb</span><span class="p">,</span>
+        <span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">random_negative_pool_epochs</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">rn_raw</span><span class="p">)</span>
+        <span class="n">cli_overrides</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"random_negative_pool_epochs"</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">LocalParallelismPlan</span><span class="p">(</span>
+        <span class="n">workload_name</span><span class="o">=</span><span class="n">memory_plan</span><span class="p">[</span><span class="s2">"workload_name"</span><span class="p">],</span>
+        <span class="n">backend</span><span class="o">=</span><span class="n">backend</span><span class="p">,</span>
+        <span class="n">gpus</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">gpus</span><span class="p">),</span>
+        <span class="n">gpus_was_auto</span><span class="o">=</span><span class="n">gpus_was_auto</span><span class="p">,</span>
+        <span class="n">max_workers_per_gpu</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">max_workers_per_gpu</span><span class="p">),</span>
+        <span class="n">max_workers_per_gpu_was_auto</span><span class="o">=</span><span class="n">mwpg_was_auto</span><span class="p">,</span>
+        <span class="n">num_jobs</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">),</span>
+        <span class="n">num_jobs_was_auto</span><span class="o">=</span><span class="n">num_jobs_was_auto</span><span class="p">,</span>
+        <span class="n">dataloader_num_workers</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">dataloader_num_workers</span><span class="p">),</span>
+        <span class="n">dataloader_num_workers_was_auto</span><span class="o">=</span><span class="n">dl_was_auto</span><span class="p">,</span>
+        <span class="n">random_negative_pool_epochs</span><span class="o">=</span><span class="n">random_negative_pool_epochs</span><span class="p">,</span>
+        <span class="n">random_negative_pool_epochs_was_auto</span><span class="o">=</span><span class="n">rn_was_auto</span><span class="p">,</span>
+        <span class="n">torch_compile</span><span class="o">=</span><span class="n">torch_compile</span><span class="p">,</span>
+        <span class="n">torch_compile_loss</span><span class="o">=</span><span class="n">torch_compile_loss</span><span class="p">,</span>
+        <span class="n">matmul_precision</span><span class="o">=</span><span class="n">matmul_precision</span><span class="p">,</span>
+        <span class="n">enable_timing</span><span class="o">=</span><span class="n">enable_timing</span><span class="p">,</span>
+        <span class="n">capacity</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">capacity</span><span class="p">),</span>
+        <span class="n">device_worker_gb</span><span class="o">=</span><span class="n">memory_plan</span><span class="p">[</span><span class="s2">"device_worker_gb"</span><span class="p">],</span>
+        <span class="n">data_pressure_gb</span><span class="o">=</span><span class="n">memory_plan</span><span class="p">[</span><span class="s2">"data_pressure_gb"</span><span class="p">],</span>
+        <span class="n">host_worker_gb</span><span class="o">=</span><span class="n">host_worker_gb</span><span class="p">,</span>
+        <span class="n">host_memory_total_gb</span><span class="o">=</span><span class="n">memory</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"total_gb"</span><span class="p">),</span>
+        <span class="n">host_memory_available_gb</span><span class="o">=</span><span class="n">memory</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"available_gb"</span><span class="p">),</span>
+        <span class="n">host_memory_source</span><span class="o">=</span><span class="n">memory</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"source"</span><span class="p">,</span> <span class="s2">"unknown"</span><span class="p">),</span>
+        <span class="n">host_memory_num_jobs_cap</span><span class="o">=</span><span class="n">host_memory_cap</span><span class="p">,</span>
+        <span class="n">cli_overrides</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">cli_overrides</span><span class="p">),</span>
+        <span class="n">warnings</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">warnings</span><span class="p">),</span>
+        <span class="n">hints</span><span class="o">=</span><span class="n">memory_plan</span><span class="p">[</span><span class="s2">"hints"</span><span class="p">],</span>
+    <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

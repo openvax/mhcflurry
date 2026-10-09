@@ -1,0 +1,564 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.cli.processing_affinity_control &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.cli.processing_affinity_control</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.cli.processing_affinity_control</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+
+<span class="sd">"""Evaluate processing scores on affinity-controlled hit/decoy risk sets."""</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">glob</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.compare_models</span><span class="w"> </span><span class="kn">import</span> <span class="n">_metrics</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..common</span><span class="w"> </span><span class="kn">import</span> <span class="n">add_random_seed_arg</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..experiment_archive</span><span class="w"> </span><span class="kn">import</span> <span class="n">sha256_file</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..processing_matching</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">MATCHING_POLICY</span><span class="p">,</span> <span class="n">make_affinity_controlled_risk_sets</span><span class="p">,</span>
+    <span class="n">validate_matching_assignments</span><span class="p">)</span>
+
+
+<span class="n">IDENTITY_COLUMNS</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="s2">"sample_id"</span><span class="p">,</span> <span class="s2">"peptide"</span><span class="p">,</span> <span class="s2">"hit"</span><span class="p">,</span> <span class="s2">"n_flank"</span><span class="p">,</span> <span class="s2">"c_flank"</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">AFFINITY_COLUMN</span> <span class="o">=</span> <span class="s2">"mhcflurry_production_affinity"</span>
+
+
+<div class="viewcode-block" id="make_parser">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.processing_affinity_control.make_parser">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_parser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="s2">"mhcflurry eval processing-affinity-control"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the command-line parser."""</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--score"</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">"append"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s2">"NAME=PATH:COLUMN"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Named score column from a saved processing prediction table. "</span>
+            <span class="s2">"Repeat for every model to compare."</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--baseline"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Score name used as the paired comparison baseline."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">affinity_input</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_mutually_exclusive_group</span><span class="p">()</span>
+    <span class="n">affinity_input</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--data-dir"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"data_evaluation directory containing cached production affinity."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">affinity_input</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--affinity-cache"</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Archived ordered cohort with frozen production-affinity scores."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--existing"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Existing processing-affinity-control output to extend. Its "</span>
+            <span class="s2">"ordered cohort and risk-set assignments are verified and reused, "</span>
+            <span class="s2">"so only the new --score tables are read."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--out"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--decoys-per-hit"</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+    <span class="n">add_random_seed_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--same-protein-caliper"</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Maximum absolute log10-affinity distance for preferred "</span>
+            <span class="s2">"same-protein decoys. Remaining slots use the same sample and "</span>
+            <span class="s2">"peptide length. Default: 0.25."</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_score_spec</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">name</span><span class="p">,</span> <span class="n">source</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"="</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">path</span><span class="p">,</span> <span class="n">column</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">":"</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Invalid --score </span><span class="si">%r</span><span class="s2">; expected NAME=PATH:COLUMN"</span> <span class="o">%</span> <span class="n">value</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">name</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">path</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">column</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Invalid --score </span><span class="si">%r</span><span class="s2">; expected NAME=PATH:COLUMN"</span> <span class="o">%</span> <span class="n">value</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">name</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">column</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_cohort_hash</span><span class="p">(</span><span class="n">frame</span><span class="p">):</span>
+    <span class="n">normalized</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="nb">list</span><span class="p">(</span><span class="n">IDENTITY_COLUMNS</span><span class="p">)]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">labels</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">normalized</span><span class="p">[</span><span class="s2">"hit"</span><span class="p">],</span> <span class="n">errors</span><span class="o">=</span><span class="s2">"raise"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">labels</span><span class="o">.</span><span class="n">isin</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Prediction cohort requires nonmissing binary labels"</span><span class="p">)</span>
+    <span class="n">normalized</span><span class="p">[</span><span class="s2">"hit"</span><span class="p">]</span> <span class="o">=</span> <span class="n">labels</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">"int8"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"sample_id"</span><span class="p">,</span> <span class="s2">"peptide"</span><span class="p">,</span> <span class="s2">"n_flank"</span><span class="p">,</span> <span class="s2">"c_flank"</span><span class="p">):</span>
+        <span class="n">normalized</span><span class="p">[</span><span class="n">column</span><span class="p">]</span> <span class="o">=</span> <span class="n">normalized</span><span class="p">[</span><span class="n">column</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">pandas</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">hash_pandas_object</span><span class="p">(</span>
+        <span class="n">normalized</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="s2">"uint64"</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_load_scores</span><span class="p">(</span><span class="n">specs</span><span class="p">):</span>
+    <span class="n">cohort</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">cohort_hash</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">sources</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">seen</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">specs_by_path</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">specs</span><span class="p">:</span>
+        <span class="n">name</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">column</span> <span class="o">=</span> <span class="n">_parse_score_spec</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Duplicate score name: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">name</span><span class="p">)</span>
+        <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Score table does not exist: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">path</span><span class="p">)</span>
+        <span class="n">specs_by_path</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">name</span><span class="p">,</span> <span class="n">column</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">path_specs</span> <span class="ow">in</span> <span class="n">specs_by_path</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">score_columns</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span>
+            <span class="n">column</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">path_specs</span><span class="p">))</span>
+        <span class="n">usecols</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">IDENTITY_COLUMNS</span><span class="p">)</span> <span class="o">+</span> <span class="n">score_columns</span>
+        <span class="n">frame</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">usecols</span><span class="o">=</span><span class="n">usecols</span><span class="p">)</span>
+        <span class="n">current_hash</span> <span class="o">=</span> <span class="n">_cohort_hash</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">cohort</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">cohort</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="n">IDENTITY_COLUMNS</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">cohort_hash</span> <span class="o">=</span> <span class="n">current_hash</span>
+        <span class="k">elif</span> <span class="p">(</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">current_hash</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">cohort_hash</span><span class="p">)</span> <span class="ow">or</span>
+                <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span><span class="n">current_hash</span><span class="p">,</span> <span class="n">cohort_hash</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Scores from </span><span class="si">%s</span><span class="s2"> do not use the same ordered benchmark cohort"</span> <span class="o">%</span>
+                <span class="n">path</span><span class="p">)</span>
+        <span class="n">digest</span> <span class="o">=</span> <span class="n">sha256_file</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">path_specs</span><span class="p">:</span>
+            <span class="n">values</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">frame</span><span class="p">[</span><span class="n">column</span><span class="p">],</span> <span class="n">errors</span><span class="o">=</span><span class="s2">"coerce"</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">values</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"</span><span class="si">%s</span><span class="s2"> has </span><span class="si">%d</span><span class="s2"> non-finite scores"</span> <span class="o">%</span> <span class="p">(</span>
+                        <span class="n">name</span><span class="p">,</span> <span class="nb">int</span><span class="p">((</span><span class="o">~</span><span class="n">numpy</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">values</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">())))</span>
+            <span class="n">cohort</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">values</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="s2">"float64"</span><span class="p">)</span>
+            <span class="n">sources</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s2">"name"</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+                <span class="s2">"path"</span><span class="p">:</span> <span class="n">path</span><span class="p">,</span>
+                <span class="s2">"column"</span><span class="p">:</span> <span class="n">column</span><span class="p">,</span>
+                <span class="s2">"sha256"</span><span class="p">:</span> <span class="n">digest</span><span class="p">,</span>
+            <span class="p">})</span>
+    <span class="k">return</span> <span class="n">cohort</span><span class="p">,</span> <span class="n">sources</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_extend_existing</span><span class="p">(</span><span class="n">existing_dir</span><span class="p">,</span> <span class="n">new_cohort</span><span class="p">,</span> <span class="n">new_sources</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Attach new score columns to verified saved cohort and risk sets."""</span>
+    <span class="n">existing_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">existing_dir</span><span class="p">)</span>
+    <span class="n">experiment_path</span> <span class="o">=</span> <span class="n">existing_dir</span> <span class="o">/</span> <span class="s2">"experiment.json"</span>
+    <span class="n">heldout_path</span> <span class="o">=</span> <span class="n">existing_dir</span> <span class="o">/</span> <span class="s2">"heldout_predictions.csv.bz2"</span>
+    <span class="n">matched_path</span> <span class="o">=</span> <span class="n">existing_dir</span> <span class="o">/</span> <span class="s2">"matched_predictions.csv.bz2"</span>
+    <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="p">(</span><span class="n">experiment_path</span><span class="p">,</span> <span class="n">heldout_path</span><span class="p">,</span> <span class="n">matched_path</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Existing affinity-control artifact missing: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">path</span><span class="p">)</span>
+
+    <span class="n">configuration</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">experiment_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
+    <span class="n">old_sources</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"score_sources"</span><span class="p">,</span> <span class="p">[])</span>
+    <span class="n">old_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">source</span><span class="p">[</span><span class="s2">"name"</span><span class="p">]</span> <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="n">old_sources</span><span class="p">]</span>
+    <span class="n">new_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">source</span><span class="p">[</span><span class="s2">"name"</span><span class="p">]</span> <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="n">new_sources</span><span class="p">]</span>
+    <span class="n">duplicates</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">old_names</span><span class="p">)</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">new_names</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">duplicates</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"New score names already exist: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">duplicates</span><span class="p">))</span>
+
+    <span class="n">heldout</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">heldout_path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">heldout</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">new_cohort</span><span class="p">)</span> <span class="ow">or</span>
+            <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span>
+                <span class="n">_cohort_hash</span><span class="p">(</span><span class="n">heldout</span><span class="p">),</span> <span class="n">_cohort_hash</span><span class="p">(</span><span class="n">new_cohort</span><span class="p">))):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"New scores do not use the existing ordered benchmark cohort"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">new_names</span><span class="p">:</span>
+        <span class="n">heldout</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_cohort</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="s2">"float64"</span><span class="p">)</span>
+
+    <span class="n">matched</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">matched_path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">"source_row"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">matched</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Existing matched predictions lack source_row"</span><span class="p">)</span>
+    <span class="n">numeric_rows</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">matched</span><span class="o">.</span><span class="n">source_row</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">"raise"</span><span class="p">)</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">numeric_rows</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">equal</span><span class="p">(</span><span class="n">numeric_rows</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">numeric_rows</span><span class="p">))</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Existing matched predictions have noninteger source_row"</span><span class="p">)</span>
+    <span class="n">source_rows</span> <span class="o">=</span> <span class="n">numeric_rows</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">"int64"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">source_rows</span><span class="p">)</span> <span class="ow">and</span>
+            <span class="p">(</span><span class="n">source_rows</span><span class="o">.</span><span class="n">min</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">source_rows</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">heldout</span><span class="p">))):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Existing matched predictions have invalid source_row"</span><span class="p">)</span>
+    <span class="n">source_identity</span> <span class="o">=</span> <span class="n">heldout</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">source_rows</span><span class="p">]</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span>
+            <span class="n">_cohort_hash</span><span class="p">(</span><span class="n">source_identity</span><span class="p">),</span> <span class="n">_cohort_hash</span><span class="p">(</span><span class="n">matched</span><span class="p">)):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Existing matched predictions do not agree with source_row"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span><span class="n">source_identity</span><span class="p">[</span><span class="n">AFFINITY_COLUMN</span><span class="p">],</span> <span class="n">matched</span><span class="p">[</span><span class="n">AFFINITY_COLUMN</span><span class="p">]):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Existing matched affinities disagree with their source"</span><span class="p">)</span>
+    <span class="n">expected_hits</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">heldout</span><span class="o">.</span><span class="n">hit</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">source_rows</span><span class="p">[</span><span class="n">matched</span><span class="o">.</span><span class="n">hit</span> <span class="o">==</span> <span class="mi">1</span><span class="p">]),</span> <span class="n">expected_hits</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Existing matching omitted or repeated held-out hits"</span><span class="p">)</span>
+    <span class="n">diagnostics</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">configuration</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"diagnostics"</span><span class="p">,</span> <span class="p">{}))</span>
+    <span class="k">if</span> <span class="n">diagnostics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"policy"</span><span class="p">)</span> <span class="o">!=</span> <span class="n">MATCHING_POLICY</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Existing assignments use an older matching policy; regenerate the cohort"</span><span class="p">)</span>
+    <span class="n">validate_matching_assignments</span><span class="p">(</span>
+        <span class="n">matched</span><span class="p">,</span> <span class="n">AFFINITY_COLUMN</span><span class="p">,</span> <span class="n">diagnostics</span><span class="p">[</span><span class="s2">"decoys_per_hit"</span><span class="p">])</span>
+    <span class="n">diagnostics</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">policy</span><span class="o">=</span><span class="n">MATCHING_POLICY</span><span class="p">,</span> <span class="n">max_log10_affinity_distance</span><span class="o">=</span><span class="mf">0.25</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">new_names</span><span class="p">:</span>
+        <span class="n">matched</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">heldout</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()[</span><span class="n">source_rows</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"heldout"</span><span class="p">:</span> <span class="n">heldout</span><span class="p">,</span>
+        <span class="s2">"matched"</span><span class="p">:</span> <span class="n">matched</span><span class="p">,</span>
+        <span class="s2">"score_sources"</span><span class="p">:</span> <span class="n">old_sources</span> <span class="o">+</span> <span class="n">new_sources</span><span class="p">,</span>
+        <span class="s2">"affinity_sources"</span><span class="p">:</span> <span class="n">configuration</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"affinity_sources"</span><span class="p">,</span> <span class="p">[]),</span>
+        <span class="s2">"diagnostics"</span><span class="p">:</span> <span class="n">diagnostics</span><span class="p">,</span>
+        <span class="s2">"existing_experiment"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">experiment_path</span><span class="o">.</span><span class="n">resolve</span><span class="p">()),</span>
+        <span class="s2">"existing_experiment_sha256"</span><span class="p">:</span> <span class="n">sha256_file</span><span class="p">(</span><span class="n">experiment_path</span><span class="p">),</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_production_paths_by_sample</span><span class="p">(</span><span class="n">data_dir</span><span class="p">):</span>
+    <span class="n">pattern</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+        <span class="n">data_dir</span><span class="p">,</span>
+        <span class="s2">"benchmark.multiallelic.production.train_excluded.*.csv.bz2"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">pattern</span><span class="p">)):</span>
+        <span class="n">sample</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s2">"sample_id"</span><span class="p">],</span> <span class="n">nrows</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sample</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Cached production-affinity file is empty: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">path</span><span class="p">)</span>
+        <span class="n">sample_id</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">sample</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">sample_id</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Multiple cached production-affinity files for sample </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span>
+                <span class="n">sample_id</span><span class="p">)</span>
+        <span class="n">result</span><span class="p">[</span><span class="n">sample_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">path</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_attach_affinity</span><span class="p">(</span><span class="n">cohort</span><span class="p">,</span> <span class="n">data_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cached_affinity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">frames</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">paths</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">usecols</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">IDENTITY_COLUMNS</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span>
+        <span class="s2">"protein_accession"</span><span class="p">,</span> <span class="n">AFFINITY_COLUMN</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">if</span> <span class="n">cached_affinity</span><span class="p">:</span>
+        <span class="n">input_paths</span> <span class="o">=</span> <span class="p">[</span><span class="n">cached_affinity</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">data_dir</span><span class="p">:</span>
+        <span class="n">paths_by_sample</span> <span class="o">=</span> <span class="n">_production_paths_by_sample</span><span class="p">(</span><span class="n">data_dir</span><span class="p">)</span>
+        <span class="n">input_paths</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">sample_id</span> <span class="ow">in</span> <span class="n">cohort</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">():</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="n">paths_by_sample</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">sample_id</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"No cached production-affinity file for sample </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">sample_id</span><span class="p">)</span>
+            <span class="n">input_paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Specify --data-dir or --affinity-cache for the frozen reference"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">input_paths</span><span class="p">:</span>
+        <span class="n">frame</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">usecols</span><span class="o">=</span><span class="n">usecols</span><span class="p">)</span>
+        <span class="n">frame</span><span class="p">[</span><span class="s2">"n_flank"</span><span class="p">]</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">n_flank</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span>
+        <span class="n">frame</span><span class="p">[</span><span class="s2">"c_flank"</span><span class="p">]</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">c_flank</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span>
+        <span class="n">frames</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+        <span class="n">paths</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s2">"path"</span><span class="p">:</span> <span class="n">path</span><span class="p">,</span> <span class="s2">"sha256"</span><span class="p">:</span> <span class="n">sha256_file</span><span class="p">(</span><span class="n">path</span><span class="p">)})</span>
+    <span class="n">affinity</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">frames</span><span class="p">,</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">affinity</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">cohort</span><span class="p">)</span> <span class="ow">or</span>
+            <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span><span class="n">_cohort_hash</span><span class="p">(</span><span class="n">affinity</span><span class="p">),</span> <span class="n">_cohort_hash</span><span class="p">(</span><span class="n">cohort</span><span class="p">))):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Cached affinity rows do not exactly match the ordered prediction "</span>
+            <span class="s2">"cohort"</span><span class="p">)</span>
+    <span class="n">values</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">affinity</span><span class="p">[</span><span class="n">AFFINITY_COLUMN</span><span class="p">],</span> <span class="n">errors</span><span class="o">=</span><span class="s2">"coerce"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">values</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span> <span class="ow">or</span> <span class="p">(</span><span class="n">values</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Cached affinity must be finite and positive"</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">cohort</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">result</span><span class="p">[</span><span class="s2">"protein_accession"</span><span class="p">]</span> <span class="o">=</span> <span class="n">affinity</span><span class="o">.</span><span class="n">protein_accession</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
+    <span class="n">result</span><span class="p">[</span><span class="n">AFFINITY_COLUMN</span><span class="p">]</span> <span class="o">=</span> <span class="n">values</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="s2">"float64"</span><span class="p">)</span>
+    <span class="n">result</span><span class="p">[</span><span class="s2">"log10_affinity"</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="n">AFFINITY_COLUMN</span><span class="p">])</span>
+    <span class="n">result</span><span class="p">[</span><span class="s2">"peptide_len"</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">"int8"</span><span class="p">)</span>
+    <span class="n">result</span><span class="p">[</span><span class="s2">"hit"</span><span class="p">]</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">hit</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">"raise"</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">"int8"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span><span class="p">,</span> <span class="n">paths</span>
+
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_concordance</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">score_column</span><span class="p">):</span>
+    <span class="n">keys</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"sample_id"</span><span class="p">,</span> <span class="s2">"risk_set_id"</span><span class="p">]</span>
+    <span class="n">hits</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">frame</span><span class="o">.</span><span class="n">hit</span> <span class="o">==</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="n">keys</span><span class="p">)[</span><span class="n">score_column</span><span class="p">]</span>
+    <span class="n">decoys</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">frame</span><span class="o">.</span><span class="n">hit</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="n">targets</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">MultiIndex</span><span class="o">.</span><span class="n">from_frame</span><span class="p">(</span><span class="n">decoys</span><span class="p">[</span><span class="n">keys</span><span class="p">])</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">hits</span><span class="p">)</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
+    <span class="n">scores</span> <span class="o">=</span> <span class="n">decoys</span><span class="p">[</span><span class="n">score_column</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
+    <span class="n">wins</span> <span class="o">=</span> <span class="p">(</span><span class="n">targets</span> <span class="o">&gt;</span> <span class="n">scores</span><span class="p">)</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">targets</span> <span class="o">==</span> <span class="n">scores</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">decoys</span><span class="p">[</span><span class="n">keys</span><span class="p">]</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">win</span><span class="o">=</span><span class="n">wins</span><span class="p">)</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">keys</span><span class="p">)</span><span class="o">.</span><span class="n">win</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_metric_record</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">score</span><span class="p">,</span> <span class="n">scope</span><span class="p">,</span> <span class="n">group</span><span class="p">):</span>
+    <span class="n">metrics</span> <span class="o">=</span> <span class="n">_metrics</span><span class="p">(</span><span class="n">frame</span><span class="o">.</span><span class="n">hit</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(),</span> <span class="n">frame</span><span class="p">[</span><span class="n">score</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">())</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"scope"</span><span class="p">:</span> <span class="n">scope</span><span class="p">,</span>
+        <span class="s2">"group"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">group</span><span class="p">),</span>
+        <span class="s2">"score"</span><span class="p">:</span> <span class="n">score</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">metrics</span><span class="p">,</span>
+        <span class="s2">"concordance"</span><span class="p">:</span> <span class="n">_concordance</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">score</span><span class="p">),</span>
+    <span class="p">}</span>
+
+
+<div class="viewcode-block" id="score_risk_sets">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.processing_affinity_control.score_risk_sets">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">score_risk_sets</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">score_columns</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return overall, sample, and peptide-length metrics."""</span>
+    <span class="n">records</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">score</span> <span class="ow">in</span> <span class="n">score_columns</span><span class="p">:</span>
+        <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_metric_record</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">score</span><span class="p">,</span> <span class="s2">"overall"</span><span class="p">,</span> <span class="s2">"all"</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">sample_id</span><span class="p">,</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">frame</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"sample_id"</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_metric_record</span><span class="p">(</span>
+                <span class="n">group</span><span class="p">,</span> <span class="n">score</span><span class="p">,</span> <span class="s2">"sample"</span><span class="p">,</span> <span class="n">sample_id</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">length</span><span class="p">,</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">frame</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"peptide_len"</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_metric_record</span><span class="p">(</span><span class="n">group</span><span class="p">,</span> <span class="n">score</span><span class="p">,</span> <span class="s2">"length"</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">length</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">records</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="summarize_metrics">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.processing_affinity_control.summarize_metrics">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">summarize_metrics</span><span class="p">(</span><span class="n">metrics</span><span class="p">,</span> <span class="n">baseline</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return score summaries and paired deltas from the baseline."""</span>
+    <span class="n">overall</span> <span class="o">=</span> <span class="n">metrics</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">metrics</span><span class="o">.</span><span class="n">scope</span> <span class="o">==</span> <span class="s2">"overall"</span><span class="p">]</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">"score"</span><span class="p">)</span>
+    <span class="n">samples</span> <span class="o">=</span> <span class="n">metrics</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">metrics</span><span class="o">.</span><span class="n">scope</span> <span class="o">==</span> <span class="s2">"sample"</span><span class="p">]</span>
+    <span class="n">macro</span> <span class="o">=</span> <span class="n">samples</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"score"</span><span class="p">)[</span>
+        <span class="p">[</span><span class="s2">"roc_auc"</span><span class="p">,</span> <span class="s2">"pr_auc"</span><span class="p">,</span> <span class="s2">"ppv_at_n"</span><span class="p">,</span> <span class="s2">"concordance"</span><span class="p">]</span>
+    <span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">add_prefix</span><span class="p">(</span><span class="s2">"macro_"</span><span class="p">)</span>
+    <span class="n">summary</span> <span class="o">=</span> <span class="n">overall</span><span class="p">[[</span>
+        <span class="s2">"n"</span><span class="p">,</span> <span class="s2">"n_pos"</span><span class="p">,</span> <span class="s2">"roc_auc"</span><span class="p">,</span> <span class="s2">"pr_auc"</span><span class="p">,</span> <span class="s2">"ppv_at_n"</span><span class="p">,</span> <span class="s2">"concordance"</span><span class="p">,</span>
+    <span class="p">]]</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">macro</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">baseline</span> <span class="ow">not</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">score</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unknown baseline score: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">baseline</span><span class="p">)</span>
+    <span class="n">baseline_row</span> <span class="o">=</span> <span class="n">summary</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">"score"</span><span class="p">)</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">baseline</span><span class="p">]</span>
+    <span class="n">comparisons</span> <span class="o">=</span> <span class="n">summary</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="s2">"roc_auc"</span><span class="p">,</span> <span class="s2">"pr_auc"</span><span class="p">,</span> <span class="s2">"ppv_at_n"</span><span class="p">,</span> <span class="s2">"concordance"</span><span class="p">,</span>
+            <span class="s2">"macro_roc_auc"</span><span class="p">,</span> <span class="s2">"macro_pr_auc"</span><span class="p">,</span> <span class="s2">"macro_ppv_at_n"</span><span class="p">,</span>
+            <span class="s2">"macro_concordance"</span><span class="p">):</span>
+        <span class="n">comparisons</span><span class="p">[</span><span class="n">column</span> <span class="o">+</span> <span class="s2">"_diff"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">comparisons</span><span class="p">[</span><span class="n">column</span><span class="p">]</span> <span class="o">-</span> <span class="n">baseline_row</span><span class="p">[</span><span class="n">column</span><span class="p">])</span>
+    <span class="n">comparisons</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">"baseline"</span><span class="p">,</span> <span class="n">baseline</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">summary</span><span class="p">,</span> <span class="n">comparisons</span></div>
+
+
+
+<div class="viewcode-block" id="run">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.processing_affinity_control.run">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Run affinity-controlled processing evaluation."""</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">)</span>
+    <span class="n">out</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">cohort</span><span class="p">,</span> <span class="n">new_score_sources</span> <span class="o">=</span> <span class="n">_load_scores</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">score</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">existing</span><span class="p">:</span>
+        <span class="n">extended</span> <span class="o">=</span> <span class="n">_extend_existing</span><span class="p">(</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">existing</span><span class="p">,</span> <span class="n">cohort</span><span class="p">,</span> <span class="n">new_score_sources</span><span class="p">)</span>
+        <span class="n">attached</span> <span class="o">=</span> <span class="n">extended</span><span class="p">[</span><span class="s2">"heldout"</span><span class="p">]</span>
+        <span class="n">matched</span> <span class="o">=</span> <span class="n">extended</span><span class="p">[</span><span class="s2">"matched"</span><span class="p">]</span>
+        <span class="n">score_sources</span> <span class="o">=</span> <span class="n">extended</span><span class="p">[</span><span class="s2">"score_sources"</span><span class="p">]</span>
+        <span class="n">affinity_sources</span> <span class="o">=</span> <span class="n">extended</span><span class="p">[</span><span class="s2">"affinity_sources"</span><span class="p">]</span>
+        <span class="n">diagnostics</span> <span class="o">=</span> <span class="n">extended</span><span class="p">[</span><span class="s2">"diagnostics"</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">score_sources</span> <span class="o">=</span> <span class="n">new_score_sources</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">baseline</span> <span class="ow">not</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="n">source</span><span class="p">[</span><span class="s2">"name"</span><span class="p">]</span> <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="n">score_sources</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"--baseline is not one of the named --score values"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">existing</span><span class="p">:</span>
+        <span class="n">attached</span><span class="p">,</span> <span class="n">affinity_sources</span> <span class="o">=</span> <span class="n">_attach_affinity</span><span class="p">(</span><span class="n">cohort</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">data_dir</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">affinity_cache</span><span class="p">)</span>
+        <span class="n">matched</span><span class="p">,</span> <span class="n">diagnostics</span> <span class="o">=</span> <span class="n">make_affinity_controlled_risk_sets</span><span class="p">(</span>
+            <span class="n">attached</span><span class="p">,</span>
+            <span class="n">decoys_per_hit</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">decoys_per_hit</span><span class="p">,</span>
+            <span class="n">same_protein_caliper</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">same_protein_caliper</span><span class="p">,</span>
+            <span class="n">random_seed</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">random_seed</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="n">score_columns</span> <span class="o">=</span> <span class="p">[</span><span class="n">source</span><span class="p">[</span><span class="s2">"name"</span><span class="p">]</span> <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="n">score_sources</span><span class="p">]</span>
+    <span class="n">metrics</span> <span class="o">=</span> <span class="n">score_risk_sets</span><span class="p">(</span><span class="n">matched</span><span class="p">,</span> <span class="n">score_columns</span><span class="p">)</span>
+    <span class="n">summary</span><span class="p">,</span> <span class="n">comparisons</span> <span class="o">=</span> <span class="n">summarize_metrics</span><span class="p">(</span><span class="n">metrics</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">baseline</span><span class="p">)</span>
+
+    <span class="c1"># Preserve the complete, ordered held-out cohort as the canonical join</span>
+    <span class="c1"># surface for external predictors. The matched table selects only a subset</span>
+    <span class="c1"># of the negatives and therefore cannot serve that purpose on its own.</span>
+    <span class="n">attached</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">out</span> <span class="o">/</span> <span class="s2">"heldout_predictions.csv.bz2"</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">matched</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">out</span> <span class="o">/</span> <span class="s2">"matched_predictions.csv.bz2"</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">metrics</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">out</span> <span class="o">/</span> <span class="s2">"metrics.csv"</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">summary</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">out</span> <span class="o">/</span> <span class="s2">"summary.csv"</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">comparisons</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">out</span> <span class="o">/</span> <span class="s2">"comparisons.csv"</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">configuration</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"design"</span><span class="p">:</span> <span class="s2">"processing-affinity-controlled-risk-sets-v2"</span><span class="p">,</span>
+        <span class="s2">"score_sources"</span><span class="p">:</span> <span class="n">score_sources</span><span class="p">,</span>
+        <span class="s2">"affinity_sources"</span><span class="p">:</span> <span class="n">affinity_sources</span><span class="p">,</span>
+        <span class="s2">"baseline"</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">baseline</span><span class="p">,</span>
+        <span class="s2">"data_dir"</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">data_dir</span><span class="p">)</span> <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">data_dir</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">"diagnostics"</span><span class="p">:</span> <span class="n">diagnostics</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">existing</span><span class="p">:</span>
+        <span class="n">configuration</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+            <span class="s2">"extended_from"</span><span class="p">:</span> <span class="n">extended</span><span class="p">[</span><span class="s2">"existing_experiment"</span><span class="p">],</span>
+            <span class="s2">"extended_from_sha256"</span><span class="p">:</span> <span class="n">extended</span><span class="p">[</span>
+                <span class="s2">"existing_experiment_sha256"</span><span class="p">],</span>
+        <span class="p">})</span>
+    <span class="p">(</span><span class="n">out</span> <span class="o">/</span> <span class="s2">"experiment.json"</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">configuration</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">to_string</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Wrote </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">out</span><span class="p">)</span>
+    <span class="k">return</span> <span class="mi">0</span></div>
+
+
+
+<div class="viewcode-block" id="run_argv">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.processing_affinity_control.run_argv">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_argv</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prog</span><span class="o">=</span><span class="s2">"mhcflurry eval processing-affinity-control"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Parse arguments and run the command."""</span>
+    <span class="k">return</span> <span class="n">run</span><span class="p">(</span><span class="n">make_parser</span><span class="p">(</span><span class="n">prog</span><span class="p">)</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">))</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,403 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.peptide_reference &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.peptide_reference</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.peptide_reference</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Helpers for matching observed peptides to reference proteins."""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">collections</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tqdm</span>
+
+<span class="n">tqdm</span><span class="o">.</span><span class="n">monitor_interval</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># see https://github.com/tqdm/tqdm/issues/481</span>
+
+
+<div class="viewcode-block" id="normalize_reference_dataframe">
+<a class="viewcode-back" href="../../api.html#mhcflurry.peptide_reference.normalize_reference_dataframe">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">normalize_reference_dataframe</span><span class="p">(</span><span class="n">reference_df</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return reference proteins indexed by accession."""</span>
+    <span class="k">if</span> <span class="s2">"accession"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">reference_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">reference_df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"accession"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">reference_df</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Expected reference_df to include an accession column"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">reference_df</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">"accession"</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="annotate_peptide_references">
+<a class="viewcode-back" href="../../api.html#mhcflurry.peptide_reference.annotate_peptide_references">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">annotate_peptide_references</span><span class="p">(</span>
+        <span class="n">peptide_df</span><span class="p">,</span>
+        <span class="n">reference_df</span><span class="p">,</span>
+        <span class="n">flanking_length</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
+        <span class="n">debug_max_rows</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Annotate peptides with matching reference proteins and flanks.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    peptide_df : pandas.DataFrame</span>
+<span class="sd">        DataFrame with a ``peptide`` column. Its index is carried into the</span>
+<span class="sd">        output as ``hit_id``.</span>
+<span class="sd">    reference_df : pandas.DataFrame</span>
+<span class="sd">        DataFrame with protein ``accession`` and ``seq`` columns.</span>
+<span class="sd">    flanking_length : int</span>
+<span class="sd">        Number of residues to include on each side of the peptide.</span>
+<span class="sd">    debug_max_rows : int, optional</span>
+<span class="sd">        Stop building annotations after this many reference rows have been</span>
+<span class="sd">        produced. Intended only for generation-script debugging.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    pandas.DataFrame</span>
+<span class="sd">        Original peptide rows joined to their reference protein annotations.</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="n">_annotate_peptide_references</span><span class="p">(</span>
+        <span class="n">peptide_df</span><span class="p">,</span>
+        <span class="n">reference_df</span><span class="p">,</span>
+        <span class="n">flanking_length</span><span class="o">=</span><span class="n">flanking_length</span><span class="p">,</span>
+        <span class="n">debug_max_rows</span><span class="o">=</span><span class="n">debug_max_rows</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="s2">"auto"</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_annotate_peptide_references</span><span class="p">(</span>
+        <span class="n">peptide_df</span><span class="p">,</span>
+        <span class="n">reference_df</span><span class="p">,</span>
+        <span class="n">flanking_length</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
+        <span class="n">debug_max_rows</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="s2">"auto"</span><span class="p">):</span>
+    <span class="n">reference_df</span> <span class="o">=</span> <span class="n">normalize_reference_dataframe</span><span class="p">(</span><span class="n">reference_df</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">"seq"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">reference_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Expected reference_df to include a seq column"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">"peptide"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">peptide_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Expected peptide_df to include a peptide column"</span><span class="p">)</span>
+
+    <span class="n">peptides</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">peptide_df</span><span class="o">.</span><span class="n">peptide</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Unique peptides"</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">))</span>
+    <span class="n">occurrences</span> <span class="o">=</span> <span class="n">_find_peptide_occurrences</span><span class="p">(</span>
+        <span class="n">peptides</span><span class="p">,</span>
+        <span class="n">reference_df</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="n">backend</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Peptides with protein matches"</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">occurrences</span><span class="p">))</span>
+
+    <span class="n">join_df</span> <span class="o">=</span> <span class="n">_build_join_dataframe</span><span class="p">(</span>
+        <span class="n">peptide_df</span><span class="p">,</span>
+        <span class="n">reference_df</span><span class="p">,</span>
+        <span class="n">occurrences</span><span class="p">,</span>
+        <span class="n">flanking_length</span><span class="p">,</span>
+        <span class="n">debug_max_rows</span><span class="p">)</span>
+
+    <span class="n">join_df</span><span class="p">[</span><span class="s2">"protein_accession"</span><span class="p">]</span> <span class="o">=</span> <span class="n">join_df</span><span class="o">.</span><span class="n">match_index</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+        <span class="n">reference_df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">to_series</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+
+    <span class="k">del</span> <span class="n">join_df</span><span class="p">[</span><span class="s2">"match_index"</span><span class="p">]</span>
+
+    <span class="n">protein_cols</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">reference_df</span><span class="o">.</span><span class="n">columns</span>
+        <span class="k">if</span> <span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"name"</span><span class="p">,</span> <span class="s2">"description"</span><span class="p">,</span> <span class="s2">"seq"</span><span class="p">]</span>
+    <span class="p">]</span>
+    <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">protein_cols</span><span class="p">:</span>
+        <span class="n">join_df</span><span class="p">[</span><span class="s2">"protein_</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">join_df</span><span class="o">.</span><span class="n">protein_accession</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+            <span class="n">reference_df</span><span class="p">[</span><span class="n">col</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">pandas</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span>
+        <span class="n">join_df</span><span class="p">,</span>
+        <span class="n">peptide_df</span><span class="p">,</span>
+        <span class="n">how</span><span class="o">=</span><span class="s2">"left"</span><span class="p">,</span>
+        <span class="n">left_on</span><span class="o">=</span><span class="s2">"hit_id"</span><span class="p">,</span>
+        <span class="n">right_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_non_overlapping_starts</span><span class="p">(</span><span class="n">starts</span><span class="p">,</span> <span class="n">peptide_length</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Match legacy ``re.finditer(peptide, seq)`` semantics."""</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">next_allowed_start</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">start</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">starts</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">start</span> <span class="o">&gt;=</span> <span class="n">next_allowed_start</span><span class="p">:</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">start</span><span class="p">)</span>
+            <span class="n">next_allowed_start</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">peptide_length</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_normalize_occurrences</span><span class="p">(</span><span class="n">occurrences</span><span class="p">):</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">peptide</span><span class="p">,</span> <span class="n">protein_to_starts</span> <span class="ow">in</span> <span class="n">occurrences</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">peptide_length</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptide</span><span class="p">)</span>
+        <span class="n">normalized</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">protein_idx</span><span class="p">,</span> <span class="n">starts</span> <span class="ow">in</span> <span class="n">protein_to_starts</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">starts</span> <span class="o">=</span> <span class="n">_non_overlapping_starts</span><span class="p">(</span><span class="n">starts</span><span class="p">,</span> <span class="n">peptide_length</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">starts</span><span class="p">:</span>
+                <span class="n">normalized</span><span class="p">[</span><span class="n">protein_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">starts</span>
+        <span class="k">if</span> <span class="n">normalized</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">peptide</span><span class="p">]</span> <span class="o">=</span> <span class="n">normalized</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_find_occurrences_sliding</span><span class="p">(</span><span class="n">peptides</span><span class="p">,</span> <span class="n">reference_df</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Pure-Python fallback: scan each protein by observed peptide length."""</span>
+    <span class="n">peptides_by_length</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">set</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">peptide</span> <span class="ow">in</span> <span class="n">peptides</span><span class="p">:</span>
+        <span class="n">peptides_by_length</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">peptide</span><span class="p">)]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">peptide</span><span class="p">)</span>
+    <span class="n">length_sets</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">peptides_by_length</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
+
+    <span class="n">occurrences</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">protein_idx</span><span class="p">,</span> <span class="n">seq</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span>
+            <span class="nb">enumerate</span><span class="p">(</span><span class="n">reference_df</span><span class="o">.</span><span class="n">seq</span><span class="p">),</span>
+            <span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">reference_df</span><span class="p">),</span>
+            <span class="n">desc</span><span class="o">=</span><span class="s2">"Scanning proteins"</span><span class="p">):</span>
+        <span class="n">seq_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">seq</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">length</span><span class="p">,</span> <span class="n">length_peptides</span> <span class="ow">in</span> <span class="n">length_sets</span><span class="p">:</span>
+            <span class="n">stop</span> <span class="o">=</span> <span class="n">seq_len</span> <span class="o">-</span> <span class="n">length</span> <span class="o">+</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">stop</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">for</span> <span class="n">start</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">stop</span><span class="p">):</span>
+                <span class="n">peptide</span> <span class="o">=</span> <span class="n">seq</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">start</span> <span class="o">+</span> <span class="n">length</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">peptide</span> <span class="ow">in</span> <span class="n">length_peptides</span><span class="p">:</span>
+                    <span class="n">occurrences</span><span class="p">[</span><span class="n">peptide</span><span class="p">][</span><span class="n">protein_idx</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">start</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_normalize_occurrences</span><span class="p">(</span><span class="n">occurrences</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_find_occurrences_ahocorasick</span><span class="p">(</span><span class="n">peptides</span><span class="p">,</span> <span class="n">reference_df</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Use Rust-backed Aho-Corasick exact matching."""</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">ahocorasick_rs</span>
+
+    <span class="n">peptides</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
+    <span class="n">automaton</span> <span class="o">=</span> <span class="n">ahocorasick_rs</span><span class="o">.</span><span class="n">AhoCorasick</span><span class="p">(</span>
+        <span class="n">peptides</span><span class="p">,</span>
+        <span class="n">matchkind</span><span class="o">=</span><span class="n">ahocorasick_rs</span><span class="o">.</span><span class="n">MATCHKIND_STANDARD</span><span class="p">)</span>
+
+    <span class="n">occurrences</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">protein_idx</span><span class="p">,</span> <span class="n">seq</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span>
+            <span class="nb">enumerate</span><span class="p">(</span><span class="n">reference_df</span><span class="o">.</span><span class="n">seq</span><span class="p">),</span>
+            <span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">reference_df</span><span class="p">),</span>
+            <span class="n">desc</span><span class="o">=</span><span class="s2">"Scanning proteins"</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">pattern_idx</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="ow">in</span> <span class="n">automaton</span><span class="o">.</span><span class="n">find_matches_as_indexes</span><span class="p">(</span>
+                <span class="n">seq</span><span class="p">,</span>
+                <span class="n">overlapping</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="n">peptide</span> <span class="o">=</span> <span class="n">peptides</span><span class="p">[</span><span class="n">pattern_idx</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">end</span> <span class="o">-</span> <span class="n">start</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptide</span><span class="p">):</span>
+                <span class="n">occurrences</span><span class="p">[</span><span class="n">peptide</span><span class="p">][</span><span class="n">protein_idx</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">start</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_normalize_occurrences</span><span class="p">(</span><span class="n">occurrences</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_find_peptide_occurrences</span><span class="p">(</span><span class="n">peptides</span><span class="p">,</span> <span class="n">reference_df</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">"auto"</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">backend</span> <span class="o">==</span> <span class="s2">"auto"</span><span class="p">:</span>
+        <span class="n">backend</span> <span class="o">=</span> <span class="s2">"ahocorasick"</span>
+
+    <span class="k">if</span> <span class="n">backend</span> <span class="o">==</span> <span class="s2">"ahocorasick"</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Using ahocorasick-rs peptide reference lookup"</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">_find_occurrences_ahocorasick</span><span class="p">(</span><span class="n">peptides</span><span class="p">,</span> <span class="n">reference_df</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">backend</span> <span class="o">==</span> <span class="s2">"sliding"</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Using sliding-window peptide reference lookup"</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">_find_occurrences_sliding</span><span class="p">(</span><span class="n">peptides</span><span class="p">,</span> <span class="n">reference_df</span><span class="p">)</span>
+
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unsupported peptide reference backend: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">backend</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_build_join_dataframe</span><span class="p">(</span>
+        <span class="n">peptide_df</span><span class="p">,</span>
+        <span class="n">reference_df</span><span class="p">,</span>
+        <span class="n">occurrences</span><span class="p">,</span>
+        <span class="n">flanking_length</span><span class="p">,</span>
+        <span class="n">debug_max_rows</span><span class="p">):</span>
+    <span class="n">join_df</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span>
+            <span class="n">peptide_df</span><span class="o">.</span><span class="n">itertuples</span><span class="p">(),</span>
+            <span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">peptide_df</span><span class="p">),</span>
+            <span class="n">desc</span><span class="o">=</span><span class="s2">"Building annotations"</span><span class="p">):</span>
+        <span class="n">hit_id</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">Index</span>
+        <span class="n">peptide</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">peptide</span>
+        <span class="n">protein_to_starts</span> <span class="o">=</span> <span class="n">occurrences</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">peptide</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="k">for</span> <span class="n">match_index</span><span class="p">,</span> <span class="n">starts</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">protein_to_starts</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+            <span class="n">reference_row</span> <span class="o">=</span> <span class="n">reference_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">match_index</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">start</span> <span class="ow">in</span> <span class="n">starts</span><span class="p">:</span>
+                <span class="n">end_pos</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptide</span><span class="p">)</span>
+                <span class="n">n_flank</span> <span class="o">=</span> <span class="n">reference_row</span><span class="o">.</span><span class="n">seq</span><span class="p">[</span>
+                    <span class="nb">max</span><span class="p">(</span><span class="n">start</span> <span class="o">-</span> <span class="n">flanking_length</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span> <span class="n">start</span>
+                <span class="p">]</span><span class="o">.</span><span class="n">rjust</span><span class="p">(</span><span class="n">flanking_length</span><span class="p">,</span> <span class="s2">"X"</span><span class="p">)</span>
+                <span class="n">c_flank</span> <span class="o">=</span> <span class="n">reference_row</span><span class="o">.</span><span class="n">seq</span><span class="p">[</span>
+                    <span class="n">end_pos</span><span class="p">:</span> <span class="p">(</span><span class="n">end_pos</span> <span class="o">+</span> <span class="n">flanking_length</span><span class="p">)</span>
+                <span class="p">]</span><span class="o">.</span><span class="n">ljust</span><span class="p">(</span><span class="n">flanking_length</span><span class="p">,</span> <span class="s2">"X"</span><span class="p">)</span>
+                <span class="n">join_df</span><span class="o">.</span><span class="n">append</span><span class="p">((</span>
+                    <span class="n">hit_id</span><span class="p">,</span>
+                    <span class="n">match_index</span><span class="p">,</span>
+                    <span class="nb">len</span><span class="p">(</span><span class="n">protein_to_starts</span><span class="p">),</span>
+                    <span class="nb">len</span><span class="p">(</span><span class="n">starts</span><span class="p">),</span>
+                    <span class="n">start</span><span class="p">,</span>
+                    <span class="n">start</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">reference_row</span><span class="o">.</span><span class="n">seq</span><span class="p">),</span>
+                    <span class="n">n_flank</span><span class="p">,</span>
+                    <span class="n">c_flank</span><span class="p">,</span>
+                <span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">debug_max_rows</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">join_df</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">debug_max_rows</span><span class="p">:</span>
+            <span class="k">break</span>
+
+    <span class="k">return</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+        <span class="n">join_df</span><span class="p">,</span>
+        <span class="n">columns</span><span class="o">=</span><span class="p">[</span>
+            <span class="s2">"hit_id"</span><span class="p">,</span>
+            <span class="s2">"match_index"</span><span class="p">,</span>
+            <span class="s2">"num_proteins"</span><span class="p">,</span>
+            <span class="s2">"num_occurrences_in_protein"</span><span class="p">,</span>
+            <span class="s2">"start_position"</span><span class="p">,</span>
+            <span class="s2">"start_fraction_in_protein"</span><span class="p">,</span>
+            <span class="s2">"n_flank"</span><span class="p">,</span>
+            <span class="s2">"c_flank"</span><span class="p">,</span>
+        <span class="p">])</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

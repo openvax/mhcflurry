@@ -1,0 +1,503 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.dla_evaluation &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.dla_evaluation</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.dla_evaluation</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Reproduce the exploratory DLA audit of Kaabinejadian et al. (PMID 42199926)."""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">Counter</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">importlib.metadata</span><span class="w"> </span><span class="kn">import</span> <span class="n">version</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.allele_capabilities</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">BUNDLED_TRAINING_TABLES</span><span class="p">,</span> <span class="n">capability_report</span><span class="p">,</span> <span class="n">generator_metadata</span><span class="p">,</span> <span class="n">model_fingerprint</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.amino_acid</span><span class="w"> </span><span class="kn">import</span> <span class="n">COMMON_AMINO_ACIDS</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">normalize_sequence_resolved_allele_name</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.sample_disjointness</span><span class="w"> </span><span class="kn">import</span> <span class="n">audit_samples</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.training_provenance</span><span class="w"> </span><span class="kn">import</span> <span class="n">file_sha256</span>
+
+
+<span class="n">STUDY</span> <span class="o">=</span> <span class="s2">"pmid:42199926"</span>
+<span class="n">SOURCE_URL</span> <span class="o">=</span> <span class="s2">"https://ars.els-cdn.com/content/image/1-s2.0-S2589004226013507-"</span>
+<span class="c1"># SHA-256 of the original workbooks, also checked against the MD5 values in</span>
+<span class="c1"># PMC13200046's full-text XML. Only the original observation sheets are used.</span>
+<span class="n">WORKBOOK_SHA256</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"mmc2.xlsx"</span><span class="p">:</span> <span class="s2">"8a80e7eda8749cb60a79b78baf7d43e02f4edab25db600132a1aa3d073b73e1b"</span><span class="p">,</span>
+    <span class="s2">"mmc3.xlsx"</span><span class="p">:</span> <span class="s2">"a87ff80df3ee7179b0bdc86c5fc49b00ad2c89cb40ca73133b97dc746096c25b"</span><span class="p">,</span>
+    <span class="s2">"mmc4.xlsx"</span><span class="p">:</span> <span class="s2">"32eda8030256186a2c89df7bd58836d9e65ff5f060e1f1763673f92fed1f4052"</span><span class="p">,</span>
+    <span class="s2">"mmc5.xlsx"</span><span class="p">:</span> <span class="s2">"c76b3712e2840f153812b4c3c3f84ec40040e224d7caf829a8563c677f0727ec"</span><span class="p">,</span>
+    <span class="s2">"mmc6.xlsx"</span><span class="p">:</span> <span class="s2">"62248335784c8958333b2ce917e13a901e9b731577a78a13452b6349185d763a"</span><span class="p">,</span>
+    <span class="s2">"mmc7.xlsx"</span><span class="p">:</span> <span class="s2">"2992966f4b9e1901cfc11bd6c75ed3bc2439d69dea529491434c2e3cd0cfdb30"</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="c1"># Table 1 describes genotype, not experimentally assigned peptide restrictions.</span>
+<span class="n">TUMORS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"mmc3.xlsx"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"Lola"</span><span class="p">,</span> <span class="s2">"H58A"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"DLA-88*501:01"</span><span class="p">]),</span>
+    <span class="s2">"mmc4.xlsx"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"Lola"</span><span class="p">,</span> <span class="s2">"BB7.6"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"DLA-88*501:01"</span><span class="p">]),</span>
+    <span class="s2">"mmc5.xlsx"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"163828A"</span><span class="p">,</span> <span class="s2">"BB7.6"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"DLA-88*004:02"</span><span class="p">]),</span>
+    <span class="s2">"mmc6.xlsx"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"Lily"</span><span class="p">,</span> <span class="s2">"H58A"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"DLA-88*004:02"</span><span class="p">,</span> <span class="s2">"DLA-88*501:01"</span><span class="p">,</span> <span class="s2">"DLA-88*501:02"</span><span class="p">]),</span>
+    <span class="s2">"mmc7.xlsx"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"Bogey"</span><span class="p">,</span> <span class="s2">"BB7.6"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"DLA-88*003:02"</span><span class="p">,</span> <span class="s2">"DLA-88*017:01"</span><span class="p">,</span> <span class="s2">"DLA-88*006:01"</span><span class="p">]),</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="prepare_observations">
+<a class="viewcode-back" href="../../api.html#mhcflurry.dla_evaluation.prepare_observations">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">prepare_observations</span><span class="p">(</span><span class="n">supplements_dir</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Read checksum-pinned original sheets; retain source rows and all lengths.</span>
+
+<span class="sd">    Requires the optional ``openpyxl`` Excel reader. No workbook is modified.</span>
+<span class="sd">    Lola's two antibody captures retain one biological sample identity. All</span>
+<span class="sd">    HCT116 transductants share their parental biological sample identity.</span>
+<span class="sd">    """</span>
+    <span class="n">records</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">filename</span><span class="p">,</span> <span class="n">expected</span> <span class="ow">in</span> <span class="n">WORKBOOK_SHA256</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">supplements_dir</span><span class="p">)</span> <span class="o">/</span> <span class="n">filename</span>
+        <span class="k">if</span> <span class="n">file_sha256</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">!=</span> <span class="n">expected</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Supplement checksum mismatch: </span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">sheets</span> <span class="o">=</span> <span class="p">([</span><span class="sa">f</span><span class="s2">"DLA-88-</span><span class="si">{</span><span class="n">code</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">code</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"00302"</span><span class="p">,</span> <span class="s2">"01201"</span><span class="p">,</span> <span class="s2">"50101"</span><span class="p">)]</span>
+                  <span class="k">if</span> <span class="n">filename</span> <span class="o">==</span> <span class="s2">"mmc2.xlsx"</span> <span class="k">else</span> <span class="p">[</span><span class="s2">"All Peptides"</span><span class="p">])</span>
+        <span class="k">for</span> <span class="n">sheet</span> <span class="ow">in</span> <span class="n">sheets</span><span class="p">:</span>
+            <span class="n">frame</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_excel</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">sheet_name</span><span class="o">=</span><span class="n">sheet</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">"openpyxl"</span><span class="p">)</span>
+            <span class="n">frame</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s2">"Peptides"</span><span class="p">:</span> <span class="s2">"Peptide"</span><span class="p">})</span>
+            <span class="k">for</span> <span class="n">offset</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">frame</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+                <span class="n">peptide</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">Peptide</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">peptide</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">peptide</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptide</span><span class="p">)</span> <span class="o">!=</span> <span class="n">row</span><span class="o">.</span><span class="n">Length</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Invalid peptide/length at </span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">sheet</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">offset</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">3</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">filename</span> <span class="o">==</span> <span class="s2">"mmc2.xlsx"</span><span class="p">:</span>
+                    <span class="n">code</span> <span class="o">=</span> <span class="n">sheet</span><span class="o">.</span><span class="n">removeprefix</span><span class="p">(</span><span class="s2">"DLA-88-"</span><span class="p">)</span>
+                    <span class="n">assigned</span> <span class="o">=</span> <span class="n">normalize_sequence_resolved_allele_name</span><span class="p">(</span><span class="sa">f</span><span class="s2">"DLA-88*</span><span class="si">{</span><span class="n">code</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">code</span><span class="p">[</span><span class="mi">3</span><span class="p">:]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+                    <span class="n">sample</span><span class="p">,</span> <span class="n">antibody</span><span class="p">,</span> <span class="n">genotype</span> <span class="o">=</span> <span class="s2">"HCT116"</span><span class="p">,</span> <span class="s2">"BB7.6"</span><span class="p">,</span> <span class="p">[</span><span class="n">assigned</span><span class="p">]</span>
+                    <span class="n">arm</span><span class="p">,</span> <span class="n">host</span> <span class="o">=</span> <span class="s2">"human_host_monoallelic"</span><span class="p">,</span> <span class="s2">"Homo sapiens"</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">sample</span><span class="p">,</span> <span class="n">antibody</span><span class="p">,</span> <span class="n">genotype</span> <span class="o">=</span> <span class="n">TUMORS</span><span class="p">[</span><span class="n">filename</span><span class="p">]</span>
+                    <span class="n">assigned</span><span class="p">,</span> <span class="n">arm</span><span class="p">,</span> <span class="n">host</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span> <span class="s2">"canine_tumor"</span><span class="p">,</span> <span class="s2">"Canis lupus familiaris"</span>
+                <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s2">"study_id"</span><span class="p">:</span> <span class="n">STUDY</span><span class="p">,</span> <span class="s2">"sample_id"</span><span class="p">:</span> <span class="n">sample</span><span class="p">,</span> <span class="s2">"arm"</span><span class="p">:</span> <span class="n">arm</span><span class="p">,</span>
+                    <span class="s2">"capture_id"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">sheet</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="s2">"antibody"</span><span class="p">:</span> <span class="n">antibody</span><span class="p">,</span>
+                    <span class="s2">"peptide"</span><span class="p">:</span> <span class="n">peptide</span><span class="p">,</span> <span class="s2">"length"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptide</span><span class="p">),</span> <span class="s2">"hit"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+                    <span class="s2">"assigned_allele"</span><span class="p">:</span> <span class="n">assigned</span><span class="p">,</span> <span class="s2">"genotype"</span><span class="p">:</span> <span class="s2">" "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">genotype</span><span class="p">),</span>
+                    <span class="s2">"mhc_species"</span><span class="p">:</span> <span class="s2">"Canis lupus familiaris"</span><span class="p">,</span> <span class="s2">"source_species"</span><span class="p">:</span> <span class="n">host</span><span class="p">,</span>
+                    <span class="s2">"host_species"</span><span class="p">:</span> <span class="n">host</span><span class="p">,</span> <span class="s2">"source_accessions"</span><span class="p">:</span> <span class="n">row</span><span class="o">.</span><span class="n">Accession</span><span class="p">,</span>
+                    <span class="s2">"source_file"</span><span class="p">:</span> <span class="n">filename</span><span class="p">,</span> <span class="s2">"source_sheet"</span><span class="p">:</span> <span class="n">sheet</span><span class="p">,</span> <span class="s2">"source_excel_row"</span><span class="p">:</span> <span class="n">offset</span> <span class="o">+</span> <span class="mi">3</span><span class="p">,</span>
+                <span class="p">})</span>
+    <span class="k">return</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">records</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="peptide_overlap">
+<a class="viewcode-back" href="../../api.html#mhcflurry.dla_evaluation.peptide_overlap">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">peptide_overlap</span><span class="p">(</span><span class="n">cohort</span><span class="p">,</span> <span class="n">source_paths</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Audit all source rows/alleles/labels against exact and I/L-folded strings.</span>
+
+<span class="sd">    The returned row flags do not assert common study, donor or peptide–MHC</span>
+<span class="sd">    identity. Absence from these tables cannot certify complete lineage.</span>
+<span class="sd">    """</span>
+    <span class="n">flags</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="n">cohort</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+    <span class="n">report</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">source_paths</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">peptides</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s2">"peptide"</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+                                     <span class="n">keep_default_na</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">chunksize</span><span class="o">=</span><span class="mi">100_000</span><span class="p">):</span>
+            <span class="n">peptides</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">chunk</span><span class="o">.</span><span class="n">peptide</span><span class="p">)</span>
+        <span class="n">folded</span> <span class="o">=</span> <span class="p">{</span><span class="n">p</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"I"</span><span class="p">,</span> <span class="s2">"L"</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">peptides</span><span class="p">}</span>
+        <span class="n">flags</span><span class="p">[</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_exact_overlap"</span><span class="p">]</span> <span class="o">=</span> <span class="n">cohort</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
+        <span class="n">flags</span><span class="p">[</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_il_overlap"</span><span class="p">]</span> <span class="o">=</span> <span class="n">cohort</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"I"</span><span class="p">,</span> <span class="s2">"L"</span><span class="p">)</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">folded</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">arm</span><span class="p">,</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">cohort</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"arm"</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="n">unique</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">frame</span><span class="o">.</span><span class="n">peptide</span><span class="p">)</span>
+            <span class="n">report</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s2">"source"</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span> <span class="s2">"source_sha256"</span><span class="p">:</span> <span class="n">file_sha256</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="s2">"arm"</span><span class="p">:</span> <span class="n">arm</span><span class="p">,</span>
+                <span class="s2">"unique_peptides"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">unique</span><span class="p">),</span> <span class="s2">"exact_overlap"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">unique</span> <span class="o">&amp;</span> <span class="n">peptides</span><span class="p">),</span>
+                <span class="s2">"il_overlap"</span><span class="p">:</span> <span class="nb">sum</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"I"</span><span class="p">,</span> <span class="s2">"L"</span><span class="p">)</span> <span class="ow">in</span> <span class="n">folded</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">unique</span><span class="p">),</span>
+                <span class="s2">"il_denominator"</span><span class="p">:</span> <span class="s2">"distinct original peptide strings"</span><span class="p">,</span>
+            <span class="p">})</span>
+    <span class="k">return</span> <span class="n">flags</span><span class="p">,</span> <span class="n">report</span></div>
+
+
+
+<div class="viewcode-block" id="observation_diagnostics">
+<a class="viewcode-back" href="../../api.html#mhcflurry.dla_evaluation.observation_diagnostics">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">observation_diagnostics</span><span class="p">(</span><span class="n">frame</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Report lengths and empirical 9-mer residue counts per capture.</span>
+
+<span class="sd">    Residue counts are descriptive motifs, without alignment or a background</span>
+<span class="sd">    enrichment claim. Tumor motifs remain unassigned to individual alleles.</span>
+<span class="sd">    """</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">capture</span><span class="p">,</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">frame</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"capture_id"</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="n">unique</span> <span class="o">=</span> <span class="n">group</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">(</span><span class="s2">"peptide"</span><span class="p">)</span>
+        <span class="n">nine</span> <span class="o">=</span> <span class="n">unique</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">unique</span><span class="o">.</span><span class="n">length</span><span class="o">.</span><span class="n">eq</span><span class="p">(</span><span class="mi">9</span><span class="p">),</span> <span class="s2">"peptide"</span><span class="p">]</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s2">"capture_id"</span><span class="p">:</span> <span class="n">capture</span><span class="p">,</span> <span class="s2">"arm"</span><span class="p">:</span> <span class="n">group</span><span class="o">.</span><span class="n">arm</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s2">"sample_id"</span><span class="p">:</span> <span class="n">group</span><span class="o">.</span><span class="n">sample_id</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="s2">"assigned_allele"</span><span class="p">:</span> <span class="n">group</span><span class="o">.</span><span class="n">assigned_allele</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">or</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s2">"observations"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">group</span><span class="p">),</span> <span class="s2">"unique_peptides"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">unique</span><span class="p">),</span>
+            <span class="s2">"length_counts"</span><span class="p">:</span> <span class="p">{</span><span class="nb">str</span><span class="p">(</span><span class="n">k</span><span class="p">):</span> <span class="nb">int</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">unique</span><span class="o">.</span><span class="n">length</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">sort_index</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">()},</span>
+            <span class="s2">"nine_mer_residue_counts"</span><span class="p">:</span> <span class="p">[</span><span class="nb">dict</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">Counter</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">nine</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">()))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">9</span><span class="p">)],</span>
+        <span class="p">})</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="score_observations">
+<a class="viewcode-back" href="../../api.html#mhcflurry.dla_evaluation.score_observations">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">score_observations</span><span class="p">(</span><span class="n">predictor</span><span class="p">,</span> <span class="n">frame</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Score fixed observations without inventing negatives or restrictions.</span>
+
+<span class="sd">    Binding is the predicted minimum IC50 across a sample's stated genotype.</span>
+<span class="sd">    The winning allele is explicitly a prediction. All genotype alleles must</span>
+<span class="sd">    be supported; unsupported lengths/identities remain missing with reasons.</span>
+<span class="sd">    Processing uses no flanks, because these observation sheets do not resolve</span>
+<span class="sd">    protein mappings sufficiently to select unique source flanks.</span>
+<span class="sd">    """</span>
+    <span class="n">scored</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"affinity"</span><span class="p">,</span> <span class="s2">"processing_score"</span><span class="p">,</span> <span class="s2">"presentation_score"</span><span class="p">):</span>
+        <span class="n">scored</span><span class="p">[</span><span class="n">column</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">nan</span>
+        <span class="n">scored</span><span class="p">[</span><span class="n">column</span> <span class="o">+</span> <span class="s2">"_status"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"unsupported_length"</span>
+    <span class="n">scored</span><span class="p">[</span><span class="s2">"predicted_best_allele"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">""</span>
+    <span class="n">affinity</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">affinity_predictor</span>
+    <span class="n">processing</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">processing_predictor_without_flanks</span>
+    <span class="n">low</span><span class="p">,</span> <span class="n">high</span> <span class="o">=</span> <span class="n">affinity</span><span class="o">.</span><span class="n">supported_peptide_lengths</span>
+    <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">frame</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"capture_id"</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="n">alleles</span> <span class="o">=</span> <span class="n">group</span><span class="o">.</span><span class="n">genotype</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+        <span class="n">valid_sequence</span> <span class="o">=</span> <span class="n">group</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="nb">set</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="nb">set</span><span class="p">(</span><span class="n">COMMON_AMINO_ACIDS</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"affinity"</span><span class="p">,</span> <span class="s2">"processing_score"</span><span class="p">,</span> <span class="s2">"presentation_score"</span><span class="p">):</span>
+            <span class="n">scored</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">group</span><span class="o">.</span><span class="n">index</span><span class="p">[</span><span class="o">~</span><span class="n">valid_sequence</span><span class="p">],</span> <span class="n">column</span> <span class="o">+</span> <span class="s2">"_status"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"unsupported_residue"</span>
+        <span class="n">candidates</span> <span class="o">=</span> <span class="n">group</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">valid_sequence</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">processing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">proc</span> <span class="o">=</span> <span class="n">candidates</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">candidates</span><span class="o">.</span><span class="n">length</span><span class="o">.</span><span class="n">between</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">processing</span><span class="o">.</span><span class="n">sequence_lengths</span><span class="p">[</span><span class="s2">"peptide"</span><span class="p">])]</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">proc</span><span class="p">):</span>
+                <span class="n">values</span> <span class="o">=</span> <span class="n">processing</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">proc</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">values</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Nonfinite processing predictions"</span><span class="p">)</span>
+                <span class="n">scored</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">proc</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="s2">"processing_score"</span><span class="p">]</span> <span class="o">=</span> <span class="n">values</span>
+                <span class="n">scored</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">proc</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="s2">"processing_score_status"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"executed"</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">scored</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">candidates</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="s2">"processing_score_status"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"component_unavailable"</span>
+        <span class="n">keys</span> <span class="o">=</span> <span class="p">[</span><span class="n">affinity</span><span class="o">.</span><span class="n">canonicalize_allele_name</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">alleles</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">keys</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span><span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">affinity</span><span class="o">.</span><span class="n">supported_alleles</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"affinity"</span><span class="p">,</span> <span class="s2">"presentation_score"</span><span class="p">):</span>
+                <span class="n">scored</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">candidates</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">column</span> <span class="o">+</span> <span class="s2">"_status"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"unsupported_genotype"</span>
+            <span class="k">continue</span>
+        <span class="n">binding</span> <span class="o">=</span> <span class="n">candidates</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">candidates</span><span class="o">.</span><span class="n">length</span><span class="o">.</span><span class="n">between</span><span class="p">(</span><span class="n">low</span><span class="p">,</span> <span class="n">high</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="n">binding</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">matrix</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">([</span><span class="n">affinity</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">binding</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span> <span class="n">allele</span><span class="o">=</span><span class="n">a</span><span class="p">)</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">])</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">matrix</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Nonfinite affinity predictions"</span><span class="p">)</span>
+        <span class="n">scored</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">binding</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="s2">"affinity"</span><span class="p">]</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">scored</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">binding</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="s2">"affinity_status"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"executed"</span>
+        <span class="n">scored</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">binding</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="s2">"predicted_best_allele"</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">keys</span><span class="p">)[</span><span class="n">matrix</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)]</span>
+        <span class="n">presentation</span> <span class="o">=</span> <span class="n">binding</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">scored</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">binding</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="s2">"processing_score"</span><span class="p">]</span><span class="o">.</span><span class="n">notna</span><span class="p">()]</span>
+        <span class="n">has_presentation</span> <span class="o">=</span> <span class="p">(</span><span class="n">processing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">predictor</span><span class="o">.</span><span class="n">weights_dataframe</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                            <span class="ow">and</span> <span class="s2">"without_flanks"</span> <span class="ow">in</span> <span class="n">predictor</span><span class="o">.</span><span class="n">weights_dataframe</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">has_presentation</span><span class="p">:</span>
+            <span class="n">scored</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">binding</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="s2">"presentation_score_status"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"component_unavailable"</span>
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">presentation</span><span class="p">):</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">presentation</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span> <span class="n">alleles</span><span class="o">=</span><span class="n">keys</span><span class="p">,</span>
+                                       <span class="n">include_affinity_percentile</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">values</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">presentation_score</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">values</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Nonfinite presentation predictions"</span><span class="p">)</span>
+            <span class="n">scored</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">presentation</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="s2">"presentation_score"</span><span class="p">]</span> <span class="o">=</span> <span class="n">values</span>
+            <span class="n">scored</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">presentation</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="s2">"presentation_score_status"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"executed"</span>
+    <span class="k">return</span> <span class="n">scored</span></div>
+
+
+
+<div class="viewcode-block" id="score_summary">
+<a class="viewcode-back" href="../../api.html#mhcflurry.dla_evaluation.score_summary">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">score_summary</span><span class="p">(</span><span class="n">scored</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">490</span><span class="p">,</span> <span class="n">bootstrap_replicates</span><span class="o">=</span><span class="mi">2000</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Summarize exploratory scores; bootstrap canine donors, never peptides.</span>
+
+<span class="sd">    Lola antibody captures are deduplicated within donor. Confidence intervals</span>
+<span class="sd">    describe the mean of donor medians, not accuracy or canine calibration.</span>
+<span class="sd">    There is no independent biological replicate for each monoallelic arm.</span>
+<span class="sd">    """</span>
+    <span class="n">summaries</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">capture</span><span class="p">,</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">scored</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"capture_id"</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="n">row</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"capture_id"</span><span class="p">:</span> <span class="n">capture</span><span class="p">}</span>
+        <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"affinity"</span><span class="p">,</span> <span class="s2">"processing_score"</span><span class="p">,</span> <span class="s2">"presentation_score"</span><span class="p">):</span>
+            <span class="n">values</span> <span class="o">=</span> <span class="n">group</span><span class="p">[</span><span class="n">column</span><span class="p">]</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+            <span class="n">row</span><span class="p">[</span><span class="n">column</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"executed_rows"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">values</span><span class="p">),</span> <span class="s2">"total_rows"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">group</span><span class="p">),</span>
+                           <span class="s2">"median"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">values</span><span class="o">.</span><span class="n">median</span><span class="p">())</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">values</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                           <span class="s2">"status_counts"</span><span class="p">:</span> <span class="p">{</span><span class="nb">str</span><span class="p">(</span><span class="n">k</span><span class="p">):</span> <span class="nb">int</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">group</span><span class="p">[</span><span class="n">column</span> <span class="o">+</span> <span class="s2">"_status"</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">()},</span>
+                           <span class="s2">"by_length"</span><span class="p">:</span> <span class="p">[</span>
+                               <span class="p">{</span><span class="s2">"length"</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">length</span><span class="p">),</span> <span class="s2">"total_rows"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">sub</span><span class="p">),</span>
+                                <span class="s2">"executed_rows"</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">sub</span><span class="p">[</span><span class="n">column</span><span class="p">]</span><span class="o">.</span><span class="n">notna</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()),</span>
+                                <span class="s2">"median"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">sub</span><span class="p">[</span><span class="n">column</span><span class="p">]</span><span class="o">.</span><span class="n">median</span><span class="p">())</span> <span class="k">if</span> <span class="n">sub</span><span class="p">[</span><span class="n">column</span><span class="p">]</span><span class="o">.</span><span class="n">notna</span><span class="p">()</span><span class="o">.</span><span class="n">any</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span><span class="p">}</span>
+                               <span class="k">for</span> <span class="n">length</span><span class="p">,</span> <span class="n">sub</span> <span class="ow">in</span> <span class="n">group</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"length"</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">True</span><span class="p">)]}</span>
+        <span class="n">summaries</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
+    <span class="n">canine</span> <span class="o">=</span> <span class="n">scored</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">scored</span><span class="o">.</span><span class="n">arm</span><span class="o">.</span><span class="n">eq</span><span class="p">(</span><span class="s2">"canine_tumor"</span><span class="p">)]</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">([</span><span class="s2">"sample_id"</span><span class="p">,</span> <span class="s2">"peptide"</span><span class="p">])</span>
+    <span class="n">bootstrap</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"affinity"</span><span class="p">,</span> <span class="s2">"processing_score"</span><span class="p">,</span> <span class="s2">"presentation_score"</span><span class="p">):</span>
+        <span class="n">medians</span> <span class="o">=</span> <span class="n">canine</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"sample_id"</span><span class="p">)[</span><span class="n">column</span><span class="p">]</span><span class="o">.</span><span class="n">median</span><span class="p">()</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+        <span class="n">bootstrap</span><span class="p">[</span><span class="n">column</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"donor_medians"</span><span class="p">:</span> <span class="n">medians</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span> <span class="s2">"mean_of_donor_medians"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                             <span class="s2">"percentile_95_ci"</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">medians</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">rng</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+            <span class="n">replicates</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">medians</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">bootstrap_replicates</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">medians</span><span class="p">)))</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">bootstrap</span><span class="p">[</span><span class="n">column</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">mean_of_donor_medians</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">medians</span><span class="o">.</span><span class="n">mean</span><span class="p">()),</span>
+                                     <span class="n">percentile_95_ci</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="n">replicates</span><span class="p">,</span> <span class="p">[</span><span class="mf">.025</span><span class="p">,</span> <span class="mf">.975</span><span class="p">])</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"captures"</span><span class="p">:</span> <span class="n">summaries</span><span class="p">,</span> <span class="s2">"canine_donor_bootstrap"</span><span class="p">:</span> <span class="n">bootstrap</span><span class="p">,</span>
+            <span class="s2">"seed"</span><span class="p">:</span> <span class="n">seed</span><span class="p">,</span> <span class="s2">"replicates"</span><span class="p">:</span> <span class="n">bootstrap_replicates</span><span class="p">,</span>
+            <span class="s2">"estimand"</span><span class="p">:</span> <span class="s2">"mean of within-donor medians on executable observed peptides; descriptive only"</span><span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="evaluate_dla">
+<a class="viewcode-back" href="../../api.html#mhcflurry.dla_evaluation.evaluate_dla">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">evaluate_dla</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">supplements_dir</span><span class="p">,</span> <span class="n">out_dir</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Write a frozen, conservative historical-bundle canine evaluation.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    models_dir : str or pathlib.Path</span>
+<span class="sd">        Frozen presentation bundle to evaluate, without changing its weights.</span>
+<span class="sd">    supplements_dir : str or pathlib.Path</span>
+<span class="sd">        Original mmc2.xlsx through mmc7.xlsx from PMID 42199926.</span>
+<span class="sd">    out_dir : str or pathlib.Path</span>
+<span class="sd">        New output directory for observations, scores, evidence and sample audit.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict</span>
+<span class="sd">        Exploratory report. Historical bundled training tables alone never</span>
+<span class="sd">        establish complete lineage; this recipe cannot certify a holdout.</span>
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.class1_presentation_predictor</span><span class="w"> </span><span class="kn">import</span> <span class="n">Class1PresentationPredictor</span>
+
+    <span class="n">directory</span><span class="p">,</span> <span class="n">models_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">out_dir</span><span class="p">),</span> <span class="n">Path</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">directory</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">FileExistsError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Output directory already exists: </span><span class="si">{</span><span class="n">directory</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">cohort</span> <span class="o">=</span> <span class="n">prepare_observations</span><span class="p">(</span><span class="n">supplements_dir</span><span class="p">)</span>
+    <span class="n">alleles</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">({</span><span class="n">a</span> <span class="k">for</span> <span class="n">genotype</span> <span class="ow">in</span> <span class="n">cohort</span><span class="o">.</span><span class="n">genotype</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">genotype</span><span class="o">.</span><span class="n">split</span><span class="p">()})</span>
+    <span class="n">capabilities</span> <span class="o">=</span> <span class="n">capability_report</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">alleles</span><span class="p">)</span>
+    <span class="n">paths</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">models_dir</span> <span class="o">/</span> <span class="n">filename</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">filename</span> <span class="ow">in</span> <span class="n">BUNDLED_TRAINING_TABLES</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+             <span class="k">if</span> <span class="p">(</span><span class="n">models_dir</span> <span class="o">/</span> <span class="n">filename</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">()}</span>
+    <span class="n">flags</span><span class="p">,</span> <span class="n">overlaps</span> <span class="o">=</span> <span class="n">peptide_overlap</span><span class="p">(</span><span class="n">cohort</span><span class="p">,</span> <span class="n">paths</span><span class="p">)</span>
+    <span class="n">predictor</span> <span class="o">=</span> <span class="n">Class1PresentationPredictor</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">models_dir</span><span class="p">))</span>
+    <span class="n">scored</span> <span class="o">=</span> <span class="n">score_observations</span><span class="p">(</span><span class="n">predictor</span><span class="p">,</span> <span class="n">cohort</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">flags</span><span class="p">)</span>
+    <span class="n">directory</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">cohort_path</span> <span class="o">=</span> <span class="n">directory</span> <span class="o">/</span> <span class="s2">"observations.csv.gz"</span>
+    <span class="n">cohort</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">cohort_path</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">compression</span><span class="o">=</span><span class="p">{</span><span class="s2">"method"</span><span class="p">:</span> <span class="s2">"gzip"</span><span class="p">,</span> <span class="s2">"mtime"</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>
+    <span class="n">scored</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">directory</span> <span class="o">/</span> <span class="s2">"scores.csv.gz"</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">compression</span><span class="o">=</span><span class="p">{</span><span class="s2">"method"</span><span class="p">:</span> <span class="s2">"gzip"</span><span class="p">,</span> <span class="s2">"mtime"</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>
+    <span class="c1"># Unknown stages are omitted deliberately; [] means reviewed as unused in</span>
+    <span class="c1"># the sample-audit contract. No biological sample IDs are invented for old</span>
+    <span class="c1"># deduplicated training rows, even when their measurement_source is known.</span>
+    <span class="n">inventory</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"schema_version"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="s2">"identity_review"</span><span class="p">:</span> <span class="s2">"Lola captures share one dog; all HCT116 transductants share a parental line. "</span>
+                           <span class="s2">"Historical source/study/sample identities remain unresolved."</span><span class="p">,</span>
+        <span class="s2">"models"</span><span class="p">:</span> <span class="p">[{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"evaluated-presentation-bundle"</span><span class="p">,</span> <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"presentation"</span><span class="p">,</span>
+                    <span class="s2">"artifacts"</span><span class="p">:</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">models_dir</span> <span class="o">/</span> <span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">capabilities</span><span class="p">[</span><span class="s2">"model"</span><span class="p">][</span><span class="s2">"files"</span><span class="p">]],</span>
+                    <span class="s2">"components"</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s2">"affinity"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"complete"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">"evidence"</span><span class="p">:</span> <span class="s2">"Bundled training snapshot only"</span><span class="p">,</span>
+                                     <span class="s2">"training"</span><span class="p">:</span> <span class="p">[{</span><span class="s2">"path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">p</span><span class="p">)}</span> <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">paths</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="s2">"affinity"</span><span class="p">]},</span>
+                        <span class="s2">"processing"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"complete"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">"evidence"</span><span class="p">:</span> <span class="s2">"Bundled training snapshots only"</span><span class="p">,</span>
+                                       <span class="s2">"training"</span><span class="p">:</span> <span class="p">[{</span><span class="s2">"path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">p</span><span class="p">)}</span> <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">paths</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">n</span> <span class="o">!=</span> <span class="s2">"affinity"</span><span class="p">]},</span>
+                        <span class="s2">"presentation"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"complete"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">"evidence"</span><span class="p">:</span> <span class="s2">"Training/selection sources unavailable"</span><span class="p">},</span>
+                    <span class="p">}}],</span>
+    <span class="p">}</span>
+    <span class="p">(</span><span class="n">directory</span> <span class="o">/</span> <span class="s2">"lineage.json"</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">inventory</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">audit</span> <span class="o">=</span> <span class="n">audit_samples</span><span class="p">(</span><span class="n">directory</span> <span class="o">/</span> <span class="s2">"lineage.json"</span><span class="p">,</span> <span class="n">cohort_path</span><span class="p">,</span> <span class="n">directory</span> <span class="o">/</span> <span class="s2">"sample_audit"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">model_fingerprint</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span> <span class="o">!=</span> <span class="n">capabilities</span><span class="p">[</span><span class="s2">"model"</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Model bundle changed during evaluation"</span><span class="p">)</span>
+    <span class="n">report</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"schema_version"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"generator"</span><span class="p">:</span> <span class="n">generator_metadata</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span>
+        <span class="s2">"configuration"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"context"</span><span class="p">:</span> <span class="s2">"without_flanks"</span><span class="p">,</span> <span class="s2">"training_rows"</span><span class="p">:</span> <span class="s2">"all alleles and labels"</span><span class="p">,</span>
+                          <span class="s2">"negative_or_background_scheme"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                          <span class="s2">"bootstrap_unit"</span><span class="p">:</span> <span class="s2">"canine donor"</span><span class="p">,</span> <span class="s2">"bootstrap_seed"</span><span class="p">:</span> <span class="mi">490</span><span class="p">,</span>
+                          <span class="s2">"bootstrap_replicates"</span><span class="p">:</span> <span class="mi">2000</span><span class="p">},</span>
+        <span class="s2">"study"</span><span class="p">:</span> <span class="n">STUDY</span><span class="p">,</span> <span class="s2">"doi"</span><span class="p">:</span> <span class="s2">"10.1016/j.isci.2026.115975"</span><span class="p">,</span> <span class="s2">"raw_ms"</span><span class="p">:</span> <span class="s2">"PXD074485"</span><span class="p">,</span>
+        <span class="s2">"sources"</span><span class="p">:</span> <span class="p">{</span><span class="n">f</span><span class="p">:</span> <span class="p">{</span><span class="s2">"url"</span><span class="p">:</span> <span class="n">SOURCE_URL</span> <span class="o">+</span> <span class="n">f</span><span class="p">,</span> <span class="s2">"sha256"</span><span class="p">:</span> <span class="n">digest</span><span class="p">}</span> <span class="k">for</span> <span class="n">f</span><span class="p">,</span> <span class="n">digest</span> <span class="ow">in</span> <span class="n">WORKBOOK_SHA256</span><span class="o">.</span><span class="n">items</span><span class="p">()},</span>
+        <span class="s2">"excel_reader"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"openpyxl"</span><span class="p">:</span> <span class="n">version</span><span class="p">(</span><span class="s2">"openpyxl"</span><span class="p">)},</span>
+        <span class="s2">"model_sha256"</span><span class="p">:</span> <span class="n">capabilities</span><span class="p">[</span><span class="s2">"model"</span><span class="p">][</span><span class="s2">"sha256"</span><span class="p">],</span>
+        <span class="s2">"observations_sha256"</span><span class="p">:</span> <span class="n">file_sha256</span><span class="p">(</span><span class="n">cohort_path</span><span class="p">),</span> <span class="s2">"scores_sha256"</span><span class="p">:</span> <span class="n">file_sha256</span><span class="p">(</span><span class="n">directory</span> <span class="o">/</span> <span class="s2">"scores.csv.gz"</span><span class="p">),</span>
+        <span class="s2">"sample_disjointness"</span><span class="p">:</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">audit</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"status"</span><span class="p">,</span> <span class="s2">"models"</span><span class="p">,</span> <span class="s2">"cohort"</span><span class="p">)},</span>
+        <span class="s2">"held_out_performance"</span><span class="p">:</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="p">{</span><span class="s2">"status"</span><span class="p">:</span> <span class="s2">"not_evaluated"</span><span class="p">,</span> <span class="s2">"metrics"</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span>
+                                 <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"binding"</span><span class="p">,</span> <span class="s2">"processing"</span><span class="p">,</span> <span class="s2">"presentation"</span><span class="p">,</span> <span class="s2">"calibration"</span><span class="p">)},</span>
+        <span class="s2">"peptide_overlap"</span><span class="p">:</span> <span class="n">overlaps</span><span class="p">,</span> <span class="s2">"diagnostics"</span><span class="p">:</span> <span class="n">observation_diagnostics</span><span class="p">(</span><span class="n">cohort</span><span class="p">),</span>
+        <span class="s2">"exploratory_scores"</span><span class="p">:</span> <span class="n">score_summary</span><span class="p">(</span><span class="n">scored</span><span class="p">),</span>
+        <span class="s2">"limitations"</span><span class="p">:</span> <span class="p">[</span>
+            <span class="s2">"No sample is eligible for held-out claims with this incomplete historical inventory."</span><span class="p">,</span>
+            <span class="s2">"Peptide overlap is scanned across all bundled training alleles and labels; it is not donor/study identity."</span><span class="p">,</span>
+            <span class="s2">"No sampled background or measured negatives: AP, precision-at-N, AUROC and calibration are unevaluated."</span><span class="p">,</span>
+            <span class="s2">"MS ligands are not quantitative binding measurements or isolated processing labels."</span><span class="p">,</span>
+            <span class="s2">"Human-host monoallelic evidence does not validate endogenous canine processing."</span><span class="p">,</span>
+            <span class="s2">"Tumor genotype minima and best alleles are predictions, not experimental restrictions."</span><span class="p">,</span>
+            <span class="s2">"Donor-bootstrap score intervals describe four dogs, not prediction accuracy or population coverage."</span><span class="p">,</span>
+            <span class="s2">"Recover every component's training/development/selection and teacher lineage, or retrain with study/donor/peptide exclusions."</span><span class="p">,</span>
+            <span class="s2">"Use a new untouched confirmation cohort after development on these observations."</span><span class="p">,</span>
+        <span class="p">],</span>
+    <span class="p">}</span>
+    <span class="p">(</span><span class="n">directory</span> <span class="o">/</span> <span class="s2">"report.json"</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">allow_nan</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">capabilities</span><span class="p">[</span><span class="s2">"exploratory_evaluation"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"report"</span><span class="p">:</span> <span class="s2">"report.json"</span><span class="p">,</span> <span class="s2">"sha256"</span><span class="p">:</span> <span class="n">file_sha256</span><span class="p">(</span><span class="n">directory</span> <span class="o">/</span> <span class="s2">"report.json"</span><span class="p">),</span>
+        <span class="s2">"study"</span><span class="p">:</span> <span class="n">STUDY</span><span class="p">,</span> <span class="s2">"status"</span><span class="p">:</span> <span class="s2">"exploratory_only"</span><span class="p">,</span> <span class="s2">"held_out_eligible_samples"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="p">(</span><span class="n">directory</span> <span class="o">/</span> <span class="s2">"capabilities.json"</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">capabilities</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">allow_nan</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">report</span></div>
+
+
+
+<div class="viewcode-block" id="run_argv">
+<a class="viewcode-back" href="../../api.html#mhcflurry.dla_evaluation.run_argv">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_argv</span><span class="p">(</span><span class="n">argv</span><span class="p">,</span> <span class="n">prog</span><span class="o">=</span><span class="s2">"mhcflurry eval dla"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Run the checksum-pinned 2026 DLA observation audit."""</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--models-dir"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--supplements-dir"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--out-dir"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+    <span class="n">evaluate_dla</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">supplements_dir</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">out_dir</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

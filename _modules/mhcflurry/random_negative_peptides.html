@@ -1,0 +1,1034 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.random_negative_peptides &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.random_negative_peptides</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.random_negative_peptides</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">amino_acid</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.encodable_sequences</span><span class="w"> </span><span class="kn">import</span> <span class="n">EncodableSequences</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.hyperparameters</span><span class="w"> </span><span class="kn">import</span> <span class="n">HyperparameterDefaults</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">amino_acid_distribution</span><span class="p">,</span> <span class="n">random_peptides</span>
+
+
+<div class="viewcode-block" id="RandomNegativePeptides">
+<a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.RandomNegativePeptides">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">RandomNegativePeptides</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Generate random negative (peptide, allele) pairs. These are used during</span>
+<span class="sd">    model training, where they are resampled at each epoch.</span>
+<span class="sd">    """</span>
+
+    <span class="n">hyperparameter_defaults</span> <span class="o">=</span> <span class="n">HyperparameterDefaults</span><span class="p">(</span>
+        <span class="n">random_negative_rate</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">random_negative_constant</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">random_negative_match_distribution</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">random_negative_distribution_smoothing</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">random_negative_method</span><span class="o">=</span><span class="s2">"recommended"</span><span class="p">,</span>
+        <span class="n">random_negative_binder_threshold</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">random_negative_lengths</span><span class="o">=</span><span class="p">[</span><span class="mi">8</span><span class="p">,</span><span class="mi">9</span><span class="p">,</span><span class="mi">10</span><span class="p">,</span><span class="mi">11</span><span class="p">,</span><span class="mi">12</span><span class="p">,</span><span class="mi">13</span><span class="p">,</span><span class="mi">14</span><span class="p">,</span><span class="mi">15</span><span class="p">])</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Hyperperameters for random negative peptides.</span>
+
+<span class="sd">    Number of random negatives will be:</span>
+<span class="sd">        random_negative_rate * (num measurements) + random_negative_constant</span>
+
+<span class="sd">    where the exact meaning of (num measurements) depends on the particular</span>
+<span class="sd">    random_negative_method in use.</span>
+
+<span class="sd">    If random_negative_match_distribution is True, then the amino acid</span>
+<span class="sd">    frequencies of the training data peptides are used to generate the</span>
+<span class="sd">    random peptides.</span>
+
+<span class="sd">    Valid values for random_negative_method are:</span>
+<span class="sd">        "by_length": used for allele-specific prediction. See description in</span>
+<span class="sd">            `RandomNegativePeptides.plan_by_length` method.</span>
+<span class="sd">        "by_allele": used for pan-allele prediction. See</span>
+<span class="sd">            `RandomNegativePeptides.plan_by_allele` method.</span>
+<span class="sd">        "by_allele_equalize_nonbinders": used for pan-allele prediction. See</span>
+<span class="sd">            `RandomNegativePeptides.plan_by_allele_equalize_nonbinders` method.</span>
+<span class="sd">        "recommended": the default. Use by_length if the predictor is allele-</span>
+<span class="sd">            specific and by_allele if it's pan-allele.</span>
+
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">hyperparameters</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameter_defaults</span><span class="o">.</span><span class="n">with_defaults</span><span class="p">(</span>
+            <span class="n">hyperparameters</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">aa_distribution</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="RandomNegativePeptides.plan">
+<a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.RandomNegativePeptides.plan">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">plan</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">peptides</span><span class="p">,</span> <span class="n">affinities</span><span class="p">,</span> <span class="n">alleles</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">inequalities</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Calculate the number of random negatives for each allele and peptide</span>
+<span class="sd">        length. Call this once after instantiating the object.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        peptides : list of string</span>
+<span class="sd">        affinities : list of float</span>
+<span class="sd">        alleles : list of string, optional</span>
+<span class="sd">        inequalities : list of string ("&gt;", "&lt;", or "="), optional</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        pandas.DataFrame indicating number of random negatives for each length</span>
+<span class="sd">        and allele.</span>
+<span class="sd">        """</span>
+        <span class="n">numpy</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_equal</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">affinities</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">alleles</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">numpy</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_equal</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">alleles</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">inequalities</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">numpy</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_equal</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">inequalities</span><span class="p">))</span>
+
+        <span class="n">peptides</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">peptides</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">peptide_lengths</span> <span class="o">=</span> <span class="n">peptides</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">'random_negative_match_distribution'</span><span class="p">]:</span>
+            <span class="n">distribution</span> <span class="o">=</span> <span class="n">amino_acid_distribution</span><span class="p">(</span>
+                <span class="n">peptides</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+                <span class="n">smoothing</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span>
+                    <span class="s1">'random_negative_distribution_smoothing'</span>
+                <span class="p">])</span>
+            <span class="c1"># Random negatives are decoys over the common amino acids. Drop X</span>
+            <span class="c1"># and any residue absent from the canonical amino-acid index</span>
+            <span class="c1"># (e.g. B/Z/U) -- treat both as the X/unknown index -- then</span>
+            <span class="c1"># renormalize so the host sampler (random_peptides over this</span>
+            <span class="c1"># distribution) and the device sampler agree. The device sampler</span>
+            <span class="c1"># (aa_distribution_to_index_weights) indexes AMINO_ACID_INDEX and</span>
+            <span class="c1"># would KeyError on an unsupported letter, so it must never reach</span>
+            <span class="c1"># here. Defaulting get() to X_INDEX is load-bearing: a bare</span>
+            <span class="c1"># get(letter) returns None for an unsupported residue, and</span>
+            <span class="c1"># None != X_INDEX keeps it, which would let the host path emit it</span>
+            <span class="c1"># while the device path raises before the first epoch.</span>
+            <span class="n">keep</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">letter</span> <span class="k">for</span> <span class="n">letter</span> <span class="ow">in</span> <span class="n">distribution</span><span class="o">.</span><span class="n">index</span>
+                <span class="k">if</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">AMINO_ACID_INDEX</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">letter</span><span class="p">,</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">X_INDEX</span><span class="p">)</span>
+                <span class="o">!=</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">X_INDEX</span>
+            <span class="p">]</span>
+            <span class="n">distribution</span> <span class="o">=</span> <span class="n">distribution</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">keep</span><span class="p">]</span>
+            <span class="n">total</span> <span class="o">=</span> <span class="n">distribution</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">total</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="c1"># Only reachable if every residue in every training peptide is</span>
+                <span class="c1"># X (or otherwise maps to the unknown index) — there are no</span>
+                <span class="c1"># common amino acids left to sample random negatives from.</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"Cannot match random-negative amino acid distribution: "</span>
+                    <span class="s2">"the training peptides contain no common amino acids "</span>
+                    <span class="s2">"(every residue mapped to X after dropping the unknown "</span>
+                    <span class="s2">"index)."</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">aa_distribution</span> <span class="o">=</span> <span class="n">distribution</span> <span class="o">/</span> <span class="n">total</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">"Using amino acid distribution for random negative:</span><span class="se">\n</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">aa_distribution</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())))</span>
+
+        <span class="n">df_all</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+            <span class="s1">'length'</span><span class="p">:</span> <span class="n">peptide_lengths</span><span class="p">,</span>
+            <span class="s1">'affinity'</span><span class="p">:</span> <span class="n">affinities</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">df_all</span><span class="p">[</span><span class="s2">"allele"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">""</span> <span class="k">if</span> <span class="n">alleles</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">alleles</span>
+        <span class="n">df_all</span><span class="p">[</span><span class="s2">"inequality"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"="</span> <span class="k">if</span> <span class="n">inequalities</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">inequalities</span>
+
+        <span class="n">df_binders</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">df_nonbinders</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">'random_negative_binder_threshold'</span><span class="p">]:</span>
+            <span class="n">df_nonbinders</span> <span class="o">=</span> <span class="n">df_all</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+                <span class="p">(</span><span class="n">df_all</span><span class="o">.</span><span class="n">inequality</span> <span class="o">!=</span> <span class="s2">"&lt;"</span><span class="p">)</span> <span class="o">&amp;</span>
+                <span class="p">(</span><span class="n">df_all</span><span class="o">.</span><span class="n">affinity</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span>
+                    <span class="s1">'random_negative_binder_threshold'</span>
+                <span class="p">])</span>
+            <span class="p">]</span>
+            <span class="n">df_binders</span> <span class="o">=</span> <span class="n">df_all</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+                <span class="p">(</span><span class="n">df_all</span><span class="o">.</span><span class="n">inequality</span> <span class="o">!=</span> <span class="s2">"&gt;"</span><span class="p">)</span> <span class="o">&amp;</span>
+                <span class="p">(</span><span class="n">df_all</span><span class="o">.</span><span class="n">affinity</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span>
+                    <span class="s1">'random_negative_binder_threshold'</span>
+                <span class="p">])</span>
+            <span class="p">]</span>
+
+        <span class="n">method</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">'random_negative_method'</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s1">'recommended'</span><span class="p">:</span>
+            <span class="c1"># by_length for allele-specific prediction and by_allele for pan.</span>
+            <span class="n">method</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">"by_length"</span>
+                <span class="k">if</span> <span class="n">alleles</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span>
+                <span class="s2">"by_allele"</span><span class="p">)</span>
+
+        <span class="n">function</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">'by_length'</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_by_length</span><span class="p">,</span>
+            <span class="s1">'by_allele'</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_by_allele</span><span class="p">,</span>
+            <span class="s1">'by_allele_equalize_nonbinders'</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">plan_by_allele_equalize_nonbinders</span><span class="p">,</span>
+        <span class="p">}[</span><span class="n">method</span><span class="p">]</span>
+        <span class="n">function</span><span class="p">(</span><span class="n">df_all</span><span class="p">,</span> <span class="n">df_binders</span><span class="p">,</span> <span class="n">df_nonbinders</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Random negative plan [</span><span class="si">%s</span><span class="s2">]:</span><span class="se">\n</span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span></div>
+
+
+<div class="viewcode-block" id="RandomNegativePeptides.plan_by_length">
+<a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.RandomNegativePeptides.plan_by_length">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">plan_by_length</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df_all</span><span class="p">,</span> <span class="n">df_binders</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">df_nonbinders</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Generate a random negative plan using the "by_length" policy.</span>
+
+<span class="sd">        Parameters are as in the `plan` method. No return value.</span>
+
+<span class="sd">        Used for allele-specific predictors. Does not work well for pan-allele.</span>
+
+<span class="sd">        Different numbers of random negatives per length. Alleles are sampled</span>
+<span class="sd">        proportionally to the number of times they are used in the training</span>
+<span class="sd">        data.</span>
+<span class="sd">        """</span>
+        <span class="k">assert</span> <span class="nb">list</span><span class="p">(</span><span class="n">df_all</span><span class="o">.</span><span class="n">allele</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span> <span class="o">==</span> <span class="p">[</span><span class="s2">""</span><span class="p">],</span> <span class="p">(</span>
+            <span class="s2">"by_length only recommended for allele specific prediction"</span><span class="p">)</span>
+
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df_all</span> <span class="k">if</span> <span class="n">df_binders</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">df_binders</span>
+        <span class="n">lengths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">'random_negative_lengths'</span><span class="p">]</span>
+
+        <span class="n">length_to_num_random_negative</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">length_counts</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">length</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="n">lengths</span><span class="p">:</span>
+            <span class="n">length_to_num_random_negative</span><span class="p">[</span><span class="n">length</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+                <span class="n">length_counts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">*</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">'random_negative_rate'</span><span class="p">]</span> <span class="o">+</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">'random_negative_constant'</span><span class="p">])</span>
+
+        <span class="n">plan_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="nb">sorted</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">allele</span><span class="o">.</span><span class="n">unique</span><span class="p">()))</span>
+        <span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="n">lengths</span><span class="p">:</span>
+            <span class="n">plan_df</span><span class="p">[</span><span class="n">length</span><span class="p">]</span> <span class="o">=</span> <span class="n">length_to_num_random_negative</span><span class="p">[</span><span class="n">length</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span> <span class="o">=</span> <span class="n">plan_df</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RandomNegativePeptides.plan_by_allele">
+<a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.RandomNegativePeptides.plan_by_allele">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">plan_by_allele</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df_all</span><span class="p">,</span> <span class="n">df_binders</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">df_nonbinders</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Generate a random negative plan using the "by_allele" policy.</span>
+
+<span class="sd">        Parameters are as in the `plan` method. No return value.</span>
+
+<span class="sd">        For each allele, a particular number of random negatives are used</span>
+<span class="sd">        for all lengths. Across alleles, the number of random negatives</span>
+<span class="sd">        varies; within an allele, the number of random negatives for each</span>
+<span class="sd">        length is a constant</span>
+<span class="sd">        """</span>
+        <span class="n">allele_to_num_per_length</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">total_random_peptides_per_length</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df_all</span> <span class="k">if</span> <span class="n">df_binders</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">df_binders</span>
+        <span class="n">lengths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">'random_negative_lengths'</span><span class="p">]</span>
+        <span class="n">all_alleles</span> <span class="o">=</span> <span class="n">df_all</span><span class="o">.</span><span class="n">allele</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">allele</span> <span class="ow">in</span> <span class="n">all_alleles</span><span class="p">:</span>
+            <span class="n">sub_df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">df</span><span class="o">.</span><span class="n">allele</span> <span class="o">==</span> <span class="n">allele</span><span class="p">]</span>
+            <span class="n">num_for_allele</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">sub_df</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">'random_negative_rate'</span><span class="p">]</span>
+            <span class="p">)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">'random_negative_constant'</span><span class="p">]</span>
+            <span class="n">num_per_length</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span>
+                <span class="n">num_for_allele</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">lengths</span><span class="p">)))</span>
+            <span class="n">total_random_peptides_per_length</span> <span class="o">+=</span> <span class="n">num_per_length</span>
+            <span class="n">allele_to_num_per_length</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span> <span class="o">=</span> <span class="n">num_per_length</span>
+
+        <span class="n">plan_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="nb">sorted</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">allele</span><span class="o">.</span><span class="n">unique</span><span class="p">()))</span>
+        <span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="n">lengths</span><span class="p">:</span>
+            <span class="n">plan_df</span><span class="p">[</span><span class="n">length</span><span class="p">]</span> <span class="o">=</span> <span class="n">plan_df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">allele_to_num_per_length</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span> <span class="o">=</span> <span class="n">plan_df</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RandomNegativePeptides.plan_by_allele_equalize_nonbinders">
+<a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.RandomNegativePeptides.plan_by_allele_equalize_nonbinders">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">plan_by_allele_equalize_nonbinders</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">df_all</span><span class="p">,</span> <span class="n">df_binders</span><span class="p">,</span> <span class="n">df_nonbinders</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Generate a random negative plan using the</span>
+<span class="sd">        "by_allele_equalize_nonbinders" policy.</span>
+
+<span class="sd">        Parameters are as in the `plan` method. No return value.</span>
+
+<span class="sd">        Requires that the random_negative_binder_threshold hyperparameter is set.</span>
+
+<span class="sd">        In a first step, the number of random negatives selected by the</span>
+<span class="sd">        "by_allele" method are added (see `plan_by_allele`). Then, the total</span>
+<span class="sd">        number of non-binders are calculated for each allele and length. This</span>
+<span class="sd">        total includes non-binder measurements in the training data plus the</span>
+<span class="sd">        random negative peptides added in the first step. In a second step,</span>
+<span class="sd">        additional random negative peptides are added so that for each allele,</span>
+<span class="sd">        all peptide lengths have the same total number of non-binders.</span>
+<span class="sd">        """</span>
+        <span class="k">assert</span> <span class="n">df_binders</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">assert</span> <span class="n">df_nonbinders</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
+        <span class="n">lengths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">'random_negative_lengths'</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">plan_by_allele</span><span class="p">(</span><span class="n">df_all</span><span class="p">,</span> <span class="n">df_binders</span><span class="p">,</span> <span class="n">df_nonbinders</span><span class="p">)</span>
+        <span class="n">first_pass_plan</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="c1"># Use floating point while populating so NaN assignment remains valid</span>
+        <span class="c1"># across pandas versions; cast to int at the end.</span>
+        <span class="n">new_plan</span> <span class="o">=</span> <span class="n">first_pass_plan</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">new_plan</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">nan</span>
+
+        <span class="k">for</span> <span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">first_pass_per_length</span><span class="p">)</span> <span class="ow">in</span> <span class="n">first_pass_plan</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="n">real_nonbinders_by_length</span> <span class="o">=</span> <span class="n">df_nonbinders</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+                <span class="n">df_nonbinders</span><span class="o">.</span><span class="n">allele</span> <span class="o">==</span> <span class="n">allele</span>
+            <span class="p">]</span><span class="o">.</span><span class="n">length</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">reindex</span><span class="p">(</span><span class="n">lengths</span><span class="p">)</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">total_nonbinders_by_length</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">real_nonbinders_by_length</span> <span class="o">+</span> <span class="n">first_pass_per_length</span><span class="p">)</span>
+            <span class="n">new_plan</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span> <span class="o">=</span> <span class="n">first_pass_per_length</span> <span class="o">+</span> <span class="p">(</span>
+                <span class="n">total_nonbinders_by_length</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">total_nonbinders_by_length</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">new_plan</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span><span class="o">.</span><span class="n">any</span><span class="p">()</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+                <span class="s2">"Random negative plan contains NaN after equalization; "</span>
+                <span class="s2">"this indicates an incomplete per-allele assignment bug."</span>
+            <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span> <span class="o">=</span> <span class="n">new_plan</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RandomNegativePeptides.get_alleles">
+<a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.RandomNegativePeptides.get_alleles">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_alleles</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Get the list of alleles corresponding to each random negative peptide</span>
+<span class="sd">        as returned by `get_peptides`. This does NOT change and can be safely</span>
+<span class="sd">        called once and reused.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list of string</span>
+<span class="sd">        """</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"Call plan() first"</span>
+        <span class="n">alleles</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">allele</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="n">alleles</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">allele</span><span class="p">]</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">sum</span><span class="p">()))</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">alleles</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_total_count</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">alleles</span></div>
+
+
+<div class="viewcode-block" id="RandomNegativePeptides.get_peptides">
+<a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.RandomNegativePeptides.get_peptides">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_peptides</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Get the list of random negative peptides. This will be different each</span>
+<span class="sd">        time the method is called.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        rng : numpy.random.Generator, optional</span>
+<span class="sd">            When supplied, all random draws go through this generator.</span>
+<span class="sd">            Lets a caller make the returned peptide list deterministic —</span>
+<span class="sd">            used by ``RandomNegativesPool`` to build reproducible</span>
+<span class="sd">            multi-epoch pools. When None the numpy global state is used,</span>
+<span class="sd">            preserving the historical "fresh peptides every call"</span>
+<span class="sd">            behavior.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list of string</span>
+
+<span class="sd">        """</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"Call plan() first"</span>
+        <span class="n">peptides</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">allele</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="n">num</span><span class="p">)</span> <span class="ow">in</span> <span class="n">row</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">peptides</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="n">random_peptides</span><span class="p">(</span>
+                        <span class="n">num</span><span class="p">,</span>
+                        <span class="n">length</span><span class="o">=</span><span class="n">length</span><span class="p">,</span>
+                        <span class="n">distribution</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">aa_distribution</span><span class="p">,</span>
+                        <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">))</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_total_count</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">peptides</span></div>
+
+
+<div class="viewcode-block" id="RandomNegativePeptides.get_total_count">
+<a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.RandomNegativePeptides.get_total_count">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_total_count</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Total number of planned random negative peptides.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        int</span>
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="RandomNegativesPool">
+<a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.RandomNegativesPool">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">RandomNegativesPool</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Amortize random-negative generation and encoding across N epochs.</span>
+
+<span class="sd">    ``Class1NeuralNetwork.fit`` needs random-negative peptides each epoch.</span>
+<span class="sd">    Generating them and encoding them into network inputs can dominate</span>
+<span class="sd">    training time for large pan-allele runs. This class generates</span>
+<span class="sd">    ``pool_epochs`` worth of random peptides in one call to the planner, encodes</span>
+<span class="sd">    the whole pool once, and hands back an O(1) slice per epoch.</span>
+
+<span class="sd">    Setting ``pool_epochs=1`` samples and encodes fresh negatives every epoch.</span>
+<span class="sd">    Setting ``pool_epochs&gt;1`` amortizes generation and encoding across the pool;</span>
+<span class="sd">    the trade-off is that consecutive epochs in a pool cycle see distinct</span>
+<span class="sd">    slices of the same generated pool rather than independently generated</span>
+<span class="sd">    peptides. A new pool is generated at each ``epoch // pool_epochs`` boundary.</span>
+
+<span class="sd">    Seeding is optional. When ``seed`` is None the peptides are drawn</span>
+<span class="sd">    from the process's numpy global state, matching the pre-pool</span>
+<span class="sd">    semantics. Worker initialization is responsible for independent RNG</span>
+<span class="sd">    states; separate processes alone do not guarantee them. Supplying</span>
+<span class="sd">    an explicit seed makes pool contents reproducible — useful for</span>
+<span class="sd">    debugging and for regression tests.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">planner</span><span class="p">,</span>
+            <span class="n">peptide_encoder</span><span class="p">,</span>
+            <span class="n">pool_epochs</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">peptide_encoding</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        planner : RandomNegativePeptides</span>
+<span class="sd">            A planner that has already had ``plan(...)`` called on it.</span>
+
+<span class="sd">        peptide_encoder : callable</span>
+<span class="sd">            Receives an ``EncodableSequences`` and returns an encoded</span>
+<span class="sd">            numpy array (typically ``Class1NeuralNetwork</span>
+<span class="sd">            .peptides_to_network_input``). Called once per cycle on the</span>
+<span class="sd">            full pool. Ignored when ``device`` is set — the device path</span>
+<span class="sd">            samples and encodes integer indices directly.</span>
+
+<span class="sd">        pool_epochs : int</span>
+<span class="sd">            Number of consecutive epochs that share a pool. 1 means fresh</span>
+<span class="sd">            random negatives every epoch.</span>
+
+<span class="sd">        seed : int, optional</span>
+<span class="sd">            Seed for the per-cycle RNG. When None, draws go through</span>
+<span class="sd">            numpy's global state (or torch's global state on the device path).</span>
+
+<span class="sd">        device : torch.device or str, optional</span>
+<span class="sd">            When set, the pool builds device-resident int8 tensors via</span>
+<span class="sd">            :func:`encode_random_negatives_on_device` instead of the</span>
+<span class="sd">            host-side string-→encoder path. ``peptide_encoding`` must</span>
+<span class="sd">            be provided alongside; ``peptide_encoder`` is unused on</span>
+<span class="sd">            this path. Peptide strings are not materialized</span>
+<span class="sd">            (``get_epoch_inputs`` returns ``(None, encoded_slice)``).</span>
+
+<span class="sd">        peptide_encoding : dict, optional</span>
+<span class="sd">            Required when ``device`` is set. Subset of the model's</span>
+<span class="sd">            ``peptide_encoding`` hyperparameter — at minimum</span>
+<span class="sd">            ``alignment_method`` and ``max_length`` (plus</span>
+<span class="sd">            ``left_edge`` / ``right_edge`` for ``pad_middle``).</span>
+<span class="sd">        """</span>
+        <span class="k">assert</span> <span class="n">planner</span><span class="o">.</span><span class="n">plan_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"Call planner.plan() first"</span>
+        <span class="k">if</span> <span class="n">device</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">peptide_encoding</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"RandomNegativesPool: device-resident pool requires "</span>
+                <span class="s2">"peptide_encoding (alignment_method, max_length, ...)"</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">planner</span> <span class="o">=</span> <span class="n">planner</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">peptide_encoder</span> <span class="o">=</span> <span class="n">peptide_encoder</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pool_epochs</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">pool_epochs</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">seed</span> <span class="o">=</span> <span class="n">seed</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">device</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">peptide_encoding</span> <span class="o">=</span> <span class="n">peptide_encoding</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_total_count</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">planner</span><span class="o">.</span><span class="n">get_total_count</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_current_cycle</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_current_encoded</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># shape: (pool_epochs * total_count, ...)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_current_peptides</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># list of str, len = pool_epochs * total_count</span>
+        <span class="c1"># Allocated lazily on first device-mode build, reused per cycle.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_device_buffer</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_rng_for_cycle</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cycle</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">seed</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">seed_seq</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">SeedSequence</span><span class="p">(</span>
+            <span class="n">entropy</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seed</span><span class="p">),</span> <span class="n">spawn_key</span><span class="o">=</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">cycle</span><span class="p">),)</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">seed_seq</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_torch_generator_for_cycle</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cycle</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Per-cycle torch.Generator for the device path.</span>
+
+<span class="sd">        Returns ``None`` when ``self.seed`` is None (let torch's global</span>
+<span class="sd">        state vary per worker). Mirrors the SeedSequence(seed, cycle)</span>
+<span class="sd">        deterministic mix used by the host path so seeded device pools</span>
+<span class="sd">        are reproducible across rebuilds.</span>
+<span class="sd">        """</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">_torch</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">seed</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">seed_seq</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">SeedSequence</span><span class="p">(</span>
+            <span class="n">entropy</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seed</span><span class="p">),</span> <span class="n">spawn_key</span><span class="o">=</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">cycle</span><span class="p">),)</span>
+        <span class="p">)</span>
+        <span class="c1"># Squeeze the SeedSequence into a 64-bit unsigned int seed.</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="n">seed_seq</span><span class="o">.</span><span class="n">generate_state</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">uint32</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span>
+            <span class="n">numpy</span><span class="o">.</span><span class="n">uint64</span>
+        <span class="p">)</span>
+        <span class="n">seed64</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">|</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">&lt;&lt;</span> <span class="mi">32</span><span class="p">)</span>
+        <span class="n">seed64</span> <span class="o">&amp;=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">63</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>  <span class="c1"># torch wants signed positive 64-bit</span>
+        <span class="n">gen</span> <span class="o">=</span> <span class="n">_torch</span><span class="o">.</span><span class="n">Generator</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">gen</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed64</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">gen</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_cycle</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cycle</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_build_cycle_device</span><span class="p">(</span><span class="n">cycle</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="n">rng</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rng_for_cycle</span><span class="p">(</span><span class="n">cycle</span><span class="p">)</span>
+        <span class="n">peptides</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pool_epochs</span><span class="p">):</span>
+            <span class="n">peptides</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">planner</span><span class="o">.</span><span class="n">get_peptides</span><span class="p">(</span><span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">))</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">pool_epochs</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">_total_count</span>
+        <span class="n">encoded</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">peptide_encoder</span><span class="p">(</span><span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">peptides</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_current_peptides</span> <span class="o">=</span> <span class="n">peptides</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_current_encoded</span> <span class="o">=</span> <span class="n">encoded</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_current_cycle</span> <span class="o">=</span> <span class="n">cycle</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_cycle_device</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cycle</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Device-resident path: sample + encode int indices on device.</span>
+
+<span class="sd">        Allocates a single device-resident int8 tensor on first call</span>
+<span class="sd">        and refills it in place every cycle. ``_current_peptides``</span>
+<span class="sd">        stays ``None`` — fit() doesn't need the strings; logging /</span>
+<span class="sd">        debug callers can re-materialize via</span>
+<span class="sd">        :func:`amino_acid.indices_to_peptide`.</span>
+<span class="sd">        """</span>
+        <span class="n">gen</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_torch_generator_for_cycle</span><span class="p">(</span><span class="n">cycle</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device_buffer</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_device_buffer</span> <span class="o">=</span> <span class="n">encode_random_negatives_on_device</span><span class="p">(</span>
+                <span class="n">planner</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">planner</span><span class="p">,</span>
+                <span class="n">pool_epochs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">pool_epochs</span><span class="p">,</span>
+                <span class="n">peptide_encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">peptide_encoding</span><span class="p">,</span>
+                <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+                <span class="n">generator</span><span class="o">=</span><span class="n">gen</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">encode_random_negatives_on_device</span><span class="p">(</span>
+                <span class="n">planner</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">planner</span><span class="p">,</span>
+                <span class="n">pool_epochs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">pool_epochs</span><span class="p">,</span>
+                <span class="n">peptide_encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">peptide_encoding</span><span class="p">,</span>
+                <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+                <span class="n">generator</span><span class="o">=</span><span class="n">gen</span><span class="p">,</span>
+                <span class="n">out</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device_buffer</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_current_encoded</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device_buffer</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_current_peptides</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_current_cycle</span> <span class="o">=</span> <span class="n">cycle</span>
+
+<div class="viewcode-block" id="RandomNegativesPool.get_epoch_inputs">
+<a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.RandomNegativesPool.get_epoch_inputs">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_epoch_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">epoch</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Return ``(peptides_list, encoded_slice)`` for ``epoch``.</span>
+
+<span class="sd">        The returned ``encoded_slice`` is a view into the pool-level</span>
+<span class="sd">        encoded array — no copy — so downstream assignments that expect</span>
+<span class="sd">        to own the memory should ``.copy()`` it first. The list of raw</span>
+<span class="sd">        peptide strings is included for callers that need it (e.g.</span>
+<span class="sd">        logging / diagnostics).</span>
+
+<span class="sd">        On the device-resident path ``peptides_list`` is ``None`` (the</span>
+<span class="sd">        strings are never materialized; recover them via</span>
+<span class="sd">        :func:`amino_acid.indices_to_peptide` against the int8</span>
+<span class="sd">        encoded slice if a logging caller needs them).</span>
+
+<span class="sd">        """</span>
+        <span class="n">cycle</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">epoch</span><span class="p">)</span> <span class="o">//</span> <span class="bp">self</span><span class="o">.</span><span class="n">pool_epochs</span>
+        <span class="k">if</span> <span class="n">cycle</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_cycle</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_build_cycle</span><span class="p">(</span><span class="n">cycle</span><span class="p">)</span>
+        <span class="n">offset</span> <span class="o">=</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">epoch</span><span class="p">)</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">pool_epochs</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">_total_count</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="n">offset</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_total_count</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_peptides</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">peptides_slice</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">peptides_slice</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_peptides</span><span class="p">[</span><span class="n">offset</span><span class="p">:</span><span class="n">end</span><span class="p">]</span>
+        <span class="n">encoded_slice</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_encoded</span><span class="p">[</span><span class="n">offset</span><span class="p">:</span><span class="n">end</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">peptides_slice</span><span class="p">,</span> <span class="n">encoded_slice</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">total_count</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_total_count</span></div>
+
+
+
+<span class="c1"># --- Device-resident random-negative encoding -----------------------------</span>
+<span class="c1">#</span>
+<span class="c1"># The host path generates peptides by sampling AA letters via</span>
+<span class="c1"># ``numpy.random.choice``, joining each row into a Python string, and then</span>
+<span class="c1"># round-tripping the strings through ``EncodableSequences.create`` →</span>
+<span class="c1"># ``sequences_to_fixed_length_index_encoded_array`` to recover integer</span>
+<span class="c1"># indices. On a release-exact run that string round-trip dominated random-</span>
+<span class="c1"># negative generation: ~22.5 M Python string allocations + 1.5 M joins per</span>
+<span class="c1"># epoch.</span>
+<span class="c1">#</span>
+<span class="c1"># The helpers below skip the round-trip entirely. They sample integer</span>
+<span class="c1"># indices directly via ``torch.multinomial`` against the canonical AA</span>
+<span class="c1"># distribution and apply the same per-(allele, length) alignment math as</span>
+<span class="c1"># the host path, writing into a pre-allocated device-resident int8 tensor.</span>
+<span class="c1"># Output rows match ``planner.get_peptides()`` order: outer loop over</span>
+<span class="c1"># pool epochs, then ``plan_df`` row-major iteration of (allele, length,</span>
+<span class="c1"># count). Within a (allele, length) block, the row order is the order</span>
+<span class="c1"># returned by torch.multinomial — not the same RNG stream as the numpy</span>
+<span class="c1"># path, but the row layout (which (allele, length) sits where) is</span>
+<span class="c1"># byte-identical.</span>
+
+
+<span class="n">_SUPPORTED_DEVICE_ALIGNMENTS</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="s2">"left_pad_centered_right_pad"</span><span class="p">,</span>
+    <span class="s2">"pad_middle"</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="supports_device_random_negative_encoding">
+<a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.supports_device_random_negative_encoding">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">supports_device_random_negative_encoding</span><span class="p">(</span><span class="n">peptide_encoding</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return whether random negatives can be encoded directly on device."""</span>
+    <span class="k">return</span> <span class="n">peptide_encoding</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"alignment_method"</span><span class="p">)</span> <span class="ow">in</span> <span class="n">_SUPPORTED_DEVICE_ALIGNMENTS</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_place_indices_with_alignment</span><span class="p">(</span>
+        <span class="n">out_rows</span><span class="p">,</span>
+        <span class="n">block</span><span class="p">,</span>
+        <span class="n">length</span><span class="p">,</span>
+        <span class="n">alignment</span><span class="p">,</span>
+        <span class="n">max_length</span><span class="p">,</span>
+        <span class="n">left_edge</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+        <span class="n">right_edge</span><span class="o">=</span><span class="mi">4</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Write a ``(count, length)`` index block into ``out_rows`` in place.</span>
+
+<span class="sd">    ``out_rows`` is a (count, encoded_length) tensor or array prefilled</span>
+<span class="sd">    with the X index. Mirrors the per-length branch of</span>
+<span class="sd">    :func:`EncodableSequences.sequences_to_fixed_length_index_encoded_array`</span>
+<span class="sd">    for the supported alignment methods, but operates on already-sampled</span>
+<span class="sd">    integer indices instead of peptide strings.</span>
+
+<span class="sd">    Factored out so the device-aware encoder and host-side parity tests</span>
+<span class="sd">    share one source of truth for the alignment math.</span>
+<span class="sd">    """</span>
+    <span class="n">L</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">length</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">alignment</span> <span class="o">==</span> <span class="s2">"left_pad_centered_right_pad"</span><span class="p">:</span>
+        <span class="c1"># Mirror the reference encoder, which arbitrarily sets a minimum</span>
+        <span class="c1"># length of 5 for this alignment (see</span>
+        <span class="c1"># EncodableSequences.sequences_to_fixed_length_index_encoded_array).</span>
+        <span class="c1"># Keeping the same floor means the device path rejects exactly the</span>
+        <span class="c1"># lengths the host path would, rather than silently accepting 1..4.</span>
+        <span class="n">min_length</span> <span class="o">=</span> <span class="mi">5</span>
+        <span class="k">if</span> <span class="n">L</span> <span class="o">&lt;</span> <span class="n">min_length</span> <span class="ow">or</span> <span class="n">L</span> <span class="o">&gt;</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_length</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"left_pad_centered_right_pad requires </span><span class="si">%d</span><span class="s2"> &lt;= length &lt;= "</span>
+                <span class="s2">"max_length=</span><span class="si">%d</span><span class="s2">; got </span><span class="si">%d</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">min_length</span><span class="p">,</span> <span class="n">max_length</span><span class="p">,</span> <span class="n">L</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="n">out_rows</span><span class="p">[:,</span> <span class="p">:</span><span class="n">L</span><span class="p">]</span> <span class="o">=</span> <span class="n">block</span>
+        <span class="n">out_rows</span><span class="p">[:,</span> <span class="o">-</span><span class="n">L</span><span class="p">:]</span> <span class="o">=</span> <span class="n">block</span>
+        <span class="n">center_left_padding</span> <span class="o">=</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">max_length</span><span class="p">)</span> <span class="o">-</span> <span class="n">L</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span>
+        <span class="n">center_left_offset</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_length</span><span class="p">)</span> <span class="o">+</span> <span class="n">center_left_padding</span>
+        <span class="n">out_rows</span><span class="p">[:,</span> <span class="n">center_left_offset</span> <span class="p">:</span> <span class="n">center_left_offset</span> <span class="o">+</span> <span class="n">L</span><span class="p">]</span> <span class="o">=</span> <span class="n">block</span>
+        <span class="k">return</span>
+    <span class="k">if</span> <span class="n">alignment</span> <span class="o">==</span> <span class="s2">"pad_middle"</span><span class="p">:</span>
+        <span class="n">min_length</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">left_edge</span><span class="p">)</span> <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">right_edge</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">L</span> <span class="o">&lt;</span> <span class="n">min_length</span> <span class="ow">or</span> <span class="n">L</span> <span class="o">&gt;</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_length</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"pad_middle requires </span><span class="si">%d</span><span class="s2"> &lt;= length &lt;= max_length=</span><span class="si">%d</span><span class="s2">; "</span>
+                <span class="s2">"got </span><span class="si">%d</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">min_length</span><span class="p">,</span> <span class="n">max_length</span><span class="p">,</span> <span class="n">L</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="n">middle_length</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_length</span><span class="p">)</span> <span class="o">-</span> <span class="nb">int</span><span class="p">(</span><span class="n">left_edge</span><span class="p">)</span> <span class="o">-</span> <span class="nb">int</span><span class="p">(</span><span class="n">right_edge</span><span class="p">)</span>
+        <span class="n">num_null</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_length</span><span class="p">)</span> <span class="o">-</span> <span class="n">L</span>
+        <span class="n">num_null_left</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">num_null</span> <span class="o">/</span> <span class="mi">2</span><span class="p">))</span>
+        <span class="n">num_middle_filled</span> <span class="o">=</span> <span class="n">middle_length</span> <span class="o">-</span> <span class="n">num_null</span>
+        <span class="n">middle_start</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">left_edge</span><span class="p">)</span> <span class="o">+</span> <span class="n">num_null_left</span>
+        <span class="n">out_rows</span><span class="p">[:,</span> <span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">left_edge</span><span class="p">)]</span> <span class="o">=</span> <span class="n">block</span><span class="p">[:,</span> <span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">left_edge</span><span class="p">)]</span>
+        <span class="n">out_rows</span><span class="p">[:,</span> <span class="o">-</span><span class="nb">int</span><span class="p">(</span><span class="n">right_edge</span><span class="p">)</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">block</span><span class="p">[:,</span> <span class="o">-</span><span class="nb">int</span><span class="p">(</span><span class="n">right_edge</span><span class="p">)</span> <span class="p">:]</span>
+        <span class="k">if</span> <span class="n">num_middle_filled</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">out_rows</span><span class="p">[</span>
+                <span class="p">:,</span> <span class="n">middle_start</span> <span class="p">:</span> <span class="n">middle_start</span> <span class="o">+</span> <span class="n">num_middle_filled</span>
+            <span class="p">]</span> <span class="o">=</span> <span class="n">block</span><span class="p">[</span>
+                <span class="p">:,</span> <span class="nb">int</span><span class="p">(</span><span class="n">left_edge</span><span class="p">)</span> <span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">left_edge</span><span class="p">)</span> <span class="o">+</span> <span class="n">num_middle_filled</span>
+            <span class="p">]</span>
+        <span class="k">return</span>
+    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+        <span class="s2">"Device-resident RN encoder supports alignment_method in </span><span class="si">%r</span><span class="s2">; "</span>
+        <span class="s2">"got </span><span class="si">%r</span><span class="s2">."</span> <span class="o">%</span> <span class="p">(</span><span class="n">_SUPPORTED_DEVICE_ALIGNMENTS</span><span class="p">,</span> <span class="n">alignment</span><span class="p">)</span>
+    <span class="p">)</span>
+
+
+<div class="viewcode-block" id="encoded_length_for_alignment">
+<a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.encoded_length_for_alignment">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">encoded_length_for_alignment</span><span class="p">(</span><span class="n">alignment</span><span class="p">,</span> <span class="n">max_length</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the per-row encoded length for an alignment method.</span>
+
+<span class="sd">    Mirrors the shape contract of</span>
+<span class="sd">    :func:`EncodableSequences.sequences_to_fixed_length_index_encoded_array`.</span>
+<span class="sd">    Covers every alignment method for shape bookkeeping / host-path parity;</span>
+<span class="sd">    note the device random-negative encoder only supports the subset in</span>
+<span class="sd">    ``_SUPPORTED_DEVICE_ALIGNMENTS`` (left_pad_centered_right_pad / pad_middle),</span>
+<span class="sd">    so the ``left_pad_right_pad`` / ``right_pad`` / ``left_pad`` branches here</span>
+<span class="sd">    are reachable only on the host path, not on device.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">alignment</span> <span class="o">==</span> <span class="s2">"left_pad_centered_right_pad"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">3</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_length</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">alignment</span> <span class="o">==</span> <span class="s2">"pad_middle"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_length</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">alignment</span> <span class="o">==</span> <span class="s2">"left_pad_right_pad"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">2</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_length</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">alignment</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"right_pad"</span><span class="p">,</span> <span class="s2">"left_pad"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_length</span><span class="p">)</span>
+    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+        <span class="s2">"encoded_length_for_alignment: unknown alignment </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">alignment</span><span class="p">,)</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="aa_distribution_to_index_weights">
+<a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.aa_distribution_to_index_weights">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">aa_distribution_to_index_weights</span><span class="p">(</span><span class="n">distribution</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Convert a letter-indexed AA distribution to a torch index-weight vector.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    distribution : pandas.Series or None</span>
+<span class="sd">        Letter→probability map (typically the planner's</span>
+<span class="sd">        ``aa_distribution``). When ``None``, weights are uniform over</span>
+<span class="sd">        the 20 common amino acids.</span>
+<span class="sd">    device, dtype : forwarded to the result tensor. ``dtype`` defaults</span>
+<span class="sd">        to ``torch.float32`` (multinomial requires float).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    torch.Tensor of shape ``(len(amino_acid.AMINO_ACIDS),)`` — index 20</span>
+<span class="sd">    (X) is always zero so X is never sampled.</span>
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">_torch</span>
+
+    <span class="k">if</span> <span class="n">dtype</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">dtype</span> <span class="o">=</span> <span class="n">_torch</span><span class="o">.</span><span class="n">float32</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="n">_torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+        <span class="nb">len</span><span class="p">(</span><span class="n">amino_acid</span><span class="o">.</span><span class="n">AMINO_ACIDS</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">distribution</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">letter</span> <span class="ow">in</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">COMMON_AMINO_ACIDS</span><span class="p">:</span>
+            <span class="n">weights</span><span class="p">[</span><span class="n">amino_acid</span><span class="o">.</span><span class="n">AMINO_ACID_INDEX</span><span class="p">[</span><span class="n">letter</span><span class="p">]]</span> <span class="o">=</span> <span class="mf">1.0</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">letter</span><span class="p">,</span> <span class="n">prob</span> <span class="ow">in</span> <span class="n">distribution</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">idx</span> <span class="o">=</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">AMINO_ACID_INDEX</span><span class="p">[</span><span class="n">letter</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">idx</span> <span class="o">==</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">X_INDEX</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">weights</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">prob</span><span class="p">)</span>
+    <span class="n">total</span> <span class="o">=</span> <span class="n">weights</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="k">if</span> <span class="nb">float</span><span class="p">(</span><span class="n">total</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"aa_distribution_to_index_weights: all weights are zero. "</span>
+            <span class="s2">"Either supply a distribution covering common AAs or pass "</span>
+            <span class="s2">"distribution=None for a uniform fallback."</span>
+        <span class="p">)</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="n">weights</span> <span class="o">/</span> <span class="n">total</span>
+    <span class="k">return</span> <span class="n">weights</span></div>
+
+
+
+<div class="viewcode-block" id="encode_random_negatives_on_device">
+<a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.encode_random_negatives_on_device">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">encode_random_negatives_on_device</span><span class="p">(</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">planner</span><span class="p">,</span>
+        <span class="n">pool_epochs</span><span class="p">,</span>
+        <span class="n">peptide_encoding</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">,</span>
+        <span class="n">generator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">out</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Sample + encode ``pool_epochs`` cycles of random negatives on device.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    planner : RandomNegativePeptides</span>
+<span class="sd">        Already had ``plan(...)`` called.</span>
+<span class="sd">    pool_epochs : int</span>
+<span class="sd">        Number of consecutive get_peptides() epochs to materialize. The</span>
+<span class="sd">        result has ``pool_epochs * planner.get_total_count()`` rows.</span>
+<span class="sd">    peptide_encoding : dict</span>
+<span class="sd">        Subset of ``Class1NeuralNetwork.network_hyperparameter_defaults``</span>
+<span class="sd">        that controls peptide encoding. Required keys:</span>
+<span class="sd">        ``alignment_method``, ``max_length``. For ``pad_middle``,</span>
+<span class="sd">        ``left_edge`` and ``right_edge`` are also consulted (default 4</span>
+<span class="sd">        each, matching the historical defaults).</span>
+<span class="sd">    device : torch.device or str</span>
+<span class="sd">        Output tensor device. Sampling and alignment writes happen here</span>
+<span class="sd">        (no host round-trip).</span>
+<span class="sd">    generator : torch.Generator, optional</span>
+<span class="sd">        When supplied, all multinomial draws are routed through it. The</span>
+<span class="sd">        caller is responsible for seeding (the numpy / torch RNG streams</span>
+<span class="sd">        are not bridged — for reproducible parity tests, seed both).</span>
+<span class="sd">    dtype : torch.dtype, optional</span>
+<span class="sd">        Output dtype. Default ``torch.int8`` (alphabet size 21 fits with</span>
+<span class="sd">        room to spare).</span>
+<span class="sd">    out : torch.Tensor, optional</span>
+<span class="sd">        Pre-allocated output tensor of the correct shape, dtype, and</span>
+<span class="sd">        device. When supplied, this function refills it in place — the</span>
+<span class="sd">        usual pattern for the device-resident fit path, where the</span>
+<span class="sd">        per-fit RN buffer is allocated once and reused per cycle.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    torch.Tensor of shape ``(pool_epochs * total_count, encoded_length)``,</span>
+<span class="sd">    dtype int8 by default, on ``device``. Rows are the per-(allele,</span>
+<span class="sd">    length) blocks in canonical ``planner.plan_df`` row-major order,</span>
+<span class="sd">    repeated ``pool_epochs`` times — same layout the host path produces</span>
+<span class="sd">    after encoding ``planner.get_peptides()``.</span>
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">_torch</span>
+
+    <span class="k">if</span> <span class="n">planner</span><span class="o">.</span><span class="n">plan_df</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"encode_random_negatives_on_device: planner has no plan; "</span>
+            <span class="s2">"call planner.plan(...) before encoding."</span>
+        <span class="p">)</span>
+    <span class="n">pool_epochs</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">pool_epochs</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">dtype</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">dtype</span> <span class="o">=</span> <span class="n">_torch</span><span class="o">.</span><span class="n">int8</span>
+
+    <span class="n">alignment</span> <span class="o">=</span> <span class="n">peptide_encoding</span><span class="p">[</span><span class="s2">"alignment_method"</span><span class="p">]</span>
+    <span class="n">max_length</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">peptide_encoding</span><span class="p">[</span><span class="s2">"max_length"</span><span class="p">])</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">supports_device_random_negative_encoding</span><span class="p">(</span><span class="n">peptide_encoding</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+            <span class="s2">"encode_random_negatives_on_device: alignment_method </span><span class="si">%r</span><span class="s2"> not "</span>
+            <span class="s2">"supported on device. Callers should gate on "</span>
+            <span class="s2">"supports_device_random_negative_encoding() and use the host "</span>
+            <span class="s2">"EncodableSequences path instead."</span> <span class="o">%</span> <span class="p">(</span><span class="n">alignment</span><span class="p">,)</span>
+        <span class="p">)</span>
+    <span class="n">left_edge</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">peptide_encoding</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"left_edge"</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+    <span class="n">right_edge</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">peptide_encoding</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"right_edge"</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+    <span class="n">encoded_length</span> <span class="o">=</span> <span class="n">encoded_length_for_alignment</span><span class="p">(</span><span class="n">alignment</span><span class="p">,</span> <span class="n">max_length</span><span class="p">)</span>
+
+    <span class="n">total_count</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">planner</span><span class="o">.</span><span class="n">get_total_count</span><span class="p">())</span>
+    <span class="n">expected_rows</span> <span class="o">=</span> <span class="n">pool_epochs</span> <span class="o">*</span> <span class="n">total_count</span>
+    <span class="n">expected_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">expected_rows</span><span class="p">,</span> <span class="n">encoded_length</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">out</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">_torch</span><span class="o">.</span><span class="n">full</span><span class="p">(</span>
+            <span class="n">expected_shape</span><span class="p">,</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">amino_acid</span><span class="o">.</span><span class="n">X_INDEX</span><span class="p">),</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span>
+            <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">!=</span> <span class="n">expected_shape</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"out shape mismatch: expected </span><span class="si">%r</span><span class="s2">, got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="n">expected_shape</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">shape</span><span class="p">),</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">out</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">dtype</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"out dtype mismatch: expected </span><span class="si">%r</span><span class="s2">, got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="n">out</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">fill_</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">amino_acid</span><span class="o">.</span><span class="n">X_INDEX</span><span class="p">))</span>
+
+    <span class="n">weights</span> <span class="o">=</span> <span class="n">aa_distribution_to_index_weights</span><span class="p">(</span>
+        <span class="n">planner</span><span class="o">.</span><span class="n">aa_distribution</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span>
+    <span class="p">)</span>
+
+    <span class="n">plan_df</span> <span class="o">=</span> <span class="n">planner</span><span class="o">.</span><span class="n">plan_df</span>
+    <span class="n">alleles</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">plan_df</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+    <span class="n">length_columns</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">plan_df</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
+
+    <span class="n">cursor</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">_epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pool_epochs</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">allele</span> <span class="ow">in</span> <span class="n">alleles</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="n">length_columns</span><span class="p">:</span>
+                <span class="n">num</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">plan_df</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="n">allele</span><span class="p">,</span> <span class="n">length</span><span class="p">])</span>
+                <span class="k">if</span> <span class="n">num</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">L</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">length</span><span class="p">)</span>
+                <span class="n">flat</span> <span class="o">=</span> <span class="n">_torch</span><span class="o">.</span><span class="n">multinomial</span><span class="p">(</span>
+                    <span class="n">weights</span><span class="p">,</span>
+                    <span class="n">num_samples</span><span class="o">=</span><span class="n">num</span> <span class="o">*</span> <span class="n">L</span><span class="p">,</span>
+                    <span class="n">replacement</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">generator</span><span class="o">=</span><span class="n">generator</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">block</span> <span class="o">=</span> <span class="n">flat</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">num</span><span class="p">,</span> <span class="n">L</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="p">)</span>
+                <span class="n">_place_indices_with_alignment</span><span class="p">(</span>
+                    <span class="n">out</span><span class="p">[</span><span class="n">cursor</span> <span class="p">:</span> <span class="n">cursor</span> <span class="o">+</span> <span class="n">num</span><span class="p">],</span>
+                    <span class="n">block</span><span class="p">,</span>
+                    <span class="n">length</span><span class="o">=</span><span class="n">L</span><span class="p">,</span>
+                    <span class="n">alignment</span><span class="o">=</span><span class="n">alignment</span><span class="p">,</span>
+                    <span class="n">max_length</span><span class="o">=</span><span class="n">max_length</span><span class="p">,</span>
+                    <span class="n">left_edge</span><span class="o">=</span><span class="n">left_edge</span><span class="p">,</span>
+                    <span class="n">right_edge</span><span class="o">=</span><span class="n">right_edge</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">cursor</span> <span class="o">+=</span> <span class="n">num</span>
+    <span class="k">if</span> <span class="n">cursor</span> <span class="o">!=</span> <span class="n">expected_rows</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+            <span class="s2">"encode_random_negatives_on_device: wrote </span><span class="si">%d</span><span class="s2"> rows, expected "</span>
+            <span class="s2">"</span><span class="si">%d</span><span class="s2"> (planner.get_total_count() drift?)"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">cursor</span><span class="p">,</span> <span class="n">expected_rows</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">out</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,650 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.cli.affinity_candidate_figures &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.cli.affinity_candidate_figures</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.cli.affinity_candidate_figures</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1"># http://www.apache.org/licenses/LICENSE-2.0</span>
+
+<span class="sd">"""Build common-cohort affinity figure inputs for shortlisted candidates."""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">mhcflurry.experiment_archive</span><span class="w"> </span><span class="kn">import</span> <span class="n">sha256_file</span>
+
+
+<span class="n">BASELINE_PUBLIC_COMPARISON</span> <span class="o">=</span> <span class="s2">"baseline-vs-public-no-additional-ms"</span>
+<span class="n">PUBLIC_COMPARISON</span> <span class="o">=</span> <span class="s2">"comparison-vs-public-no-additional-ms"</span>
+<span class="n">IDENTITY_COLUMNS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"source_file"</span><span class="p">,</span> <span class="s2">"hla"</span><span class="p">,</span> <span class="s2">"peptide"</span><span class="p">,</span> <span class="s2">"hit"</span><span class="p">)</span>
+<span class="n">BENCHMARK_METADATA_COLUMNS</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="s2">"source_file"</span><span class="p">,</span>
+    <span class="s2">"protein_accession"</span><span class="p">,</span>
+    <span class="s2">"sample_id"</span><span class="p">,</span>
+    <span class="s2">"hla"</span><span class="p">,</span>
+    <span class="s2">"peptide"</span><span class="p">,</span>
+    <span class="s2">"peptide_len"</span><span class="p">,</span>
+    <span class="s2">"n_flank"</span><span class="p">,</span>
+    <span class="s2">"c_flank"</span><span class="p">,</span>
+    <span class="s2">"hit"</span><span class="p">,</span>
+    <span class="s2">"allele"</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">EXTERNAL_JOIN_COLUMNS</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="s2">"protein_accession"</span><span class="p">,</span>
+    <span class="s2">"sample_id"</span><span class="p">,</span>
+    <span class="s2">"hla"</span><span class="p">,</span>
+    <span class="s2">"peptide"</span><span class="p">,</span>
+    <span class="s2">"n_flank"</span><span class="p">,</span>
+    <span class="s2">"c_flank"</span><span class="p">,</span>
+    <span class="s2">"hit"</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="make_parser">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.affinity_candidate_figures.make_parser">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_parser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="s2">"mhcflurry eval affinity-candidate-figures"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Build the shortlisted-candidate figure parser."""</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--factorial-dir"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--out"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--condition"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"append"</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Candidate condition to include; repeat for each finalist."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--public-predictor-name"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"mhcflurry_public_2_2"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Column/legend name for the pinned public predictor."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--external-predictions"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"append"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="p">[],</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"CSV[.bz2]"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Benchmark-aligned table containing NetMHCpan/MixMHCpred "</span>
+            <span class="s2">"columns. Repeat to merge multiple tables. Every candidate row "</span>
+            <span class="s2">"must match exactly one external row."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--formats"</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">"svg,pdf,png"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Paper-figure output formats. Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--skip-render"</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Build reusable prediction/score tables without rendering figures."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_comparison_dir</span><span class="p">(</span><span class="n">factorial_dir</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="n">baseline</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">condition</span> <span class="o">==</span> <span class="n">baseline</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">factorial_dir</span> <span class="o">/</span> <span class="n">BASELINE_PUBLIC_COMPARISON</span>
+    <span class="k">return</span> <span class="n">factorial_dir</span> <span class="o">/</span> <span class="n">condition</span> <span class="o">/</span> <span class="n">PUBLIC_COMPARISON</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_load_comparison</span><span class="p">(</span><span class="n">factorial_dir</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="n">baseline</span><span class="p">):</span>
+    <span class="n">comparison</span> <span class="o">=</span> <span class="n">_comparison_dir</span><span class="p">(</span><span class="n">factorial_dir</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="n">baseline</span><span class="p">)</span>
+    <span class="n">summary_path</span> <span class="o">=</span> <span class="n">comparison</span> <span class="o">/</span> <span class="s2">"affinity"</span> <span class="o">/</span> <span class="s2">"summary.json"</span>
+    <span class="n">predictions_path</span> <span class="o">=</span> <span class="n">comparison</span> <span class="o">/</span> <span class="s2">"affinity"</span> <span class="o">/</span> <span class="s2">"predictions.csv.bz2"</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">summary_path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Missing direct public summary for </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">condition</span><span class="p">,</span> <span class="n">summary_path</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">predictions_path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Missing held-out predictions for </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">condition</span><span class="p">,</span> <span class="n">predictions_path</span><span class="p">))</span>
+    <span class="n">summary</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">summary_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
+    <span class="n">identity</span> <span class="o">=</span> <span class="n">summary</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"benchmark_identity"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">identity</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">identity</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"sha256"</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Comparison lacks benchmark_identity: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">summary_path</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">comparison</span><span class="p">,</span> <span class="n">summary_path</span><span class="p">,</span> <span class="n">predictions_path</span><span class="p">,</span> <span class="n">identity</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_predictor_info_row</span><span class="p">(</span>
+        <span class="n">name</span><span class="p">,</span> <span class="n">description</span><span class="p">,</span> <span class="n">primary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">short</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"predictor"</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+        <span class="s2">"description"</span><span class="p">:</span> <span class="n">description</span><span class="p">,</span>
+        <span class="s2">"primary"</span><span class="p">:</span> <span class="nb">bool</span><span class="p">(</span><span class="n">primary</span><span class="p">),</span>
+        <span class="s2">"color"</span><span class="p">:</span> <span class="n">color</span><span class="p">,</span>
+        <span class="s2">"short"</span><span class="p">:</span> <span class="n">short</span> <span class="ow">or</span> <span class="n">name</span><span class="p">,</span>
+        <span class="s2">"detail"</span><span class="p">:</span> <span class="n">description</span><span class="p">,</span>
+        <span class="s2">"higher_is_better"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_condition_short_label</span><span class="p">(</span><span class="n">condition</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return a compact, unambiguous label for an affinity factorial arm."""</span>
+    <span class="n">replacements</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"rmsprop_keras"</span><span class="p">:</span> <span class="s2">"Keras"</span><span class="p">,</span>
+        <span class="s2">"rmsprop_pytorch"</span><span class="p">:</span> <span class="s2">"PyTorch"</span><span class="p">,</span>
+        <span class="s2">"lsuv_post_activation"</span><span class="p">:</span> <span class="s2">"post-LSUV"</span><span class="p">,</span>
+        <span class="s2">"lsuv_pre_activation"</span><span class="p">:</span> <span class="s2">"pre-LSUV"</span><span class="p">,</span>
+        <span class="s2">"lsuv_none"</span><span class="p">:</span> <span class="s2">"no LSUV"</span><span class="p">,</span>
+        <span class="s2">"init_glorot_uniform"</span><span class="p">:</span> <span class="s2">"Glorot"</span><span class="p">,</span>
+        <span class="s2">"init_he_uniform"</span><span class="p">:</span> <span class="s2">"He"</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="n">labels</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">component</span> <span class="ow">in</span> <span class="n">condition</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"__"</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">component</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"mb_"</span><span class="p">):</span>
+            <span class="n">labels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"mb</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">component</span><span class="o">.</span><span class="n">removeprefix</span><span class="p">(</span><span class="s2">"mb_"</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">labels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">replacements</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">component</span><span class="p">,</span> <span class="n">component</span><span class="p">))</span>
+    <span class="k">return</span> <span class="s2">" | "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">labels</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_merge_external_predictions</span><span class="p">(</span><span class="n">combined</span><span class="p">,</span> <span class="n">paths</span><span class="p">,</span> <span class="n">canonical_columns</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Join canonical external scores with strict row-coverage validation."""</span>
+    <span class="n">records</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">path_value</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">path_value</span><span class="p">)</span><span class="o">.</span><span class="n">expanduser</span><span class="p">()</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Missing external prediction table: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">path</span><span class="p">)</span>
+        <span class="n">external</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="n">missing_keys</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">column</span> <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">EXTERNAL_JOIN_COLUMNS</span>
+            <span class="k">if</span> <span class="n">column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">combined</span> <span class="ow">or</span> <span class="n">column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">external</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="n">missing_keys</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"External prediction join lacks stable key column(s) in </span><span class="si">%s</span><span class="s2">: "</span>
+                <span class="s2">"</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">missing_keys</span><span class="p">)))</span>
+        <span class="n">score_columns</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">column</span> <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">external</span><span class="o">.</span><span class="n">columns</span>
+            <span class="k">if</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">canonical_columns</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">score_columns</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"External prediction table has no supported predictor "</span>
+                <span class="s2">"columns: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">path</span><span class="p">)</span>
+        <span class="n">duplicate_columns</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">column</span> <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">score_columns</span> <span class="k">if</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">combined</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="n">duplicate_columns</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"External predictor column already exists before joining </span><span class="si">%s</span><span class="s2">: "</span>
+                <span class="s2">"</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">duplicate_columns</span><span class="p">)))</span>
+        <span class="n">join_columns</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">EXTERNAL_JOIN_COLUMNS</span><span class="p">)</span>
+        <span class="n">candidate_duplicate_mask</span> <span class="o">=</span> <span class="n">combined</span><span class="o">.</span><span class="n">duplicated</span><span class="p">(</span>
+            <span class="n">join_columns</span><span class="p">,</span> <span class="n">keep</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">external_duplicate_mask</span> <span class="o">=</span> <span class="n">external</span><span class="o">.</span><span class="n">duplicated</span><span class="p">(</span>
+            <span class="n">join_columns</span><span class="p">,</span> <span class="n">keep</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">external_duplicate_rows</span> <span class="o">=</span> <span class="n">external</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+            <span class="n">external_duplicate_mask</span><span class="p">,</span> <span class="n">join_columns</span> <span class="o">+</span> <span class="n">score_columns</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">external_duplicate_rows</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+            <span class="n">score_counts</span> <span class="o">=</span> <span class="n">external_duplicate_rows</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span>
+                <span class="n">join_columns</span><span class="p">,</span> <span class="n">dropna</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="p">)[</span><span class="n">score_columns</span><span class="p">]</span><span class="o">.</span><span class="n">nunique</span><span class="p">(</span><span class="n">dropna</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">inconsistent</span> <span class="o">=</span> <span class="n">score_counts</span><span class="o">.</span><span class="n">gt</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">inconsistent</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"External prediction rows repeat a join identity with "</span>
+                    <span class="s2">"different scores in </span><span class="si">%s</span><span class="s2"> (</span><span class="si">%d</span><span class="s2"> inconsistent key(s))"</span> <span class="o">%</span> <span class="p">(</span>
+                        <span class="n">path</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">inconsistent</span><span class="o">.</span><span class="n">sum</span><span class="p">())))</span>
+        <span class="n">external_unique</span> <span class="o">=</span> <span class="n">external</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">(</span><span class="n">join_columns</span><span class="p">,</span> <span class="n">keep</span><span class="o">=</span><span class="s2">"first"</span><span class="p">)</span>
+
+        <span class="n">original_rows</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">combined</span><span class="p">)</span>
+        <span class="n">combined</span><span class="p">[</span><span class="s2">"_candidate_row_order"</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">original_rows</span><span class="p">)</span>
+        <span class="n">combined</span> <span class="o">=</span> <span class="n">combined</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span>
+            <span class="n">external_unique</span><span class="p">[</span><span class="n">join_columns</span> <span class="o">+</span> <span class="n">score_columns</span><span class="p">],</span>
+            <span class="n">on</span><span class="o">=</span><span class="n">join_columns</span><span class="p">,</span>
+            <span class="n">how</span><span class="o">=</span><span class="s2">"left"</span><span class="p">,</span>
+            <span class="n">sort</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">validate</span><span class="o">=</span><span class="s2">"many_to_one"</span><span class="p">,</span>
+            <span class="n">indicator</span><span class="o">=</span><span class="s2">"_external_merge"</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">unmatched</span> <span class="o">=</span> <span class="nb">int</span><span class="p">((</span><span class="n">combined</span><span class="p">[</span><span class="s2">"_external_merge"</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">"both"</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+        <span class="k">if</span> <span class="n">unmatched</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"External prediction table failed to cover </span><span class="si">%d</span><span class="s2"> of </span><span class="si">%d</span><span class="s2"> candidate "</span>
+                <span class="s2">"rows: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">unmatched</span><span class="p">,</span> <span class="n">original_rows</span><span class="p">,</span> <span class="n">path</span><span class="p">))</span>
+        <span class="n">combined</span> <span class="o">=</span> <span class="n">combined</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">"_candidate_row_order"</span><span class="p">)</span>
+        <span class="n">combined</span> <span class="o">=</span> <span class="n">combined</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span>
+            <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">"_candidate_row_order"</span><span class="p">,</span> <span class="s2">"_external_merge"</span><span class="p">])</span>
+        <span class="n">combined</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">RangeIndex</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">combined</span><span class="p">))</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">combined</span><span class="p">)</span> <span class="o">!=</span> <span class="n">original_rows</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"External prediction join changed candidate row count: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span>
+                <span class="n">path</span><span class="p">)</span>
+        <span class="n">companion</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"</span><span class="si">%s</span><span class="s2">.provenance.json"</span> <span class="o">%</span> <span class="n">path</span><span class="p">)</span>
+        <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s2">"path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+            <span class="s2">"sha256"</span><span class="p">:</span> <span class="n">sha256_file</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+            <span class="s2">"source_rows"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">external</span><span class="p">),</span>
+            <span class="s2">"unique_join_rows"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">external_unique</span><span class="p">),</span>
+            <span class="s2">"duplicate_source_rows"</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">external_duplicate_mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()),</span>
+            <span class="s2">"duplicate_source_keys"</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span>
+                <span class="n">external</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">external_duplicate_mask</span><span class="p">,</span> <span class="n">join_columns</span><span class="p">]</span>
+                <span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span>
+                <span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+            <span class="s2">"matched_candidate_rows"</span><span class="p">:</span> <span class="n">original_rows</span><span class="p">,</span>
+            <span class="s2">"duplicate_candidate_rows"</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">candidate_duplicate_mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()),</span>
+            <span class="s2">"duplicate_candidate_keys"</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span>
+                <span class="n">combined</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">candidate_duplicate_mask</span><span class="p">,</span> <span class="n">join_columns</span><span class="p">]</span>
+                <span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span>
+                <span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+            <span class="s2">"join_columns"</span><span class="p">:</span> <span class="n">join_columns</span><span class="p">,</span>
+            <span class="s2">"predictor_columns"</span><span class="p">:</span> <span class="n">score_columns</span><span class="p">,</span>
+            <span class="s2">"finite_prediction_rows"</span><span class="p">:</span> <span class="p">{</span>
+                <span class="n">column</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span>
+                    <span class="n">pandas</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">combined</span><span class="p">[</span><span class="n">column</span><span class="p">],</span> <span class="n">errors</span><span class="o">=</span><span class="s2">"coerce"</span><span class="p">)</span>
+                <span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+                <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">score_columns</span>
+            <span class="p">},</span>
+            <span class="s2">"companion_provenance"</span><span class="p">:</span> <span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">"path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">companion</span><span class="p">),</span>
+                    <span class="s2">"sha256"</span><span class="p">:</span> <span class="n">sha256_file</span><span class="p">(</span><span class="n">companion</span><span class="p">),</span>
+                <span class="p">}</span>
+                <span class="k">if</span> <span class="n">companion</span><span class="o">.</span><span class="n">is_file</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="p">),</span>
+        <span class="p">})</span>
+    <span class="k">return</span> <span class="n">combined</span><span class="p">,</span> <span class="n">records</span>
+
+
+<div class="viewcode-block" id="build_candidate_figure_inputs">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.affinity_candidate_figures.build_candidate_figure_inputs">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">build_candidate_figure_inputs</span><span class="p">(</span>
+        <span class="n">factorial_dir</span><span class="p">,</span> <span class="n">out_dir</span><span class="p">,</span> <span class="n">conditions</span><span class="p">,</span> <span class="n">public_predictor_name</span><span class="p">,</span>
+        <span class="n">external_predictions</span><span class="o">=</span><span class="p">()):</span>
+<span class="w">    </span><span class="sd">"""Write and return common-cohort predictions and score metadata."""</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">paper_figures</span>
+
+    <span class="n">factorial_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">factorial_dir</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="n">out_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">out_dir</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="n">manifest_path</span> <span class="o">=</span> <span class="n">factorial_dir</span> <span class="o">/</span> <span class="s2">"manifest.json"</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">manifest_path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Missing factorial manifest: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">manifest_path</span><span class="p">)</span>
+    <span class="n">manifest</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">manifest_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
+    <span class="n">baseline</span> <span class="o">=</span> <span class="n">manifest</span><span class="p">[</span><span class="s2">"baseline_condition"</span><span class="p">]</span>
+    <span class="n">known</span> <span class="o">=</span> <span class="p">{</span><span class="n">record</span><span class="p">[</span><span class="s2">"condition"</span><span class="p">]</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">manifest</span><span class="p">[</span><span class="s2">"records"</span><span class="p">]}</span>
+    <span class="n">conditions</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">conditions</span><span class="p">))</span>
+    <span class="n">unknown</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">conditions</span><span class="p">)</span> <span class="o">-</span> <span class="n">known</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">unknown</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unknown factorial condition(s): </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">unknown</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">conditions</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"At least one --condition is required"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">public_predictor_name</span> <span class="ow">in</span> <span class="n">conditions</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"--public-predictor-name collides with a condition: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span>
+            <span class="n">public_predictor_name</span><span class="p">)</span>
+
+    <span class="n">records</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">expected_identity</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">combined</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">public_scores</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">public_prediction_max_abs_diff</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">predictor_info_rows</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">candidate_columns</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">canonical_external_columns</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">name</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">paper_figures</span><span class="o">.</span><span class="n">DEFAULT_PREDICTOR_HIGHER_IS_BETTER</span>
+        <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"netmhcpan"</span><span class="p">)</span> <span class="ow">or</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">"mixmhcpred"</span>
+    <span class="p">}</span>
+
+    <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">condition</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">conditions</span><span class="p">):</span>
+        <span class="n">comparison</span><span class="p">,</span> <span class="n">summary_path</span><span class="p">,</span> <span class="n">predictions_path</span><span class="p">,</span> <span class="n">identity</span> <span class="o">=</span> <span class="n">_load_comparison</span><span class="p">(</span>
+            <span class="n">factorial_dir</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="n">baseline</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">expected_identity</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">expected_identity</span> <span class="o">=</span> <span class="n">identity</span>
+        <span class="k">elif</span> <span class="n">identity</span> <span class="o">!=</span> <span class="n">expected_identity</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Candidate comparisons use different held-out rows: </span><span class="si">%s</span><span class="s2"> has "</span>
+                <span class="s2">"</span><span class="si">%s</span><span class="s2">; expected </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="n">condition</span><span class="p">,</span> <span class="n">identity</span><span class="p">[</span><span class="s2">"sha256"</span><span class="p">],</span>
+                    <span class="n">expected_identity</span><span class="p">[</span><span class="s2">"sha256"</span><span class="p">]))</span>
+
+        <span class="n">predictions</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">predictions_path</span><span class="p">)</span>
+        <span class="n">missing</span> <span class="o">=</span> <span class="p">[</span><span class="n">column</span> <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="p">(</span><span class="o">*</span><span class="n">IDENTITY_COLUMNS</span><span class="p">,</span> <span class="s2">"a_score"</span><span class="p">,</span> <span class="s2">"b_score"</span><span class="p">)</span>
+                   <span class="k">if</span> <span class="n">column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">predictions</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">missing</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Prediction table for </span><span class="si">%s</span><span class="s2"> lacks: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="n">condition</span><span class="p">,</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">missing</span><span class="p">)))</span>
+        <span class="k">if</span> <span class="n">combined</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">metadata_columns</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">column</span> <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">BENCHMARK_METADATA_COLUMNS</span>
+                <span class="k">if</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">predictions</span>
+            <span class="p">]</span>
+            <span class="n">external_columns</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">column</span> <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">predictions</span><span class="o">.</span><span class="n">columns</span>
+                <span class="k">if</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">canonical_external_columns</span>
+            <span class="p">]</span>
+            <span class="n">combined</span> <span class="o">=</span> <span class="n">predictions</span><span class="p">[</span><span class="n">metadata_columns</span> <span class="o">+</span> <span class="n">external_columns</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">public_predictor_name</span> <span class="ow">in</span> <span class="n">combined</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"--public-predictor-name collides with benchmark metadata "</span>
+                    <span class="s2">"or an external predictor column: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span>
+                    <span class="n">public_predictor_name</span><span class="p">)</span>
+            <span class="n">public_scores</span> <span class="o">=</span> <span class="n">predictions</span><span class="p">[</span><span class="s2">"b_score"</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">copy</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">combined</span><span class="p">[</span><span class="n">public_predictor_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">public_scores</span>
+            <span class="n">predictor_info_rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_predictor_info_row</span><span class="p">(</span>
+                <span class="n">public_predictor_name</span><span class="p">,</span>
+                <span class="s2">"Pinned public 2.2 models.no_additional_ms affinity ensemble"</span><span class="p">,</span>
+                <span class="n">color</span><span class="o">=</span><span class="s2">"#4c78a8"</span><span class="p">,</span>
+                <span class="n">short</span><span class="o">=</span><span class="s2">"Public 2.2"</span><span class="p">,</span>
+            <span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">predictions</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">combined</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"Prediction row count changed for </span><span class="si">%s</span><span class="s2">: </span><span class="si">%d</span><span class="s2"> versus </span><span class="si">%d</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                        <span class="n">condition</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">predictions</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">combined</span><span class="p">)))</span>
+            <span class="n">candidate_identity</span> <span class="o">=</span> <span class="n">predictions</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="n">IDENTITY_COLUMNS</span><span class="p">]</span>
+            <span class="n">combined_identity</span> <span class="o">=</span> <span class="n">combined</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="n">IDENTITY_COLUMNS</span><span class="p">]</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">candidate_identity</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">equals</span><span class="p">(</span>
+                    <span class="n">combined_identity</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"Prediction row identity or order changed for </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span>
+                    <span class="n">condition</span><span class="p">)</span>
+            <span class="n">comparison_public_scores</span> <span class="o">=</span> <span class="n">predictions</span><span class="p">[</span><span class="s2">"b_score"</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
+            <span class="n">finite_difference</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span>
+                <span class="n">comparison_public_scores</span> <span class="o">-</span> <span class="n">public_scores</span><span class="p">)</span>
+            <span class="n">max_abs_diff</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">nanmax</span><span class="p">(</span><span class="n">finite_difference</span><span class="p">))</span>
+            <span class="n">public_prediction_max_abs_diff</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+                <span class="n">public_prediction_max_abs_diff</span><span class="p">,</span> <span class="n">max_abs_diff</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">numpy</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span>
+                    <span class="n">comparison_public_scores</span><span class="p">,</span> <span class="n">public_scores</span><span class="p">,</span>
+                    <span class="n">rtol</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-7</span><span class="p">,</span> <span class="n">equal_nan</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"Pinned public predictions changed across comparisons: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span>
+                    <span class="n">condition</span><span class="p">)</span>
+
+        <span class="n">candidate_column</span> <span class="o">=</span> <span class="n">condition</span>
+        <span class="k">if</span> <span class="n">candidate_column</span> <span class="ow">in</span> <span class="n">combined</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Condition name collides with benchmark metadata or an "</span>
+                <span class="s2">"external predictor column: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">candidate_column</span><span class="p">)</span>
+        <span class="n">combined</span><span class="p">[</span><span class="n">candidate_column</span><span class="p">]</span> <span class="o">=</span> <span class="n">predictions</span><span class="p">[</span><span class="s2">"a_score"</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
+        <span class="n">candidate_columns</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">candidate_column</span><span class="p">)</span>
+        <span class="n">predictor_info_rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_predictor_info_row</span><span class="p">(</span>
+            <span class="n">candidate_column</span><span class="p">,</span>
+            <span class="s2">"MHCflurry affinity-factorial candidate </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">condition</span><span class="p">,</span>
+            <span class="n">primary</span><span class="o">=</span><span class="n">index</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="n">short</span><span class="o">=</span><span class="n">_condition_short_label</span><span class="p">(</span><span class="n">condition</span><span class="p">),</span>
+        <span class="p">))</span>
+        <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s2">"condition"</span><span class="p">:</span> <span class="n">condition</span><span class="p">,</span>
+            <span class="s2">"comparison_dir"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">comparison</span><span class="p">),</span>
+            <span class="s2">"summary_path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">summary_path</span><span class="p">),</span>
+            <span class="s2">"summary_sha256"</span><span class="p">:</span> <span class="n">sha256_file</span><span class="p">(</span><span class="n">summary_path</span><span class="p">),</span>
+            <span class="s2">"predictions_path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">predictions_path</span><span class="p">),</span>
+            <span class="s2">"predictions_sha256"</span><span class="p">:</span> <span class="n">sha256_file</span><span class="p">(</span><span class="n">predictions_path</span><span class="p">),</span>
+            <span class="s2">"benchmark_identity_sha256"</span><span class="p">:</span> <span class="n">identity</span><span class="p">[</span><span class="s2">"sha256"</span><span class="p">],</span>
+        <span class="p">})</span>
+
+    <span class="n">combined</span><span class="p">,</span> <span class="n">external_prediction_sources</span> <span class="o">=</span> <span class="n">_merge_external_predictions</span><span class="p">(</span>
+        <span class="n">combined</span><span class="p">,</span>
+        <span class="n">external_predictions</span><span class="p">,</span>
+        <span class="n">canonical_external_columns</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">external_columns</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">column</span> <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">combined</span><span class="o">.</span><span class="n">columns</span>
+        <span class="k">if</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">canonical_external_columns</span>
+    <span class="p">]</span>
+    <span class="n">external_short_labels</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"netmhcpan4.ba"</span><span class="p">:</span> <span class="s2">"NetMHCpan 4.0 BA"</span><span class="p">,</span>
+        <span class="s2">"netmhcpan4.el"</span><span class="p">:</span> <span class="s2">"NetMHCpan 4.0 EL"</span><span class="p">,</span>
+        <span class="s2">"mixmhcpred"</span><span class="p">:</span> <span class="s2">"MixMHCpred"</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">external_columns</span><span class="p">:</span>
+        <span class="n">predictor_info_rows</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="o">**</span><span class="n">_predictor_info_row</span><span class="p">(</span>
+                <span class="n">column</span><span class="p">,</span> <span class="s2">"External benchmark predictor </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">column</span><span class="p">,</span>
+                <span class="n">short</span><span class="o">=</span><span class="n">external_short_labels</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">column</span><span class="p">,</span> <span class="n">column</span><span class="p">)),</span>
+            <span class="s2">"higher_is_better"</span><span class="p">:</span> <span class="n">paper_figures</span><span class="o">.</span><span class="n">DEFAULT_PREDICTOR_HIGHER_IS_BETTER</span><span class="p">[</span>
+                <span class="n">column</span><span class="p">],</span>
+        <span class="p">})</span>
+
+    <span class="n">out_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">predictions_out</span> <span class="o">=</span> <span class="n">out_dir</span> <span class="o">/</span> <span class="s2">"benchmark.monoallelic.csv.bz2"</span>
+    <span class="n">predictor_info_out</span> <span class="o">=</span> <span class="n">out_dir</span> <span class="o">/</span> <span class="s2">"predictor_info.csv"</span>
+    <span class="n">scores_out</span> <span class="o">=</span> <span class="n">out_dir</span> <span class="o">/</span> <span class="s2">"accuracy_scores.monoallelic.csv"</span>
+    <span class="n">combined</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">predictions_out</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">predictor_info</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">predictor_info_rows</span><span class="p">)</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">(</span>
+        <span class="s2">"predictor"</span><span class="p">,</span> <span class="n">keep</span><span class="o">=</span><span class="s2">"first"</span><span class="p">)</span>
+    <span class="n">predictor_info</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">predictor_info_out</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">indexed_info</span> <span class="o">=</span> <span class="n">predictor_info</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">"predictor"</span><span class="p">,</span> <span class="n">drop</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">predictor_columns</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">candidate_columns</span> <span class="o">+</span> <span class="p">[</span><span class="n">public_predictor_name</span><span class="p">]</span> <span class="o">+</span> <span class="n">external_columns</span><span class="p">)</span>
+    <span class="n">scores</span> <span class="o">=</span> <span class="n">paper_figures</span><span class="o">.</span><span class="n">score_saved_prediction_table</span><span class="p">(</span>
+        <span class="n">predictions_out</span><span class="p">,</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">"monoallelic"</span><span class="p">,</span>
+        <span class="n">predictor_info</span><span class="o">=</span><span class="n">indexed_info</span><span class="p">,</span>
+        <span class="n">predictor_columns</span><span class="o">=</span><span class="n">predictor_columns</span><span class="p">,</span>
+        <span class="n">external_baselines</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"."</span><span class="p">,</span> <span class="s2">"_"</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">[</span><span class="n">public_predictor_name</span><span class="p">]</span> <span class="o">+</span> <span class="n">external_columns</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">scores</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">scores_out</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">provenance</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"schema_version"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="s2">"factorial_dir"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">factorial_dir</span><span class="p">),</span>
+        <span class="s2">"factorial_manifest"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">),</span>
+        <span class="s2">"factorial_manifest_sha256"</span><span class="p">:</span> <span class="n">sha256_file</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">),</span>
+        <span class="s2">"benchmark_identity"</span><span class="p">:</span> <span class="n">expected_identity</span><span class="p">,</span>
+        <span class="s2">"conditions"</span><span class="p">:</span> <span class="n">conditions</span><span class="p">,</span>
+        <span class="s2">"public_predictor_name"</span><span class="p">:</span> <span class="n">public_predictor_name</span><span class="p">,</span>
+        <span class="s2">"public_prediction_max_abs_diff"</span><span class="p">:</span> <span class="n">public_prediction_max_abs_diff</span><span class="p">,</span>
+        <span class="s2">"external_predictors_included"</span><span class="p">:</span> <span class="n">external_columns</span><span class="p">,</span>
+        <span class="s2">"external_prediction_sources"</span><span class="p">:</span> <span class="n">external_prediction_sources</span><span class="p">,</span>
+        <span class="s2">"source_comparisons"</span><span class="p">:</span> <span class="n">records</span><span class="p">,</span>
+        <span class="s2">"outputs"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"predictions"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">predictions_out</span><span class="p">),</span>
+            <span class="s2">"predictor_info"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">predictor_info_out</span><span class="p">),</span>
+            <span class="s2">"scores"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">scores_out</span><span class="p">),</span>
+        <span class="p">},</span>
+    <span class="p">}</span>
+    <span class="p">(</span><span class="n">out_dir</span> <span class="o">/</span> <span class="s2">"provenance.json"</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">provenance</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">provenance</span></div>
+
+
+
+<div class="viewcode-block" id="run">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.affinity_candidate_figures.run">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Build common inputs and optionally render the paper-figure suite."""</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">paper_figures</span>
+
+    <span class="n">provenance</span> <span class="o">=</span> <span class="n">build_candidate_figure_inputs</span><span class="p">(</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">factorial_dir</span><span class="p">,</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">condition</span><span class="p">,</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">public_predictor_name</span><span class="p">,</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">external_predictions</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">skip_render</span><span class="p">:</span>
+        <span class="n">external</span> <span class="o">=</span> <span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">public_predictor_name</span><span class="p">]</span>
+        <span class="n">external</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">provenance</span><span class="p">[</span><span class="s2">"external_predictors_included"</span><span class="p">])</span>
+        <span class="n">preferred</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">condition</span><span class="p">)</span> <span class="o">+</span> <span class="n">external</span>
+        <span class="n">paper_args</span> <span class="o">=</span> <span class="n">paper_figures</span><span class="o">.</span><span class="n">make_parser</span><span class="p">()</span><span class="o">.</span><span class="n">parse_args</span><span class="p">([</span>
+            <span class="s2">"--scores-dir"</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()),</span>
+            <span class="s2">"--monoallelic-predictions"</span><span class="p">,</span>
+            <span class="n">provenance</span><span class="p">[</span><span class="s2">"outputs"</span><span class="p">][</span><span class="s2">"predictions"</span><span class="p">],</span>
+            <span class="s2">"--out"</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span> <span class="o">/</span> <span class="s2">"paper_figures"</span><span class="p">),</span>
+            <span class="s2">"--formats"</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">formats</span><span class="p">,</span>
+            <span class="s2">"--candidate-predictor"</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">condition</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="s2">"--monoallelic-panel-predictors"</span><span class="p">,</span> <span class="s2">","</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">condition</span><span class="p">),</span>
+            <span class="s2">"--external-baselines"</span><span class="p">,</span> <span class="s2">","</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">external</span><span class="p">),</span>
+            <span class="s2">"--preferred-predictors"</span><span class="p">,</span> <span class="s2">","</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">preferred</span><span class="p">),</span>
+        <span class="p">])</span>
+        <span class="n">status</span> <span class="o">=</span> <span class="n">paper_figures</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">paper_args</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">status</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">status</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">())</span>
+    <span class="k">return</span> <span class="mi">0</span></div>
+
+
+
+<div class="viewcode-block" id="run_argv">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.affinity_candidate_figures.run_argv">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_argv</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prog</span><span class="o">=</span><span class="s2">"mhcflurry eval affinity-candidate-figures"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Parse arguments and generate shortlisted-candidate figures."""</span>
+    <span class="k">return</span> <span class="n">run</span><span class="p">(</span><span class="n">make_parser</span><span class="p">(</span><span class="n">prog</span><span class="p">)</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">))</span></div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="n">run_argv</span><span class="p">())</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

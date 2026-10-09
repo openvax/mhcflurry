@@ -1,0 +1,612 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.parallelism.torch_compile &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.parallelism.torch_compile</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.parallelism.torch_compile</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Torch compile environment and cache-warmup helpers."""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">..common</span><span class="w"> </span><span class="kn">import</span> <span class="n">normalize_pytorch_backend</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..memory_budget</span><span class="w"> </span><span class="kn">import</span> <span class="n">per_worker_memory_budget_bytes</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..workload_planning</span><span class="w"> </span><span class="kn">import</span> <span class="n">env_int</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.planning</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">refine_local_parallelism_from_warmup</span><span class="p">,</span>
+    <span class="n">resolve_local_parallelism_args</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.worker_pool</span><span class="w"> </span><span class="kn">import</span> <span class="n">worker_pool_with_gpu_assignments</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.worker_runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">call_wrapped_kwargs</span>
+
+
+<span class="n">_INDUCTOR_THREAD_HARD_CAP</span> <span class="o">=</span> <span class="mi">16</span>
+<span class="n">_INDUCTOR_WARMUP_THREAD_HARD_CAP</span> <span class="o">=</span> <span class="mi">64</span>
+<span class="n">WORKER_CONTEXT</span> <span class="o">=</span> <span class="p">{}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_run_resource_probe_item</span><span class="p">(</span><span class="n">work_function</span><span class="p">,</span> <span class="n">work_item</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Run one resource probe using data installed once in this process."""</span>
+    <span class="n">item</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">work_item</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">"constant_data"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">item</span> <span class="ow">and</span> <span class="s2">"constant_data"</span> <span class="ow">in</span> <span class="n">WORKER_CONTEXT</span><span class="p">:</span>
+        <span class="n">item</span><span class="p">[</span><span class="s2">"constant_data"</span><span class="p">]</span> <span class="o">=</span> <span class="n">WORKER_CONTEXT</span><span class="p">[</span><span class="s2">"constant_data"</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">call_wrapped_kwargs</span><span class="p">(</span><span class="n">work_function</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_torch_compile_enabled</span><span class="p">():</span>
+    <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_TORCH_COMPILE"</span><span class="p">,</span> <span class="s2">"0"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"1"</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_auto_torchinductor_compile_threads</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">,</span> <span class="n">phase</span><span class="o">=</span><span class="s2">"production"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return auto-sized Inductor compile helper count for this phase."""</span>
+    <span class="n">cpu_count_</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span> <span class="ow">or</span> <span class="mi">1</span>
+    <span class="k">if</span> <span class="n">phase</span> <span class="o">==</span> <span class="s2">"warmup"</span><span class="p">:</span>
+        <span class="n">threads</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">cpu_count_</span><span class="p">,</span> <span class="n">_INDUCTOR_WARMUP_THREAD_HARD_CAP</span><span class="p">)</span>
+        <span class="n">cap_name</span> <span class="o">=</span> <span class="s2">"MHCFLURRY_TORCHINDUCTOR_WARMUP_COMPILE_THREADS_CAP"</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">threads</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>
+            <span class="n">_INDUCTOR_THREAD_HARD_CAP</span><span class="p">,</span>
+            <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">cpu_count_</span> <span class="o">//</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">),</span> <span class="mi">1</span><span class="p">)),</span>
+        <span class="p">)</span>
+        <span class="n">cap_name</span> <span class="o">=</span> <span class="s2">"MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_CAP"</span>
+    <span class="n">raw_cap</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">cap_name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">raw_cap</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">):</span>
+        <span class="n">threads</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>
+            <span class="n">threads</span><span class="p">,</span>
+            <span class="n">env_int</span><span class="p">(</span><span class="n">cap_name</span><span class="p">,</span> <span class="n">raw_cap</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="kc">None</span><span class="p">)),</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">threads</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_compile_threads_env_is_auto_owned</span><span class="p">():</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"1"</span>
+        <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"TORCHINDUCTOR_COMPILE_THREADS"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"auto"</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_set_auto_torchinductor_compile_threads</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">,</span> <span class="n">phase</span><span class="o">=</span><span class="s2">"production"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Set ``TORCHINDUCTOR_COMPILE_THREADS`` to the auto value."""</span>
+    <span class="n">threads</span> <span class="o">=</span> <span class="n">_auto_torchinductor_compile_threads</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">,</span> <span class="n">phase</span><span class="o">=</span><span class="n">phase</span><span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"TORCHINDUCTOR_COMPILE_THREADS"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">threads</span><span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"1"</span>
+    <span class="k">return</span> <span class="n">threads</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_compile_threads_num_jobs</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">num_jobs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">1</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">num_jobs</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"auto"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">1</span>
+    <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="resolve_torchinductor_compile_threads_env">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.resolve_torchinductor_compile_threads_env">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">resolve_torchinductor_compile_threads_env</span><span class="p">(</span><span class="n">num_jobs</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">phase</span><span class="o">=</span><span class="s2">"production"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Ensure ``TORCHINDUCTOR_COMPILE_THREADS`` is parseable by PyTorch.</span>
+
+<span class="sd">    MHCflurry launchers accept ``TORCHINDUCTOR_COMPILE_THREADS=auto`` as an</span>
+<span class="sd">    orchestrator-owned sentinel so each command can size the Inductor compiler</span>
+<span class="sd">    helper pool after it knows its local worker count. PyTorch itself does not</span>
+<span class="sd">    accept that sentinel: Inductor parses the env var with ``int(...)``.</span>
+
+<span class="sd">    This helper is for entry points that do not run the full local-parallelism</span>
+<span class="sd">    resolver before importing or spawning PyTorch work. It leaves unset and</span>
+<span class="sd">    user-pinned integer values alone, resolves orchestrator-owned ``auto`` to a</span>
+<span class="sd">    numeric value, and fails early on other invalid values with a clearer</span>
+<span class="sd">    message than the downstream Inductor traceback.</span>
+<span class="sd">    """</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"TORCHINDUCTOR_COMPILE_THREADS"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">auto_owned</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">value</span> <span class="o">==</span> <span class="s2">"auto"</span>
+        <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"1"</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">auto_owned</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_set_auto_torchinductor_compile_threads</span><span class="p">(</span>
+            <span class="n">num_jobs</span><span class="o">=</span><span class="n">_compile_threads_num_jobs</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">),</span>
+            <span class="n">phase</span><span class="o">=</span><span class="n">phase</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"TORCHINDUCTOR_COMPILE_THREADS must be an integer or the "</span>
+            <span class="s2">"MHCflurry-owned sentinel 'auto'; got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">value</span><span class="p">,)</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="configure_cluster_worker_torch_compile_threads">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.configure_cluster_worker_torch_compile_threads">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">configure_cluster_worker_torch_compile_threads</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Auto-size Inductor helper threads inside one cluster worker process.</span>
+
+<span class="sd">    Cluster parallelism submits each work item as its own process, often on</span>
+<span class="sd">    different nodes. We therefore do not try to share a compile cache across</span>
+<span class="sd">    the cluster. Each worker process still needs the same local policy: if</span>
+<span class="sd">    compile is enabled and ``TORCHINDUCTOR_COMPILE_THREADS`` is unset or</span>
+<span class="sd">    ``auto``, pick a numeric value on that machine before the first</span>
+<span class="sd">    ``torch.compile`` call.</span>
+
+<span class="sd">    If a scheduler packs several mhcflurry work items onto one node, set</span>
+<span class="sd">    ``MHCFLURRY_CLUSTER_WORKERS_PER_NODE`` so the auto value is divided across</span>
+<span class="sd">    those co-resident compiler processes. Otherwise the default assumes one</span>
+<span class="sd">    work process owns its scheduler CPU allocation.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_torch_compile_enabled</span><span class="p">():</span>
+        <span class="n">resolve_torchinductor_compile_threads_env</span><span class="p">(</span><span class="n">num_jobs</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span>
+    <span class="k">if</span> <span class="s2">"TORCHINDUCTOR_COMPILE_THREADS"</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span>
+            <span class="n">_compile_threads_env_is_auto_owned</span><span class="p">()):</span>
+        <span class="n">resolve_torchinductor_compile_threads_env</span><span class="p">(</span><span class="n">num_jobs</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span>
+    <span class="n">workers_per_node</span> <span class="o">=</span> <span class="n">env_int</span><span class="p">(</span>
+        <span class="s2">"MHCFLURRY_CLUSTER_WORKERS_PER_NODE"</span><span class="p">,</span> <span class="s2">"1"</span><span class="p">,</span>
+        <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">threads</span> <span class="o">=</span> <span class="n">_set_auto_torchinductor_compile_threads</span><span class="p">(</span>
+        <span class="n">num_jobs</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="n">workers_per_node</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+        <span class="n">phase</span><span class="o">=</span><span class="s2">"production"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="s2">"torch.compile: cluster worker auto-set "</span>
+        <span class="s2">"TORCHINDUCTOR_COMPILE_THREADS=</span><span class="si">%d</span><span class="s2"> "</span>
+        <span class="s2">"(MHCFLURRY_CLUSTER_WORKERS_PER_NODE=</span><span class="si">%d</span><span class="s2">)"</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="n">threads</span><span class="p">,</span> <span class="n">workers_per_node</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="hoist_torchinductor_compile_threads">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.hoist_torchinductor_compile_threads">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">hoist_torchinductor_compile_threads</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">phase</span><span class="o">=</span><span class="s2">"production"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Auto-size ``TORCHINDUCTOR_COMPILE_THREADS`` for local training.</span>
+
+<span class="sd">    ``torch.compile`` (when enabled via ``MHCFLURRY_TORCH_COMPILE=1``)</span>
+<span class="sd">    spins up an inductor compile worker pool that defaults to</span>
+<span class="sd">    ``os.cpu_count()`` threads. With N fit() workers each running their own</span>
+<span class="sd">    compile pool, that multiplies into an oversubscribed compile storm. The</span>
+<span class="sd">    production phase uses an auto value derived from available cores and the</span>
+<span class="sd">    worker count; the warmup phase uses a larger value because only one worker</span>
+<span class="sd">    is compiling.</span>
+
+<span class="sd">    The orchestrator owns "how many workers will exist", so it owns</span>
+<span class="sd">    the env knob too: set once before forking, every worker inherits.</span>
+<span class="sd">    Skips the hoist when the user has already pinned the value or when</span>
+<span class="sd">    ``MHCFLURRY_TORCH_COMPILE`` isn't on. Cluster workers running on</span>
+<span class="sd">    other hosts must size themselves locally; see</span>
+<span class="sd">    ``configure_cluster_worker_torch_compile_threads``.</span>
+
+<span class="sd">    Lives here (not in any one ``train_*_command`` module) so processing,</span>
+<span class="sd">    allele-specific, and any future train command can call it the same</span>
+<span class="sd">    way.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_torch_compile_enabled</span><span class="p">():</span>
+        <span class="c1"># No compile = no compile pool to size, but still normalize any</span>
+        <span class="c1"># inherited MHCflurry-owned sentinel before a worker imports PyTorch.</span>
+        <span class="n">resolve_torchinductor_compile_threads_env</span><span class="p">(</span>
+            <span class="n">num_jobs</span><span class="o">=</span><span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"num_jobs"</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">phase</span><span class="o">=</span><span class="n">phase</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span>
+    <span class="n">auto_owned</span> <span class="o">=</span> <span class="n">_compile_threads_env_is_auto_owned</span><span class="p">()</span>
+    <span class="k">if</span> <span class="s2">"TORCHINDUCTOR_COMPILE_THREADS"</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">auto_owned</span><span class="p">:</span>
+        <span class="c1"># User pinned explicitly; don't second-guess.</span>
+        <span class="n">resolve_torchinductor_compile_threads_env</span><span class="p">(</span>
+            <span class="n">num_jobs</span><span class="o">=</span><span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"num_jobs"</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">phase</span><span class="o">=</span><span class="n">phase</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">"torch.compile: TORCHINDUCTOR_COMPILE_THREADS=</span><span class="si">%s</span><span class="s2"> "</span>
+            <span class="s2">"(user-pinned, orchestrator hoist skipped)"</span>
+            <span class="o">%</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"TORCHINDUCTOR_COMPILE_THREADS"</span><span class="p">],</span>
+            <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span>
+    <span class="n">num_jobs</span> <span class="o">=</span> <span class="n">_compile_threads_num_jobs</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"num_jobs"</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="n">cpu_count_</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span> <span class="ow">or</span> <span class="mi">1</span>
+    <span class="n">threads</span> <span class="o">=</span> <span class="n">_auto_torchinductor_compile_threads</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">,</span> <span class="n">phase</span><span class="o">=</span><span class="n">phase</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span>
+            <span class="n">auto_owned</span>
+            <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"TORCHINDUCTOR_COMPILE_THREADS"</span><span class="p">)</span> <span class="o">==</span> <span class="nb">str</span><span class="p">(</span><span class="n">threads</span><span class="p">)):</span>
+        <span class="k">return</span>
+    <span class="n">_set_auto_torchinductor_compile_threads</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">,</span> <span class="n">phase</span><span class="o">=</span><span class="n">phase</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="s2">"torch.compile: hoisted TORCHINDUCTOR_COMPILE_THREADS=</span><span class="si">%d</span><span class="s2"> "</span>
+        <span class="s2">"(phase=</span><span class="si">%s</span><span class="s2">, num_jobs=</span><span class="si">%d</span><span class="s2">, cpu_count=</span><span class="si">%d</span><span class="s2">)"</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="n">threads</span><span class="p">,</span> <span class="n">phase</span><span class="p">,</span> <span class="n">num_jobs</span><span class="p">,</span> <span class="n">cpu_count_</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+<span class="n">_COMPILE_KEY_HYPERPARAMS</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="s2">"layer_sizes"</span><span class="p">,</span>
+    <span class="s2">"topology"</span><span class="p">,</span>
+    <span class="s2">"dropout_probability"</span><span class="p">,</span>
+    <span class="s2">"batch_normalization"</span><span class="p">,</span>
+    <span class="s2">"activation"</span><span class="p">,</span>
+    <span class="s2">"output_activation"</span><span class="p">,</span>
+    <span class="s2">"peptide_dense_layer_sizes"</span><span class="p">,</span>
+    <span class="s2">"allele_dense_layer_sizes"</span><span class="p">,</span>
+    <span class="s2">"peptide_allele_merge_method"</span><span class="p">,</span>
+    <span class="s2">"peptide_allele_merge_activation"</span><span class="p">,</span>
+    <span class="s2">"locally_connected_layers"</span><span class="p">,</span>
+    <span class="s2">"peptide_amino_acid_encoding"</span><span class="p">,</span>
+    <span class="s2">"peptide_amino_acid_encoding_torch"</span><span class="p">,</span>
+    <span class="s2">"peptide_encoding"</span><span class="p">,</span>
+    <span class="s2">"num_outputs"</span><span class="p">,</span>
+    <span class="s2">"loss"</span><span class="p">,</span>
+    <span class="s2">"convolutional_filters"</span><span class="p">,</span>
+    <span class="s2">"convolutional_kernel_size"</span><span class="p">,</span>
+    <span class="s2">"convolutional_activation"</span><span class="p">,</span>
+    <span class="s2">"post_convolutional_dense_layer_sizes"</span><span class="p">,</span>
+    <span class="s2">"convolutional_kernel_l1_l2"</span><span class="p">,</span>
+    <span class="s2">"n_flank_length"</span><span class="p">,</span>
+    <span class="s2">"c_flank_length"</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_arch_compile_key</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Stable fingerprint for hyperparameters that change the compile graph.</span>
+
+<span class="sd">    Two work items with the same key produce the same torch.compile graph</span>
+<span class="sd">    and therefore share an on-disk compile cache entry; warming one warms</span>
+<span class="sd">    both. Hyperparameters that only affect optimization or regularization</span>
+<span class="sd">    (learning rate, L1/L2 reg, max_epochs, patience, ...) are excluded —</span>
+<span class="sd">    they're applied outside the compiled forward / loss closure.</span>
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span>
+        <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">_COMPILE_KEY_HYPERPARAMS</span><span class="p">},</span>
+        <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="p">)</span>
+
+
+<span class="n">_RESOURCE_KEY_HYPERPARAMS</span> <span class="o">=</span> <span class="n">_COMPILE_KEY_HYPERPARAMS</span> <span class="o">+</span> <span class="p">(</span>
+    <span class="s2">"minibatch_size"</span><span class="p">,</span>
+    <span class="s2">"validation_batch_size"</span><span class="p">,</span>
+    <span class="s2">"validation_split"</span><span class="p">,</span>
+    <span class="s2">"fit_tensor_residency"</span><span class="p">,</span>
+    <span class="s2">"optimizer"</span><span class="p">,</span>
+    <span class="s2">"random_negative_rate"</span><span class="p">,</span>
+    <span class="s2">"random_negative_constant"</span><span class="p">,</span>
+    <span class="s2">"random_negative_method"</span><span class="p">,</span>
+    <span class="s2">"random_negative_pool_epochs"</span><span class="p">,</span>
+    <span class="s2">"train_data"</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_resource_probe_key</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Stable fingerprint for parameters that can change peak resources."""</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span>
+        <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">_RESOURCE_KEY_HYPERPARAMS</span><span class="p">},</span>
+        <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="p">)</span>
+
+
+<div class="viewcode-block" id="run_single_worker_resource_probe">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.run_single_worker_resource_probe">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_single_worker_resource_probe</span><span class="p">(</span>
+        <span class="n">args</span><span class="p">,</span>
+        <span class="n">work_items</span><span class="p">,</span>
+        <span class="n">work_function</span><span class="p">,</span>
+        <span class="n">constant_data</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Measure one real peak phase for every resource-distinct architecture.</span>
+
+<span class="sd">    The command's ``resource_probe_only`` path must exercise its true resident</span>
+<span class="sd">    data, configured minibatch, and validation phase for one bounded epoch.</span>
+<span class="sd">    The single spawned worker records process-level CUDA memory (including the</span>
+<span class="sd">    context), allocator peaks, and host RSS. Those observations may only tighten</span>
+<span class="sd">    automatic concurrency before the production pool starts.</span>
+
+<span class="sd">    When torch.compile is enabled the same pass also primes its on-disk cache;</span>
+<span class="sd">    resource safety is intentionally independent of compile being enabled.</span>
+
+<span class="sd">    ``work_items`` is not mutated: every task still runs in production.</span>
+
+<span class="sd">    Returns ``None`` when skipped, otherwise the number of unique</span>
+<span class="sd">    architectures warmed.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">work_items</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">resolve_local_parallelism_args</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"cluster_parallelism"</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"num_jobs"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"MHCFLURRY_RESOURCE_PROBE"</span><span class="p">,</span> <span class="s2">"1"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"0"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">compile_enabled</span> <span class="o">=</span> <span class="n">_torch_compile_enabled</span><span class="p">()</span>
+
+    <span class="n">backend</span> <span class="o">=</span> <span class="n">normalize_pytorch_backend</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"backend"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">"auto"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">backend</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"cpu"</span><span class="p">,</span> <span class="s2">"mps"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">seen_keys</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">unique_warmup_items</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">work_items</span><span class="p">:</span>
+        <span class="n">hp</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"hyperparameters"</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">_resource_probe_key</span><span class="p">(</span><span class="n">hp</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">seen_keys</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">seen_keys</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="n">unique_warmup_items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">unique_warmup_items</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="s2">"Resource probe: measuring </span><span class="si">%d</span><span class="s2"> resource-distinct architecture(s) "</span>
+        <span class="s2">"of </span><span class="si">%d</span><span class="s2"> work items (full residency + train + validation, "</span>
+        <span class="s2">"single-worker phase</span><span class="si">%s</span><span class="s2">)"</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">unique_warmup_items</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">work_items</span><span class="p">),</span>
+            <span class="s2">"; also priming torch.compile cache"</span> <span class="k">if</span> <span class="n">compile_enabled</span> <span class="k">else</span> <span class="s2">""</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">explicit_threads</span> <span class="o">=</span> <span class="n">compile_enabled</span> <span class="ow">and</span> <span class="p">(</span>
+        <span class="s2">"TORCHINDUCTOR_COMPILE_THREADS"</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span>
+        <span class="ow">and</span> <span class="ow">not</span> <span class="n">_compile_threads_env_is_auto_owned</span><span class="p">()</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">compile_enabled</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">explicit_threads</span><span class="p">:</span>
+        <span class="n">threads</span> <span class="o">=</span> <span class="n">_set_auto_torchinductor_compile_threads</span><span class="p">(</span>
+            <span class="n">num_jobs</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">phase</span><span class="o">=</span><span class="s2">"warmup"</span>
+        <span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">"Resource probe: TORCHINDUCTOR_COMPILE_THREADS=</span><span class="si">%d</span><span class="s2"> "</span>
+            <span class="s2">"(single-worker codegen phase)"</span> <span class="o">%</span> <span class="n">threads</span><span class="p">,</span>
+            <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">warmup_pool</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">reports</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># The probe is the only GPU worker in this phase. Give it the full</span>
+        <span class="c1"># launch-time usable envelope so it measures the requested production</span>
+        <span class="c1"># minibatch and validation peak instead of inheriting (and potentially</span>
+        <span class="c1"># shrinking to) the preliminary N-worker slice we are validating.</span>
+        <span class="n">launch_available_bytes</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span>
+            <span class="n">args</span><span class="p">,</span> <span class="s2">"_device_memory_available_bytes_at_launch"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">probe_device_budget_bytes</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">per_worker_memory_budget_bytes</span><span class="p">(</span><span class="n">launch_available_bytes</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">launch_available_bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="k">else</span> <span class="kc">None</span>
+        <span class="p">)</span>
+        <span class="n">warmup_pool</span> <span class="o">=</span> <span class="n">worker_pool_with_gpu_assignments</span><span class="p">(</span>
+            <span class="n">num_jobs</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="n">num_gpus</span><span class="o">=</span><span class="mi">1</span> <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"gpus"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="n">backend</span><span class="o">=</span><span class="n">backend</span><span class="p">,</span>
+            <span class="c1"># This phase intentionally has one resident GPU worker. Keep the</span>
+            <span class="c1"># advertised co-resident count consistent with the full launch</span>
+            <span class="c1"># entitlement above; otherwise runtime batch sizing divides the</span>
+            <span class="c1"># probe's budget by the preliminary production density again.</span>
+            <span class="n">max_workers_per_gpu</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="n">device_memory_budget_bytes</span><span class="o">=</span><span class="n">probe_device_budget_bytes</span><span class="p">,</span>
+            <span class="n">max_tasks_per_worker</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">unique_warmup_items</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="n">worker_log_dir</span><span class="o">=</span><span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"worker_log_dir"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+            <span class="n">cpu_threads_per_worker</span><span class="o">=</span><span class="nb">getattr</span><span class="p">(</span>
+                <span class="n">args</span><span class="p">,</span> <span class="s2">"cpu_threads_per_worker"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+            <span class="n">cpu_threads_per_worker_was_auto</span><span class="o">=</span><span class="nb">getattr</span><span class="p">(</span>
+                <span class="n">args</span><span class="p">,</span> <span class="s2">"cpu_threads_per_worker_was_auto"</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span>
+            <span class="c1"># Spawn (not fork) for parity with the production pools below;</span>
+            <span class="c1"># forked CUDA workers break if the parent has touched CUDA.</span>
+            <span class="n">start_method</span><span class="o">=</span><span class="s2">"spawn"</span><span class="p">,</span>
+            <span class="n">worker_context_module</span><span class="o">=</span><span class="p">(</span><span class="vm">__name__</span> <span class="k">if</span> <span class="n">constant_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">),</span>
+            <span class="n">worker_context_data</span><span class="o">=</span><span class="p">(</span>
+                <span class="p">{</span><span class="s2">"constant_data"</span><span class="p">:</span> <span class="n">constant_data</span><span class="p">}</span>
+                <span class="k">if</span> <span class="n">constant_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="p">),</span>
+        <span class="p">)</span>
+        <span class="n">warmup_started_at</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">warmup_item</span> <span class="ow">in</span> <span class="n">unique_warmup_items</span><span class="p">:</span>
+            <span class="n">item_for_worker</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">warmup_item</span><span class="p">)</span>
+            <span class="n">item_for_worker</span><span class="p">[</span><span class="s2">"resource_probe_only"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">report</span> <span class="o">=</span> <span class="n">warmup_pool</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span>
+                <span class="n">_run_resource_probe_item</span><span class="p">,</span> <span class="p">(</span><span class="n">work_function</span><span class="p">,</span> <span class="n">item_for_worker</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">report</span><span class="p">:</span>
+                <span class="n">reports</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">report</span><span class="p">)</span>
+        <span class="n">warmup_pool</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">warmup_pool</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+        <span class="n">warmup_pool</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">"Resource probe: completed </span><span class="si">%d</span><span class="s2"> architecture probe(s) in "</span>
+            <span class="s2">"</span><span class="si">%.1f</span><span class="s2"> sec."</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">unique_warmup_items</span><span class="p">),</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">warmup_started_at</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">warmup_pool</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">warmup_pool</span><span class="o">.</span><span class="n">terminate</span><span class="p">()</span>
+            <span class="n">warmup_pool</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">compile_enabled</span><span class="p">:</span>
+            <span class="n">hoist_torchinductor_compile_threads</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">phase</span><span class="o">=</span><span class="s2">"production"</span><span class="p">)</span>
+
+    <span class="n">refine_local_parallelism_from_warmup</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">reports</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">unique_warmup_items</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="run_single_worker_torch_compile_warmup">
+<a class="viewcode-back" href="../../../mhcflurry.parallelism.html#mhcflurry.parallelism.run_single_worker_torch_compile_warmup">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_single_worker_torch_compile_warmup</span><span class="p">(</span>
+        <span class="n">args</span><span class="p">,</span>
+        <span class="n">work_items</span><span class="p">,</span>
+        <span class="n">work_function</span><span class="p">,</span>
+        <span class="n">constant_data</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Compatibility alias for :func:`run_single_worker_resource_probe`."""</span>
+    <span class="k">return</span> <span class="n">run_single_worker_resource_probe</span><span class="p">(</span>
+        <span class="n">args</span><span class="p">,</span>
+        <span class="n">work_items</span><span class="p">,</span>
+        <span class="n">work_function</span><span class="p">,</span>
+        <span class="n">constant_data</span><span class="o">=</span><span class="n">constant_data</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

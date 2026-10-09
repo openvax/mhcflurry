@@ -1,0 +1,1235 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.common &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.common</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.common</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">collections</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">datetime</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">hashlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">random</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shlex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mhcgnomes</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">parse</span><span class="p">,</span>
+    <span class="n">parse_gene_class</span><span class="p">,</span>
+    <span class="n">Allele</span><span class="p">,</span>
+    <span class="n">AlleleWithoutGene</span><span class="p">,</span>
+    <span class="n">Gene</span><span class="p">,</span>
+    <span class="n">Serotype</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">amino_acid</span>
+
+
+<span class="c1"># Default master seed for CLI commands that accept --random-seed. A fixed</span>
+<span class="c1"># seed supports reproducible sampling; numerical results can still depend on</span>
+<span class="c1"># hardware, library versions and nondeterministic kernels.</span>
+<span class="n">DEFAULT_RANDOM_SEED</span> <span class="o">=</span> <span class="mi">42</span>
+
+
+<div class="viewcode-block" id="positive_int_arg">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.positive_int_arg">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">positive_int_arg</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Parse an argparse value as an integer greater than zero."""</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentTypeError</span><span class="p">(</span>
+            <span class="s2">"expected a positive integer, got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">value</span><span class="p">,)</span>
+        <span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentTypeError</span><span class="p">(</span>
+            <span class="s2">"expected a positive integer, got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">value</span><span class="p">,)</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">float</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">floating</span><span class="p">))</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">value</span><span class="o">.</span><span class="n">is_integer</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentTypeError</span><span class="p">(</span>
+            <span class="s2">"expected a positive integer, got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">value</span><span class="p">,)</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">result</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentTypeError</span><span class="p">(</span>
+            <span class="s2">"expected a positive integer, got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">value</span><span class="p">,)</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="positive_float_arg">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.positive_float_arg">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">positive_float_arg</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Parse an argparse value as a finite float greater than zero."""</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentTypeError</span><span class="p">(</span>
+            <span class="s2">"expected a positive number, got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">value</span><span class="p">,)</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="ow">or</span> <span class="n">result</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentTypeError</span><span class="p">(</span>
+            <span class="s2">"expected a positive number, got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">value</span><span class="p">,)</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="fraction_arg">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.fraction_arg">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">fraction_arg</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Parse an argparse value as a finite fraction in ``(0, 1]``."""</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">positive_float_arg</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">result</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentTypeError</span><span class="p">(</span>
+            <span class="s2">"expected a fraction in (0, 1], got </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">value</span><span class="p">,)</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="add_random_seed_arg">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.add_random_seed_arg">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">add_random_seed_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Add the standard ``--random-seed`` argument to a CLI parser.</span>
+
+<span class="sd">    Training commands use this flag to record a shared source of random seeds.</span>
+<span class="sd">    It does not guarantee identical results across devices or library versions.</span>
+<span class="sd">    Pair with :func:`configure_random_seed`</span>
+<span class="sd">    at the start of the command's ``run``/``main``.</span>
+<span class="sd">    """</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--random-seed"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">DEFAULT_RANDOM_SEED</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Master random seed for this command "</span>
+        <span class="s2">"(numpy, Python `random`, and torch): data shuffles, fold/held-out "</span>
+        <span class="s2">"sampling, weight initialization, and random peptide/negative "</span>
+        <span class="s2">"sampling. Default: </span><span class="si">%(default)s</span><span class="s2">. Exact numerical results can still "</span>
+        <span class="s2">"vary with hardware, library versions and nondeterministic kernels."</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="configure_random_seed">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.configure_random_seed">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">configure_random_seed</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"mhcflurry"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Resolve, apply, and log a master random seed.</span>
+
+<span class="sd">    Seeds numpy's, Python's, and torch's *global* RNGs so every randomness</span>
+<span class="sd">    source in this process derives from one value. When ``seed`` is None a</span>
+<span class="sd">    value is drawn from system entropy. Returns the resolved seed so callers</span>
+<span class="sd">    can derive worker-local sub-seeds via :func:`derive_seed`.</span>
+<span class="sd">    """</span>
+    <span class="n">resolved</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span> <span class="k">if</span> <span class="n">seed</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="nb">int</span><span class="o">.</span><span class="n">from_bytes</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">urandom</span><span class="p">(</span><span class="mi">4</span><span class="p">),</span> <span class="s2">"little"</span><span class="p">))</span>
+    <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">resolved</span> <span class="o">%</span> <span class="p">(</span><span class="mi">2</span> <span class="o">**</span> <span class="mi">32</span><span class="p">))</span>
+    <span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">resolved</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">resolved</span> <span class="o">&amp;</span> <span class="p">((</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">63</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="k">pass</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="si">%s</span><span class="s2"> random seed: </span><span class="si">%d%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+        <span class="n">name</span><span class="p">,</span> <span class="n">resolved</span><span class="p">,</span> <span class="s2">""</span> <span class="k">if</span> <span class="n">seed</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">" (drawn from entropy)"</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">resolved</span></div>
+
+
+
+<div class="viewcode-block" id="install_sigusr1_stack_trace_handler">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.install_sigusr1_stack_trace_handler">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">install_sigusr1_stack_trace_handler</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Install a SIGUSR1 handler that prints this process's stack trace."""</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">signal</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">traceback</span>
+
+    <span class="n">signum</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="s2">"SIGUSR1"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">signum</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"To show stack trace, run:</span><span class="se">\n</span><span class="s2">kill -s USR1 </span><span class="si">%d</span><span class="s2">"</span> <span class="o">%</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">())</span>
+    <span class="n">signal</span><span class="o">.</span><span class="n">signal</span><span class="p">(</span><span class="n">signum</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">_signum</span><span class="p">,</span> <span class="n">_frame</span><span class="p">:</span> <span class="n">traceback</span><span class="o">.</span><span class="n">print_stack</span><span class="p">())</span>
+    <span class="k">return</span> <span class="kc">True</span></div>
+
+
+
+<div class="viewcode-block" id="derive_seed">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.derive_seed">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">derive_seed</span><span class="p">(</span><span class="n">master_seed</span><span class="p">,</span> <span class="o">*</span><span class="n">parts</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Derive a stable sub-seed from a master seed and identity ``parts``.</span>
+
+<span class="sd">    Gives independent units of work (e.g. one training fit, keyed by</span>
+<span class="sd">    architecture/fold/replicate) decorrelated but reproducible seeds, all</span>
+<span class="sd">    rooted in the run's single master seed. ``master_seed`` may be None</span>
+<span class="sd">    (e.g. a legacy run with no recorded seed); the result is still stable.</span>
+<span class="sd">    """</span>
+    <span class="n">pieces</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="p">((</span><span class="n">master_seed</span><span class="p">,)</span> <span class="o">+</span> <span class="n">parts</span><span class="p">)]</span>
+    <span class="c1"># The "|" join is unambiguous only because no coordinate contains "|"</span>
+    <span class="c1"># (parts are integers / allele names today). Guard it so a future caller</span>
+    <span class="c1"># passing a "|"-containing identity fails loudly rather than silently</span>
+    <span class="c1"># colliding with a differently-split set of parts -- e.g. ("a|b",) vs</span>
+    <span class="c1"># ("a", "b"). Kept as a guard rather than a new length-prefixed encoding</span>
+    <span class="c1"># so every existing derived seed is unchanged.</span>
+    <span class="k">assert</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="s2">"|"</span> <span class="ow">in</span> <span class="n">piece</span> <span class="k">for</span> <span class="n">piece</span> <span class="ow">in</span> <span class="n">pieces</span><span class="p">),</span> <span class="p">(</span>
+        <span class="s2">"derive_seed parts must not contain '|': </span><span class="si">%r</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">parts</span><span class="p">,))</span>
+    <span class="n">identity</span> <span class="o">=</span> <span class="s2">"|"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">pieces</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">hashlib</span><span class="o">.</span><span class="n">sha1</span><span class="p">(</span><span class="n">identity</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()[:</span><span class="mi">16</span><span class="p">],</span> <span class="mi">16</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="normalize_allele_name">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.normalize_allele_name">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">normalize_allele_name</span><span class="p">(</span>
+        <span class="n">raw_name</span><span class="p">,</span>
+        <span class="n">forbidden_substrings</span><span class="o">=</span><span class="p">(</span><span class="s2">"MIC"</span><span class="p">,</span> <span class="s2">"HFE"</span><span class="p">),</span>
+        <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">default_value</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">use_allele_aliases</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Parses a string into a normalized allele representation.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    raw_name : str</span>
+<span class="sd">        Input string to normalize</span>
+
+<span class="sd">    forbidden_substrings : tuple of str</span>
+<span class="sd">        Legacy argument naming retained for compatibility. Values identify</span>
+<span class="sd">        exact genes; ``MIC`` identifies the mhcgnomes class-Ic family. Input</span>
+<span class="sd">        names are never rejected by substring matching.</span>
+
+<span class="sd">    raise_on_error : bool</span>
+<span class="sd">        If an allele fails to parse raise an exception if this argument is True</span>
+
+<span class="sd">    default_value : str or None</span>
+<span class="sd">        If raise_on_error is False and allele fails to parse, return this value</span>
+
+<span class="sd">    use_allele_aliases : bool</span>
+<span class="sd">        If True, use mhcgnomes allele alias table (IMGT historical name</span>
+<span class="sd">        reassignments). Some old allele names (e.g. B*44:01, Cw*0201) were</span>
+<span class="sd">        retired by IMGT when the original sequences were found to contain</span>
+<span class="sd">        errors. Defaults to True, so retired/aliased names resolve to their</span>
+<span class="sd">        current canonical form. Callers that must preserve current IMGT</span>
+<span class="sd">        nomenclature (e.g. pseudosequence-key matching, which is no-alias-first</span>
+<span class="sd">        with explicit fallback) pass use_allele_aliases=False.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str or None</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">raw_name</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">raw_name</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+        <span class="n">message</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">"Invalid MHC allele name: </span><span class="si">%r</span><span class="s2">. Expected a non-empty string."</span>
+            <span class="o">%</span> <span class="p">(</span><span class="n">raw_name</span><span class="p">,)</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">raise_on_error</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">default_value</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="n">parse</span><span class="p">(</span>
+        <span class="n">raw_name</span><span class="p">,</span>
+        <span class="n">only_class1</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">required_result_types</span><span class="o">=</span><span class="p">[</span><span class="n">Allele</span><span class="p">,</span> <span class="n">AlleleWithoutGene</span><span class="p">,</span> <span class="n">Gene</span><span class="p">],</span>
+        <span class="n">preferred_result_types</span><span class="o">=</span><span class="p">[</span><span class="n">Allele</span><span class="p">],</span>
+        <span class="n">use_allele_aliases</span><span class="o">=</span><span class="n">use_allele_aliases</span><span class="p">,</span>
+        <span class="n">infer_class2_pairing</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">collapse_singleton_haplotypes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">collapse_singleton_serotypes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">result</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">parsed_any_class</span> <span class="o">=</span> <span class="n">parse</span><span class="p">(</span>
+            <span class="n">raw_name</span><span class="p">,</span>
+            <span class="n">only_class1</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">use_allele_aliases</span><span class="o">=</span><span class="n">use_allele_aliases</span><span class="p">,</span>
+            <span class="n">infer_class2_pairing</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">collapse_singleton_haplotypes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">collapse_singleton_serotypes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">parsed_any_class</span><span class="p">,</span> <span class="n">Serotype</span><span class="p">):</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">"Ambiguous MHC serotype is not a specific allele: </span><span class="si">%s</span><span class="s2">. "</span>
+                <span class="s2">"Provide a sequence-resolved allele such as HLA-A*02:01; "</span>
+                <span class="s2">"MHCflurry does not choose or average serotype members."</span>
+                <span class="o">%</span> <span class="n">raw_name</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">parsed_any_class</span><span class="p">,</span> <span class="s2">"is_class2"</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">"Unsupported MHC class II allele for a class I predictor: "</span>
+                <span class="s2">"</span><span class="si">%s</span><span class="s2">. Use an MHC class I allele and a model containing its "</span>
+                <span class="s2">"pseudosequence."</span> <span class="o">%</span> <span class="n">raw_name</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">parsed_any_class</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">"Unsupported MHC name for class I allele prediction: </span><span class="si">%s</span><span class="s2"> "</span>
+                <span class="s2">"(parsed as </span><span class="si">%s</span><span class="s2">, not a class I allele)."</span>
+                <span class="o">%</span> <span class="p">(</span><span class="n">raw_name</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">parsed_any_class</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">"Invalid MHC allele name: </span><span class="si">%s</span><span class="s2">. Provide a sequence-resolved "</span>
+                <span class="s2">"MHC class I allele such as HLA-A*02:01."</span> <span class="o">%</span> <span class="n">raw_name</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">raise_on_error</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">default_value</span>
+    <span class="n">gene_name</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="s2">"gene_name"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">""</span>
+    <span class="n">gene_class</span> <span class="o">=</span> <span class="n">parse_gene_class</span><span class="p">(</span><span class="n">raw_name</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">forbidden_gene</span> <span class="ow">in</span> <span class="n">forbidden_substrings</span><span class="p">:</span>
+        <span class="n">is_forbidden</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">gene_name</span> <span class="o">==</span> <span class="n">forbidden_gene</span>
+            <span class="ow">or</span> <span class="p">(</span>
+                <span class="n">forbidden_gene</span> <span class="o">==</span> <span class="s2">"MIC"</span>
+                <span class="ow">and</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">gene_class</span><span class="p">,</span> <span class="s2">"mhc_class"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"Ic"</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">is_forbidden</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">raise_on_error</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"Unsupported gene in MHC allele name: </span><span class="si">%s</span><span class="s2">. MHCflurry "</span>
+                    <span class="s2">"affinity models support classical MHC class I alleles, "</span>
+                    <span class="s2">"not </span><span class="si">%s</span><span class="s2">-family genes."</span> <span class="o">%</span> <span class="p">(</span><span class="n">raw_name</span><span class="p">,</span> <span class="n">forbidden_gene</span><span class="p">)</span>
+                <span class="p">)</span>
+            <span class="k">return</span> <span class="n">default_value</span>
+    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="s2">"is_pseudogene"</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">raise_on_error</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Unsupported pseudogene MHC allele: </span><span class="si">%s</span><span class="s2">. Pseudogene alleles "</span>
+                <span class="s2">"do not have a usable class I product for affinity "</span>
+                <span class="s2">"prediction."</span> <span class="o">%</span> <span class="n">raw_name</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">default_value</span>
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">annotation_null</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">raise_on_error</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Unsupported null-expression MHC allele: </span><span class="si">%s</span><span class="s2">. Null alleles "</span>
+                <span class="s2">"are not expressed and are not supported for prediction."</span>
+                <span class="o">%</span> <span class="n">raw_name</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">default_value</span>
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">annotation_questionable</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">raise_on_error</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Unsupported questionable-expression MHC allele: </span><span class="si">%s</span><span class="s2">. "</span>
+                <span class="s2">"Alleles with uncertain expression are not supported for "</span>
+                <span class="s2">"prediction."</span> <span class="o">%</span> <span class="n">raw_name</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">default_value</span>
+    <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">restrict_allele_fields</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="normalize_sequence_resolved_allele_name">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.normalize_sequence_resolved_allele_name">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">normalize_sequence_resolved_allele_name</span><span class="p">(</span><span class="n">raw_name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return a canonical, sequence-resolved class-I allele name.</span>
+
+<span class="sd">    HLA allele groups require at least two fields because a one-field group</span>
+<span class="sd">    can contain multiple protein sequences. Other species require at least one</span>
+<span class="sd">    allele field. Serotypes, genes, class-II names, pseudogenes, and invalid</span>
+<span class="sd">    spellings fail through :func:`normalize_allele_name` with its specific</span>
+<span class="sd">    diagnostic.</span>
+<span class="sd">    """</span>
+    <span class="n">normalized</span> <span class="o">=</span> <span class="n">normalize_allele_name</span><span class="p">(</span><span class="n">raw_name</span><span class="p">)</span>
+    <span class="n">parsed</span> <span class="o">=</span> <span class="n">parse</span><span class="p">(</span><span class="n">normalized</span><span class="p">,</span> <span class="n">only_class1</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">species</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">parsed</span><span class="p">,</span> <span class="s2">"species"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">required_fields</span> <span class="o">=</span> <span class="mi">2</span> <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">species</span><span class="p">,</span> <span class="s2">"mhc_prefix"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"HLA"</span> <span class="k">else</span> <span class="mi">1</span>
+    <span class="k">if</span> <span class="p">(</span>
+            <span class="n">parsed</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span>
+            <span class="nb">len</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">parsed</span><span class="p">,</span> <span class="s2">"allele_fields"</span><span class="p">,</span> <span class="p">()))</span> <span class="o">&lt;</span> <span class="n">required_fields</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Expected a sequence-resolved class-I allele with at least </span><span class="si">%d</span><span class="s2"> "</span>
+            <span class="s2">"field</span><span class="si">%s</span><span class="s2">; got </span><span class="si">%r</span><span class="s2">."</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">required_fields</span><span class="p">,</span>
+                <span class="s2">""</span> <span class="k">if</span> <span class="n">required_fields</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="s2">"s"</span><span class="p">,</span>
+                <span class="n">raw_name</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">normalized</span></div>
+
+
+
+<div class="viewcode-block" id="normalize_class1_genotype">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.normalize_class1_genotype">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">normalize_class1_genotype</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Canonicalize whitespace-delimited class-I MHC alleles into a tuple."""</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">value</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Expected a non-empty whitespace-delimited class-I genotype; "</span>
+            <span class="s2">"got </span><span class="si">%r</span><span class="s2">."</span> <span class="o">%</span> <span class="n">value</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span>
+        <span class="n">normalize_sequence_resolved_allele_name</span><span class="p">(</span><span class="n">allele</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">allele</span> <span class="ow">in</span> <span class="n">value</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+    <span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="allele_locus_name">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.allele_locus_name">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">allele_locus_name</span><span class="p">(</span>
+        <span class="n">raw_name</span><span class="p">,</span>
+        <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">default_value</span><span class="o">=</span><span class="s2">"other"</span><span class="p">,</span>
+        <span class="n">use_allele_aliases</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return a class-I MHC locus label using mhcgnomes parsing.</span>
+
+<span class="sd">    Human loci are returned as ``HLA-A``, ``HLA-B``, etc. Mouse H-2 loci are</span>
+<span class="sd">    collapsed to ``H2`` for the plotting/MHC-sampling code that only needs</span>
+<span class="sd">    a species-level bucket. Unparseable inputs raise when ``raise_on_error`` is</span>
+<span class="sd">    true. Valid but unhandled loci still return ``default_value``.</span>
+<span class="sd">    """</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">parse</span><span class="p">(</span>
+        <span class="nb">str</span><span class="p">(</span><span class="n">raw_name</span><span class="p">),</span>
+        <span class="n">only_class1</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">required_result_types</span><span class="o">=</span><span class="p">[</span><span class="n">Allele</span><span class="p">,</span> <span class="n">AlleleWithoutGene</span><span class="p">,</span> <span class="n">Gene</span><span class="p">,</span> <span class="n">Serotype</span><span class="p">],</span>
+        <span class="n">preferred_result_types</span><span class="o">=</span><span class="p">[</span><span class="n">Allele</span><span class="p">],</span>
+        <span class="n">use_allele_aliases</span><span class="o">=</span><span class="n">use_allele_aliases</span><span class="p">,</span>
+        <span class="n">infer_class2_pairing</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">collapse_singleton_haplotypes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">collapse_singleton_serotypes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">result</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">raise_on_error</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Invalid MHC allele name: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">raw_name</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">default_value</span>
+
+    <span class="n">species</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="s2">"species"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">prefix</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">species</span><span class="p">,</span> <span class="s2">"mhc_prefix"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">gene_name</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="s2">"gene_name"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">prefix</span> <span class="o">==</span> <span class="s2">"HLA"</span> <span class="ow">and</span> <span class="n">gene_name</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">"HLA-</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">gene_name</span>
+    <span class="k">if</span> <span class="n">prefix</span> <span class="o">==</span> <span class="s2">"H2"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">"H2"</span>
+    <span class="k">return</span> <span class="n">default_value</span></div>
+
+
+
+<div class="viewcode-block" id="filter_canonicalizable_alleles">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.filter_canonicalizable_alleles">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">filter_canonicalizable_alleles</span><span class="p">(</span><span class="n">alleles</span><span class="p">,</span> <span class="n">log_label</span><span class="o">=</span><span class="s2">"alleles"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Drop alleles that ``normalize_allele_name`` refuses to canonicalize.</span>
+
+<span class="sd">    Returns the surviving names **unchanged** (raw input strings), having only</span>
+<span class="sd">    removed the un-canonicalizable ones. ``predictor.supported_alleles`` (and</span>
+<span class="sd">    any user-supplied ``--alleles-file``) can contain pseudogenes / null</span>
+<span class="sd">    alleles / questionable annotations — those are real entries in the public</span>
+<span class="sd">    ``allele_sequences.csv`` (which aims to be exhaustive), but</span>
+<span class="sd">    ``predict_to_dataframe`` raises on them mid-iteration. Filter once up front</span>
+<span class="sd">    so iteration doesn't crash partway through, and log the dropped sample so</span>
+<span class="sd">    the missing rows in the resulting output table are explainable.</span>
+
+<span class="sd">    Survivors are returned verbatim rather than canonicalized: callers that</span>
+<span class="sd">    need names to match a predictor's pseudosequence keys must map them through</span>
+<span class="sd">    ``predictor.canonicalize_allele_name`` (which prefers the no-alias form,</span>
+<span class="sd">    matching how ``allele_to_sequence`` keys are built). A generic</span>
+<span class="sd">    alias-applying normalization here would silently remap retired alleles</span>
+<span class="sd">    (e.g. ``HLA-B*44:01`` -&gt; ``HLA-B*44:02``) away from their own key.</span>
+
+<span class="sd">    A local memo keeps the per-allele ``normalize_allele_name`` cost bounded.</span>
+<span class="sd">    mhcgnomes also caches its own parses, so even the full ~20K-allele predictor</span>
+<span class="sd">    set is a one-time ~1-2 sec single-threaded pre-pass (measured), not the</span>
+<span class="sd">    minutes a naive uncached parse would cost.</span>
+<span class="sd">    """</span>
+    <span class="n">seen</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_ok</span><span class="p">(</span><span class="n">allele</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">allele</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">normalize_allele_name</span><span class="p">(</span><span class="n">allele</span><span class="p">)</span>
+                <span class="n">seen</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                <span class="n">seen</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">return</span> <span class="n">seen</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span>
+
+    <span class="n">filtered</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">dropped</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">alleles</span><span class="p">:</span>
+        <span class="p">(</span><span class="n">filtered</span> <span class="k">if</span> <span class="n">_ok</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="k">else</span> <span class="n">dropped</span><span class="p">)</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">dropped</span><span class="p">:</span>
+        <span class="n">sample</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dropped</span><span class="p">[:</span><span class="mi">5</span><span class="p">])</span> <span class="o">+</span> <span class="p">(</span>
+            <span class="s2">", ..."</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">dropped</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">5</span> <span class="k">else</span> <span class="s2">""</span>
+        <span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"Skipping </span><span class="si">%d</span><span class="s2"> </span><span class="si">%s</span><span class="s2"> that fail canonicalization "</span>
+            <span class="s2">"(pseudogene/null/questionable): </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">dropped</span><span class="p">),</span>
+            <span class="n">log_label</span><span class="p">,</span>
+            <span class="n">sample</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">filtered</span></div>
+
+
+
+<div class="viewcode-block" id="build_allele_alias_map">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.build_allele_alias_map">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">build_allele_alias_map</span><span class="p">(</span><span class="n">valid_keys</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Map mhcgnomes-aliased names back to the canonical keys in ``valid_keys``.</span>
+
+<span class="sd">    For each key, compute its alias-applied normalization; if that differs from</span>
+<span class="sd">    the key and isn't itself a key, record ``alias -&gt; key``. Mirrors the map the</span>
+<span class="sd">    affinity predictor builds at load time (``allele_to_canonical``), but for an</span>
+<span class="sd">    arbitrary key set — e.g. an allele-sequences table at training time.</span>
+<span class="sd">    """</span>
+    <span class="n">valid</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">valid_keys</span><span class="p">)</span>
+    <span class="n">alias_map</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">valid</span><span class="p">:</span>
+        <span class="n">aliased</span> <span class="o">=</span> <span class="n">normalize_allele_name</span><span class="p">(</span>
+            <span class="n">key</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_allele_aliases</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">aliased</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">aliased</span> <span class="o">!=</span> <span class="n">key</span> <span class="ow">and</span> <span class="n">aliased</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">valid</span><span class="p">:</span>
+            <span class="n">alias_map</span><span class="p">[</span><span class="n">aliased</span><span class="p">]</span> <span class="o">=</span> <span class="n">key</span>
+    <span class="k">return</span> <span class="n">alias_map</span></div>
+
+
+
+<div class="viewcode-block" id="AlleleKeyResolver">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.AlleleKeyResolver">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AlleleKeyResolver</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Resolves allele names to a fixed set of canonical keys, no-alias-first.</span>
+
+<span class="sd">    A name is resolved by this priority (each step checked against</span>
+<span class="sd">    ``valid_keys``):</span>
+
+<span class="sd">      1. its own no-alias normalization, if that is already a key — so an</span>
+<span class="sd">         allele with its own pseudosequence isn't remapped onto an alias target</span>
+<span class="sd">         (e.g. retired ``HLA-B*44:01`` keeps its own entry rather than</span>
+<span class="sd">         collapsing to ``HLA-B*44:02``);</span>
+<span class="sd">      2. its alias-applied normalization, if *that* is a key;</span>
+<span class="sd">      3. the key it is a retired alias of, via the reverse alias map.</span>
+
+<span class="sd">    Two resolution modes, deliberately distinct:</span>
+
+<span class="sd">      * :meth:`resolve_to_key` — strict. Returns the resolved key, or None for</span>
+<span class="sd">        any name that maps to no key (whether unsupported or unparseable). Use</span>
+<span class="sd">        this when an unmatched name should be dropped (e.g. training ingestion).</span>
+<span class="sd">      * :meth:`resolve` — best effort. Like ``resolve_to_key`` for names that do</span>
+<span class="sd">        match a key, but a name that *normalizes* yet matches no key is returned</span>
+<span class="sd">        as its normalized form (not None), so callers can surface it as an</span>
+<span class="sd">        unsupported allele downstream. Returns None only when the name can't be</span>
+<span class="sd">        normalized at all (and ``raise_on_error=False``).</span>
+
+<span class="sd">    The reverse alias map (``build_allele_alias_map``, an O(len(valid_keys))</span>
+<span class="sd">    scan) is built once and cached on first use — so already-canonical inputs,</span>
+<span class="sd">    which resolve at step 1 or 2, never pay for it. Pass it prebuilt (e.g. a</span>
+<span class="sd">    predictor's load-time ``allele_to_canonical``) to skip the scan entirely.</span>
+
+<span class="sd">    ``valid_keys`` should support O(1) ``in`` (a dict or set); an empty/falsy</span>
+<span class="sd">    value skips steps 1-2 (e.g. allele-specific predictors with no</span>
+<span class="sd">    pseudosequences), so every name falls through to the reverse-map step.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">valid_keys</span><span class="p">,</span> <span class="n">alias_map</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">valid_keys</span> <span class="o">=</span> <span class="n">valid_keys</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_alias_map</span> <span class="o">=</span> <span class="n">alias_map</span>  <span class="c1"># built lazily by reverse_alias_map()</span>
+
+<div class="viewcode-block" id="AlleleKeyResolver.reverse_alias_map">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.AlleleKeyResolver.reverse_alias_map">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">reverse_alias_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""The alias -&gt; key map, built once on first use and cached."""</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_alias_map</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_alias_map</span> <span class="o">=</span> <span class="n">build_allele_alias_map</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">valid_keys</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_alias_map</span></div>
+
+
+<div class="viewcode-block" id="AlleleKeyResolver.resolve">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.AlleleKeyResolver.resolve">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">resolve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">raw_name</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Best-effort resolution. See the class docstring for the contract."""</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">valid_keys</span><span class="p">:</span>
+            <span class="n">no_alias</span> <span class="o">=</span> <span class="n">normalize_allele_name</span><span class="p">(</span>
+                <span class="n">raw_name</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_allele_aliases</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">no_alias</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">no_alias</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">valid_keys</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">no_alias</span>
+        <span class="n">normalized</span> <span class="o">=</span> <span class="n">normalize_allele_name</span><span class="p">(</span>
+            <span class="n">raw_name</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="n">raise_on_error</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">normalized</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">valid_keys</span> <span class="ow">and</span> <span class="n">normalized</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">valid_keys</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">normalized</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">reverse_alias_map</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">normalized</span><span class="p">,</span> <span class="n">normalized</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="AlleleKeyResolver.resolve_to_key">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.AlleleKeyResolver.resolve_to_key">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">resolve_to_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">raw_name</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Strict resolution: a key in ``valid_keys``, or None.</span>
+
+<span class="sd">        Drops the best-effort fallback of :meth:`resolve` — an unsupported or</span>
+<span class="sd">        unparseable name both return None.</span>
+<span class="sd">        """</span>
+        <span class="n">resolved</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">resolve</span><span class="p">(</span><span class="n">raw_name</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">valid_keys</span> <span class="ow">and</span> <span class="n">resolved</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">valid_keys</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">resolved</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="canonicalize_allele_series">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.canonicalize_allele_series">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">canonicalize_allele_series</span><span class="p">(</span><span class="n">alleles</span><span class="p">,</span> <span class="n">valid_keys</span><span class="p">,</span> <span class="n">log_label</span><span class="o">=</span><span class="s2">"alleles"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Map allele names to canonical keys (no-alias-first), strictly.</span>
+
+<span class="sd">    Returns a list parallel to ``alleles`` with each name resolved to a key in</span>
+<span class="sd">    ``valid_keys``, or None when it resolves to no key (so the row can be</span>
+<span class="sd">    dropped). Memoizes per unique input, so it is cheap over a long training</span>
+<span class="sd">    column with few distinct alleles, and the reverse alias map is built lazily</span>
+<span class="sd">    (only if some name is a current-name request for a retired key) — so</span>
+<span class="sd">    already-canonical data never pays the ~O(len(valid_keys)) scan. Logs a</span>
+<span class="sd">    sample of names that did not resolve. Use this for training ingestion.</span>
+<span class="sd">    """</span>
+    <span class="n">resolver</span> <span class="o">=</span> <span class="n">AlleleKeyResolver</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">valid_keys</span><span class="p">))</span>  <span class="c1"># alias map built lazily</span>
+    <span class="n">resolved</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">dropped</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_resolve</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">resolved</span><span class="p">:</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="n">resolver</span><span class="o">.</span><span class="n">resolve_to_key</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>  <span class="c1"># key, or None to drop</span>
+            <span class="n">resolved</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">key</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">dropped</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">resolved</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+
+    <span class="n">out</span> <span class="o">=</span> <span class="p">[</span><span class="n">_resolve</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">alleles</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">dropped</span><span class="p">:</span>
+        <span class="n">sample</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">dropped</span><span class="p">[:</span><span class="mi">5</span><span class="p">]))</span> <span class="o">+</span> <span class="p">(</span>
+            <span class="s2">", ..."</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">dropped</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">5</span> <span class="k">else</span> <span class="s2">""</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"Dropping </span><span class="si">%d</span><span class="s2"> </span><span class="si">%s</span><span class="s2"> that resolve to no supported allele key: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">dropped</span><span class="p">),</span> <span class="n">log_label</span><span class="p">,</span> <span class="n">sample</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">out</span></div>
+
+
+
+<span class="n">_pytorch_backend</span> <span class="o">=</span> <span class="s2">"auto"</span>
+<span class="n">_PYTORCH_BACKEND_ALIASES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"default"</span><span class="p">:</span> <span class="s2">"auto"</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="n">_TENSORFLOW_BACKEND_ALIASES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"tensorflow"</span><span class="p">:</span> <span class="s2">"auto"</span><span class="p">,</span>
+    <span class="s2">"tensorflow-default"</span><span class="p">:</span> <span class="s2">"auto"</span><span class="p">,</span>
+    <span class="s2">"tensorflow-gpu"</span><span class="p">:</span> <span class="s2">"gpu"</span><span class="p">,</span>
+    <span class="s2">"tensorflow-cpu"</span><span class="p">:</span> <span class="s2">"cpu"</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="n">_VALID_PYTORCH_BACKENDS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"auto"</span><span class="p">,</span> <span class="s2">"gpu"</span><span class="p">,</span> <span class="s2">"mps"</span><span class="p">,</span> <span class="s2">"cpu"</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="normalize_pytorch_backend">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.normalize_pytorch_backend">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">normalize_pytorch_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Normalize a requested backend name and validate it.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    backend : str or None</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str or None</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">backend</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">backend</span> <span class="o">=</span> <span class="n">_PYTORCH_BACKEND_ALIASES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">backend</span><span class="p">,</span> <span class="n">backend</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">backend</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_VALID_PYTORCH_BACKENDS</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Invalid backend </span><span class="si">%r</span><span class="s2">. Expected one of: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">backend</span><span class="p">,</span>
+                <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">_VALID_PYTORCH_BACKENDS</span><span class="p">),</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">backend</span></div>
+
+
+
+<div class="viewcode-block" id="configure_pytorch">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.configure_pytorch">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">configure_pytorch</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">gpu_device_nums</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_threads</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Configure PyTorch device backend and threading.</span>
+
+<span class="sd">    Can be called multiple times. Each call updates the settings provided.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    backend : str, optional</span>
+<span class="sd">        Device backend: "auto", "gpu", "mps", or "cpu".</span>
+<span class="sd">        "auto" selects the best available device (GPU &gt; MPS &gt; CPU).</span>
+<span class="sd">    gpu_device_nums : list of str or int, optional</span>
+<span class="sd">        CUDA device identifiers to expose via CUDA_VISIBLE_DEVICES. An empty</span>
+<span class="sd">        list hides CUDA entirely for the current process.</span>
+<span class="sd">    num_threads : int, optional</span>
+<span class="sd">        Number of threads for PyTorch operations</span>
+<span class="sd">    """</span>
+    <span class="k">global</span> <span class="n">_pytorch_backend</span>
+
+    <span class="k">if</span> <span class="n">backend</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">_pytorch_backend</span> <span class="o">=</span> <span class="n">normalize_pytorch_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">gpu_device_nums</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">'CUDA_VISIBLE_DEVICES'</span><span class="p">]</span> <span class="o">=</span> <span class="s1">','</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">gpu_device_nums</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="n">num_threads</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">set_num_threads</span><span class="p">(</span><span class="n">num_threads</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="configure_tensorflow">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.configure_tensorflow">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">configure_tensorflow</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">gpu_device_nums</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_threads</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Backward-compatible configuration entry point from the TF backend era.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    backend : str, optional</span>
+<span class="sd">        Legacy backend value retained for API compatibility. TensorFlow-era</span>
+<span class="sd">        names such as "tensorflow-cpu" are translated to the equivalent</span>
+<span class="sd">        PyTorch backend and emit a deprecation warning.</span>
+<span class="sd">    gpu_device_nums : list of str or int, optional</span>
+<span class="sd">        GPU device identifiers to potentially use.</span>
+<span class="sd">    num_threads : int, optional</span>
+<span class="sd">        Number of threads for backend operations.</span>
+<span class="sd">    """</span>
+    <span class="n">translated_backend</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">backend</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">translated_backend</span> <span class="o">=</span> <span class="n">_TENSORFLOW_BACKEND_ALIASES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">translated_backend</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="p">(</span>
+                    <span class="s2">"configure_tensorflow(backend=</span><span class="si">%r</span><span class="s2">) is deprecated; "</span>
+                    <span class="s2">"using PyTorch backend=</span><span class="si">%r</span><span class="s2">. Use configure_pytorch() instead."</span>
+                <span class="p">)</span> <span class="o">%</span> <span class="p">(</span><span class="n">backend</span><span class="p">,</span> <span class="n">translated_backend</span><span class="p">),</span>
+                <span class="ne">FutureWarning</span><span class="p">,</span>
+                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">translated_backend</span> <span class="o">=</span> <span class="n">normalize_pytorch_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
+    <span class="n">configure_pytorch</span><span class="p">(</span>
+        <span class="n">backend</span><span class="o">=</span><span class="n">translated_backend</span><span class="p">,</span>
+        <span class="n">gpu_device_nums</span><span class="o">=</span><span class="n">gpu_device_nums</span><span class="p">,</span>
+        <span class="n">num_threads</span><span class="o">=</span><span class="n">num_threads</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_pytorch_device">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.get_pytorch_device">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_pytorch_device</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Get the PyTorch device based on the backend set by ``configure_pytorch``.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    torch.device</span>
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+
+    <span class="n">backend</span> <span class="o">=</span> <span class="n">_pytorch_backend</span>
+
+    <span class="k">if</span> <span class="n">backend</span> <span class="o">==</span> <span class="s2">"gpu"</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">"Backend 'gpu' requested but CUDA is not available"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s1">'cuda'</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">backend</span> <span class="o">==</span> <span class="s2">"mps"</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">backends</span><span class="p">,</span> <span class="s1">'mps'</span><span class="p">)</span> <span class="ow">and</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">backends</span><span class="o">.</span><span class="n">mps</span><span class="o">.</span><span class="n">is_available</span><span class="p">()):</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">"Backend 'mps' requested but MPS is not available"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s1">'mps'</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">backend</span> <span class="o">==</span> <span class="s2">"cpu"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s1">'cpu'</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># auto: GPU &gt; MPS &gt; CPU</span>
+        <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s1">'cuda'</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">backends</span><span class="p">,</span> <span class="s1">'mps'</span><span class="p">)</span> <span class="ow">and</span>
+              <span class="n">torch</span><span class="o">.</span><span class="n">backends</span><span class="o">.</span><span class="n">mps</span><span class="o">.</span><span class="n">is_available</span><span class="p">()):</span>
+            <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s1">'mps'</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s1">'cpu'</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="configure_logging">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.configure_logging">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">configure_logging</span><span class="p">(</span><span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Configure logging module using defaults.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    verbose : boolean</span>
+<span class="sd">        If true, output will be at level DEBUG, otherwise, INFO.</span>
+<span class="sd">    """</span>
+    <span class="n">level</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span> <span class="k">if</span> <span class="n">verbose</span> <span class="k">else</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span>
+        <span class="nb">format</span><span class="o">=</span><span class="s2">"</span><span class="si">%(asctime)s</span><span class="s2">.</span><span class="si">%(msecs)d</span><span class="s2"> </span><span class="si">%(levelname)s</span><span class="s2"> </span><span class="si">%(module)s</span><span class="s2"> - </span><span class="si">%(funcName)s</span><span class="s2">:"</span>
+        <span class="s2">" </span><span class="si">%(message)s</span><span class="s2">"</span><span class="p">,</span>
+        <span class="n">datefmt</span><span class="o">=</span><span class="s2">"%Y-%m-</span><span class="si">%d</span><span class="s2"> %H:%M:%S"</span><span class="p">,</span>
+        <span class="n">stream</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span>
+        <span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+
+<div class="viewcode-block" id="amino_acid_distribution">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.amino_acid_distribution">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">amino_acid_distribution</span><span class="p">(</span><span class="n">peptides</span><span class="p">,</span> <span class="n">smoothing</span><span class="o">=</span><span class="mf">0.0</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Compute the fraction of each amino acid across a collection of peptides.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    peptides : list of string</span>
+<span class="sd">    smoothing : float, optional</span>
+<span class="sd">        Small number (e.g. 0.01) to add to all amino acid fractions. The higher</span>
+<span class="sd">        the number the more uniform the distribution.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    pandas.Series indexed by amino acids</span>
+<span class="sd">    """</span>
+    <span class="n">peptides</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span>
+    <span class="n">aa_counts</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">peptides</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">collections</span><span class="o">.</span><span class="n">Counter</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+    <span class="n">normalized</span> <span class="o">=</span> <span class="n">aa_counts</span> <span class="o">/</span> <span class="n">aa_counts</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">smoothing</span><span class="p">:</span>
+        <span class="n">normalized</span> <span class="o">+=</span> <span class="n">smoothing</span>
+        <span class="n">normalized</span> <span class="o">/=</span> <span class="n">normalized</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">normalized</span></div>
+
+
+
+<div class="viewcode-block" id="random_peptides">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.random_peptides">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">random_peptides</span><span class="p">(</span><span class="n">num</span><span class="p">,</span> <span class="n">length</span><span class="o">=</span><span class="mi">9</span><span class="p">,</span> <span class="n">distribution</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Generate random peptides (kmers).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    num : int</span>
+<span class="sd">        Number of peptides to return</span>
+
+<span class="sd">    length : int</span>
+<span class="sd">        Length of each peptide</span>
+
+<span class="sd">    distribution : pandas.Series</span>
+<span class="sd">        Maps 1-letter amino acid abbreviations to</span>
+<span class="sd">        probabilities. If not specified a uniform</span>
+<span class="sd">        distribution is used.</span>
+
+<span class="sd">    rng : numpy.random.Generator, optional</span>
+<span class="sd">        If provided, peptides are sampled from this generator instead of the</span>
+<span class="sd">        global ``numpy.random`` state. Used by callers that need deterministic</span>
+<span class="sd">        peptide generation, such as pre-generated random-negative pools. When</span>
+<span class="sd">        None the global state is used, preserving legacy call-site semantics.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    list of string</span>
+
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">num</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">distribution</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">distribution</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="nb">sorted</span><span class="p">(</span><span class="n">amino_acid</span><span class="o">.</span><span class="n">COMMON_AMINO_ACIDS</span><span class="p">))</span>
+        <span class="n">distribution</span> <span class="o">/=</span> <span class="n">distribution</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">rng</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">sampled</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span>
+            <span class="n">distribution</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="n">distribution</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">length</span><span class="p">))</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">sampled</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span>
+            <span class="n">distribution</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(),</span>
+            <span class="n">p</span><span class="o">=</span><span class="n">distribution</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+            <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">length</span><span class="p">)),</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="p">[</span><span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">peptide_sequence</span><span class="p">)</span> <span class="k">for</span> <span class="n">peptide_sequence</span> <span class="ow">in</span> <span class="n">sampled</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="positional_frequency_matrix">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.positional_frequency_matrix">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">positional_frequency_matrix</span><span class="p">(</span><span class="n">peptides</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Given a set of peptides, calculate a length x amino acids frequency matrix.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    peptides : list of string</span>
+<span class="sd">        All of same length</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    pandas.DataFrame</span>
+<span class="sd">        Index is position, columns are amino acids</span>
+<span class="sd">    """</span>
+    <span class="n">length</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">peptide</span><span class="p">)</span> <span class="o">==</span> <span class="n">length</span> <span class="k">for</span> <span class="n">peptide</span> <span class="ow">in</span> <span class="n">peptides</span><span class="p">)</span>
+    <span class="n">counts</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+        <span class="n">index</span><span class="o">=</span><span class="p">[</span><span class="n">a</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">BLOSUM62_MATRIX</span><span class="o">.</span><span class="n">index</span> <span class="k">if</span> <span class="n">a</span> <span class="o">!=</span> <span class="s2">"X"</span><span class="p">],</span>
+        <span class="n">columns</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">length</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">length</span><span class="p">):</span>
+        <span class="n">counts</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">([</span><span class="n">p</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">peptides</span><span class="p">])</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">(</span><span class="n">counts</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">))</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">"position"</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="save_weights">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.save_weights">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_weights</span><span class="p">(</span><span class="n">weights_list</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Save model weights to the given filename using numpy's ".npz" format.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    weights_list : list of numpy array</span>
+
+<span class="sd">    filename : string</span>
+<span class="sd">    """</span>
+    <span class="n">numpy</span><span class="o">.</span><span class="n">savez</span><span class="p">(</span>
+        <span class="n">filename</span><span class="p">,</span> <span class="o">**</span><span class="nb">dict</span><span class="p">(((</span><span class="s2">"array_</span><span class="si">%d</span><span class="s2">"</span> <span class="o">%</span> <span class="n">i</span><span class="p">),</span> <span class="n">w</span><span class="p">)</span> <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">w</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">weights_list</span><span class="p">))</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="load_weights">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.load_weights">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_weights</span><span class="p">(</span><span class="n">filename</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Restore model weights from the given filename, which should have been</span>
+<span class="sd">    created with `save_weights`.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    filename : string</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    list of array</span>
+<span class="sd">    """</span>
+    <span class="k">with</span> <span class="n">numpy</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span> <span class="k">as</span> <span class="n">loaded</span><span class="p">:</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="p">[</span><span class="n">loaded</span><span class="p">[</span><span class="s2">"array_</span><span class="si">%d</span><span class="s2">"</span> <span class="o">%</span> <span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">loaded</span><span class="o">.</span><span class="n">keys</span><span class="p">()))]</span>
+    <span class="k">return</span> <span class="n">weights</span></div>
+
+
+
+<div class="viewcode-block" id="NumpyJSONEncoder">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.NumpyJSONEncoder">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NumpyJSONEncoder</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">JSONEncoder</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    JSON encoder (used with json module) that can handle numpy arrays.</span>
+<span class="sd">    """</span>
+
+<div class="viewcode-block" id="NumpyJSONEncoder.default">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.NumpyJSONEncoder.default">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">default</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">obj</span><span class="p">,</span>
+            <span class="p">(</span>
+                <span class="n">numpy</span><span class="o">.</span><span class="n">int_</span><span class="p">,</span>
+                <span class="n">numpy</span><span class="o">.</span><span class="n">intc</span><span class="p">,</span>
+                <span class="n">numpy</span><span class="o">.</span><span class="n">intp</span><span class="p">,</span>
+                <span class="n">numpy</span><span class="o">.</span><span class="n">int8</span><span class="p">,</span>
+                <span class="n">numpy</span><span class="o">.</span><span class="n">int16</span><span class="p">,</span>
+                <span class="n">numpy</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+                <span class="n">numpy</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span>
+                <span class="n">numpy</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+                <span class="n">numpy</span><span class="o">.</span><span class="n">uint16</span><span class="p">,</span>
+                <span class="n">numpy</span><span class="o">.</span><span class="n">uint32</span><span class="p">,</span>
+                <span class="n">numpy</span><span class="o">.</span><span class="n">uint64</span><span class="p">,</span>
+            <span class="p">),</span>
+        <span class="p">):</span>
+            <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">obj</span><span class="p">,</span> <span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">float_</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">float16</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">obj</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONEncoder</span><span class="o">.</span><span class="n">default</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">)</span></div>
+</div>
+
+
+
+<span class="n">_GENERATE_SH_TEMPLATE</span> <span class="o">=</span> <span class="s2">"""</span><span class="se">\</span>
+<span class="s2">#!/usr/bin/env bash</span>
+<span class="s2"># Auto-generated by mhcflurry </span><span class="si">{version}</span><span class="s2"> on </span><span class="si">{timestamp}</span><span class="s2">.</span>
+<span class="s2">#</span>
+<span class="s2"># Run this script with no arguments to produce a tar.gz snapshot of</span>
+<span class="s2"># the artifact directory it lives in:</span>
+<span class="s2">#</span>
+<span class="s2">#     bash GENERATE.sh</span>
+<span class="s2">#</span>
+<span class="s2"># Pass `regenerate` as the first argument to re-run the originating</span>
+<span class="s2"># mhcflurry command (which recreates the directory) and then snapshot:</span>
+<span class="s2">#</span>
+<span class="s2">#     bash GENERATE.sh regenerate</span>
+<span class="s2">#</span>
+<span class="s2"># The originating command is recorded in ORIGINAL_COMMAND below; paths</span>
+<span class="s2"># inside it may need adjustment if you run from a different machine.</span>
+<span class="s2">set -euo pipefail</span>
+<span class="s2">HERE="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" &amp;&amp; pwd)"</span>
+<span class="s2">NAME="$(basename "$HERE")"</span>
+<span class="s2">PARENT="$(dirname "$HERE")"</span>
+
+<span class="s2">ORIGINAL_CWD=</span><span class="si">{cwd}</span>
+<span class="s2">ORIGINAL_COMMAND=(</span>
+<span class="s2">    </span><span class="si">{cmd}</span>
+<span class="s2">)</span>
+
+<span class="s2">if [ "${{1:-}}" = "regenerate" ]; then</span>
+<span class="s2">    # Safety checks before destroying the artifact dir:</span>
+<span class="s2">    #   * $HERE must resolve to a directory we own,</span>
+<span class="s2">    #   * not be the filesystem root or $HOME,</span>
+<span class="s2">    #   * and contain the GENERATE.sh we are running -- the canonical</span>
+<span class="s2">    #     marker that this dir was produced by mhcflurry. Without these</span>
+<span class="s2">    #     checks, a user re-running GENERATE.sh from inside an already-</span>
+<span class="s2">    #     replaced mountpoint, or with $HERE corrupted by a path edit,</span>
+<span class="s2">    #     could rm -rf an unrelated tree.</span>
+<span class="s2">    if [ -z "$HERE" ] || [ "$HERE" = "/" ] || [ "$HERE" = "$HOME" ]; then</span>
+<span class="s2">        echo "regenerate: refusing to rm -rf suspicious path: $HERE" &gt;&amp;2</span>
+<span class="s2">        exit 1</span>
+<span class="s2">    fi</span>
+<span class="s2">    if [ ! -d "$HERE" ] || [ ! -O "$HERE" ]; then</span>
+<span class="s2">        echo "regenerate: $HERE is not a directory we own" &gt;&amp;2</span>
+<span class="s2">        exit 1</span>
+<span class="s2">    fi</span>
+<span class="s2">    if [ ! -f "$HERE/GENERATE.sh" ]; then</span>
+<span class="s2">        echo "regenerate: GENERATE.sh missing in $HERE -- refusing" &gt;&amp;2</span>
+<span class="s2">        exit 1</span>
+<span class="s2">    fi</span>
+<span class="s2">    cd "$ORIGINAL_CWD"</span>
+<span class="s2">    rm -rf "$HERE"</span>
+<span class="s2">    "${{ORIGINAL_COMMAND[@]}}"</span>
+<span class="s2">fi</span>
+
+<span class="s2">TARBALL="$PARENT/$NAME.tar.gz"</span>
+<span class="s2">echo "Snapshotting $HERE -&gt; $TARBALL ..."</span>
+<span class="s2">tar czf "$TARBALL" -C "$PARENT" "$NAME"</span>
+<span class="s2">echo "Snapshot complete: $TARBALL"</span>
+<span class="s2">"""</span>
+
+
+<div class="viewcode-block" id="write_generate_sh">
+<a class="viewcode-back" href="../../api.html#mhcflurry.common.write_generate_sh">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">write_generate_sh</span><span class="p">(</span><span class="n">out_dir</span><span class="p">,</span> <span class="n">argv</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mhcflurry_version</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Write a GENERATE.sh in ``out_dir`` recording how to reproduce the</span>
+<span class="sd">    artifact directory and snapshot it as a tar.gz.</span>
+
+<span class="sd">    Called by every artifact-producing CLI (train/select/calibrate)</span>
+<span class="sd">    so each output directory ships a one-liner snapshot script.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    out_dir : str</span>
+<span class="sd">        Directory to write GENERATE.sh into. Created by the caller.</span>
+<span class="sd">    argv : list of str, optional</span>
+<span class="sd">        Command-line invocation to record. Defaults to ``sys.argv``.</span>
+<span class="sd">    mhcflurry_version : str, optional</span>
+<span class="sd">        Version string for the audit comment. Defaults to current.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str</span>
+<span class="sd">        Absolute path to the GENERATE.sh that was written.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">argv</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">argv</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">mhcflurry_version</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">mhcflurry.version</span><span class="w"> </span><span class="kn">import</span> <span class="n">__version__</span> <span class="k">as</span> <span class="n">mhcflurry_version</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">mhcflurry_version</span> <span class="o">=</span> <span class="s2">"unknown"</span>
+
+    <span class="n">timestamp</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(</span><span class="n">timespec</span><span class="o">=</span><span class="s2">"seconds"</span><span class="p">)</span>
+    <span class="n">cmd_lines</span> <span class="o">=</span> <span class="s2">" </span><span class="se">\\\n</span><span class="s2">    "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">argv</span><span class="p">)</span>
+    <span class="n">cwd</span> <span class="o">=</span> <span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">())</span>
+
+    <span class="n">contents</span> <span class="o">=</span> <span class="n">_GENERATE_SH_TEMPLATE</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+        <span class="n">version</span><span class="o">=</span><span class="n">mhcflurry_version</span><span class="p">,</span>
+        <span class="n">timestamp</span><span class="o">=</span><span class="n">timestamp</span><span class="p">,</span>
+        <span class="n">cwd</span><span class="o">=</span><span class="n">cwd</span><span class="p">,</span>
+        <span class="n">cmd</span><span class="o">=</span><span class="n">cmd_lines</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">out_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">out_dir</span><span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">out_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">out_dir</span><span class="p">,</span> <span class="s2">"GENERATE.sh"</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">"w"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">contents</span><span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">chmod</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="mo">0o755</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">path</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

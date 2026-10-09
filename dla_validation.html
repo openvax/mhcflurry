@@ -1,0 +1,475 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DLA evidence and canine evaluation &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=86f393d6"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Maintainer workflows" href="maintainers.html" />
+    <link rel="prev" title="Auditing training-sample overlap" href="training_provenance.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">DLA evidence and canine evaluation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#inspect-one-model-bundle">Inspect one model bundle</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#reproduce-the-2026-observation-audit">Reproduce the 2026 observation audit</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#historical-lineage-limits">Historical lineage limits</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#executed-report-october-8-2026">Executed report: October 8, 2026</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">DLA evidence and canine evaluation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/dla_validation.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="dla-evidence-and-canine-evaluation">
+<h1>DLA evidence and canine evaluation<a class="headerlink" href="#dla-evidence-and-canine-evaluation" title="Link to this heading"></a></h1>
+<p>MHCflurry can execute DLA predictions without having independently validated
+canine performance. <code class="docutils literal notranslate"><span class="pre">supported_alleles</span></code> describes execution support. The
+commands below expose the other evidence separately and leave missing evidence
+unknown. They do not change prediction values or model weights.</p>
+<section id="inspect-one-model-bundle">
+<h2>Inspect one model bundle<a class="headerlink" href="#inspect-one-model-bundle" title="Link to this heading"></a></h2>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>allele-capabilities<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--models-dir<span class="w"> </span>/path/to/models_class1_presentation/models<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--alleles<span class="w"> </span><span class="s1">'DLA-88*01:01'</span><span class="w"> </span><span class="s1">'DLA-88*003:02'</span><span class="w"> </span><span class="s1">'DLA-88*501:01'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--lengths<span class="w"> </span><span class="m">7</span><span class="w"> </span><span class="m">8</span><span class="w"> </span><span class="m">9</span><span class="w"> </span><span class="m">10</span><span class="w"> </span><span class="m">11</span><span class="w"> </span><span class="m">12</span><span class="w"> </span><span class="m">13</span><span class="w"> </span><span class="m">14</span><span class="w"> </span><span class="m">15</span><span class="w"> </span><span class="m">16</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--out<span class="w"> </span>capabilities.json
+</pre></div>
+</div>
+<p>The Python API returns the same JSON-serializable dictionary:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">mhcflurry.allele_capabilities</span><span class="w"> </span><span class="kn">import</span> <span class="n">capability_report</span>
+
+<span class="n">report</span> <span class="o">=</span> <span class="n">capability_report</span><span class="p">(</span>
+    <span class="s2">"/path/to/models_class1_presentation/models"</span><span class="p">,</span>
+    <span class="p">[</span><span class="s2">"DLA-88*01:01"</span><span class="p">,</span> <span class="s2">"DLA-88*003:02"</span><span class="p">],</span> <span class="n">lengths</span><span class="o">=</span><span class="p">[</span><span class="mi">8</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="mi">16</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Each requested allele/length records its canonical identity, actual model key,
+MHCgnomes species identity, model-input sequence SHA-256 and length, and support
+for binding, processing and presentation <strong>without flanks</strong>. MHCgnomes may
+identify an MHC species group; this is never substituted for the experimental
+host species. The model-input sequence may be a pseudosequence, not a full
+protein. Configuration support is not a runtime probe or accuracy measurement.
+Unsupported names/lengths do not acquire a human or nearest-sequence allele.
+Processing is allele-independent, so it can remain available when a requested
+allele is unsupported.</p>
+<p>Training evidence counts all rows in each available bundled table, including
+decoys, by canonical allele and peptide length. Explicit <code class="docutils literal notranslate"><span class="pre">source_species</span></code> and
+<code class="docutils literal notranslate"><span class="pre">host_species</span></code> columns are retained when present. Their absence is <code class="docutils literal notranslate"><span class="pre">null</span></code>, even
+for DLA-labeled rows: a DLA molecule can be expressed in a human host. A present
+table with zero matching rows is distinguished from a missing table or column.
+These counts do not inventory every training/development/selection source.</p>
+<p>Percentile-transform availability is separate from its reference population and
+validation. The report leaves the latter unknown. The inspected bundle’s
+<code class="docutils literal notranslate"><span class="pre">GENERATE.sh</span></code> records presentation calibration using random peptides matched to
+training-table amino-acid composition, 50 single-allele genotypes, 10,000 peptides
+per length and seed 42. This recipe does not establish a canine reference
+population or calibration on canine experimental outcomes.</p>
+<p><code class="docutils literal notranslate"><span class="pre">model.sha256</span></code> hashes a sorted compact JSON mapping from every relative file
+name to its SHA-256. Component weights, manifests, calibration and historical
+metadata are therefore bound together. Keep output files outside the model
+directory, and freeze inputs while either command runs. Existing output files
+or directories are not overwritten.</p>
+<p>Symlinks inside the model bundle are rejected with an error naming the path.
+Use a copy containing regular files and directories so every loaded component
+is included in the fingerprint.</p>
+</section>
+<section id="reproduce-the-2026-observation-audit">
+<h2>Reproduce the 2026 observation audit<a class="headerlink" href="#reproduce-the-2026-observation-audit" title="Link to this heading"></a></h2>
+<p>The source is <a class="reference external" href="https://pubmed.ncbi.nlm.nih.gov/42199926/">Kaabinejadian et al., iScience 2026,
+PMID 42199926</a>,
+<a class="reference external" href="https://doi.org/10.1016/j.isci.2026.115975">DOI 10.1016/j.isci.2026.115975</a>.
+Raw mass spectra are deposited as
+<a class="reference external" href="https://www.ebi.ac.uk/pride/archive/projects/PXD074485">PXD074485</a>.
+Download the original Data S1–S6 workbooks (<code class="docutils literal notranslate"><span class="pre">mmc2.xlsx</span></code> through <code class="docutils literal notranslate"><span class="pre">mmc7.xlsx</span></code>)
+from the article. The command checks their pinned SHA-256 values before parsing.
+These files also matched the MD5 values in the article’s PMC full-text XML.
+Install the optional Excel reader in the evaluation environment:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="nv">openpyxl</span><span class="o">==</span><span class="m">3</span>.1.5
+mkdir<span class="w"> </span>-p<span class="w"> </span>work/dla-supplements
+<span class="k">for</span><span class="w"> </span>n<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="m">3</span><span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="m">6</span><span class="w"> </span><span class="m">7</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<span class="w">  </span>curl<span class="w"> </span>--fail<span class="w"> </span>--location<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span><span class="s2">"https://ars.els-cdn.com/content/image/1-s2.0-S2589004226013507-mmc</span><span class="si">${</span><span class="nv">n</span><span class="si">}</span><span class="s2">.xlsx"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--output<span class="w"> </span><span class="s2">"work/dla-supplements/mmc</span><span class="si">${</span><span class="nv">n</span><span class="si">}</span><span class="s2">.xlsx"</span>
+<span class="k">done</span>
+mhcflurry<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>dla<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--models-dir<span class="w"> </span>/path/to/models_class1_presentation/models<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--supplements-dir<span class="w"> </span>work/dla-supplements<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--out-dir<span class="w"> </span>results/dla-2026
+</pre></div>
+</div>
+<p>The output contains <code class="docutils literal notranslate"><span class="pre">observations.csv.gz</span></code>, <code class="docutils literal notranslate"><span class="pre">scores.csv.gz</span></code>, <code class="docutils literal notranslate"><span class="pre">capabilities.json</span></code>,
+<code class="docutils literal notranslate"><span class="pre">report.json</span></code>, an explicitly incomplete <code class="docutils literal notranslate"><span class="pre">lineage.json</span></code>, and the existing
+sample-audit outputs under <code class="docutils literal notranslate"><span class="pre">sample_audit/</span></code>. Source file, worksheet and Excel row
+are preserved. The report records source/model/code hashes, dependency versions,
+configuration and the bootstrap seed. Its linked capability report retains
+unknown empirical validation and identifies the exploratory evaluation.</p>
+<p>The original observation sheets contain 3,580 monoallelic DLA observations from
+engineered <strong>human HCT116 cells</strong>, and 12,779 canine tumor observations from four
+dogs (12,181 distinct canine peptide strings). Human comparison/TAA worksheets
+are excluded. Lola’s H58A and BB7.6 captures share one donor identity. HCT116
+transductants retain separate capture/allele labels while sharing their parental
+biological identity. All original lengths remain in the output, with explicit
+missing-score reasons for unsupported lengths or residues.</p>
+<p>For each capture, the report includes length distributions, nine-mer
+position-specific residue counts, execution counts and score medians by length.
+Affinity is in nM; processing and presentation are model scores on [0, 1].
+Tumor affinity is the minimum predicted affinity over the reported genotype;
+<code class="docutils literal notranslate"><span class="pre">predicted_best_allele</span></code> is a model assignment, never an experimental restriction.
+No tumor observation is duplicated across its typed alleles. If any genotype
+allele is unsupported, that genotype’s binding/presentation scores stay missing.
+Only no-flank processing is scored, because the workbook’s multiple protein
+accessions do not establish a unique flank context.</p>
+<p>The descriptive bootstrap resamples canine donors with replacement (seed 490,
+2,000 replicates), after deduplicating each donor’s peptide observations across
+antibody captures. Its estimand is the mean of within-donor score medians on
+executable peptides. The intervals are not accuracy estimates. Three human-host
+transductants do not supply independent biological replicates per DLA allele.</p>
+<p>No negatives or sampled background are introduced. AP, precision-at-N, AUROC,
+quantitative binding accuracy, isolated processing accuracy, and calibration
+remain unevaluated. MS nonobservations must not be labeled measured negatives.
+Future ranking evaluations need a frozen, species/context-appropriate sampled
+background, declared sampling prevalence and length/motif diagnostics, with
+uncertainty at the biological sampling unit.</p>
+</section>
+<section id="historical-lineage-limits">
+<h2>Historical lineage limits<a class="headerlink" href="#historical-lineage-limits" title="Link to this heading"></a></h2>
+<p>The recipe audits all alleles and labels in every available bundled training
+table for exact and I/L-collapsed peptide overlap. The I/L denominator remains
+distinct <strong>original</strong> peptide strings. Peptide overlap does not establish the
+same donor, study or peptide–DLA pair. Removing overlapping strings cannot
+establish sample separation.</p>
+<p>The generated inventory deliberately marks every component incomplete. Unknown
+pretraining/development/selection stages are omitted, rather than recorded as
+empty lists (which mean reviewed as unused). The existing
+<a class="reference internal" href="training_provenance.html"><span class="doc">Auditing training-sample overlap</span></a> audit excludes unresolved samples from its exported
+cohort. The exploratory score file retains the entire original cohort and
+overlap flags, and is not a held-out benchmark.</p>
+<p>To claim independent canine performance, recover and review the complete
+affinity, processing and presentation lineage, including synthetic-target
+teachers, stopping/development and ensemble selection. Bind every source and
+model artifact to an inventory, resolve study/donor aliases, and run the
+existing sample audit plus peptide overlap checks. If historical identities
+cannot be recovered, retrain with explicit study/donor/peptide exclusions and
+preserved contributor provenance. Use an untouched confirmation cohort after
+developing against these observations. Assess human-host DLA binding evidence,
+endogenous canine processing, presentation and percentile calibration separately.</p>
+<p>This implements the reporting and reproducible historical audit requested in
+<a class="reference external" href="https://github.com/openvax/mhcflurry/issues/490">MHCflurry #490</a>.
+The mhctools legacy dictionary-key normalization defect is tracked separately
+in <a class="reference external" href="https://github.com/openvax/mhctools/issues/544">mhctools #544</a>.</p>
+</section>
+<section id="executed-report-october-8-2026">
+<h2>Executed report: October 8, 2026<a class="headerlink" href="#executed-report-october-8-2026" title="Link to this heading"></a></h2>
+<p>The inspected local bundle is under model catalogue <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code>. Its <code class="docutils literal notranslate"><span class="pre">info.txt</span></code>
+records September 28, 2026, MHCflurry <code class="docutils literal notranslate"><span class="pre">2.3.1rc3</span></code>, training source
+<code class="docutils literal notranslate"><span class="pre">ac253f8c859dc687f7fbce9f4840fb55d5acf2c5</span></code>, and workflow
+<code class="docutils literal notranslate"><span class="pre">pr433-completion-20260928</span></code>. Its full file-tree fingerprint is:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>7bcbbd0846a0642c67b367ed51320f92ff747f6f15c2fec8251bd07f678a37bd
+</pre></div>
+</div>
+<p>The <a class="reference download internal" download="" href="_downloads/470e90e66e5fa3aa4daa327695d89035/report.json"><span class="xref download myst">machine-readable report</span></a> and
+<a class="reference download internal" download="" href="_downloads/759bb687860674007a3bb81ed36f1a7e/capabilities.json"><span class="xref download myst">capability report</span></a> bind these results to that
+bundle. The <a class="reference download internal" download="" href="_downloads/317b5fd2907f26b368a99da1e40be677/observations.csv.gz"><span class="xref download myst">observations</span></a>,
+<a class="reference download internal" download="" href="_downloads/27664ae467cd346aab60d0688c503de9/scores.csv.gz"><span class="xref download myst">scores and overlap flags</span></a>, and
+<a class="reference download internal" download="" href="_downloads/5003de952c5d05d78a55127413cc7e87/sample_audit.csv"><span class="xref download myst">sample audit</span></a> preserve the evaluated rows.
+The capability report covers the seven DLA alleles typed in this study.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Bundled training table</p></th>
+<th class="head text-right"><p>All rows</p></th>
+<th class="head text-right"><p>Exact canine overlap</p></th>
+<th class="head text-right"><p>I/L-collapsed canine overlap</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Affinity</p></td>
+<td class="text-right"><p>811,134</p></td>
+<td class="text-right"><p>2,610 / 12,181</p></td>
+<td class="text-right"><p>2,686 / 12,181</p></td>
+</tr>
+<tr class="row-odd"><td><p>Processing with flanks</p></td>
+<td class="text-right"><p>399,392</p></td>
+<td class="text-right"><p>1,144 / 12,181</p></td>
+<td class="text-right"><p>1,183 / 12,181</p></td>
+</tr>
+<tr class="row-even"><td><p>Processing without flanks</p></td>
+<td class="text-right"><p>399,392</p></td>
+<td class="text-right"><p>1,144 / 12,181</p></td>
+<td class="text-right"><p>1,183 / 12,181</p></td>
+</tr>
+</tbody>
+</table>
+<p>Among the seven study alleles, the affinity table contains 1,963 rows labeled
+<code class="docutils literal notranslate"><span class="pre">DLA-88*501:01</span></code> and zero for each of the other six. Neither processing table has
+rows labeled with these alleles. Host/source species and complete contributor
+provenance are unavailable in these tables. The sample audit retains <strong>zero
+rows and zero biological samples</strong> as verified disjoint.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Observation capture</p></th>
+<th class="head text-right"><p>Original rows</p></th>
+<th class="head text-right"><p>Rows scored for each modality</p></th>
+<th class="head text-right"><p>Median affinity (nM)</p></th>
+<th class="head text-right"><p>Median processing score</p></th>
+<th class="head text-right"><p>Median presentation score</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>HCT116 / DLA-88*003:02</p></td>
+<td class="text-right"><p>811</p></td>
+<td class="text-right"><p>626</p></td>
+<td class="text-right"><p>11,268.2</p></td>
+<td class="text-right"><p>0.464</p></td>
+<td class="text-right"><p>0.023</p></td>
+</tr>
+<tr class="row-odd"><td><p>HCT116 / DLA-88*012:01</p></td>
+<td class="text-right"><p>912</p></td>
+<td class="text-right"><p>733</p></td>
+<td class="text-right"><p>1,714.1</p></td>
+<td class="text-right"><p>0.518</p></td>
+<td class="text-right"><p>0.160</p></td>
+</tr>
+<tr class="row-even"><td><p>HCT116 / DLA-88*501:01</p></td>
+<td class="text-right"><p>1,857</p></td>
+<td class="text-right"><p>1,524</p></td>
+<td class="text-right"><p>164.5</p></td>
+<td class="text-right"><p>0.461</p></td>
+<td class="text-right"><p>0.663</p></td>
+</tr>
+<tr class="row-odd"><td><p>Lola / H58A</p></td>
+<td class="text-right"><p>207</p></td>
+<td class="text-right"><p>185</p></td>
+<td class="text-right"><p>108.6</p></td>
+<td class="text-right"><p>0.614</p></td>
+<td class="text-right"><p>0.860</p></td>
+</tr>
+<tr class="row-even"><td><p>Lola / BB7.6</p></td>
+<td class="text-right"><p>330</p></td>
+<td class="text-right"><p>281</p></td>
+<td class="text-right"><p>211.8</p></td>
+<td class="text-right"><p>0.531</p></td>
+<td class="text-right"><p>0.669</p></td>
+</tr>
+<tr class="row-odd"><td><p>163828A / BB7.6</p></td>
+<td class="text-right"><p>1,671</p></td>
+<td class="text-right"><p>1,377</p></td>
+<td class="text-right"><p>221.3</p></td>
+<td class="text-right"><p>0.495</p></td>
+<td class="text-right"><p>0.585</p></td>
+</tr>
+<tr class="row-even"><td><p>Lily / H58A</p></td>
+<td class="text-right"><p>60</p></td>
+<td class="text-right"><p>58</p></td>
+<td class="text-right"><p>93.3</p></td>
+<td class="text-right"><p>0.489</p></td>
+<td class="text-right"><p>0.777</p></td>
+</tr>
+<tr class="row-odd"><td><p>Bogey / BB7.6</p></td>
+<td class="text-right"><p>10,511</p></td>
+<td class="text-right"><p>8,003</p></td>
+<td class="text-right"><p>5,088.8</p></td>
+<td class="text-right"><p>0.395</p></td>
+<td class="text-right"><p>0.042</p></td>
+</tr>
+</tbody>
+</table>
+<p>All unscored rows in this run exceed the model’s maximum peptide length of 15.
+The observed score differences across alleles and captures are exploratory;
+they do not estimate sensitivity, specificity, calibrated probability, or
+canine population coverage. Length-specific medians, motif counts and the
+four-donor descriptive bootstrap are in the JSON report.</p>
+<p>For a compact motif check, the two most frequent residues at positions 2 and 9
+of the <strong>unfiltered original nine-mer observations</strong> are shown below. These
+are residue frequencies, not the paper’s GibbsCluster-selected motifs or a
+measure of model accuracy. Tumor rows retain their unassigned mixture.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Capture</p></th>
+<th class="head text-right"><p>Nine-mers</p></th>
+<th class="head"><p>Position 2</p></th>
+<th class="head"><p>Position 9</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>HCT116 / DLA-88*003:02</p></td>
+<td class="text-right"><p>300</p></td>
+<td><p>D 59.3%, E 19.0%</p></td>
+<td><p>I 32.3%, V 26.0%</p></td>
+</tr>
+<tr class="row-odd"><td><p>HCT116 / DLA-88*012:01</p></td>
+<td class="text-right"><p>357</p></td>
+<td><p>A 24.1%, P 24.1%</p></td>
+<td><p>L 58.3%, V 20.2%</p></td>
+</tr>
+<tr class="row-even"><td><p>HCT116 / DLA-88*501:01</p></td>
+<td class="text-right"><p>676</p></td>
+<td><p>I 38.9%, V 31.2%</p></td>
+<td><p>L 45.9%, V 26.0%</p></td>
+</tr>
+<tr class="row-odd"><td><p>Lola / H58A</p></td>
+<td class="text-right"><p>97</p></td>
+<td><p>I 48.5%, V 23.7%</p></td>
+<td><p>L 54.6%, V 14.4%</p></td>
+</tr>
+<tr class="row-even"><td><p>Lola / BB7.6</p></td>
+<td class="text-right"><p>116</p></td>
+<td><p>I 41.4%, V 27.6%</p></td>
+<td><p>L 47.4%, V 20.7%</p></td>
+</tr>
+<tr class="row-odd"><td><p>163828A / BB7.6</p></td>
+<td class="text-right"><p>755</p></td>
+<td><p>I 34.4%, L 27.5%</p></td>
+<td><p>L 49.4%, V 17.1%</p></td>
+</tr>
+<tr class="row-even"><td><p>Lily / H58A</p></td>
+<td class="text-right"><p>32</p></td>
+<td><p>I 53.1%, L 21.9%</p></td>
+<td><p>V 40.6%, L 37.5%</p></td>
+</tr>
+<tr class="row-odd"><td><p>Bogey / BB7.6</p></td>
+<td class="text-right"><p>2,573</p></td>
+<td><p>F 19.7%, L 15.2%</p></td>
+<td><p>L 40.7%, V 15.7%</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="training_provenance.html" class="btn btn-neutral float-left" title="Auditing training-sample overlap" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="maintainers.html" class="btn btn-neutral float-right" title="Maintainer workflows" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

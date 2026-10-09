@@ -1,0 +1,840 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.cli.generate_training_hyperparameters &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.cli.generate_training_hyperparameters</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.cli.generate_training_hyperparameters</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Generate release-training hyperparameter grids."""</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">copy</span><span class="w"> </span><span class="kn">import</span> <span class="n">deepcopy</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">yaml</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">..common</span><span class="w"> </span><span class="kn">import</span> <span class="n">positive_int_arg</span>
+
+
+<span class="n">AFFINITY_DEFAULT_MINIBATCH_SIZE</span> <span class="o">=</span> <span class="mi">128</span>
+<span class="n">PROCESSING_DEFAULT_MINIBATCH_SIZE</span> <span class="o">=</span> <span class="mi">512</span>
+<span class="n">DEFAULT_OPTIMIZER_IMPLEMENTATION</span> <span class="o">=</span> <span class="s2">"keras"</span>
+<span class="n">OPTIMIZER_IMPLEMENTATION_CHOICES</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"keras"</span><span class="p">,</span> <span class="s2">"pytorch"</span><span class="p">)</span>
+<span class="n">LSUV_TARGET_CHOICES</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"post_activation"</span><span class="p">,</span> <span class="s2">"pre_activation"</span><span class="p">)</span>
+<span class="n">AFFINITY_INIT_CHOICES</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="s2">"glorot_uniform"</span><span class="p">,</span>
+    <span class="s2">"glorot_normal"</span><span class="p">,</span>
+    <span class="s2">"he_uniform"</span><span class="p">,</span>
+    <span class="s2">"he_normal"</span><span class="p">,</span>
+    <span class="s2">"orthogonal"</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">PROCESSING_INIT_CHOICES</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"glorot_uniform"</span><span class="p">,</span> <span class="s2">"kaiming_uniform_fan_in"</span><span class="p">)</span>
+<span class="n">PROCESSING_BATCH_SWEEP_SIZES</span> <span class="o">=</span> <span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">256</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">1024</span><span class="p">)</span>
+<span class="c1"># Compatibility name used by the historical affinity generator wrapper.</span>
+<span class="n">DEFAULT_MINIBATCH_SIZE</span> <span class="o">=</span> <span class="n">AFFINITY_DEFAULT_MINIBATCH_SIZE</span>
+<span class="n">PROCESSING_VARIANT_CHOICES</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="s2">"with_flanks"</span><span class="p">,</span>
+    <span class="s2">"no_n_flank"</span><span class="p">,</span>
+    <span class="s2">"no_c_flank"</span><span class="p">,</span>
+    <span class="s2">"no_flank"</span><span class="p">,</span>
+    <span class="s2">"short_flanks"</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<span class="n">AFFINITY_BASE_HYPERPARAMETERS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"activation"</span><span class="p">:</span> <span class="s2">"tanh"</span><span class="p">,</span>
+    <span class="s2">"allele_dense_layer_sizes"</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s2">"batch_normalization"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s2">"dense_layer_l1_regularization"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+    <span class="s2">"dense_layer_l2_regularization"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+    <span class="s2">"dropout_probability"</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span>
+    <span class="s2">"early_stopping"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="s2">"init"</span><span class="p">:</span> <span class="s2">"glorot_uniform"</span><span class="p">,</span>
+    <span class="s2">"layer_sizes"</span><span class="p">:</span> <span class="p">[</span><span class="mi">1024</span><span class="p">,</span> <span class="mi">512</span><span class="p">],</span>
+    <span class="s2">"learning_rate"</span><span class="p">:</span> <span class="mf">0.001</span><span class="p">,</span>
+    <span class="s2">"locally_connected_layers"</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s2">"topology"</span><span class="p">:</span> <span class="s2">"feedfoward"</span><span class="p">,</span>
+    <span class="s2">"loss"</span><span class="p">:</span> <span class="s2">"custom:mse_with_inequalities"</span><span class="p">,</span>
+    <span class="c1"># Preserve the published 2.1.x/2.2.x scientific recipe. Early stopping</span>
+    <span class="c1"># normally terminates well before this safety ceiling.</span>
+    <span class="s2">"max_epochs"</span><span class="p">:</span> <span class="mi">5000</span><span class="p">,</span>
+    <span class="s2">"minibatch_size"</span><span class="p">:</span> <span class="n">AFFINITY_DEFAULT_MINIBATCH_SIZE</span><span class="p">,</span>
+    <span class="s2">"optimizer"</span><span class="p">:</span> <span class="s2">"rmsprop"</span><span class="p">,</span>
+    <span class="s2">"optimizer_implementation"</span><span class="p">:</span> <span class="n">DEFAULT_OPTIMIZER_IMPLEMENTATION</span><span class="p">,</span>
+    <span class="s2">"output_activation"</span><span class="p">:</span> <span class="s2">"sigmoid"</span><span class="p">,</span>
+    <span class="s2">"patience"</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+    <span class="s2">"min_delta"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+    <span class="s2">"validation_interval"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="s2">"peptide_encoding"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"vector_encoding_name"</span><span class="p">:</span> <span class="s2">"BLOSUM62"</span><span class="p">,</span>
+        <span class="s2">"alignment_method"</span><span class="p">:</span> <span class="s2">"left_pad_centered_right_pad"</span><span class="p">,</span>
+        <span class="s2">"max_length"</span><span class="p">:</span> <span class="mi">15</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="s2">"peptide_amino_acid_encoding_torch"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="s2">"peptide_allele_merge_activation"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+    <span class="s2">"peptide_allele_merge_method"</span><span class="p">:</span> <span class="s2">"concatenate"</span><span class="p">,</span>
+    <span class="s2">"peptide_amino_acid_encoding"</span><span class="p">:</span> <span class="s2">"BLOSUM62"</span><span class="p">,</span>
+    <span class="s2">"peptide_dense_layer_sizes"</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s2">"random_negative_affinity_max"</span><span class="p">:</span> <span class="mf">50000.0</span><span class="p">,</span>
+    <span class="s2">"random_negative_affinity_min"</span><span class="p">:</span> <span class="mf">30000.0</span><span class="p">,</span>
+    <span class="s2">"random_negative_constant"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="s2">"random_negative_distribution_smoothing"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+    <span class="s2">"random_negative_match_distribution"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="s2">"random_negative_rate"</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="s2">"random_negative_method"</span><span class="p">:</span> <span class="s2">"by_allele_equalize_nonbinders"</span><span class="p">,</span>
+    <span class="s2">"random_negative_binder_threshold"</span><span class="p">:</span> <span class="mf">500.0</span><span class="p">,</span>
+    <span class="c1"># Keep random-negative pooling memory bounded. Larger values can</span>
+    <span class="c1"># amortize generation cost, but prior full runs ballooned memory</span>
+    <span class="c1"># far beyond the nominal encoded peptide tensor size.</span>
+    <span class="s2">"random_negative_pool_epochs"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="s2">"train_data"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"pretrain"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">"pretrain_peptides_per_epoch"</span><span class="p">:</span> <span class="mi">64</span><span class="p">,</span>
+        <span class="s2">"pretrain_steps_per_epoch"</span><span class="p">:</span> <span class="mi">256</span><span class="p">,</span>
+        <span class="s2">"pretrain_patience"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+        <span class="s2">"pretrain_min_delta"</span><span class="p">:</span> <span class="mf">0.0001</span><span class="p">,</span>
+        <span class="s2">"pretrain_max_val_loss"</span><span class="p">:</span> <span class="mf">0.10</span><span class="p">,</span>
+        <span class="s2">"pretrain_max_epochs"</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span>
+        <span class="s2">"pretrain_min_epochs"</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="s2">"validation_split"</span><span class="p">:</span> <span class="mf">0.1</span><span class="p">,</span>
+    <span class="s2">"data_dependent_initialization_method"</span><span class="p">:</span> <span class="s2">"lsuv"</span><span class="p">,</span>
+    <span class="s2">"data_dependent_initialization_target"</span><span class="p">:</span> <span class="s2">"post_activation"</span><span class="p">,</span>
+<span class="p">}</span>
+
+
+<span class="n">PROCESSING_BASE_HYPERPARAMETERS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"convolutional_filters"</span><span class="p">:</span> <span class="mi">64</span><span class="p">,</span>
+    <span class="s2">"convolutional_kernel_size"</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
+    <span class="s2">"convolutional_kernel_l1_l2"</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.00</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span>
+    <span class="s2">"flanking_averages"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="s2">"n_flank_length"</span><span class="p">:</span> <span class="mi">15</span><span class="p">,</span>
+    <span class="s2">"c_flank_length"</span><span class="p">:</span> <span class="mi">15</span><span class="p">,</span>
+    <span class="s2">"post_convolutional_dense_layer_sizes"</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s2">"minibatch_size"</span><span class="p">:</span> <span class="n">PROCESSING_DEFAULT_MINIBATCH_SIZE</span><span class="p">,</span>
+    <span class="s2">"dropout_rate"</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span>
+    <span class="s2">"convolutional_activation"</span><span class="p">:</span> <span class="s2">"relu"</span><span class="p">,</span>
+    <span class="s2">"patience"</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+    <span class="s2">"learning_rate"</span><span class="p">:</span> <span class="mf">0.001</span><span class="p">,</span>
+    <span class="s2">"optimizer_implementation"</span><span class="p">:</span> <span class="n">DEFAULT_OPTIMIZER_IMPLEMENTATION</span><span class="p">,</span>
+    <span class="s2">"init"</span><span class="p">:</span> <span class="s2">"glorot_uniform"</span><span class="p">,</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="unique_hyperparameters">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.generate_training_hyperparameters.unique_hyperparameters">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">unique_hyperparameters</span><span class="p">(</span><span class="n">items</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return ``items`` with duplicate dicts removed, preserving order."""</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">items</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">item</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="build_affinity_grid">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.generate_training_hyperparameters.build_affinity_grid">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">build_affinity_grid</span><span class="p">(</span>
+    <span class="n">minibatch_size</span><span class="o">=</span><span class="n">AFFINITY_DEFAULT_MINIBATCH_SIZE</span><span class="p">,</span>
+    <span class="n">optimizer_implementation</span><span class="o">=</span><span class="n">DEFAULT_OPTIMIZER_IMPLEMENTATION</span><span class="p">,</span>
+    <span class="n">data_dependent_initialization_target</span><span class="o">=</span><span class="s2">"post_activation"</span><span class="p">,</span>
+    <span class="n">init</span><span class="o">=</span><span class="s2">"glorot_uniform"</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the 35-architecture Class I pan-allele affinity grid."""</span>
+    <span class="k">if</span> <span class="n">init</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">AFFINITY_INIT_CHOICES</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Unknown affinity initializer </span><span class="si">%r</span><span class="s2">; expected one of: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">init</span><span class="p">,</span>
+                <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">AFFINITY_INIT_CHOICES</span><span class="p">),</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+    <span class="n">grid</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">base</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">AFFINITY_BASE_HYPERPARAMETERS</span><span class="p">)</span>
+    <span class="n">base</span><span class="p">[</span><span class="s2">"minibatch_size"</span><span class="p">]</span> <span class="o">=</span> <span class="n">minibatch_size</span>
+    <span class="n">base</span><span class="p">[</span><span class="s2">"optimizer_implementation"</span><span class="p">]</span> <span class="o">=</span> <span class="n">optimizer_implementation</span>
+    <span class="n">base</span><span class="p">[</span><span class="s2">"init"</span><span class="p">]</span> <span class="o">=</span> <span class="n">init</span>
+    <span class="n">base</span><span class="p">[</span><span class="s2">"data_dependent_initialization_target"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">data_dependent_initialization_target</span>
+    <span class="p">)</span>
+    <span class="k">for</span> <span class="n">layer_sizes</span> <span class="ow">in</span> <span class="p">[[</span><span class="mi">512</span><span class="p">,</span> <span class="mi">256</span><span class="p">],</span> <span class="p">[</span><span class="mi">512</span><span class="p">,</span> <span class="mi">512</span><span class="p">],</span> <span class="p">[</span><span class="mi">1024</span><span class="p">,</span> <span class="mi">512</span><span class="p">],</span> <span class="p">[</span><span class="mi">1024</span><span class="p">,</span> <span class="mi">1024</span><span class="p">]]:</span>
+        <span class="n">l1_base</span> <span class="o">=</span> <span class="mf">0.0000001</span>
+        <span class="k">for</span> <span class="n">l1</span> <span class="ow">in</span> <span class="p">[</span><span class="n">l1_base</span><span class="p">,</span> <span class="n">l1_base</span> <span class="o">/</span> <span class="mi">10</span><span class="p">,</span> <span class="n">l1_base</span> <span class="o">/</span> <span class="mi">100</span><span class="p">,</span> <span class="n">l1_base</span> <span class="o">/</span> <span class="mi">1000</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]:</span>
+            <span class="n">new</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">base</span><span class="p">)</span>
+            <span class="n">new</span><span class="p">[</span><span class="s2">"topology"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"feedforward"</span>
+            <span class="n">new</span><span class="p">[</span><span class="s2">"layer_sizes"</span><span class="p">]</span> <span class="o">=</span> <span class="n">layer_sizes</span>
+            <span class="n">new</span><span class="p">[</span><span class="s2">"dense_layer_l1_regularization"</span><span class="p">]</span> <span class="o">=</span> <span class="n">l1</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">grid</span> <span class="ow">or</span> <span class="n">new</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">grid</span><span class="p">:</span>
+                <span class="n">grid</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">layer_sizes</span> <span class="ow">in</span> <span class="p">[[</span><span class="mi">256</span><span class="p">,</span> <span class="mi">512</span><span class="p">],</span> <span class="p">[</span><span class="mi">256</span><span class="p">,</span> <span class="mi">256</span><span class="p">,</span> <span class="mi">512</span><span class="p">],</span> <span class="p">[</span><span class="mi">256</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">512</span><span class="p">]]:</span>
+        <span class="n">l1_base</span> <span class="o">=</span> <span class="mf">0.0000001</span>
+        <span class="k">for</span> <span class="n">l1</span> <span class="ow">in</span> <span class="p">[</span><span class="n">l1_base</span><span class="p">,</span> <span class="n">l1_base</span> <span class="o">/</span> <span class="mi">10</span><span class="p">,</span> <span class="n">l1_base</span> <span class="o">/</span> <span class="mi">100</span><span class="p">,</span> <span class="n">l1_base</span> <span class="o">/</span> <span class="mi">1000</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]:</span>
+            <span class="n">new</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">base</span><span class="p">)</span>
+            <span class="n">new</span><span class="p">[</span><span class="s2">"topology"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"with-skip-connections"</span>
+            <span class="n">new</span><span class="p">[</span><span class="s2">"layer_sizes"</span><span class="p">]</span> <span class="o">=</span> <span class="n">layer_sizes</span>
+            <span class="n">new</span><span class="p">[</span><span class="s2">"dense_layer_l1_regularization"</span><span class="p">]</span> <span class="o">=</span> <span class="n">l1</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">grid</span> <span class="ow">or</span> <span class="n">new</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">grid</span><span class="p">:</span>
+                <span class="n">grid</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">grid</span></div>
+
+
+
+<div class="viewcode-block" id="processing_base_grid_iter">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.generate_training_hyperparameters.processing_base_grid_iter">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">processing_base_grid_iter</span><span class="p">(</span>
+    <span class="n">minibatch_size</span><span class="o">=</span><span class="n">PROCESSING_DEFAULT_MINIBATCH_SIZE</span><span class="p">,</span>
+    <span class="n">optimizer_implementation</span><span class="o">=</span><span class="n">DEFAULT_OPTIMIZER_IMPLEMENTATION</span><span class="p">,</span>
+    <span class="n">init</span><span class="o">=</span><span class="s2">"glorot_uniform"</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Yield the base processing architecture grid before flank variants."""</span>
+    <span class="n">base</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">PROCESSING_BASE_HYPERPARAMETERS</span><span class="p">)</span>
+    <span class="n">base</span><span class="p">[</span><span class="s2">"minibatch_size"</span><span class="p">]</span> <span class="o">=</span> <span class="n">minibatch_size</span>
+    <span class="n">base</span><span class="p">[</span><span class="s2">"optimizer_implementation"</span><span class="p">]</span> <span class="o">=</span> <span class="n">optimizer_implementation</span>
+    <span class="n">base</span><span class="p">[</span><span class="s2">"init"</span><span class="p">]</span> <span class="o">=</span> <span class="n">init</span>
+    <span class="k">for</span> <span class="n">learning_rate</span> <span class="ow">in</span> <span class="p">[</span><span class="mf">0.001</span><span class="p">]:</span>
+        <span class="k">for</span> <span class="n">convolutional_activation</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"tanh"</span><span class="p">,</span> <span class="s2">"relu"</span><span class="p">]:</span>
+            <span class="k">for</span> <span class="n">convolutional_filters</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">256</span><span class="p">,</span> <span class="mi">512</span><span class="p">]:</span>
+                <span class="k">for</span> <span class="n">flanking_averages</span> <span class="ow">in</span> <span class="p">[</span><span class="kc">True</span><span class="p">]:</span>
+                    <span class="k">for</span> <span class="n">convolutional_kernel_size</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">11</span><span class="p">,</span> <span class="mi">13</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="mi">17</span><span class="p">]:</span>
+                        <span class="k">for</span> <span class="n">l1</span> <span class="ow">in</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1e-6</span><span class="p">]:</span>
+                            <span class="k">for</span> <span class="n">dense_sizes</span> <span class="ow">in</span> <span class="p">[[</span><span class="mi">8</span><span class="p">],</span> <span class="p">[</span><span class="mi">16</span><span class="p">]]:</span>
+                                <span class="k">for</span> <span class="n">dropout_rate</span> <span class="ow">in</span> <span class="p">[</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]:</span>
+                                    <span class="n">new</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">base</span><span class="p">)</span>
+                                    <span class="n">new</span><span class="p">[</span><span class="s2">"learning_rate"</span><span class="p">]</span> <span class="o">=</span> <span class="n">learning_rate</span>
+                                    <span class="n">new</span><span class="p">[</span><span class="s2">"convolutional_activation"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                                        <span class="n">convolutional_activation</span><span class="p">)</span>
+                                    <span class="n">new</span><span class="p">[</span><span class="s2">"convolutional_filters"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                                        <span class="n">convolutional_filters</span><span class="p">)</span>
+                                    <span class="n">new</span><span class="p">[</span><span class="s2">"flanking_averages"</span><span class="p">]</span> <span class="o">=</span> <span class="n">flanking_averages</span>
+                                    <span class="n">new</span><span class="p">[</span><span class="s2">"convolutional_kernel_size"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                                        <span class="n">convolutional_kernel_size</span><span class="p">)</span>
+                                    <span class="n">new</span><span class="p">[</span><span class="s2">"convolutional_kernel_l1_l2"</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+                                        <span class="n">l1</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]</span>
+                                    <span class="n">new</span><span class="p">[</span>
+                                        <span class="s2">"post_convolutional_dense_layer_sizes"</span>
+                                    <span class="p">]</span> <span class="o">=</span> <span class="n">dense_sizes</span>
+                                    <span class="n">new</span><span class="p">[</span><span class="s2">"dropout_rate"</span><span class="p">]</span> <span class="o">=</span> <span class="n">dropout_rate</span>
+                                    <span class="k">yield</span> <span class="n">new</span></div>
+
+
+
+<div class="viewcode-block" id="build_processing_base_grid">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.generate_training_hyperparameters.build_processing_base_grid">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">build_processing_base_grid</span><span class="p">(</span>
+    <span class="n">minibatch_size</span><span class="o">=</span><span class="n">PROCESSING_DEFAULT_MINIBATCH_SIZE</span><span class="p">,</span>
+    <span class="n">optimizer_implementation</span><span class="o">=</span><span class="n">DEFAULT_OPTIMIZER_IMPLEMENTATION</span><span class="p">,</span>
+    <span class="n">init</span><span class="o">=</span><span class="s2">"glorot_uniform"</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the processing architecture grid before flank variants."""</span>
+    <span class="k">return</span> <span class="n">unique_hyperparameters</span><span class="p">(</span>
+        <span class="n">processing_base_grid_iter</span><span class="p">(</span>
+            <span class="n">minibatch_size</span><span class="o">=</span><span class="n">minibatch_size</span><span class="p">,</span>
+            <span class="n">optimizer_implementation</span><span class="o">=</span><span class="n">optimizer_implementation</span><span class="p">,</span>
+            <span class="n">init</span><span class="o">=</span><span class="n">init</span><span class="p">,</span>
+        <span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="transform_processing_hyperparameters">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.generate_training_hyperparameters.transform_processing_hyperparameters">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">transform_processing_hyperparameters</span><span class="p">(</span>
+        <span class="n">kind</span><span class="p">,</span> <span class="n">hyperparameters</span><span class="p">,</span> <span class="n">optimizer_implementation</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return one processing flank variant for a hyperparameter dict.</span>
+
+<span class="sd">    ``optimizer_implementation`` and ``init`` are optional explicit overrides.</span>
+<span class="sd">    When omitted, the values already serialized in ``hyperparameters`` are</span>
+<span class="sd">    retained.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">kind</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">PROCESSING_VARIANT_CHOICES</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Unknown processing variant </span><span class="si">%r</span><span class="s2">; expected one of: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">kind</span><span class="p">,</span>
+                <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PROCESSING_VARIANT_CHOICES</span><span class="p">),</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+    <span class="n">new_hyperparameters</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">kind</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"no_n_flank"</span><span class="p">,</span> <span class="s2">"no_flank"</span><span class="p">):</span>
+        <span class="n">new_hyperparameters</span><span class="p">[</span><span class="s2">"n_flank_length"</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="n">kind</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"no_c_flank"</span><span class="p">,</span> <span class="s2">"no_flank"</span><span class="p">):</span>
+        <span class="n">new_hyperparameters</span><span class="p">[</span><span class="s2">"c_flank_length"</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"short_flanks"</span><span class="p">:</span>
+        <span class="n">new_hyperparameters</span><span class="p">[</span><span class="s2">"c_flank_length"</span><span class="p">]</span> <span class="o">=</span> <span class="mi">5</span>
+        <span class="n">new_hyperparameters</span><span class="p">[</span><span class="s2">"n_flank_length"</span><span class="p">]</span> <span class="o">=</span> <span class="mi">5</span>
+    <span class="k">if</span> <span class="n">optimizer_implementation</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">optimizer_implementation</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">OPTIMIZER_IMPLEMENTATION_CHOICES</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Unknown optimizer implementation </span><span class="si">%r</span><span class="s2">; expected one of: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="n">optimizer_implementation</span><span class="p">,</span>
+                    <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">OPTIMIZER_IMPLEMENTATION_CHOICES</span><span class="p">),</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="n">new_hyperparameters</span><span class="p">[</span><span class="s2">"optimizer_implementation"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">optimizer_implementation</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">init</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">init</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">PROCESSING_INIT_CHOICES</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Unknown processing initializer </span><span class="si">%r</span><span class="s2">; expected one of: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="n">init</span><span class="p">,</span>
+                    <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PROCESSING_INIT_CHOICES</span><span class="p">),</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="n">new_hyperparameters</span><span class="p">[</span><span class="s2">"init"</span><span class="p">]</span> <span class="o">=</span> <span class="n">init</span>
+    <span class="k">return</span> <span class="n">new_hyperparameters</span></div>
+
+
+
+<div class="viewcode-block" id="build_processing_variant_grid">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.generate_training_hyperparameters.build_processing_variant_grid">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">build_processing_variant_grid</span><span class="p">(</span>
+        <span class="n">production_hyperparameters</span><span class="p">,</span> <span class="n">kind</span><span class="p">,</span> <span class="n">optimizer_implementation</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">init</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return a flank-mode variant of a processing hyperparameter grid."""</span>
+    <span class="k">return</span> <span class="n">unique_hyperparameters</span><span class="p">(</span>
+        <span class="n">transform_processing_hyperparameters</span><span class="p">(</span>
+            <span class="n">kind</span><span class="p">,</span>
+            <span class="n">item</span><span class="p">,</span>
+            <span class="n">optimizer_implementation</span><span class="o">=</span><span class="n">optimizer_implementation</span><span class="p">,</span>
+            <span class="n">init</span><span class="o">=</span><span class="n">init</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">production_hyperparameters</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="build_affinity_ablation_panels">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.generate_training_hyperparameters.build_affinity_ablation_panels">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">build_affinity_ablation_panels</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Return the paired, representative affinity audit panels."""</span>
+    <span class="n">architecture_keys</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">(</span><span class="s2">"feedforward"</span><span class="p">,</span> <span class="p">(</span><span class="mi">512</span><span class="p">,</span> <span class="mi">512</span><span class="p">),</span> <span class="mf">1e-8</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">"with-skip-connections"</span><span class="p">,</span> <span class="p">(</span><span class="mi">256</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">512</span><span class="p">),</span> <span class="mf">1e-8</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">conditions</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"published_parity"</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">minibatch_size</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span>
+            <span class="n">optimizer_implementation</span><span class="o">=</span><span class="s2">"keras"</span><span class="p">,</span>
+            <span class="n">data_dependent_initialization_target</span><span class="o">=</span><span class="s2">"post_activation"</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="s2">"proposed_release"</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">minibatch_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span>
+            <span class="n">optimizer_implementation</span><span class="o">=</span><span class="s2">"keras"</span><span class="p">,</span>
+            <span class="n">data_dependent_initialization_target</span><span class="o">=</span><span class="s2">"post_activation"</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="s2">"pre_activation_lsuv"</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">minibatch_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span>
+            <span class="n">optimizer_implementation</span><span class="o">=</span><span class="s2">"keras"</span><span class="p">,</span>
+            <span class="n">data_dependent_initialization_target</span><span class="o">=</span><span class="s2">"pre_activation"</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="s2">"no_lsuv"</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">minibatch_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span>
+            <span class="n">optimizer_implementation</span><span class="o">=</span><span class="s2">"keras"</span><span class="p">,</span>
+            <span class="n">data_dependent_initialization_target</span><span class="o">=</span><span class="s2">"post_activation"</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="s2">"pytorch_rmsprop"</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">minibatch_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span>
+            <span class="n">optimizer_implementation</span><span class="o">=</span><span class="s2">"pytorch"</span><span class="p">,</span>
+            <span class="n">data_dependent_initialization_target</span><span class="o">=</span><span class="s2">"post_activation"</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="s2">"pytorch_rmsprop_batch128"</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">minibatch_size</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span>
+            <span class="n">optimizer_implementation</span><span class="o">=</span><span class="s2">"pytorch"</span><span class="p">,</span>
+            <span class="n">data_dependent_initialization_target</span><span class="o">=</span><span class="s2">"post_activation"</span><span class="p">,</span>
+        <span class="p">),</span>
+    <span class="p">}</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">condition</span><span class="p">,</span> <span class="n">options</span> <span class="ow">in</span> <span class="n">conditions</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">grid</span> <span class="o">=</span> <span class="n">build_affinity_grid</span><span class="p">(</span><span class="o">**</span><span class="n">options</span><span class="p">)</span>
+        <span class="n">selected</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">item</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">grid</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">item</span><span class="p">[</span><span class="s2">"topology"</span><span class="p">],</span>
+                <span class="nb">tuple</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">"layer_sizes"</span><span class="p">]),</span>
+                <span class="n">item</span><span class="p">[</span><span class="s2">"dense_layer_l1_regularization"</span><span class="p">],</span>
+            <span class="p">)</span> <span class="ow">in</span> <span class="n">architecture_keys</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">selected</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">architecture_keys</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">"Affinity ablation architecture selection returned </span><span class="si">%d</span><span class="s2"> rows"</span>
+                <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">selected</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">condition</span> <span class="o">==</span> <span class="s2">"no_lsuv"</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">selected</span><span class="p">:</span>
+                <span class="n">item</span><span class="p">[</span><span class="s2">"data_dependent_initialization_method"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">result</span><span class="p">[</span><span class="n">condition</span><span class="p">]</span> <span class="o">=</span> <span class="n">selected</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="build_processing_ablation_panels">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.generate_training_hyperparameters.build_processing_ablation_panels">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">build_processing_ablation_panels</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Return the paired, representative processing audit panels."""</span>
+    <span class="n">architecture_keys</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">(</span><span class="s2">"tanh"</span><span class="p">,</span> <span class="mi">256</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="mi">8</span><span class="p">,),</span> <span class="mf">0.3</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">"relu"</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">17</span><span class="p">,</span> <span class="p">(</span><span class="mf">1e-6</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="mi">16</span><span class="p">,),</span> <span class="mf">0.5</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">conditions</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"glorot_keras_adam"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"glorot_uniform"</span><span class="p">,</span> <span class="s2">"keras"</span><span class="p">),</span>
+        <span class="s2">"kaiming_keras_adam"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"kaiming_uniform_fan_in"</span><span class="p">,</span> <span class="s2">"keras"</span><span class="p">),</span>
+        <span class="s2">"glorot_pytorch_adam"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"glorot_uniform"</span><span class="p">,</span> <span class="s2">"pytorch"</span><span class="p">),</span>
+        <span class="s2">"kaiming_pytorch_adam"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"kaiming_uniform_fan_in"</span><span class="p">,</span> <span class="s2">"pytorch"</span><span class="p">),</span>
+    <span class="p">}</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">condition</span><span class="p">,</span> <span class="p">(</span><span class="n">init</span><span class="p">,</span> <span class="n">optimizer_implementation</span><span class="p">)</span> <span class="ow">in</span> <span class="n">conditions</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">grid</span> <span class="o">=</span> <span class="n">build_processing_base_grid</span><span class="p">(</span>
+            <span class="n">init</span><span class="o">=</span><span class="n">init</span><span class="p">,</span>
+            <span class="n">optimizer_implementation</span><span class="o">=</span><span class="n">optimizer_implementation</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">selected</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">item</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">grid</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">item</span><span class="p">[</span><span class="s2">"convolutional_activation"</span><span class="p">],</span>
+                <span class="n">item</span><span class="p">[</span><span class="s2">"convolutional_filters"</span><span class="p">],</span>
+                <span class="n">item</span><span class="p">[</span><span class="s2">"convolutional_kernel_size"</span><span class="p">],</span>
+                <span class="nb">tuple</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">"convolutional_kernel_l1_l2"</span><span class="p">]),</span>
+                <span class="nb">tuple</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">"post_convolutional_dense_layer_sizes"</span><span class="p">]),</span>
+                <span class="n">item</span><span class="p">[</span><span class="s2">"dropout_rate"</span><span class="p">],</span>
+            <span class="p">)</span> <span class="ow">in</span> <span class="n">architecture_keys</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">selected</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">architecture_keys</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">"Processing ablation architecture selection returned </span><span class="si">%d</span><span class="s2"> rows"</span>
+                <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">selected</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="n">result</span><span class="p">[</span><span class="n">condition</span><span class="p">]</span> <span class="o">=</span> <span class="n">selected</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="build_processing_batch_sweep_panels">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.generate_training_hyperparameters.build_processing_batch_sweep_panels">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">build_processing_batch_sweep_panels</span><span class="p">(</span>
+        <span class="n">minibatch_sizes</span><span class="o">=</span><span class="n">PROCESSING_BATCH_SWEEP_SIZES</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return focused 5-aa and no-flank processing batch-sweep panels.</span>
+
+<span class="sd">    This is a screening grid, not the production architecture grid. It keeps</span>
+<span class="sd">    the two representative architectures used by the initializer/optimizer</span>
+<span class="sd">    audit and prunes recipe combinations that were dominated on the primary</span>
+<span class="sd">    held-out metrics. The same candidate recipes are emitted at every batch</span>
+<span class="sd">    size so minibatch size is the only between-panel change.</span>
+<span class="sd">    """</span>
+    <span class="n">minibatch_sizes</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">minibatch_sizes</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">minibatch_sizes</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"minibatch_sizes must not be empty"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">or</span> <span class="n">value</span> <span class="o">&lt;=</span> <span class="mi">0</span>
+            <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">minibatch_sizes</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"minibatch_sizes must contain positive integers"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">minibatch_sizes</span><span class="p">))</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">minibatch_sizes</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"minibatch_sizes must not contain duplicates"</span><span class="p">)</span>
+
+    <span class="n">architecture_keys</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"small"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"tanh"</span><span class="p">,</span> <span class="mi">256</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="mi">8</span><span class="p">,),</span> <span class="mf">0.3</span><span class="p">),</span>
+        <span class="s2">"large"</span><span class="p">:</span> <span class="p">(</span><span class="s2">"relu"</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">17</span><span class="p">,</span> <span class="p">(</span><span class="mf">1e-6</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="mi">16</span><span class="p">,),</span> <span class="mf">0.5</span><span class="p">),</span>
+    <span class="p">}</span>
+    <span class="c1"># Primary 5-aa candidates: alternatives hurt the small/tanh model. For</span>
+    <span class="c1"># large/ReLU, Kaiming+Keras was dominated by the two retained alternatives.</span>
+    <span class="c1"># Secondary no-flank candidates: Kaiming+Keras improved all three primary</span>
+    <span class="c1"># small/tanh metrics; every alternative hurt large/ReLU.</span>
+    <span class="n">candidate_recipes</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"short_flanks"</span><span class="p">:</span> <span class="p">(</span>
+            <span class="p">(</span><span class="s2">"small"</span><span class="p">,</span> <span class="s2">"glorot_uniform"</span><span class="p">,</span> <span class="s2">"keras"</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"large"</span><span class="p">,</span> <span class="s2">"glorot_uniform"</span><span class="p">,</span> <span class="s2">"keras"</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"large"</span><span class="p">,</span> <span class="s2">"glorot_uniform"</span><span class="p">,</span> <span class="s2">"pytorch"</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"large"</span><span class="p">,</span> <span class="s2">"kaiming_uniform_fan_in"</span><span class="p">,</span> <span class="s2">"pytorch"</span><span class="p">),</span>
+        <span class="p">),</span>
+        <span class="s2">"no_flank"</span><span class="p">:</span> <span class="p">(</span>
+            <span class="p">(</span><span class="s2">"small"</span><span class="p">,</span> <span class="s2">"glorot_uniform"</span><span class="p">,</span> <span class="s2">"keras"</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"small"</span><span class="p">,</span> <span class="s2">"kaiming_uniform_fan_in"</span><span class="p">,</span> <span class="s2">"keras"</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"large"</span><span class="p">,</span> <span class="s2">"glorot_uniform"</span><span class="p">,</span> <span class="s2">"keras"</span><span class="p">),</span>
+        <span class="p">),</span>
+    <span class="p">}</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">minibatch_size</span> <span class="ow">in</span> <span class="n">minibatch_sizes</span><span class="p">:</span>
+        <span class="n">recipe_grids</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">recipes</span> <span class="ow">in</span> <span class="n">candidate_recipes</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">optimizer_implementation</span> <span class="ow">in</span> <span class="n">recipes</span><span class="p">:</span>
+                <span class="n">recipe_key</span> <span class="o">=</span> <span class="p">(</span><span class="n">init</span><span class="p">,</span> <span class="n">optimizer_implementation</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">recipe_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">recipe_grids</span><span class="p">:</span>
+                    <span class="n">recipe_grids</span><span class="p">[</span><span class="n">recipe_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">build_processing_base_grid</span><span class="p">(</span>
+                        <span class="n">minibatch_size</span><span class="o">=</span><span class="n">minibatch_size</span><span class="p">,</span>
+                        <span class="n">init</span><span class="o">=</span><span class="n">init</span><span class="p">,</span>
+                        <span class="n">optimizer_implementation</span><span class="o">=</span><span class="n">optimizer_implementation</span><span class="p">,</span>
+                    <span class="p">)</span>
+        <span class="k">for</span> <span class="n">variant</span><span class="p">,</span> <span class="n">recipes</span> <span class="ow">in</span> <span class="n">candidate_recipes</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">selected</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">architecture</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">optimizer_implementation</span> <span class="ow">in</span> <span class="n">recipes</span><span class="p">:</span>
+                <span class="n">architecture_key</span> <span class="o">=</span> <span class="n">architecture_keys</span><span class="p">[</span><span class="n">architecture</span><span class="p">]</span>
+                <span class="n">matches</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="n">item</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">recipe_grids</span><span class="p">[</span>
+                        <span class="p">(</span><span class="n">init</span><span class="p">,</span> <span class="n">optimizer_implementation</span><span class="p">)]</span>
+                    <span class="k">if</span> <span class="p">(</span>
+                        <span class="n">item</span><span class="p">[</span><span class="s2">"convolutional_activation"</span><span class="p">],</span>
+                        <span class="n">item</span><span class="p">[</span><span class="s2">"convolutional_filters"</span><span class="p">],</span>
+                        <span class="n">item</span><span class="p">[</span><span class="s2">"convolutional_kernel_size"</span><span class="p">],</span>
+                        <span class="nb">tuple</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">"convolutional_kernel_l1_l2"</span><span class="p">]),</span>
+                        <span class="nb">tuple</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">"post_convolutional_dense_layer_sizes"</span><span class="p">]),</span>
+                        <span class="n">item</span><span class="p">[</span><span class="s2">"dropout_rate"</span><span class="p">],</span>
+                    <span class="p">)</span> <span class="o">==</span> <span class="n">architecture_key</span>
+                <span class="p">]</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">matches</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                        <span class="s2">"Processing batch-sweep architecture selection "</span>
+                        <span class="s2">"returned </span><span class="si">%d</span><span class="s2"> rows for </span><span class="si">%s</span><span class="s2">/</span><span class="si">%s</span><span class="s2">/</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                            <span class="nb">len</span><span class="p">(</span><span class="n">matches</span><span class="p">),</span> <span class="n">variant</span><span class="p">,</span> <span class="n">architecture</span><span class="p">,</span> <span class="n">recipe_key</span><span class="p">))</span>
+                <span class="n">selected</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">transform_processing_hyperparameters</span><span class="p">(</span>
+                    <span class="n">variant</span><span class="p">,</span> <span class="n">matches</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+            <span class="n">result</span><span class="p">[</span><span class="s2">"batch</span><span class="si">%d</span><span class="s2">.</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">minibatch_size</span><span class="p">,</span> <span class="n">variant</span><span class="p">)]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">unique_hyperparameters</span><span class="p">(</span><span class="n">selected</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="read_hyperparameters_yaml">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.generate_training_hyperparameters.read_hyperparameters_yaml">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">read_hyperparameters_yaml</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Read a YAML hyperparameter list from ``path``."""</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+        <span class="n">hyperparameters</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">hyperparameters</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Expected YAML list in </span><span class="si">%s</span><span class="s2">; got </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">path</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">hyperparameters</span></div>
+
+
+
+<div class="viewcode-block" id="dump_hyperparameters">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.generate_training_hyperparameters.dump_hyperparameters">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">dump_hyperparameters</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Write hyperparameter dictionaries as safe YAML."""</span>
+    <span class="n">yaml</span><span class="o">.</span><span class="n">safe_dump</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">,</span> <span class="n">stream</span> <span class="ow">or</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="add_minibatch_argument">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.generate_training_hyperparameters.add_minibatch_argument">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">add_minibatch_argument</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">DEFAULT_MINIBATCH_SIZE</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Add the common training-minibatch-size argument to ``parser``."""</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--minibatch-size"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">default</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Training minibatch size to write into every architecture. "</span>
+            <span class="s2">"Default: </span><span class="si">%(default)s</span><span class="s2">"</span>
+        <span class="p">),</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="add_optimizer_implementation_argument">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.generate_training_hyperparameters.add_optimizer_implementation_argument">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">add_optimizer_implementation_argument</span><span class="p">(</span><span class="n">parser</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Add the optimizer-equation implementation argument."""</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--optimizer-implementation"</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="n">OPTIMIZER_IMPLEMENTATION_CHOICES</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">DEFAULT_OPTIMIZER_IMPLEMENTATION</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Optimizer update equations to write into every architecture. "</span>
+            <span class="s2">"Default: </span><span class="si">%(default)s</span><span class="s2"> (published 2.1.x parity)"</span>
+        <span class="p">),</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="make_parser">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.generate_training_hyperparameters.make_parser">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_parser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Build the argparse parser for the unified generator command."""</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">,</span> <span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">)</span>
+    <span class="n">subparsers</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_subparsers</span><span class="p">(</span><span class="n">dest</span><span class="o">=</span><span class="s2">"recipe"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">affinity</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"affinity"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Generate the Class I pan-allele affinity grid."</span><span class="p">)</span>
+    <span class="n">add_minibatch_argument</span><span class="p">(</span><span class="n">affinity</span><span class="p">,</span> <span class="n">AFFINITY_DEFAULT_MINIBATCH_SIZE</span><span class="p">)</span>
+    <span class="n">add_optimizer_implementation_argument</span><span class="p">(</span><span class="n">affinity</span><span class="p">)</span>
+    <span class="n">affinity</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--data-dependent-initialization-target"</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="n">LSUV_TARGET_CHOICES</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"post_activation"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"LSUV activation boundary. Default: </span><span class="si">%(default)s</span><span class="s2"> (2.1.x parity)"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">affinity</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--init"</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="n">AFFINITY_INIT_CHOICES</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"glorot_uniform"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Affinity-layer initializer. Default: </span><span class="si">%(default)s</span><span class="s2"> (2.1.x parity)"</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">processing_base</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"processing-base"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Generate the base Class I processing grid."</span><span class="p">)</span>
+    <span class="n">add_minibatch_argument</span><span class="p">(</span><span class="n">processing_base</span><span class="p">,</span> <span class="n">PROCESSING_DEFAULT_MINIBATCH_SIZE</span><span class="p">)</span>
+    <span class="n">add_optimizer_implementation_argument</span><span class="p">(</span><span class="n">processing_base</span><span class="p">)</span>
+    <span class="n">processing_base</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--init"</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="n">PROCESSING_INIT_CHOICES</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"glorot_uniform"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Processing-layer initializer. Default: </span><span class="si">%(default)s</span><span class="s2"> (2.1.x parity)"</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">processing_variant</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"processing-variant"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Generate a flank-mode processing grid from a base grid."</span><span class="p">)</span>
+    <span class="n">processing_variant</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"production_hyperparameters"</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"YAML"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Base processing hyperparameter grid YAML."</span><span class="p">)</span>
+    <span class="n">processing_variant</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"kind"</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="n">PROCESSING_VARIANT_CHOICES</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Processing flank variant to output."</span><span class="p">)</span>
+    <span class="n">processing_variant</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--optimizer-implementation"</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="n">OPTIMIZER_IMPLEMENTATION_CHOICES</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Override the optimizer equations in every architecture. "</span>
+            <span class="s2">"If omitted, retain the value from the base YAML."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">processing_variant</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--init"</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="n">PROCESSING_INIT_CHOICES</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Override the initializer in every architecture. If omitted, "</span>
+            <span class="s2">"retain the value from the base YAML."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+
+<div class="viewcode-block" id="run_argv">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.generate_training_hyperparameters.run_argv">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_argv</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prog</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Run the unified generator command."""</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">make_parser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">)</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">recipe</span> <span class="o">==</span> <span class="s2">"affinity"</span><span class="p">:</span>
+        <span class="n">grid</span> <span class="o">=</span> <span class="n">build_affinity_grid</span><span class="p">(</span>
+            <span class="n">minibatch_size</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">minibatch_size</span><span class="p">,</span>
+            <span class="n">optimizer_implementation</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">optimizer_implementation</span><span class="p">,</span>
+            <span class="n">data_dependent_initialization_target</span><span class="o">=</span><span class="p">(</span>
+                <span class="n">args</span><span class="o">.</span><span class="n">data_dependent_initialization_target</span>
+            <span class="p">),</span>
+            <span class="n">init</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">init</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">elif</span> <span class="n">args</span><span class="o">.</span><span class="n">recipe</span> <span class="o">==</span> <span class="s2">"processing-base"</span><span class="p">:</span>
+        <span class="n">grid</span> <span class="o">=</span> <span class="n">build_processing_base_grid</span><span class="p">(</span>
+            <span class="n">minibatch_size</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">minibatch_size</span><span class="p">,</span>
+            <span class="n">optimizer_implementation</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">optimizer_implementation</span><span class="p">,</span>
+            <span class="n">init</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">init</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">elif</span> <span class="n">args</span><span class="o">.</span><span class="n">recipe</span> <span class="o">==</span> <span class="s2">"processing-variant"</span><span class="p">:</span>
+        <span class="n">grid</span> <span class="o">=</span> <span class="n">build_processing_variant_grid</span><span class="p">(</span>
+            <span class="n">read_hyperparameters_yaml</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">production_hyperparameters</span><span class="p">),</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">kind</span><span class="p">,</span>
+            <span class="n">optimizer_implementation</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">optimizer_implementation</span><span class="p">,</span>
+            <span class="n">init</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">init</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unsupported recipe: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">args</span><span class="o">.</span><span class="n">recipe</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Hyperparameters grid size: </span><span class="si">%d</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">grid</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+    <span class="n">dump_hyperparameters</span><span class="p">(</span><span class="n">grid</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="run_affinity_argv">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.generate_training_hyperparameters.run_affinity_argv">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_affinity_argv</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prog</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Compatibility entry point for the old affinity generator script."""</span>
+    <span class="k">if</span> <span class="n">argv</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">argv</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+    <span class="k">return</span> <span class="n">run_argv</span><span class="p">([</span><span class="s2">"affinity"</span><span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">argv</span><span class="p">),</span> <span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="run_processing_base_argv">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.generate_training_hyperparameters.run_processing_base_argv">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_processing_base_argv</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prog</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Compatibility entry point for the old processing-base script."""</span>
+    <span class="k">if</span> <span class="n">argv</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">argv</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+    <span class="k">return</span> <span class="n">run_argv</span><span class="p">([</span><span class="s2">"processing-base"</span><span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">argv</span><span class="p">),</span> <span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="run_processing_variant_argv">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.generate_training_hyperparameters.run_processing_variant_argv">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_processing_variant_argv</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prog</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Compatibility entry point for the old processing-variant script."""</span>
+    <span class="k">if</span> <span class="n">argv</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">argv</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+    <span class="k">return</span> <span class="n">run_argv</span><span class="p">([</span><span class="s2">"processing-variant"</span><span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">argv</span><span class="p">),</span> <span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">)</span></div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
+    <span class="n">run_argv</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

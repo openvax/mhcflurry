@@ -1,0 +1,642 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.affinity.persistence &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.affinity.persistence</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.affinity.persistence</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Persistence helpers for class I affinity predictors."""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">collections</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">partial</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">getpass</span><span class="w"> </span><span class="kn">import</span> <span class="n">getuser</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">os</span><span class="w"> </span><span class="kn">import</span> <span class="n">makedirs</span><span class="p">,</span> <span class="n">mkdir</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">os.path</span><span class="w"> </span><span class="kn">import</span> <span class="n">abspath</span><span class="p">,</span> <span class="n">commonpath</span><span class="p">,</span> <span class="n">dirname</span><span class="p">,</span> <span class="n">exists</span><span class="p">,</span> <span class="n">join</span><span class="p">,</span> <span class="n">realpath</span><span class="p">,</span> <span class="n">relpath</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">socket</span><span class="w"> </span><span class="kn">import</span> <span class="n">gethostname</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mhcgnomes</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse</span><span class="p">,</span> <span class="n">parse_gene_class</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">..class1_neural_network</span><span class="w"> </span><span class="kn">import</span> <span class="n">Class1NeuralNetwork</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..common</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_weights</span><span class="p">,</span> <span class="n">normalize_allele_name</span><span class="p">,</span> <span class="n">save_weights</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..downloads</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_default_class1_models_dir</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..percentile_calibration</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_percent_rank_transforms</span><span class="p">,</span> <span class="n">save_percent_rank_transforms</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..pseudosequences</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">LEGACY_ALLELE_SEQUENCES_FILENAME</span><span class="p">,</span>
+    <span class="n">pseudosequence_filename_candidates</span><span class="p">,</span>
+    <span class="n">pseudosequence_filename_for_mapping</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..version</span><span class="w"> </span><span class="kn">import</span> <span class="n">__version__</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..model_provenance</span><span class="w"> </span><span class="kn">import</span> <span class="n">add_release_provenance</span>
+
+
+<span class="c1"># The public 2.2.0 model artifact contains this malformed spelling of the</span>
+<span class="c1"># official Caja-PS2*01 processed-pseudogene allele. Keep only this exact</span>
+<span class="c1"># artifact compatibility case until pirl-unc/mhcgnomes#88 supplies the</span>
+<span class="c1"># ontology property and, if appropriate, the historical alias. Do not infer</span>
+<span class="c1"># pseudogene status from a ``PS`` substring.</span>
+<span class="n">_LEGACY_NON_PREDICTOR_PSEUDOSEQUENCE_KEYS</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span><span class="s2">"Caja-PS*02:01"</span><span class="p">})</span>
+<span class="n">_CHECKPOINT_POLICIES</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"terminal"</span><span class="p">,</span> <span class="s2">"best"</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_checkpoint_manifest_column</span><span class="p">(</span><span class="n">policy</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the manifest column containing a checkpoint's relative path."""</span>
+    <span class="k">return</span> <span class="s2">"checkpoint_</span><span class="si">%s</span><span class="s2">_weights"</span> <span class="o">%</span> <span class="n">policy</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_mhc_name</span><span class="p">(</span><span class="n">raw_name</span><span class="p">,</span> <span class="n">only_class1</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Parse an MHC name with mhcgnomes, returning None on failure."""</span>
+    <span class="k">return</span> <span class="n">parse</span><span class="p">(</span>
+        <span class="nb">str</span><span class="p">(</span><span class="n">raw_name</span><span class="p">),</span>
+        <span class="n">only_class1</span><span class="o">=</span><span class="n">only_class1</span><span class="p">,</span>
+        <span class="n">infer_class2_pairing</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">collapse_singleton_haplotypes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">collapse_singleton_serotypes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_is_non_predictor_pseudosequence</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return true for known non-class-I predictor pseudosequence rows."""</span>
+    <span class="n">parsed_any_class</span> <span class="o">=</span> <span class="n">_parse_mhc_name</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">only_class1</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">parsed_any_class</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">gene_class</span> <span class="o">=</span> <span class="n">parse_gene_class</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">name</span><span class="p">),</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">gene_class</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Use mhcgnomes' lenient, species-aware classification for names</span>
+            <span class="c1"># outside its strict allele ontology, including DAA/DAB/DR-family</span>
+            <span class="c1"># class-II genes and known non-MHC helper genes.</span>
+            <span class="k">return</span> <span class="n">gene_class</span><span class="o">.</span><span class="n">is_class2</span> <span class="ow">or</span> <span class="n">gene_class</span><span class="o">.</span><span class="n">non_mhc</span>
+
+        <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="ow">in</span> <span class="n">_LEGACY_NON_PREDICTOR_PSEUDOSEQUENCE_KEYS</span>
+
+    <span class="n">parsed_class1</span> <span class="o">=</span> <span class="n">_parse_mhc_name</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">only_class1</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">parsed_class1</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Known non-class-I MHC names such as class II and TAP entries do not</span>
+        <span class="c1"># belong in a class-I predictor.</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="n">gene_name</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">parsed_class1</span><span class="p">,</span> <span class="s2">"gene_name"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">gene_name</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"HFE"</span><span class="p">,</span> <span class="s2">"MICA"</span><span class="p">,</span> <span class="s2">"MICB"</span><span class="p">}</span>
+        <span class="ow">or</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">parsed_class1</span><span class="p">,</span> <span class="s2">"is_pseudogene"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="ow">or</span> <span class="n">parsed_class1</span><span class="o">.</span><span class="n">annotation_null</span>
+        <span class="ow">or</span> <span class="n">parsed_class1</span><span class="o">.</span><span class="n">annotation_questionable</span>
+    <span class="p">)</span>
+
+
+<div class="viewcode-block" id="save_predictor">
+<a class="viewcode-back" href="../../../mhcflurry.affinity.html#mhcflurry.affinity.persistence.save_predictor">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_predictor</span><span class="p">(</span><span class="n">predictor</span><span class="p">,</span> <span class="n">models_dir</span><span class="p">,</span> <span class="n">model_names_to_write</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">write_metadata</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Serialize the predictor to a directory on disk. If the directory does</span>
+<span class="sd">    not exist it will be created.</span>
+
+<span class="sd">    The serialization format consists of a file called "manifest.csv" with</span>
+<span class="sd">    the configurations of each Class1NeuralNetwork, along with per-network</span>
+<span class="sd">    files giving the model weights. If there are pan-allele predictors in</span>
+<span class="sd">    the ensemble, the pseudosequences are also stored in the</span>
+<span class="sd">    directory. There is also a small file "info.txt" with basic metadata:</span>
+<span class="sd">    the save time, user and host (not the original training time).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    predictor : Class1AffinityPredictor</span>
+<span class="sd">        Predictor to serialize.</span>
+
+<span class="sd">    models_dir : string</span>
+<span class="sd">        Path to directory. It will be created if it doesn't exist.</span>
+
+<span class="sd">    model_names_to_write : list of string, optional</span>
+<span class="sd">        Only write the weights for the specified models. Useful for</span>
+<span class="sd">        incremental updates during training. Passing an explicit empty</span>
+<span class="sd">        list writes no model artifacts; this is used by calibration-only</span>
+<span class="sd">        updates that replace percentile calibration (CSV or JSON) without touching</span>
+<span class="sd">        the manifest, weights, model provenance, allele sequences, or</span>
+<span class="sd">        optimization metadata. Explicit ``metadata_dataframes`` are still</span>
+<span class="sd">        written when ``write_metadata`` is true.</span>
+
+<span class="sd">    write_metadata : boolean, optional</span>
+<span class="sd">        Whether to write optional metadata</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">model_names_to_write</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Write all models</span>
+        <span class="n">model_names_to_write</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">predictor</span><span class="o">.</span><span class="n">manifest_df</span><span class="o">.</span><span class="n">model_name</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+        <span class="n">write_model_artifacts</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">model_names_to_write</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">model_names_to_write</span><span class="p">)</span>
+        <span class="n">write_model_artifacts</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">model_names_to_write</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+
+    <span class="k">if</span> <span class="n">write_model_artifacts</span><span class="p">:</span>
+        <span class="n">predictor</span><span class="o">.</span><span class="n">check_consistency</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">exists</span><span class="p">(</span><span class="n">models_dir</span><span class="p">):</span>
+        <span class="n">mkdir</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">write_model_artifacts</span><span class="p">:</span>
+        <span class="n">sub_manifest_df</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">manifest_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+            <span class="n">predictor</span><span class="o">.</span><span class="n">manifest_df</span><span class="o">.</span><span class="n">model_name</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">model_names_to_write</span><span class="p">)</span>
+        <span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="c1"># Network JSON configs may have changed since the models were added,</span>
+        <span class="c1"># for example due to changes to the allele representation layer.</span>
+        <span class="c1"># So we update the JSON configs here also.</span>
+        <span class="n">updated_network_config_jsons</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">row</span><span class="p">)</span> <span class="ow">in</span> <span class="n">sub_manifest_df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="n">updated_network_config_jsons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">get_config</span><span class="p">()))</span>
+            <span class="n">weights_path</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">weights_path</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">row</span><span class="o">.</span><span class="n">model_name</span><span class="p">)</span>
+            <span class="n">save_weights</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">get_weights</span><span class="p">(),</span> <span class="n">weights_path</span><span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Wrote: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">weights_path</span><span class="p">)</span>
+
+            <span class="c1"># A refit may discard one or both previously retained policies.</span>
+            <span class="c1"># Never leave references to sidecars from the previous fit.</span>
+            <span class="k">for</span> <span class="n">policy</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"terminal"</span><span class="p">,</span> <span class="s2">"best"</span><span class="p">):</span>
+                <span class="n">column</span> <span class="o">=</span> <span class="n">_checkpoint_manifest_column</span><span class="p">(</span><span class="n">policy</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">predictor</span><span class="o">.</span><span class="n">manifest_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                    <span class="n">predictor</span><span class="o">.</span><span class="n">manifest_df</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="n">row</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">column</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">for</span> <span class="n">policy</span> <span class="ow">in</span> <span class="n">row</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">available_checkpoint_policies</span><span class="p">():</span>
+                <span class="n">checkpoint_path</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">checkpoint_weights_path</span><span class="p">(</span>
+                    <span class="n">models_dir</span><span class="p">,</span> <span class="n">row</span><span class="o">.</span><span class="n">model_name</span><span class="p">,</span> <span class="n">policy</span><span class="p">)</span>
+                <span class="n">makedirs</span><span class="p">(</span><span class="n">dirname</span><span class="p">(</span><span class="n">checkpoint_path</span><span class="p">),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="n">checkpoint_weights</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">get_checkpoint_weights</span><span class="p">(</span><span class="n">policy</span><span class="p">)</span>
+                <span class="n">save_weights</span><span class="p">(</span><span class="n">checkpoint_weights</span><span class="p">,</span> <span class="n">checkpoint_path</span><span class="p">)</span>
+                <span class="n">column</span> <span class="o">=</span> <span class="n">_checkpoint_manifest_column</span><span class="p">(</span><span class="n">policy</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">predictor</span><span class="o">.</span><span class="n">manifest_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                    <span class="n">predictor</span><span class="o">.</span><span class="n">manifest_df</span><span class="p">[</span><span class="n">column</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="n">predictor</span><span class="o">.</span><span class="n">manifest_df</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="n">row</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">column</span><span class="p">]</span> <span class="o">=</span> <span class="n">relpath</span><span class="p">(</span>
+                    <span class="n">checkpoint_path</span><span class="p">,</span> <span class="n">models_dir</span><span class="p">)</span>
+                <span class="n">row</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">set_checkpoint_weights_loader</span><span class="p">(</span>
+                    <span class="n">policy</span><span class="p">,</span>
+                    <span class="n">partial</span><span class="p">(</span><span class="n">load_weights</span><span class="p">,</span> <span class="n">abspath</span><span class="p">(</span><span class="n">checkpoint_path</span><span class="p">)),</span>
+                    <span class="n">weight_path</span><span class="o">=</span><span class="n">abspath</span><span class="p">(</span><span class="n">checkpoint_path</span><span class="p">),</span>
+                <span class="p">)</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Wrote: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">checkpoint_path</span><span class="p">)</span>
+        <span class="n">sub_manifest_df</span><span class="p">[</span><span class="s2">"config_json"</span><span class="p">]</span> <span class="o">=</span> <span class="n">updated_network_config_jsons</span>
+        <span class="n">predictor</span><span class="o">.</span><span class="n">manifest_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+            <span class="n">sub_manifest_df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span>
+            <span class="s2">"config_json"</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="n">updated_network_config_jsons</span>
+
+        <span class="n">write_manifest_df</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">manifest_df</span><span class="p">[[</span>
+            <span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">predictor</span><span class="o">.</span><span class="n">manifest_df</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span> <span class="o">!=</span> <span class="s2">"model"</span>
+        <span class="p">]]</span>
+        <span class="n">manifest_path</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">"manifest.csv"</span><span class="p">)</span>
+        <span class="n">write_manifest_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Wrote: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">manifest_path</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">write_metadata</span><span class="p">:</span>
+            <span class="c1"># Write "info.txt"</span>
+            <span class="n">info_path</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">"info.txt"</span><span class="p">)</span>
+            <span class="n">rows</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="p">(</span><span class="s2">"trained on"</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">asctime</span><span class="p">()),</span>
+                <span class="p">(</span><span class="s2">"package   "</span><span class="p">,</span> <span class="s2">"mhcflurry </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">__version__</span><span class="p">),</span>
+                <span class="p">(</span><span class="s2">"hostname  "</span><span class="p">,</span> <span class="n">gethostname</span><span class="p">()),</span>
+                <span class="p">(</span><span class="s2">"user      "</span><span class="p">,</span> <span class="n">getuser</span><span class="p">()),</span>
+            <span class="p">]</span>
+            <span class="n">add_release_provenance</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+            <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span>
+                <span class="n">info_path</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">"</span><span class="se">\t</span><span class="s2">"</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="c1"># Save pseudosequences. New artifacts get an explicit</span>
+        <span class="c1"># pseudosequences.&lt;source&gt;.&lt;length&gt;aa.csv filename while still</span>
+        <span class="c1"># writing allele_sequences.csv for older MHCflurry releases and</span>
+        <span class="c1"># external tooling.</span>
+        <span class="k">if</span> <span class="n">predictor</span><span class="o">.</span><span class="n">allele_to_sequence</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">allele_to_sequence_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+                <span class="nb">list</span><span class="p">(</span><span class="n">predictor</span><span class="o">.</span><span class="n">allele_to_sequence</span><span class="o">.</span><span class="n">items</span><span class="p">()),</span>
+                <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">'allele'</span><span class="p">,</span> <span class="s1">'sequence'</span><span class="p">]</span>
+            <span class="p">)</span>
+            <span class="n">legacy_path</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">LEGACY_ALLELE_SEQUENCES_FILENAME</span><span class="p">)</span>
+            <span class="n">allele_to_sequence_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">legacy_path</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Wrote: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">legacy_path</span><span class="p">)</span>
+
+            <span class="n">pseudosequences_filename</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">pseudosequence_filename_for_mapping</span><span class="p">(</span>
+                    <span class="n">predictor</span><span class="o">.</span><span class="n">allele_to_sequence</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">pseudosequences_filename</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">pseudosequences_path</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span>
+                    <span class="n">models_dir</span><span class="p">,</span> <span class="n">pseudosequences_filename</span><span class="p">)</span>
+                <span class="n">pseudosequences_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+                    <span class="nb">list</span><span class="p">(</span><span class="n">predictor</span><span class="o">.</span><span class="n">allele_to_sequence</span><span class="o">.</span><span class="n">items</span><span class="p">()),</span>
+                    <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">'allele'</span><span class="p">,</span> <span class="s1">'pseudosequence'</span><span class="p">])</span>
+                <span class="n">pseudosequences_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span>
+                    <span class="n">pseudosequences_path</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Wrote: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">pseudosequences_path</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="s2">"Pseudosequences have mixed or unknown lengths; "</span>
+                    <span class="s2">"skipping explicit pseudosequences.*.*aa.csv alias."</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">write_metadata</span> <span class="ow">and</span> <span class="n">predictor</span><span class="o">.</span><span class="n">metadata_dataframes</span><span class="p">:</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">df</span><span class="p">)</span> <span class="ow">in</span> <span class="n">predictor</span><span class="o">.</span><span class="n">metadata_dataframes</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">metadata_df_path</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">"</span><span class="si">%s</span><span class="s2">.csv.bz2"</span> <span class="o">%</span> <span class="n">name</span><span class="p">)</span>
+            <span class="n">df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">metadata_df_path</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">compression</span><span class="o">=</span><span class="s2">"bz2"</span><span class="p">)</span>
+
+    <span class="n">save_percent_rank_transforms</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">predictor</span><span class="o">.</span><span class="n">allele_to_percent_rank_transform</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">write_model_artifacts</span> <span class="ow">and</span> <span class="n">predictor</span><span class="o">.</span><span class="n">optimization_info</span><span class="p">:</span>
+        <span class="c1"># If the model being saved was optimized, we need to save that</span>
+        <span class="c1"># information since it can affect how predictions are performed</span>
+        <span class="c1"># (e.g. stitched-together ensembles output concatenated results,</span>
+        <span class="c1"># which then need to be averaged outside the model).</span>
+        <span class="n">optimization_info_path</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">"optimization_info.json"</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">optimization_info_path</span><span class="p">,</span> <span class="s2">"w"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+            <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">predictor</span><span class="o">.</span><span class="n">optimization_info</span><span class="p">,</span> <span class="n">fd</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+    <span class="n">predictor</span><span class="o">.</span><span class="n">models_dir</span> <span class="o">=</span> <span class="n">abspath</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="load_predictor">
+<a class="viewcode-back" href="../../../mhcflurry.affinity.html#mhcflurry.affinity.persistence.load_predictor">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_predictor</span><span class="p">(</span>
+        <span class="n">predictor_class</span><span class="p">,</span>
+        <span class="n">models_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">max_models</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">optimization_level</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">optimization_level_default</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Deserialize a predictor from a directory on disk.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    predictor_class : type</span>
+<span class="sd">        Predictor class to instantiate.</span>
+
+<span class="sd">    models_dir : string</span>
+<span class="sd">        Path to directory. If unspecified the default downloaded models are</span>
+<span class="sd">        used.</span>
+
+<span class="sd">    max_models : int, optional</span>
+<span class="sd">        Maximum number of `Class1NeuralNetwork` instances to load</span>
+
+<span class="sd">    optimization_level : int or None</span>
+<span class="sd">        If &gt;0, model optimization will be attempted. When None, use</span>
+<span class="sd">        optimization_level_default supplied by the public loader.</span>
+
+<span class="sd">    optimization_level_default : int or None</span>
+<span class="sd">        Fallback supplied by the public loader when no explicit level is set.</span>
+<span class="sd">        That loader reads MHCFLURRY_OPTIMIZATION_LEVEL with a default of 1.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    `Class1AffinityPredictor` instance</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">models_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">models_dir</span> <span class="o">=</span> <span class="n">get_default_class1_models_dir</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">RuntimeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="c1"># Fall back to the affinity predictor included in presentation</span>
+            <span class="c1"># predictor if possible.</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">mhcflurry.class1_presentation_predictor</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+                <span class="n">Class1PresentationPredictor</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">presentation_predictor</span> <span class="o">=</span> <span class="n">Class1PresentationPredictor</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+                <span class="k">return</span> <span class="n">presentation_predictor</span><span class="o">.</span><span class="n">affinity_predictor</span>
+            <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">e</span>
+
+    <span class="k">if</span> <span class="n">optimization_level</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">optimization_level</span> <span class="o">=</span> <span class="n">optimization_level_default</span>
+
+    <span class="n">manifest_path</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">"manifest.csv"</span><span class="p">)</span>
+    <span class="n">manifest_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">,</span> <span class="n">nrows</span><span class="o">=</span><span class="n">max_models</span><span class="p">)</span>
+
+    <span class="c1"># ----- Load pseudosequences first so we can canonicalize -----</span>
+    <span class="n">allele_to_sequence</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">allele_to_canonical</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">allele_sequences_filename</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">candidates</span> <span class="o">=</span> <span class="n">pseudosequence_filename_candidates</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">candidates</span><span class="p">:</span>
+        <span class="n">allele_sequences_filename</span> <span class="o">=</span> <span class="n">candidates</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">allele_sequences_filename</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">allele_to_sequence</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span>
+            <span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">allele_sequences_filename</span><span class="p">),</span>
+            <span class="n">index_col</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+
+        <span class="c1"># Re-normalize allele names. We first try without IMGT allele</span>
+        <span class="c1"># aliases to preserve current nomenclature. If the parse fails</span>
+        <span class="c1"># or the pseudosequence contains unknown (X) positions, we</span>
+        <span class="c1"># retry with aliases — retired allele names like B*44:01 (an</span>
+        <span class="c1"># IMGT error reassigned to B*44:02 in 1994) often have</span>
+        <span class="c1"># incomplete pseudosequences, and the alias target may have a</span>
+        <span class="c1"># complete one. Keys that mhcgnomes cannot parse are omitted: keeping</span>
+        <span class="c1"># them would make supported_alleles advertise a value that the public</span>
+        <span class="c1"># prediction API cannot canonicalize back to that key.</span>
+        <span class="n">renormalized</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">skipped_non_class1</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">skipped_unparseable</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="ow">in</span> <span class="n">allele_to_sequence</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">normalized</span> <span class="o">=</span> <span class="n">normalize_allele_name</span><span class="p">(</span>
+                <span class="n">name</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_allele_aliases</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">normalized</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="s2">"X"</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
+                <span class="n">alias_normalized</span> <span class="o">=</span> <span class="n">normalize_allele_name</span><span class="p">(</span>
+                    <span class="n">name</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_allele_aliases</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">alias_normalized</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">normalized</span> <span class="o">=</span> <span class="n">alias_normalized</span>
+            <span class="k">if</span> <span class="n">normalized</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="c1"># Detect class II, TAP, and pseudogene entries. Unknown raw</span>
+                <span class="c1"># keys are also unusable because prediction inputs cannot be</span>
+                <span class="c1"># canonicalized to them.</span>
+                <span class="k">if</span> <span class="n">_is_non_predictor_pseudosequence</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+                    <span class="n">skipped_non_class1</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">skipped_unparseable</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">normalized</span> <span class="ow">in</span> <span class="n">renormalized</span> <span class="ow">and</span> <span class="n">name</span> <span class="o">!=</span> <span class="n">normalized</span><span class="p">:</span>
+                <span class="n">existing</span> <span class="o">=</span> <span class="n">renormalized</span><span class="p">[</span><span class="n">normalized</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">value</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">"X"</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">existing</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">"X"</span><span class="p">):</span>
+                    <span class="n">renormalized</span><span class="p">[</span><span class="n">normalized</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+                <span class="k">continue</span>
+            <span class="n">renormalized</span><span class="p">[</span><span class="n">normalized</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="n">allele_to_sequence</span> <span class="o">=</span> <span class="n">renormalized</span>
+        <span class="k">if</span> <span class="n">skipped_non_class1</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">"Skipped </span><span class="si">%d</span><span class="s2"> non-class-I entries from pseudosequence "</span>
+                <span class="s2">"file (class II / TAP / pseudogene with incomplete "</span>
+                <span class="s2">"pseudosequences): </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">skipped_non_class1</span><span class="p">),</span>
+                <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">skipped_non_class1</span><span class="p">)[:</span><span class="mi">10</span><span class="p">])</span>
+                <span class="o">+</span> <span class="p">(</span><span class="s2">" ..."</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">skipped_non_class1</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">10</span> <span class="k">else</span> <span class="s2">""</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">skipped_unparseable</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">"Skipped </span><span class="si">%d</span><span class="s2"> unparseable pseudosequence allele key(s) that "</span>
+                <span class="s2">"cannot be resolved by the predictor API: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">skipped_unparseable</span><span class="p">),</span>
+                <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">skipped_unparseable</span><span class="p">)[:</span><span class="mi">10</span><span class="p">])</span>
+                <span class="o">+</span> <span class="p">(</span><span class="s2">" ..."</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">skipped_unparseable</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">10</span> <span class="k">else</span> <span class="s2">""</span><span class="p">))</span>
+
+        <span class="c1"># Map mhcgnomes-aliased forms back to pseudosequence keys.</span>
+        <span class="c1"># e.g. Mamu-A1*007:01 -&gt; Mamu-A*07:01</span>
+        <span class="k">for</span> <span class="n">canonical_name</span> <span class="ow">in</span> <span class="n">allele_to_sequence</span><span class="p">:</span>
+            <span class="n">aliased</span> <span class="o">=</span> <span class="n">normalize_allele_name</span><span class="p">(</span>
+                <span class="n">canonical_name</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                <span class="n">use_allele_aliases</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">aliased</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">aliased</span> <span class="o">!=</span> <span class="n">canonical_name</span>
+                    <span class="ow">and</span> <span class="n">aliased</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">allele_to_sequence</span><span class="p">):</span>
+                <span class="n">allele_to_canonical</span><span class="p">[</span><span class="n">aliased</span><span class="p">]</span> <span class="o">=</span> <span class="n">canonical_name</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_canonical</span><span class="p">(</span><span class="n">raw_name</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Normalize a raw allele name to its canonical pseudosequence key."""</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">normalize_allele_name</span><span class="p">(</span><span class="n">raw_name</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="ow">or</span> <span class="n">raw_name</span>
+        <span class="k">return</span> <span class="n">allele_to_canonical</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+
+    <span class="c1"># ----- Load manifest -----</span>
+    <span class="n">allele_to_allele_specific_models</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">class1_pan_allele_models</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">all_models</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">row</span><span class="p">)</span> <span class="ow">in</span> <span class="n">manifest_df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+        <span class="n">weights_filename</span> <span class="o">=</span> <span class="n">predictor_class</span><span class="o">.</span><span class="n">weights_path</span><span class="p">(</span>
+            <span class="n">models_dir</span><span class="p">,</span> <span class="n">row</span><span class="o">.</span><span class="n">model_name</span><span class="p">)</span>
+        <span class="n">config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">config_json</span><span class="p">)</span>
+
+        <span class="n">model</span> <span class="o">=</span> <span class="n">Class1NeuralNetwork</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span>
+            <span class="n">config</span><span class="p">,</span>
+            <span class="n">weights_loader</span><span class="o">=</span><span class="n">partial</span><span class="p">(</span><span class="n">load_weights</span><span class="p">,</span> <span class="n">abspath</span><span class="p">(</span><span class="n">weights_filename</span><span class="p">)),</span>
+            <span class="n">weight_paths</span><span class="o">=</span><span class="n">abspath</span><span class="p">(</span><span class="n">weights_filename</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">policy</span> <span class="ow">in</span> <span class="n">_CHECKPOINT_POLICIES</span><span class="p">:</span>
+            <span class="n">column</span> <span class="o">=</span> <span class="n">_checkpoint_manifest_column</span><span class="p">(</span><span class="n">policy</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">manifest_df</span><span class="o">.</span><span class="n">columns</span> <span class="ow">or</span> <span class="n">pandas</span><span class="o">.</span><span class="n">isna</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">column</span><span class="p">)):</span>
+                <span class="k">continue</span>
+            <span class="n">relative_checkpoint_path</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="n">column</span><span class="p">])</span>
+            <span class="n">checkpoint_path</span> <span class="o">=</span> <span class="n">realpath</span><span class="p">(</span><span class="n">join</span><span class="p">(</span>
+                <span class="n">models_dir</span><span class="p">,</span> <span class="n">relative_checkpoint_path</span><span class="p">))</span>
+            <span class="n">models_dir_absolute</span> <span class="o">=</span> <span class="n">realpath</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">commonpath</span><span class="p">((</span><span class="n">checkpoint_path</span><span class="p">,</span> <span class="n">models_dir_absolute</span><span class="p">))</span> <span class="o">!=</span> <span class="p">(</span>
+                    <span class="n">models_dir_absolute</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"Checkpoint path escapes predictor directory: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span>
+                    <span class="n">relative_checkpoint_path</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">exists</span><span class="p">(</span><span class="n">checkpoint_path</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">IOError</span><span class="p">(</span>
+                    <span class="s2">"Missing retained </span><span class="si">%s</span><span class="s2"> checkpoint for </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                        <span class="n">policy</span><span class="p">,</span> <span class="n">row</span><span class="o">.</span><span class="n">model_name</span><span class="p">,</span> <span class="n">checkpoint_path</span><span class="p">))</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">set_checkpoint_weights_loader</span><span class="p">(</span>
+                <span class="n">policy</span><span class="p">,</span>
+                <span class="n">partial</span><span class="p">(</span><span class="n">load_weights</span><span class="p">,</span> <span class="n">checkpoint_path</span><span class="p">),</span>
+                <span class="n">weight_path</span><span class="o">=</span><span class="n">checkpoint_path</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">row</span><span class="o">.</span><span class="n">allele</span> <span class="o">==</span> <span class="s2">"pan-class1"</span><span class="p">:</span>
+            <span class="n">class1_pan_allele_models</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">allele_to_allele_specific_models</span><span class="p">[</span>
+                <span class="n">to_canonical</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">allele</span><span class="p">)]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+        <span class="n">all_models</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+    <span class="n">manifest_df</span><span class="p">[</span><span class="s2">"model"</span><span class="p">]</span> <span class="o">=</span> <span class="n">all_models</span>
+
+    <span class="c1"># ----- Load percent ranks -----</span>
+    <span class="n">allele_to_percent_rank_transform</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">allele</span><span class="p">,</span> <span class="n">transform</span> <span class="ow">in</span> <span class="n">load_percent_rank_transforms</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">canonical</span> <span class="o">=</span> <span class="n">to_canonical</span><span class="p">(</span><span class="n">allele</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">canonical</span> <span class="ow">in</span> <span class="n">allele_to_percent_rank_transform</span> <span class="ow">and</span> <span class="n">allele</span> <span class="o">!=</span> <span class="n">canonical</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">allele_to_percent_rank_transform</span><span class="p">[</span><span class="n">canonical</span><span class="p">]</span> <span class="o">=</span> <span class="n">transform</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">"Loaded </span><span class="si">%d</span><span class="s2"> class1 pan allele predictors, </span><span class="si">%d</span><span class="s2"> allele sequences, "</span>
+        <span class="s2">"</span><span class="si">%d</span><span class="s2"> percent rank distributions, and </span><span class="si">%d</span><span class="s2"> allele specific models: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span>
+        <span class="nb">len</span><span class="p">(</span><span class="n">class1_pan_allele_models</span><span class="p">),</span>
+        <span class="nb">len</span><span class="p">(</span><span class="n">allele_to_sequence</span><span class="p">)</span> <span class="k">if</span> <span class="n">allele_to_sequence</span> <span class="k">else</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="nb">len</span><span class="p">(</span><span class="n">allele_to_percent_rank_transform</span><span class="p">),</span>
+        <span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">allele_to_allele_specific_models</span><span class="o">.</span><span class="n">values</span><span class="p">()),</span>
+        <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="s2">"</span><span class="si">%s</span><span class="s2"> (</span><span class="si">%d</span><span class="s2">)"</span> <span class="o">%</span> <span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">v</span><span class="p">))</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>
+            <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">allele_to_allele_specific_models</span><span class="o">.</span><span class="n">items</span><span class="p">())))</span>
+
+    <span class="n">provenance_string</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">info_path</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">"info.txt"</span><span class="p">)</span>
+        <span class="n">info</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span>
+            <span class="n">info_path</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">"</span><span class="se">\t</span><span class="s2">"</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span>
+            <span class="p">:,</span> <span class="mi">0</span>
+        <span class="p">]</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">provenance_string</span> <span class="o">=</span> <span class="s2">"generated on </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">info</span><span class="p">[</span><span class="s2">"trained on"</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="n">optimization_info</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">optimization_info_path</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="s2">"optimization_info.json"</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">optimization_info_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+            <span class="n">optimization_info</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="n">predictor_class</span><span class="p">(</span>
+        <span class="n">allele_to_allele_specific_models</span><span class="o">=</span><span class="n">allele_to_allele_specific_models</span><span class="p">,</span>
+        <span class="n">class1_pan_allele_models</span><span class="o">=</span><span class="n">class1_pan_allele_models</span><span class="p">,</span>
+        <span class="n">allele_to_sequence</span><span class="o">=</span><span class="n">allele_to_sequence</span><span class="p">,</span>
+        <span class="n">manifest_df</span><span class="o">=</span><span class="n">manifest_df</span><span class="p">,</span>
+        <span class="n">allele_to_percent_rank_transform</span><span class="o">=</span><span class="n">allele_to_percent_rank_transform</span><span class="p">,</span>
+        <span class="n">provenance_string</span><span class="o">=</span><span class="n">provenance_string</span><span class="p">,</span>
+        <span class="n">optimization_info</span><span class="o">=</span><span class="n">optimization_info</span><span class="p">,</span>
+        <span class="n">models_dir</span><span class="o">=</span><span class="n">abspath</span><span class="p">(</span><span class="n">models_dir</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">allele_to_sequence</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">allele_to_canonical</span> <span class="o">=</span> <span class="n">allele_to_canonical</span>
+    <span class="k">if</span> <span class="n">optimization_level</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">optimized</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">optimize</span><span class="p">()</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">"Model optimization </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span>
+            <span class="s2">"succeeded"</span> <span class="k">if</span> <span class="n">optimized</span> <span class="k">else</span> <span class="s2">"not supported for these models"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

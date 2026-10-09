@@ -1,0 +1,347 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Downloading and selecting model weights &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=86f393d6"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Evaluation of the 2.3.0 weights" href="release_model_evaluation.html" />
+    <link rel="prev" title="Python library tutorial" href="python_tutorial.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Downloading and selecting model weights</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#browse-what-is-available">Browse what is available</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#compare-new-and-historical-weights">Compare new and historical weights</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#older-allele-specific-models">Older allele-specific models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#local-storage-and-overrides">Local storage and overrides</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#why-archive-tags-differ">Why archive tags differ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#percentile-calibration">Percentile calibration</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Downloading and selecting model weights</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/model_downloads.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="downloading-and-selecting-model-weights">
+<h1>Downloading and selecting model weights<a class="headerlink" href="#downloading-and-selecting-model-weights" title="Link to this heading"></a></h1>
+<p>Code and weights have separate versions. A code patch can keep the same default
+weights: the current package uses the <strong>2.3.0 weight release</strong>. New weight
+releases identify changed model artifacts; they need not accompany every code
+release. Historical catalogue names remain available for reproducibility.</p>
+<section id="browse-what-is-available">
+<h2>Browse what is available<a class="headerlink" href="#browse-what-is-available" title="Link to this heading"></a></h2>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span>downloads<span class="w"> </span>releases<span class="w"> </span>models_class1_presentation
+mhcflurry<span class="w"> </span>downloads<span class="w"> </span>list<span class="w"> </span>--kind<span class="w"> </span>models
+mhcflurry<span class="w"> </span>downloads<span class="w"> </span>info<span class="w"> </span>models_class1_presentation
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">releases</span></code> lists valid catalogue identifiers. With a bundle name, it shows only
+releases containing that bundle and groups entries with the same archive URLs.
+For example, catalogues <code class="docutils literal notranslate"><span class="pre">2.2.0</span></code> and <code class="docutils literal notranslate"><span class="pre">2.0.0</span></code> point to the same presentation archive.
+<code class="docutils literal notranslate"><span class="pre">list</span></code> groups prediction models, legacy models, experiments, and supporting data.
+The first table shows the latest weights, distinct older archive versions and
+installed catalogue directories, with the recommended presentation bundle first,
+followed by standalone affinity and processing bundles.
+Affinity and processing rows also show components found inside installed
+presentation bundles as <code class="docutils literal notranslate"><span class="pre">RELEASE</span> <span class="pre">via</span> <span class="pre">presentation</span></code>; standalone bundle installs
+remain separate entries. Components must have a model directory and
+<code class="docutils literal notranslate"><span class="pre">manifest.csv</span></code> to appear in the table. A bundle containing only one processing
+variant is marked <code class="docutils literal notranslate"><span class="pre">with</span> <span class="pre">flanks</span> <span class="pre">only</span></code> or <code class="docutils literal notranslate"><span class="pre">without</span> <span class="pre">flanks</span> <span class="pre">only</span></code>. The presentation
+bundle’s <code class="docutils literal notranslate"><span class="pre">?</span></code> or <code class="docutils literal notranslate"><span class="pre">!</span></code> marker indicates unknown or different source URLs.
+Aliases sharing the same archive are grouped in the availability columns;
+<code class="docutils literal notranslate"><span class="pre">releases</span> <span class="pre">DOWNLOAD</span></code> lists every valid identifier. Historical resources appear
+below the main predictors. Terminal output uses restrained color; redirected
+output and <code class="docutils literal notranslate"><span class="pre">NO_COLOR=1</span></code> remain plain.
+Use <code class="docutils literal notranslate"><span class="pre">--kind</span> <span class="pre">data</span></code> for data only, or <code class="docutils literal notranslate"><span class="pre">--release</span> <span class="pre">2.2.0</span></code> to inspect an older catalogue.
+<code class="docutils literal notranslate"><span class="pre">info</span> <span class="pre">DOWNLOAD</span></code> adds descriptions, archive locations, fetch/use commands and
+exact embedded component paths. These presence checks do not verify weight
+file integrity or prove that embedded and standalone ensembles are identical.
+All three commands support <code class="docutils literal notranslate"><span class="pre">--json</span></code> and read the installed package’s catalogue
+offline. Update the package to obtain a newer catalogue.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Bundle</p></th>
+<th class="head"><p>Contents and use</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">models_class1_presentation</span></code></p></td>
+<td><p>Full presentation predictor, including affinity, processing, and their combiner. The normal prediction bundle.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">models_class1_pan</span></code></p></td>
+<td><p>Selected pan-allele affinity ensemble, for standalone affinity prediction.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">models_class1_processing</span></code></p></td>
+<td><p>Standalone processing ensembles with and without N/C flanks.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">models_class1</span></code></p></td>
+<td><p>Legacy allele-specific affinity models. The name does not mean the current general-purpose class I bundle.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">*_unselected</span></code></p></td>
+<td><p>Candidate networks before ensemble selection.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">*_variants</span></code>, <code class="docutils literal notranslate"><span class="pre">*_refined</span></code>, <code class="docutils literal notranslate"><span class="pre">*_experiments1</span></code></p></td>
+<td><p>Historical experimental configurations.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">*_with_mass_spec</span></code>, <code class="docutils literal notranslate"><span class="pre">*_no_mass_spec</span></code>, <code class="docutils literal notranslate"><span class="pre">*_minimal</span></code></p></td>
+<td><p>Historical training variants or smaller subsets.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">data_*</span></code>, <code class="docutils literal notranslate"><span class="pre">allele_sequences</span></code>, <code class="docutils literal notranslate"><span class="pre">analysis_predictor_info</span></code>, <code class="docutils literal notranslate"><span class="pre">random_peptide_predictions</span></code>, <code class="docutils literal notranslate"><span class="pre">cross_validation_class1</span></code></p></td>
+<td><p>Supporting data and analyses.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The presentation bundle contains its own affinity and processing components.
+The standalone bundles can be absent while full presentation prediction is
+ready to use. <code class="docutils literal notranslate"><span class="pre">Class1AffinityPredictor.load()</span></code> can fall back to the default
+presentation bundle when standalone affinity weights are absent and no
+affinity-path override is set. <code class="docutils literal notranslate"><span class="pre">Class1ProcessingPredictor.load()</span></code> has no such
+fallback: pass an embedded component path explicitly, or use
+<code class="docutils literal notranslate"><span class="pre">Class1PresentationPredictor.load().processing_predictor_with_flanks</span></code> (or
+<code class="docutils literal notranslate"><span class="pre">processing_predictor_without_flanks</span></code>). Explicit paths and release selection
+retain their existing precedence.</p>
+<p>In JSON output, <code class="docutils literal notranslate"><span class="pre">downloaded</span></code>, <code class="docutils literal notranslate"><span class="pre">status</span></code> and <code class="docutils literal notranslate"><span class="pre">path</span></code> still describe the named
+bundle. The additive <code class="docutils literal notranslate"><span class="pre">presentation_components</span></code> entries describe embedded paths,
+directory/manifest presence and the presentation bundle’s source status.</p>
+</section>
+<section id="compare-new-and-historical-weights">
+<h2>Compare new and historical weights<a class="headerlink" href="#compare-new-and-historical-weights" title="Link to this heading"></a></h2>
+<p>The public <strong>2.1.5, 2.2.0, and 2.2.1 packages used the same 2020 model archives</strong>,
+registered under catalogue <code class="docutils literal notranslate"><span class="pre">2.2.0</span></code>. There is no separate <code class="docutils literal notranslate"><span class="pre">2.1.5</span></code> or <code class="docutils literal notranslate"><span class="pre">2.2.1</span></code>
+weight catalogue. The <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> models use the 2023 curated affinity snapshot and an updated
+processing training recipe; this does not mean every component gained new
+2023 observations. See <a class="reference internal" href="release_training_recipe.html"><span class="doc">Release training recipe</span></a>.</p>
+<p>Fetch both presentation bundles once:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span>downloads<span class="w"> </span>fetch<span class="w"> </span>models_class1_presentation<span class="w"> </span>--release<span class="w"> </span><span class="m">2</span>.3.0
+mhcflurry<span class="w"> </span>downloads<span class="w"> </span>fetch<span class="w"> </span>models_class1_presentation<span class="w"> </span>--release<span class="w"> </span><span class="m">2</span>.2.0
+</pre></div>
+</div>
+<p>Use a CSV with <code class="docutils literal notranslate"><span class="pre">peptide</span></code>, <code class="docutils literal notranslate"><span class="pre">allele</span></code>, <code class="docutils literal notranslate"><span class="pre">n_flank</span></code>, and <code class="docutils literal notranslate"><span class="pre">c_flank</span></code> columns. An <code class="docutils literal notranslate"><span class="pre">allele</span></code>
+cell can contain a semicolon-separated MHC allele set. Run both models on the
+same rows; available N/C flanks are used by default:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span>predict<span class="w"> </span>eval.csv<span class="w"> </span>--model-release<span class="w"> </span><span class="m">2</span>.3.0<span class="w"> </span>--out<span class="w"> </span>new.csv
+mhcflurry<span class="w"> </span>predict<span class="w"> </span>eval.csv<span class="w"> </span>--model-release<span class="w"> </span><span class="m">2</span>.2.0<span class="w"> </span>--out<span class="w"> </span>old.csv
+</pre></div>
+</div>
+<p>For the corresponding comparison without flanks:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span>predict<span class="w"> </span>eval.csv<span class="w"> </span>--model-release<span class="w"> </span><span class="m">2</span>.3.0<span class="w"> </span>--no-flanking<span class="w"> </span>--out<span class="w"> </span>new-no-flanks.csv
+mhcflurry<span class="w"> </span>predict<span class="w"> </span>eval.csv<span class="w"> </span>--model-release<span class="w"> </span><span class="m">2</span>.2.0<span class="w"> </span>--no-flanking<span class="w"> </span>--out<span class="w"> </span>old-no-flanks.csv
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">predict-scan</span></code> also accepts <code class="docutils literal notranslate"><span class="pre">--model-release</span></code>. The selector uses a presentation
+bundle, including when <code class="docutils literal notranslate"><span class="pre">predict</span> <span class="pre">--affinity-only</span></code> requests only its affinity
+component. It selects installed weights; it does not download them automatically.
+<code class="docutils literal notranslate"><span class="pre">--models</span> <span class="pre">DIR</span></code> instead selects an arbitrary local predictor and cannot be
+combined with <code class="docutils literal notranslate"><span class="pre">--model-release</span></code>.</p>
+<p>These commands compare weights using the installed code. Reproducing a
+historical software version also requires that version in its own environment.
+See <a class="reference internal" href="release_model_evaluation.html"><span class="doc">Evaluation of the 2.3.0 weights</span></a> for the completed comparison across public
+software versions, NetMHCpan BA/EL outputs, and MixMHCpred on identical rows.</p>
+</section>
+<section id="older-allele-specific-models">
+<h2>Older allele-specific models<a class="headerlink" href="#older-allele-specific-models" title="Link to this heading"></a></h2>
+<p>MHCflurry still distributes the allele-specific predictors described in the
+2018 paper for reproducing earlier results; for new work, use the current
+presentation bundle. They are a separate, affinity-only bundle selected with
+<code class="docutils literal notranslate"><span class="pre">--models</span></code> rather than <code class="docutils literal notranslate"><span class="pre">--model-release</span></code>:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span>downloads<span class="w"> </span>fetch<span class="w"> </span>models_class1
+mhcflurry<span class="w"> </span>predict<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--alleles<span class="w"> </span>HLA-A0201<span class="w"> </span>HLA-A0301<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--peptides<span class="w"> </span>SIINFEKL<span class="w"> </span>SIINFEKD<span class="w"> </span>SIINFEKQ<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--models<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>mhcflurry<span class="w"> </span>downloads<span class="w"> </span>path<span class="w"> </span>models_class1<span class="k">)</span><span class="s2">/models"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--affinity-only<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--out<span class="w"> </span>predictions.csv
+</pre></div>
+</div>
+</section>
+<section id="local-storage-and-overrides">
+<h2>Local storage and overrides<a class="headerlink" href="#local-storage-and-overrides" title="Link to this heading"></a></h2>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span>downloads<span class="w"> </span>info
+mhcflurry<span class="w"> </span>downloads<span class="w"> </span>path<span class="w"> </span>models_class1_presentation<span class="w"> </span>--release<span class="w"> </span><span class="m">2</span>.3.0
+mhcflurry<span class="w"> </span>downloads<span class="w"> </span>url<span class="w"> </span>models_class1_presentation<span class="w"> </span>--release<span class="w"> </span><span class="m">2</span>.3.0
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">info</span></code> starts with model availability, followed by historical resources and
+resolved configuration. Use <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">downloads</span> <span class="pre">--verbose</span> <span class="pre">info</span></code> for configured
+default predictor paths, components inside the default presentation predictor,
+and environment variables. The variables are <strong>optional
+overrides</strong>: <code class="docutils literal notranslate"><span class="pre">unset</span></code> means
+the default is in use, not that the local path is missing. On macOS the default
+root is <code class="docutils literal notranslate"><span class="pre">~/Library/Application</span> <span class="pre">Support/mhcflurry/4/</span></code>; each weight release has
+its own subdirectory. The <code class="docutils literal notranslate"><span class="pre">4</span></code> is the cache-layout version, not a model version.
+The presentation predictor is inside <code class="docutils literal notranslate"><span class="pre">models_class1_presentation/models</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">MHCFLURRY_DATA_DIR</span></code> changes the parent of the release directories.
+<code class="docutils literal notranslate"><span class="pre">MHCFLURRY_DOWNLOADS_CURRENT_RELEASE</span></code> changes the active catalogue.
+<code class="docutils literal notranslate"><span class="pre">MHCFLURRY_DOWNLOADS_DIR</span></code> selects an unversioned custom download directory.
+The <code class="docutils literal notranslate"><span class="pre">MHCFLURRY_DEFAULT_CLASS1_*</span></code> variables shown by <code class="docutils literal notranslate"><span class="pre">info</span></code> override individual
+predictor defaults. Explicit <code class="docutils literal notranslate"><span class="pre">--model-release</span></code> selects from the requested
+catalogue instead of those individual model-path overrides.</p>
+<p>With an unversioned custom directory, <code class="docutils literal notranslate"><span class="pre">--model-release</span></code> requires recorded
+source URLs matching the requested bundle; otherwise it asks you to use a
+versioned cache or select the local model explicitly with <code class="docutils literal notranslate"><span class="pre">--models</span></code>. A
+release selector must not silently load another release’s weights.</p>
+<p>“Installed” means a directory exists. “Source matches” means its
+<code class="docutils literal notranslate"><span class="pre">DOWNLOAD_INFO.csv</span></code> URLs match the catalogue; it does not verify every file’s
+integrity. Public model checksums are attached to the corresponding GitHub
+release. The <code class="docutils literal notranslate"><span class="pre">--release</span></code> option is supported consistently by <code class="docutils literal notranslate"><span class="pre">fetch</span></code>, <code class="docutils literal notranslate"><span class="pre">list</span></code>,
+<code class="docutils literal notranslate"><span class="pre">info</span></code>, <code class="docutils literal notranslate"><span class="pre">path</span></code>, and <code class="docutils literal notranslate"><span class="pre">url</span></code>.</p>
+</section>
+<section id="why-archive-tags-differ">
+<h2>Why archive tags differ<a class="headerlink" href="#why-archive-tags-differ" title="Link to this heading"></a></h2>
+<p>A catalogue collects many resources. Unchanged older resources keep their
+original URLs, so a current catalogue can include storage tags such as
+<code class="docutils literal notranslate"><span class="pre">pre-2.0</span></code> alongside <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code>. Those tags describe where an archive was uploaded;
+they do not require prerelease code. Several catalogues can reference the same
+archive, and a single catalogue can include model and data archives from
+different dates. Inspect <code class="docutils literal notranslate"><span class="pre">releases</span> <span class="pre">DOWNLOAD</span></code> or <code class="docutils literal notranslate"><span class="pre">info</span> <span class="pre">DOWNLOAD</span></code> to see this
+mapping explicitly.</p>
+</section>
+<section id="percentile-calibration">
+<h2>Percentile calibration<a class="headerlink" href="#percentile-calibration" title="Link to this heading"></a></h2>
+<p>Released affinity and presentation predictors include percentile calibration;
+released processing predictors do not. For custom models, or for processing
+percentiles, <a class="reference internal" href="shared_percent_rank_transforms.html"><span class="doc">Percentile calibration for all predictors</span></a> documents compact calibration, which uses
+a small validated knot representation instead of dense histogram tables.
+Calibration changes percentile mappings, not raw model scores or weights.
+Use a separate model copy and an appropriate background reference; do not fit
+calibration to evaluation labels.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="python_tutorial.html" class="btn btn-neutral float-left" title="Python library tutorial" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="release_model_evaluation.html" class="btn btn-neutral float-right" title="Evaluation of the 2.3.0 weights" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

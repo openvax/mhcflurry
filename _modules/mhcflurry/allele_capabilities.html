@@ -1,0 +1,391 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.allele_capabilities &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.allele_capabilities</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.allele_capabilities</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Model-bound execution and training evidence, without validation inference."""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">Counter</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">hashlib</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">importlib.metadata</span><span class="w"> </span><span class="kn">import</span> <span class="n">version</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">mhcgnomes</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">normalize_allele_name</span><span class="p">,</span> <span class="n">normalize_sequence_resolved_allele_name</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.training_provenance</span><span class="w"> </span><span class="kn">import</span> <span class="n">file_sha256</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.version</span><span class="w"> </span><span class="kn">import</span> <span class="n">__version__</span>
+
+
+<span class="n">BUNDLED_TRAINING_TABLES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"affinity"</span><span class="p">:</span> <span class="s2">"affinity_predictor_train_data.csv.bz2"</span><span class="p">,</span>
+    <span class="s2">"processing_with_flanks"</span><span class="p">:</span> <span class="s2">"processing_predictor_with_flanks_train_data.csv.bz2"</span><span class="p">,</span>
+    <span class="s2">"processing_without_flanks"</span><span class="p">:</span> <span class="s2">"processing_predictor_no_flank_train_data.csv.bz2"</span><span class="p">,</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="model_fingerprint">
+<a class="viewcode-back" href="../../api.html#mhcflurry.allele_capabilities.model_fingerprint">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">model_fingerprint</span><span class="p">(</span><span class="n">models_dir</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Hash every file and its relative name; reject symlinks inside the bundle."""</span>
+    <span class="n">directory</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span>
+    <span class="n">files</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">directory</span><span class="o">.</span><span class="n">rglob</span><span class="p">(</span><span class="s2">"*"</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">is_symlink</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Model bundle contains a symlink: </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">. "</span>
+                             <span class="s2">"Use a copy with regular files and directories."</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="n">files</span><span class="p">[</span><span class="n">path</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="n">directory</span><span class="p">)</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()]</span> <span class="o">=</span> <span class="n">file_sha256</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">files</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Model directory contains no files"</span><span class="p">)</span>
+    <span class="n">digest</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span>
+        <span class="n">files</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">separators</span><span class="o">=</span><span class="p">(</span><span class="s2">","</span><span class="p">,</span> <span class="s2">":"</span><span class="p">))</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"sha256"</span><span class="p">:</span> <span class="n">digest</span><span class="p">,</span> <span class="s2">"files"</span><span class="p">:</span> <span class="n">files</span><span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="generator_metadata">
+<a class="viewcode-back" href="../../api.html#mhcflurry.allele_capabilities.generator_metadata">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">generator_metadata</span><span class="p">(</span><span class="n">source_file</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Record code and dependency identities used to generate a report."""</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"mhcflurry"</span><span class="p">:</span> <span class="n">__version__</span><span class="p">,</span> <span class="s2">"python"</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">python_version</span><span class="p">(),</span>
+            <span class="s2">"dependencies"</span><span class="p">:</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">version</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span>
+                             <span class="p">(</span><span class="s2">"mhcgnomes"</span><span class="p">,</span> <span class="s2">"numpy"</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">,</span> <span class="s2">"torch"</span><span class="p">)},</span>
+            <span class="s2">"source_sha256"</span><span class="p">:</span> <span class="n">file_sha256</span><span class="p">(</span><span class="n">source_file</span><span class="p">),</span>
+            <span class="s2">"source_files"</span><span class="p">:</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">file_sha256</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span>
+                <span class="s2">"allele_capabilities.py"</span><span class="p">,</span> <span class="s2">"dla_evaluation.py"</span><span class="p">,</span> <span class="s2">"common.py"</span><span class="p">,</span>
+                <span class="s2">"sample_disjointness.py"</span><span class="p">,</span> <span class="s2">"training_provenance.py"</span><span class="p">,</span>
+                <span class="s2">"class1_affinity_predictor.py"</span><span class="p">,</span> <span class="s2">"class1_processing_predictor.py"</span><span class="p">,</span>
+                <span class="s2">"class1_presentation_predictor.py"</span><span class="p">)}}</span></div>
+
+
+
+<div class="viewcode-block" id="training_evidence">
+<a class="viewcode-back" href="../../api.html#mhcflurry.allele_capabilities.training_evidence">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">training_evidence</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">alleles</span><span class="p">,</span> <span class="n">lengths</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Count observations in bundled tables, preserving unknown host species.</span>
+
+<span class="sd">    Counts include every row (including decoys) and are not a complete inventory</span>
+<span class="sd">    of pretraining, training, development or selection. MHC species never</span>
+<span class="sd">    substitutes for the species of the peptide source or experimental host.</span>
+<span class="sd">    Missing tables/columns produce null counts, not zero evidence.</span>
+<span class="sd">    """</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">component</span><span class="p">,</span> <span class="n">filename</span> <span class="ow">in</span> <span class="n">BUNDLED_TRAINING_TABLES</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span> <span class="o">/</span> <span class="n">filename</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">component</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"path"</span><span class="p">:</span> <span class="n">filename</span><span class="p">,</span> <span class="s2">"status"</span><span class="p">:</span> <span class="s2">"unavailable"</span><span class="p">}</span>
+            <span class="k">continue</span>
+        <span class="n">totals</span><span class="p">,</span> <span class="n">strata</span> <span class="o">=</span> <span class="n">Counter</span><span class="p">(),</span> <span class="n">Counter</span><span class="p">()</span>
+        <span class="n">total</span><span class="p">,</span> <span class="n">unresolved_allele_rows</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">keep_default_na</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">chunksize</span><span class="o">=</span><span class="mi">100_000</span><span class="p">):</span>
+            <span class="n">total</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+            <span class="n">allele_column</span> <span class="o">=</span> <span class="nb">next</span><span class="p">((</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"allele"</span><span class="p">,</span> <span class="s2">"hla"</span><span class="p">)</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">frame</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">allele_column</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="s2">"peptide"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">frame</span><span class="p">:</span>
+                <span class="n">unresolved_allele_rows</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="n">mapping</span> <span class="o">=</span> <span class="p">{</span><span class="n">s</span><span class="p">:</span> <span class="n">normalize_allele_name</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                       <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">frame</span><span class="p">[</span><span class="n">allele_column</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">()}</span>
+            <span class="n">frame</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">canonical_allele</span><span class="o">=</span><span class="n">frame</span><span class="p">[</span><span class="n">allele_column</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">mapping</span><span class="p">))</span>
+            <span class="n">unresolved_allele_rows</span> <span class="o">+=</span> <span class="nb">int</span><span class="p">(</span><span class="n">frame</span><span class="o">.</span><span class="n">canonical_allele</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+            <span class="n">frame</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">frame</span><span class="o">.</span><span class="n">canonical_allele</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">alleles</span><span class="p">)]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">frame</span><span class="p">[</span><span class="s2">"length"</span><span class="p">]</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">allele</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="n">frame</span><span class="o">.</span><span class="n">canonical_allele</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">totals</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span> <span class="o">+=</span> <span class="nb">int</span><span class="p">(</span><span class="n">count</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"source_species"</span><span class="p">,</span> <span class="s2">"host_species"</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">frame</span><span class="p">:</span>
+                    <span class="n">frame</span><span class="p">[</span><span class="n">column</span><span class="p">]</span> <span class="o">=</span> <span class="s2">""</span>
+            <span class="k">for</span> <span class="n">keys</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="n">frame</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span>
+                    <span class="s2">"canonical_allele"</span><span class="p">,</span> <span class="s2">"length"</span><span class="p">,</span> <span class="s2">"source_species"</span><span class="p">,</span> <span class="s2">"host_species"</span>
+            <span class="p">],</span> <span class="n">dropna</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">size</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">strata</span><span class="p">[</span><span class="n">keys</span><span class="p">]</span> <span class="o">+=</span> <span class="nb">int</span><span class="p">(</span><span class="n">count</span><span class="p">)</span>
+        <span class="n">columns</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">nrows</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">columns</span>
+        <span class="n">countable</span> <span class="o">=</span> <span class="s2">"peptide"</span> <span class="ow">in</span> <span class="n">columns</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span><span class="n">c</span> <span class="ow">in</span> <span class="n">columns</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"allele"</span><span class="p">,</span> <span class="s2">"hla"</span><span class="p">))</span>
+        <span class="n">result</span><span class="p">[</span><span class="n">component</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"path"</span><span class="p">:</span> <span class="n">filename</span><span class="p">,</span> <span class="s2">"sha256"</span><span class="p">:</span> <span class="n">file_sha256</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="s2">"status"</span><span class="p">:</span> <span class="s2">"available"</span><span class="p">,</span>
+            <span class="s2">"total_rows"</span><span class="p">:</span> <span class="n">total</span><span class="p">,</span> <span class="s2">"source_provenance_present"</span><span class="p">:</span> <span class="s2">"source_provenance"</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">,</span>
+            <span class="s2">"unresolved_allele_rows"</span><span class="p">:</span> <span class="n">unresolved_allele_rows</span><span class="p">,</span>
+            <span class="s2">"scope"</span><span class="p">:</span> <span class="s2">"bundled table only; all labels; not complete model lineage"</span><span class="p">,</span>
+            <span class="s2">"allele_rows"</span><span class="p">:</span> <span class="p">{</span><span class="n">a</span><span class="p">:</span> <span class="n">totals</span><span class="p">[</span><span class="n">a</span><span class="p">]</span> <span class="k">if</span> <span class="n">countable</span> <span class="k">else</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">alleles</span><span class="p">},</span>
+            <span class="s2">"allele_length_rows"</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">{</span><span class="s2">"allele"</span><span class="p">:</span> <span class="n">a</span><span class="p">,</span> <span class="s2">"length"</span><span class="p">:</span> <span class="n">n</span><span class="p">,</span> <span class="s2">"rows"</span><span class="p">:</span> <span class="nb">sum</span><span class="p">(</span>
+                    <span class="n">count</span> <span class="k">for</span> <span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">),</span> <span class="n">count</span> <span class="ow">in</span> <span class="n">strata</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="n">allele</span> <span class="o">==</span> <span class="n">a</span> <span class="ow">and</span> <span class="n">length</span> <span class="o">==</span> <span class="n">n</span><span class="p">)</span> <span class="k">if</span> <span class="n">countable</span> <span class="k">else</span> <span class="kc">None</span><span class="p">}</span>
+                <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">alleles</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">lengths</span><span class="p">],</span>
+            <span class="s2">"species_strata"</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">{</span><span class="s2">"allele"</span><span class="p">:</span> <span class="n">a</span><span class="p">,</span> <span class="s2">"length"</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">n</span><span class="p">),</span> <span class="s2">"source_species"</span><span class="p">:</span> <span class="n">source</span> <span class="ow">or</span> <span class="kc">None</span><span class="p">,</span>
+                 <span class="s2">"host_species"</span><span class="p">:</span> <span class="n">host</span> <span class="ow">or</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"rows"</span><span class="p">:</span> <span class="n">count</span><span class="p">}</span>
+                <span class="k">for</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">host</span><span class="p">),</span> <span class="n">count</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">strata</span><span class="o">.</span><span class="n">items</span><span class="p">())],</span>
+        <span class="p">}</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="capability_rows">
+<a class="viewcode-back" href="../../api.html#mhcflurry.allele_capabilities.capability_rows">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">capability_rows</span><span class="p">(</span><span class="n">predictor</span><span class="p">,</span> <span class="n">alleles</span><span class="p">,</span> <span class="n">lengths</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Describe no-flank modality support per requested allele and length.</span>
+
+<span class="sd">    Support is determined from the loaded model configuration. This function</span>
+<span class="sd">    does not run predictions or establish empirical accuracy. Processing is</span>
+<span class="sd">    allele-independent and remains available for an unsupported allele when</span>
+<span class="sd">    its length is supported. Presentation requires that exact resolved allele.</span>
+<span class="sd">    """</span>
+    <span class="n">affinity</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">affinity_predictor</span>
+    <span class="n">processing</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">processing_predictor_without_flanks</span>
+    <span class="n">minimum</span><span class="p">,</span> <span class="n">maximum</span> <span class="o">=</span> <span class="n">affinity</span><span class="o">.</span><span class="n">supported_peptide_lengths</span>
+    <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">raw</span> <span class="ow">in</span> <span class="n">alleles</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">canonical</span> <span class="o">=</span> <span class="n">normalize_sequence_resolved_allele_name</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="n">canonical</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">affinity</span><span class="o">.</span><span class="n">canonicalize_allele_name</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="k">if</span> <span class="n">canonical</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">supported</span> <span class="o">=</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">affinity</span><span class="o">.</span><span class="n">supported_alleles</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">key</span> <span class="k">if</span> <span class="n">supported</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">parsed</span> <span class="o">=</span> <span class="n">mhcgnomes</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">canonical</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="k">if</span> <span class="n">canonical</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">sequence</span> <span class="o">=</span> <span class="p">(</span><span class="n">affinity</span><span class="o">.</span><span class="n">allele_to_sequence</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="n">calibrated_key</span> <span class="o">=</span> <span class="n">affinity</span><span class="o">.</span><span class="n">percent_rank_calibrated_allele</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="k">if</span> <span class="n">key</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="n">lengths</span><span class="p">:</span>
+            <span class="n">binding</span> <span class="o">=</span> <span class="n">supported</span> <span class="ow">and</span> <span class="n">minimum</span> <span class="o">&lt;=</span> <span class="n">length</span> <span class="o">&lt;=</span> <span class="n">maximum</span>
+            <span class="n">processing_ok</span> <span class="o">=</span> <span class="n">processing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="mi">1</span> <span class="o">&lt;=</span> <span class="n">length</span> <span class="o">&lt;=</span> <span class="n">processing</span><span class="o">.</span><span class="n">sequence_lengths</span><span class="p">[</span><span class="s2">"peptide"</span><span class="p">]</span>
+            <span class="n">presentation</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">binding</span> <span class="ow">and</span> <span class="n">processing_ok</span> <span class="ow">and</span> <span class="n">predictor</span><span class="o">.</span><span class="n">weights_dataframe</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                                <span class="ow">and</span> <span class="s2">"without_flanks"</span> <span class="ow">in</span> <span class="n">predictor</span><span class="o">.</span><span class="n">weights_dataframe</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+            <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s2">"requested_allele"</span><span class="p">:</span> <span class="n">raw</span><span class="p">,</span> <span class="s2">"canonical_allele"</span><span class="p">:</span> <span class="n">canonical</span><span class="p">,</span>
+                <span class="s2">"model_allele"</span><span class="p">:</span> <span class="n">key</span><span class="p">,</span> <span class="s2">"mhc_species"</span><span class="p">:</span> <span class="n">parsed</span><span class="o">.</span><span class="n">species</span><span class="o">.</span><span class="n">name</span> <span class="k">if</span> <span class="n">parsed</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="s2">"length"</span><span class="p">:</span> <span class="n">length</span><span class="p">,</span> <span class="s2">"context"</span><span class="p">:</span> <span class="s2">"without_flanks"</span><span class="p">,</span>
+                <span class="s2">"model_input_sequence_sha256"</span><span class="p">:</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">(</span><span class="n">sequence</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span> <span class="k">if</span> <span class="n">sequence</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="s2">"model_input_sequence_length"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">sequence</span><span class="p">)</span> <span class="k">if</span> <span class="n">sequence</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="s2">"support_basis"</span><span class="p">:</span> <span class="s2">"model configuration; not an execution test"</span><span class="p">,</span>
+                <span class="s2">"supported"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"binding"</span><span class="p">:</span> <span class="nb">bool</span><span class="p">(</span><span class="n">binding</span><span class="p">),</span> <span class="s2">"processing"</span><span class="p">:</span> <span class="nb">bool</span><span class="p">(</span><span class="n">processing_ok</span><span class="p">),</span>
+                              <span class="s2">"presentation"</span><span class="p">:</span> <span class="n">presentation</span><span class="p">},</span>
+                <span class="s2">"allele_status"</span><span class="p">:</span> <span class="s2">"supported"</span> <span class="k">if</span> <span class="n">supported</span> <span class="k">else</span> <span class="s2">"invalid"</span> <span class="k">if</span> <span class="n">canonical</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">"unsupported"</span><span class="p">,</span>
+                <span class="s2">"affinity_length_supported"</span><span class="p">:</span> <span class="nb">bool</span><span class="p">(</span><span class="n">minimum</span> <span class="o">&lt;=</span> <span class="n">length</span> <span class="o">&lt;=</span> <span class="n">maximum</span><span class="p">),</span>
+                <span class="s2">"percentile_calibration"</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">"binding"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"available"</span><span class="p">:</span> <span class="nb">bool</span><span class="p">(</span><span class="n">binding</span> <span class="ow">and</span> <span class="n">calibrated_key</span><span class="p">),</span> <span class="s2">"model_allele"</span><span class="p">:</span> <span class="n">calibrated_key</span><span class="p">,</span>
+                                <span class="s2">"reference_population"</span><span class="p">:</span> <span class="kc">None</span><span class="p">},</span>
+                    <span class="s2">"processing"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"available"</span><span class="p">:</span> <span class="nb">bool</span><span class="p">(</span><span class="n">processing_ok</span> <span class="ow">and</span> <span class="n">processing</span><span class="o">.</span><span class="n">percent_rank_transform</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">),</span>
+                                   <span class="s2">"reference_population"</span><span class="p">:</span> <span class="kc">None</span><span class="p">},</span>
+                    <span class="s2">"presentation"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"available"</span><span class="p">:</span> <span class="nb">bool</span><span class="p">(</span><span class="n">presentation</span> <span class="ow">and</span> <span class="n">predictor</span><span class="o">.</span><span class="n">percent_rank_transform</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">),</span>
+                                     <span class="s2">"reference_population"</span><span class="p">:</span> <span class="kc">None</span><span class="p">},</span>
+                <span class="p">},</span>
+                <span class="s2">"empirical_validation"</span><span class="p">:</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="p">{</span><span class="s2">"status"</span><span class="p">:</span> <span class="s2">"unknown"</span><span class="p">,</span> <span class="s2">"provenance"</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span>
+                                         <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"binding"</span><span class="p">,</span> <span class="s2">"processing"</span><span class="p">,</span> <span class="s2">"presentation"</span><span class="p">)},</span>
+            <span class="p">})</span>
+    <span class="k">return</span> <span class="n">rows</span></div>
+
+
+
+<div class="viewcode-block" id="capability_report">
+<a class="viewcode-back" href="../../api.html#mhcflurry.allele_capabilities.capability_report">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">capability_report</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">alleles</span><span class="p">,</span> <span class="n">lengths</span><span class="o">=</span><span class="nb">range</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">16</span><span class="p">)):</span>
+<span class="w">    </span><span class="sd">"""Load an exact presentation bundle and report capability plus evidence.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    models_dir : str or pathlib.Path</span>
+<span class="sd">        Frozen presentation bundle directory. All files are hashed; symlinks</span>
+<span class="sd">        inside the bundle are rejected.</span>
+<span class="sd">    alleles : iterable of str</span>
+<span class="sd">        Requested allele names. Order and aliases are retained in the report.</span>
+<span class="sd">    lengths : iterable of int</span>
+<span class="sd">        Positive peptide lengths to inspect, including unsupported lengths.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict</span>
+<span class="sd">        JSON-serializable evidence. Null validation/calibration provenance means</span>
+<span class="sd">        unknown; presence of a transform or training row does not establish it.</span>
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.class1_presentation_predictor</span><span class="w"> </span><span class="kn">import</span> <span class="n">Class1PresentationPredictor</span>
+
+    <span class="n">alleles</span><span class="p">,</span> <span class="n">lengths</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">alleles</span><span class="p">),</span> <span class="nb">list</span><span class="p">(</span><span class="n">lengths</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">alleles</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">lengths</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="nb">int</span> <span class="ow">or</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">lengths</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Supply nonempty alleles and positive integer lengths"</span><span class="p">)</span>
+    <span class="n">fingerprint</span> <span class="o">=</span> <span class="n">model_fingerprint</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span>
+    <span class="n">predictor</span> <span class="o">=</span> <span class="n">Class1PresentationPredictor</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">models_dir</span><span class="p">))</span>
+    <span class="n">rows</span> <span class="o">=</span> <span class="n">capability_rows</span><span class="p">(</span><span class="n">predictor</span><span class="p">,</span> <span class="n">alleles</span><span class="p">,</span> <span class="n">lengths</span><span class="p">)</span>
+    <span class="n">canonical</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">({</span><span class="n">r</span><span class="p">[</span><span class="s2">"canonical_allele"</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rows</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s2">"canonical_allele"</span><span class="p">]})</span>
+    <span class="n">training</span> <span class="o">=</span> <span class="n">training_evidence</span><span class="p">(</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">canonical</span><span class="p">,</span> <span class="n">lengths</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">model_fingerprint</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span> <span class="o">!=</span> <span class="n">fingerprint</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Model bundle changed during report generation"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"schema_version"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"generator"</span><span class="p">:</span> <span class="n">generator_metadata</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span>
+        <span class="s2">"configuration"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"alleles"</span><span class="p">:</span> <span class="n">alleles</span><span class="p">,</span> <span class="s2">"lengths"</span><span class="p">:</span> <span class="n">lengths</span><span class="p">,</span> <span class="s2">"context"</span><span class="p">:</span> <span class="s2">"without_flanks"</span><span class="p">,</span>
+                          <span class="s2">"random_seed"</span><span class="p">:</span> <span class="kc">None</span><span class="p">},</span>
+        <span class="s2">"model"</span><span class="p">:</span> <span class="n">fingerprint</span><span class="p">,</span> <span class="s2">"capabilities"</span><span class="p">:</span> <span class="n">rows</span><span class="p">,</span> <span class="s2">"training_evidence"</span><span class="p">:</span> <span class="n">training</span><span class="p">,</span>
+        <span class="s2">"limitations"</span><span class="p">:</span> <span class="p">[</span>
+            <span class="s2">"Support describes configuration; empirical validation remains unknown."</span><span class="p">,</span>
+            <span class="s2">"Model input sequences may be pseudosequences, not full-length proteins."</span><span class="p">,</span>
+            <span class="s2">"Bundled tables do not establish complete lineage or experimental host species."</span><span class="p">,</span>
+            <span class="s2">"Calibration transforms do not identify their reference population or validate canine calibration."</span><span class="p">,</span>
+        <span class="p">],</span>
+    <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="run_argv">
+<a class="viewcode-back" href="../../api.html#mhcflurry.allele_capabilities.run_argv">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_argv</span><span class="p">(</span><span class="n">argv</span><span class="p">,</span> <span class="n">prog</span><span class="o">=</span><span class="s2">"mhcflurry eval allele-capabilities"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Write a model-bound allele capability report as JSON."""</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--models-dir"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--alleles"</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s2">"+"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--lengths"</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s2">"+"</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">16</span><span class="p">)))</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--out"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+    <span class="n">report</span> <span class="o">=</span> <span class="n">capability_report</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">models_dir</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">alleles</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">lengths</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span> <span class="s2">"x"</span><span class="p">)</span> <span class="k">as</span> <span class="n">stream</span><span class="p">:</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">stream</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">allow_nan</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">stream</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

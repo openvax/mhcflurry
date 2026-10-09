@@ -1,0 +1,662 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.cli.predict_scan_command &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.cli.predict_scan_command</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.cli.predict_scan_command</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""</span>
+<span class="sd">Scan proteins for peptide presentation using a CSV, FASTA or --sequences.</span>
+
+<span class="sd">With --alleles, return peptides with affinity percentile ranks at most 2.0 by</span>
+<span class="sd">default. Use --results-all for every peptide or --threshold-* to change the</span>
+<span class="sd">filters. Without --alleles, predict processing only. Results go to stdout</span>
+<span class="sd">unless --out is given.</span>
+
+<span class="sd">Examples:</span>
+<span class="sd">  mhcflurry predict-scan proteins.fasta --alleles HLA-A0201 --out hits.csv</span>
+<span class="sd">  mhcflurry predict-scan proteins.csv --alleles 'HLA-A*02:01;HLA-A*03:01'</span>
+<span class="sd">  mhcflurry predict-scan --sequences SIINFEKLGGGNLVPMVATV --alleles HLA-A0201</span>
+
+<span class="sd">CSV columns: sequence_id, sequence. Each --alleles argument is one sample;</span>
+<span class="sd">delimit alleles within a quoted argument with commas or semicolons to give</span>
+<span class="sd">a sample MHC allele set.</span>
+<span class="sd">"""</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">collections</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.help</span><span class="w"> </span><span class="kn">import</span> <span class="n">HelpArgumentParser</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..downloads</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_default_class1_presentation_models_dir</span><span class="p">,</span> <span class="n">get_model_release_dir</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..parallelism</span><span class="w"> </span><span class="kn">import</span> <span class="n">add_prediction_parallelism_args</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..version</span><span class="w"> </span><span class="kn">import</span> <span class="n">__version__</span>
+
+
+<span class="n">parser</span> <span class="o">=</span> <span class="n">HelpArgumentParser</span><span class="p">(</span>
+    <span class="n">usage</span><span class="o">=</span><span class="s2">"</span><span class="si">%(prog)s</span><span class="s2"> [OPTIONS] [INPUT]"</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">,</span>
+    <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+
+<span class="n">input_args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_argument_group</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">"Input options"</span><span class="p">)</span>
+<span class="n">input_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"input"</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"INPUT"</span><span class="p">,</span>
+    <span class="n">nargs</span><span class="o">=</span><span class="s2">"?"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Input CSV or FASTA"</span><span class="p">)</span>
+<span class="n">input_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--input-format"</span><span class="p">,</span>
+    <span class="n">choices</span><span class="o">=</span><span class="p">(</span><span class="s2">"guess"</span><span class="p">,</span> <span class="s2">"csv"</span><span class="p">,</span> <span class="s2">"fasta"</span><span class="p">),</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">"guess"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Format of input file. By default, it is guessed from the file "</span>
+         <span class="s2">"extension."</span><span class="p">)</span>
+<span class="n">input_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--alleles"</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"ALLELE"</span><span class="p">,</span>
+    <span class="n">nargs</span><span class="o">=</span><span class="s2">"+"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Sample MHC allele or allele-set queries. Each argument is one sample; "</span>
+    <span class="s2">"delimit alleles within a sample with ',' or ';'."</span><span class="p">)</span>
+<span class="n">input_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--sequences"</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"SEQ"</span><span class="p">,</span>
+    <span class="n">nargs</span><span class="o">=</span><span class="s2">"+"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Sequences to predict (exclusive with passing an input file)"</span><span class="p">)</span>
+<span class="n">input_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--sequence-id-column"</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"NAME"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">"sequence_id"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Input CSV column name for sequence IDs. Default: '</span><span class="si">%(default)s</span><span class="s2">'"</span><span class="p">)</span>
+<span class="n">input_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--sequence-column"</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"NAME"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">"sequence"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Input CSV column name for sequences. Default: '</span><span class="si">%(default)s</span><span class="s2">'"</span><span class="p">)</span>
+<span class="n">input_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--no-throw"</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Return NaNs for unsupported alleles or peptides instead of raising"</span><span class="p">)</span>
+
+<span class="n">results_args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_argument_group</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">"Result options"</span><span class="p">)</span>
+<span class="n">results_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--peptide-lengths"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">"8-11"</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"L"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Peptide lengths to consider. Pass as START-END (e.g. 8-11) or a "</span>
+    <span class="s2">"comma-separated list (8,9,10,11). When using START-END, the range is "</span>
+    <span class="s2">"INCLUSIVE on both ends. Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">)</span>
+<span class="n">default_thresholds</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"presentation_score"</span><span class="p">:</span> <span class="mf">0.7</span><span class="p">,</span>
+    <span class="s2">"processing_score"</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span>
+    <span class="s2">"affinity"</span><span class="p">:</span> <span class="mi">500</span><span class="p">,</span>
+    <span class="s2">"affinity_percentile"</span><span class="p">:</span> <span class="mf">2.0</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="n">results_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--results-all"</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Disable the default affinity-percentile filter. Explicit thresholds still apply."</span><span class="p">)</span>
+<span class="n">results_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--threshold-presentation-score"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Keep presentation scores &gt;= this value. No default filter on this score."</span><span class="p">)</span>
+<span class="n">results_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--threshold-processing-score"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Keep processing scores &gt;= this value. No default filter on this score."</span><span class="p">)</span>
+<span class="n">results_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--threshold-affinity"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Keep predicted affinities &lt;= this value in nM. No default filter on nM affinity."</span><span class="p">)</span>
+<span class="n">results_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--threshold-affinity-percentile"</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="sa">f</span><span class="s2">"Keep affinity percentiles &lt;= this value. Defaults to </span><span class="si">{</span><span class="n">default_thresholds</span><span class="p">[</span><span class="s1">'affinity_percentile'</span><span class="p">]</span><span class="si">}</span><span class="s2"> "</span>
+         <span class="s2">"when no thresholds or --results-all are supplied."</span><span class="p">)</span>
+
+
+<span class="n">output_args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_argument_group</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">"Output options"</span><span class="p">)</span>
+<span class="n">output_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--out"</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"OUTPUT.csv"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Output CSV"</span><span class="p">)</span>
+<span class="n">output_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--output-delimiter"</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"CHAR"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">","</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Delimiter character for results. Default: '</span><span class="si">%(default)s</span><span class="s2">'"</span><span class="p">)</span>
+<span class="n">output_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--no-affinity-percentile"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Do not include affinity percentile rank"</span><span class="p">)</span>
+
+<span class="n">model_args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_argument_group</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">"Model options"</span><span class="p">)</span>
+<span class="n">model_selection</span> <span class="o">=</span> <span class="n">model_args</span><span class="o">.</span><span class="n">add_mutually_exclusive_group</span><span class="p">()</span>
+<span class="n">model_selection</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--models"</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"DIR"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Directory containing presentation models. "</span>
+    <span class="s2">"Default: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">get_default_class1_presentation_models_dir</span><span class="p">(</span>
+        <span class="n">test_exists</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+<span class="n">model_selection</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--model-release"</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">"RELEASE"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Use the presentation weights from a download release, overriding model "</span>
+    <span class="s2">"path defaults. List choices: mhcflurry downloads releases models_class1_presentation."</span><span class="p">)</span>
+
+<span class="n">model_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--no-flanking"</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Do not use flanking sequence information in predictions"</span><span class="p">)</span>
+
+<span class="n">add_prediction_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+
+<span class="n">helper_args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_argument_group</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">"Help"</span><span class="p">)</span>
+<span class="n">helper_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"-h"</span><span class="p">,</span> <span class="s2">"--help"</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">"help"</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Show this help message and exit"</span>
+<span class="p">)</span>
+<span class="n">helper_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--list-supported-alleles"</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Print the list of supported alleles and exit"</span>
+<span class="p">)</span>
+<span class="n">helper_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--list-supported-peptide-lengths"</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">"Print the list of supported peptide lengths and exit"</span>
+<span class="p">)</span>
+<span class="n">helper_args</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+    <span class="s2">"--version"</span><span class="p">,</span>
+    <span class="n">action</span><span class="o">=</span><span class="s2">"version"</span><span class="p">,</span>
+    <span class="n">version</span><span class="o">=</span><span class="s2">"mhcflurry </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">__version__</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<span class="n">_PREDICTOR_CACHE</span> <span class="o">=</span> <span class="p">{}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_load_predictor_for_command</span><span class="p">(</span><span class="n">models_dir</span><span class="p">):</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">..class1_presentation_predictor</span><span class="w"> </span><span class="kn">import</span> <span class="n">Class1PresentationPredictor</span>
+
+    <span class="k">if</span> <span class="n">models_dir</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_PREDICTOR_CACHE</span><span class="p">:</span>
+        <span class="n">_PREDICTOR_CACHE</span><span class="p">[</span><span class="n">models_dir</span><span class="p">]</span> <span class="o">=</span> <span class="n">Class1PresentationPredictor</span><span class="o">.</span><span class="n">load</span><span class="p">(</span>
+            <span class="n">models_dir</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_PREDICTOR_CACHE</span><span class="p">[</span><span class="n">models_dir</span><span class="p">]</span>
+
+
+<span class="c1"># One parallel chunk's predictions plus the comparison quantity the predictor</span>
+<span class="c1"># resolved for it. ``comparison_quantity`` is identical across chunks (it</span>
+<span class="c1"># depends only on the predictor's capabilities and the alleles, not on the</span>
+<span class="c1"># chunk's sequences); it is carried per-chunk so the parent can apply the same</span>
+<span class="c1"># global sort the serial path would without re-loading the predictor.</span>
+<span class="n">ChunkResult</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">namedtuple</span><span class="p">(</span>
+    <span class="s2">"ChunkResult"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"chunk_num"</span><span class="p">,</span> <span class="s2">"predictions"</span><span class="p">,</span> <span class="s2">"comparison_quantity"</span><span class="p">])</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_predict_sequences_chunk_worker</span><span class="p">(</span><span class="n">work_item</span><span class="p">):</span>
+    <span class="n">predictor</span> <span class="o">=</span> <span class="n">_load_predictor_for_command</span><span class="p">(</span><span class="n">work_item</span><span class="p">[</span><span class="s2">"models_dir"</span><span class="p">])</span>
+    <span class="n">result_df</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">predict_sequences</span><span class="p">(</span>
+        <span class="n">sequences</span><span class="o">=</span><span class="n">work_item</span><span class="p">[</span><span class="s2">"sequences"</span><span class="p">],</span>
+        <span class="n">alleles</span><span class="o">=</span><span class="n">work_item</span><span class="p">[</span><span class="s2">"alleles"</span><span class="p">],</span>
+        <span class="n">result</span><span class="o">=</span><span class="s2">"all"</span><span class="p">,</span>
+        <span class="n">peptide_lengths</span><span class="o">=</span><span class="n">work_item</span><span class="p">[</span><span class="s2">"peptide_lengths"</span><span class="p">],</span>
+        <span class="n">use_flanks</span><span class="o">=</span><span class="n">work_item</span><span class="p">[</span><span class="s2">"use_flanks"</span><span class="p">],</span>
+        <span class="n">include_affinity_percentile</span><span class="o">=</span><span class="n">work_item</span><span class="p">[</span>
+            <span class="s2">"include_affinity_percentile"</span><span class="p">],</span>
+        <span class="n">throw</span><span class="o">=</span><span class="n">work_item</span><span class="p">[</span><span class="s2">"throw"</span><span class="p">],</span>
+        <span class="n">affinity_model_kwargs</span><span class="o">=</span><span class="n">work_item</span><span class="p">[</span><span class="s2">"affinity_model_kwargs"</span><span class="p">],</span>
+        <span class="n">processing_batch_size</span><span class="o">=</span><span class="n">work_item</span><span class="p">[</span><span class="s2">"processing_batch_size"</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">ChunkResult</span><span class="p">(</span>
+        <span class="n">chunk_num</span><span class="o">=</span><span class="n">work_item</span><span class="p">[</span><span class="s2">"chunk_num"</span><span class="p">],</span>
+        <span class="n">predictions</span><span class="o">=</span><span class="n">result_df</span><span class="p">,</span>
+        <span class="n">comparison_quantity</span><span class="o">=</span><span class="n">predictor</span><span class="o">.</span><span class="n">resolve_comparison_quantity</span><span class="p">(</span>
+            <span class="n">work_item</span><span class="p">[</span><span class="s2">"alleles"</span><span class="p">]))</span>
+
+
+<div class="viewcode-block" id="parse_peptide_lengths">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.predict_scan_command.parse_peptide_lengths">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">parse_peptide_lengths</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">"-"</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
+            <span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"-"</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+            <span class="n">start</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">start</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+            <span class="n">end</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">end</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+            <span class="n">peptide_lengths</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">peptide_lengths</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="nb">int</span><span class="p">(</span><span class="n">length</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+                <span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="n">value</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">","</span><span class="p">)</span>
+            <span class="p">]</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Couldn't parse peptide lengths: "</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">peptide_lengths</span></div>
+
+
+
+<div class="viewcode-block" id="run">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.predict_scan_command.run">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">argv</span><span class="p">:</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">print_help</span><span class="p">()</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">selected_models_dir</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">get_model_release_dir</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">model_release</span><span class="p">)</span> <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">model_release</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">error</span><span class="p">))</span>
+
+    <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">..parallelism</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">chunk_ranges_for_local_parallelism</span><span class="p">,</span>
+        <span class="n">num_workers_per_gpu_from_args</span><span class="p">,</span>
+        <span class="n">worker_pool_with_gpu_assignments_from_args</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">..pytorch_sizing</span><span class="w"> </span><span class="kn">import</span> <span class="n">default_prediction_batch_is_auto</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">..workload_planning</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">WORKLOAD_PRESENTATION_INFERENCE</span><span class="p">,</span>
+        <span class="n">WORKLOAD_PROCESSING_INFERENCE</span><span class="p">,</span>
+        <span class="n">model_artifact_size_bytes</span><span class="p">,</span>
+        <span class="n">path_size_bytes</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">..class1_presentation_predictor</span><span class="w"> </span><span class="kn">import</span> <span class="n">Class1PresentationPredictor</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">..fasta</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_fasta_to_dataframe</span>
+
+    <span class="c1"># It's hard to pass a tab in a shell, so we correct a common error:</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">output_delimiter</span> <span class="o">==</span> <span class="s2">"</span><span class="se">\\</span><span class="s2">t"</span><span class="p">:</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">output_delimiter</span> <span class="o">=</span> <span class="s2">"</span><span class="se">\t</span><span class="s2">"</span>
+
+    <span class="n">peptide_lengths</span> <span class="o">=</span> <span class="n">parse_peptide_lengths</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">peptide_lengths</span><span class="p">)</span>
+
+    <span class="n">threshold_args</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">threshold_presentation_score</span><span class="p">,</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">threshold_processing_score</span><span class="p">,</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">threshold_affinity</span><span class="p">,</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">threshold_affinity_percentile</span><span class="p">,</span>
+    <span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">results_all</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span><span class="n">x</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">threshold_args</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">"Filtering by affinity-percentile &lt;= </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">default_thresholds</span><span class="p">[</span><span class="s2">"affinity_percentile"</span><span class="p">],</span>
+            <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">"to show all predictions, pass --results-all"</span><span class="p">,</span>
+            <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">threshold_affinity_percentile</span> <span class="o">=</span> <span class="n">default_thresholds</span><span class="p">[</span><span class="s2">"affinity_percentile"</span><span class="p">]</span>
+
+    <span class="n">models_dir</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">models</span> <span class="ow">or</span> <span class="n">selected_models_dir</span>
+    <span class="k">if</span> <span class="n">models_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># The reason we set the default here instead of in the argument parser</span>
+        <span class="c1"># is that we want to test_exists at this point, so the user gets a</span>
+        <span class="c1"># message instructing them to download the models if needed.</span>
+        <span class="n">models_dir</span> <span class="o">=</span> <span class="n">get_default_class1_presentation_models_dir</span><span class="p">(</span><span class="n">test_exists</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">list_supported_alleles</span><span class="p">:</span>
+        <span class="n">predictor</span> <span class="o">=</span> <span class="n">_load_predictor_for_command</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">predictor</span><span class="o">.</span><span class="n">supported_alleles</span><span class="p">))</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">list_supported_peptide_lengths</span><span class="p">:</span>
+        <span class="n">predictor</span> <span class="o">=</span> <span class="n">_load_predictor_for_command</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span>
+        <span class="n">min_len</span><span class="p">,</span> <span class="n">max_len</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">supported_peptide_lengths</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">length</span><span class="p">)</span> <span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">min_len</span><span class="p">,</span> <span class="n">max_len</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]))</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">input</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">sequences</span><span class="p">:</span>
+            <span class="n">parser</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">"If an input file is specified, do not specify --sequences"</span><span class="p">)</span>
+
+        <span class="n">input_format</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">input_format</span>
+        <span class="k">if</span> <span class="n">input_format</span> <span class="o">==</span> <span class="s2">"guess"</span><span class="p">:</span>
+            <span class="n">extension</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">input</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"."</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">extension</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"gz"</span><span class="p">,</span> <span class="s2">"bzip2"</span><span class="p">]:</span>
+                <span class="n">extension</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">input</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"."</span><span class="p">)[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="n">extension</span> <span class="o">==</span> <span class="s2">"csv"</span><span class="p">:</span>
+                <span class="n">input_format</span> <span class="o">=</span> <span class="s2">"csv"</span>
+            <span class="k">elif</span> <span class="n">extension</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"fasta"</span><span class="p">,</span> <span class="s2">"fa"</span><span class="p">]:</span>
+                <span class="n">input_format</span> <span class="o">=</span> <span class="s2">"fasta"</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">parser</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                    <span class="s2">"Couldn't guess input format from file extension: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">"</span>
+                    <span class="s2">"Pass the --input-format argument to specify if it is a "</span>
+                    <span class="s2">"CSV or fasta file"</span> <span class="o">%</span> <span class="n">args</span><span class="o">.</span><span class="n">input</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="s2">"Guessed input file format:"</span><span class="p">,</span> <span class="n">input_format</span><span class="p">,</span>
+                <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">input_format</span> <span class="o">==</span> <span class="s2">"csv"</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">input</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="s2">"Read input CSV with </span><span class="si">%d</span><span class="s2"> rows, columns are: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">),</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">)),</span>
+                <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">sequence_column</span><span class="p">,]:</span>
+                <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="s2">"No such column '</span><span class="si">%s</span><span class="s2">' in CSV. Columns are: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                            <span class="n">col</span><span class="p">,</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="s2">"'</span><span class="si">%s</span><span class="s2">'"</span> <span class="o">%</span> <span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">])))</span>
+
+        <span class="k">elif</span> <span class="n">input_format</span> <span class="o">==</span> <span class="s2">"fasta"</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">read_fasta_to_dataframe</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">input</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="s2">"Read input fasta with </span><span class="si">%d</span><span class="s2"> sequences"</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">),</span>
+                <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unsupported input format"</span><span class="p">,</span> <span class="n">input_format</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">sequences</span><span class="p">:</span>
+            <span class="n">parser</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">"Specify either an input file or the --sequences argument"</span><span class="p">)</span>
+
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">sequence_column</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">sequences</span><span class="p">,</span>
+        <span class="p">})</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">sequence_id_column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="p">:</span>
+        <span class="n">df</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">sequence_id_column</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"sequence_"</span> <span class="o">+</span> <span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">sequence_id_column</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">alleles</span><span class="p">:</span>
+        <span class="n">genotypes</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">alleles</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="sa">r</span><span class="s2">"[;,\s]+"</span><span class="p">)</span>
+        <span class="n">genotypes</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">genotypes</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">i</span><span class="p">:</span> <span class="s2">"genotype_</span><span class="si">%02d</span><span class="s2">"</span> <span class="o">%</span> <span class="n">i</span><span class="p">)</span>
+        <span class="n">alleles</span> <span class="o">=</span> <span class="n">genotypes</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">"No alleles specified. Will perform processing prediction only."</span><span class="p">,</span>
+            <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+        <span class="n">alleles</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="n">sequences</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">sequence_column</span><span class="p">]</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">sequences</span><span class="p">:</span>
+        <span class="c1"># Empty input: return a DataFrame with the same schema the</span>
+        <span class="c1"># predictor would have produced for non-empty input, so</span>
+        <span class="c1"># threshold filters and downstream readers don't see a</span>
+        <span class="c1"># schema-less object. The column list is derived from the</span>
+        <span class="c1"># predictor (single source of truth) — see test_empty_and_populated_schemas_match.</span>
+        <span class="n">predictor</span> <span class="o">=</span> <span class="n">_load_predictor_for_command</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span>
+        <span class="n">result_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+            <span class="n">columns</span><span class="o">=</span><span class="n">predictor</span><span class="o">.</span><span class="n">predict_sequences_columns</span><span class="p">(</span>
+                <span class="n">alleles</span><span class="o">=</span><span class="n">alleles</span><span class="p">,</span>
+                <span class="n">use_flanks</span><span class="o">=</span><span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">no_flanking</span><span class="p">,</span>
+                <span class="n">include_affinity_percentile</span><span class="o">=</span><span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">no_affinity_percentile</span><span class="p">,</span>
+            <span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">worker_pool</span> <span class="o">=</span> <span class="n">worker_pool_with_gpu_assignments_from_args</span><span class="p">(</span>
+            <span class="n">args</span><span class="p">,</span>
+            <span class="n">workload_name</span><span class="o">=</span><span class="p">(</span>
+                <span class="n">WORKLOAD_PRESENTATION_INFERENCE</span>
+                <span class="k">if</span> <span class="n">alleles</span>
+                <span class="k">else</span> <span class="n">WORKLOAD_PROCESSING_INFERENCE</span>
+            <span class="p">),</span>
+            <span class="n">workload_hints</span><span class="o">=</span><span class="p">{</span>
+                <span class="s2">"data_bytes"</span><span class="p">:</span> <span class="n">path_size_bytes</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">input</span><span class="p">),</span>
+                <span class="s2">"elastic_batch"</span><span class="p">:</span> <span class="p">(</span>
+                    <span class="ow">not</span> <span class="n">alleles</span> <span class="ow">or</span> <span class="n">default_prediction_batch_is_auto</span><span class="p">()),</span>
+                <span class="s2">"model_bytes"</span><span class="p">:</span> <span class="n">model_artifact_size_bytes</span><span class="p">(</span><span class="n">models_dir</span><span class="p">),</span>
+                <span class="s2">"num_rows"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">),</span>
+            <span class="p">},</span>
+            <span class="c1"># Predict-scan workers run PyTorch inference. On Linux, the default</span>
+            <span class="c1"># fork context can inherit a parent process where PyTorch has</span>
+            <span class="c1"># already been initialized by earlier command invocations/tests,</span>
+            <span class="c1"># which makes later model .to(...) calls unsafe in workers.</span>
+            <span class="n">start_method</span><span class="o">=</span><span class="s2">"spawn"</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">affinity_model_kwargs</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"max_workers_per_gpu"</span><span class="p">):</span>
+            <span class="n">affinity_model_kwargs</span><span class="p">[</span><span class="s2">"num_workers_per_gpu"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">num_workers_per_gpu_from_args</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">worker_pool</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">predictor</span> <span class="o">=</span> <span class="n">_load_predictor_for_command</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span>
+            <span class="n">result_df</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">predict_sequences</span><span class="p">(</span>
+                <span class="n">sequences</span><span class="o">=</span><span class="n">sequences</span><span class="p">,</span>
+                <span class="n">alleles</span><span class="o">=</span><span class="n">alleles</span><span class="p">,</span>
+                <span class="n">result</span><span class="o">=</span><span class="s2">"all"</span><span class="p">,</span>
+                <span class="n">peptide_lengths</span><span class="o">=</span><span class="n">peptide_lengths</span><span class="p">,</span>
+                <span class="n">use_flanks</span><span class="o">=</span><span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">no_flanking</span><span class="p">,</span>
+                <span class="n">include_affinity_percentile</span><span class="o">=</span><span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">no_affinity_percentile</span><span class="p">,</span>
+                <span class="n">throw</span><span class="o">=</span><span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">no_throw</span><span class="p">,</span>
+                <span class="n">affinity_model_kwargs</span><span class="o">=</span><span class="n">affinity_model_kwargs</span><span class="p">,</span>
+                <span class="n">processing_batch_size</span><span class="o">=</span><span class="s2">"auto"</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># Build the work items inside the try so a failure here still</span>
+                <span class="c1"># tears the pool down via the finally rather than leaking</span>
+                <span class="c1"># non-daemon workers.</span>
+                <span class="n">sequence_items</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">sequences</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
+                <span class="n">ranges</span> <span class="o">=</span> <span class="n">chunk_ranges_for_local_parallelism</span><span class="p">(</span>
+                    <span class="nb">len</span><span class="p">(</span><span class="n">sequence_items</span><span class="p">),</span> <span class="n">args</span><span class="o">.</span><span class="n">num_jobs</span><span class="p">)</span>
+                <span class="n">work_items</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="p">(</span><span class="n">chunk_num</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)</span> <span class="ow">in</span> <span class="n">ranges</span><span class="p">:</span>
+                    <span class="n">work_items</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                        <span class="s2">"chunk_num"</span><span class="p">:</span> <span class="n">chunk_num</span><span class="p">,</span>
+                        <span class="s2">"models_dir"</span><span class="p">:</span> <span class="n">models_dir</span><span class="p">,</span>
+                        <span class="s2">"sequences"</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span><span class="n">sequence_items</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">]),</span>
+                        <span class="s2">"alleles"</span><span class="p">:</span> <span class="n">alleles</span><span class="p">,</span>
+                        <span class="s2">"peptide_lengths"</span><span class="p">:</span> <span class="n">peptide_lengths</span><span class="p">,</span>
+                        <span class="s2">"use_flanks"</span><span class="p">:</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">no_flanking</span><span class="p">,</span>
+                        <span class="s2">"include_affinity_percentile"</span><span class="p">:</span> <span class="p">(</span>
+                            <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">no_affinity_percentile</span><span class="p">),</span>
+                        <span class="s2">"throw"</span><span class="p">:</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">no_throw</span><span class="p">,</span>
+                        <span class="s2">"affinity_model_kwargs"</span><span class="p">:</span> <span class="n">affinity_model_kwargs</span><span class="p">,</span>
+                        <span class="s2">"processing_batch_size"</span><span class="p">:</span> <span class="s2">"auto"</span><span class="p">,</span>
+                    <span class="p">})</span>
+                <span class="n">results</span> <span class="o">=</span> <span class="n">worker_pool</span><span class="o">.</span><span class="n">imap_unordered</span><span class="p">(</span>
+                    <span class="n">_predict_sequences_chunk_worker</span><span class="p">,</span> <span class="n">work_items</span><span class="p">,</span> <span class="n">chunksize</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="n">chunks</span> <span class="o">=</span> <span class="p">[</span><span class="n">result</span> <span class="k">for</span> <span class="n">result</span> <span class="ow">in</span> <span class="n">results</span><span class="p">]</span>
+                <span class="n">worker_pool</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                <span class="n">worker_pool</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+                <span class="n">worker_pool</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">finally</span><span class="p">:</span>
+                <span class="c1"># On failure mid-iteration, terminate() rather than</span>
+                <span class="c1"># close()/join() (which can hang on a wedged worker) and</span>
+                <span class="c1"># leave non-daemon workers behind.</span>
+                <span class="k">if</span> <span class="n">worker_pool</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">worker_pool</span><span class="o">.</span><span class="n">terminate</span><span class="p">()</span>
+                    <span class="n">worker_pool</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+            <span class="c1"># Restore input sequence order by chunk_num before the global</span>
+            <span class="c1"># re-sort.</span>
+            <span class="n">chunks</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">chunk</span><span class="p">:</span> <span class="n">chunk</span><span class="o">.</span><span class="n">chunk_num</span><span class="p">)</span>
+            <span class="n">result_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span>
+                <span class="p">[</span><span class="n">chunk</span><span class="o">.</span><span class="n">predictions</span> <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">chunks</span><span class="p">],</span>
+                <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="c1"># Apply the same global sort serial predict_sequences(result="all")</span>
+            <span class="c1"># uses (Class1PresentationPredictor.sort_predictions). Each chunk is</span>
+            <span class="c1"># sorted only within its sequence subset, so after concat we re-sort</span>
+            <span class="c1"># globally. All chunks resolved the same comparison quantity, so we</span>
+            <span class="c1"># take it from any of them — keeping parallel output ranking</span>
+            <span class="c1"># identical to serial, including the deterministic peptide</span>
+            <span class="c1"># tie-break.</span>
+            <span class="n">comparison_quantity</span> <span class="o">=</span> <span class="n">chunks</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">comparison_quantity</span>
+            <span class="n">result_df</span> <span class="o">=</span> <span class="n">Class1PresentationPredictor</span><span class="o">.</span><span class="n">sort_predictions</span><span class="p">(</span>
+                <span class="n">result_df</span><span class="p">,</span> <span class="n">comparison_quantity</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># Apply thresholds, skipping ones whose column is missing (e.g.</span>
+    <span class="c1"># processing-only run with no alleles, or --no-affinity-percentile</span>
+    <span class="c1"># leaves affinity_percentile out).</span>
+    <span class="n">threshold_filters</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">(</span><span class="s2">"presentation_score"</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">threshold_presentation_score</span><span class="p">,</span> <span class="s2">"ge"</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">"processing_score"</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">threshold_processing_score</span><span class="p">,</span> <span class="s2">"ge"</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">"affinity"</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">threshold_affinity</span><span class="p">,</span> <span class="s2">"le"</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">"affinity_percentile"</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">threshold_affinity_percentile</span><span class="p">,</span> <span class="s2">"le"</span><span class="p">),</span>
+    <span class="p">]</span>
+    <span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="n">thresh</span><span class="p">,</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">threshold_filters</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">thresh</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">result_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">"ge"</span><span class="p">:</span>
+            <span class="n">result_df</span> <span class="o">=</span> <span class="n">result_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">result_df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">thresh</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">result_df</span> <span class="o">=</span> <span class="n">result_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">result_df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">thresh</span><span class="p">]</span>
+
+    <span class="c1"># Write results</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">:</span>
+        <span class="n">result_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">output_delimiter</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Wrote: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">result_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">output_delimiter</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

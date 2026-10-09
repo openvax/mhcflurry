@@ -1,0 +1,222 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resource planning guarantees &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=86f393d6"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Release training recipe" href="release_training_recipe.html" />
+    <link rel="prev" title="Orchestrator architecture" href="orchestrator.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Resource planning guarantees</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#planner-invariants">Planner invariants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#hardware-validation-matrix">Hardware validation matrix</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#limits">Limits</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Resource planning guarantees</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/auto_sizing_audit.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="resource-planning-guarantees">
+<h1>Resource planning guarantees<a class="headerlink" href="#resource-planning-guarantees" title="Link to this heading"></a></h1>
+<p>The planner combines conservative capacity estimates with real-workload probes.
+Use <a class="reference internal" href="configuration.html"><span class="doc">Configuration and performance</span></a> for user controls and <a class="reference internal" href="orchestrator.html"><span class="doc">Orchestrator architecture</span></a> for process
+ownership and implementation boundaries.</p>
+<section id="planner-invariants">
+<h2>Planner invariants<a class="headerlink" href="#planner-invariants" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>The sum of automatic worker entitlements never exceeds launch-time free
+device memory after one shared reserve, including when unrelated processes
+already occupy the GPU.</p></li>
+<li><p>A worker’s elastic allocation is bounded by both its remaining entitlement
+and current global headroom; worker startup order cannot increase it.</p></li>
+<li><p>A measurement can only tighten an automatic plan. Explicit user concurrency
+remains authoritative and receives diagnostics instead of mutation.</p></li>
+<li><p>A training probe exercises every phase that can own the peak: real resident
+inputs, the configured minibatch and optimizer, and validation.</p></li>
+<li><p>Process-level measurement includes CUDA context and non-PyTorch allocations;
+allocator counters alone are insufficient for multi-process packing. A
+before-context driver baseline covers containers whose host and container
+process IDs differ.</p></li>
+<li><p>Resource decisions are visible in the run log, and release workflows turn
+any training-affecting shrink into a hard provenance failure.</p></li>
+<li><p>Automatic CUDA processing batches are calibrated after the real model and
+encoded inputs are resident. The measured peak may only shrink the analytic
+batch, and the selected value cannot exceed the successfully exercised probe
+shape. If a probe OOMs, calibration halves the probe until one succeeds; if
+allocator telemetry is unavailable, it uses the successful probe instead of
+restoring an unverified analytic value. Explicit batches are unchanged, and
+elastic halving remains the final allocator-specific safety net.</p></li>
+</ol>
+</section>
+<section id="hardware-validation-matrix">
+<h2>Hardware validation matrix<a class="headerlink" href="#hardware-validation-matrix" title="Link to this heading"></a></h2>
+<p>The autosizer tests machine <em>characteristics</em>, not accelerator names. A label
+such as <code class="docutils literal notranslate"><span class="pre">4xH100</span></code> makes a test case readable, but the planner receives only
+GPU count and free memory per GPU, available host RAM, available CPU units, and
+the workload envelope. This keeps a new card or cloud shape from requiring a
+model-name lookup table.</p>
+<p>Each matrix row validates two plans:</p>
+<ol class="arabic simple">
+<li><p>The provisional launch plan packs the analytic worker estimate into the
+shared-reserve GPU budget, then clamps total jobs by host RAM, CPU count,
+and available work items. DataLoader children are resolved from the
+resulting CPU/RAM share and host capacity is checked again.</p></li>
+<li><p>The measured plan replaces optimistic worker estimates with the maximum
+full-residency probe peaks plus safety margins. It may only tighten an
+automatic plan. Explicit concurrency is never mutated.</p></li>
+</ol>
+<p>The test matrix includes CPU-only, single- and multiple-GPU hosts and CPU/RAM
+constrained variants. These are tests of capacity arithmetic, not runtime
+benchmarks of every accelerator. Real planning uses detected free capacity,
+not a hardware-name lookup table.</p>
+</section>
+<section id="limits">
+<h2>Limits<a class="headerlink" href="#limits" title="Link to this heading"></a></h2>
+<p>Host worker, DataLoader and random-negative pool estimates include conservative
+throughput heuristics. They do not establish identical runtime peaks on all
+hardware. Explicit user concurrency remains authoritative; release workflows
+reject unexpected training minibatch reductions because those can alter the
+trained model.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="orchestrator.html" class="btn btn-neutral float-left" title="Orchestrator architecture" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="release_training_recipe.html" class="btn btn-neutral float-right" title="Release training recipe" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

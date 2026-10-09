@@ -1,0 +1,292 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.numeric_sequences &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.numeric_sequences</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.numeric_sequences</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""String-free peptide inputs with the existing class-I alignment semantics."""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.amino_acid</span><span class="w"> </span><span class="kn">import</span> <span class="n">AMINO_ACID_INDEX</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.encodable_sequences</span><span class="w"> </span><span class="kn">import</span> <span class="n">EncodingError</span>
+
+
+<span class="n">UNKNOWN_INDEX</span> <span class="o">=</span> <span class="n">AMINO_ACID_INDEX</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="NumericSequences">
+<a class="viewcode-back" href="../../api.html#mhcflurry.numeric_sequences.NumericSequences">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NumericSequences</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Unaligned integer residue rows and actual lengths, on CPU or accelerator.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    indices : array-like or torch.Tensor</span>
+<span class="sd">        Shape (N, width); entries index ``AMINO_ACID_INDEX``. Padding is ignored.</span>
+<span class="sd">    lengths : array-like or torch.Tensor</span>
+<span class="sd">        N integer lengths between zero and width.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indices</span><span class="p">,</span> <span class="n">lengths</span><span class="p">):</span>
+        <span class="n">indices</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span>
+        <span class="n">lengths</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">lengths</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">indices</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">integers</span> <span class="o">=</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int16</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">indices</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="n">lengths</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">1</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">lengths</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Numeric peptides require an (N, width) matrix and N lengths"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">indices</span><span class="o">.</span><span class="n">dtype</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">integers</span> <span class="ow">or</span> <span class="n">lengths</span><span class="o">.</span><span class="n">dtype</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">integers</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Numeric peptide indices and lengths must be integers"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">((</span><span class="n">lengths</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span><span class="n">lengths</span> <span class="o">&gt;</span> <span class="n">indices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Numeric peptide length exceeds its row width"</span><span class="p">)</span>
+        <span class="n">valid</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">indices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">indices</span><span class="o">.</span><span class="n">device</span><span class="p">)[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span> <span class="o">&lt;</span> <span class="n">lengths</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">valid</span> <span class="o">&amp;</span> <span class="p">((</span><span class="n">indices</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span><span class="n">indices</span> <span class="o">&gt;</span> <span class="n">UNKNOWN_INDEX</span><span class="p">)))</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Invalid numeric amino-acid index"</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">indices</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">valid</span><span class="p">,</span> <span class="n">indices</span><span class="p">,</span> <span class="n">UNKNOWN_INDEX</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lengths</span> <span class="o">=</span> <span class="n">lengths</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lengths</span><span class="p">)</span>
+
+<div class="viewcode-block" id="NumericSequences.from_strings">
+<a class="viewcode-back" href="../../api.html#mhcflurry.numeric_sequences.NumericSequences.from_strings">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_strings</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">sequences</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Encode existing strings once, with vectorized ASCII lookup."""</span>
+        <span class="n">sequences</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">sequences</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">sequences</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Sequence of strings is required"</span><span class="p">)</span>
+        <span class="n">lengths</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">fromiter</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">len</span><span class="p">,</span> <span class="n">sequences</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"int64"</span><span class="p">,</span> <span class="n">count</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">sequences</span><span class="p">))</span>
+        <span class="n">width</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">lengths</span><span class="o">.</span><span class="n">max</span><span class="p">())</span> <span class="k">if</span> <span class="n">width</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">lengths</span><span class="p">)</span> <span class="k">else</span> <span class="p">(</span><span class="n">width</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">lengths</span><span class="p">)</span> <span class="ow">and</span> <span class="n">lengths</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="n">width</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Sequence length exceeds numeric width"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">width</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">sequences</span><span class="p">),</span> <span class="mi">0</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"int8"</span><span class="p">),</span> <span class="n">lengths</span><span class="p">)</span>
+        <span class="n">lookup</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="mi">256</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"int8"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">letter</span><span class="p">,</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">AMINO_ACID_INDEX</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">lookup</span><span class="p">[</span><span class="nb">ord</span><span class="p">(</span><span class="n">letter</span><span class="p">)]</span> <span class="o">=</span> <span class="n">index</span>
+        <span class="n">encoded</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">sequences</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"S</span><span class="si">%d</span><span class="s2">"</span> <span class="o">%</span> <span class="n">width</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="s2">"uint8"</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">width</span><span class="p">)</span>
+        <span class="n">valid</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">width</span><span class="p">)[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span> <span class="o">&lt;</span> <span class="n">lengths</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">valid</span><span class="p">,</span> <span class="n">lookup</span><span class="p">[</span><span class="n">encoded</span><span class="p">],</span> <span class="n">UNKNOWN_INDEX</span><span class="p">),</span> <span class="n">lengths</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="NumericSequences.take">
+<a class="viewcode-back" href="../../api.html#mhcflurry.numeric_sequences.NumericSequences.take">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">take</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rows</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Select a vector of integer row indices or a same-length boolean mask."""</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">indices</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">rows</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Numeric row selection must be one-dimensional"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">rows</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">bool</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Numeric row mask must match sequence count"</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">rows</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="ow">and</span> <span class="n">rows</span><span class="o">.</span><span class="n">dtype</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int16</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int64</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Numeric row indices must be integers"</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">rows</span> <span class="o">=</span> <span class="n">rows</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)(</span><span class="bp">self</span><span class="o">.</span><span class="n">indices</span><span class="p">[</span><span class="n">rows</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">lengths</span><span class="p">[</span><span class="n">rows</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="NumericSequences.to_strings">
+<a class="viewcode-back" href="../../api.html#mhcflurry.numeric_sequences.NumericSequences.to_strings">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_strings</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Materialize strings for export or diagnostics, never for scoring."""</span>
+        <span class="n">alphabet</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">UNKNOWN_INDEX</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="sa">b</span><span class="s2">"X"</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"S1"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">letter</span><span class="p">,</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">AMINO_ACID_INDEX</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">alphabet</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">letter</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"ascii"</span><span class="p">)</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="n">alphabet</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">indices</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()]</span>
+        <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">([</span><span class="n">row</span><span class="o">.</span><span class="n">tobytes</span><span class="p">()[:</span><span class="nb">int</span><span class="p">(</span><span class="n">length</span><span class="p">)]</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"ascii"</span><span class="p">)</span>
+                              <span class="k">for</span> <span class="n">row</span><span class="p">,</span> <span class="n">length</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">lengths</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">())])</span></div>
+
+
+<div class="viewcode-block" id="NumericSequences.aligned_tensor">
+<a class="viewcode-back" href="../../api.html#mhcflurry.numeric_sequences.NumericSequences.aligned_tensor">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">aligned_tensor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">peptide_encoding</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Gather the exact categorical network input on the requested device."""</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="n">peptide_encoding</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"alignment_method"</span><span class="p">,</span> <span class="s2">"pad_middle"</span><span class="p">)</span>
+        <span class="n">width</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">peptide_encoding</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"max_length"</span><span class="p">,</span> <span class="mi">15</span><span class="p">))</span>
+        <span class="n">left</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">peptide_encoding</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"left_edge"</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+        <span class="n">right</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">peptide_encoding</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"right_edge"</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+        <span class="n">trim</span> <span class="o">=</span> <span class="n">peptide_encoding</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"trim"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">width</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">left</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">right</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Invalid peptide alignment widths"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">trim</span> <span class="ow">and</span> <span class="n">method</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"left_pad"</span><span class="p">,</span> <span class="s2">"right_pad"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"trim not supported"</span><span class="p">)</span>
+        <span class="n">minimum</span> <span class="o">=</span> <span class="n">left</span> <span class="o">+</span> <span class="n">right</span> <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">"pad_middle"</span> <span class="k">else</span> <span class="p">(</span>
+            <span class="mi">1</span> <span class="k">if</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"left_pad"</span><span class="p">,</span> <span class="s2">"right_pad"</span><span class="p">)</span> <span class="k">else</span> <span class="mi">5</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">lengths</span> <span class="o">&lt;</span> <span class="n">minimum</span><span class="p">)</span> <span class="o">|</span> <span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">lengths</span> <span class="o">&gt;</span> <span class="n">width</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="ow">not</span> <span class="n">trim</span><span class="p">)))</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="n">EncodingError</span><span class="p">(</span><span class="s2">"Numeric peptide lengths outside supported range"</span><span class="p">,</span>
+                                <span class="n">supported_peptide_lengths</span><span class="o">=</span><span class="p">(</span><span class="n">minimum</span><span class="p">,</span> <span class="n">width</span><span class="p">))</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">indices</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">device</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">indices</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">lengths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lengths</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">device</span><span class="p">)[:,</span> <span class="kc">None</span><span class="p">]</span>
+        <span class="n">positions</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">device</span><span class="p">)[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">),</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">"pad_middle"</span><span class="p">:</span>
+            <span class="n">middle_start</span> <span class="o">=</span> <span class="n">left</span> <span class="o">+</span> <span class="p">(</span><span class="n">width</span> <span class="o">-</span> <span class="n">lengths</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span>
+            <span class="n">source</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">positions</span> <span class="o">&lt;</span> <span class="n">left</span><span class="p">,</span> <span class="n">positions</span><span class="p">,</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">positions</span> <span class="o">&gt;=</span> <span class="n">width</span> <span class="o">-</span> <span class="n">right</span><span class="p">,</span> <span class="n">lengths</span> <span class="o">-</span> <span class="n">right</span> <span class="o">+</span> <span class="n">positions</span> <span class="o">-</span> <span class="p">(</span><span class="n">width</span> <span class="o">-</span> <span class="n">right</span><span class="p">),</span>
+                            <span class="n">left</span> <span class="o">+</span> <span class="n">positions</span> <span class="o">-</span> <span class="n">middle_start</span><span class="p">))</span>
+            <span class="n">valid</span> <span class="o">=</span> <span class="p">((</span><span class="n">positions</span> <span class="o">&lt;</span> <span class="n">left</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span><span class="n">positions</span> <span class="o">&gt;=</span> <span class="n">width</span> <span class="o">-</span> <span class="n">right</span><span class="p">)</span> <span class="o">|</span>
+                     <span class="p">((</span><span class="n">positions</span> <span class="o">&gt;=</span> <span class="n">middle_start</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">positions</span> <span class="o">&lt;</span> <span class="n">middle_start</span> <span class="o">+</span> <span class="n">lengths</span> <span class="o">-</span> <span class="n">left</span> <span class="o">-</span> <span class="n">right</span><span class="p">)))</span>
+        <span class="k">elif</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"left_pad"</span><span class="p">,</span> <span class="s2">"right_pad"</span><span class="p">,</span> <span class="s2">"left_pad_right_pad"</span><span class="p">,</span> <span class="s2">"left_pad_centered_right_pad"</span><span class="p">):</span>
+            <span class="n">left_aligned</span> <span class="o">=</span> <span class="n">positions</span>
+            <span class="n">right_aligned</span> <span class="o">=</span> <span class="n">positions</span> <span class="o">-</span> <span class="p">(</span><span class="n">width</span> <span class="o">-</span> <span class="n">lengths</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">"right_pad"</span><span class="p">:</span>
+                <span class="n">source</span> <span class="o">=</span> <span class="n">left_aligned</span>
+            <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">"left_pad"</span><span class="p">:</span>
+                <span class="n">source</span> <span class="o">=</span> <span class="n">right_aligned</span>
+            <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">"left_pad_right_pad"</span><span class="p">:</span>
+                <span class="n">source</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">left_aligned</span><span class="p">,</span> <span class="n">right_aligned</span><span class="p">],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">centered</span> <span class="o">=</span> <span class="n">positions</span> <span class="o">-</span> <span class="p">(</span><span class="n">width</span> <span class="o">-</span> <span class="n">lengths</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span>
+                <span class="n">source</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">left_aligned</span><span class="p">,</span> <span class="n">centered</span><span class="p">,</span> <span class="n">right_aligned</span><span class="p">],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">valid</span> <span class="o">=</span> <span class="p">(</span><span class="n">source</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">source</span> <span class="o">&lt;</span> <span class="n">lengths</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Unsupported alignment method: "</span> <span class="o">+</span> <span class="n">method</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">source</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">valid</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">source</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)),</span> <span class="n">UNKNOWN_INDEX</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

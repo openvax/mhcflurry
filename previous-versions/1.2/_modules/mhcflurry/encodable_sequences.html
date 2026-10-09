@@ -1,0 +1,450 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>mhcflurry.encodable_sequences &mdash; MHCflurry 1.2.0 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="search" title="Search" href="../../search.html"/>
+    <link rel="top" title="MHCflurry 1.2.0 documentation" href="../../index.html"/>
+        <link rel="up" title="Module code" href="../index.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> MHCflurry
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.2.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../models_supported_alleles.html">Supported alleles and peptide lengths</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../models.html">Details on the released predictor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>mhcflurry.encodable_sequences</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for mhcflurry.encodable_sequences</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="p">(</span>
+    <span class="n">print_function</span><span class="p">,</span>
+    <span class="n">division</span><span class="p">,</span>
+    <span class="n">absolute_import</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="k">import</span> <span class="n">string_types</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">import</span> <span class="nn">pandas</span>
+
+<span class="kn">from</span> <span class="nn">.</span> <span class="k">import</span> <span class="n">amino_acid</span>
+
+
+<div class="viewcode-block" id="EncodableSequences"><a class="viewcode-back" href="../../api.html#mhcflurry.encodable_sequences.EncodableSequences">[docs]</a><span class="k">class</span> <span class="nc">EncodableSequences</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Sequences of amino acids.</span>
+<span class="sd">    </span>
+<span class="sd">    This class caches various encodings of a list of sequences.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">unknown_character</span> <span class="o">=</span> <span class="s2">&quot;X&quot;</span>
+
+<div class="viewcode-block" id="EncodableSequences.create"><a class="viewcode-back" href="../../api.html#mhcflurry.encodable_sequences.EncodableSequences.create">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">create</span><span class="p">(</span><span class="n">klass</span><span class="p">,</span> <span class="n">sequences</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Factory that returns an EncodableSequences given a list of</span>
+<span class="sd">        strings. As a convenience, you can also pass it an EncodableSequences</span>
+<span class="sd">        instance, in which case the object is returned unchanged.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sequences</span><span class="p">,</span> <span class="n">klass</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">sequences</span>
+        <span class="k">return</span> <span class="n">klass</span><span class="p">(</span><span class="n">sequences</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sequences</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">string_types</span><span class="p">)</span> <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">sequences</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Sequence of strings is required&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sequences</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">sequences</span><span class="p">)</span>
+        <span class="n">lengths</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_length</span> <span class="o">=</span> <span class="n">lengths</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_length</span> <span class="o">=</span> <span class="n">lengths</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fixed_sequence_length</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fixed_sequence_length</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+    <span class="k">def</span> <span class="nf">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">)</span>
+
+<div class="viewcode-block" id="EncodableSequences.variable_length_to_fixed_length_categorical"><a class="viewcode-back" href="../../api.html#mhcflurry.encodable_sequences.EncodableSequences.variable_length_to_fixed_length_categorical">[docs]</a>    <span class="k">def</span> <span class="nf">variable_length_to_fixed_length_categorical</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">left_edge</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">right_edge</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">max_length</span><span class="o">=</span><span class="mi">15</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Encode variable-length sequences using a fixed-length encoding designed</span>
+<span class="sd">        for preserving the anchor positions of class I peptides.</span>
+<span class="sd">        </span>
+<span class="sd">        The sequences must be of length at least left_edge + right_edge, and at</span>
+<span class="sd">        most max_length.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        left_edge : int, size of fixed-position left side</span>
+<span class="sd">        right_edge : int, size of the fixed-position right side</span>
+<span class="sd">        max_length : sequence length of the resulting encoding</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.array of integers with shape (num sequences, max_length)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">cache_key</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">&quot;fixed_length_categorical&quot;</span><span class="p">,</span>
+            <span class="n">left_edge</span><span class="p">,</span>
+            <span class="n">right_edge</span><span class="p">,</span>
+            <span class="n">max_length</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">cache_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">:</span>
+            <span class="n">fixed_length_sequences</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">sequences_to_fixed_length_index_encoded_array</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">,</span>
+                    <span class="n">left_edge</span><span class="o">=</span><span class="n">left_edge</span><span class="p">,</span>
+                    <span class="n">right_edge</span><span class="o">=</span><span class="n">right_edge</span><span class="p">,</span>
+                    <span class="n">max_length</span><span class="o">=</span><span class="n">max_length</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">fixed_length_sequences</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="EncodableSequences.variable_length_to_fixed_length_vector_encoding"><a class="viewcode-back" href="../../api.html#mhcflurry.encodable_sequences.EncodableSequences.variable_length_to_fixed_length_vector_encoding">[docs]</a>    <span class="k">def</span> <span class="nf">variable_length_to_fixed_length_vector_encoding</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">vector_encoding_name</span><span class="p">,</span> <span class="n">left_edge</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">right_edge</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">max_length</span><span class="o">=</span><span class="mi">15</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Encode variable-length sequences using a fixed-length encoding designed</span>
+<span class="sd">        for preserving the anchor positions of class I peptides.</span>
+
+<span class="sd">        The sequences must be of length at least left_edge + right_edge, and at</span>
+<span class="sd">        most max_length.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        vector_encoding_name : string</span>
+<span class="sd">            How to represent amino acids.</span>
+<span class="sd">            One of &quot;BLOSUM62&quot;, &quot;one-hot&quot;, etc. Full list of supported vector</span>
+<span class="sd">            encodings is given by available_vector_encodings().</span>
+<span class="sd">        left_edge : int, size of fixed-position left side</span>
+<span class="sd">        right_edge : int, size of the fixed-position right side</span>
+<span class="sd">        max_length : sequence length of the resulting encoding</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.array with shape (num sequences, max_length, m) where m is</span>
+<span class="sd">        vector_encoding_length(vector_encoding_name)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">cache_key</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">&quot;fixed_length_vector_encoding&quot;</span><span class="p">,</span>
+            <span class="n">vector_encoding_name</span><span class="p">,</span>
+            <span class="n">left_edge</span><span class="p">,</span>
+            <span class="n">right_edge</span><span class="p">,</span>
+            <span class="n">max_length</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">cache_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">:</span>
+            <span class="n">fixed_length_sequences</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">sequences_to_fixed_length_index_encoded_array</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">,</span>
+                    <span class="n">left_edge</span><span class="o">=</span><span class="n">left_edge</span><span class="p">,</span>
+                    <span class="n">right_edge</span><span class="o">=</span><span class="n">right_edge</span><span class="p">,</span>
+                    <span class="n">max_length</span><span class="o">=</span><span class="n">max_length</span><span class="p">))</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">fixed_vectors_encoding</span><span class="p">(</span>
+                <span class="n">fixed_length_sequences</span><span class="p">,</span>
+                <span class="n">amino_acid</span><span class="o">.</span><span class="n">ENCODING_DATA_FRAMES</span><span class="p">[</span><span class="n">vector_encoding_name</span><span class="p">])</span>
+            <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding_cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="EncodableSequences.sequences_to_fixed_length_index_encoded_array"><a class="viewcode-back" href="../../api.html#mhcflurry.encodable_sequences.EncodableSequences.sequences_to_fixed_length_index_encoded_array">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">sequences_to_fixed_length_index_encoded_array</span><span class="p">(</span>
+            <span class="n">klass</span><span class="p">,</span> <span class="n">sequences</span><span class="p">,</span> <span class="n">left_edge</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">right_edge</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">max_length</span><span class="o">=</span><span class="mi">15</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Transform a sequence of strings, where each string is of length at least</span>
+<span class="sd">        left_edge + right_edge and at most max_length into strings of length</span>
+<span class="sd">        max_length using a scheme designed to preserve the anchor positions of</span>
+<span class="sd">        class I peptides.</span>
+
+<span class="sd">        The first left_edge characters in the input always map to the first</span>
+<span class="sd">        left_edge characters in the output. Similarly for the last right_edge</span>
+<span class="sd">        characters. The middle characters are filled in based on the length,</span>
+<span class="sd">        with the X character filling in the blanks.</span>
+
+<span class="sd">        For example, using defaults:</span>
+
+<span class="sd">        AAAACDDDD -&gt; AAAAXXXCXXXDDDD</span>
+
+<span class="sd">        The strings are also converted to int categorical amino acid indices.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        sequence : string</span>
+<span class="sd">        left_edge : int</span>
+<span class="sd">        right_edge : int</span>
+<span class="sd">        max_length : int</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy array of shape (len(sequences), max_length) and dtype int</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># Result array is int32, filled with X (null amino acid) value.</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span>
+            <span class="n">fill_value</span><span class="o">=</span><span class="n">amino_acid</span><span class="o">.</span><span class="n">AMINO_ACID_INDEX</span><span class="p">[</span><span class="s1">&#39;X&#39;</span><span class="p">],</span>
+            <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">sequences</span><span class="p">),</span> <span class="n">max_length</span><span class="p">),</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;int32&quot;</span><span class="p">)</span>
+
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">&quot;peptide&quot;</span><span class="p">:</span> <span class="n">sequences</span><span class="p">})</span>
+        <span class="n">df</span><span class="p">[</span><span class="s2">&quot;length&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span>
+
+        <span class="n">middle_length</span> <span class="o">=</span> <span class="n">max_length</span> <span class="o">-</span> <span class="n">left_edge</span> <span class="o">-</span> <span class="n">right_edge</span>
+
+        <span class="c1"># For efficiency we handle each supported peptide length using bulk</span>
+        <span class="c1"># array operations.</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="n">sub_df</span><span class="p">)</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">&quot;length&quot;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">length</span> <span class="o">&lt;</span> <span class="n">left_edge</span> <span class="o">+</span> <span class="n">right_edge</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;Sequence &#39;</span><span class="si">%s</span><span class="s2">&#39; (length </span><span class="si">%d</span><span class="s2">) unsupported: length must be at &quot;</span>
+                    <span class="s2">&quot;least </span><span class="si">%d</span><span class="s2">. There are </span><span class="si">%d</span><span class="s2"> total peptides with this length.&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                        <span class="n">sub_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">peptide</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="n">left_edge</span> <span class="o">+</span> <span class="n">right_edge</span><span class="p">,</span>
+                        <span class="nb">len</span><span class="p">(</span><span class="n">sub_df</span><span class="p">)))</span>
+            <span class="k">if</span> <span class="n">length</span> <span class="o">&gt;</span> <span class="n">max_length</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;Sequence &#39;</span><span class="si">%s</span><span class="s2">&#39; (length </span><span class="si">%d</span><span class="s2">) unsupported: length must be at &quot;</span>
+                    <span class="s2">&quot;most </span><span class="si">%d</span><span class="s2">. There are </span><span class="si">%d</span><span class="s2"> total peptides with this length.&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                        <span class="n">sub_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">peptide</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="n">max_length</span><span class="p">,</span>
+                        <span class="nb">len</span><span class="p">(</span><span class="n">sub_df</span><span class="p">)))</span>
+
+            <span class="c1"># Array of shape (num peptides, length) giving fixed-length amino</span>
+            <span class="c1"># acid encoding each peptide of the current length.</span>
+            <span class="n">fixed_length_sequences</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span>
+                <span class="n">sub_df</span><span class="o">.</span><span class="n">peptide</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+                    <span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
+                        <span class="n">amino_acid</span><span class="o">.</span><span class="n">AMINO_ACID_INDEX</span><span class="p">[</span><span class="n">char</span><span class="p">]</span> <span class="k">for</span> <span class="n">char</span> <span class="ow">in</span> <span class="n">s</span>
+                    <span class="p">]))</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+
+            <span class="n">num_null</span> <span class="o">=</span> <span class="n">max_length</span> <span class="o">-</span> <span class="n">length</span>
+            <span class="n">num_null_left</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">num_null</span> <span class="o">/</span> <span class="mi">2</span><span class="p">))</span>
+            <span class="n">num_middle_filled</span> <span class="o">=</span> <span class="n">middle_length</span> <span class="o">-</span> <span class="n">num_null</span>
+            <span class="n">middle_start</span> <span class="o">=</span> <span class="n">left_edge</span> <span class="o">+</span> <span class="n">num_null_left</span>
+
+            <span class="c1"># Set left edge</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">sub_df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="p">:</span><span class="n">left_edge</span><span class="p">]</span> <span class="o">=</span> <span class="n">fixed_length_sequences</span><span class="p">[</span>
+                <span class="p">:,</span> <span class="p">:</span><span class="n">left_edge</span>
+            <span class="p">]</span>
+
+            <span class="c1"># Set middle.</span>
+            <span class="n">result</span><span class="p">[</span>
+                <span class="n">sub_df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span>
+                <span class="n">middle_start</span> <span class="p">:</span> <span class="n">middle_start</span> <span class="o">+</span> <span class="n">num_middle_filled</span>
+            <span class="p">]</span> <span class="o">=</span> <span class="n">fixed_length_sequences</span><span class="p">[</span>
+                <span class="p">:,</span> <span class="n">left_edge</span> <span class="p">:</span> <span class="n">left_edge</span> <span class="o">+</span> <span class="n">num_middle_filled</span>
+            <span class="p">]</span>
+
+            <span class="c1"># Set right edge.</span>
+            <span class="n">result</span><span class="p">[</span>
+                <span class="n">sub_df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span>
+                <span class="o">-</span><span class="n">right_edge</span><span class="p">:</span>
+            <span class="p">]</span> <span class="o">=</span> <span class="n">fixed_length_sequences</span><span class="p">[:,</span> <span class="o">-</span><span class="n">right_edge</span><span class="p">:]</span>
+        <span class="k">return</span> <span class="n">result</span></div></div>
+</pre></div>
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, Timothy O&#39;Donnell.
+      Last updated on Feb 26, 2018.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'1.2.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

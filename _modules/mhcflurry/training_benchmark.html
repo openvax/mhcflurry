@@ -1,0 +1,642 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.training_benchmark &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.training_benchmark</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.training_benchmark</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Training benchmark / profiling harness for pan-allele runs."""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shlex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+
+
+<span class="n">TIMING_MARKER_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">"TIMING_MARKER\s+(\S+)\s+([0-9]+(?:\.[0-9]+)?)"</span><span class="p">)</span>
+<span class="n">PROCESS_TELEMETRY_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="sa">r</span><span class="s2">"PROCESS_TELEMETRY pid=(\d+) marker=(\S+) rss_mb=([^\s]+) num_fds=([^\s]+)"</span>
+<span class="p">)</span>
+<span class="n">GPU_TELEMETRY_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="sa">r</span><span class="s2">"GPU_MEMORY_TELEMETRY pid=(\d+) task=(\S+) marker=(\S+) "</span>
+    <span class="sa">r</span><span class="s2">"allocated_gb=([0-9.]+) reserved_gb=([0-9.]+) max_allocated_gb=([0-9.]+)"</span>
+<span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_scalar</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mf">0.0</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">default</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">default</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">integer</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">floating</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">default</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_series</span><span class="p">(</span><span class="n">info</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="p">[])</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">value</span><span class="p">]</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">value</span><span class="p">]</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">integer</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">floating</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)]</span>
+    <span class="k">return</span> <span class="p">[]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_sum_series</span><span class="p">(</span><span class="n">info</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">_series</span><span class="p">(</span><span class="n">info</span><span class="p">,</span> <span class="n">key</span><span class="p">)))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_safe_div</span><span class="p">(</span><span class="n">numerator</span><span class="p">,</span> <span class="n">denominator</span><span class="p">):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">denominator</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">numerator</span> <span class="o">/</span> <span class="n">denominator</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_flatten_fit_records</span><span class="p">(</span><span class="n">models_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">os</span><span class="o">.</span><span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">]):</span>
+    <span class="n">manifest_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span> <span class="o">/</span> <span class="s2">"manifest.csv"</span>
+    <span class="n">manifest_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">)</span>
+    <span class="n">records</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">manifest_df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+        <span class="n">config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">"config_json"</span><span class="p">])</span>
+        <span class="n">fit_infos</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"fit_info"</span><span class="p">,</span> <span class="p">[])</span> <span class="ow">or</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">fit_index</span><span class="p">,</span> <span class="n">info</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">fit_infos</span><span class="p">):</span>
+            <span class="n">training_info</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"training_info"</span><span class="p">,</span> <span class="p">{})</span> <span class="ow">or</span> <span class="p">{}</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">"model_name"</span><span class="p">:</span> <span class="n">row</span><span class="p">[</span><span class="s2">"model_name"</span><span class="p">],</span>
+                    <span class="s2">"fit_index"</span><span class="p">:</span> <span class="n">fit_index</span><span class="p">,</span>
+                    <span class="s2">"phase"</span><span class="p">:</span> <span class="n">training_info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"phase"</span><span class="p">,</span> <span class="s2">"unknown"</span><span class="p">),</span>
+                    <span class="s2">"info"</span><span class="p">:</span> <span class="n">info</span><span class="p">,</span>
+                    <span class="s2">"training_info"</span><span class="p">:</span> <span class="n">training_info</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+    <span class="k">return</span> <span class="n">records</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_summarize_fit_records</span><span class="p">(</span><span class="n">records</span><span class="p">):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">records</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">"num_fits"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">"total_time_s"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="p">}</span>
+
+    <span class="n">total_time</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">_scalar</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"time"</span><span class="p">))</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">)</span>
+    <span class="n">total_epochs</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"loss"</span><span class="p">,</span> <span class="p">[]))</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">)</span>
+    <span class="n">total_train_time</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">_sum_series</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">],</span> <span class="s2">"epoch_train_time"</span><span class="p">)</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">)</span>
+    <span class="n">total_fetch_time</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">_sum_series</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">],</span> <span class="s2">"epoch_fetch_time"</span><span class="p">)</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">)</span>
+    <span class="n">total_h2d_time</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">_sum_series</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">],</span> <span class="s2">"epoch_h2d_time"</span><span class="p">)</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">)</span>
+    <span class="n">total_loss_sync_time</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+        <span class="n">_sum_series</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">],</span> <span class="s2">"epoch_loss_sync_time"</span><span class="p">)</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span>
+    <span class="p">)</span>
+    <span class="n">total_input_build_time</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+        <span class="n">_sum_series</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">],</span> <span class="s2">"epoch_input_build_time"</span><span class="p">)</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span>
+    <span class="p">)</span>
+    <span class="n">total_initialization_time</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+        <span class="n">_sum_series</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">],</span> <span class="s2">"epoch_initialization_time"</span><span class="p">)</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span>
+    <span class="p">)</span>
+    <span class="n">total_shuffle_time</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+        <span class="n">_sum_series</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">],</span> <span class="s2">"epoch_shuffle_dataset_time"</span><span class="p">)</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span>
+    <span class="p">)</span>
+    <span class="n">total_dataloader_setup_time</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+        <span class="n">_sum_series</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">],</span> <span class="s2">"epoch_dataloader_setup_time"</span><span class="p">)</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span>
+    <span class="p">)</span>
+    <span class="n">total_validation_materialize_time</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+        <span class="n">_sum_series</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">],</span> <span class="s2">"epoch_validation_materialize_time"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span>
+    <span class="p">)</span>
+    <span class="n">total_validation_compute_time</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+        <span class="n">_sum_series</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">],</span> <span class="s2">"epoch_validation_time"</span><span class="p">)</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span>
+    <span class="p">)</span>
+    <span class="n">total_callback_time</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+        <span class="n">_sum_series</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">],</span> <span class="s2">"epoch_callback_time"</span><span class="p">)</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span>
+    <span class="p">)</span>
+    <span class="n">total_gc_time</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">_sum_series</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">],</span> <span class="s2">"epoch_gc_time"</span><span class="p">)</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">)</span>
+    <span class="n">total_epoch_time</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">_sum_series</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">],</span> <span class="s2">"epoch_total_time"</span><span class="p">)</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">)</span>
+    <span class="n">total_train_batches</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+        <span class="nb">sum</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"epoch_num_train_batches"</span><span class="p">,</span> <span class="p">[]))</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">total_train_rows</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+        <span class="nb">sum</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"epoch_num_train_rows"</span><span class="p">,</span> <span class="p">[]))</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">total_tail_rows</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+        <span class="nb">sum</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"epoch_tail_train_rows"</span><span class="p">,</span> <span class="p">[]))</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">total_validation_batches</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+        <span class="nb">sum</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"epoch_num_validation_batches"</span><span class="p">,</span> <span class="p">[]))</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">compile_overhead_estimates</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">first_batch_times</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+        <span class="n">info</span> <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">]</span>
+        <span class="n">first_batch_time</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"first_batch_time"</span><span class="p">)</span>
+        <span class="n">epoch_train_times</span> <span class="o">=</span> <span class="n">_series</span><span class="p">(</span><span class="n">info</span><span class="p">,</span> <span class="s2">"epoch_train_time"</span><span class="p">)</span>
+        <span class="n">epoch_train_batches</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"epoch_num_train_batches"</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="k">if</span> <span class="n">first_batch_time</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">first_batch_times</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">first_batch_time</span><span class="p">))</span>
+        <span class="n">total_batches</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">epoch_train_batches</span><span class="p">))</span> <span class="k">if</span> <span class="n">epoch_train_batches</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="k">if</span> <span class="n">total_batches</span> <span class="o">&lt;=</span> <span class="mi">1</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">epoch_train_times</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">steady_batch_time</span> <span class="o">=</span> <span class="n">_safe_div</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">epoch_train_times</span><span class="p">)</span> <span class="o">-</span> <span class="nb">float</span><span class="p">(</span><span class="n">first_batch_time</span><span class="p">),</span> <span class="n">total_batches</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">steady_batch_time</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">compile_overhead_estimates</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="n">first_batch_time</span><span class="p">)</span> <span class="o">-</span> <span class="n">steady_batch_time</span><span class="p">))</span>
+
+    <span class="n">validation_rows_total</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">effective_validation_batch_sizes</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">validation_cache_reused_count</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">dataloader_num_workers</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">iterator_setup_time</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+        <span class="n">info</span> <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="s2">"info"</span><span class="p">]</span>
+        <span class="n">epochs</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"loss"</span><span class="p">,</span> <span class="p">[]))</span>
+        <span class="n">validation_rows</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">_scalar</span><span class="p">(</span><span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"validation_rows"</span><span class="p">),</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+        <span class="n">validation_rows_total</span> <span class="o">+=</span> <span class="n">validation_rows</span> <span class="o">*</span> <span class="n">epochs</span>
+        <span class="n">batch_size</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"effective_validation_batch_size"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">batch_size</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">effective_validation_batch_sizes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">batch_size</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"validation_cache_reused"</span><span class="p">):</span>
+            <span class="n">validation_cache_reused_count</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">dataloader_num_workers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">_scalar</span><span class="p">(</span><span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"dataloader_num_workers"</span><span class="p">),</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)))</span>
+        <span class="n">iterator_setup_time</span> <span class="o">+=</span> <span class="n">_scalar</span><span class="p">(</span><span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"iterator_setup_time"</span><span class="p">),</span> <span class="n">default</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+
+    <span class="n">validation_total_time</span> <span class="o">=</span> <span class="n">total_validation_materialize_time</span> <span class="o">+</span> <span class="n">total_validation_compute_time</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"num_fits"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">),</span>
+        <span class="s2">"total_time_s"</span><span class="p">:</span> <span class="n">total_time</span><span class="p">,</span>
+        <span class="s2">"total_epochs"</span><span class="p">:</span> <span class="n">total_epochs</span><span class="p">,</span>
+        <span class="s2">"total_epoch_timing_s"</span><span class="p">:</span> <span class="n">total_epoch_time</span><span class="p">,</span>
+        <span class="s2">"train_time_s"</span><span class="p">:</span> <span class="n">total_train_time</span><span class="p">,</span>
+        <span class="s2">"fetch_time_s"</span><span class="p">:</span> <span class="n">total_fetch_time</span><span class="p">,</span>
+        <span class="s2">"h2d_time_s"</span><span class="p">:</span> <span class="n">total_h2d_time</span><span class="p">,</span>
+        <span class="s2">"loss_sync_time_s"</span><span class="p">:</span> <span class="n">total_loss_sync_time</span><span class="p">,</span>
+        <span class="s2">"input_build_time_s"</span><span class="p">:</span> <span class="n">total_input_build_time</span><span class="p">,</span>
+        <span class="s2">"initialization_time_s"</span><span class="p">:</span> <span class="n">total_initialization_time</span><span class="p">,</span>
+        <span class="s2">"shuffle_time_s"</span><span class="p">:</span> <span class="n">total_shuffle_time</span><span class="p">,</span>
+        <span class="s2">"dataloader_setup_time_s"</span><span class="p">:</span> <span class="n">total_dataloader_setup_time</span><span class="p">,</span>
+        <span class="s2">"iterator_setup_time_s"</span><span class="p">:</span> <span class="n">iterator_setup_time</span><span class="p">,</span>
+        <span class="s2">"validation_materialize_time_s"</span><span class="p">:</span> <span class="n">total_validation_materialize_time</span><span class="p">,</span>
+        <span class="s2">"validation_compute_time_s"</span><span class="p">:</span> <span class="n">total_validation_compute_time</span><span class="p">,</span>
+        <span class="s2">"validation_total_time_s"</span><span class="p">:</span> <span class="n">validation_total_time</span><span class="p">,</span>
+        <span class="s2">"callback_time_s"</span><span class="p">:</span> <span class="n">total_callback_time</span><span class="p">,</span>
+        <span class="s2">"gc_time_s"</span><span class="p">:</span> <span class="n">total_gc_time</span><span class="p">,</span>
+        <span class="s2">"train_time_fraction_of_epoch_timing"</span><span class="p">:</span> <span class="n">_safe_div</span><span class="p">(</span><span class="n">total_train_time</span><span class="p">,</span> <span class="n">total_epoch_time</span><span class="p">),</span>
+        <span class="s2">"validation_time_fraction_of_epoch_timing"</span><span class="p">:</span> <span class="n">_safe_div</span><span class="p">(</span><span class="n">validation_total_time</span><span class="p">,</span> <span class="n">total_epoch_time</span><span class="p">),</span>
+        <span class="s2">"fetch_time_fraction_of_epoch_timing"</span><span class="p">:</span> <span class="n">_safe_div</span><span class="p">(</span><span class="n">total_fetch_time</span><span class="p">,</span> <span class="n">total_epoch_time</span><span class="p">),</span>
+        <span class="s2">"input_build_fraction_of_epoch_timing"</span><span class="p">:</span> <span class="n">_safe_div</span><span class="p">(</span><span class="n">total_input_build_time</span><span class="p">,</span> <span class="n">total_epoch_time</span><span class="p">),</span>
+        <span class="s2">"h2d_time_fraction_of_epoch_timing"</span><span class="p">:</span> <span class="n">_safe_div</span><span class="p">(</span><span class="n">total_h2d_time</span><span class="p">,</span> <span class="n">total_epoch_time</span><span class="p">),</span>
+        <span class="s2">"loss_sync_time_fraction_of_epoch_timing"</span><span class="p">:</span> <span class="n">_safe_div</span><span class="p">(</span>
+            <span class="n">total_loss_sync_time</span><span class="p">,</span> <span class="n">total_epoch_time</span>
+        <span class="p">),</span>
+        <span class="s2">"total_train_batches"</span><span class="p">:</span> <span class="n">total_train_batches</span><span class="p">,</span>
+        <span class="s2">"total_train_rows"</span><span class="p">:</span> <span class="n">total_train_rows</span><span class="p">,</span>
+        <span class="s2">"total_tail_train_rows"</span><span class="p">:</span> <span class="n">total_tail_rows</span><span class="p">,</span>
+        <span class="s2">"total_validation_batches"</span><span class="p">:</span> <span class="n">total_validation_batches</span><span class="p">,</span>
+        <span class="s2">"validation_rows_seen"</span><span class="p">:</span> <span class="n">validation_rows_total</span><span class="p">,</span>
+        <span class="s2">"train_rows_per_second"</span><span class="p">:</span> <span class="n">_safe_div</span><span class="p">(</span><span class="n">total_train_rows</span><span class="p">,</span> <span class="n">total_train_time</span><span class="p">),</span>
+        <span class="s2">"validation_rows_per_second"</span><span class="p">:</span> <span class="n">_safe_div</span><span class="p">(</span><span class="n">validation_rows_total</span><span class="p">,</span> <span class="n">validation_total_time</span><span class="p">),</span>
+        <span class="s2">"steady_state_train_batch_time_s"</span><span class="p">:</span> <span class="n">_safe_div</span><span class="p">(</span>
+            <span class="n">total_train_time</span> <span class="o">-</span> <span class="nb">sum</span><span class="p">(</span><span class="n">first_batch_times</span><span class="p">),</span>
+            <span class="n">total_train_batches</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">first_batch_times</span><span class="p">),</span>
+        <span class="p">)</span> <span class="k">if</span> <span class="n">total_train_batches</span> <span class="o">&gt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">first_batch_times</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">"first_batch_time_s_median"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">first_batch_times</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">first_batch_times</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">"first_batch_time_s_max"</span><span class="p">:</span> <span class="nb">max</span><span class="p">(</span><span class="n">first_batch_times</span><span class="p">)</span> <span class="k">if</span> <span class="n">first_batch_times</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">"compile_warmup_overhead_s_sum"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">compile_overhead_estimates</span><span class="p">)),</span>
+        <span class="s2">"compile_warmup_overhead_s_median"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">compile_overhead_estimates</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">compile_overhead_estimates</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">"compile_warmup_overhead_s_max"</span><span class="p">:</span> <span class="nb">max</span><span class="p">(</span><span class="n">compile_overhead_estimates</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">compile_overhead_estimates</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">"effective_validation_batch_sizes"</span><span class="p">:</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">effective_validation_batch_sizes</span><span class="p">)),</span>
+        <span class="s2">"validation_cache_reused_fit_count"</span><span class="p">:</span> <span class="n">validation_cache_reused_count</span><span class="p">,</span>
+        <span class="s2">"dataloader_num_workers"</span><span class="p">:</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">dataloader_num_workers</span><span class="p">)),</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_log_file</span><span class="p">(</span><span class="n">log_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">os</span><span class="o">.</span><span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">log_path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">"path"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s2">"timing_markers"</span><span class="p">:</span> <span class="p">{},</span>
+            <span class="s2">"process_telemetry"</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s2">"gpu_telemetry"</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="p">}</span>
+
+    <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">log_path</span><span class="p">)</span>
+    <span class="n">markers</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">process_telemetry</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">gpu_telemetry</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">with</span> <span class="n">path</span><span class="o">.</span><span class="n">open</span><span class="p">()</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">fd</span><span class="p">:</span>
+            <span class="n">match</span> <span class="o">=</span> <span class="n">TIMING_MARKER_RE</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+                <span class="n">markers</span><span class="p">[</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
+            <span class="n">match</span> <span class="o">=</span> <span class="n">PROCESS_TELEMETRY_RE</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+                <span class="n">rss_value</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"na"</span> <span class="k">else</span> <span class="nb">float</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+                <span class="n">fd_value</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"na"</span> <span class="k">else</span> <span class="nb">int</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">4</span><span class="p">))</span>
+                <span class="n">process_telemetry</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">"pid"</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)),</span>
+                        <span class="s2">"marker"</span><span class="p">:</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span>
+                        <span class="s2">"rss_mb"</span><span class="p">:</span> <span class="n">rss_value</span><span class="p">,</span>
+                        <span class="s2">"num_fds"</span><span class="p">:</span> <span class="n">fd_value</span><span class="p">,</span>
+                    <span class="p">}</span>
+                <span class="p">)</span>
+            <span class="n">match</span> <span class="o">=</span> <span class="n">GPU_TELEMETRY_RE</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+                <span class="n">gpu_telemetry</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">"pid"</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)),</span>
+                        <span class="s2">"task"</span><span class="p">:</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span>
+                        <span class="s2">"marker"</span><span class="p">:</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>
+                        <span class="s2">"allocated_gb"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">4</span><span class="p">)),</span>
+                        <span class="s2">"reserved_gb"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">5</span><span class="p">)),</span>
+                        <span class="s2">"max_allocated_gb"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">6</span><span class="p">)),</span>
+                    <span class="p">}</span>
+                <span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+        <span class="s2">"timing_markers"</span><span class="p">:</span> <span class="n">markers</span><span class="p">,</span>
+        <span class="s2">"process_telemetry"</span><span class="p">:</span> <span class="n">process_telemetry</span><span class="p">,</span>
+        <span class="s2">"gpu_telemetry"</span><span class="p">:</span> <span class="n">gpu_telemetry</span><span class="p">,</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_summarize_telemetry</span><span class="p">(</span><span class="n">parsed_log</span><span class="p">):</span>
+    <span class="n">process_entries</span> <span class="o">=</span> <span class="n">parsed_log</span><span class="p">[</span><span class="s2">"process_telemetry"</span><span class="p">]</span>
+    <span class="n">gpu_entries</span> <span class="o">=</span> <span class="n">parsed_log</span><span class="p">[</span><span class="s2">"gpu_telemetry"</span><span class="p">]</span>
+
+    <span class="n">process_by_pid</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">process_entries</span><span class="p">:</span>
+        <span class="n">pid_entries</span> <span class="o">=</span> <span class="n">process_by_pid</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="s2">"pid"</span><span class="p">],</span> <span class="p">{})</span>
+        <span class="n">pid_entries</span><span class="p">[</span><span class="n">entry</span><span class="p">[</span><span class="s2">"marker"</span><span class="p">]]</span> <span class="o">=</span> <span class="n">entry</span>
+
+    <span class="n">rss_growth</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">fd_growth</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">pid</span><span class="p">,</span> <span class="n">markers</span> <span class="ow">in</span> <span class="n">process_by_pid</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">start_entry</span> <span class="o">=</span> <span class="n">markers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"START"</span><span class="p">)</span>
+        <span class="n">end_entry</span> <span class="o">=</span> <span class="n">markers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"END"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">start_entry</span> <span class="ow">and</span> <span class="n">end_entry</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">start_entry</span><span class="p">[</span><span class="s2">"rss_mb"</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">end_entry</span><span class="p">[</span><span class="s2">"rss_mb"</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">rss_growth</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">"pid"</span><span class="p">:</span> <span class="n">pid</span><span class="p">,</span>
+                        <span class="s2">"rss_mb_delta"</span><span class="p">:</span> <span class="n">end_entry</span><span class="p">[</span><span class="s2">"rss_mb"</span><span class="p">]</span> <span class="o">-</span> <span class="n">start_entry</span><span class="p">[</span><span class="s2">"rss_mb"</span><span class="p">],</span>
+                    <span class="p">}</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="n">start_entry</span><span class="p">[</span><span class="s2">"num_fds"</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">end_entry</span><span class="p">[</span><span class="s2">"num_fds"</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">fd_growth</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">"pid"</span><span class="p">:</span> <span class="n">pid</span><span class="p">,</span>
+                        <span class="s2">"fd_delta"</span><span class="p">:</span> <span class="n">end_entry</span><span class="p">[</span><span class="s2">"num_fds"</span><span class="p">]</span> <span class="o">-</span> <span class="n">start_entry</span><span class="p">[</span><span class="s2">"num_fds"</span><span class="p">],</span>
+                    <span class="p">}</span>
+                <span class="p">)</span>
+
+    <span class="n">max_gpu_reserved</span> <span class="o">=</span> <span class="nb">max</span><span class="p">((</span><span class="n">entry</span><span class="p">[</span><span class="s2">"reserved_gb"</span><span class="p">]</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">gpu_entries</span><span class="p">),</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="n">max_gpu_allocated</span> <span class="o">=</span> <span class="nb">max</span><span class="p">((</span><span class="n">entry</span><span class="p">[</span><span class="s2">"allocated_gb"</span><span class="p">]</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">gpu_entries</span><span class="p">),</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="n">max_gpu_highwater</span> <span class="o">=</span> <span class="nb">max</span><span class="p">((</span><span class="n">entry</span><span class="p">[</span><span class="s2">"max_allocated_gb"</span><span class="p">]</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">gpu_entries</span><span class="p">),</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="n">max_rss</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="s2">"rss_mb"</span><span class="p">]</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">process_entries</span> <span class="k">if</span> <span class="n">entry</span><span class="p">[</span><span class="s2">"rss_mb"</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">max_fds</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="s2">"num_fds"</span><span class="p">]</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">process_entries</span> <span class="k">if</span> <span class="n">entry</span><span class="p">[</span><span class="s2">"num_fds"</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"num_process_samples"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">process_entries</span><span class="p">),</span>
+        <span class="s2">"num_gpu_samples"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">gpu_entries</span><span class="p">),</span>
+        <span class="s2">"max_rss_mb"</span><span class="p">:</span> <span class="n">max_rss</span><span class="p">,</span>
+        <span class="s2">"max_num_fds"</span><span class="p">:</span> <span class="n">max_fds</span><span class="p">,</span>
+        <span class="s2">"max_gpu_reserved_gb"</span><span class="p">:</span> <span class="n">max_gpu_reserved</span><span class="p">,</span>
+        <span class="s2">"max_gpu_allocated_gb"</span><span class="p">:</span> <span class="n">max_gpu_allocated</span><span class="p">,</span>
+        <span class="s2">"max_gpu_highwater_gb"</span><span class="p">:</span> <span class="n">max_gpu_highwater</span><span class="p">,</span>
+        <span class="s2">"rss_growth_by_pid"</span><span class="p">:</span> <span class="n">rss_growth</span><span class="p">,</span>
+        <span class="s2">"fd_growth_by_pid"</span><span class="p">:</span> <span class="n">fd_growth</span><span class="p">,</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_derive_top_level_wall_times</span><span class="p">(</span><span class="n">train_log</span><span class="p">,</span> <span class="n">selection_log</span><span class="p">):</span>
+    <span class="n">train_markers</span> <span class="o">=</span> <span class="n">train_log</span><span class="p">[</span><span class="s2">"timing_markers"</span><span class="p">]</span>
+    <span class="n">selection_markers</span> <span class="o">=</span> <span class="n">selection_log</span><span class="p">[</span><span class="s2">"timing_markers"</span><span class="p">]</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"data_load_s"</span><span class="p">:</span> <span class="n">_safe_div</span><span class="p">(</span>
+            <span class="n">train_markers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"data_loaded"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">-</span> <span class="n">train_markers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"start"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+            <span class="mf">1.0</span><span class="p">,</span>
+        <span class="p">)</span> <span class="k">if</span> <span class="s2">"start"</span> <span class="ow">in</span> <span class="n">train_markers</span> <span class="ow">and</span> <span class="s2">"data_loaded"</span> <span class="ow">in</span> <span class="n">train_markers</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">"setup_s"</span><span class="p">:</span> <span class="n">_safe_div</span><span class="p">(</span>
+            <span class="n">train_markers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"setup_done"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">-</span> <span class="n">train_markers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"data_loaded"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+            <span class="mf">1.0</span><span class="p">,</span>
+        <span class="p">)</span> <span class="k">if</span> <span class="s2">"data_loaded"</span> <span class="ow">in</span> <span class="n">train_markers</span> <span class="ow">and</span> <span class="s2">"setup_done"</span> <span class="ow">in</span> <span class="n">train_markers</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">"training_s"</span><span class="p">:</span> <span class="n">_safe_div</span><span class="p">(</span>
+            <span class="n">train_markers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"training_done"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">-</span> <span class="n">train_markers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"setup_done"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+            <span class="mf">1.0</span><span class="p">,</span>
+        <span class="p">)</span> <span class="k">if</span> <span class="s2">"setup_done"</span> <span class="ow">in</span> <span class="n">train_markers</span> <span class="ow">and</span> <span class="s2">"training_done"</span> <span class="ow">in</span> <span class="n">train_markers</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">"selection_s"</span><span class="p">:</span> <span class="n">_safe_div</span><span class="p">(</span>
+            <span class="n">selection_markers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"selection_done"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">-</span> <span class="n">selection_markers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"selection_start"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+            <span class="mf">1.0</span><span class="p">,</span>
+        <span class="p">)</span> <span class="k">if</span> <span class="s2">"selection_start"</span> <span class="ow">in</span> <span class="n">selection_markers</span> <span class="ow">and</span> <span class="s2">"selection_done"</span> <span class="ow">in</span> <span class="n">selection_markers</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">}</span>
+
+
+<div class="viewcode-block" id="analyze_training_run">
+<a class="viewcode-back" href="../../api.html#mhcflurry.training_benchmark.analyze_training_run">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">analyze_training_run</span><span class="p">(</span>
+    <span class="n">models_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">os</span><span class="o">.</span><span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">train_log</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">os</span><span class="o">.</span><span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">selection_log</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">os</span><span class="o">.</span><span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="n">records</span> <span class="o">=</span> <span class="n">_flatten_fit_records</span><span class="p">(</span><span class="n">models_dir</span><span class="p">)</span>
+    <span class="n">phase_to_records</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+        <span class="n">phase_to_records</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s2">"phase"</span><span class="p">],</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+    <span class="n">parsed_train_log</span> <span class="o">=</span> <span class="n">_parse_log_file</span><span class="p">(</span><span class="n">train_log</span><span class="p">)</span>
+    <span class="n">parsed_selection_log</span> <span class="o">=</span> <span class="n">_parse_log_file</span><span class="p">(</span><span class="n">selection_log</span><span class="p">)</span>
+    <span class="n">summary</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"models_dir"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">models_dir</span><span class="p">),</span>
+        <span class="s2">"num_models"</span><span class="p">:</span> <span class="nb">len</span><span class="p">({</span><span class="n">record</span><span class="p">[</span><span class="s2">"model_name"</span><span class="p">]</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">}),</span>
+        <span class="s2">"num_fit_records"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">),</span>
+        <span class="s2">"top_level_wall_times_s"</span><span class="p">:</span> <span class="n">_derive_top_level_wall_times</span><span class="p">(</span>
+            <span class="n">parsed_train_log</span><span class="p">,</span> <span class="n">parsed_selection_log</span>
+        <span class="p">),</span>
+        <span class="s2">"train_log"</span><span class="p">:</span> <span class="n">parsed_train_log</span><span class="p">,</span>
+        <span class="s2">"selection_log"</span><span class="p">:</span> <span class="n">parsed_selection_log</span><span class="p">,</span>
+        <span class="s2">"telemetry"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"train"</span><span class="p">:</span> <span class="n">_summarize_telemetry</span><span class="p">(</span><span class="n">parsed_train_log</span><span class="p">),</span>
+            <span class="s2">"selection"</span><span class="p">:</span> <span class="n">_summarize_telemetry</span><span class="p">(</span><span class="n">parsed_selection_log</span><span class="p">),</span>
+        <span class="p">},</span>
+        <span class="s2">"phase_summaries"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="n">phase</span><span class="p">:</span> <span class="n">_summarize_fit_records</span><span class="p">(</span><span class="n">phase_records</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">phase</span><span class="p">,</span> <span class="n">phase_records</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">phase_to_records</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
+        <span class="p">},</span>
+        <span class="s2">"all_fit_summary"</span><span class="p">:</span> <span class="n">_summarize_fit_records</span><span class="p">(</span><span class="n">records</span><span class="p">),</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">summary</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_write_json</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">out_json</span><span class="p">):</span>
+    <span class="n">payload</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">out_json</span><span class="p">:</span>
+        <span class="n">Path</span><span class="p">(</span><span class="n">out_json</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">payload</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_run_command</span><span class="p">(</span><span class="n">command</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">log_path</span><span class="p">,</span> <span class="n">cwd</span><span class="p">):</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">shlex</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">command</span><span class="p">)</span>
+    <span class="n">env</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">env</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"MHCFLURRY_ENABLE_TIMING"</span><span class="p">,</span> <span class="s2">"1"</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">Path</span><span class="p">(</span><span class="n">log_path</span><span class="p">)</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"w"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+        <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="n">args</span><span class="p">,</span>
+            <span class="n">cwd</span><span class="o">=</span><span class="n">cwd</span><span class="p">,</span>
+            <span class="n">env</span><span class="o">=</span><span class="n">env</span><span class="p">,</span>
+            <span class="n">stdout</span><span class="o">=</span><span class="n">fd</span><span class="p">,</span>
+            <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">STDOUT</span><span class="p">,</span>
+            <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+
+
+<div class="viewcode-block" id="build_arg_parser">
+<a class="viewcode-back" href="../../api.html#mhcflurry.training_benchmark.build_arg_parser">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">build_arg_parser</span><span class="p">():</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">)</span>
+    <span class="n">subparsers</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_subparsers</span><span class="p">(</span><span class="n">dest</span><span class="o">=</span><span class="s2">"command"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">analyze_parser</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"analyze"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Analyze an existing training/models directory and timing logs."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">analyze_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--models-dir"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">analyze_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--train-log"</span><span class="p">)</span>
+    <span class="n">analyze_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--selection-log"</span><span class="p">)</span>
+    <span class="n">analyze_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--out-json"</span><span class="p">)</span>
+
+    <span class="n">run_parser</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span>
+        <span class="s2">"run"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Run profiled train/select commands and emit a JSON summary."</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">run_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--models-dir"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">run_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--train-command"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">run_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--selection-command"</span><span class="p">)</span>
+    <span class="n">run_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--cwd"</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">"."</span><span class="p">)</span>
+    <span class="n">run_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--log-dir"</span><span class="p">)</span>
+    <span class="n">run_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--out-json"</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+
+<div class="viewcode-block" id="main">
+<a class="viewcode-back" href="../../api.html#mhcflurry.training_benchmark.main">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">build_arg_parser</span><span class="p">()</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">command</span> <span class="o">==</span> <span class="s2">"analyze"</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">analyze_training_run</span><span class="p">(</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">models_dir</span><span class="p">,</span>
+            <span class="n">train_log</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">train_log</span><span class="p">,</span>
+            <span class="n">selection_log</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">selection_log</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">_write_json</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">out_json</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="n">log_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">log_dir</span> <span class="ow">or</span> <span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">models_dir</span><span class="p">)</span> <span class="o">/</span> <span class="s2">"benchmark_profile_logs"</span><span class="p">))</span>
+    <span class="n">log_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">train_log</span> <span class="o">=</span> <span class="n">log_dir</span> <span class="o">/</span> <span class="s2">"train.log"</span>
+    <span class="n">selection_log</span> <span class="o">=</span> <span class="n">log_dir</span> <span class="o">/</span> <span class="s2">"select.log"</span>
+
+    <span class="n">_run_command</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">train_command</span><span class="p">,</span> <span class="n">log_path</span><span class="o">=</span><span class="n">train_log</span><span class="p">,</span> <span class="n">cwd</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">cwd</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">selection_command</span><span class="p">:</span>
+        <span class="n">_run_command</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">selection_command</span><span class="p">,</span> <span class="n">log_path</span><span class="o">=</span><span class="n">selection_log</span><span class="p">,</span> <span class="n">cwd</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">cwd</span><span class="p">)</span>
+        <span class="n">selection_log_path</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">selection_log</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">selection_log_path</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="n">analyze_training_run</span><span class="p">(</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">models_dir</span><span class="p">,</span>
+        <span class="n">train_log</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">train_log</span><span class="p">),</span>
+        <span class="n">selection_log</span><span class="o">=</span><span class="n">selection_log_path</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">_write_json</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">out_json</span><span class="p">)</span>
+    <span class="k">return</span> <span class="mi">0</span></div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="n">main</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]))</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

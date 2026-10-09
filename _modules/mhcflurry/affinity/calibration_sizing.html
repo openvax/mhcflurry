@@ -1,0 +1,814 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.affinity.calibration_sizing &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.affinity.calibration_sizing</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.affinity.calibration_sizing</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Calibration sizing and cache helpers for class I affinity predictors."""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">collections</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">hashlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+
+
+<div class="viewcode-block" id="peptide_sequences_fingerprint">
+<a class="viewcode-back" href="../../../mhcflurry.affinity.html#mhcflurry.affinity.calibration_sizing.peptide_sequences_fingerprint">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">peptide_sequences_fingerprint</span><span class="p">(</span><span class="n">sequences</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Order-and-content-sensitive SHA-256 of a peptide list.</span>
+
+<span class="sd">    Length-prefixes each peptide so e.g. ``["AB", "C"]`` and ``["A", "BC"]``</span>
+<span class="sd">    cannot collide by concatenation. Used as the cache key for the fast</span>
+<span class="sd">    calibration peptide-stage cache; collisions there silently reuse the</span>
+<span class="sd">    wrong tensors and produce wrong PercentRankTransforms.</span>
+<span class="sd">    """</span>
+    <span class="n">h</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">peptide</span> <span class="ow">in</span> <span class="n">sequences</span><span class="p">:</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">peptide</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"utf8"</span><span class="p">)</span>
+        <span class="n">h</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">b</span><span class="p">)</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="s2">"little"</span><span class="p">))</span>
+        <span class="n">h</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">h</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="CalibrationFastCache">
+<a class="viewcode-back" href="../../../mhcflurry.affinity.html#mhcflurry.affinity.calibration_sizing.CalibrationFastCache">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CalibrationFastCache</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Per-predictor-instance state for ``calibrate_percentile_ranks_fast``.</span>
+
+<span class="sd">    Holds the device-resident peptide-stage tensors and the motif-summary</span>
+<span class="sd">    helper state that survive across calibrate tasks within one worker.</span>
+<span class="sd">    Centralizing both fields here makes the cache lifecycle visible —</span>
+<span class="sd">    it used to live behind dynamic ``setattr`` of private names.</span>
+<span class="sd">    """</span>
+
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">"stage_signature"</span><span class="p">,</span>
+        <span class="s2">"cached_stages"</span><span class="p">,</span>
+        <span class="s2">"motif_signature"</span><span class="p">,</span>
+        <span class="s2">"motif_state"</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stage_signature</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cached_stages</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">motif_signature</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">motif_state</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="CalibrationFastCache.clear">
+<a class="viewcode-back" href="../../../mhcflurry.affinity.html#mhcflurry.affinity.calibration_sizing.CalibrationFastCache.clear">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stage_signature</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cached_stages</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">motif_signature</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">motif_state</span> <span class="o">=</span> <span class="kc">None</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="peptide_encoding_feature_dim">
+<a class="viewcode-back" href="../../../mhcflurry.affinity.html#mhcflurry.affinity.calibration_sizing.peptide_encoding_feature_dim">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">peptide_encoding_feature_dim</span><span class="p">(</span><span class="n">model</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the raw encoded peptide feature width for ``model`` if known."""</span>
+    <span class="n">enc_shape</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"peptide_encoding_shape"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">enc_shape</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">enc_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">enc_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span></div>
+
+
+
+<div class="viewcode-block" id="resolve_peptide_feature_dim">
+<a class="viewcode-back" href="../../../mhcflurry.affinity.html#mhcflurry.affinity.calibration_sizing.resolve_peptide_feature_dim">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">resolve_peptide_feature_dim</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">peptide_feature_dim</span><span class="p">,</span> <span class="n">peak_bytes</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Resolve the width of cached peptide features used during calibration.</span>
+
+<span class="sd">    ``peptide_feature_dim`` is the actual width of</span>
+<span class="sd">    ``forward_peptide_stage(...)`` when the caller has probed it. Without a</span>
+<span class="sd">    probe, fall back to shape-derived estimates and then to the generic peak</span>
+<span class="sd">    memory estimate.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">peptide_feature_dim</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">peptide_feature_dim</span><span class="p">)</span>
+
+    <span class="n">sub_networks</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"networks"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">sub_networks</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"peptide_encoding_shape"</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">sub_dims</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">net</span> <span class="ow">in</span> <span class="n">sub_networks</span><span class="p">:</span>
+                <span class="n">sub_dim</span> <span class="o">=</span> <span class="n">peptide_encoding_feature_dim</span><span class="p">(</span><span class="n">net</span><span class="p">)</span>
+                <span class="n">sub_dims</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">1024</span> <span class="k">if</span> <span class="n">sub_dim</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">sub_dim</span><span class="p">)</span>
+            <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">sub_dims</span><span class="p">))</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">IndexError</span><span class="p">):</span>
+            <span class="k">pass</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">feature_dim</span> <span class="o">=</span> <span class="n">peptide_encoding_feature_dim</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">IndexError</span><span class="p">):</span>
+        <span class="n">feature_dim</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">feature_dim</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">feature_dim</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">peak_bytes</span> <span class="o">//</span> <span class="mi">32</span><span class="p">)</span> <span class="k">if</span> <span class="n">peak_bytes</span> <span class="k">else</span> <span class="mi">1024</span></div>
+
+
+
+<span class="n">CalibrationSizingEnv</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">namedtuple</span><span class="p">(</span>
+    <span class="s2">"CalibrationSizingEnv"</span><span class="p">,</span>
+    <span class="p">[</span>
+        <span class="s2">"free_memory_fraction"</span><span class="p">,</span>
+        <span class="s2">"reserve_fraction"</span><span class="p">,</span>
+        <span class="s2">"reserve_min_bytes"</span><span class="p">,</span>
+        <span class="s2">"fixed_safety_multiplier"</span><span class="p">,</span>
+    <span class="p">],</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="read_calibration_sizing_env">
+<a class="viewcode-back" href="../../../mhcflurry.affinity.html#mhcflurry.affinity.calibration_sizing.read_calibration_sizing_env">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">read_calibration_sizing_env</span><span class="p">(</span><span class="n">free_memory_fraction</span><span class="p">,</span> <span class="n">safety_multiplier</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Resolve the ``MHCFLURRY_CALIBRATE_AUTO_*`` overrides for the sizer.</span>
+
+<span class="sd">    ``free_memory_fraction`` and ``safety_multiplier`` are the caller</span>
+<span class="sd">    defaults used when the matching env var is unset. Invalid or</span>
+<span class="sd">    out-of-range values raise ``ValueError`` (via ``env_float``) rather than</span>
+<span class="sd">    being silently ignored. Returns a ``CalibrationSizingEnv``.</span>
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">..memory_budget</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">DEVICE_MIN_RESERVE_BYTES</span><span class="p">,</span>
+        <span class="n">MEMORY_RESERVE_FRACTION</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">..workload_planning</span><span class="w"> </span><span class="kn">import</span> <span class="n">env_float</span>
+
+    <span class="n">fraction_name</span> <span class="o">=</span> <span class="s2">"MHCFLURRY_CALIBRATE_AUTO_FREE_MEMORY_FRACTION"</span>
+    <span class="n">fraction_raw</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">fraction_name</span><span class="p">)</span>
+    <span class="n">resolved_fraction</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">env_float</span><span class="p">(</span><span class="n">fraction_name</span><span class="p">,</span> <span class="n">fraction_raw</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">fraction_raw</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
+        <span class="k">else</span> <span class="p">(</span>
+            <span class="nb">float</span><span class="p">(</span><span class="n">free_memory_fraction</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">free_memory_fraction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">CalibrationSizingEnv</span><span class="p">(</span>
+        <span class="n">free_memory_fraction</span><span class="o">=</span><span class="n">resolved_fraction</span><span class="p">,</span>
+        <span class="n">reserve_fraction</span><span class="o">=</span><span class="n">env_float</span><span class="p">(</span>
+            <span class="s2">"MHCFLURRY_CALIBRATE_AUTO_RESERVE_FRACTION"</span><span class="p">,</span>
+            <span class="n">MEMORY_RESERVE_FRACTION</span><span class="p">,</span>
+            <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)),</span>
+        <span class="n">reserve_min_bytes</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span>
+            <span class="n">env_float</span><span class="p">(</span>
+                <span class="s2">"MHCFLURRY_CALIBRATE_AUTO_RESERVE_GB"</span><span class="p">,</span>
+                <span class="n">DEVICE_MIN_RESERVE_BYTES</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">),</span>
+                <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+            <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">)</span>
+        <span class="p">),</span>
+        <span class="n">fixed_safety_multiplier</span><span class="o">=</span><span class="n">env_float</span><span class="p">(</span>
+            <span class="s2">"MHCFLURRY_CALIBRATE_AUTO_FIXED_SAFETY_MULTIPLIER"</span><span class="p">,</span>
+            <span class="n">safety_multiplier</span><span class="p">,</span>
+            <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="p">),</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="cuda_device_memory_bytes">
+<a class="viewcode-back" href="../../../mhcflurry.affinity.html#mhcflurry.affinity.calibration_sizing.cuda_device_memory_bytes">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cuda_device_memory_bytes</span><span class="p">(</span><span class="n">device</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return best-effort ``(free_bytes, total_bytes)`` for a CUDA device.</span>
+
+<span class="sd">    ``free`` comes from the shared ``free_device_memory_bytes`` probe.</span>
+<span class="sd">    ``total`` uses ``torch.cuda.get_device_properties`` when available and</span>
+<span class="sd">    otherwise falls back to ``free`` -- tests and nonstandard CUDA wrappers</span>
+<span class="sd">    may not expose device properties, and the explicit reserve still keeps</span>
+<span class="sd">    the budget bounded.</span>
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">..pytorch_sizing</span><span class="w"> </span><span class="kn">import</span> <span class="n">free_device_memory_bytes</span>
+
+    <span class="n">free</span> <span class="o">=</span> <span class="n">free_device_memory_bytes</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">total_memory</span> <span class="o">=</span> <span class="n">free</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">props</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">get_device_properties</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">total_memory</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">props</span><span class="o">.</span><span class="n">total_memory</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span>
+            <span class="ne">AssertionError</span><span class="p">,</span> <span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">,</span>
+            <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+        <span class="k">pass</span>
+    <span class="k">return</span> <span class="n">free</span><span class="p">,</span> <span class="n">total_memory</span></div>
+
+
+
+<div class="viewcode-block" id="cuda_calibration_total_rows">
+<a class="viewcode-back" href="../../../mhcflurry.affinity.html#mhcflurry.affinity.calibration_sizing.cuda_calibration_total_rows">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cuda_calibration_total_rows</span><span class="p">(</span>
+        <span class="n">model</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">n_peptides</span><span class="p">,</span>
+        <span class="n">num_workers_per_gpu</span><span class="p">,</span>
+        <span class="n">env</span><span class="p">,</span>
+        <span class="n">num_cached_networks</span><span class="p">,</span>
+        <span class="n">peptide_feature_dim</span><span class="p">,</span>
+        <span class="n">num_sub_networks</span><span class="p">,</span>
+        <span class="n">cuda_overhead_bytes</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Size the cartesian forward row budget on a CUDA device.</span>
+
+<span class="sd">    Carves a per-worker VRAM budget out of free memory, subtracts the fixed</span>
+<span class="sd">    overhead (the persistent peptide-feature cache plus safety-padded</span>
+<span class="sd">    CUDA/runtime scratch and small state), and converts the remaining</span>
+<span class="sd">    forward budget into a row count. ``env`` is a ``CalibrationSizingEnv``</span>
+<span class="sd">    from ``read_calibration_sizing_env``; see ``auto_size_calibration_batches``</span>
+<span class="sd">    for the full peak model. Returns the row budget for</span>
+<span class="sd">    ``choose_calibration_batch_shape``.</span>
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">..pytorch_sizing</span><span class="w"> </span><span class="kn">import</span> <span class="n">AUTO_BATCH_MAX_ROWS</span><span class="p">,</span> <span class="n">AUTO_BATCH_MIN_ROWS</span>
+
+    <span class="n">free_memory_fraction</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">free_memory_fraction</span>
+    <span class="n">reserve_fraction</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">reserve_fraction</span>
+    <span class="n">reserve_min_bytes</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">reserve_min_bytes</span>
+    <span class="n">fixed_safety_multiplier</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">fixed_safety_multiplier</span>
+
+    <span class="n">workers</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_workers_per_gpu</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">peak_bytes</span> <span class="o">=</span> <span class="n">estimate_calibration_peak_bytes_per_row</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">..pytorch_sizing</span><span class="w"> </span><span class="kn">import</span> <span class="n">device_memory_budget</span>
+    <span class="n">memory</span> <span class="o">=</span> <span class="n">device_memory_budget</span><span class="p">(</span>
+        <span class="n">device</span><span class="p">,</span>
+        <span class="n">num_workers_per_gpu</span><span class="o">=</span><span class="n">workers</span><span class="p">,</span>
+        <span class="n">free_memory_fraction</span><span class="o">=</span><span class="n">free_memory_fraction</span><span class="p">,</span>
+        <span class="n">reserve_min_bytes</span><span class="o">=</span><span class="n">reserve_min_bytes</span><span class="p">,</span>
+        <span class="n">reserve_fraction</span><span class="o">=</span><span class="n">reserve_fraction</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">free</span> <span class="o">=</span> <span class="n">memory</span><span class="o">.</span><span class="n">free_bytes</span>
+    <span class="n">total_memory</span> <span class="o">=</span> <span class="n">memory</span><span class="o">.</span><span class="n">total_bytes</span>
+    <span class="n">reserve_bytes</span> <span class="o">=</span> <span class="n">memory</span><span class="o">.</span><span class="n">reserve_bytes</span>
+    <span class="n">fraction_budget</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">total_memory</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="n">free_memory_fraction</span><span class="p">)</span> <span class="o">/</span> <span class="n">workers</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">free_memory_fraction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="n">memory</span><span class="o">.</span><span class="n">worker_entitlement_bytes</span>
+    <span class="p">)</span>
+    <span class="n">per_worker_budget</span> <span class="o">=</span> <span class="n">memory</span><span class="o">.</span><span class="n">available_bytes</span>
+    <span class="n">sub_networks</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"networks"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">num_sub_networks</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">num_sub_networks</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">sub_networks</span><span class="p">)</span> <span class="k">if</span> <span class="n">sub_networks</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">1</span>
+        <span class="p">)</span>
+    <span class="n">peptide_feature_dim</span> <span class="o">=</span> <span class="n">resolve_peptide_feature_dim</span><span class="p">(</span>
+        <span class="n">model</span><span class="p">,</span>
+        <span class="n">peptide_feature_dim</span><span class="p">,</span>
+        <span class="n">peak_bytes</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">cache_bytes</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">num_cached_networks</span><span class="p">)</span>
+        <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">n_peptides</span><span class="p">)</span>
+        <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">peptide_feature_dim</span><span class="p">)</span>
+        <span class="o">*</span> <span class="mi">4</span>
+    <span class="p">)</span>
+    <span class="c1"># Small-state pad: log-IC50 accumulator, ic50_unique view,</span>
+    <span class="c1"># motif-summary state, PercentRankTransform.fit_batch_torch</span>
+    <span class="c1"># buffers, allele_idx tensor, etc. Scales with a_size and</span>
+    <span class="c1"># n_peptides; a 1 GB constant covers the production ranges</span>
+    <span class="c1"># without further accounting. Cheap insurance vs OOM.</span>
+    <span class="n">small_state_bytes</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">)</span>
+    <span class="c1"># The peptide-stage cache estimate is shape-derived and</span>
+    <span class="c1"># persistent, so multiplying it by a fragmentation safety factor</span>
+    <span class="c1"># unnecessarily strands several GB on A100-40GB. Keep explicit</span>
+    <span class="c1"># global headroom, and safety-pad only CUDA/runtime scratch and</span>
+    <span class="c1"># small state whose allocation behavior is less predictable.</span>
+    <span class="n">scratch_state_bytes</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">cuda_overhead_bytes</span><span class="p">)</span> <span class="o">+</span> <span class="n">small_state_bytes</span>
+    <span class="n">guarded_fixed_overhead</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">cache_bytes</span>
+        <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">scratch_state_bytes</span> <span class="o">*</span> <span class="n">fixed_safety_multiplier</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">forward_budget</span> <span class="o">=</span> <span class="n">per_worker_budget</span> <span class="o">-</span> <span class="n">guarded_fixed_overhead</span>
+    <span class="n">log_fields</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"free_gb"</span><span class="p">:</span> <span class="n">free</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+        <span class="s2">"workers"</span><span class="p">:</span> <span class="n">workers</span><span class="p">,</span>
+        <span class="s2">"total_gb"</span><span class="p">:</span> <span class="n">total_memory</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+        <span class="s2">"reserve_gb"</span><span class="p">:</span> <span class="n">reserve_bytes</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+        <span class="s2">"fraction_budget_gb"</span><span class="p">:</span> <span class="n">fraction_budget</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+        <span class="s2">"per_worker_budget_gb"</span><span class="p">:</span> <span class="n">per_worker_budget</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+        <span class="s2">"worker_entitlement_gb"</span><span class="p">:</span> <span class="n">memory</span><span class="o">.</span><span class="n">worker_entitlement_bytes</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+        <span class="s2">"process_gb"</span><span class="p">:</span> <span class="n">memory</span><span class="o">.</span><span class="n">process_bytes</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+        <span class="s2">"peptide_feature_dim"</span><span class="p">:</span> <span class="n">peptide_feature_dim</span><span class="p">,</span>
+        <span class="s2">"num_sub_networks"</span><span class="p">:</span> <span class="n">num_sub_networks</span><span class="p">,</span>
+        <span class="s2">"num_cached_networks"</span><span class="p">:</span> <span class="n">num_cached_networks</span><span class="p">,</span>
+        <span class="s2">"cache_gb"</span><span class="p">:</span> <span class="n">cache_bytes</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+        <span class="s2">"cuda_overhead_gb"</span><span class="p">:</span> <span class="n">cuda_overhead_bytes</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+        <span class="s2">"small_state_gb"</span><span class="p">:</span> <span class="n">small_state_bytes</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+        <span class="s2">"scratch_safety"</span><span class="p">:</span> <span class="n">fixed_safety_multiplier</span><span class="p">,</span>
+        <span class="s2">"guarded_fixed_gb"</span><span class="p">:</span> <span class="n">guarded_fixed_overhead</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+        <span class="s2">"forward_budget_gb"</span><span class="p">:</span> <span class="n">forward_budget</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+        <span class="s2">"peak_bytes_per_row"</span><span class="p">:</span> <span class="n">peak_bytes</span><span class="p">,</span>
+        <span class="s2">"peak_kb_per_row"</span><span class="p">:</span> <span class="n">peak_bytes</span> <span class="o">/</span> <span class="mi">1024</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">"calibrate auto-sizer: free=</span><span class="si">%(free_gb).2f</span><span class="s2"> GB, "</span>
+        <span class="s2">"workers=</span><span class="si">%(workers)d</span><span class="s2">, total=</span><span class="si">%(total_gb).2f</span><span class="s2"> GB, "</span>
+        <span class="s2">"reserve=</span><span class="si">%(reserve_gb).2f</span><span class="s2"> GB, "</span>
+        <span class="s2">"fraction_budget=</span><span class="si">%(fraction_budget_gb).2f</span><span class="s2"> GB, "</span>
+        <span class="s2">"worker_entitlement=</span><span class="si">%(worker_entitlement_gb).2f</span><span class="s2"> GB, "</span>
+        <span class="s2">"process=</span><span class="si">%(process_gb).2f</span><span class="s2"> GB, "</span>
+        <span class="s2">"remaining_budget=</span><span class="si">%(per_worker_budget_gb).2f</span><span class="s2"> GB, "</span>
+        <span class="s2">"peptide_feature_dim=</span><span class="si">%(peptide_feature_dim)d</span><span class="s2"> "</span>
+        <span class="s2">"(sub_networks=</span><span class="si">%(num_sub_networks)d</span><span class="s2">, "</span>
+        <span class="s2">"num_cached=</span><span class="si">%(num_cached_networks)d</span><span class="s2">), "</span>
+        <span class="s2">"cache=</span><span class="si">%(cache_gb).2f</span><span class="s2"> GB, "</span>
+        <span class="s2">"cuda_overhead=</span><span class="si">%(cuda_overhead_gb).2f</span><span class="s2"> GB, "</span>
+        <span class="s2">"small_state=</span><span class="si">%(small_state_gb).2f</span><span class="s2"> GB, "</span>
+        <span class="s2">"scratch_safety=</span><span class="si">%(scratch_safety).2f</span><span class="s2">x, "</span>
+        <span class="s2">"guarded_fixed=</span><span class="si">%(guarded_fixed_gb).2f</span><span class="s2"> GB "</span>
+        <span class="s2">"-&gt; forward_budget=</span><span class="si">%(forward_budget_gb).2f</span><span class="s2"> GB, "</span>
+        <span class="s2">"peak_bytes_per_row=</span><span class="si">%(peak_bytes_per_row)d</span><span class="s2"> "</span>
+        <span class="s2">"(≈</span><span class="si">%(peak_kb_per_row).2f</span><span class="s2"> KB)"</span><span class="p">,</span>
+        <span class="n">log_fields</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">forward_budget</span> <span class="o">&lt;</span> <span class="n">peak_bytes</span> <span class="o">*</span> <span class="n">AUTO_BATCH_MIN_ROWS</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"calibrate auto-sizer: fixed overhead "</span>
+            <span class="s2">"(cache </span><span class="si">%.2f</span><span class="s2"> GB + scratch/state </span><span class="si">%.2f</span><span class="s2"> GB × safety </span><span class="si">%.2f</span><span class="s2">x) "</span>
+            <span class="s2">"exceeds per-worker budget </span><span class="si">%.2f</span><span class="s2"> GB "</span>
+            <span class="s2">"(</span><span class="si">%.2f</span><span class="s2"> GB free, </span><span class="si">%.2f</span><span class="s2"> GB reserved, </span><span class="si">%d</span><span class="s2"> workers). "</span>
+            <span class="s2">"Falling back to minimum batch; reduce "</span>
+            <span class="s2">"--max-workers-per-gpu or lower the peptide universe "</span>
+            <span class="s2">"size."</span><span class="p">,</span>
+            <span class="n">cache_bytes</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+            <span class="n">scratch_state_bytes</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+            <span class="n">fixed_safety_multiplier</span><span class="p">,</span>
+            <span class="n">per_worker_budget</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+            <span class="n">free</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+            <span class="n">reserve_bytes</span> <span class="o">/</span> <span class="mf">1e9</span><span class="p">,</span>
+            <span class="n">workers</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">forward_budget</span> <span class="o">=</span> <span class="n">peak_bytes</span> <span class="o">*</span> <span class="n">AUTO_BATCH_MIN_ROWS</span>
+    <span class="k">return</span> <span class="nb">max</span><span class="p">(</span>
+        <span class="n">AUTO_BATCH_MIN_ROWS</span><span class="p">,</span>
+        <span class="nb">min</span><span class="p">(</span><span class="n">forward_budget</span> <span class="o">//</span> <span class="n">peak_bytes</span><span class="p">,</span> <span class="n">AUTO_BATCH_MAX_ROWS</span><span class="p">),</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="auto_size_calibration_batches">
+<a class="viewcode-back" href="../../../mhcflurry.affinity.html#mhcflurry.affinity.calibration_sizing.auto_size_calibration_batches">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">auto_size_calibration_batches</span><span class="p">(</span>
+        <span class="n">model</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">n_peptides</span><span class="p">,</span> <span class="n">n_alleles</span><span class="p">,</span>
+        <span class="n">num_workers_per_gpu</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">free_memory_fraction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">num_cached_networks</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">peptide_feature_dim</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">num_sub_networks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">cuda_overhead_bytes</span><span class="o">=</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">),</span>
+        <span class="n">safety_multiplier</span><span class="o">=</span><span class="mf">1.3</span><span class="p">,</span>
+        <span class="n">fixed_peptide_batch</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">fixed_allele_batch</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Split the auto-sized batch budget between peptide and allele axes.</span>
+
+<span class="sd">    ``fixed_peptide_batch`` / ``fixed_allele_batch`` pin one axis to a</span>
+<span class="sd">    user-supplied value (mixed pin/auto mode). The pinned axis is held</span>
+<span class="sd">    constant and only the other axis is sized against the VRAM budget, so</span>
+<span class="sd">    the auto axis shrinks to keep ``allele_batch × peptide_batch`` within</span>
+<span class="sd">    the per-worker budget instead of being sized as if the pinned axis were</span>
+<span class="sd">    also auto (which would underestimate peak VRAM).</span>
+
+<span class="sd">    Models the per-worker VRAM peak as::</span>
+
+<span class="sd">        peak = cuda_overhead</span>
+<span class="sd">             + cache_bytes                # peptide-stage cache,</span>
+<span class="sd">                                          # ``num_cached_networks ×</span>
+<span class="sd">                                          # n_peptides × peptide_feature_dim × 4``</span>
+<span class="sd">             + cartesian_intermediate     # transient forward</span>
+<span class="sd">                                          # ``a_size × p_batch ×</span>
+<span class="sd">                                          # peak_bytes_per_row``</span>
+<span class="sd">             + small_state                # log-IC50 acc, ic50_unique,</span>
+<span class="sd">                                          # motif state (~1 GB)</span>
+
+<span class="sd">    This includes explicit free-memory headroom plus a safety factor on</span>
+<span class="sd">    CUDA/runtime scratch allocations to absorb fragmentation that</span>
+<span class="sd">    ``mem_get_info`` can't see.</span>
+
+<span class="sd">    ``peak_bytes_per_row`` is calibrated for the cartesian fast path.</span>
+<span class="sd">    For a merged ensemble it uses one sub-network's hidden activation</span>
+<span class="sd">    peak plus the small retained per-sub-network outputs, matching</span>
+<span class="sd">    ``MergedClass1NeuralNetwork.forward_cartesian_from_peptide_stage``</span>
+<span class="sd">    which runs each sub-network to completion before starting the next.</span>
+<span class="sd">    The cartesian-intermediate term scales with ``a_size × p_batch``,</span>
+<span class="sd">    which is exactly the rate the budget carves out — preserving the existing</span>
+<span class="sd">    ``total_rows = forward_budget // peak_bytes`` math.</span>
+
+<span class="sd">    Returns the chosen ``(peptide_batch, allele_batch)``.</span>
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">..pytorch_sizing</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">AUTO_BATCH_MIN_ROWS</span><span class="p">,</span>
+        <span class="n">compute_prediction_batch_size</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">n_peptides</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">n_alleles</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="n">n_peptides</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="nb">max</span><span class="p">(</span><span class="n">n_alleles</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">env</span> <span class="o">=</span> <span class="n">read_calibration_sizing_env</span><span class="p">(</span><span class="n">free_memory_fraction</span><span class="p">,</span> <span class="n">safety_multiplier</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">!=</span> <span class="s2">"cuda"</span><span class="p">:</span>
+        <span class="n">total_rows</span> <span class="o">=</span> <span class="n">compute_prediction_batch_size</span><span class="p">(</span>
+            <span class="n">device</span><span class="p">,</span>
+            <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+            <span class="n">num_workers_per_gpu</span><span class="o">=</span><span class="n">num_workers_per_gpu</span><span class="p">,</span>
+            <span class="n">free_memory_fraction</span><span class="o">=</span><span class="n">env</span><span class="o">.</span><span class="n">free_memory_fraction</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">total_rows</span> <span class="o">=</span> <span class="n">cuda_calibration_total_rows</span><span class="p">(</span>
+            <span class="n">model</span><span class="p">,</span>
+            <span class="n">device</span><span class="p">,</span>
+            <span class="n">n_peptides</span><span class="p">,</span>
+            <span class="n">num_workers_per_gpu</span><span class="o">=</span><span class="n">num_workers_per_gpu</span><span class="p">,</span>
+            <span class="n">env</span><span class="o">=</span><span class="n">env</span><span class="p">,</span>
+            <span class="n">num_cached_networks</span><span class="o">=</span><span class="n">num_cached_networks</span><span class="p">,</span>
+            <span class="n">peptide_feature_dim</span><span class="o">=</span><span class="n">peptide_feature_dim</span><span class="p">,</span>
+            <span class="n">num_sub_networks</span><span class="o">=</span><span class="n">num_sub_networks</span><span class="p">,</span>
+            <span class="n">cuda_overhead_bytes</span><span class="o">=</span><span class="n">cuda_overhead_bytes</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">choose_calibration_batch_shape</span><span class="p">(</span>
+        <span class="n">total_rows</span><span class="p">,</span>
+        <span class="n">n_peptides</span><span class="o">=</span><span class="n">n_peptides</span><span class="p">,</span>
+        <span class="n">n_alleles</span><span class="o">=</span><span class="n">n_alleles</span><span class="p">,</span>
+        <span class="n">min_peptide_batch</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="n">AUTO_BATCH_MIN_ROWS</span><span class="p">,</span> <span class="mi">2_000</span><span class="p">),</span>
+        <span class="n">fixed_peptide_batch</span><span class="o">=</span><span class="n">fixed_peptide_batch</span><span class="p">,</span>
+        <span class="n">fixed_allele_batch</span><span class="o">=</span><span class="n">fixed_allele_batch</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="estimate_calibration_peak_bytes_per_row">
+<a class="viewcode-back" href="../../../mhcflurry.affinity.html#mhcflurry.affinity.calibration_sizing.estimate_calibration_peak_bytes_per_row">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">estimate_calibration_peak_bytes_per_row</span><span class="p">(</span><span class="n">model</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Estimate cartesian calibration forward peak bytes per row.</span>
+
+<span class="sd">    The generic prediction estimator is deliberately conservative for</span>
+<span class="sd">    arbitrary merged forwards. Calibration has a more specific execution</span>
+<span class="sd">    shape: ``MergedClass1NeuralNetwork.forward_cartesian_from_peptide_stage``</span>
+<span class="sd">    evaluates sub-networks serially and retains only their final outputs</span>
+<span class="sd">    before combining them. Hidden-layer peak memory is therefore the max</span>
+<span class="sd">    sub-network peak, not the sum of every sub-network peak.</span>
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">..pytorch_sizing</span><span class="w"> </span><span class="kn">import</span> <span class="n">estimate_peak_bytes_per_row</span>
+
+    <span class="k">if</span> <span class="n">model</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">estimate_peak_bytes_per_row</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+    <span class="n">sub_networks</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"networks"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">sub_networks</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"peptide_encoding_shape"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">estimate_peak_bytes_per_row</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">sub_peaks</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">estimate_peak_bytes_per_row</span><span class="p">(</span><span class="n">net</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">net</span> <span class="ow">in</span> <span class="n">sub_networks</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">sub_peaks</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">estimate_peak_bytes_per_row</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+        <span class="n">output_channels</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">net</span> <span class="ow">in</span> <span class="n">sub_networks</span><span class="p">:</span>
+            <span class="n">output_layer</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">net</span><span class="p">,</span> <span class="s2">"output_layer"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="n">output_channels</span> <span class="o">+=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">output_layer</span><span class="p">,</span> <span class="s2">"out_features"</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="c1"># Retained outputs are small compared with hidden activations but</span>
+        <span class="c1"># include them, padded for stack/cat/log-IC50 temporary tensors.</span>
+        <span class="n">retained_output_bytes</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">output_channels</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="mi">8</span> <span class="o">*</span> <span class="mi">4</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">sub_peaks</span><span class="p">)</span> <span class="o">+</span> <span class="n">retained_output_bytes</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"Could not estimate calibration peak for merged ensemble; "</span>
+            <span class="s2">"falling back to generic estimator: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span>
+            <span class="n">exc</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">estimate_peak_bytes_per_row</span><span class="p">(</span><span class="n">model</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="choose_calibration_batch_shape">
+<a class="viewcode-back" href="../../../mhcflurry.affinity.html#mhcflurry.affinity.calibration_sizing.choose_calibration_batch_shape">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">choose_calibration_batch_shape</span><span class="p">(</span>
+        <span class="n">total_rows</span><span class="p">,</span>
+        <span class="n">n_peptides</span><span class="p">,</span>
+        <span class="n">n_alleles</span><span class="p">,</span>
+        <span class="n">min_peptide_batch</span><span class="p">,</span>
+        <span class="n">max_allele_batch</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span>
+        <span class="n">fixed_peptide_batch</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">fixed_allele_batch</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Choose ``(peptide_batch, allele_batch)`` under a row budget.</span>
+
+<span class="sd">    Minimize the number of cartesian forward chunks rather than filling</span>
+<span class="sd">    one axis greedily. This matters for the production shape</span>
+<span class="sd">    (tens of alleles × tens of thousands of peptides), where many</span>
+<span class="sd">    equivalent row budgets can differ by 20-40% in Python-level loop</span>
+<span class="sd">    count and kernel launches.</span>
+
+<span class="sd">    ``fixed_peptide_batch`` / ``fixed_allele_batch`` pin one axis (mixed</span>
+<span class="sd">    pin/auto mode). The pinned axis is held at the user value and the other</span>
+<span class="sd">    axis is sized as ``total_rows // pinned`` so the product stays within</span>
+<span class="sd">    the budget; the pinned axis is *not* capped by ``max_allele_batch``</span>
+<span class="sd">    (the user asked for it explicitly).</span>
+<span class="sd">    """</span>
+    <span class="n">total_rows</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">total_rows</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">n_peptides</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">n_peptides</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">n_alleles</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">n_alleles</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">min_peptide_batch</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">min_peptide_batch</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">max_allele_batch</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">max_allele_batch</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># Mixed pin/auto: hold the pinned axis fixed and size the other axis</span>
+    <span class="c1"># against the same row budget so peak VRAM isn't underestimated.</span>
+    <span class="k">if</span> <span class="n">fixed_allele_batch</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">fixed_peptide_batch</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">allele_batch</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">fixed_allele_batch</span><span class="p">),</span> <span class="mi">1</span><span class="p">),</span> <span class="n">n_alleles</span><span class="p">)</span>
+        <span class="n">peptide_batch</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">total_rows</span> <span class="o">//</span> <span class="n">allele_batch</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">peptide_batch</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">n_peptides</span><span class="p">,</span> <span class="n">peptide_batch</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">peptide_batch</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">allele_batch</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">fixed_peptide_batch</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">fixed_allele_batch</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">peptide_batch</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">fixed_peptide_batch</span><span class="p">),</span> <span class="mi">1</span><span class="p">),</span> <span class="n">n_peptides</span><span class="p">)</span>
+        <span class="n">allele_batch</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">total_rows</span> <span class="o">//</span> <span class="n">peptide_batch</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">allele_batch</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">n_alleles</span><span class="p">,</span> <span class="n">max_allele_batch</span><span class="p">,</span> <span class="n">allele_batch</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">peptide_batch</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">allele_batch</span><span class="p">)</span>
+
+    <span class="n">max_a</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">n_alleles</span><span class="p">,</span> <span class="n">max_allele_batch</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">total_rows</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="n">best</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">for</span> <span class="n">allele_batch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">max_a</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">peptide_batch</span> <span class="o">=</span> <span class="n">total_rows</span> <span class="o">//</span> <span class="n">allele_batch</span>
+        <span class="k">if</span> <span class="n">peptide_batch</span> <span class="o">&lt;</span> <span class="n">min_peptide_batch</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">peptide_batch</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">n_peptides</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">min_peptide_batch</span><span class="p">,</span> <span class="n">peptide_batch</span><span class="p">))</span>
+        <span class="n">chunk_count</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">n_alleles</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="n">allele_batch</span><span class="p">)))</span>
+            <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">n_peptides</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="n">peptide_batch</span><span class="p">)))</span>
+        <span class="p">)</span>
+        <span class="n">used_rows</span> <span class="o">=</span> <span class="n">allele_batch</span> <span class="o">*</span> <span class="n">peptide_batch</span>
+        <span class="n">candidate</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">chunk_count</span><span class="p">,</span>
+            <span class="o">-</span><span class="n">used_rows</span><span class="p">,</span>
+            <span class="o">-</span><span class="n">allele_batch</span><span class="p">,</span>
+            <span class="o">-</span><span class="n">peptide_batch</span><span class="p">,</span>
+            <span class="n">peptide_batch</span><span class="p">,</span>
+            <span class="n">allele_batch</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">best</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">candidate</span> <span class="o">&lt;</span> <span class="n">best</span><span class="p">:</span>
+            <span class="n">best</span> <span class="o">=</span> <span class="n">candidate</span>
+
+    <span class="k">if</span> <span class="n">best</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">allele_batch</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">n_alleles</span><span class="p">,</span> <span class="n">max_a</span><span class="p">)</span>
+        <span class="n">peptide_batch</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">n_peptides</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">min_peptide_batch</span><span class="p">,</span> <span class="n">total_rows</span><span class="p">))</span>
+        <span class="k">while</span> <span class="n">allele_batch</span> <span class="o">*</span> <span class="n">peptide_batch</span> <span class="o">&gt;</span> <span class="n">total_rows</span> <span class="ow">and</span> <span class="n">allele_batch</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">allele_batch</span> <span class="o">-=</span> <span class="mi">1</span>
+        <span class="k">while</span> <span class="p">(</span>
+                <span class="n">allele_batch</span> <span class="o">*</span> <span class="n">peptide_batch</span> <span class="o">&gt;</span> <span class="n">total_rows</span>
+                <span class="ow">and</span> <span class="n">peptide_batch</span> <span class="o">&gt;</span> <span class="n">min_peptide_batch</span><span class="p">):</span>
+            <span class="n">peptide_batch</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">min_peptide_batch</span><span class="p">,</span> <span class="n">peptide_batch</span> <span class="o">//</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">peptide_batch</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">allele_batch</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">best</span><span class="p">[</span><span class="mi">4</span><span class="p">]),</span> <span class="nb">int</span><span class="p">(</span><span class="n">best</span><span class="p">[</span><span class="mi">5</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="calibration_stage_cache_signature">
+<a class="viewcode-back" href="../../../mhcflurry.affinity.html#mhcflurry.affinity.calibration_sizing.calibration_stage_cache_signature">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">calibration_stage_cache_signature</span><span class="p">(</span><span class="n">encoded_peptides</span><span class="p">,</span> <span class="n">networks</span><span class="p">,</span> <span class="n">device</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the key for a reusable peptide-stage calibration cache.</span>
+
+<span class="sd">    Keyed on the peptide-set fingerprint, the network object identities</span>
+<span class="sd">    (``id``), and the device -- NOT on weight *content*. Adding, removing,</span>
+<span class="sd">    or replacing ensemble models changes the ``networks`` list (new</span>
+<span class="sd">    objects -&gt; new ids) and so invalidates the cache, but mutating an</span>
+<span class="sd">    existing network's weights *in place* (e.g. a re-fit) does not. A</span>
+<span class="sd">    weight-content fingerprint is deliberately not used here:</span>
+<span class="sd">    ``borrow_cached_network`` serves architecturally-identical networks</span>
+<span class="sd">    from a single process-wide ``MODELS_CACHE`` module, so the underlying</span>
+<span class="sd">    torch parameter storage is shared across ensemble members and is not a</span>
+<span class="sd">    reliable per-network weight signal. Callers that mutate weights in</span>
+<span class="sd">    place between fast-calibrate calls on the same predictor instance must</span>
+<span class="sd">    therefore call ``clear_calibration_fast_cache()`` first (see</span>
+<span class="sd">    ``calibrate_percentile_ranks_fast``).</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">peptide_sequences_fingerprint</span><span class="p">(</span><span class="n">encoded_peptides</span><span class="o">.</span><span class="n">sequences</span><span class="p">),</span>
+        <span class="nb">tuple</span><span class="p">(</span><span class="nb">id</span><span class="p">(</span><span class="n">net</span><span class="p">)</span> <span class="k">for</span> <span class="n">net</span> <span class="ow">in</span> <span class="n">networks</span><span class="p">),</span>
+        <span class="nb">str</span><span class="p">(</span><span class="n">device</span><span class="p">),</span>
+    <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="probe_peptide_feature_dim">
+<a class="viewcode-back" href="../../../mhcflurry.affinity.html#mhcflurry.affinity.calibration_sizing.probe_peptide_feature_dim">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">probe_peptide_feature_dim</span><span class="p">(</span><span class="n">net_obj</span><span class="p">,</span> <span class="n">encoded_peptides</span><span class="p">,</span> <span class="n">device</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Run a 1-row forward through ``forward_peptide_stage`` to</span>
+<span class="sd">    record the actual width of the peptide feature tensor.</span>
+
+<span class="sd">    The auto-sizer's cache estimate depends on this and</span>
+<span class="sd">    the encoding-shape heuristic under-counts when the model</span>
+<span class="sd">    configures ``peptide_dense_layer_sizes`` or LC layers.</span>
+
+<span class="sd">    Returns ``None`` on probe failure so callers can fall back</span>
+<span class="sd">    to the heuristic.</span>
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">..encodable_sequences</span><span class="w"> </span><span class="kn">import</span> <span class="n">EncodableSequences</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">seqs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">encoded_peptides</span><span class="o">.</span><span class="n">sequences</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">seqs</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">probe_seqs</span> <span class="o">=</span> <span class="n">EncodableSequences</span><span class="o">.</span><span class="n">create</span><span class="p">([</span><span class="n">seqs</span><span class="p">[</span><span class="mi">0</span><span class="p">]])</span>
+        <span class="n">probe_input</span> <span class="o">=</span> <span class="n">net_obj</span><span class="o">.</span><span class="n">peptides_to_network_input</span><span class="p">(</span><span class="n">probe_seqs</span><span class="p">)</span>
+        <span class="n">probe_is_int</span> <span class="o">=</span> <span class="n">net_obj</span><span class="o">.</span><span class="n">uses_peptide_torch_encoding</span><span class="p">()</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">probe_is_int</span>
+            <span class="ow">and</span> <span class="n">probe_input</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">2</span>
+            <span class="ow">and</span> <span class="n">numpy</span><span class="o">.</span><span class="n">issubdtype</span><span class="p">(</span><span class="n">probe_input</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">integer</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="n">probe_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">probe_input</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">probe_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span>
+                <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">probe_input</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">net_obj</span><span class="o">.</span><span class="n">network</span><span class="p">(</span><span class="n">borrow</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+        <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="n">peptide_features</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">forward_peptide_stage</span><span class="p">(</span><span class="n">probe_tensor</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">peptide_features</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"calibrate auto-sizer: peptide_feature_dim probe failed "</span>
+            <span class="s2">"(</span><span class="si">%s</span><span class="s2">); falling back to encoding-shape heuristic"</span><span class="p">,</span> <span class="n">exc</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="calibration_fast_cache">
+<a class="viewcode-back" href="../../../mhcflurry.affinity.html#mhcflurry.affinity.calibration_sizing.calibration_fast_cache">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">calibration_fast_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return (creating if needed) the per-instance fast-calibrate cache.</span>
+
+<span class="sd">    See ``CalibrationFastCache``. Lazy so that predictors loaded for</span>
+<span class="sd">    prediction never pay the allocation cost.</span>
+<span class="sd">    """</span>
+    <span class="n">cache</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"_calibration_fast_cache_state"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">cache</span> <span class="o">=</span> <span class="n">CalibrationFastCache</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_calibration_fast_cache_state</span> <span class="o">=</span> <span class="n">cache</span>
+    <span class="k">return</span> <span class="n">cache</span></div>
+
+
+<div class="viewcode-block" id="clear_calibration_fast_cache">
+<a class="viewcode-back" href="../../../mhcflurry.affinity.html#mhcflurry.affinity.calibration_sizing.clear_calibration_fast_cache">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">clear_calibration_fast_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Drop any cached fast-calibrate state on this predictor.</span>
+
+<span class="sd">    Long-lived workers that finish calibrate but stay alive for</span>
+<span class="sd">    prediction can reclaim the (potentially many GB) of device-</span>
+<span class="sd">    resident peptide-stage tensors via this hook.</span>
+<span class="sd">    """</span>
+    <span class="n">cache</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"_calibration_fast_cache_state"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">cache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">cache</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_calibration_fast_cache_state</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

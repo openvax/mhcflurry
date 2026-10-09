@@ -1,0 +1,710 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.experiment_archive &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.experiment_archive</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.experiment_archive</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1"># http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Create portable, plot-reconstructable snapshots of training experiments."""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">csv</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timezone</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">hashlib</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">importlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">metadata</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+
+
+<span class="n">SCHEMA_VERSION</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">DEFAULT_MAX_COPY_BYTES</span> <span class="o">=</span> <span class="mi">64</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span>
+<span class="n">HASH_LINE_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">"^([0-9a-f]</span><span class="si">{64}</span><span class="s2">)\s+(.+)$"</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="sha256_file">
+<a class="viewcode-back" href="../../api.html#mhcflurry.experiment_archive.sha256_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">sha256_file</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return the SHA256 digest of ``path`` without loading it into memory."""</span>
+    <span class="n">digest</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">()</span>
+    <span class="k">with</span> <span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="nb">iter</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">fd</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">chunk_size</span><span class="p">),</span> <span class="sa">b</span><span class="s2">""</span><span class="p">):</span>
+            <span class="n">digest</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">digest</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_json_value</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">pandas</span><span class="o">.</span><span class="n">isna</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">dict</span><span class="p">))</span> <span class="k">else</span> <span class="kc">False</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">bool</span><span class="p">))</span> <span class="ow">or</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">value</span>
+    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">separators</span><span class="o">=</span><span class="p">(</span><span class="s2">","</span><span class="p">,</span> <span class="s2">":"</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_write_csv</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">rows</span><span class="p">,</span> <span class="n">preferred_fields</span><span class="o">=</span><span class="p">()):</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="n">all_fields</span> <span class="o">=</span> <span class="p">{</span><span class="n">key</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">rows</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">row</span><span class="p">}</span>
+    <span class="n">fieldnames</span> <span class="o">=</span> <span class="p">[</span><span class="n">field</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">preferred_fields</span> <span class="k">if</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">all_fields</span><span class="p">]</span>
+    <span class="n">fieldnames</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">all_fields</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">fieldnames</span><span class="p">)))</span>
+    <span class="k">with</span> <span class="n">path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"w"</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">""</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">fieldnames</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">writer</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">DictWriter</span><span class="p">(</span><span class="n">fd</span><span class="p">,</span> <span class="n">fieldnames</span><span class="o">=</span><span class="n">fieldnames</span><span class="p">)</span>
+        <span class="n">writer</span><span class="o">.</span><span class="n">writeheader</span><span class="p">()</span>
+        <span class="n">writer</span><span class="o">.</span><span class="n">writerows</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_model_manifest_paths</span><span class="p">(</span><span class="n">source_dir</span><span class="p">):</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">source_dir</span><span class="p">)</span><span class="o">.</span><span class="n">rglob</span><span class="p">(</span><span class="s2">"manifest.csv"</span><span class="p">)):</span>
+        <span class="k">with</span> <span class="n">path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">newline</span><span class="o">=</span><span class="s2">""</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+            <span class="n">fieldnames</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">csv</span><span class="o">.</span><span class="n">reader</span><span class="p">(</span><span class="n">fd</span><span class="p">),</span> <span class="p">[])</span>
+        <span class="k">if</span> <span class="s2">"model_name"</span> <span class="ow">in</span> <span class="n">fieldnames</span> <span class="ow">and</span> <span class="s2">"config_json"</span> <span class="ow">in</span> <span class="n">fieldnames</span><span class="p">:</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<div class="viewcode-block" id="export_training_tables">
+<a class="viewcode-back" href="../../api.html#mhcflurry.experiment_archive.export_training_tables">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">export_training_tables</span><span class="p">(</span><span class="n">source_dir</span><span class="p">,</span> <span class="n">out_dir</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Export normalized model, fit, and per-epoch tables from manifests.</span>
+
+<span class="sd">    The source manifests remain authoritative. These tables deliberately omit</span>
+<span class="sd">    serialized network graphs and weights so ordinary plotting and audit code</span>
+<span class="sd">    can consume the histories without loading model implementations.</span>
+<span class="sd">    """</span>
+    <span class="n">source_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">source_dir</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="n">out_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">out_dir</span><span class="p">)</span>
+    <span class="n">out_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">model_rows</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">fit_rows</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">epoch_rows</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">config_records</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">manifest_path</span> <span class="ow">in</span> <span class="n">_model_manifest_paths</span><span class="p">(</span><span class="n">source_dir</span><span class="p">):</span>
+        <span class="n">relative_manifest</span> <span class="o">=</span> <span class="n">manifest_path</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="n">source_dir</span><span class="p">)</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()</span>
+        <span class="n">manifest</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">manifest_row</span> <span class="ow">in</span> <span class="n">manifest</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="n">config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">manifest_row</span><span class="p">[</span><span class="s2">"config_json"</span><span class="p">])</span>
+            <span class="n">hyperparameters</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"hyperparameters"</span><span class="p">,</span> <span class="p">{})</span> <span class="ow">or</span> <span class="p">{}</span>
+            <span class="n">fit_infos</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"fit_info"</span><span class="p">,</span> <span class="p">[])</span> <span class="ow">or</span> <span class="p">[]</span>
+            <span class="n">model_name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">manifest_row</span><span class="p">[</span><span class="s2">"model_name"</span><span class="p">])</span>
+            <span class="n">config_payload</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">"hyperparameters"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="p">,</span>
+                    <span class="s2">"fit_info"</span><span class="p">:</span> <span class="n">fit_infos</span><span class="p">,</span>
+                <span class="p">},</span>
+                <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="n">separators</span><span class="o">=</span><span class="p">(</span><span class="s2">","</span><span class="p">,</span> <span class="s2">":"</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">model_rows</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s2">"manifest_path"</span><span class="p">:</span> <span class="n">relative_manifest</span><span class="p">,</span>
+                <span class="s2">"model_name"</span><span class="p">:</span> <span class="n">model_name</span><span class="p">,</span>
+                <span class="s2">"allele"</span><span class="p">:</span> <span class="n">manifest_row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"allele"</span><span class="p">),</span>
+                <span class="s2">"config_sha256"</span><span class="p">:</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">(</span>
+                    <span class="nb">str</span><span class="p">(</span><span class="n">manifest_row</span><span class="p">[</span><span class="s2">"config_json"</span><span class="p">])</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">(),</span>
+                <span class="s2">"fit_count"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">fit_infos</span><span class="p">),</span>
+                <span class="s2">"topology"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"topology"</span><span class="p">),</span>
+                <span class="s2">"layer_sizes"</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span>
+                    <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"layer_sizes"</span><span class="p">,</span> <span class="p">[]),</span>
+                    <span class="n">separators</span><span class="o">=</span><span class="p">(</span><span class="s2">","</span><span class="p">,</span> <span class="s2">":"</span><span class="p">),</span>
+                <span class="p">),</span>
+                <span class="s2">"activation"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"activation"</span><span class="p">),</span>
+                <span class="s2">"convolutional_activation"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="s2">"convolutional_activation"</span><span class="p">),</span>
+                <span class="s2">"normalization"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"normalization"</span><span class="p">,</span> <span class="s2">"none"</span><span class="p">),</span>
+                <span class="s2">"dropout_keep_probability"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="s2">"dropout_probability"</span><span class="p">),</span>
+                <span class="s2">"dropout_rate"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"dropout_rate"</span><span class="p">),</span>
+                <span class="s2">"restore_best_weights"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="s2">"restore_best_weights"</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+                <span class="s2">"patience"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"patience"</span><span class="p">),</span>
+                <span class="s2">"learning_rate"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"learning_rate"</span><span class="p">),</span>
+                <span class="s2">"minibatch_size"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"minibatch_size"</span><span class="p">),</span>
+                <span class="s2">"optimizer"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"optimizer"</span><span class="p">),</span>
+                <span class="s2">"optimizer_implementation"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="s2">"optimizer_implementation"</span><span class="p">),</span>
+                <span class="s2">"initializer"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"init"</span><span class="p">),</span>
+                <span class="s2">"data_dependent_initialization_method"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="s2">"data_dependent_initialization_method"</span><span class="p">),</span>
+                <span class="s2">"data_dependent_initialization_target"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="s2">"data_dependent_initialization_target"</span><span class="p">),</span>
+                <span class="s2">"convolutional_filters"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="s2">"convolutional_filters"</span><span class="p">),</span>
+                <span class="s2">"convolutional_kernel_size"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="s2">"convolutional_kernel_size"</span><span class="p">),</span>
+                <span class="s2">"n_flank_length"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"n_flank_length"</span><span class="p">),</span>
+                <span class="s2">"c_flank_length"</span><span class="p">:</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"c_flank_length"</span><span class="p">),</span>
+                <span class="s2">"hyperparameters_json"</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span>
+                    <span class="n">hyperparameters</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">separators</span><span class="o">=</span><span class="p">(</span><span class="s2">","</span><span class="p">,</span> <span class="s2">":"</span><span class="p">)),</span>
+            <span class="p">})</span>
+            <span class="n">config_records</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s2">"manifest_path"</span><span class="p">:</span> <span class="n">relative_manifest</span><span class="p">,</span>
+                <span class="s2">"model_name"</span><span class="p">:</span> <span class="n">model_name</span><span class="p">,</span>
+                <span class="s2">"config"</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">config_payload</span><span class="p">),</span>
+            <span class="p">})</span>
+
+            <span class="k">for</span> <span class="n">fit_index</span><span class="p">,</span> <span class="n">fit_info</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">fit_infos</span><span class="p">):</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fit_info</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                    <span class="k">continue</span>
+                <span class="n">training_info</span> <span class="o">=</span> <span class="n">fit_info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"training_info"</span><span class="p">,</span> <span class="p">{})</span> <span class="ow">or</span> <span class="p">{}</span>
+                <span class="n">identity</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">"manifest_path"</span><span class="p">:</span> <span class="n">relative_manifest</span><span class="p">,</span>
+                    <span class="s2">"model_name"</span><span class="p">:</span> <span class="n">model_name</span><span class="p">,</span>
+                    <span class="s2">"fit_index"</span><span class="p">:</span> <span class="n">fit_index</span><span class="p">,</span>
+                    <span class="s2">"phase"</span><span class="p">:</span> <span class="n">training_info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"phase"</span><span class="p">,</span> <span class="s2">"unknown"</span><span class="p">),</span>
+                    <span class="s2">"fold"</span><span class="p">:</span> <span class="n">training_info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"fold_num"</span><span class="p">),</span>
+                    <span class="s2">"architecture"</span><span class="p">:</span> <span class="n">training_info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"architecture_num"</span><span class="p">),</span>
+                    <span class="s2">"replicate"</span><span class="p">:</span> <span class="n">training_info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"replicate_num"</span><span class="p">),</span>
+                    <span class="s2">"work_item_name"</span><span class="p">:</span> <span class="n">training_info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"work_item_name"</span><span class="p">),</span>
+                <span class="p">}</span>
+                <span class="n">scalar_info</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">"fit_"</span> <span class="o">+</span> <span class="n">key</span><span class="p">:</span> <span class="n">_json_value</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">fit_info</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="n">key</span> <span class="o">!=</span> <span class="s2">"training_info"</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span>
+                <span class="p">}</span>
+                <span class="n">scalar_training_info</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">"training_"</span> <span class="o">+</span> <span class="n">key</span><span class="p">:</span> <span class="n">_json_value</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">training_info</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span>
+                <span class="p">}</span>
+                <span class="n">fit_rows</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="o">**</span><span class="n">identity</span><span class="p">,</span>
+                    <span class="o">**</span><span class="n">scalar_info</span><span class="p">,</span>
+                    <span class="o">**</span><span class="n">scalar_training_info</span><span class="p">,</span>
+                    <span class="s2">"fit_info_json"</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span>
+                        <span class="n">fit_info</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">separators</span><span class="o">=</span><span class="p">(</span><span class="s2">","</span><span class="p">,</span> <span class="s2">":"</span><span class="p">)),</span>
+                <span class="p">})</span>
+
+                <span class="n">series</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="n">key</span><span class="p">:</span> <span class="n">value</span>
+                    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">fit_info</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span>
+                        <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"loss"</span><span class="p">,</span> <span class="s2">"val_loss"</span><span class="p">,</span> <span class="s2">"optimizer_steps"</span><span class="p">)</span>
+                        <span class="ow">or</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"epoch_"</span><span class="p">)</span> <span class="ow">or</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"val_macro_"</span><span class="p">))</span>
+                <span class="p">}</span>
+                <span class="c1"># Sample/row identity and retained-state names are list-valued</span>
+                <span class="c1"># metadata too, not epoch series. Preserve them in fit_info_json</span>
+                <span class="c1"># without inventing thousands of epochs from validation IDs.</span>
+                <span class="n">epoch_count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">fit_info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"loss"</span><span class="p">,</span> <span class="p">[]))</span>
+                <span class="k">for</span> <span class="n">epoch_index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">epoch_count</span><span class="p">):</span>
+                    <span class="n">row</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">identity</span><span class="p">,</span> <span class="s2">"epoch"</span><span class="p">:</span> <span class="n">epoch_index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">}</span>
+                    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="n">series</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                        <span class="k">if</span> <span class="n">epoch_index</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">values</span><span class="p">):</span>
+                            <span class="n">row</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">_json_value</span><span class="p">(</span><span class="n">values</span><span class="p">[</span><span class="n">epoch_index</span><span class="p">])</span>
+                    <span class="n">epoch_rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
+
+    <span class="n">preferred</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">"manifest_path"</span><span class="p">,</span> <span class="s2">"model_name"</span><span class="p">,</span> <span class="s2">"fit_index"</span><span class="p">,</span> <span class="s2">"phase"</span><span class="p">,</span> <span class="s2">"fold"</span><span class="p">,</span>
+        <span class="s2">"architecture"</span><span class="p">,</span> <span class="s2">"replicate"</span><span class="p">,</span> <span class="s2">"work_item_name"</span><span class="p">,</span> <span class="s2">"epoch"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">_write_csv</span><span class="p">(</span><span class="n">out_dir</span> <span class="o">/</span> <span class="s2">"models.csv"</span><span class="p">,</span> <span class="n">model_rows</span><span class="p">,</span> <span class="n">preferred</span><span class="p">[:</span><span class="mi">2</span><span class="p">])</span>
+    <span class="n">_write_csv</span><span class="p">(</span><span class="n">out_dir</span> <span class="o">/</span> <span class="s2">"fits.csv"</span><span class="p">,</span> <span class="n">fit_rows</span><span class="p">,</span> <span class="n">preferred</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+    <span class="n">_write_csv</span><span class="p">(</span><span class="n">out_dir</span> <span class="o">/</span> <span class="s2">"training_history.csv"</span><span class="p">,</span> <span class="n">epoch_rows</span><span class="p">,</span> <span class="n">preferred</span><span class="p">)</span>
+    <span class="k">with</span> <span class="p">(</span><span class="n">out_dir</span> <span class="o">/</span> <span class="s2">"model_configs.jsonl"</span><span class="p">)</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"w"</span><span class="p">)</span> <span class="k">as</span> <span class="n">fd</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">config_records</span><span class="p">:</span>
+            <span class="n">fd</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">record</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"model_manifest_count"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">_model_manifest_paths</span><span class="p">(</span><span class="n">source_dir</span><span class="p">)),</span>
+        <span class="s2">"model_count"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">model_rows</span><span class="p">),</span>
+        <span class="s2">"fit_count"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">fit_rows</span><span class="p">),</span>
+        <span class="s2">"epoch_count"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">epoch_rows</span><span class="p">),</span>
+    <span class="p">}</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_artifact_role</span><span class="p">(</span><span class="n">relative_path</span><span class="p">):</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">relative_path</span><span class="p">)</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">name</span>
+    <span class="n">lower_name</span> <span class="o">=</span> <span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"weights_"</span><span class="p">)</span> <span class="ow">and</span> <span class="n">path</span><span class="o">.</span><span class="n">suffix</span> <span class="o">==</span> <span class="s2">".npz"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">"weight"</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">"train_data.csv.bz2"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">"training_data"</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">"manifest.csv"</span> <span class="ow">and</span> <span class="s2">"models"</span> <span class="ow">in</span> <span class="n">relative_path</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">"model_manifest"</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">"gpu_occupancy.csv"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">"telemetry"</span>
+    <span class="k">if</span> <span class="p">(</span>
+            <span class="s2">"prediction"</span> <span class="ow">in</span> <span class="n">lower_name</span> <span class="ow">and</span>
+            <span class="n">lower_name</span><span class="o">.</span><span class="n">endswith</span><span class="p">((</span><span class="s2">".csv"</span><span class="p">,</span> <span class="s2">".csv.bz2"</span><span class="p">,</span> <span class="s2">".parquet"</span><span class="p">))):</span>
+        <span class="k">return</span> <span class="s2">"prediction"</span>
+    <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"benchmark."</span><span class="p">)</span> <span class="ow">and</span> <span class="n">name</span><span class="o">.</span><span class="n">endswith</span><span class="p">((</span><span class="s2">".csv"</span><span class="p">,</span> <span class="s2">".csv.bz2"</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="s2">"prediction"</span>
+    <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">parts</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">{</span><span class="s2">"training_feature_cache"</span><span class="p">,</span> <span class="s2">"component_scores"</span><span class="p">}</span> <span class="ow">and</span> <span class="n">path</span><span class="o">.</span><span class="n">suffix</span> <span class="o">==</span> <span class="s2">".npy"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">"prediction"</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">"bootstrap_deltas.npz"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">"metric"</span>
+    <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">suffix</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">".pdf"</span><span class="p">,</span> <span class="s2">".png"</span><span class="p">,</span> <span class="s2">".svg"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">"figure"</span>
+    <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">endswith</span><span class="p">((</span><span class="s2">".log"</span><span class="p">,</span> <span class="s2">".txt"</span><span class="p">))</span> <span class="ow">and</span> <span class="p">(</span>
+            <span class="s2">"log"</span> <span class="ow">in</span> <span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">or</span> <span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"LOG-worker"</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="s2">"log"</span>
+    <span class="k">if</span> <span class="p">(</span>
+            <span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">".runplz"</span> <span class="ow">and</span>
+            <span class="n">path</span><span class="o">.</span><span class="n">suffix</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">".py"</span><span class="p">,</span> <span class="s2">".sh"</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="s2">"provenance"</span>
+    <span class="k">if</span> <span class="s2">"condition"</span> <span class="ow">in</span> <span class="n">path</span><span class="o">.</span><span class="n">parts</span> <span class="ow">and</span> <span class="n">path</span><span class="o">.</span><span class="n">suffix</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">".yaml"</span><span class="p">,</span> <span class="s2">".yml"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">"configuration"</span>
+    <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"provenance"</span><span class="p">)</span> <span class="ow">or</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">{</span>
+            <span class="s2">"manifest.json"</span><span class="p">,</span> <span class="s2">"manifest.csv"</span><span class="p">,</span> <span class="s2">"command.sh"</span><span class="p">,</span>
+            <span class="s2">"started_at_utc.txt"</span><span class="p">,</span> <span class="s2">"completed_at_utc.txt"</span><span class="p">,</span>
+            <span class="s2">"queue_provenance.txt"</span><span class="p">,</span> <span class="s2">"verification.json"</span><span class="p">}:</span>
+        <span class="k">return</span> <span class="s2">"provenance"</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">{</span>
+            <span class="s2">"summary.csv"</span><span class="p">,</span> <span class="s2">"summary.json"</span><span class="p">,</span> <span class="s2">"summary.md"</span><span class="p">,</span> <span class="s2">"summary_table.csv"</span><span class="p">,</span>
+            <span class="s2">"release_summary.csv"</span><span class="p">,</span> <span class="s2">"release_summary.md"</span><span class="p">,</span> <span class="s2">"per_allele.csv"</span><span class="p">,</span>
+            <span class="s2">"per_length.csv"</span><span class="p">,</span> <span class="s2">"per_length_per_allele.csv"</span><span class="p">,</span>
+            <span class="s2">"training_overlap.json"</span><span class="p">,</span> <span class="s2">"model_selection_summary.csv.bz2"</span><span class="p">}:</span>
+        <span class="k">return</span> <span class="s2">"metric"</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">"predictor_info.csv"</span> <span class="ow">or</span> <span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"accuracy_scores."</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">"metric"</span>
+    <span class="k">if</span> <span class="n">lower_name</span> <span class="o">==</span> <span class="s2">"weights.csv"</span> <span class="ow">or</span> <span class="n">lower_name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">".weights.csv"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">"weight"</span>
+    <span class="k">if</span> <span class="n">lower_name</span><span class="o">.</span><span class="n">endswith</span><span class="p">((</span><span class="s2">".csv"</span><span class="p">,</span> <span class="s2">".csv.bz2"</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="s2">"metric"</span>
+    <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">suffix</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">".json"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">"provenance"</span>
+    <span class="k">return</span> <span class="s2">"other"</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_copy_role</span><span class="p">(</span><span class="n">role</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">role</span> <span class="ow">in</span> <span class="p">{</span>
+        <span class="s2">"weight"</span><span class="p">,</span> <span class="s2">"training_data"</span><span class="p">,</span> <span class="s2">"model_manifest"</span><span class="p">,</span> <span class="s2">"telemetry"</span><span class="p">,</span> <span class="s2">"log"</span><span class="p">,</span>
+        <span class="s2">"configuration"</span><span class="p">,</span> <span class="s2">"provenance"</span><span class="p">,</span> <span class="s2">"metric"</span><span class="p">,</span> <span class="s2">"prediction"</span><span class="p">,</span> <span class="s2">"figure"</span><span class="p">,</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_copy_regardless_of_size</span><span class="p">(</span><span class="n">role</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">role</span> <span class="o">==</span> <span class="s2">"prediction"</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_copy_artifact</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">target</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Copy an artifact into an immutable experiment snapshot."""</span>
+    <span class="n">shutil</span><span class="o">.</span><span class="n">copy2</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
+    <span class="k">return</span> <span class="s2">"copy"</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_environment_record</span><span class="p">():</span>
+    <span class="n">distributions</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">distribution</span> <span class="ow">in</span> <span class="n">metadata</span><span class="o">.</span><span class="n">distributions</span><span class="p">():</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">distribution</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"Name"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">name</span><span class="p">:</span>
+            <span class="n">distributions</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">distribution</span><span class="o">.</span><span class="n">version</span>
+    <span class="n">gpu_query</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="s2">"nvidia-smi"</span><span class="p">,</span>
+                <span class="s2">"--query-gpu=name,memory.total,driver_version"</span><span class="p">,</span>
+                <span class="s2">"--format=csv,noheader,nounits"</span><span class="p">,</span>
+            <span class="p">],</span>
+            <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">returncode</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">gpu_query</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">FileNotFoundError</span><span class="p">,</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">TimeoutExpired</span><span class="p">):</span>
+        <span class="k">pass</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"python"</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">python_version</span><span class="p">(),</span>
+        <span class="s2">"python_executable"</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">realpath</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">),</span>
+        <span class="s2">"platform"</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">platform</span><span class="p">(),</span>
+        <span class="s2">"machine"</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">machine</span><span class="p">(),</span>
+        <span class="s2">"packages"</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">distributions</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">item</span><span class="p">:</span> <span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">())),</span>
+        <span class="s2">"gpus"</span><span class="p">:</span> <span class="n">gpu_query</span><span class="p">,</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_external_hash_records</span><span class="p">(</span><span class="n">source_dir</span><span class="p">):</span>
+    <span class="n">records</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">provenance</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">source_dir</span><span class="p">)</span><span class="o">.</span><span class="n">rglob</span><span class="p">(</span><span class="s2">"*provenance*"</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">provenance</span><span class="o">.</span><span class="n">is_file</span><span class="p">()</span> <span class="ow">or</span> <span class="n">provenance</span><span class="o">.</span><span class="n">stat</span><span class="p">()</span><span class="o">.</span><span class="n">st_size</span> <span class="o">&gt;</span> <span class="mi">8</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">lines</span> <span class="o">=</span> <span class="n">provenance</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">errors</span><span class="o">=</span><span class="s2">"replace"</span><span class="p">)</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">:</span>
+            <span class="n">match</span> <span class="o">=</span> <span class="n">HASH_LINE_RE</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+            <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+                <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s2">"recorded_sha256"</span><span class="p">:</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span>
+                    <span class="s2">"path"</span><span class="p">:</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span>
+                    <span class="s2">"recorded_in"</span><span class="p">:</span> <span class="n">provenance</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="n">source_dir</span><span class="p">)</span><span class="o">.</span><span class="n">as_posix</span><span class="p">(),</span>
+                <span class="p">})</span>
+    <span class="k">return</span> <span class="n">records</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_slug</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">"[^A-Za-z0-9._-]+"</span><span class="p">,</span> <span class="s2">"-"</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">"-._"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Experiment name must contain a letter or number"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_read_source_commit</span><span class="p">(</span><span class="n">source_dir</span><span class="p">,</span> <span class="n">explicit</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">explicit</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">explicit</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="n">provenance</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">source_dir</span><span class="p">)</span> <span class="o">/</span> <span class="s2">"provenance.txt"</span>
+    <span class="k">if</span> <span class="n">provenance</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">provenance</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">errors</span><span class="o">=</span><span class="s2">"replace"</span><span class="p">)</span><span class="o">.</span><span class="n">splitlines</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"source_commit="</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"="</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+        <span class="s2">"source_commit is required when source_dir/provenance.txt does not "</span>
+        <span class="s2">"record source_commit=&lt;hash&gt;"</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_collector_commit</span><span class="p">():</span>
+    <span class="n">repo_root</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span><span class="o">.</span><span class="n">parents</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="p">[</span><span class="s2">"git"</span><span class="p">,</span> <span class="s2">"-C"</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">repo_root</span><span class="p">),</span> <span class="s2">"rev-parse"</span><span class="p">,</span> <span class="s2">"HEAD"</span><span class="p">],</span>
+            <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">returncode</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="snapshot_experiment">
+<a class="viewcode-back" href="../../api.html#mhcflurry.experiment_archive.snapshot_experiment">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">snapshot_experiment</span><span class="p">(</span>
+    <span class="n">source_dir</span><span class="p">,</span>
+    <span class="n">experiments_dir</span><span class="p">,</span>
+    <span class="n">name</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">source_commit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">collector_commit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">source_archive</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">command_files</span><span class="o">=</span><span class="p">(),</span>
+    <span class="n">input_files</span><span class="o">=</span><span class="p">(),</span>
+    <span class="n">captured_at</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">max_copy_bytes</span><span class="o">=</span><span class="n">DEFAULT_MAX_COPY_BYTES</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Create and return one immutable timestamped experiment snapshot."""</span>
+    <span class="n">source_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">source_dir</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">source_dir</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"source_dir is not a directory: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">source_dir</span><span class="p">)</span>
+    <span class="n">source_commit</span> <span class="o">=</span> <span class="n">_read_source_commit</span><span class="p">(</span><span class="n">source_dir</span><span class="p">,</span> <span class="n">source_commit</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">source_commit</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"source_commit must not be empty"</span><span class="p">)</span>
+    <span class="n">captured_at</span> <span class="o">=</span> <span class="n">captured_at</span> <span class="ow">or</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">captured_at</span><span class="o">.</span><span class="n">tzinfo</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"captured_at must be timezone-aware"</span><span class="p">)</span>
+    <span class="n">captured_at</span> <span class="o">=</span> <span class="n">captured_at</span><span class="o">.</span><span class="n">astimezone</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+    <span class="n">timestamp</span> <span class="o">=</span> <span class="n">captured_at</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">"%Y%m</span><span class="si">%d</span><span class="s2">T%H%M%SZ"</span><span class="p">)</span>
+    <span class="n">snapshot_name</span> <span class="o">=</span> <span class="s2">"</span><span class="si">%s</span><span class="s2">-</span><span class="si">%s</span><span class="s2">-</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+        <span class="n">timestamp</span><span class="p">,</span> <span class="n">_slug</span><span class="p">(</span><span class="n">name</span><span class="p">),</span> <span class="n">_slug</span><span class="p">(</span><span class="n">source_commit</span><span class="p">)[:</span><span class="mi">12</span><span class="p">])</span>
+    <span class="n">experiments_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">experiments_dir</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="n">experiments_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">destination</span> <span class="o">=</span> <span class="n">experiments_dir</span> <span class="o">/</span> <span class="n">snapshot_name</span>
+    <span class="n">temporary</span> <span class="o">=</span> <span class="n">experiments_dir</span> <span class="o">/</span> <span class="p">(</span><span class="s2">"."</span> <span class="o">+</span> <span class="n">snapshot_name</span> <span class="o">+</span> <span class="s2">".tmp"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">destination</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">or</span> <span class="n">temporary</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">FileExistsError</span><span class="p">(</span><span class="s2">"Experiment snapshot already exists: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">destination</span><span class="p">)</span>
+    <span class="n">temporary</span><span class="o">.</span><span class="n">mkdir</span><span class="p">()</span>
+    <span class="n">artifacts_dir</span> <span class="o">=</span> <span class="n">temporary</span> <span class="o">/</span> <span class="s2">"artifacts"</span>
+    <span class="n">artifacts_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">()</span>
+    <span class="n">data_dir</span> <span class="o">=</span> <span class="n">temporary</span> <span class="o">/</span> <span class="s2">"data"</span>
+    <span class="n">data_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">()</span>
+
+    <span class="n">inventory</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">source_path</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">path</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">source_dir</span><span class="o">.</span><span class="n">rglob</span><span class="p">(</span><span class="s2">"*"</span><span class="p">)</span> <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">()):</span>
+        <span class="n">relative_path</span> <span class="o">=</span> <span class="n">source_path</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="n">source_dir</span><span class="p">)</span>
+        <span class="n">role</span> <span class="o">=</span> <span class="n">_artifact_role</span><span class="p">(</span><span class="n">relative_path</span><span class="o">.</span><span class="n">as_posix</span><span class="p">())</span>
+        <span class="n">size</span> <span class="o">=</span> <span class="n">source_path</span><span class="o">.</span><span class="n">stat</span><span class="p">()</span><span class="o">.</span><span class="n">st_size</span>
+        <span class="n">copied</span> <span class="o">=</span> <span class="n">_copy_role</span><span class="p">(</span><span class="n">role</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span>
+            <span class="n">size</span> <span class="o">&lt;=</span> <span class="n">max_copy_bytes</span> <span class="ow">or</span> <span class="n">_copy_regardless_of_size</span><span class="p">(</span><span class="n">role</span><span class="p">))</span>
+        <span class="n">storage</span> <span class="o">=</span> <span class="s2">"inventory_only"</span>
+        <span class="k">if</span> <span class="n">copied</span><span class="p">:</span>
+            <span class="n">target</span> <span class="o">=</span> <span class="n">artifacts_dir</span> <span class="o">/</span> <span class="n">relative_path</span>
+            <span class="n">target</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">storage</span> <span class="o">=</span> <span class="n">_copy_artifact</span><span class="p">(</span><span class="n">source_path</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
+        <span class="n">inventory</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s2">"relative_path"</span><span class="p">:</span> <span class="n">relative_path</span><span class="o">.</span><span class="n">as_posix</span><span class="p">(),</span>
+            <span class="s2">"role"</span><span class="p">:</span> <span class="n">role</span><span class="p">,</span>
+            <span class="s2">"size_bytes"</span><span class="p">:</span> <span class="n">size</span><span class="p">,</span>
+            <span class="s2">"sha256"</span><span class="p">:</span> <span class="n">sha256_file</span><span class="p">(</span><span class="n">source_path</span><span class="p">),</span>
+            <span class="s2">"copied"</span><span class="p">:</span> <span class="n">copied</span><span class="p">,</span>
+            <span class="s2">"storage"</span><span class="p">:</span> <span class="n">storage</span><span class="p">,</span>
+        <span class="p">})</span>
+
+    <span class="n">training_tables</span> <span class="o">=</span> <span class="n">export_training_tables</span><span class="p">(</span><span class="n">source_dir</span><span class="p">,</span> <span class="n">data_dir</span><span class="p">)</span>
+    <span class="n">_write_csv</span><span class="p">(</span>
+        <span class="n">temporary</span> <span class="o">/</span> <span class="s2">"source_files.csv"</span><span class="p">,</span>
+        <span class="n">inventory</span><span class="p">,</span>
+        <span class="p">(</span>
+            <span class="s2">"relative_path"</span><span class="p">,</span> <span class="s2">"role"</span><span class="p">,</span> <span class="s2">"size_bytes"</span><span class="p">,</span> <span class="s2">"sha256"</span><span class="p">,</span> <span class="s2">"copied"</span><span class="p">,</span>
+            <span class="s2">"storage"</span><span class="p">,</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">_write_csv</span><span class="p">(</span>
+        <span class="n">temporary</span> <span class="o">/</span> <span class="s2">"external_inputs.csv"</span><span class="p">,</span>
+        <span class="n">_external_hash_records</span><span class="p">(</span><span class="n">source_dir</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">"path"</span><span class="p">,</span> <span class="s2">"recorded_sha256"</span><span class="p">,</span> <span class="s2">"recorded_in"</span><span class="p">),</span>
+    <span class="p">)</span>
+
+    <span class="n">supplemental</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">role</span><span class="p">,</span> <span class="n">paths</span> <span class="ow">in</span> <span class="p">((</span><span class="s2">"command"</span><span class="p">,</span> <span class="n">command_files</span><span class="p">),</span> <span class="p">(</span><span class="s2">"input"</span><span class="p">,</span> <span class="n">input_files</span><span class="p">)):</span>
+        <span class="n">resolved_paths</span> <span class="o">=</span> <span class="p">[</span><span class="n">Path</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">]</span>
+        <span class="n">basenames</span> <span class="o">=</span> <span class="p">[</span><span class="n">path</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">resolved_paths</span><span class="p">]</span>
+        <span class="n">disambiguate</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">basenames</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">basenames</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">path</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">resolved_paths</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"</span><span class="si">%s</span><span class="s2"> file does not exist: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">role</span><span class="p">,</span> <span class="n">path</span><span class="p">))</span>
+            <span class="n">record</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">"role"</span><span class="p">:</span> <span class="n">role</span><span class="p">,</span>
+                <span class="s2">"path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+                <span class="s2">"size_bytes"</span><span class="p">:</span> <span class="n">path</span><span class="o">.</span><span class="n">stat</span><span class="p">()</span><span class="o">.</span><span class="n">st_size</span><span class="p">,</span>
+                <span class="s2">"sha256"</span><span class="p">:</span> <span class="n">sha256_file</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+                <span class="s2">"copied"</span><span class="p">:</span> <span class="n">path</span><span class="o">.</span><span class="n">stat</span><span class="p">()</span><span class="o">.</span><span class="n">st_size</span> <span class="o">&lt;=</span> <span class="n">max_copy_bytes</span><span class="p">,</span>
+            <span class="p">}</span>
+            <span class="k">if</span> <span class="n">record</span><span class="p">[</span><span class="s2">"copied"</span><span class="p">]:</span>
+                <span class="n">target_name</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="s2">"</span><span class="si">%03d</span><span class="s2">-</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">path</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">disambiguate</span> <span class="k">else</span> <span class="n">path</span><span class="o">.</span><span class="n">name</span>
+                <span class="p">)</span>
+                <span class="n">target</span> <span class="o">=</span> <span class="n">temporary</span> <span class="o">/</span> <span class="s2">"supplemental"</span> <span class="o">/</span> <span class="n">role</span> <span class="o">/</span> <span class="n">target_name</span>
+                <span class="n">target</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="n">shutil</span><span class="o">.</span><span class="n">copy2</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
+                <span class="n">record</span><span class="p">[</span><span class="s2">"snapshot_path"</span><span class="p">]</span> <span class="o">=</span> <span class="n">target</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="n">temporary</span><span class="p">)</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()</span>
+            <span class="n">supplemental</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+    <span class="n">source_archive_record</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">source_archive</span><span class="p">:</span>
+        <span class="n">archive</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">source_archive</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">archive</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"source_archive is not a file: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">archive</span><span class="p">)</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="n">temporary</span> <span class="o">/</span> <span class="s2">"source"</span> <span class="o">/</span> <span class="n">archive</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">target</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">()</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">copy2</span><span class="p">(</span><span class="n">archive</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
+        <span class="n">source_archive_record</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">archive</span><span class="p">),</span>
+            <span class="s2">"snapshot_path"</span><span class="p">:</span> <span class="n">target</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="n">temporary</span><span class="p">)</span><span class="o">.</span><span class="n">as_posix</span><span class="p">(),</span>
+            <span class="s2">"size_bytes"</span><span class="p">:</span> <span class="n">archive</span><span class="o">.</span><span class="n">stat</span><span class="p">()</span><span class="o">.</span><span class="n">st_size</span><span class="p">,</span>
+            <span class="s2">"sha256"</span><span class="p">:</span> <span class="n">sha256_file</span><span class="p">(</span><span class="n">archive</span><span class="p">),</span>
+        <span class="p">}</span>
+
+    <span class="n">experiment</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"schema_version"</span><span class="p">:</span> <span class="n">SCHEMA_VERSION</span><span class="p">,</span>
+        <span class="s2">"name"</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+        <span class="s2">"captured_at_utc"</span><span class="p">:</span> <span class="n">captured_at</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"+00:00"</span><span class="p">,</span> <span class="s2">"Z"</span><span class="p">),</span>
+        <span class="s2">"source_commit"</span><span class="p">:</span> <span class="n">source_commit</span><span class="p">,</span>
+        <span class="s2">"collector_commit"</span><span class="p">:</span> <span class="n">collector_commit</span> <span class="ow">or</span> <span class="n">_collector_commit</span><span class="p">(),</span>
+        <span class="s2">"source_dir"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">source_dir</span><span class="p">),</span>
+        <span class="s2">"source_archive"</span><span class="p">:</span> <span class="n">source_archive_record</span><span class="p">,</span>
+        <span class="s2">"training_tables"</span><span class="p">:</span> <span class="n">training_tables</span><span class="p">,</span>
+        <span class="s2">"source_file_count"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">inventory</span><span class="p">),</span>
+        <span class="s2">"copied_source_file_count"</span><span class="p">:</span> <span class="nb">sum</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">"copied"</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">inventory</span><span class="p">),</span>
+        <span class="s2">"supplemental_files"</span><span class="p">:</span> <span class="n">supplemental</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="p">(</span><span class="n">temporary</span> <span class="o">/</span> <span class="s2">"experiment.json"</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">experiment</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+    <span class="p">(</span><span class="n">temporary</span> <span class="o">/</span> <span class="s2">"environment.json"</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">_environment_record</span><span class="p">(),</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+    <span class="p">(</span><span class="n">temporary</span> <span class="o">/</span> <span class="s2">"README.md"</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span>
+        <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">([</span>
+            <span class="s2">"# </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">name</span><span class="p">,</span>
+            <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"- Captured: `</span><span class="si">%s</span><span class="s2">`"</span> <span class="o">%</span> <span class="n">experiment</span><span class="p">[</span><span class="s2">"captured_at_utc"</span><span class="p">],</span>
+            <span class="s2">"- Training source commit: `</span><span class="si">%s</span><span class="s2">`"</span> <span class="o">%</span> <span class="n">source_commit</span><span class="p">,</span>
+            <span class="s2">"- Snapshot collector commit: `</span><span class="si">%s</span><span class="s2">`"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">experiment</span><span class="p">[</span><span class="s2">"collector_commit"</span><span class="p">]</span> <span class="ow">or</span> <span class="s2">"unavailable"</span><span class="p">),</span>
+            <span class="s2">"- Original output: `</span><span class="si">%s</span><span class="s2">`"</span> <span class="o">%</span> <span class="n">source_dir</span><span class="p">,</span>
+            <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"`data/training_history.csv` is the tidy per-epoch table used to "</span>
+            <span class="s2">"rebuild learning-curve plots. `data/models.csv`, `data/fits.csv`, "</span>
+            <span class="s2">"and `data/model_configs.jsonl` preserve model and fit metadata. "</span>
+            <span class="s2">"Comparison tables, telemetry, configs, manifests, and logs are "</span>
+            <span class="s2">"under `artifacts/`. Held-out prediction tables and generated "</span>
+            <span class="s2">"figures are copied there even when prediction files exceed the "</span>
+            <span class="s2">"ordinary artifact-size threshold. Prediction tables are copied, "</span>
+            <span class="s2">"not hard-linked, so later changes to a live run cannot mutate "</span>
+            <span class="s2">"the snapshot. Storage mode is recorded in `source_files.csv`."</span><span class="p">,</span>
+            <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"`source_files.csv` inventories every original artifact by SHA256. "</span>
+            <span class="s2">"Weights and per-model training tables below the configured copy-size "</span>
+            <span class="s2">"limit are retained; larger files remain checksummed in the inventory. "</span>
+            <span class="s2">"`external_inputs.csv` preserves hashes recorded by the runner. "</span>
+            <span class="s2">"`environment.json` records the capture environment."</span><span class="p">,</span>
+            <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"To reconstruct, check out the training source commit, verify input "</span>
+            <span class="s2">"and weight hashes against the inventories, then use a preserved "</span>
+            <span class="s2">"command file from `supplemental/command/` or `artifacts/command.sh`."</span><span class="p">,</span>
+            <span class="s2">""</span><span class="p">,</span>
+            <span class="s2">"Rebuild learning curves with `mhcflurry train plot-loss-curves` "</span>
+            <span class="s2">"against a copied model manifest. Rebuild comparison plots and a "</span>
+            <span class="s2">"review PDF with `mhcflurry plot-model-comparison --input "</span>
+            <span class="s2">"artifacts/&lt;comparison&gt; --summary-pdf &lt;output.pdf&gt;`."</span><span class="p">,</span>
+            <span class="s2">""</span><span class="p">,</span>
+        <span class="p">]))</span>
+    <span class="n">temporary</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">destination</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">destination</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

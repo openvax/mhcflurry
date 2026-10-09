@@ -1,0 +1,601 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.affinity package &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=86f393d6"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="mhcflurry.cli package" href="mhcflurry.cli.html" />
+    <link rel="prev" title="API Documentation" href="api.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="api.html">API Documentation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="api.html#mhcflurry.Class1AffinityPredictor"><code class="docutils literal notranslate"><span class="pre">Class1AffinityPredictor</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#mhcflurry.Class1NeuralNetwork"><code class="docutils literal notranslate"><span class="pre">Class1NeuralNetwork</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#mhcflurry.Class1ProcessingPredictor"><code class="docutils literal notranslate"><span class="pre">Class1ProcessingPredictor</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#mhcflurry.Class1ProcessingNeuralNetwork"><code class="docutils literal notranslate"><span class="pre">Class1ProcessingNeuralNetwork</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#mhcflurry.Class1PresentationPredictor"><code class="docutils literal notranslate"><span class="pre">Class1PresentationPredictor</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#mhcflurry.HistogramPercentRankTransform"><code class="docutils literal notranslate"><span class="pre">HistogramPercentRankTransform</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#mhcflurry.CompactPercentRankTransform"><code class="docutils literal notranslate"><span class="pre">CompactPercentRankTransform</span></code></a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="api.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">mhcflurry.affinity package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-mhcflurry.affinity.calibration_sizing">mhcflurry.affinity.calibration_sizing module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-mhcflurry.affinity.model_selection">mhcflurry.affinity.model_selection module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-mhcflurry.affinity.persistence">mhcflurry.affinity.persistence module</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="mhcflurry.cli.html">mhcflurry.cli package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mhcflurry.parallelism.html">mhcflurry.parallelism package</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.allele_capabilities">mhcflurry.allele_capabilities module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.allele_encoding">mhcflurry.allele_encoding module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.amino_acid">mhcflurry.amino_acid module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.calibrate_percentile_ranks_command">mhcflurry.calibrate_percentile_ranks_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.class1_affinity_predictor">mhcflurry.class1_affinity_predictor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.class1_affinity_training_data">mhcflurry.class1_affinity_training_data module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.class1_encoding">mhcflurry.class1_encoding module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.class1_neural_network">mhcflurry.class1_neural_network module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.class1_presentation_predictor">mhcflurry.class1_presentation_predictor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.class1_processing_neural_network">mhcflurry.class1_processing_neural_network module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.class1_processing_predictor">mhcflurry.class1_processing_predictor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.class1_training">mhcflurry.class1_training module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.cluster_parallelism">mhcflurry.cluster_parallelism module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.cluster_worker_entry_point">mhcflurry.cluster_worker_entry_point module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.common">mhcflurry.common module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.compact_percent_rank_transform">mhcflurry.compact_percent_rank_transform module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.custom_loss">mhcflurry.custom_loss module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.data_dependent_weights_initialization">mhcflurry.data_dependent_weights_initialization module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.device_footprint">mhcflurry.device_footprint module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.dla_evaluation">mhcflurry.dla_evaluation module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.downloads">mhcflurry.downloads module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.downloads_command">mhcflurry.downloads_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.encodable_sequences">mhcflurry.encodable_sequences module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.ensemble_centrality">mhcflurry.ensemble_centrality module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.experiment_archive">mhcflurry.experiment_archive module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.fasta">mhcflurry.fasta module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.flanking_encoding">mhcflurry.flanking_encoding module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.histogram_percent_rank_transform">mhcflurry.histogram_percent_rank_transform module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.hyperparameters">mhcflurry.hyperparameters module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.keras_optimizers">mhcflurry.keras_optimizers module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.memory_budget">mhcflurry.memory_budget module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.model_provenance">mhcflurry.model_provenance module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.motif_summary">mhcflurry.motif_summary module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.numeric_proteome">mhcflurry.numeric_proteome module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.numeric_sequences">mhcflurry.numeric_sequences module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.peptide_reference">mhcflurry.peptide_reference module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.percent_rank_transform">mhcflurry.percent_rank_transform module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.percentile_calibration">mhcflurry.percentile_calibration module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.predict_command">mhcflurry.predict_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.predict_scan_command">mhcflurry.predict_scan_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.processing_evaluation">mhcflurry.processing_evaluation module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.processing_initialization">mhcflurry.processing_initialization module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.processing_matching">mhcflurry.processing_matching module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.processing_preparation">mhcflurry.processing_preparation module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.processing_ranking">mhcflurry.processing_ranking module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.proteome_decoys">mhcflurry.proteome_decoys module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.pseudosequences">mhcflurry.pseudosequences module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.pytorch_layers">mhcflurry.pytorch_layers module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.pytorch_losses">mhcflurry.pytorch_losses module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.pytorch_sizing">mhcflurry.pytorch_sizing module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.pytorch_training">mhcflurry.pytorch_training module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.random_negative_peptides">mhcflurry.random_negative_peptides module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.regression_target">mhcflurry.regression_target module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.release_holdout">mhcflurry.release_holdout module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.sample_disjointness">mhcflurry.sample_disjointness module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.scoring">mhcflurry.scoring module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.scoring_pipeline">mhcflurry.scoring_pipeline module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.select_allele_specific_models_command">mhcflurry.select_allele_specific_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.select_pan_allele_models_command">mhcflurry.select_pan_allele_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.select_processing_models_command">mhcflurry.select_processing_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.testing_utils">mhcflurry.testing_utils module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.train_allele_specific_models_command">mhcflurry.train_allele_specific_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.train_pan_allele_models_command">mhcflurry.train_pan_allele_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.train_presentation_models_command">mhcflurry.train_presentation_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.train_processing_models_command">mhcflurry.train_processing_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.training_benchmark">mhcflurry.training_benchmark module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.training_folds">mhcflurry.training_folds module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.training_provenance">mhcflurry.training_provenance module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.version">mhcflurry.version module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.workload_planning">mhcflurry.workload_planning module</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="api.html">API Documentation</a></li>
+      <li class="breadcrumb-item active">mhcflurry.affinity package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/mhcflurry.affinity.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-mhcflurry.affinity">
+<span id="mhcflurry-affinity-package"></span><h1>mhcflurry.affinity package<a class="headerlink" href="#module-mhcflurry.affinity" title="Link to this heading"></a></h1>
+<p>Helper modules for class I affinity prediction.</p>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+</section>
+<section id="module-mhcflurry.affinity.calibration_sizing">
+<span id="mhcflurry-affinity-calibration-sizing-module"></span><h2>mhcflurry.affinity.calibration_sizing module<a class="headerlink" href="#module-mhcflurry.affinity.calibration_sizing" title="Link to this heading"></a></h2>
+<p>Calibration sizing and cache helpers for class I affinity predictors.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.peptide_sequences_fingerprint">
+<span class="sig-prename descclassname"><span class="pre">mhcflurry.affinity.calibration_sizing.</span></span><span class="sig-name descname"><span class="pre">peptide_sequences_fingerprint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sequences</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/affinity/calibration_sizing.html#peptide_sequences_fingerprint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.peptide_sequences_fingerprint" title="Link to this definition"></a></dt>
+<dd><p>Order-and-content-sensitive SHA-256 of a peptide list.</p>
+<p>Length-prefixes each peptide so e.g. <code class="docutils literal notranslate"><span class="pre">[&quot;AB&quot;,</span> <span class="pre">&quot;C&quot;]</span></code> and <code class="docutils literal notranslate"><span class="pre">[&quot;A&quot;,</span> <span class="pre">&quot;BC&quot;]</span></code>
+cannot collide by concatenation. Used as the cache key for the fast
+calibration peptide-stage cache; collisions there silently reuse the
+wrong tensors and produce wrong PercentRankTransforms.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.CalibrationFastCache">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">mhcflurry.affinity.calibration_sizing.</span></span><span class="sig-name descname"><span class="pre">CalibrationFastCache</span></span><a class="reference internal" href="_modules/mhcflurry/affinity/calibration_sizing.html#CalibrationFastCache"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.CalibrationFastCache" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Per-predictor-instance state for <code class="docutils literal notranslate"><span class="pre">calibrate_percentile_ranks_fast</span></code>.</p>
+<p>Holds the device-resident peptide-stage tensors and the motif-summary
+helper state that survive across calibrate tasks within one worker.
+Centralizing both fields here makes the cache lifecycle visible —
+it used to live behind dynamic <code class="docutils literal notranslate"><span class="pre">setattr</span></code> of private names.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.CalibrationFastCache.stage_signature">
+<span class="sig-name descname"><span class="pre">stage_signature</span></span><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.CalibrationFastCache.stage_signature" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.CalibrationFastCache.cached_stages">
+<span class="sig-name descname"><span class="pre">cached_stages</span></span><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.CalibrationFastCache.cached_stages" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.CalibrationFastCache.motif_signature">
+<span class="sig-name descname"><span class="pre">motif_signature</span></span><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.CalibrationFastCache.motif_signature" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.CalibrationFastCache.motif_state">
+<span class="sig-name descname"><span class="pre">motif_state</span></span><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.CalibrationFastCache.motif_state" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.CalibrationFastCache.clear">
+<span class="sig-name descname"><span class="pre">clear</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/affinity/calibration_sizing.html#CalibrationFastCache.clear"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.CalibrationFastCache.clear" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.peptide_encoding_feature_dim">
+<span class="sig-prename descclassname"><span class="pre">mhcflurry.affinity.calibration_sizing.</span></span><span class="sig-name descname"><span class="pre">peptide_encoding_feature_dim</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/affinity/calibration_sizing.html#peptide_encoding_feature_dim"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.peptide_encoding_feature_dim" title="Link to this definition"></a></dt>
+<dd><p>Return the raw encoded peptide feature width for <code class="docutils literal notranslate"><span class="pre">model</span></code> if known.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.resolve_peptide_feature_dim">
+<span class="sig-prename descclassname"><span class="pre">mhcflurry.affinity.calibration_sizing.</span></span><span class="sig-name descname"><span class="pre">resolve_peptide_feature_dim</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">peptide_feature_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">peak_bytes</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/affinity/calibration_sizing.html#resolve_peptide_feature_dim"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.resolve_peptide_feature_dim" title="Link to this definition"></a></dt>
+<dd><p>Resolve the width of cached peptide features used during calibration.</p>
+<p><code class="docutils literal notranslate"><span class="pre">peptide_feature_dim</span></code> is the actual width of
+<code class="docutils literal notranslate"><span class="pre">forward_peptide_stage(...)</span></code> when the caller has probed it. Without a
+probe, fall back to shape-derived estimates and then to the generic peak
+memory estimate.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.CalibrationSizingEnv">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">mhcflurry.affinity.calibration_sizing.</span></span><span class="sig-name descname"><span class="pre">CalibrationSizingEnv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">free_memory_fraction</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reserve_fraction</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reserve_min_bytes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fixed_safety_multiplier</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.CalibrationSizingEnv" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></p>
+<p>Create new instance of CalibrationSizingEnv(free_memory_fraction, reserve_fraction, reserve_min_bytes, fixed_safety_multiplier)</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.CalibrationSizingEnv.fixed_safety_multiplier">
+<span class="sig-name descname"><span class="pre">fixed_safety_multiplier</span></span><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.CalibrationSizingEnv.fixed_safety_multiplier" title="Link to this definition"></a></dt>
+<dd><p>Alias for field number 3</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.CalibrationSizingEnv.free_memory_fraction">
+<span class="sig-name descname"><span class="pre">free_memory_fraction</span></span><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.CalibrationSizingEnv.free_memory_fraction" title="Link to this definition"></a></dt>
+<dd><p>Alias for field number 0</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.CalibrationSizingEnv.reserve_fraction">
+<span class="sig-name descname"><span class="pre">reserve_fraction</span></span><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.CalibrationSizingEnv.reserve_fraction" title="Link to this definition"></a></dt>
+<dd><p>Alias for field number 1</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.CalibrationSizingEnv.reserve_min_bytes">
+<span class="sig-name descname"><span class="pre">reserve_min_bytes</span></span><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.CalibrationSizingEnv.reserve_min_bytes" title="Link to this definition"></a></dt>
+<dd><p>Alias for field number 2</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.read_calibration_sizing_env">
+<span class="sig-prename descclassname"><span class="pre">mhcflurry.affinity.calibration_sizing.</span></span><span class="sig-name descname"><span class="pre">read_calibration_sizing_env</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">free_memory_fraction</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">safety_multiplier</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/affinity/calibration_sizing.html#read_calibration_sizing_env"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.read_calibration_sizing_env" title="Link to this definition"></a></dt>
+<dd><p>Resolve the <code class="docutils literal notranslate"><span class="pre">MHCFLURRY_CALIBRATE_AUTO_*</span></code> overrides for the sizer.</p>
+<p><code class="docutils literal notranslate"><span class="pre">free_memory_fraction</span></code> and <code class="docutils literal notranslate"><span class="pre">safety_multiplier</span></code> are the caller
+defaults used when the matching env var is unset. Invalid or
+out-of-range values raise <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> (via <code class="docutils literal notranslate"><span class="pre">env_float</span></code>) rather than
+being silently ignored. Returns a <code class="docutils literal notranslate"><span class="pre">CalibrationSizingEnv</span></code>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.cuda_device_memory_bytes">
+<span class="sig-prename descclassname"><span class="pre">mhcflurry.affinity.calibration_sizing.</span></span><span class="sig-name descname"><span class="pre">cuda_device_memory_bytes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">device</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/affinity/calibration_sizing.html#cuda_device_memory_bytes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.cuda_device_memory_bytes" title="Link to this definition"></a></dt>
+<dd><p>Return best-effort <code class="docutils literal notranslate"><span class="pre">(free_bytes,</span> <span class="pre">total_bytes)</span></code> for a CUDA device.</p>
+<p><code class="docutils literal notranslate"><span class="pre">free</span></code> comes from the shared <code class="docutils literal notranslate"><span class="pre">free_device_memory_bytes</span></code> probe.
+<code class="docutils literal notranslate"><span class="pre">total</span></code> uses <code class="docutils literal notranslate"><span class="pre">torch.cuda.get_device_properties</span></code> when available and
+otherwise falls back to <code class="docutils literal notranslate"><span class="pre">free</span></code> – tests and nonstandard CUDA wrappers
+may not expose device properties, and the explicit reserve still keeps
+the budget bounded.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.cuda_calibration_total_rows">
+<span class="sig-prename descclassname"><span class="pre">mhcflurry.affinity.calibration_sizing.</span></span><span class="sig-name descname"><span class="pre">cuda_calibration_total_rows</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_peptides</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_workers_per_gpu</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">env</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_cached_networks</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">peptide_feature_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_sub_networks</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cuda_overhead_bytes</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/affinity/calibration_sizing.html#cuda_calibration_total_rows"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.cuda_calibration_total_rows" title="Link to this definition"></a></dt>
+<dd><p>Size the cartesian forward row budget on a CUDA device.</p>
+<p>Carves a per-worker VRAM budget out of free memory, subtracts the fixed
+overhead (the persistent peptide-feature cache plus safety-padded
+CUDA/runtime scratch and small state), and converts the remaining
+forward budget into a row count. <code class="docutils literal notranslate"><span class="pre">env</span></code> is a <code class="docutils literal notranslate"><span class="pre">CalibrationSizingEnv</span></code>
+from <code class="docutils literal notranslate"><span class="pre">read_calibration_sizing_env</span></code>; see <code class="docutils literal notranslate"><span class="pre">auto_size_calibration_batches</span></code>
+for the full peak model. Returns the row budget for
+<code class="docutils literal notranslate"><span class="pre">choose_calibration_batch_shape</span></code>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.auto_size_calibration_batches">
+<span class="sig-prename descclassname"><span class="pre">mhcflurry.affinity.calibration_sizing.</span></span><span class="sig-name descname"><span class="pre">auto_size_calibration_batches</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_peptides</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_alleles</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_workers_per_gpu</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">free_memory_fraction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_cached_networks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">peptide_feature_dim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_sub_networks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cuda_overhead_bytes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2147483648</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">safety_multiplier</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fixed_peptide_batch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fixed_allele_batch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/affinity/calibration_sizing.html#auto_size_calibration_batches"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.auto_size_calibration_batches" title="Link to this definition"></a></dt>
+<dd><p>Split the auto-sized batch budget between peptide and allele axes.</p>
+<p><code class="docutils literal notranslate"><span class="pre">fixed_peptide_batch</span></code> / <code class="docutils literal notranslate"><span class="pre">fixed_allele_batch</span></code> pin one axis to a
+user-supplied value (mixed pin/auto mode). The pinned axis is held
+constant and only the other axis is sized against the VRAM budget, so
+the auto axis shrinks to keep <code class="docutils literal notranslate"><span class="pre">allele_batch</span> <span class="pre">×</span> <span class="pre">peptide_batch</span></code> within
+the per-worker budget instead of being sized as if the pinned axis were
+also auto (which would underestimate peak VRAM).</p>
+<p>Models the per-worker VRAM peak as:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">peak</span> <span class="o">=</span> <span class="n">cuda_overhead</span>
+     <span class="o">+</span> <span class="n">cache_bytes</span>                <span class="c1"># peptide-stage cache,</span>
+                                  <span class="c1"># ``num_cached_networks ×</span>
+                                  <span class="c1"># n_peptides × peptide_feature_dim × 4``</span>
+     <span class="o">+</span> <span class="n">cartesian_intermediate</span>     <span class="c1"># transient forward</span>
+                                  <span class="c1"># ``a_size × p_batch ×</span>
+                                  <span class="c1"># peak_bytes_per_row``</span>
+     <span class="o">+</span> <span class="n">small_state</span>                <span class="c1"># log-IC50 acc, ic50_unique,</span>
+                                  <span class="c1"># motif state (~1 GB)</span>
+</pre></div>
+</div>
+<p>This includes explicit free-memory headroom plus a safety factor on
+CUDA/runtime scratch allocations to absorb fragmentation that
+<code class="docutils literal notranslate"><span class="pre">mem_get_info</span></code> can’t see.</p>
+<p><code class="docutils literal notranslate"><span class="pre">peak_bytes_per_row</span></code> is calibrated for the cartesian fast path.
+For a merged ensemble it uses one sub-network’s hidden activation
+peak plus the small retained per-sub-network outputs, matching
+<code class="docutils literal notranslate"><span class="pre">MergedClass1NeuralNetwork.forward_cartesian_from_peptide_stage</span></code>
+which runs each sub-network to completion before starting the next.
+The cartesian-intermediate term scales with <code class="docutils literal notranslate"><span class="pre">a_size</span> <span class="pre">×</span> <span class="pre">p_batch</span></code>,
+which is exactly the rate the budget carves out — preserving the existing
+<code class="docutils literal notranslate"><span class="pre">total_rows</span> <span class="pre">=</span> <span class="pre">forward_budget</span> <span class="pre">//</span> <span class="pre">peak_bytes</span></code> math.</p>
+<p>Returns the chosen <code class="docutils literal notranslate"><span class="pre">(peptide_batch,</span> <span class="pre">allele_batch)</span></code>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.estimate_calibration_peak_bytes_per_row">
+<span class="sig-prename descclassname"><span class="pre">mhcflurry.affinity.calibration_sizing.</span></span><span class="sig-name descname"><span class="pre">estimate_calibration_peak_bytes_per_row</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/affinity/calibration_sizing.html#estimate_calibration_peak_bytes_per_row"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.estimate_calibration_peak_bytes_per_row" title="Link to this definition"></a></dt>
+<dd><p>Estimate cartesian calibration forward peak bytes per row.</p>
+<p>The generic prediction estimator is deliberately conservative for
+arbitrary merged forwards. Calibration has a more specific execution
+shape: <code class="docutils literal notranslate"><span class="pre">MergedClass1NeuralNetwork.forward_cartesian_from_peptide_stage</span></code>
+evaluates sub-networks serially and retains only their final outputs
+before combining them. Hidden-layer peak memory is therefore the max
+sub-network peak, not the sum of every sub-network peak.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.choose_calibration_batch_shape">
+<span class="sig-prename descclassname"><span class="pre">mhcflurry.affinity.calibration_sizing.</span></span><span class="sig-name descname"><span class="pre">choose_calibration_batch_shape</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">total_rows</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_peptides</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_alleles</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_peptide_batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_allele_batch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">256</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fixed_peptide_batch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fixed_allele_batch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/affinity/calibration_sizing.html#choose_calibration_batch_shape"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.choose_calibration_batch_shape" title="Link to this definition"></a></dt>
+<dd><p>Choose <code class="docutils literal notranslate"><span class="pre">(peptide_batch,</span> <span class="pre">allele_batch)</span></code> under a row budget.</p>
+<p>Minimize the number of cartesian forward chunks rather than filling
+one axis greedily. This matters for the production shape
+(tens of alleles × tens of thousands of peptides), where many
+equivalent row budgets can differ by 20-40% in Python-level loop
+count and kernel launches.</p>
+<p><code class="docutils literal notranslate"><span class="pre">fixed_peptide_batch</span></code> / <code class="docutils literal notranslate"><span class="pre">fixed_allele_batch</span></code> pin one axis (mixed
+pin/auto mode). The pinned axis is held at the user value and the other
+axis is sized as <code class="docutils literal notranslate"><span class="pre">total_rows</span> <span class="pre">//</span> <span class="pre">pinned</span></code> so the product stays within
+the budget; the pinned axis is <em>not</em> capped by <code class="docutils literal notranslate"><span class="pre">max_allele_batch</span></code>
+(the user asked for it explicitly).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.calibration_stage_cache_signature">
+<span class="sig-prename descclassname"><span class="pre">mhcflurry.affinity.calibration_sizing.</span></span><span class="sig-name descname"><span class="pre">calibration_stage_cache_signature</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">encoded_peptides</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">networks</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/affinity/calibration_sizing.html#calibration_stage_cache_signature"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.calibration_stage_cache_signature" title="Link to this definition"></a></dt>
+<dd><p>Return the key for a reusable peptide-stage calibration cache.</p>
+<p>Keyed on the peptide-set fingerprint, the network object identities
+(<code class="docutils literal notranslate"><span class="pre">id</span></code>), and the device – NOT on weight <em>content</em>. Adding, removing,
+or replacing ensemble models changes the <code class="docutils literal notranslate"><span class="pre">networks</span></code> list (new
+objects -&gt; new ids) and so invalidates the cache, but mutating an
+existing network’s weights <em>in place</em> (e.g. a re-fit) does not. A
+weight-content fingerprint is deliberately not used here:
+<code class="docutils literal notranslate"><span class="pre">borrow_cached_network</span></code> serves architecturally-identical networks
+from a single process-wide <code class="docutils literal notranslate"><span class="pre">MODELS_CACHE</span></code> module, so the underlying
+torch parameter storage is shared across ensemble members and is not a
+reliable per-network weight signal. Callers that mutate weights in
+place between fast-calibrate calls on the same predictor instance must
+therefore call <code class="docutils literal notranslate"><span class="pre">clear_calibration_fast_cache()</span></code> first (see
+<code class="docutils literal notranslate"><span class="pre">calibrate_percentile_ranks_fast</span></code>).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.probe_peptide_feature_dim">
+<span class="sig-prename descclassname"><span class="pre">mhcflurry.affinity.calibration_sizing.</span></span><span class="sig-name descname"><span class="pre">probe_peptide_feature_dim</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">net_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoded_peptides</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/affinity/calibration_sizing.html#probe_peptide_feature_dim"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.probe_peptide_feature_dim" title="Link to this definition"></a></dt>
+<dd><p>Run a 1-row forward through <code class="docutils literal notranslate"><span class="pre">forward_peptide_stage</span></code> to
+record the actual width of the peptide feature tensor.</p>
+<p>The auto-sizer’s cache estimate depends on this and
+the encoding-shape heuristic under-counts when the model
+configures <code class="docutils literal notranslate"><span class="pre">peptide_dense_layer_sizes</span></code> or LC layers.</p>
+<p>Returns <code class="docutils literal notranslate"><span class="pre">None</span></code> on probe failure so callers can fall back
+to the heuristic.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.calibration_fast_cache">
+<span class="sig-prename descclassname"><span class="pre">mhcflurry.affinity.calibration_sizing.</span></span><span class="sig-name descname"><span class="pre">calibration_fast_cache</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/affinity/calibration_sizing.html#calibration_fast_cache"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.calibration_fast_cache" title="Link to this definition"></a></dt>
+<dd><p>Return (creating if needed) the per-instance fast-calibrate cache.</p>
+<p>See <code class="docutils literal notranslate"><span class="pre">CalibrationFastCache</span></code>. Lazy so that predictors loaded for
+prediction never pay the allocation cost.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mhcflurry.affinity.calibration_sizing.clear_calibration_fast_cache">
+<span class="sig-prename descclassname"><span class="pre">mhcflurry.affinity.calibration_sizing.</span></span><span class="sig-name descname"><span class="pre">clear_calibration_fast_cache</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/affinity/calibration_sizing.html#clear_calibration_fast_cache"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mhcflurry.affinity.calibration_sizing.clear_calibration_fast_cache" title="Link to this definition"></a></dt>
+<dd><p>Drop any cached fast-calibrate state on this predictor.</p>
+<p>Long-lived workers that finish calibrate but stay alive for
+prediction can reclaim the (potentially many GB) of device-
+resident peptide-stage tensors via this hook.</p>
+</dd></dl>
+
+</section>
+<section id="module-mhcflurry.affinity.model_selection">
+<span id="mhcflurry-affinity-model-selection-module"></span><h2>mhcflurry.affinity.model_selection module<a class="headerlink" href="#module-mhcflurry.affinity.model_selection" title="Link to this heading"></a></h2>
+<p>Model-selection helpers for class I affinity predictors.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="mhcflurry.affinity.model_selection.model_select">
+<span class="sig-prename descclassname"><span class="pre">mhcflurry.affinity.model_selection.</span></span><span class="sig-name descname"><span class="pre">model_select</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">predictor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">predictor_class</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">score_function</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alleles</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_models</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_models</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/affinity/model_selection.html#model_select"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mhcflurry.affinity.model_selection.model_select" title="Link to this definition"></a></dt>
+<dd><p>Perform model selection using a user-specified scoring function.</p>
+<p>This works only with allele-specific models, not pan-allele models.</p>
+<p>Model selection is done using a “step up” variable selection procedure,
+in which models are repeatedly added to an ensemble until the score
+stops improving.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>predictor</strong><span class="classifier">Class1AffinityPredictor</span></dt><dd><p>Predictor containing the candidate models.</p>
+</dd>
+<dt><strong>predictor_class</strong><span class="classifier">type</span></dt><dd><p>Predictor class used for candidate and selected ensembles.</p>
+</dd>
+<dt><strong>score_function</strong><span class="classifier">Class1AffinityPredictor -&gt; float function</span></dt><dd><p>Scoring function</p>
+</dd>
+<dt><strong>alleles</strong><span class="classifier">list of string, optional</span></dt><dd><p>If not specified, model selection is performed for all alleles.</p>
+</dd>
+<dt><strong>min_models</strong><span class="classifier">int, optional</span></dt><dd><p>Min models to select per allele</p>
+</dd>
+<dt><strong>max_models</strong><span class="classifier">int, optional</span></dt><dd><p>Max models to select per allele</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>Class1AffinityPredictor</strong><span class="classifier">predictor containing the selected models</span></dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-mhcflurry.affinity.persistence">
+<span id="mhcflurry-affinity-persistence-module"></span><h2>mhcflurry.affinity.persistence module<a class="headerlink" href="#module-mhcflurry.affinity.persistence" title="Link to this heading"></a></h2>
+<p>Persistence helpers for class I affinity predictors.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="mhcflurry.affinity.persistence.save_predictor">
+<span class="sig-prename descclassname"><span class="pre">mhcflurry.affinity.persistence.</span></span><span class="sig-name descname"><span class="pre">save_predictor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">predictor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">models_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_names_to_write</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">write_metadata</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/affinity/persistence.html#save_predictor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mhcflurry.affinity.persistence.save_predictor" title="Link to this definition"></a></dt>
+<dd><p>Serialize the predictor to a directory on disk. If the directory does
+not exist it will be created.</p>
+<p>The serialization format consists of a file called “manifest.csv” with
+the configurations of each Class1NeuralNetwork, along with per-network
+files giving the model weights. If there are pan-allele predictors in
+the ensemble, the pseudosequences are also stored in the
+directory. There is also a small file “info.txt” with basic metadata:
+the save time, user and host (not the original training time).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>predictor</strong><span class="classifier">Class1AffinityPredictor</span></dt><dd><p>Predictor to serialize.</p>
+</dd>
+<dt><strong>models_dir</strong><span class="classifier">string</span></dt><dd><p>Path to directory. It will be created if it doesn’t exist.</p>
+</dd>
+<dt><strong>model_names_to_write</strong><span class="classifier">list of string, optional</span></dt><dd><p>Only write the weights for the specified models. Useful for
+incremental updates during training. Passing an explicit empty
+list writes no model artifacts; this is used by calibration-only
+updates that replace percentile calibration (CSV or JSON) without touching
+the manifest, weights, model provenance, allele sequences, or
+optimization metadata. Explicit <code class="docutils literal notranslate"><span class="pre">metadata_dataframes</span></code> are still
+written when <code class="docutils literal notranslate"><span class="pre">write_metadata</span></code> is true.</p>
+</dd>
+<dt><strong>write_metadata</strong><span class="classifier">boolean, optional</span></dt><dd><p>Whether to write optional metadata</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mhcflurry.affinity.persistence.load_predictor">
+<span class="sig-prename descclassname"><span class="pre">mhcflurry.affinity.persistence.</span></span><span class="sig-name descname"><span class="pre">load_predictor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">predictor_class</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">models_dir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_models</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimization_level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimization_level_default</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mhcflurry/affinity/persistence.html#load_predictor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mhcflurry.affinity.persistence.load_predictor" title="Link to this definition"></a></dt>
+<dd><p>Deserialize a predictor from a directory on disk.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>predictor_class</strong><span class="classifier">type</span></dt><dd><p>Predictor class to instantiate.</p>
+</dd>
+<dt><strong>models_dir</strong><span class="classifier">string</span></dt><dd><p>Path to directory. If unspecified the default downloaded models are
+used.</p>
+</dd>
+<dt><strong>max_models</strong><span class="classifier">int, optional</span></dt><dd><p>Maximum number of <code class="xref py py-obj docutils literal notranslate"><span class="pre">Class1NeuralNetwork</span></code> instances to load</p>
+</dd>
+<dt><strong>optimization_level</strong><span class="classifier">int or None</span></dt><dd><p>If &gt;0, model optimization will be attempted. When None, use
+optimization_level_default supplied by the public loader.</p>
+</dd>
+<dt><strong>optimization_level_default</strong><span class="classifier">int or None</span></dt><dd><p>Fallback supplied by the public loader when no explicit level is set.
+That loader reads MHCFLURRY_OPTIMIZATION_LEVEL with a default of 1.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><code class="xref py py-obj docutils literal notranslate"><span class="pre">Class1AffinityPredictor</span></code> instance</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="api.html" class="btn btn-neutral float-left" title="API Documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="mhcflurry.cli.html" class="btn btn-neutral float-right" title="mhcflurry.cli package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

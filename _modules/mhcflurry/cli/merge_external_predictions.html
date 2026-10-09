@@ -1,0 +1,366 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.cli.merge_external_predictions &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.cli.merge_external_predictions</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.cli.merge_external_predictions</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1"># http://www.apache.org/licenses/LICENSE-2.0</span>
+
+<span class="sd">"""Merge precomputed external-predictor benchmark groups into one table."""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">bz2</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">mhcflurry.experiment_archive</span><span class="w"> </span><span class="kn">import</span> <span class="n">sha256_file</span>
+
+
+<div class="viewcode-block" id="make_parser">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.merge_external_predictions.make_parser">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_parser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="s2">"mhcflurry eval merge-external-predictions"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Build the external-prediction merge parser."""</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="n">prog</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--group"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"append"</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"PREDICTOR=MANIFEST.csv"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Predictor name and data_evaluation group manifest. Repeat once "</span>
+            <span class="s2">"per predictor. The manifests must describe the same base rows."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">"--out"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s2">"CSV[.bz2]"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_group</span><span class="p">(</span><span class="n">spec</span><span class="p">):</span>
+    <span class="k">if</span> <span class="s2">"="</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">spec</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"--group must have the form PREDICTOR=MANIFEST.csv: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">spec</span><span class="p">)</span>
+    <span class="n">predictor</span><span class="p">,</span> <span class="n">manifest</span> <span class="o">=</span> <span class="n">spec</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"="</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">predictor</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="n">manifest</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">manifest</span><span class="p">)</span><span class="o">.</span><span class="n">expanduser</span><span class="p">()</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">predictor</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">manifest</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Invalid --group: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">spec</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">predictor</span><span class="p">,</span> <span class="n">manifest</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_member_key</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">predictor</span><span class="p">):</span>
+    <span class="n">marker</span> <span class="o">=</span> <span class="s2">".</span><span class="si">%s</span><span class="s2">."</span> <span class="o">%</span> <span class="n">predictor</span>
+    <span class="k">if</span> <span class="n">marker</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">filename</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Group member does not contain predictor marker </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">marker</span><span class="p">,</span> <span class="n">filename</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">filename</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">marker</span><span class="p">,</span> <span class="s2">".&lt;predictor&gt;."</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_load_group</span><span class="p">(</span><span class="n">predictor</span><span class="p">,</span> <span class="n">manifest</span><span class="p">):</span>
+    <span class="n">frame</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">manifest</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">list</span><span class="p">(</span><span class="n">frame</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span> <span class="o">!=</span> <span class="p">[</span><span class="s2">"filename"</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Group manifest must contain only a filename column: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span>
+            <span class="n">manifest</span><span class="p">)</span>
+    <span class="n">records</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">seen</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">filename</span> <span class="ow">in</span> <span class="n">frame</span><span class="o">.</span><span class="n">filename</span><span class="p">:</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="p">(</span><span class="n">manifest</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="nb">str</span><span class="p">(</span><span class="n">filename</span><span class="p">))</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Missing group member: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">path</span><span class="p">)</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">_member_key</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">predictor</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Duplicate group member identity: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">key</span><span class="p">)</span>
+        <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">key</span><span class="p">,</span> <span class="n">path</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">records</span>
+
+
+<div class="viewcode-block" id="merge_external_prediction_groups">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.merge_external_predictions.merge_external_prediction_groups">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">merge_external_prediction_groups</span><span class="p">(</span><span class="n">group_specs</span><span class="p">,</span> <span class="n">out_path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Merge aligned per-predictor group members and return provenance."""</span>
+    <span class="n">groups</span> <span class="o">=</span> <span class="p">[</span><span class="n">_parse_group</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span> <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">group_specs</span><span class="p">]</span>
+    <span class="n">predictor_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">predictor</span> <span class="k">for</span> <span class="n">predictor</span><span class="p">,</span> <span class="n">_manifest</span> <span class="ow">in</span> <span class="n">groups</span><span class="p">]</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">predictor_names</span><span class="p">))</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">predictor_names</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Predictor names in --group must be unique"</span><span class="p">)</span>
+
+    <span class="n">loaded</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">predictor</span><span class="p">:</span> <span class="p">(</span><span class="n">manifest</span><span class="p">,</span> <span class="n">_load_group</span><span class="p">(</span><span class="n">predictor</span><span class="p">,</span> <span class="n">manifest</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">predictor</span><span class="p">,</span> <span class="n">manifest</span> <span class="ow">in</span> <span class="n">groups</span>
+    <span class="p">}</span>
+    <span class="n">first_predictor</span> <span class="o">=</span> <span class="n">predictor_names</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">first_records</span> <span class="o">=</span> <span class="n">loaded</span><span class="p">[</span><span class="n">first_predictor</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">expected_keys</span> <span class="o">=</span> <span class="p">[</span><span class="n">key</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">_path</span> <span class="ow">in</span> <span class="n">first_records</span><span class="p">]</span>
+    <span class="n">expected_key_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">expected_keys</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">predictor</span> <span class="ow">in</span> <span class="n">predictor_names</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+        <span class="n">actual_keys</span> <span class="o">=</span> <span class="p">{</span><span class="n">key</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">_path</span> <span class="ow">in</span> <span class="n">loaded</span><span class="p">[</span><span class="n">predictor</span><span class="p">][</span><span class="mi">1</span><span class="p">]}</span>
+        <span class="k">if</span> <span class="n">actual_keys</span> <span class="o">!=</span> <span class="n">expected_key_set</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Group </span><span class="si">%s</span><span class="s2"> describes different members: missing=</span><span class="si">%s</span><span class="s2"> extra=</span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="n">predictor</span><span class="p">,</span>
+                    <span class="nb">sorted</span><span class="p">(</span><span class="n">expected_key_set</span> <span class="o">-</span> <span class="n">actual_keys</span><span class="p">)[:</span><span class="mi">5</span><span class="p">],</span>
+                    <span class="nb">sorted</span><span class="p">(</span><span class="n">actual_keys</span> <span class="o">-</span> <span class="n">expected_key_set</span><span class="p">)[:</span><span class="mi">5</span><span class="p">],</span>
+                <span class="p">))</span>
+
+    <span class="n">path_by_predictor</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">predictor</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span><span class="n">records</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">predictor</span><span class="p">,</span> <span class="p">(</span><span class="n">_manifest</span><span class="p">,</span> <span class="n">records</span><span class="p">)</span> <span class="ow">in</span> <span class="n">loaded</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+    <span class="p">}</span>
+    <span class="n">out_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">out_path</span><span class="p">)</span><span class="o">.</span><span class="n">expanduser</span><span class="p">()</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="n">out_path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">opener</span> <span class="o">=</span> <span class="n">bz2</span><span class="o">.</span><span class="n">open</span> <span class="k">if</span> <span class="n">out_path</span><span class="o">.</span><span class="n">suffix</span> <span class="o">==</span> <span class="s2">".bz2"</span> <span class="k">else</span> <span class="nb">open</span>
+    <span class="n">input_records</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">total_rows</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">metadata_columns</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">with</span> <span class="n">opener</span><span class="p">(</span><span class="n">out_path</span><span class="p">,</span> <span class="s2">"wt"</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">""</span><span class="p">)</span> <span class="k">as</span> <span class="n">out_fd</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">member_index</span><span class="p">,</span> <span class="n">key</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">expected_keys</span><span class="p">):</span>
+            <span class="n">merged</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">for</span> <span class="n">predictor</span> <span class="ow">in</span> <span class="n">predictor_names</span><span class="p">:</span>
+                <span class="n">path</span> <span class="o">=</span> <span class="n">path_by_predictor</span><span class="p">[</span><span class="n">predictor</span><span class="p">][</span><span class="n">key</span><span class="p">]</span>
+                <span class="n">frame</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+                <span class="n">required</span> <span class="o">=</span> <span class="p">[</span><span class="n">predictor</span><span class="p">]</span>
+                <span class="n">missing</span> <span class="o">=</span> <span class="p">[</span><span class="n">column</span> <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">required</span> <span class="k">if</span> <span class="n">column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">frame</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">missing</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="s2">"</span><span class="si">%s</span><span class="s2"> lacks predictor column </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">predictor</span><span class="p">))</span>
+                <span class="n">current_metadata</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="n">column</span> <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">frame</span><span class="o">.</span><span class="n">columns</span>
+                    <span class="k">if</span> <span class="n">column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span>
+                        <span class="n">predictor</span><span class="p">,</span> <span class="s2">"</span><span class="si">%s</span><span class="s2">_best_allele"</span> <span class="o">%</span> <span class="n">predictor</span><span class="p">)</span>
+                <span class="p">]</span>
+                <span class="k">if</span> <span class="n">merged</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">metadata_columns</span> <span class="o">=</span> <span class="n">metadata_columns</span> <span class="ow">or</span> <span class="n">current_metadata</span>
+                    <span class="k">if</span> <span class="n">current_metadata</span> <span class="o">!=</span> <span class="n">metadata_columns</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                            <span class="s2">"Benchmark metadata columns changed in </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">path</span><span class="p">)</span>
+                    <span class="n">merged</span> <span class="o">=</span> <span class="n">frame</span><span class="p">[</span><span class="n">current_metadata</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">current_metadata</span> <span class="o">!=</span> <span class="n">metadata_columns</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                            <span class="s2">"Benchmark metadata columns differ in </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="n">path</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">frame</span><span class="p">[</span><span class="n">current_metadata</span><span class="p">]</span><span class="o">.</span><span class="n">equals</span><span class="p">(</span>
+                            <span class="n">merged</span><span class="p">[</span><span class="n">metadata_columns</span><span class="p">]):</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                            <span class="s2">"Benchmark rows are not aligned for </span><span class="si">%s</span><span class="s2"> in </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span>
+                                <span class="n">predictor</span><span class="p">,</span> <span class="n">path</span><span class="p">))</span>
+                <span class="n">merged</span><span class="p">[</span><span class="n">predictor</span><span class="p">]</span> <span class="o">=</span> <span class="n">frame</span><span class="p">[</span><span class="n">predictor</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
+                <span class="n">input_records</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s2">"predictor"</span><span class="p">:</span> <span class="n">predictor</span><span class="p">,</span>
+                    <span class="s2">"member_identity"</span><span class="p">:</span> <span class="n">key</span><span class="p">,</span>
+                    <span class="s2">"path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+                    <span class="s2">"sha256"</span><span class="p">:</span> <span class="n">sha256_file</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+                    <span class="s2">"rows"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">frame</span><span class="p">),</span>
+                <span class="p">})</span>
+            <span class="n">merged</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span>
+                <span class="n">out_fd</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="n">member_index</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">total_rows</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">merged</span><span class="p">)</span>
+            <span class="n">completed</span> <span class="o">=</span> <span class="n">member_index</span> <span class="o">+</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">completed</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">expected_keys</span><span class="p">)</span> <span class="ow">or</span> <span class="n">completed</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span>
+                    <span class="s2">"Merged </span><span class="si">%d</span><span class="s2">/</span><span class="si">%d</span><span class="s2"> benchmark members (</span><span class="si">%d</span><span class="s2"> rows)"</span> <span class="o">%</span> <span class="p">(</span>
+                        <span class="n">completed</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">expected_keys</span><span class="p">),</span> <span class="n">total_rows</span><span class="p">),</span>
+                    <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">)</span>
+
+    <span class="n">manifest_records</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">"predictor"</span><span class="p">:</span> <span class="n">predictor</span><span class="p">,</span>
+            <span class="s2">"path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">manifest</span><span class="p">),</span>
+            <span class="s2">"sha256"</span><span class="p">:</span> <span class="n">sha256_file</span><span class="p">(</span><span class="n">manifest</span><span class="p">),</span>
+        <span class="p">}</span>
+        <span class="k">for</span> <span class="n">predictor</span><span class="p">,</span> <span class="n">manifest</span> <span class="ow">in</span> <span class="n">groups</span>
+    <span class="p">]</span>
+    <span class="n">provenance</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"schema_version"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="s2">"predictors"</span><span class="p">:</span> <span class="n">predictor_names</span><span class="p">,</span>
+        <span class="s2">"metadata_columns"</span><span class="p">:</span> <span class="n">metadata_columns</span><span class="p">,</span>
+        <span class="s2">"member_count"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">expected_keys</span><span class="p">),</span>
+        <span class="s2">"row_count"</span><span class="p">:</span> <span class="n">total_rows</span><span class="p">,</span>
+        <span class="s2">"group_manifests"</span><span class="p">:</span> <span class="n">manifest_records</span><span class="p">,</span>
+        <span class="s2">"input_members"</span><span class="p">:</span> <span class="n">input_records</span><span class="p">,</span>
+        <span class="s2">"output"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">out_path</span><span class="p">),</span>
+            <span class="s2">"sha256"</span><span class="p">:</span> <span class="n">sha256_file</span><span class="p">(</span><span class="n">out_path</span><span class="p">),</span>
+        <span class="p">},</span>
+    <span class="p">}</span>
+    <span class="n">provenance_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"</span><span class="si">%s</span><span class="s2">.provenance.json"</span> <span class="o">%</span> <span class="n">out_path</span><span class="p">)</span>
+    <span class="n">provenance_path</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">provenance</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">provenance</span><span class="p">[</span><span class="s2">"provenance_path"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">provenance_path</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">provenance</span></div>
+
+
+
+<div class="viewcode-block" id="run">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.merge_external_predictions.run">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Merge external predictions specified on the command line."""</span>
+    <span class="n">provenance</span> <span class="o">=</span> <span class="n">merge_external_prediction_groups</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">group</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">out</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">provenance</span><span class="p">[</span><span class="s2">"output"</span><span class="p">][</span><span class="s2">"path"</span><span class="p">])</span>
+    <span class="k">return</span> <span class="mi">0</span></div>
+
+
+
+<div class="viewcode-block" id="run_argv">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.merge_external_predictions.run_argv">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_argv</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prog</span><span class="o">=</span><span class="s2">"mhcflurry eval merge-external-predictions"</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Parse arguments and merge external prediction groups."""</span>
+    <span class="k">return</span> <span class="n">run</span><span class="p">(</span><span class="n">make_parser</span><span class="p">(</span><span class="n">prog</span><span class="p">)</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">))</span></div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="n">run_argv</span><span class="p">())</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

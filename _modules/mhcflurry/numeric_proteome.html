@@ -1,0 +1,394 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.numeric_proteome &mdash; MHCflurry 2.3.14 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=86f393d6"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Training internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release_training_recipe.html">Release training recipe</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_neural_hyperparameter_audit.html">Neural training semantics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../final_230_candidate_experiment.html">Reproduce the 2.3.0 model training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../affinity_dual_checkpoint_workflow.html">Affinity checkpoint comparison</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_preparation_acceleration.html">Processing data preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic_processing_matching.html">Processing negative matching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../presentation_percentile_calibration.html">Presentation percentile calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../saved_candidate_evaluation.html">Evaluate saved model runs</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Controlled experiments</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_cleavage_boundary_experiment.html">Cleavage-boundary processing models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_kernel_sweep.html">Processing kernel-width experiment</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../processing_hyperparameter_campaign.html">Processing hyperparameter campaign</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../exact_public_data_experiment.html">Replaying historical processing data</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.numeric_proteome</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.numeric_proteome</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Reusable numeric processing candidates; strings are an export operation."""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.amino_acid</span><span class="w"> </span><span class="kn">import</span> <span class="n">AMINO_ACID_INDEX</span><span class="p">,</span> <span class="n">COMMON_AMINO_ACIDS</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.numeric_sequences</span><span class="w"> </span><span class="kn">import</span> <span class="n">NumericSequences</span><span class="p">,</span> <span class="n">UNKNOWN_INDEX</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.proteome_decoys</span><span class="w"> </span><span class="kn">import</span> <span class="n">PROTEOME_PEPTIDE_COLUMNS</span><span class="p">,</span> <span class="n">unique_in_order</span>
+
+
+<span class="n">MAX_PROCESSING_LENGTH</span> <span class="o">=</span> <span class="mi">11</span>
+
+
+<div class="viewcode-block" id="sequence_keys">
+<a class="viewcode-back" href="../../api.html#mhcflurry.numeric_proteome.sequence_keys">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">sequence_keys</span><span class="p">(</span><span class="n">indices</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Collision-free fixed-width numeric identity, including X padding."""</span>
+    <span class="n">indices</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ascontiguousarray</span><span class="p">(</span><span class="n">indices</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"int8"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">indices</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="n">indices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">MAX_PROCESSING_LENGTH</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Processing identities require eleven numeric columns"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">indices</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="s2">"V</span><span class="si">%d</span><span class="s2">"</span> <span class="o">%</span> <span class="n">MAX_PROCESSING_LENGTH</span><span class="p">)</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="ProcessingProteome">
+<a class="viewcode-back" href="../../api.html#mhcflurry.numeric_proteome.ProcessingProteome">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ProcessingProteome</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Encode source proteins once; sample numeric positions and gather on device.</span>
+
+<span class="sd">    CPU sampling preserves the historical eligible-window population and RNG</span>
+<span class="sd">    stream when passed an equivalent ``numpy.random.RandomState``. A device copy</span>
+<span class="sd">    is created lazily by the scoring owner, never by CPU preparation threads.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sequences</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">accessions</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">sequences</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sequences</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">sequences</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">accession_index</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">accessions</span><span class="p">)}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lengths</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">([</span><span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"int64"</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">offsets</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">r_</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lengths</span><span class="p">)]</span>
+        <span class="n">lookup</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="mi">256</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"int8"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">letter</span> <span class="ow">in</span> <span class="n">COMMON_AMINO_ACIDS</span><span class="p">:</span>
+            <span class="n">lookup</span><span class="p">[</span><span class="nb">ord</span><span class="p">(</span><span class="n">letter</span><span class="p">)]</span> <span class="o">=</span> <span class="n">AMINO_ACID_INDEX</span><span class="p">[</span><span class="n">letter</span><span class="p">]</span>
+        <span class="n">encoded</span> <span class="o">=</span> <span class="p">[</span><span class="n">lookup</span><span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">frombuffer</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"ascii"</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">"replace"</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"uint8"</span><span class="p">)]</span>
+                   <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sequences</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">residues</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="n">encoded</span><span class="p">)</span> <span class="k">if</span> <span class="n">encoded</span> <span class="k">else</span> <span class="n">numpy</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"int8"</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">invalid_prefix</span> <span class="o">=</span> <span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">r_</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">row</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">encoded</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_devices</span> <span class="o">=</span> <span class="p">{}</span>
+
+<div class="viewcode-block" id="ProcessingProteome.raw_rows">
+<a class="viewcode-back" href="../../api.html#mhcflurry.numeric_proteome.ProcessingProteome.raw_rows">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">raw_rows</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">proteins</span><span class="p">,</span> <span class="n">starts</span><span class="p">,</span> <span class="n">lengths</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Gather CPU numeric identities for filtering without string creation."""</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">starts</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="n">MAX_PROCESSING_LENGTH</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"int8"</span><span class="p">)</span>
+        <span class="n">columns</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">MAX_PROCESSING_LENGTH</span><span class="p">)</span>
+        <span class="n">positions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">offsets</span><span class="p">[</span><span class="n">proteins</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">+</span> <span class="n">starts</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">+</span> <span class="n">columns</span>
+        <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">columns</span> <span class="o">&lt;</span> <span class="n">lengths</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">],</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">residues</span><span class="p">[</span><span class="n">positions</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">residues</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)],</span> <span class="n">UNKNOWN_INDEX</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ProcessingProteome.gather">
+<a class="viewcode-back" href="../../api.html#mhcflurry.numeric_proteome.ProcessingProteome.gather">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">gather</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">windows</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">"cpu"</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Gather selected peptide rows into Torch directly from encoded proteins."""</span>
+        <span class="k">if</span> <span class="n">windows</span><span class="o">.</span><span class="n">proteome</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Windows belong to a different encoded proteome"</span><span class="p">)</span>
+        <span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_devices</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_devices</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">residues</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">windows</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">NumericSequences</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="n">MAX_PROCESSING_LENGTH</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">),</span>
+                                    <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">))</span>
+        <span class="n">starts</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">offsets</span><span class="p">[</span><span class="n">windows</span><span class="o">.</span><span class="n">proteins</span><span class="p">]</span> <span class="o">+</span> <span class="n">windows</span><span class="o">.</span><span class="n">starts</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">lengths</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">windows</span><span class="o">.</span><span class="n">lengths</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">columns</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">MAX_PROCESSING_LENGTH</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">positions</span> <span class="o">=</span> <span class="n">starts</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">+</span> <span class="n">columns</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_devices</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="n">positions</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">residues</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="n">NumericSequences</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">columns</span> <span class="o">&lt;</span> <span class="n">lengths</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">rows</span><span class="p">,</span> <span class="n">UNKNOWN_INDEX</span><span class="p">),</span> <span class="n">lengths</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ProcessingProteome.sample">
+<a class="viewcode-back" href="../../api.html#mhcflurry.numeric_proteome.ProcessingProteome.sample">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">accessions</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">excluded</span><span class="p">,</span> <span class="n">rng</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Draw n eligible windows without replacement, then deduplicate peptides.</span>
+
+<span class="sd">        Exhaustion returns the available population. As in the previous caller,</span>
+<span class="sd">        duplicate sequences are removed *after* n position draws, keeping the</span>
+<span class="sd">        first retained source position. No peptide/flank strings are constructed.</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="mi">1</span> <span class="o">&lt;=</span> <span class="n">length</span> <span class="o">&lt;=</span> <span class="n">MAX_PROCESSING_LENGTH</span> <span class="ow">or</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Invalid processing window length or count"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">empty</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"int64"</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">ProteinWindows</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">empty</span><span class="p">,</span> <span class="n">empty</span><span class="p">,</span> <span class="n">empty</span><span class="p">)</span>
+        <span class="n">starts</span><span class="p">,</span> <span class="n">proteins</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">accession</span> <span class="ow">in</span> <span class="n">unique_in_order</span><span class="p">(</span><span class="n">accessions</span><span class="p">):</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">accession_index</span><span class="p">[</span><span class="n">accession</span><span class="p">]</span>
+            <span class="c1"># Preserve the historical excluded final length-mer start.</span>
+            <span class="n">candidates</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">lengths</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">length</span><span class="p">))</span>
+            <span class="n">prefix</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">invalid_prefix</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">candidates</span> <span class="o">=</span> <span class="n">candidates</span><span class="p">[(</span><span class="n">prefix</span><span class="p">[</span><span class="n">candidates</span> <span class="o">+</span> <span class="n">length</span><span class="p">]</span> <span class="o">-</span> <span class="n">prefix</span><span class="p">[</span><span class="n">candidates</span><span class="p">])</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span>
+            <span class="n">starts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">candidates</span><span class="p">)</span>
+            <span class="n">proteins</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">candidates</span><span class="p">),</span> <span class="n">i</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"int64"</span><span class="p">))</span>
+        <span class="n">starts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="n">starts</span><span class="p">)</span> <span class="k">if</span> <span class="n">starts</span> <span class="k">else</span> <span class="n">numpy</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"int64"</span><span class="p">)</span>
+        <span class="n">proteins</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="n">proteins</span><span class="p">)</span> <span class="k">if</span> <span class="n">proteins</span> <span class="k">else</span> <span class="n">numpy</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"int64"</span><span class="p">)</span>
+        <span class="n">excluded</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">excluded</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="o">==</span> <span class="n">length</span><span class="p">]</span>
+        <span class="n">excluded_keys</span> <span class="o">=</span> <span class="n">sequence_keys</span><span class="p">(</span><span class="n">NumericSequences</span><span class="o">.</span><span class="n">from_strings</span><span class="p">(</span><span class="n">excluded</span><span class="p">,</span> <span class="n">MAX_PROCESSING_LENGTH</span><span class="p">)</span><span class="o">.</span><span class="n">indices</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">starts</span><span class="p">))</span>
+        <span class="n">retained</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">remaining</span> <span class="o">=</span> <span class="n">n</span>
+        <span class="k">for</span> <span class="n">offset</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">order</span><span class="p">),</span> <span class="mi">65536</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">remaining</span><span class="p">:</span>
+                <span class="k">break</span>
+            <span class="n">draw</span> <span class="o">=</span> <span class="n">order</span><span class="p">[</span><span class="n">offset</span><span class="p">:</span><span class="n">offset</span> <span class="o">+</span> <span class="mi">65536</span><span class="p">]</span>
+            <span class="n">lengths</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">draw</span><span class="p">),</span> <span class="n">length</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"int64"</span><span class="p">)</span>
+            <span class="n">keys</span> <span class="o">=</span> <span class="n">sequence_keys</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">raw_rows</span><span class="p">(</span><span class="n">proteins</span><span class="p">[</span><span class="n">draw</span><span class="p">],</span> <span class="n">starts</span><span class="p">[</span><span class="n">draw</span><span class="p">],</span> <span class="n">lengths</span><span class="p">))</span>
+            <span class="n">keep</span> <span class="o">=</span> <span class="n">draw</span><span class="p">[</span><span class="o">~</span><span class="n">numpy</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">keys</span><span class="p">,</span> <span class="n">excluded_keys</span><span class="p">)][:</span><span class="n">remaining</span><span class="p">]</span>
+            <span class="n">retained</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">keep</span><span class="p">)</span>
+            <span class="n">remaining</span> <span class="o">-=</span> <span class="nb">len</span><span class="p">(</span><span class="n">keep</span><span class="p">)</span>
+        <span class="n">retained</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="n">retained</span><span class="p">)</span> <span class="k">if</span> <span class="n">retained</span> <span class="k">else</span> <span class="n">numpy</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"int64"</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">ProteinWindows</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">proteins</span><span class="p">[</span><span class="n">retained</span><span class="p">],</span> <span class="n">starts</span><span class="p">[</span><span class="n">retained</span><span class="p">],</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">retained</span><span class="p">),</span> <span class="n">length</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"int64"</span><span class="p">))</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">first</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">keys</span><span class="p">,</span> <span class="n">return_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">first</span><span class="p">))</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ProteinWindows">
+<a class="viewcode-back" href="../../api.html#mhcflurry.numeric_proteome.ProteinWindows">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ProteinWindows</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Selected source positions with collision-free numeric peptide identities.</span>
+
+<span class="sd">    ``proteins``, ``starts`` and ``lengths`` are equally sized one-dimensional</span>
+<span class="sd">    integer arrays. Starts are zero-based; each window must fit its protein and</span>
+<span class="sd">    have a length between one and ``MAX_PROCESSING_LENGTH``.</span>
+<span class="sd">    """</span>
+
+    <span class="n">proteome</span><span class="p">:</span> <span class="n">ProcessingProteome</span>
+    <span class="n">proteins</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span>
+    <span class="n">starts</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span>
+    <span class="n">lengths</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"proteins"</span><span class="p">,</span> <span class="s2">"starts"</span><span class="p">,</span> <span class="s2">"lengths"</span><span class="p">):</span>
+            <span class="n">values</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">values</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">1</span> <span class="ow">or</span> <span class="p">(</span><span class="n">values</span><span class="o">.</span><span class="n">size</span> <span class="ow">and</span> <span class="n">values</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">kind</span> <span class="ow">not</span> <span class="ow">in</span> <span class="s2">"iu"</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Window positions and lengths must be integer vectors"</span><span class="p">)</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">values</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">"int64"</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">proteins</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">starts</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lengths</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Window position vectors have different lengths"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">proteins</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">proteins</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">proteome</span><span class="o">.</span><span class="n">lengths</span><span class="p">)))</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Window refers to an unknown protein index"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">starts</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lengths</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">)</span> <span class="o">|</span>
+                <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lengths</span> <span class="o">&gt;</span> <span class="n">MAX_PROCESSING_LENGTH</span><span class="p">)</span> <span class="o">|</span>
+                <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">starts</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">proteome</span><span class="o">.</span><span class="n">lengths</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">proteins</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">lengths</span><span class="p">))</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Window lies outside its protein or supported peptide lengths"</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">starts</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">keys</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">sequence_keys</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">proteome</span><span class="o">.</span><span class="n">raw_rows</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">proteins</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">starts</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">lengths</span><span class="p">))</span>
+
+<div class="viewcode-block" id="ProteinWindows.take">
+<a class="viewcode-back" href="../../api.html#mhcflurry.numeric_proteome.ProteinWindows.take">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">take</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rows</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)(</span><span class="bp">self</span><span class="o">.</span><span class="n">proteome</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">proteins</span><span class="p">[</span><span class="n">rows</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">starts</span><span class="p">[</span><span class="n">rows</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">lengths</span><span class="p">[</span><span class="n">rows</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="ProteinWindows.concatenate">
+<a class="viewcode-back" href="../../api.html#mhcflurry.numeric_proteome.ProteinWindows.concatenate">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">concatenate</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">parts</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">parts</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span><span class="n">part</span><span class="o">.</span><span class="n">proteome</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">proteome</span> <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">parts</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Window batches must share one encoded proteome"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">proteome</span><span class="p">,</span> <span class="o">*</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="nb">getattr</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">parts</span><span class="p">])</span>
+                                       <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"proteins"</span><span class="p">,</span> <span class="s2">"starts"</span><span class="p">,</span> <span class="s2">"lengths"</span><span class="p">)))</span></div>
+
+
+<div class="viewcode-block" id="ProteinWindows.to_frame">
+<a class="viewcode-back" href="../../api.html#mhcflurry.numeric_proteome.ProteinWindows.to_frame">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_frame</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">flank_length</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Construct sequence/flank strings only when exporting scored artifacts."""</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">flank_length</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">integer</span><span class="p">))</span> <span class="ow">or</span> <span class="n">flank_length</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Flank length must be a nonnegative integer"</span><span class="p">)</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">protein</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">length</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">proteins</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">starts</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">lengths</span><span class="p">):</span>
+            <span class="n">sequence</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">proteome</span><span class="o">.</span><span class="n">sequences</span><span class="p">[</span><span class="n">protein</span><span class="p">]</span>
+            <span class="n">end</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">length</span>
+            <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">proteome</span><span class="o">.</span><span class="n">accessions</span><span class="p">[</span><span class="n">protein</span><span class="p">],</span> <span class="n">sequence</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">],</span>
+                         <span class="n">sequence</span><span class="p">[</span><span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">start</span> <span class="o">-</span> <span class="n">flank_length</span><span class="p">):</span><span class="n">start</span><span class="p">]</span><span class="o">.</span><span class="n">rjust</span><span class="p">(</span><span class="n">flank_length</span><span class="p">,</span> <span class="s2">"X"</span><span class="p">),</span>
+                         <span class="n">sequence</span><span class="p">[</span><span class="n">end</span><span class="p">:</span><span class="n">end</span> <span class="o">+</span> <span class="n">flank_length</span><span class="p">]</span><span class="o">.</span><span class="n">ljust</span><span class="p">(</span><span class="n">flank_length</span><span class="p">,</span> <span class="s2">"X"</span><span class="p">),</span> <span class="n">start</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="o">.</span><span class="n">from_records</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">PROTEOME_PEPTIDE_COLUMNS</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="NumericCandidatePool">
+<a class="viewcode-back" href="../../api.html#mhcflurry.numeric_proteome.NumericCandidatePool">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NumericCandidatePool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Observed rows plus numeric negatives, ready for scoring then export."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hits</span><span class="p">,</span> <span class="n">windows</span><span class="p">,</span> <span class="n">sample</span><span class="p">,</span> <span class="n">flank_length</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hits</span> <span class="o">=</span> <span class="n">hits</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">windows</span> <span class="o">=</span> <span class="n">windows</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sample</span> <span class="o">=</span> <span class="n">sample</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">flank_length</span> <span class="o">=</span> <span class="n">flank_length</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hit_peptides</span> <span class="o">=</span> <span class="n">NumericSequences</span><span class="o">.</span><span class="n">from_strings</span><span class="p">(</span><span class="n">hits</span><span class="o">.</span><span class="n">peptide</span><span class="p">,</span> <span class="n">MAX_PROCESSING_LENGTH</span><span class="p">)</span>
+        <span class="n">keys</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">r_</span><span class="p">[</span><span class="n">sequence_keys</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hit_peptides</span><span class="o">.</span><span class="n">indices</span><span class="o">.</span><span class="n">numpy</span><span class="p">()),</span> <span class="n">windows</span><span class="o">.</span><span class="n">keys</span><span class="p">]</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">first</span><span class="p">,</span> <span class="n">inverse</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">keys</span><span class="p">,</span> <span class="n">return_index</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">return_inverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">first</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">unique_rows</span> <span class="o">=</span> <span class="n">first</span><span class="p">[</span><span class="n">order</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inverse</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">order</span><span class="p">)[</span><span class="n">inverse</span><span class="p">]</span>
+
+<div class="viewcode-block" id="NumericCandidatePool.prediction_input">
+<a class="viewcode-back" href="../../api.html#mhcflurry.numeric_proteome.NumericCandidatePool.prediction_input">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">prediction_input</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Use the scoring owner's device; no strings or host round trip."""</span>
+        <span class="n">candidates</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">windows</span><span class="o">.</span><span class="n">proteome</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">windows</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">NumericSequences</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">hit_peptides</span><span class="o">.</span><span class="n">indices</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">),</span> <span class="n">candidates</span><span class="o">.</span><span class="n">indices</span><span class="p">]),</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">hit_peptides</span><span class="o">.</span><span class="n">lengths</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">),</span> <span class="n">candidates</span><span class="o">.</span><span class="n">lengths</span><span class="p">]))</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unique_rows</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="NumericCandidatePool.with_scores">
+<a class="viewcode-back" href="../../api.html#mhcflurry.numeric_proteome.NumericCandidatePool.with_scores">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">with_scores</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Export a scored pool in the established observed-then-decoy order."""</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">values</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unique_rows</span><span class="p">),):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Numeric candidate score count mismatch"</span><span class="p">)</span>
+        <span class="n">negatives</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">windows</span><span class="o">.</span><span class="n">to_frame</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">flank_length</span><span class="p">)</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="s2">"start_position"</span><span class="p">)</span>
+        <span class="n">negatives</span><span class="p">[</span><span class="s2">"hit"</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">frame</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">hits</span><span class="p">,</span> <span class="n">negatives</span><span class="p">],</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">frame</span><span class="p">[</span><span class="s2">"sample_id"</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample</span>
+        <span class="n">frame</span><span class="p">[</span><span class="s2">"affinity_prediction"</span><span class="p">]</span> <span class="o">=</span> <span class="n">values</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">inverse</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">frame</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Oct 09, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
