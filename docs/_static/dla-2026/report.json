@@ -5019,7 +5019,7 @@
     "mhcflurry": "2.3.14",
     "python": "3.12.6",
     "source_files": {
-      "allele_capabilities.py": "bda5b3c405b4dee9b0fb412f94ec979eb44601a4a9feaa993f2dde02aecf49e8",
+      "allele_capabilities.py": "1ae7808ce9e1a855bc70bc5a7dddd37a0528a7c5b1bf1cef85c0a551c1e23d2f",
       "class1_affinity_predictor.py": "df832aaa0b9b32afa9422de2a06a625cd9ae0f7a14965c56f7cedbaf9dca9666",
       "class1_presentation_predictor.py": "68f2799ee393e3c8269d249141854131bd5b1fcd48e1395f37ba6c727b88f9bf",
       "class1_processing_predictor.py": "247534495d2747a62f397d6d21af4a5f4c1479b1a4a45001197ce3263d85d6e6",

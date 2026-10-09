@@ -23,10 +23,15 @@ BUNDLED_TRAINING_TABLES = {
 
 
 def model_fingerprint(models_dir):
-    """Hash every file and the sorted compact JSON filename-to-hash mapping."""
+    """Hash every file and its relative name; reject symlinks inside the bundle."""
     directory = Path(models_dir)
-    files = {path.relative_to(directory).as_posix(): file_sha256(path)
-             for path in sorted(directory.rglob("*")) if path.is_file()}
+    files = {}
+    for path in sorted(directory.rglob("*")):
+        if path.is_symlink():
+            raise ValueError(f"Model bundle contains a symlink: {path}. "
+                             "Use a copy with regular files and directories.")
+        if path.is_file():
+            files[path.relative_to(directory).as_posix()] = file_sha256(path)
     if not files:
         raise ValueError("Model directory contains no files")
     digest = hashlib.sha256(json.dumps(
@@ -164,7 +169,8 @@ def capability_report(models_dir, alleles, lengths=range(8, 16)):
     Parameters
     ----------
     models_dir : str or pathlib.Path
-        Frozen presentation bundle directory. All files are hashed.
+        Frozen presentation bundle directory. All files are hashed; symlinks
+        inside the bundle are rejected.
     alleles : iterable of str
         Requested allele names. Order and aliases are retained in the report.
     lengths : iterable of int

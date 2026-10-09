@@ -55,6 +55,10 @@ metadata are therefore bound together. Keep output files outside the model
 directory, and freeze inputs while either command runs. Existing output files
 or directories are not overwritten.
 
+Symlinks inside the model bundle are rejected with an error naming the path.
+Use a copy containing regular files and directories so every loaded component
+is included in the fingerprint.
+
 ## Reproduce the 2026 observation audit
 
 The source is [Kaabinejadian et al., iScience 2026,

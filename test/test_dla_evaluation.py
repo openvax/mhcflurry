@@ -62,13 +62,47 @@ def test_unsupported_lengths_do_not_claim_presentation(predictor):
 
 
 def test_fingerprint_changes_with_any_weight_or_metadata(tmp_path):
-    (tmp_path / "weights.npz").write_bytes(b"weights1")
+    component = tmp_path / "affinity_predictor"
+    component.mkdir()
+    (component / "weights.npz").write_bytes(b"weights1")
     first = model_fingerprint(tmp_path)
-    (tmp_path / "weights.npz").write_bytes(b"weights2")
+    assert set(first["files"]) == {"affinity_predictor/weights.npz"}
+    (component / "weights.npz").write_bytes(b"weights2")
     second = model_fingerprint(tmp_path)
     assert first["sha256"] != second["sha256"]
     (tmp_path / "info.txt").write_text("metadata")
     assert model_fingerprint(tmp_path)["sha256"] != second["sha256"]
+
+
+@pytest.mark.parametrize("relative_link", ["affinity_predictor", "nested/affinity_predictor"])
+def test_fingerprint_rejects_symlinked_component_directories(tmp_path, relative_link):
+    models = tmp_path / "models"
+    models.mkdir()
+    (models / "info.txt").write_text("bundle metadata")
+    component = tmp_path / "external_component"
+    component.mkdir()
+    (component / "weights.npz").write_bytes(b"weights")
+    link = models / relative_link
+    link.parent.mkdir(parents=True, exist_ok=True)
+    link.symlink_to(component, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="Model bundle contains a symlink") as error:
+        model_fingerprint(models)
+    assert str(link) in str(error.value)
+
+
+@pytest.mark.parametrize("target_exists", [True, False])
+def test_fingerprint_rejects_file_and_dangling_symlinks(tmp_path, target_exists):
+    models = tmp_path / "models"
+    models.mkdir()
+    (models / "info.txt").write_text("bundle metadata")
+    target = tmp_path / "external_weights.npz"
+    if target_exists:
+        target.write_bytes(b"weights")
+    (models / "weights.npz").symlink_to(target)
+
+    with pytest.raises(ValueError, match="Model bundle contains a symlink"):
+        model_fingerprint(models)
 
 
 def test_training_counts_are_allele_length_specific_not_host_inference(tmp_path):
