@@ -3,13 +3,12 @@
 MHCflurry predicts which peptides are likely to be displayed by MHC class I
 molecules. Its pretrained models answer three related questions:
 
-- **Binding affinity:** can this peptide bind a particular MHC allele?
-- **Antigen processing:** is cellular processing likely to produce this
-  peptide?
-- **Presentation:** is the peptide likely to reach the cell surface, considering
+- Binding affinity: can this peptide bind a particular MHC allele?
+- Antigen processing: is cellular processing likely to produce this peptide?
+- Presentation: is the peptide likely to reach the cell surface, considering
   both binding and processing?
 
-For most epitope-prioritization work, start with the **presentation** predictor.
+For most epitope-prioritization work, start with the presentation predictor.
 Use binding affinity when you specifically need peptide–MHC binding estimates,
 or processing alone when you do not have an allele or MHC allele set.
 
@@ -59,8 +58,8 @@ arguments and protein scanning.
 
 ## Understand the results
 
-The output contains one row per peptide and allele or MHC allele set query. These are
-the main prediction columns:
+The output has one row for each peptide and each allele or MHC allele set in
+the query. These are the main prediction columns:
 
 | Column | Interpretation |
 |---|---|

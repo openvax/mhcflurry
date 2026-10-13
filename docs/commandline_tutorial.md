@@ -99,11 +99,14 @@ protein context for cleavage prediction. See the
 ## Scanning protein sequences for predicted MHC I ligands
 
 Use `mhcflurry predict-scan` to score peptide windows in a protein sequence.
-The default lengths are 8–11 amino acids; set `--peptide-lengths` to change them.
-By default, the output keeps rows with affinity percentile at most 2. Use
-`--results-all` to return every scored window, or `--threshold-*` to choose a
-different filter. Scanning supplies N/C source-protein flanks automatically;
-use `--no-flanking` for predictions without that context.
+By default:
+
+- Peptide lengths are 8–11 amino acids; set `--peptide-lengths` to change them.
+- The output keeps rows with affinity percentile at most 2. Use `--results-all`
+  to return every scored window, or `--threshold-*` to choose a different
+  filter.
+- N/C source-protein flanks are supplied automatically; use `--no-flanking` for
+  predictions without that context.
 
 `example.fasta` contains two short sequences:
 

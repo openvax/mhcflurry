@@ -1,9 +1,9 @@
 # Downloading and selecting model weights
 
 Code and weights have separate versions. A code patch can keep the same default
-weights: the current package uses the **2.3.0 weight release**. New weight
-releases identify changed model artifacts; they need not accompany every code
-release. Historical catalogue names remain available for reproducibility.
+weights: the current package uses the 2.3.0 weight release. New weight releases
+identify changed model artifacts; they need not accompany every code release.
+Historical catalogue names remain available for reproducibility.
 
 ## Browse what is available
 
@@ -13,27 +13,17 @@ mhcflurry downloads list --kind models
 mhcflurry downloads info models_class1_presentation
 ```
 
-`releases` lists valid catalogue identifiers. With a bundle name, it shows only
-releases containing that bundle and groups entries with the same archive URLs.
-For example, catalogues `2.2.0` and `2.0.0` point to the same presentation archive.
-`list` groups prediction models, legacy models, experiments, and supporting data.
-The first table shows the latest weights, distinct older archive versions and
-installed catalogue directories, with the recommended presentation bundle first,
-followed by standalone affinity and processing bundles.
-Affinity and processing rows also show components found inside installed
-presentation bundles as `RELEASE via presentation`; standalone bundle installs
-remain separate entries. Components must have a model directory and
-`manifest.csv` to appear in the table. A bundle containing only one processing
-variant is marked `with flanks only` or `without flanks only`. The presentation
-bundle's `?` or `!` marker indicates unknown or different source URLs.
-Aliases sharing the same archive are grouped in the availability columns;
-`releases DOWNLOAD` lists every valid identifier. Historical resources appear
-below the main predictors. Terminal output uses restrained color; redirected
-output and `NO_COLOR=1` remain plain.
-Use `--kind data` for data only, or `--release 2.2.0` to inspect an older catalogue.
-`info DOWNLOAD` adds descriptions, archive locations, fetch/use commands and
-exact embedded component paths. These presence checks do not verify weight
-file integrity or prove that embedded and standalone ensembles are identical.
+- `releases` lists valid catalogue identifiers. With a bundle name, it shows
+  only the releases containing that bundle and groups entries with the same
+  archive URLs. For example, catalogues `2.2.0` and `2.0.0` point to the same
+  presentation archive.
+- `list` groups prediction models, legacy models, experiments, and supporting
+  data, and shows which are installed. Use `--kind data` for data only, or
+  `--release 2.2.0` to inspect an older catalogue. {ref}`reading-downloads-list`
+  explains its markers.
+- `info DOWNLOAD` adds descriptions, archive locations, fetch/use commands and
+  exact embedded component paths.
+
 All three commands support `--json` and read the installed package's catalogue
 offline. Update the package to obtain a newer catalogue.
 
@@ -48,25 +38,28 @@ offline. Update the package to obtain a newer catalogue.
 | `*_with_mass_spec`, `*_no_mass_spec`, `*_minimal` | Historical training variants or smaller subsets. |
 | `data_*`, `allele_sequences`, `analysis_predictor_info`, `random_peptide_predictions`, `cross_validation_class1` | Supporting data and analyses. |
 
-The presentation bundle contains its own affinity and processing components.
-The standalone bundles can be absent while full presentation prediction is
-ready to use. `Class1AffinityPredictor.load()` can fall back to the default
-presentation bundle when standalone affinity weights are absent and no
-affinity-path override is set. `Class1ProcessingPredictor.load()` has no such
-fallback: pass an embedded component path explicitly, or use
-`Class1PresentationPredictor.load().processing_predictor_with_flanks` (or
-`processing_predictor_without_flanks`). Explicit paths and release selection
-retain their existing precedence.
+The presentation bundle contains its own affinity and processing components,
+so full presentation prediction works even when the standalone bundles are
+absent. Loading a component predictor by itself behaves differently for each
+component:
 
-In JSON output, `downloaded`, `status` and `path` still describe the named
-bundle. The additive `presentation_components` entries describe embedded paths,
-directory/manifest presence and the presentation bundle's source status.
+- `Class1AffinityPredictor.load()` can fall back to the default presentation
+  bundle when standalone affinity weights are absent and no affinity-path
+  override is set.
+- `Class1ProcessingPredictor.load()` has no such fallback. Pass an embedded
+  component path explicitly, or use
+  `Class1PresentationPredictor.load().processing_predictor_with_flanks` (or
+  `processing_predictor_without_flanks`).
+
+Explicit paths and release selection retain their existing precedence.
 
 ## Compare new and historical weights
 
-The public **2.1.5, 2.2.0, and 2.2.1 packages used the same 2020 model archives**,
-registered under catalogue `2.2.0`. There is no separate `2.1.5` or `2.2.1`
-weight catalogue. The `2.3.0` models use the 2023 curated affinity snapshot and an updated
+The public 2.1.5, 2.2.0, and 2.2.1 packages all used the same 2020 model
+archives, registered under catalogue `2.2.0`. There is no separate `2.1.5` or
+`2.2.1` weight catalogue.
+
+The `2.3.0` models use the 2023 curated affinity snapshot and an updated
 processing training recipe; this does not mean every component gained new
 2023 observations. See {doc}`release_training_recipe`.
 
@@ -132,19 +125,25 @@ mhcflurry downloads url models_class1_presentation --release 2.3.0
 `info` starts with model availability, followed by historical resources and
 resolved configuration. Use `mhcflurry downloads --verbose info` for configured
 default predictor paths, components inside the default presentation predictor,
-and environment variables. The variables are **optional
-overrides**: `unset` means
-the default is in use, not that the local path is missing. On macOS the default
-root is `~/Library/Application Support/mhcflurry/4/`; each weight release has
-its own subdirectory. The `4` is the cache-layout version, not a model version.
-The presentation predictor is inside `models_class1_presentation/models`.
+and environment variables.
 
-`MHCFLURRY_DATA_DIR` changes the parent of the release directories.
-`MHCFLURRY_DOWNLOADS_CURRENT_RELEASE` changes the active catalogue.
-`MHCFLURRY_DOWNLOADS_DIR` selects an unversioned custom download directory.
-The `MHCFLURRY_DEFAULT_CLASS1_*` variables shown by `info` override individual
-predictor defaults. Explicit `--model-release` selects from the requested
-catalogue instead of those individual model-path overrides.
+On macOS the default root is `~/Library/Application Support/mhcflurry/4/`; each
+weight release has its own subdirectory, and the presentation predictor is
+inside `models_class1_presentation/models`. The `4` is the cache-layout
+version, not a model version.
+
+These environment variables are optional overrides. In `info` output, `unset`
+means the default is in use, not that the local path is missing.
+
+| Variable | Effect |
+|---|---|
+| `MHCFLURRY_DATA_DIR` | Changes the parent of the release directories. |
+| `MHCFLURRY_DOWNLOADS_CURRENT_RELEASE` | Changes the active catalogue. |
+| `MHCFLURRY_DOWNLOADS_DIR` | Selects an unversioned custom download directory. |
+| `MHCFLURRY_DEFAULT_CLASS1_*` | Overrides individual predictor defaults; `info` lists each variable. |
+
+An explicit `--model-release` selects from the requested catalogue instead of
+those individual model-path overrides.
 
 With an unversioned custom directory, `--model-release` requires recorded
 source URLs matching the requested bundle; otherwise it asks you to use a
@@ -176,3 +175,31 @@ a small validated knot representation instead of dense histogram tables.
 Calibration changes percentile mappings, not raw model scores or weights.
 Use a separate model copy and an appropriate background reference; do not fit
 calibration to evaluation labels.
+
+(reading-downloads-list)=
+
+## Reading the model availability table
+
+The first table printed by `mhcflurry downloads list` shows the latest weights,
+distinct older archive versions and installed catalogue directories. The
+recommended presentation bundle comes first, followed by the standalone
+affinity and processing bundles. Historical resources appear below the main
+predictors.
+
+| Marker | Meaning |
+|---|---|
+| `RELEASE via presentation` | An affinity or processing component found inside an installed presentation bundle. Standalone bundle installs remain separate entries. |
+| `with flanks only`, `without flanks only` | The bundle contains only one processing variant. |
+| `?` or `!` on the presentation bundle | Unknown or different source URLs. |
+
+A component appears in the table only if it has a model directory and
+`manifest.csv`. These presence checks do not verify weight file integrity or
+prove that embedded and standalone ensembles are identical.
+
+Aliases sharing the same archive are grouped in the availability columns;
+`releases DOWNLOAD` lists every valid identifier. Terminal output uses
+restrained color; redirected output and `NO_COLOR=1` remain plain.
+
+In JSON output, `downloaded`, `status` and `path` still describe the named
+bundle. The additive `presentation_components` entries describe embedded paths,
+directory/manifest presence and the presentation bundle's source status.

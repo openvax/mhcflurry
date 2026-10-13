@@ -1,11 +1,12 @@
 # Command-line reference
 
 For each command documented here, `mhcflurry <command> --help` shows the same
-options in a terminal; set `NO_COLOR=1` to disable colored help. Other
-`mhcflurry eval` and `mhcflurry train` subcommands, and the `mhcflurry
+options in a terminal; set `NO_COLOR=1` to disable colored help.
+
+Other `mhcflurry eval` and `mhcflurry train` subcommands, and the `mhcflurry
 pseudosequences` subcommands, appear only in the namespace listings below; run
-the subcommand's `--help` for their options. Historical `mhcflurry-*` script names remain
-available; see {doc}`configuration`.
+the subcommand's `--help` for their options. Historical `mhcflurry-*` script
+names remain available; see {doc}`configuration`.
 
 ## Prediction and data
 
@@ -166,9 +167,6 @@ reassignment command excludes evaluation peptide–MHC pairs and source samples.
 
 ### `mhcflurry pseudosequences`
 
-```{note}
-`mhcflurry pseudosequences` is a shell-helper CLI for the
-pseudosequence CSV registry. It has its own subcommands
-(`filename`, `path`, `list`, `legacy`); run
-`mhcflurry pseudosequences --help` for the full argument forms.
-```
+`mhcflurry pseudosequences` is a shell-helper CLI for the pseudosequence CSV
+registry. It has its own subcommands (`filename`, `path`, `list`, `legacy`);
+run `mhcflurry pseudosequences --help` for the full argument forms.

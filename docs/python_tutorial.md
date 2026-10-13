@@ -44,25 +44,6 @@ The peptides and flanks above come from `example.fasta`. Omit both
 Here, the allele list is one MHC class I allele set, and the
 strongest binder across that MHC allele set is reported for each peptide.
 
-| Python input | Meaning |
-|---|---|
-| `alleles=["A0201", "A0301"]` | One MHC allele set; one result per peptide. |
-| `alleles={"sample1": [...], "sample2": [...]}` | Multiple named MHC allele sets; one result per sample and peptide. |
-
-```{note}
-MHCflurry normalizes allele names using the [mhcgnomes](https://github.com/pirl-unc/mhcgnomes)
-package. Names like `HLA-A0201` or `A*02:01` will be
-normalized to `HLA-A*02:01`, so most naming conventions can be used
-with methods such as {meth}`~mhcflurry.Class1PresentationPredictor.predict`.
-```
-
-Invalid, ambiguous, class-II, pseudogene, null, and unsupported allele names
-raise a descriptive `ValueError` by default. For streaming or mixed-quality
-data, pass `throw=False`; affected prediction rows are retained with `NaN`
-scores (or ignored when another valid allele in the MHC allele set supplies the
-sample's best affinity) while valid inputs are still evaluated. The
-command-line equivalent is `mhcflurry predict --no-throw`.
-
 If you have multiple sample MHC allele sets, you can pass a dict, where the
 keys are arbitrary sample names:
 
@@ -79,6 +60,26 @@ keys are arbitrary sample names:
 ```
 
 Here the strongest binder for each sample / peptide pair is returned.
+
+| Python input | Meaning |
+|---|---|
+| `alleles=["A0201", "A0301"]` | One MHC allele set; one result per peptide. |
+| `alleles={"sample1": [...], "sample2": [...]}` | Multiple named MHC allele sets; one result per sample and peptide. |
+
+### Allele names
+
+MHCflurry normalizes allele names using the
+[mhcgnomes](https://github.com/pirl-unc/mhcgnomes) package. Names like
+`HLA-A0201` or `A*02:01` are normalized to `HLA-A*02:01`, so most naming
+conventions can be used with methods such as
+{meth}`~mhcflurry.Class1PresentationPredictor.predict`.
+
+Invalid, ambiguous, class-II, pseudogene, null, and unsupported allele names
+raise a descriptive `ValueError` by default. For streaming or mixed-quality
+data, pass `throw=False`; affected prediction rows are retained with `NaN`
+scores (or ignored when another valid allele in the MHC allele set supplies the
+sample's best affinity) while valid inputs are still evaluated. The
+command-line equivalent is `mhcflurry predict --no-throw`.
 
 ## Scanning protein sequences
 

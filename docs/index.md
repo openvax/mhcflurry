@@ -93,7 +93,7 @@ auto_sizing_audit
 
 ```{toctree}
 :maxdepth: 2
-:caption: Training internals
+:caption: Maintainer notes: training internals
 :hidden:
 
 release_training_recipe
@@ -108,7 +108,7 @@ saved_candidate_evaluation
 
 ```{toctree}
 :maxdepth: 2
-:caption: Controlled experiments
+:caption: Maintainer notes: controlled experiments
 :hidden:
 
 processing_cleavage_boundary_experiment
