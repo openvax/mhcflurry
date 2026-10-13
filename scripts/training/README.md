@@ -103,14 +103,14 @@ paper figures, saved-prediction tables, and external predictors.
   for legacy 5-aa and boundary 5x5 families (48 fits, four shared folds).
   Requires verified matched training negatives, restores best checkpoints,
   uses explicit X context padding and preserves per-fold/per-member predictions.
-  See `docs/processing_kernel_sweep.md`; the bounded single-A100 launcher is
+  See `notes/processing_kernel_sweep.md`; the bounded single-A100 launcher is
   `launch_processing_kernel_sweep_modal.py` (`runplz modal --detach`).
 - **`mhcflurry train processing-hyperparameter-sweep --design training-recipe`**
   runs the 64-fit optimizer/initialization/batch factorial with explicit
   processing LSUV, independent best/terminal checkpoints, paired frozen folds
   and per-member state predictions. Use `--evaluation none` for development
   screening. Width recovery imports complete conditions without resampling.
-  See `docs/processing_hyperparameter_campaign.md` for recovery, budget controls
+  See `notes/processing_hyperparameter_campaign.md` for recovery, budget controls
   and the distinction between screening and compact-ensemble selection.
 - **`mhcflurry train processing-hyperparameter-sweep --design ranking-confirmation`**
   runs the six-condition, 24-fit width/optimizer/checkpoint panel with

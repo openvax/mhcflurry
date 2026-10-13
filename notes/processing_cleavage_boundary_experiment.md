@@ -30,7 +30,7 @@ The opt-in boundary architecture retains a full-peptide base path and adds two
 separate boundary-aligned residual paths. Each residual path receives its
 crossed-boundary window. Its contribution to the final logit is initialized to
 zero, so initial predictions come from the base path. See
-{doc}`release_training_recipe` for the 5x5 boundary family selected for 2.3.0.
+[release training recipe](../docs/release_training_recipe.md) for the 5x5 boundary family selected for 2.3.0.
 
 For processing-specific comparisons, use the same sample/length/affinity-matched
 risk sets for all predictors and retain the frozen public affinity reference.

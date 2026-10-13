@@ -105,14 +105,3 @@ probabilistic_processing_matching
 presentation_percentile_calibration
 saved_candidate_evaluation
 ```
-
-```{toctree}
-:maxdepth: 2
-:caption: Maintainer notes: controlled experiments
-:hidden:
-
-processing_cleavage_boundary_experiment
-processing_kernel_sweep
-processing_hyperparameter_campaign
-exact_public_data_experiment
-```
