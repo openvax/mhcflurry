@@ -132,10 +132,12 @@ the previous cohort SHA256 was
 
 The cohort is disjoint from the inventoried MHCflurry training peptide sources.
 Unavailable or incomplete training records, especially for external predictors,
-prevent claiming disjointness from every model ever trained. Ten patients limit
-precision and generalizability; the release changed both recipes and data, so
-its gains cannot be attributed solely to newer data. PPV@N uses the retained
-positive count in each patient, with expected precision across score ties.
+prevent claiming disjointness from every model ever trained.
+
+Ten patients limit precision and generalizability. The release changed both
+recipes and data, so its gains cannot be attributed solely to newer data.
+PPV@N uses the retained positive count in each patient, with expected precision
+across score ties.
 
 ## Components and artifacts
 
@@ -152,10 +154,14 @@ used in that full predictor. The saved presentation-percentile mapping preserves
 the raw-score AP, PPV@N and AUROC on the complete revised cohort.
 
 [Download the aggregate comparison tables and figures](https://github.com/openvax/mhcflurry/releases/download/2.3.0/model-comparison.20260928-v4.tar.gz).
+The archive holds full-precision aggregate tables, rendering code, and a
+separately labeled prerelease component comparison.
+
 The stable-model tables above and the PDF include public 2.1.5/2.2.0/2.2.1,
-NetMHCpan 4.0/4.1/4.2 BA and EL, and MixMHCpred 3.0. The archive includes full-precision aggregate tables, rendering code, and
-a separately labeled prerelease component comparison. It does not include
-MixMHCpred 2.0.2, whose incomplete coverage required a different subset. Model archive checksums accompany the [2.3.0 release](https://github.com/openvax/mhcflurry/releases/tag/2.3.0).
+NetMHCpan 4.0/4.1/4.2 BA and EL, and MixMHCpred 3.0. They do not include
+MixMHCpred 2.0.2, whose incomplete coverage required a different subset.
+Model archive checksums accompany the
+[2.3.0 release](https://github.com/openvax/mhcflurry/releases/tag/2.3.0).
 
 ```{figure} _static/release-2.3.0/affinity_ligand_ranking.svg
 :alt: Component AP, PPV at N and AUROC across stable MHCflurry models on the same presentation labels.

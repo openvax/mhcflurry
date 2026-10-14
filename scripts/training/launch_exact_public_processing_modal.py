@@ -1,7 +1,7 @@
 """Bounded runplz/Modal launcher for the exact-public-data processing replay.
 
 Run from a clean ``git archive`` extraction, not the working tree containing
-large experiment outputs. See docs/exact_public_data_experiment.md.
+large experiment outputs. See notes/exact_public_data_experiment.md.
 """
 
 import hashlib

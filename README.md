@@ -4,11 +4,12 @@
 # MHCflurry
 
 MHCflurry predicts which peptides are likely to be displayed by MHC class I
-molecules. It provides pretrained models for three related tasks:
+molecules. Given peptides or protein sequences and MHC class I alleles, its
+pretrained models predict:
 
-- **Binding affinity:** how strongly a peptide binds an MHC allele.
-- **Antigen processing:** whether cellular processing favors the peptide.
-- **Presentation:** a combined score using binding and processing predictions.
+- Binding affinity: how strongly a peptide binds an MHC allele, in nM.
+- Antigen processing: whether cellular processing favors the peptide.
+- Presentation: a combined score using binding and processing predictions.
 
 You can use the released models from the command line or Python, scan proteins
 for candidate epitopes, or train models on your own data.
@@ -23,9 +24,7 @@ pip install --upgrade "mhcflurry>=2.3,<2.4"
 mhcflurry downloads fetch models_class1_presentation
 ```
 
-The presentation bundle includes affinity and processing components. Browse
-current and historical weights with `mhcflurry downloads info`; select a weight
-release for prediction with `--model-release`.
+The presentation bundle includes the affinity and processing components.
 
 Predict a few peptides:
 
@@ -35,6 +34,11 @@ mhcflurry predict \
     --peptides SIINFEKL SIINFEKD SIINFEKQ \
     --out predictions.csv
 ```
+
+The output CSV includes predicted binding affinity (nM), affinity percentile,
+processing score and presentation score columns; the
+[introduction](https://openvax.github.io/mhcflurry/intro.html#understand-the-results)
+explains how to read them.
 
 Or scan a protein sequence for candidate ligands:
 
@@ -48,17 +52,22 @@ mhcflurry predict-scan \
 To try MHCflurry without installing anything, open the
 [Colab notebook](https://colab.research.google.com/github/openvax/mhcflurry/blob/master/notebooks/mhcflurry-colab.ipynb).
 
-The historical `mhcflurry-*` command names remain supported for existing
-scripts. See the [2.3.0 release notes](RELEASE_NOTES_2.3.0.md) for details.
-
 ## Documentation
 
 - [Introduction and installation](https://openvax.github.io/mhcflurry/intro.html)
 - [Command-line tutorial](https://openvax.github.io/mhcflurry/commandline_tutorial.html)
 - [Python tutorial](https://openvax.github.io/mhcflurry/python_tutorial.html)
+- [Model weights and older releases](https://openvax.github.io/mhcflurry/model_downloads.html):
+  browse weights with `mhcflurry downloads info` and select one with `--model-release`.
+- [Evaluation of the 2.3.0 weights](https://openvax.github.io/mhcflurry/release_model_evaluation.html)
 - [Training models](https://openvax.github.io/mhcflurry/training.html)
 - [Command reference](https://openvax.github.io/mhcflurry/commandline_tools.html)
 - [API reference](https://openvax.github.io/mhcflurry/api.html)
+- [Predicted binding motifs](https://openvax.github.io/mhcflurry-motifs/)
+
+Scripts that use the older `mhcflurry-*` command names, such as
+`mhcflurry-predict`, keep working; see the
+[2.3.0 release notes](RELEASE_NOTES_2.3.0.md).
 
 Please [file an issue](https://github.com/openvax/mhcflurry/issues) if you have
 questions or encounter problems.
@@ -95,17 +104,14 @@ docker pull openvax/mhcflurry:latest
 docker run --rm openvax/mhcflurry:latest mhcflurry --version
 ```
 
-Stable releases publish a matching version tag and update `latest` after
-both architecture builds pass an offline prediction check. Publication status
-is visible in the [Docker workflow](https://github.com/openvax/mhcflurry/actions/workflows/docker.yml);
-an incomplete publication can leave `latest` on the previous version.
-
 Run predictions against files in the current directory:
 
 ```shell
 docker run --rm -v "$PWD:/work" openvax/mhcflurry:latest \
     mhcflurry predict input.csv --out predictions.csv
 ```
+
+Mounted directories must be writable by the container's user (UID 1000).
 
 To start Jupyter, run the image without a command:
 
@@ -115,12 +121,22 @@ docker run --rm -p 127.0.0.1:9999:9999 -v "$PWD:/work" openvax/mhcflurry:latest
 
 Open the localhost URL printed in the logs, including its access token.
 Without the volume mount, the image starts in a directory containing the
-example notebooks. Mounted directories must be writable by the container's
-user (UID 1000). To build from a checkout, use
-`docker build -t mhcflurry:local .`. For CUDA training, a separate image can be
-built with `docker build -f docker/Dockerfile.train -t mhcflurry:train .`.
+example notebooks.
 
-## More resources
+Each stable release publishes a matching version tag. The `latest` tag is
+updated only after both architecture builds pass an offline prediction check,
+so an incomplete publication can leave `latest` on the previous version; see
+the [Docker workflow](https://github.com/openvax/mhcflurry/actions/workflows/docker.yml)
+for publication status.
 
-- [Predicted binding motifs](https://openvax.github.io/mhcflurry-motifs/)
-- [Manual download instructions](https://openvax.github.io/mhcflurry/commandline_tutorial.html#downloading-models)
+To build images from a checkout:
+
+```shell
+docker build -t mhcflurry:local .
+# Separate image for CUDA training
+docker build -f docker/Dockerfile.train -t mhcflurry:train .
+```
+
+## License
+
+MHCflurry is released under the [Apache License 2.0](LICENSE).

@@ -93,7 +93,7 @@ auto_sizing_audit
 
 ```{toctree}
 :maxdepth: 2
-:caption: Training internals
+:caption: Maintainer notes: training internals
 :hidden:
 
 release_training_recipe
@@ -104,15 +104,4 @@ processing_preparation_acceleration
 probabilistic_processing_matching
 presentation_percentile_calibration
 saved_candidate_evaluation
-```
-
-```{toctree}
-:maxdepth: 2
-:caption: Controlled experiments
-:hidden:
-
-processing_cleavage_boundary_experiment
-processing_kernel_sweep
-processing_hyperparameter_campaign
-exact_public_data_experiment
 ```

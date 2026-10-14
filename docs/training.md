@@ -142,30 +142,43 @@ mhcflurry train processing-data \
 mhcflurry train validate-processing-data --data processing_train.csv
 ```
 
-The frozen reference is independent of the newly trained affinity candidate.
-Each negative has the same sample and peptide length as its hit and differs
-by at most 0.25 log10 predicted-affinity units. Same-protein matches are
-preferred. If the scored candidate pool is insufficient, generation fails;
-increase the pool multiplier in a fresh experiment instead of dropping hits
-or using unmatched fallback peptides. Preserve `processing_train.csv.matching/`
-alongside the final table: it contains reference/input fingerprints, the scored
-candidate pools, matching diagnostics, and any failure records. The table
-itself retains risk-set/source identities and matching metadata.
+How the negatives are matched:
+
+- The frozen reference affinity predictor is independent of the newly trained
+  affinity candidate.
+- Each negative has the same sample and peptide length as its hit and differs
+  by at most 0.25 log10 predicted-affinity units. Same-protein matches are
+  preferred.
+- If the scored candidate pool is insufficient, generation fails. Increase the
+  pool multiplier in a fresh experiment rather than dropping hits or using
+  unmatched fallback peptides.
+
+Keep `processing_train.csv.matching/` alongside the final table. It holds the
+reference and input fingerprints, the scored candidate pools, matching
+diagnostics, and any failure records. The table itself retains risk-set and
+source identities and matching metadata.
 
 Training and selection default to `--processing-data-policy matched`, including
 resume validation. Inner early stopping keeps whole samples together so reused
-decoys do not leak across its split. For historical exact-data replay only,
-pass `--processing-data-policy legacy`; reproducing the old generator also
-requires `--negative-policy legacy-top-binders`. The `exact-public-processing`
-workflow sets the legacy policy explicitly. Do not call a matched-data retrain
-an exact-public-data comparison.
+decoys do not leak across its split.
 
-Processing evaluation defaults to the same matching algorithm with ten decoys
-per hit. It saves both the full benchmark prediction table for external joins
-and the matched risk-set predictions used for metrics. Training uses one decoy
-per hit by default to remain balanced; these two prevalences do not give
-directly comparable AUPRC values. Historical random-decoy evaluation requires
-`--processing-negative-policy random-diagnostic`, and its plotting requires
-`--allow-legacy-processing-plots`. Affinity regression and end-to-end
-presentation retain their separate objectives/cohorts; matched processing
-results are not plotted on their absolute-performance axes.
+Pass `--processing-data-policy legacy` only to replay historical exact data;
+reproducing the old generator also needs
+`--negative-policy legacy-top-binders`. The `exact-public-processing` workflow
+sets the legacy policy explicitly. A matched-data retrain is not an
+exact-public-data comparison.
+
+### Comparing training and evaluation prevalence
+
+Processing evaluation uses the same matching algorithm with ten decoys per hit,
+while training uses one decoy per hit to stay balanced. These two prevalences
+do not give directly comparable AUPRC values.
+
+Evaluation saves both the full benchmark prediction table, for external joins,
+and the matched risk-set predictions used for metrics. Historical random-decoy
+evaluation requires `--processing-negative-policy random-diagnostic`, and its
+plotting requires `--allow-legacy-processing-plots`.
+
+Affinity regression and end-to-end presentation keep their separate objectives
+and cohorts, so matched processing results are not plotted on their
+absolute-performance axes.

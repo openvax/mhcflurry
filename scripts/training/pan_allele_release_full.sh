@@ -517,7 +517,7 @@ for kind in $PROCESSING_VARIANTS; do
     if [[ "$kind" == "short_flanks" && \
             "$PROCESSING_SHORT_FLANKS_HYPERPARAMETERS" == "confirmed-ranking-candidate" ]]; then
         # The named 2026-09-10 confirmation winner; see
-        # docs/processing_hyperparameter_campaign.md. Matched training data
+        # notes/processing_hyperparameter_campaign.md. Matched training data
         # supplies the sample-disjoint inner stopping split its ranking
         # checkpoint requires.
         python "$SCRIPT_DIR/generate_processing_recipe.py" --confirmed-candidate \

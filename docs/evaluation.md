@@ -132,31 +132,43 @@ Rows join by benchmark source file and row identity, with MHC allele sets
 canonicalized as compare-models saves them; any unmatched row fails the command.
 `data_evaluation` ships NetMHCpan 4.0 BA/EL and MixMHCpred columns. Pass
 `--external-dir` once per directory of locally generated scores, such as
-NetMHCpan 4.1/4.2, whose files may be plain CSV. External training overlap
-is not certified: a tool version or release date alone does not prove that
-these evaluation samples were excluded from its training.
+NetMHCpan 4.1/4.2, whose files may be plain CSV.
 
-`multiallelic` uses the saved presentation scores with and without flanks;
-`monoallelic` uses saved affinity predictions (pass `--skip-joined-table` for
-that large cohort). Metrics use the compare-models definitions. All requested
-NetMHCpan versions, both BA and EL, receive paired comparisons.
+External training overlap is not certified: a tool version or release date
+alone does not prove that these evaluation samples were excluded from its
+training.
+
+The `--cohort` choices use different saved predictions. `multiallelic` uses the
+saved presentation scores with and without flanks. `monoallelic` uses saved
+affinity predictions; pass `--skip-joined-table` for that large cohort.
+Metrics use the compare-models definitions, and all requested NetMHCpan
+versions, both BA and EL, receive paired comparisons.
+
+### Row coverage
 
 Use `--coverage common` for reported comparisons. Every table, paired interval
 and figure then uses identical rows across all requested models, and every
-sample must remain represented with both classes. The default diagnostic
-`available` mode instead preserves per-model coverage: each predictor uses its
-covered rows and each pair uses their intersection. `coverage.csv` records
-unscored rows, original missing-score counts and common exclusions; provenance
-records original and scored hit/row counts.
+sample must remain represented with both classes.
+
+The default diagnostic `available` mode instead preserves per-model coverage:
+each predictor uses its covered rows and each pair uses their intersection.
+
+`coverage.csv` records unscored rows, original missing-score counts and common
+exclusions; provenance records original and scored hit/row counts.
+
+### Intervals, baselines and outputs
 
 Paired intervals resample whole samples (10000 draws, seed 42 by default) and
-are exploratory. Two reference baselines are included by default: seeded random
-scores, and a logistic regression on the one-hot first and last four residues
-with no MHC or flank input, fitted leave-one-sample-out so no sample's labels
-reach its own scores. Pass `--baselines none` to skip them. Outputs include
-per-sample, macro and pooled metrics, paired differences, a joined score table,
-`external_comparison.pdf` with PNG pages, `summary.md` and a provenance
-manifest.
+are exploratory.
+
+Two reference baselines are included by default: seeded random scores, and a
+logistic regression on the one-hot first and last four residues with no MHC or
+flank input, fitted leave-one-sample-out so no sample's labels reach its own
+scores. Pass `--baselines none` to skip them.
+
+Outputs include per-sample, macro and pooled metrics, paired differences, a
+joined score table, `external_comparison.pdf` with PNG pages, `summary.md` and
+a provenance manifest.
 
 ## Specialized workflows
 
@@ -199,13 +211,17 @@ mhcflurry eval compare-models \
 
 The preparation command retains every held-out hit and the original cached
 public affinities, samples additional candidates only for unresolved lengths,
-and scores them with the frozen reference. It first checks that this reference
-reproduces 256 spread-out cached predictions per sample within 0.0001 log10
-units. Input, model and output checksums, the checked rows, seeds, scored rounds
-and unique assignments are saved. `--resume` reuses verified rounds; insufficient
-capacity remains an error. This processing-only expansion does not alter the
-presentation benchmark. The remote launcher accepts the resulting directory
-through `PROCESSING_EVALUATION_COHORT`.
+and scores them with the frozen reference. Before sampling, it checks that this
+reference reproduces 256 spread-out cached predictions per sample within 0.0001
+log10 units.
+
+Input, model and output checksums, the checked rows, seeds, scored rounds and
+unique assignments are saved. `--resume` reuses verified rounds; insufficient
+capacity remains an error.
+
+This processing-only expansion does not alter the presentation benchmark. The
+remote launcher accepts the resulting directory through
+`PROCESSING_EVALUATION_COHORT`.
 
 ### Count-matched processing ensembles
 
@@ -225,6 +241,7 @@ mhcflurry eval processing-ensemble-subsets \
 This source-checkout command requires strict length/affinity-matched risk
 sets, caches each network's predictions, verifies reconstruction against the
 named full-ensemble score, and preserves all subset scores and memberships.
+
 It reports median, range and quartiles across the complete subset set. This
 spread measures ensemble composition sensitivity; it is not a confidence
 interval or a validation-based model selection procedure. Matching network

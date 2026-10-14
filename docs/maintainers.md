@@ -49,16 +49,10 @@ others reference.
 - {doc}`saved_candidate_evaluation` evaluates a completed training run with
   `mhcflurry eval saved-candidate`, without retraining.
 
-## Controlled experiments
+## Experiment notes
 
-These pages define controlled comparisons: the question, the fixed controls,
-and the commands that run them.
-
-- {doc}`processing_cleavage_boundary_experiment` asks whether boundary-spanning
-  sequence context adds signal after controlling for binding affinity.
-- {doc}`processing_kernel_sweep` sweeps kernel widths across the legacy flank
-  CNN and the boundary-branch architecture.
-- {doc}`processing_hyperparameter_campaign` compares processing-specific
-  training recipes rather than assuming affinity's settings transfer.
-- {doc}`exact_public_data_experiment` replays historical processing data against
-  the actual public affinity weights.
+Controlled-experiment write-ups (cleavage-boundary models, kernel-width sweeps,
+the processing hyperparameter campaign, and the historical public-data replay)
+are kept as working notes in the repository's
+[notes directory](https://github.com/openvax/mhcflurry/tree/master/notes), outside the
+published docs.

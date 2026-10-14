@@ -3,17 +3,8 @@
 ## Automatic hardware planning
 
 Prediction, training, calibration, selection, and evaluation commands share a
-workload-aware planner. Depending on the command, it considers available GPU
-memory, model and data size, the configured training batch, host RAM, CPU count,
-and remaining work items. Container memory limits are detected through cgroups,
-so a job does not size itself from RAM that belongs to the physical host but is
-unavailable inside the container. On spawn-based platforms, the planner also
-measures the loaded worker context before starting the pool; this prevents a
-compressed input file from hiding the much larger in-memory copy created in
-each worker. If the remaining safe RAM cannot hold even one additional spawn
-copy, an automatic plan runs serially in the already-loaded parent process.
-
-The common automatic options are:
+workload-aware planner that chooses worker counts and batch sizes. Leave these
+options on `auto` unless you have a reason to pin them:
 
 | Option | Automatic behavior |
 |---|---|
@@ -27,20 +18,36 @@ Automatic GPU packing has no default fixed worker cap. Explicit CLI values and
 explicit per-workload memory estimates remain authoritative; the planner logs
 the facts and limits used for each decision.
 
-Affinity and processing trainers validate an automatic GPU plan with a bounded
-single-worker resource probe before starting the production pool. The probe uses
-the real resident fold and validation path and measures whole-process CUDA usage;
-it is a resource-safety step even when `torch.compile` is disabled. Runtime auto
-batches use a fixed per-worker share of launch-time free device capacity, so
-their size does not depend on which co-resident worker initialized first.
-Automatic CUDA processing batches are additionally capped by a successful
-real-model forward probe; the planner does not extrapolate across unobserved
-convolution workspace shapes.
-
 If a workload still runs out of memory, first keep the batch and worker settings
 on `auto`. If you need to intervene, reduce `--max-workers-per-gpu` or use a
 smaller explicit batch. Pinning values can improve repeatability on a known
 machine, but it also bypasses some automatic safeguards.
+
+### How the planner sizes work
+
+Depending on the command, the planner considers available GPU memory, model and
+data size, the configured training batch, host RAM, CPU count, and remaining
+work items.
+
+- Container memory limits are detected through cgroups, so a job does not size
+  itself from RAM that belongs to the physical host but is unavailable inside
+  the container.
+- On spawn-based platforms, the planner measures the loaded worker context
+  before starting the pool. This prevents a compressed input file from hiding
+  the much larger in-memory copy created in each worker. If the remaining safe
+  RAM cannot hold even one additional spawn copy, an automatic plan runs
+  serially in the already-loaded parent process.
+- Affinity and processing trainers validate an automatic GPU plan with a
+  bounded single-worker resource probe before starting the production pool.
+  The probe uses the real resident fold and validation path and measures
+  whole-process CUDA usage; it is a resource-safety step even when
+  `torch.compile` is disabled.
+- Runtime auto batches use a fixed per-worker share of launch-time free device
+  capacity, so their size does not depend on which co-resident worker
+  initialized first.
+- Automatic CUDA processing batches are additionally capped by a successful
+  real-model forward probe; the planner does not extrapolate across unobserved
+  convolution workspace shapes.
 
 See {doc}`orchestrator` for implementation details and expert environment
 overrides.
@@ -48,10 +55,11 @@ overrides.
 ## Environment overrides
 
 These variables are intended for custom model locations, debugging, and
-controlled benchmarks.
+controlled benchmarks. See {doc}`model_downloads` for release selection and
+download-directory overrides.
 
 `MHCFLURRY_DEFAULT_CLASS1_MODELS`
-: Path to the default **affinity** predictor. Without this override,
+: Path to the default affinity predictor. Without this override,
   `Class1AffinityPredictor.load()` uses the active release's standalone affinity
   bundle when installed, then falls back to the affinity component of its
   presentation bundle. Explicit model paths take precedence.
@@ -63,8 +71,6 @@ controlled benchmarks.
 `MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS_DIR`
 : Path to the default standalone processing predictor. Otherwise, uses the
   active release's standalone processing bundle.
-
-See {doc}`model_downloads` for release selection and download-directory overrides.
 
 `MHCFLURRY_OPTIMIZATION_LEVEL`
 : Controls pan-allele ensemble merging. The default, `1`, enables the faster
@@ -84,7 +90,7 @@ default is `42`, covering data splits and shuffles, initial weights, random
 negatives, allele sampling, and calibration peptides. Ensemble members derive
 distinct sub-seeds from that master seed.
 
-Compact percentile knot selection has a separate, fixed seed of **403** for
+Compact percentile knot selection has a separate, fixed seed of 403 for
 its grouped 80/20 background split. `--random-seed` controls background peptide
 and MHC allele set generation, not that selection seed. The selected knot budget,
 reference hash, and available validation diagnostics are saved with the curve;
