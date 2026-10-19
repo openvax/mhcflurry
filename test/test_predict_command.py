@@ -380,3 +380,23 @@ def test_stdout_contains_only_parseable_csv(capsys, affinity_only):
     assert frame.mhcflurry_affinity.notna().all()
     assert "Predicting" not in output.out
     assert "Predicting affinities." in output.err
+
+
+def test_csv_with_empty_and_na_like_flanks(tmp_path):
+    # A peptide at a protein terminus has an empty flank, and "NA" or "NAN"
+    # are valid residue strings. pandas reads all three as NaN by default.
+    input_path = tmp_path / "input.csv"
+    input_path.write_text(
+        "allele,peptide,n_flank,c_flank\n"
+        "HLA-A*02:01,SLYNTVATL,MGWSLKVL,QFYVYMTI\n"
+        "HLA-A*02:01,SIINFEKL,,QFYVYMTI\n"
+        "HLA-A*02:01,NLVPMVATV,MGWSLKVL,\n"
+        "HLA-A*02:01,GILGFVFTL,NAN,NA\n")
+    output_path = tmp_path / "output.csv"
+
+    predict_command.run([str(input_path), "--out", str(output_path)])
+
+    result = pandas.read_csv(output_path, keep_default_na=False)
+    assert result.n_flank.tolist() == ["MGWSLKVL", "", "MGWSLKVL", "NAN"]
+    assert result.c_flank.tolist() == ["QFYVYMTI", "QFYVYMTI", "", "NA"]
+    assert (result.mhcflurry_presentation_score != "").all()

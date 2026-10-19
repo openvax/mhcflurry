@@ -23,7 +23,8 @@ Examples:
 
 CSV columns: allele, peptide, n_flank and c_flank. Available N/C flanks are
 used by default; use --no-flanking to compare without sequence context. Flank
-columns may be omitted when context is unavailable. Input columns
+columns may be omitted when context is unavailable, and a flank cell may be
+empty for a peptide at a protein terminus. Input columns
 are preserved in the output. Separate --alleles arguments are independent
 queries, each scored against every peptide. Delimit alleles within a CSV cell
 or quoted argument with commas, semicolons or spaces to score one MHC allele
@@ -343,7 +344,9 @@ def run(argv=sys.argv[1:]):
             parser.error(
                 "If an input file is specified, do not specify --alleles "
                 "or --peptides")
-        df = pandas.read_csv(args.input)
+        # Keep empty cells as "" rather than NaN: an empty flank means the
+        # peptide is at a protein terminus, and "NA" is a valid residue string.
+        df = pandas.read_csv(args.input, keep_default_na=False)
         print(
             "Read input CSV with %d rows, columns are: %s" % (
                 len(df), ", ".join(df.columns)),
