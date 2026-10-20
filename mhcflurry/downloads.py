@@ -21,7 +21,7 @@ from os import environ
 from shlex import quote
 from importlib.resources import files
 from collections import OrderedDict
-from appdirs import user_data_dir
+from platformdirs import user_data_dir
 
 import csv
 
