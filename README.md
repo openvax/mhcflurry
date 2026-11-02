@@ -147,4 +147,5 @@ If you use MHCflurry in your research, please cite:
 
 ## License
 
-MHCflurry is released under the [Apache License 2.0](LICENSE).
+MHCflurry is released under the
+[Apache License 2.0](https://github.com/openvax/mhcflurry/blob/master/LICENSE).
