@@ -112,6 +112,43 @@ def add_random_seed_arg(parser):
         "vary with hardware, library versions and nondeterministic kernels.")
 
 
+def add_verbosity_arg(parser, default=0, help="Verbosity. Default: %(default)s"):
+    """Add the standard integer ``--verbosity`` argument to a CLI parser.
+
+    Commands pass ``args.verbosity > 1`` to ``configure_logging`` and forward
+    the raw value to model ``fit``/``predict`` as ``verbose``.
+    """
+    parser.add_argument("--verbosity", type=int, help=help, default=default)
+
+
+def add_debug_arg(parser):
+    """Add the standard ``--debug`` (drop into pdb on error) flag to a parser."""
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        default=False,
+        help="Launch python debugger on error")
+
+
+def add_out_models_dir_arg(parser, help):
+    """Add the required ``--out-models-dir`` argument to a CLI parser."""
+    parser.add_argument(
+        "--out-models-dir",
+        metavar="DIR",
+        required=True,
+        help=help)
+
+
+def add_max_epochs_arg(parser):
+    """Add ``--max-epochs``, which overrides hyperparameters' ``max_epochs``."""
+    parser.add_argument(
+        "--max-epochs",
+        type=positive_int_arg,
+        metavar="N",
+        help="Max training epochs. If specified here it overrides any "
+        "'max_epochs' specified in the hyperparameters.")
+
+
 def configure_random_seed(seed=None, name="mhcflurry"):
     """Resolve, apply, and log a master random seed.
 

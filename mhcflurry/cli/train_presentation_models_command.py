@@ -30,6 +30,9 @@ from ..class1_processing_predictor import Class1ProcessingPredictor
 from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..class1_presentation_predictor import Class1PresentationPredictor
 from ..common import (
+    add_debug_arg,
+    add_out_models_dir_arg,
+    add_verbosity_arg,
     add_random_seed_arg,
     configure_logging,
     configure_random_seed,
@@ -67,11 +70,8 @@ parser.add_argument(
     "--data",
     metavar="FILE.csv",
     help="Training data CSV. Expected columns: peptide, n_flank, c_flank, hit")
-parser.add_argument(
-    "--out-models-dir",
-    metavar="DIR",
-    required=True,
-    help="Directory to write models and manifest")
+add_out_models_dir_arg(
+    parser, help="Directory to write models and manifest")
 parser.add_argument(
     "--affinity-predictor",
     metavar="DIR",
@@ -87,16 +87,8 @@ parser.add_argument(
     metavar="DIR",
     required=True,
     help="Processing predictor without flanks")
-parser.add_argument(
-    "--verbosity",
-    type=int,
-    help="Default: %(default)s",
-    default=1)
-parser.add_argument(
-    "--debug",
-    action="store_true",
-    default=False,
-    help="Launch python debugger on error")
+add_verbosity_arg(parser, default=1, help="Default: %(default)s")
+add_debug_arg(parser)
 parser.add_argument(
     "--hla-column",
     default="hla",
