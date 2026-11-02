@@ -87,7 +87,7 @@ parser.add_argument(
     metavar="DIR",
     required=True,
     help="Processing predictor without flanks")
-add_verbosity_arg(parser, default=1, help="Default: %(default)s")
+add_verbosity_arg(parser, default=1)
 add_debug_arg(parser)
 parser.add_argument(
     "--hla-column",

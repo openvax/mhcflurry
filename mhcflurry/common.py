@@ -112,17 +112,35 @@ def add_random_seed_arg(parser):
         "vary with hardware, library versions and nondeterministic kernels.")
 
 
-def add_verbosity_arg(parser, default=0, help="Verbosity. Default: %(default)s"):
+def add_verbosity_arg(parser, default=0):
     """Add the standard integer ``--verbosity`` argument to a CLI parser.
 
-    Commands pass ``args.verbosity > 1`` to ``configure_logging`` and forward
-    the raw value to model ``fit``/``predict`` as ``verbose``.
+    The training and selection commands call
+    ``configure_logging(verbose=args.verbosity > 1)``; most also forward the
+    value to model ``fit`` as ``verbose``.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to add the argument to.
+    default : int
+        Verbosity used when the flag is not given.
     """
-    parser.add_argument("--verbosity", type=int, help=help, default=default)
+    parser.add_argument(
+        "--verbosity",
+        type=int,
+        help="Verbosity. Default: %(default)s",
+        default=default)
 
 
 def add_debug_arg(parser):
-    """Add the standard ``--debug`` (drop into pdb on error) flag to a parser."""
+    """Add the standard ``--debug`` flag, which starts pdb on an error.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to add the flag to.
+    """
     parser.add_argument(
         "--debug",
         action="store_true",
@@ -131,7 +149,15 @@ def add_debug_arg(parser):
 
 
 def add_out_models_dir_arg(parser, help):
-    """Add the required ``--out-models-dir`` argument to a CLI parser."""
+    """Add the required ``--out-models-dir`` argument to a CLI parser.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to add the argument to.
+    help : str
+        Command-specific help text, e.g. what is written to the directory.
+    """
     parser.add_argument(
         "--out-models-dir",
         metavar="DIR",
@@ -140,7 +166,14 @@ def add_out_models_dir_arg(parser, help):
 
 
 def add_max_epochs_arg(parser):
-    """Add ``--max-epochs``, which overrides hyperparameters' ``max_epochs``."""
+    """Add ``--max-epochs``, which overrides the hyperparameters' ``max_epochs``.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to add the argument to. The parsed value is a positive int, or
+        ``None`` when the flag is not given.
+    """
     parser.add_argument(
         "--max-epochs",
         type=positive_int_arg,
