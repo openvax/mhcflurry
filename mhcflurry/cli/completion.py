@@ -13,9 +13,10 @@
 """Shell tab completion (argcomplete) for the command-line entry points.
 
 Each Tab press runs the command again, up to its ``argcomplete.autocomplete``
-call, in a process whose environment carries the line being completed. Only
-argument parsing happens in that process, so anything a parser computes just
-for its help text can be skipped there; see :func:`is_completing`.
+call, with the line being completed in its environment. That process only
+matches arguments, so a parser can skip work it does just for help text or
+defaults, such as reading the download catalogue; see :func:`is_completing`.
+zsh and fish then show the shorter help text in their option descriptions.
 """
 
 import os

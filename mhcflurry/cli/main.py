@@ -238,8 +238,9 @@ def load_subcommand_parser(name):
     Returns
     -------
     argparse.ArgumentParser
-        The module-level ``parser`` of historical command modules, or the
-        result of the module's ``make_parser()``.
+        The module's module-level ``parser`` when it has one (the
+        historical command modules do), otherwise ``make_parser()``'s
+        result.
     """
     module = importlib.import_module(_SUBCOMMANDS[name][0])
     parser = getattr(module, "parser", None)
