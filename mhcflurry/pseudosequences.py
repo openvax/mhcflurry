@@ -1,3 +1,4 @@
+# PYTHON_ARGCOMPLETE_OK
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -52,8 +53,6 @@ import logging
 from dataclasses import dataclass
 from glob import glob
 from os.path import basename, exists, join
-
-import pandas
 
 
 LEGACY_ALLELE_SEQUENCES_FILENAME = "allele_sequences.csv"
@@ -128,6 +127,9 @@ def pseudosequence_length(allele_to_sequence):
     """Return the common pseudosequence length, or ``None`` if ambiguous."""
     if not allele_to_sequence:
         return None
+    # Imported here so that importing this module, and so building the
+    # command-line parser, does not load pandas.
+    import pandas
     lengths = set()
     for sequence in allele_to_sequence.values():
         if pandas.isnull(sequence):
@@ -225,8 +227,18 @@ def _run_list(_args):
         ))
 
 
-def main(argv=None, prog=None):
-    """Command-line access for shell generation scripts."""
+def make_parser(prog=None):
+    """Build the ``mhcflurry pseudosequences`` argument parser.
+
+    Parameters
+    ----------
+    prog : str, optional
+        Program name shown in usage and help. Defaults to the script name.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+    """
     parser = argparse.ArgumentParser(prog=prog, description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -257,7 +269,17 @@ def main(argv=None, prog=None):
         "list",
         help="List canonical pseudosequence definitions.")
     list_parser.set_defaults(func=_run_list)
+    return parser
 
+
+def main(argv=None, prog=None):
+    """Command-line access for shell generation scripts."""
+    # Imported here, not at module level, because this is mainly a library
+    # module that model loading imports.
+    import argcomplete
+
+    parser = make_parser(prog)
+    argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
     args.func(args)
 

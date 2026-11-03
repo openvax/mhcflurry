@@ -1,3 +1,4 @@
+# PYTHON_ARGCOMPLETE_OK
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -14,6 +15,7 @@
 Train Class1 pan-allele models.
 """
 import argparse
+import argcomplete
 import os
 from os.path import join
 import sys
@@ -484,6 +486,7 @@ def pretrain_network_input_iterator(
 def run(argv=sys.argv[1:]):
     install_sigusr1_stack_trace_handler()
 
+    argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
     held_out_fraction, held_out_max = (
         args.held_out_measurements_per_allele_fraction_and_max)

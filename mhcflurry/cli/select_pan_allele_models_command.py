@@ -1,3 +1,4 @@
+# PYTHON_ARGCOMPLETE_OK
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -19,6 +20,7 @@ step-up (forward) selection procedure. The final ensemble is the union of all
 selected models across all folds.
 """
 import argparse
+import argcomplete
 import os
 import re
 import sys
@@ -167,6 +169,7 @@ def mse(
 def run(argv=sys.argv[1:]):
     install_sigusr1_stack_trace_handler()
 
+    argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
     if args.min_models_per_fold is None:
         args.min_models_per_fold = min(2, args.max_models_per_fold)

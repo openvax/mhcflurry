@@ -1,3 +1,4 @@
+# PYTHON_ARGCOMPLETE_OK
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -14,6 +15,7 @@
 Train Class1 single allele models.
 """
 import argparse
+import argcomplete
 import os
 import sys
 import time
@@ -177,6 +179,7 @@ TRAIN_DATA_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
 def run(argv=sys.argv[1:]):
     install_sigusr1_stack_trace_handler()
 
+    argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
 
     args.out_models_dir = os.path.abspath(args.out_models_dir)
