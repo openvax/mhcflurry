@@ -33,7 +33,7 @@ mhcflurry downloads fetch models_class1_presentation
 The presentation bundle includes the affinity and processing components.
 Conda users should follow
 [using conda](https://openvax.github.io/mhcflurry/intro.html#using-conda).
-There is also a [Docker image](https://openvax.github.io/mhcflurry/docker.html),
+<a id="docker"></a>There is also a [Docker image](https://openvax.github.io/mhcflurry/docker.html),
 and a [Colab notebook](https://colab.research.google.com/github/openvax/mhcflurry/blob/master/notebooks/mhcflurry-colab.ipynb)
 that needs no installation at all.
 
@@ -101,7 +101,7 @@ explains how to read the output columns.
 
 Scripts that use the older `mhcflurry-*` command names, such as
 `mhcflurry-predict`, keep working; see the
-[2.3.0 release notes](RELEASE_NOTES_2.3.0.md).
+[2.3.0 release notes](https://github.com/openvax/mhcflurry/blob/master/RELEASE_NOTES_2.3.0.md).
 
 ## Documentation
 
@@ -120,7 +120,7 @@ questions or encounter problems.
 
 ## Development
 
-Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md):
+Contributions are welcome. Start with [CONTRIBUTING.md](https://github.com/openvax/mhcflurry/blob/master/CONTRIBUTING.md):
 
 ```shell
 source develop.sh          # create/activate .venv and editable-install
@@ -130,6 +130,8 @@ python -m pytest test/     # tests live in test/, singular
 
 The [testing guide](https://openvax.github.io/mhcflurry/testing.html) describes
 the fast local checks and the full suite.
+
+<a id="citing-mhcflurry"></a>
 
 ## Citation
 
