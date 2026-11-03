@@ -8,11 +8,12 @@ Command-line options now complete with Tab, and each Tab press stays fast.
   or per command with `eval "$(register-python-argcomplete mhcflurry)"`.
 - `mhcflurry` completes every subcommand name. For `predict`, `predict-scan`,
   `downloads` and `pseudosequences` it also completes their options, importing
-  only that subcommand's module; a Tab press takes about 55 ms. The training,
-  selection, calibration and evaluation subcommands complete by name only,
-  because their modules import PyTorch or pandas at startup. Their
-  `mhcflurry-*` scripts do complete options, at the cost of that import
-  (2–3 seconds per Tab press).
+  only that subcommand's module; a Tab press takes 45–55 ms. The other
+  subcommands complete by name only: their modules import PyTorch or pandas
+  at startup, or, for most of `train` and `eval`, run scripts from a source
+  checkout. The training, selection and calibration `mhcflurry-*` scripts do
+  complete their options, at the cost of importing PyTorch (2–3 seconds per
+  Tab press).
 - Importing `mhcflurry.downloads` no longer reads the download catalogue
   (`downloads.yml`). It is read, and the download directory configured, the
   first time they are needed, so a warning about incompatible downloads now
