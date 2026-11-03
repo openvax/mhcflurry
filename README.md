@@ -49,6 +49,10 @@ mhcflurry predict-scan \
     --out scan.csv
 ```
 
+To complete subcommands and options with Tab, run
+`activate-global-python-argcomplete` once, or add
+`eval "$(register-python-argcomplete mhcflurry)"` to your shell startup file.
+
 To try MHCflurry without installing anything, open the
 [Colab notebook](https://colab.research.google.com/github/openvax/mhcflurry/blob/master/notebooks/mhcflurry-colab.ipynb).
 
