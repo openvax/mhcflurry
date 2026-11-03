@@ -39,7 +39,6 @@ subcommand's own flags complete; see :func:`build_completion_parser`.
 from __future__ import annotations
 
 import argparse
-import inspect
 import importlib
 import sys
 
@@ -346,6 +345,10 @@ def _restore_parser_progs(saved):
 
 def _entry_accepts_prog(entry_func):
     """Return whether ``entry_func`` accepts a ``prog=`` display override."""
+    # Imported here: it costs several milliseconds, and a Tab press never
+    # dispatches.
+    import inspect
+
     try:
         signature = inspect.signature(entry_func)
     except (TypeError, ValueError):
