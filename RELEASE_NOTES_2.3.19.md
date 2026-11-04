@@ -1,4 +1,4 @@
-# MHCflurry 2.3.18
+# MHCflurry 2.3.19
 
 The training, model-selection and percentile-calibration commands now share
 one definition each of `--verbosity`, `--debug`, `--out-models-dir` and
