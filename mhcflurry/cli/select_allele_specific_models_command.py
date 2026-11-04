@@ -30,6 +30,8 @@ import tqdm  # progress bar
 
 from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..common import (
+    add_out_models_dir_arg,
+    add_verbosity_arg,
     add_random_seed_arg,
     configure_logging,
     configure_random_seed,
@@ -81,11 +83,8 @@ parser.add_argument(
     metavar="DIR",
     required=True,
     help="Directory to read models")
-parser.add_argument(
-    "--out-models-dir",
-    metavar="DIR",
-    required=True,
-    help="Directory to write selected models")
+add_out_models_dir_arg(
+    parser, help="Directory to write selected models")
 parser.add_argument(
     "--out-unselected-predictions",
     metavar="FILE.csv",
@@ -196,11 +195,7 @@ parser.add_argument(
     default="mass[- ]spec",
     help="Regular expression for mass-spec data. Runs on measurement_source col."
     "Default: %(default)s.")
-parser.add_argument(
-    "--verbosity",
-    type=int,
-    help="Verbosity. Default: %(default)s",
-    default=0)
+add_verbosity_arg(parser)
 
 add_local_parallelism_args(parser)
 add_random_seed_arg(parser)
