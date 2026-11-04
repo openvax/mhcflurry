@@ -115,4 +115,4 @@ For questions and bug reports, use the
 
 If you use MHCflurry in research, cite the MHCflurry 2.0 presentation-model
 paper and the original binding-affinity paper listed in the
-[project README](https://github.com/openvax/mhcflurry#citing-mhcflurry).
+[project README](https://github.com/openvax/mhcflurry#citation).

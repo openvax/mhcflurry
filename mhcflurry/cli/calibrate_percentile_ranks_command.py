@@ -1,3 +1,4 @@
+# PYTHON_ARGCOMPLETE_OK
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -14,6 +15,7 @@
 Calibrate percentile ranks for models. Runs in-place.
 """
 import argparse
+import argcomplete
 import os
 import sys
 import time
@@ -30,6 +32,7 @@ from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..class1_presentation_predictor import Class1PresentationPredictor
 from ..class1_processing_predictor import Class1ProcessingPredictor
 from ..common import (
+    add_verbosity_arg,
     add_random_seed_arg,
     allele_locus_name,
     amino_acid_distribution,
@@ -202,11 +205,7 @@ parser.add_argument(
     metavar="N",
     default=1,
     help="Number of alleles per work chunk. Default: %(default)s.")
-parser.add_argument(
-    "--verbosity",
-    type=int,
-    help="Verbosity. Default: %(default)s",
-    default=0)
+add_verbosity_arg(parser)
 parser.add_argument(
     "--gpu-batched",
     default=False,
@@ -250,6 +249,7 @@ add_random_seed_arg(parser)
 
 
 def run(argv=sys.argv[1:]):
+    argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
     if args.length_range[0] > args.length_range[1]:
         parser.error(

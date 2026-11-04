@@ -1,3 +1,4 @@
+# PYTHON_ARGCOMPLETE_OK
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -19,6 +20,7 @@ step-up (forward) selection procedure. The final ensemble is the union of all
 selected models across all folds.
 """
 import argparse
+import argcomplete
 import os
 import re
 import sys
@@ -35,6 +37,8 @@ from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..encodable_sequences import EncodableSequences
 from ..allele_encoding import AlleleEncoding
 from ..common import (
+    add_out_models_dir_arg,
+    add_verbosity_arg,
     configure_logging,
     filter_canonicalizable_alleles,
     install_sigusr1_stack_trace_handler,
@@ -81,11 +85,8 @@ parser.add_argument(
     metavar="DIR",
     required=True,
     help="Directory to read models")
-parser.add_argument(
-    "--out-models-dir",
-    metavar="DIR",
-    required=True,
-    help="Directory to write selected models")
+add_out_models_dir_arg(
+    parser, help="Directory to write selected models")
 parser.add_argument(
     "--min-models-per-fold",
     type=positive_int_arg,
@@ -106,11 +107,7 @@ parser.add_argument(
     default="mass[- ]spec",
     help="Regular expression for mass-spec data. Runs on measurement_source col."
     "Default: %(default)s.")
-parser.add_argument(
-    "--verbosity",
-    type=int,
-    help="Verbosity. Default: %(default)s",
-    default=0)
+add_verbosity_arg(parser)
 parser.add_argument(
     "--save-validation-predictions",
     action="store_true",
@@ -167,6 +164,7 @@ def mse(
 def run(argv=sys.argv[1:]):
     install_sigusr1_stack_trace_handler()
 
+    argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
     if args.min_models_per_fold is None:
         args.min_models_per_fold = min(2, args.max_models_per_fold)

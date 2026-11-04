@@ -8,3 +8,4 @@ matplotlib
 mhcgnomes>=3.33.6
 pyyaml
 tqdm
+argcomplete>=3

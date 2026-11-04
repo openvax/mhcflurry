@@ -46,6 +46,7 @@ if __name__ == "__main__":
         "pyyaml",
         "tqdm",
         "torch>=2.0.0",
+        "argcomplete>=3",
     ]
 
     setup(

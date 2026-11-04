@@ -1,3 +1,4 @@
+# PYTHON_ARGCOMPLETE_OK
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -14,6 +15,7 @@
 Train Class1 processing models.
 """
 import argparse
+import argcomplete
 import os
 from os.path import join
 import sys
@@ -42,6 +44,10 @@ from ..pytorch_sizing import (
 )
 from ..memory_budget import training_module_bytes
 from ..common import (
+    add_debug_arg,
+    add_max_epochs_arg,
+    add_out_models_dir_arg,
+    add_verbosity_arg,
     add_random_seed_arg,
     configure_random_seed,
     configure_logging,
@@ -94,11 +100,8 @@ parser.add_argument(
     "--data",
     metavar="FILE.csv",
     help="Training data CSV. Expected columns: peptide, n_flank, c_flank, hit")
-parser.add_argument(
-    "--out-models-dir",
-    metavar="DIR",
-    required=True,
-    help="Directory to write models and manifest")
+add_out_models_dir_arg(
+    parser, help="Directory to write models and manifest")
 parser.add_argument(
     "--hyperparameters",
     metavar="FILE.json",
@@ -122,22 +125,9 @@ parser.add_argument(
     default=1,
     help="Number of replicates per (architecture, fold) pair to train.")
 add_random_seed_arg(parser)
-parser.add_argument(
-    "--max-epochs",
-    type=positive_int_arg,
-    metavar="N",
-    help="Max training epochs. If specified here it overrides any 'max_epochs' "
-    "specified in the hyperparameters.")
-parser.add_argument(
-    "--verbosity",
-    type=int,
-    help="Verbosity. Default: %(default)s",
-    default=0)
-parser.add_argument(
-    "--debug",
-    action="store_true",
-    default=False,
-    help="Launch python debugger on error")
+add_max_epochs_arg(parser)
+add_verbosity_arg(parser)
+add_debug_arg(parser)
 parser.add_argument(
     "--continue-incomplete",
     action="store_true",
@@ -213,6 +203,7 @@ def assign_folds(df, num_folds, held_out_samples, seed=None):
 def run(argv=sys.argv[1:]):
     install_sigusr1_stack_trace_handler()
 
+    argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
 
     if args.debug:

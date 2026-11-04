@@ -1,3 +1,4 @@
+# PYTHON_ARGCOMPLETE_OK
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -29,15 +30,22 @@ Two flavors of subcommand:
   for ``pseudosequences``) on the post-subcommand argv. All
   ``mhcflurry-*`` console_scripts in ``setup.py`` remain installed as
   compat shims pointing at the same underlying entry functions.
+
+Shell tab completion (argcomplete) completes subcommand names from
+:func:`build_parser`. For the subcommands in ``FLAG_COMPLETION_SUBCOMMANDS``
+it also imports that one subcommand's module and attaches its parser, so the
+subcommand's own flags complete; see :func:`build_completion_parser`.
 """
 from __future__ import annotations
 
 import argparse
-import inspect
 import importlib
 import sys
 
+import argcomplete
+
 from ..version import __version__
+from .completion import completing_subcommand, is_completing
 from .help import style_help
 
 
@@ -169,13 +177,39 @@ def _check_help_groups():
 _check_help_groups()
 
 
-def build_parser():
+# Subcommands whose flags complete on Tab. Their modules import in tens of
+# milliseconds, without torch, numpy or pandas. The other subcommands complete
+# by name only: the training, selection, calibration and evaluation modules
+# import torch or pandas at module level (seconds per Tab), and most ``train``
+# and ``eval`` subcommands shell out to scripts/ in a source checkout.
+FLAG_COMPLETION_SUBCOMMANDS = (
+    "predict",
+    "predict-scan",
+    "downloads",
+    "pseudosequences",
+)
+
+
+def build_parser(subcommand_parsers=None):
     """Return the top-level parser used by ``--help`` and tooling.
 
     Subparsers are registered by name only — no per-subcommand arguments
     are added here. The legacy module owns its own ``--help`` output and
     is invoked lazily by :func:`main`. Keeps this function torch-free.
+
+    Parameters
+    ----------
+    subcommand_parsers : dict, optional
+        Maps a subcommand name to that subcommand's own parser. Its
+        arguments are copied into the subcommand's entry (as
+        ``argparse`` ``parents``), as shell completion needs. Names not
+        given are registered by name only.
+
+    Returns
+    -------
+    argparse.ArgumentParser
     """
+    subcommand_parsers = subcommand_parsers or {}
     parser = argparse.ArgumentParser(
         prog="mhcflurry",
         description=(
@@ -187,8 +221,53 @@ def build_parser():
     # parse_args runs; no argparse action needed here.
     sub = parser.add_subparsers(dest="subcommand", required=True)
     for name, (_module, _entry, help_text) in _SUBCOMMANDS.items():
-        sub.add_parser(name, help=help_text, add_help=False)
+        parents = [subcommand_parsers[name]] if name in subcommand_parsers else []
+        sub.add_parser(name, help=help_text, add_help=False, parents=parents)
     return parser
+
+
+def load_subcommand_parser(name):
+    """Import one subcommand's module and return its argument parser.
+
+    Parameters
+    ----------
+    name : str
+        Subcommand name, a key of the subcommand registry.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The module's module-level ``parser`` when it has one (the
+        historical command modules do), otherwise ``make_parser()``'s
+        result.
+    """
+    module = importlib.import_module(_SUBCOMMANDS[name][0])
+    parser = getattr(module, "parser", None)
+    if parser is None:
+        parser = module.make_parser()
+    return parser
+
+
+def build_completion_parser(environ=None):
+    """Return the parser that answers a shell completion request.
+
+    Parameters
+    ----------
+    environ : mapping, optional
+        Environment holding argcomplete's variables. Defaults to
+        ``os.environ``.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        :func:`build_parser`, plus the parser of the subcommand on the
+        completion line when it is in ``FLAG_COMPLETION_SUBCOMMANDS``. Only
+        that subcommand's module is imported.
+    """
+    name = completing_subcommand(_SUBCOMMANDS, environ)
+    if name in FLAG_COMPLETION_SUBCOMMANDS:
+        return build_parser({name: load_subcommand_parser(name)})
+    return build_parser()
 
 
 def format_help():
@@ -266,6 +345,10 @@ def _restore_parser_progs(saved):
 
 def _entry_accepts_prog(entry_func):
     """Return whether ``entry_func`` accepts a ``prog=`` display override."""
+    # Imported here: it costs several milliseconds, and a Tab press never
+    # dispatches.
+    import inspect
+
     try:
         signature = inspect.signature(entry_func)
     except (TypeError, ValueError):
@@ -275,6 +358,9 @@ def _entry_accepts_prog(entry_func):
 
 def main(argv=None):
     """Dispatch entry point for the ``mhcflurry`` console script."""
+    if is_completing():
+        # A shell Tab press: argcomplete prints the completions and exits.
+        argcomplete.autocomplete(build_completion_parser())
     if argv is None:
         argv = sys.argv[1:]
     if not argv:

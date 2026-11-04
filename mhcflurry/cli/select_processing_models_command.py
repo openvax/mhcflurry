@@ -1,3 +1,4 @@
+# PYTHON_ARGCOMPLETE_OK
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -19,6 +20,7 @@ step-up (forward) selection procedure. The final ensemble is the union of all
 selected models across all folds. AUC is used as the metric.
 """
 import argparse
+import argcomplete
 import os
 import re
 import sys
@@ -35,6 +37,8 @@ import tqdm  # progress bar
 from ..class1_processing_predictor import Class1ProcessingPredictor
 from ..flanking_encoding import FlankingEncoding
 from ..common import (
+    add_out_models_dir_arg,
+    add_verbosity_arg,
     configure_logging,
     install_sigusr1_stack_trace_handler,
     positive_int_arg,
@@ -80,11 +84,8 @@ parser.add_argument(
     metavar="DIR",
     required=True,
     help="Directory to read models")
-parser.add_argument(
-    "--out-models-dir",
-    metavar="DIR",
-    required=True,
-    help="Directory to write selected models")
+add_out_models_dir_arg(
+    parser, help="Directory to write selected models")
 parser.add_argument(
     "--min-models-per-fold",
     type=positive_int_arg,
@@ -99,11 +100,7 @@ parser.add_argument(
     default=1000,
     metavar="N",
     help="Max number of models to select per fold")
-parser.add_argument(
-    "--verbosity",
-    type=int,
-    help="Verbosity. Default: %(default)s",
-    default=0)
+add_verbosity_arg(parser)
 parser.add_argument(
     "--save-validation-predictions",
     action="store_true",
@@ -120,6 +117,7 @@ add_cluster_parallelism_args(parser)
 def run(argv=sys.argv[1:]):
     install_sigusr1_stack_trace_handler()
 
+    argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
     if args.min_models_per_fold is None:
         args.min_models_per_fold = min(2, args.max_models_per_fold)

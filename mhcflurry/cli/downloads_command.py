@@ -1,3 +1,4 @@
+# PYTHON_ARGCOMPLETE_OK
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -42,17 +43,12 @@ from itertools import zip_longest
 from shutil import copyfileobj
 from shutil import get_terminal_size
 from tempfile import NamedTemporaryFile
-from tqdm import tqdm
 
 import posixpath
 import csv
+from urllib.parse import urlsplit
 
-try:
-    from urllib.request import urlretrieve
-    from urllib.parse import urlsplit
-except ImportError:
-    from urllib import urlretrieve
-    from urlparse import urlsplit
+import argcomplete
 
 from ..downloads import (
     get_current_release,
@@ -69,9 +65,8 @@ from ..downloads import (
     get_path,
     ENVIRONMENT_VARIABLES)
 from ..version import __version__
+from .completion import is_completing
 from .help import HelpArgumentParser, color_enabled
-
-tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
 parser = HelpArgumentParser(
     description="""Browse, download and locate released weights and supporting data.
@@ -115,7 +110,9 @@ parser_fetch.add_argument(
     help="Don't delete archives after they are extracted")
 parser_fetch.add_argument(
     "--release",
-    default=get_current_release(),
+    # The current release comes from the download catalogue, which a Tab
+    # press does not need to read.
+    default=None if is_completing() else get_current_release(),
     help="Release to download. Default: %(default)s")
 parser_fetch.add_argument(
     "--already-downloaded-dir",
@@ -150,6 +147,7 @@ for subparser in (parser_info, parser_list, parser_path, parser_url):
 
 
 def run(argv=sys.argv[1:]):
+    argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
     logging.basicConfig(level=(logging.DEBUG if args.verbose else
                                logging.WARNING if args.quiet else logging.INFO))
@@ -204,24 +202,36 @@ def suspicious_tar_member(member):
     return member.issym() or member.islnk()
 
 
-# For progress bar on download. See https://pypi.python.org/pypi/tqdm
-class TqdmUpTo(tqdm):
-    """Provides `update_to(n)` which uses `tqdm.update(delta_n)`."""
-    def update_to(self, b=1, bsize=1, tsize=None):
-        """
-        b  : int, optional
-            Number of blocks transferred so far [default: 1].
-        bsize  : int, optional
-            Size of each block (in tqdm units) [default: 1].
-        tsize  : int, optional
-            Total size (in tqdm units). If [default: None] remains unchanged.
-        """
+def download_progress_hook(progress_bar):
+    """Return a ``urlretrieve`` report hook that advances a progress bar.
+
+    Parameters
+    ----------
+    progress_bar : tqdm.tqdm
+        Progress bar counting bytes.
+
+    Returns
+    -------
+    callable
+        ``update_to(b=1, bsize=1, tsize=None)``: ``b`` blocks of ``bsize``
+        bytes transferred so far, of ``tsize`` bytes in total. A ``tsize``
+        of None leaves the bar's total unchanged.
+    """
+    def update_to(b=1, bsize=1, tsize=None):
         if tsize is not None:
-            self.total = tsize
-        self.update(b * bsize - self.n)  # will also set self.n = b * bsize
+            progress_bar.total = tsize
+        # update() takes the increment; this also sets n = b * bsize.
+        progress_bar.update(b * bsize - progress_bar.n)
+    return update_to
 
 
 def fetch_subcommand(args):
+    # Imported here rather than at module level: together they take tens of
+    # milliseconds, and every Tab press imports this module.
+    from urllib.request import urlretrieve
+    from tqdm import tqdm
+    tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
+
     def qprint(msg):
         if not args.quiet:
             print(msg)
@@ -297,9 +307,9 @@ def fetch_subcommand(args):
                     (downloaded_path, _) = urlretrieve(
                         url,
                         temp.name if len(urls) == 1 else None,
-                        reporthook=TqdmUpTo(
+                        reporthook=download_progress_hook(tqdm(
                             unit='B', unit_scale=True, miniters=1,
-                            disable=args.quiet).update_to)
+                            disable=args.quiet)))
                     qprint("Downloaded to: %s" % quote(downloaded_path))
 
                 if downloaded_path != temp.name:

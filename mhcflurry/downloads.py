@@ -12,14 +12,16 @@
 
 """
 Manage local downloaded data.
+
+Importing this module is cheap: the download catalogue (``downloads.yml``)
+is read, and the download directory configured, the first time a function
+here needs them.
 """
 
 import logging
-import yaml
 from os.path import join, exists, dirname, abspath
 from os import environ
 from shlex import quote
-from importlib.resources import files
 from collections import OrderedDict
 from appdirs import user_data_dir
 
@@ -49,6 +51,8 @@ def get_downloads_dir(release=None):
     """
     Return the download directory for a release, respecting custom overrides.
     """
+    if _DOWNLOADS_DIR is None:
+        configure()
     if release is None or _CURRENT_RELEASE is None:
         return _DOWNLOADS_DIR
     return join(dirname(_DOWNLOADS_DIR), release)
@@ -58,6 +62,8 @@ def get_current_release():
     """
     Return the current downloaded data release
     """
+    if _DOWNLOADS_DIR is None:
+        configure()
     return _CURRENT_RELEASE
 
 
@@ -67,6 +73,10 @@ def get_downloads_metadata():
     """
     global _METADATA
     if _METADATA is None:
+        # Imported here, not at module level: reading the catalogue costs
+        # tens of milliseconds, which shell completion should not pay.
+        import yaml
+        from importlib.resources import files
         _METADATA = yaml.safe_load(
             files("mhcflurry").joinpath("downloads.yml").read_text()
         )
@@ -331,6 +341,11 @@ def get_path(download_name, filename='', test_exists=True, release=None):
 def configure():
     """
     Setup various global variables based on environment variables.
+
+    Runs automatically the first time the download directory or current
+    release is needed. Call it again after changing
+    ``MHCFLURRY_DOWNLOADS_DIR``, ``MHCFLURRY_DOWNLOADS_CURRENT_RELEASE`` or
+    ``MHCFLURRY_DATA_DIR``.
     """
     global _DOWNLOADS_DIR
     global _CURRENT_RELEASE
@@ -365,6 +380,3 @@ def configure():
         _DOWNLOADS_DIR = join(data_dir, _CURRENT_RELEASE)
 
     logging.debug("Configured MHCFLURRY_DOWNLOADS_DIR: %s", _DOWNLOADS_DIR)
-
-
-configure()
