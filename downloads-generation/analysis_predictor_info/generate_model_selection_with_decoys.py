@@ -57,7 +57,7 @@ def run():
     assert len(fold_cols) > 1
 
     eval_df = data_df.loc[
-        data_df[fold_cols].sum(1) < len(fold_cols)
+        data_df[fold_cols].sum(axis=1) < len(fold_cols)
     ].copy()
 
     eval_df["binder"] = (eval_df.measurement_inequality != '>') & (

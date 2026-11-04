@@ -105,7 +105,7 @@ def run(argv):
         summary_df = df.groupby(
             ["allele", "measurement_inequality"]
         )["measurement_value"].count().unstack().fillna(0).astype(int)
-        summary_df["total"] = summary_df.sum(1)
+        summary_df["total"] = summary_df.sum(axis=1)
         summary_df.to_csv(args.out_summary)
         print("Wrote: %s" % args.out_summary)
 

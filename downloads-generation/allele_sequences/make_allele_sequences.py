@@ -105,8 +105,8 @@ def run():
         position_identities.append(row)
 
     position_identities = pandas.DataFrame(numpy.array(position_identities))
-    selected_positions = position_identities.idxmax(1).tolist()
-    fractions = position_identities.max(1)
+    selected_positions = position_identities.idxmax(axis=1).tolist()
+    fractions = position_identities.max(axis=1)
     print("Selected positions: ", *selected_positions)
     print("Lowest concordance fraction: %0.5f" % fractions.min())
     assert fractions.min() > 0.99

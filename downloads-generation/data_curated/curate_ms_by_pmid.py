@@ -292,7 +292,7 @@ def handle_pmid_26992070(*filenames):
         # two other methods used.
         sheet = sheets[cell_line + "_DeepQuanTR"]
         replicated = sheet.loc[
-            sheet[[c for c in sheet if "Sample" in c]].fillna(0).sum(1) > 1
+            sheet[[c for c in sheet if "Sample" in c]].fillna(0).sum(axis=1) > 1
         ]
         df = pandas.DataFrame({
             'peptide': replicated.Sequence.values
@@ -349,7 +349,7 @@ def handle_pmid_27412690(filename):
             if v == sample_id
         ]
         hits_df = df.loc[
-            (df[intensity_cols] > 0).sum(1) > 1
+            (df[intensity_cols] > 0).sum(axis=1) > 1
         ]
         result_df = pandas.DataFrame({
             "peptide": hits_df.Sequence.values,
@@ -689,7 +689,7 @@ def handle_pmid_27869121(filename):
         c for c in df.columns if c.endswith("HLA-II (arbitrary units)")
     ]
     class_ii_hits = set(df.loc[
-        (df[class_ii_cols].fillna(0.0).sum(1) > 0)
+        (df[class_ii_cols].fillna(0.0).sum(axis=1) > 0)
     ].Sequence.unique())
 
     results = []

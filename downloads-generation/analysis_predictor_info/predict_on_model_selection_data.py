@@ -101,7 +101,7 @@ def run():
     assert len(fold_cols) > 1
 
     eval_df = data_df.loc[
-        data_df[fold_cols].sum(1) < len(fold_cols)
+        data_df[fold_cols].sum(axis=1) < len(fold_cols)
     ].copy()
 
     print("Reduced to data held-out at least once: ", len(eval_df))
@@ -118,7 +118,7 @@ def run():
 
     eval_df["ensemble_key"] = (
         (~eval_df[fold_cols]).astype(str) + "_"
-    ).sum(1).str.strip("_")
+    ).sum(axis=1).str.strip("_")
     print("Established ensemble keys:")
     print(eval_df.ensemble_key.value_counts())
 
