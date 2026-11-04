@@ -38,6 +38,10 @@ from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..class1_encoding import peptide_sequences_to_network_input
 from ..class1_neural_network import Class1NeuralNetwork
 from ..common import (
+    add_debug_arg,
+    add_max_epochs_arg,
+    add_out_models_dir_arg,
+    add_verbosity_arg,
     add_random_seed_arg,
     canonicalize_allele_series,
     configure_random_seed,
@@ -156,11 +160,8 @@ parser.add_argument(
     help=(
         "Pre-training data CSV. Expected columns: "
         "allele, peptide, measurement_value"))
-parser.add_argument(
-    "--out-models-dir",
-    metavar="DIR",
-    required=True,
-    help="Directory to write models and manifest")
+add_out_models_dir_arg(
+    parser, help="Directory to write models and manifest")
 parser.add_argument(
     "--hyperparameters",
     metavar="FILE.json",
@@ -190,26 +191,13 @@ parser.add_argument(
     default=1,
     help="Number of replicates per (architecture, fold) pair to train.")
 add_random_seed_arg(parser)
-parser.add_argument(
-    "--max-epochs",
-    type=positive_int_arg,
-    metavar="N",
-    help="Max training epochs. If specified here it overrides any 'max_epochs' "
-    "specified in the hyperparameters.")
+add_max_epochs_arg(parser)
 parser.add_argument(
     "--allele-sequences",
     metavar="FILE.csv",
     help="Allele sequences file.")
-parser.add_argument(
-    "--verbosity",
-    type=int,
-    help="Verbosity. Default: %(default)s",
-    default=0)
-parser.add_argument(
-    "--debug",
-    action="store_true",
-    default=False,
-    help="Launch python debugger on error")
+add_verbosity_arg(parser)
+add_debug_arg(parser)
 parser.add_argument(
     "--continue-incomplete",
     action="store_true",

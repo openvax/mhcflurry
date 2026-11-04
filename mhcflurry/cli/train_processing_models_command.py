@@ -44,6 +44,10 @@ from ..pytorch_sizing import (
 )
 from ..memory_budget import training_module_bytes
 from ..common import (
+    add_debug_arg,
+    add_max_epochs_arg,
+    add_out_models_dir_arg,
+    add_verbosity_arg,
     add_random_seed_arg,
     configure_random_seed,
     configure_logging,
@@ -96,11 +100,8 @@ parser.add_argument(
     "--data",
     metavar="FILE.csv",
     help="Training data CSV. Expected columns: peptide, n_flank, c_flank, hit")
-parser.add_argument(
-    "--out-models-dir",
-    metavar="DIR",
-    required=True,
-    help="Directory to write models and manifest")
+add_out_models_dir_arg(
+    parser, help="Directory to write models and manifest")
 parser.add_argument(
     "--hyperparameters",
     metavar="FILE.json",
@@ -124,22 +125,9 @@ parser.add_argument(
     default=1,
     help="Number of replicates per (architecture, fold) pair to train.")
 add_random_seed_arg(parser)
-parser.add_argument(
-    "--max-epochs",
-    type=positive_int_arg,
-    metavar="N",
-    help="Max training epochs. If specified here it overrides any 'max_epochs' "
-    "specified in the hyperparameters.")
-parser.add_argument(
-    "--verbosity",
-    type=int,
-    help="Verbosity. Default: %(default)s",
-    default=0)
-parser.add_argument(
-    "--debug",
-    action="store_true",
-    default=False,
-    help="Launch python debugger on error")
+add_max_epochs_arg(parser)
+add_verbosity_arg(parser)
+add_debug_arg(parser)
 parser.add_argument(
     "--continue-incomplete",
     action="store_true",

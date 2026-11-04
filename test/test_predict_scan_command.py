@@ -32,10 +32,48 @@ def setup_module():
 
 
 
+FLANK_COLUMNS = ["n_flank", "c_flank"]
+
+
 def read_output_csv(filename):
-    return pandas.read_csv(
-        filename,
-        converters={"n_flank": str, "c_flank": str})
+    """
+    Read a predict-scan output CSV with every cell kept as written.
+
+    A peptide at either end of its source sequence has an empty flank, and a
+    flank such as ``NA`` is a residue string, so missing-value detection is
+    off: pandas 3.1 turns an empty cell into NaN before ``converters`` run.
+    pandas writes a missing value as an empty cell, which
+    ``assert_no_missing_values`` checks for outside the flank columns.
+
+    Parameters
+    ----------
+    filename : str
+        Path of the CSV written by ``mhcflurry-predict-scan --out``.
+
+    Returns
+    -------
+    pandas.DataFrame
+    """
+    return pandas.read_csv(filename, keep_default_na=False)
+
+
+def assert_no_missing_values(result):
+    """
+    Assert that every cell outside the flank columns is populated.
+
+    Parameters
+    ----------
+    result : pandas.DataFrame
+        Output read with ``read_output_csv``.
+
+    Raises
+    ------
+    AssertionError
+        If a non-flank cell is empty.
+    """
+    others = result.drop(columns=FLANK_COLUMNS)
+    empty = others.astype(str) == ""
+    assert not empty.any().any(), list(others.columns[empty.any()])
 
 
 def test_fasta():
@@ -53,7 +91,7 @@ def test_fasta():
         predict_scan_command.run(full_args)
         result = read_output_csv(fd_out.name)
         print(result)
-        assert not result.isnull().any().any()
+        assert_no_missing_values(result)
     finally:
         for delete in deletes:
             os.unlink(delete)
@@ -63,6 +101,9 @@ def test_fasta():
         6), str(list(result.best_allele.unique()))
     assert result.sequence_name.nunique() == 3
     assert_array_less(result.affinity_percentile, 2.0)
+    # Peptides ending at a sequence's C-terminus have no C-terminal flank;
+    # the empty string must survive the CSV round trip (#510).
+    assert (result.c_flank == "").any()
 
 
 def test_fasta_50nm():
@@ -81,7 +122,7 @@ def test_fasta_50nm():
         predict_scan_command.run(full_args)
         result = read_output_csv(fd_out.name)
         print(result)
-        assert not result.isnull().any().any()
+        assert_no_missing_values(result)
     finally:
         for delete in deletes:
             os.unlink(delete)
@@ -106,7 +147,7 @@ def test_fasta_percentile():
         predict_scan_command.run(full_args)
         result = read_output_csv(fd_out.name)
         print(result)
-        assert not result.isnull().any().any()
+        assert_no_missing_values(result)
     finally:
         for delete in deletes:
             os.unlink(delete)

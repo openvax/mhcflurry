@@ -8,6 +8,8 @@ presentation.
 - {doc}`intro` installs MHCflurry and makes a first prediction.
 - {doc}`commandline_tutorial` scores peptides and scans proteins from the shell.
 - {doc}`python_tutorial` does the same from Python.
+- {doc}`docker` runs the same tools from a published image, without installing
+  anything on the host.
 
 ## Choosing and trusting models
 
@@ -46,6 +48,7 @@ Contributors and release maintainers can start with {doc}`maintainers`.
 intro
 commandline_tutorial
 python_tutorial
+docker
 ```
 
 ```{toctree}

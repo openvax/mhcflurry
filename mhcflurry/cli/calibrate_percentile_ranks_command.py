@@ -32,6 +32,7 @@ from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..class1_presentation_predictor import Class1PresentationPredictor
 from ..class1_processing_predictor import Class1ProcessingPredictor
 from ..common import (
+    add_verbosity_arg,
     add_random_seed_arg,
     allele_locus_name,
     amino_acid_distribution,
@@ -204,11 +205,7 @@ parser.add_argument(
     metavar="N",
     default=1,
     help="Number of alleles per work chunk. Default: %(default)s.")
-parser.add_argument(
-    "--verbosity",
-    type=int,
-    help="Verbosity. Default: %(default)s",
-    default=0)
+add_verbosity_arg(parser)
 parser.add_argument(
     "--gpu-batched",
     default=False,

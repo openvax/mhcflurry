@@ -32,6 +32,9 @@ import tqdm  # progress bar
 from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..device_footprint import estimate_affinity_training_device_worker_gb
 from ..common import (
+    add_max_epochs_arg,
+    add_out_models_dir_arg,
+    add_verbosity_arg,
     add_random_seed_arg,
     configure_logging,
     configure_random_seed,
@@ -92,11 +95,8 @@ parser.add_argument(
     help=(
         "Training data CSV. Expected columns: "
         "allele, peptide, measurement_value"))
-parser.add_argument(
-    "--out-models-dir",
-    metavar="DIR",
-    required=True,
-    help="Directory to write models and manifest")
+add_out_models_dir_arg(
+    parser, help="Directory to write models and manifest")
 parser.add_argument(
     "--hyperparameters",
     metavar="FILE.json",
@@ -145,12 +145,7 @@ parser.add_argument(
     help="Ensemble size, i.e. how many models to train for each architecture. "
     "If specified here it overrides any 'n_models' specified in the "
     "hyperparameters.")
-parser.add_argument(
-    "--max-epochs",
-    type=positive_int_arg,
-    metavar="N",
-    help="Max training epochs. If specified here it overrides any 'max_epochs' "
-    "specified in the hyperparameters.")
+add_max_epochs_arg(parser)
 parser.add_argument(
     "--allele-sequences",
     metavar="FILE.csv",
@@ -162,11 +157,7 @@ parser.add_argument(
     default=60,
     help="Write models to disk every N seconds. Only affects parallel runs; "
     "serial runs write each model to disk as it is trained.")
-parser.add_argument(
-    "--verbosity",
-    type=int,
-    help="Verbosity. Default: %(default)s",
-    default=0)
+add_verbosity_arg(parser)
 
 add_local_parallelism_args(parser)
 
