@@ -15,7 +15,6 @@ Generate allele sequences for pan-class I models.
 
 Additional dependency: biopython
 """
-from __future__ import print_function
 
 import sys
 import argparse

@@ -13,7 +13,6 @@
 """
 Generate grid of hyperparameters
 """
-from __future__ import print_function
 from sys import stdout, stderr
 from copy import deepcopy
 from yaml import dump

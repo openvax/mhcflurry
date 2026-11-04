@@ -13,7 +13,6 @@
 """
 Filter and combine class I sequence fastas.
 """
-from __future__ import print_function
 
 import sys
 import argparse

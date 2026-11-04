@@ -19,7 +19,7 @@ import argparse
 import os
 import json
 import collections
-from six.moves import StringIO
+from io import StringIO
 
 import pandas
 
@@ -810,16 +810,15 @@ def handle_pmid_31844290(*filenames):
     ]
     allele_table = allele_table.loc[~allele_table.index.isnull()]
     allele_table = allele_table.loc[allele_table["HLA-A"] != 'n.d.']
-    allele_table = allele_table.applymap(
+    allele_table = allele_table.map(
         lambda s: s[1:] if s.startswith("-") else s)
-    allele_table = allele_table.applymap(
+    allele_table = allele_table.map(
         lambda s: "B5101" if s == "B51" else s)
-    allele_table = allele_table.applymap(normalize_allele_name_or_return_unknown)
+    allele_table = allele_table.map(normalize_allele_name_or_return_unknown)
 
     sample_info = metadata.drop_duplicates(
         "Clinical ID").set_index("Clinical ID")[['Cancer type', 'IP Ab']]
-    sample_info = sample_info.loc[~sample_info.index.isnull()].fillna(
-        method='ffill')
+    sample_info = sample_info.loc[~sample_info.index.isnull()].ffill()
     sample_info = sample_info.loc[sample_info.index.isin(allele_table.index)]
     sample_info = sample_info.loc[allele_table.index]
     sample_info["hla"] = [
@@ -881,7 +880,7 @@ def make_expression_groups(dataset_identifier, df, groups):
             if col not in df.columns:
                 raise ValueError(
                     "Missing: %s. Available: %s" % (col, df.columns.tolist()))
-        result_df[label] = df[columns].mean(1)
+        result_df[label] = df[columns].mean(axis=1)
         EXPRESSION_GROUPS_ROWS.append((dataset_identifier, label, columns))
     return result_df
 
@@ -1110,7 +1109,7 @@ def run():
                 ms_df["original_pmid"] = pmid
             if "expression_dataset" not in ms_df.columns:
                 ms_df["expression_dataset"] = ""
-            ms_df = ms_df.applymap(str).applymap(str.upper)
+            ms_df = ms_df.map(str).map(str.upper)
             ms_df["sample_id"] = ms_df.sample_id.str.replace(" ", "")
             print("*** PMID %s: %d peptides ***" % (pmid, len(ms_df)))
             if handler is not None:
@@ -1130,7 +1129,7 @@ def run():
 
     ms_df = pandas.concat(ms_dfs, ignore_index=True, sort=False)
     ms_df["cell_line"] = ms_df["cell_line"].fillna("")
-    ms_df["hla"] = ms_df["hla"].str.strip().str.replace(r'\s+', ' ')
+    ms_df["hla"] = ms_df["hla"].str.strip().str.replace(r'\s+', ' ', regex=True)
 
     sample_table = ms_df[
         ["sample_id", "pmid", "expression_dataset", "cell_line", "sample_type"]
@@ -1197,7 +1196,7 @@ def run():
     cols += [c for c in sorted(ms_df.columns) if c not in cols]
     ms_df = ms_df[cols]
 
-    null_df = ms_df.loc[ms_df.isnull().any(1)]
+    null_df = ms_df.loc[ms_df.isnull().any(axis=1)]
     if len(null_df) > 0:
         print("Nulls:")
         print(null_df)

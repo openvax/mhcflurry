@@ -69,7 +69,7 @@ def run(argv):
     print("Loaded data with shape: %s" % str(df.shape))
     del dfs
 
-    df = df.ix[
+    df = df.loc[
         (df.peptide.str.len() >= 8) & (df.peptide.str.len() <= 15)
     ]
     print("Subselected to 8-15mers: %s" % (str(df.shape)))

@@ -1,9 +1,11 @@
-target-version = "py310"
+target-version = "py311"
 
 [lint]
 # Keep the release gate focused on correctness. Formatting and modernization
 # rules are intentionally not enabled: applying them to this legacy scientific
 # codebase would produce a large, prediction-risking mechanical rewrite.
+# The rule set is listed explicitly so Ruff upgrades do not silently enable
+# additional style rules across the existing codebase (issue #361).
 select = [
     "E4",
     "E7",
