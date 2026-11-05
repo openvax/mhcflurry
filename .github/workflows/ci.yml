@@ -10,8 +10,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # Regression fixtures intentionally use the historical public weights.
-      MHCFLURRY_DOWNLOADS_CURRENT_RELEASE: "2.2.0"
+      # No MHCFLURRY_DOWNLOADS_CURRENT_RELEASE pin: CI tests the release that
+      # mhcflurry/downloads.yml names as current-release, which is what users
+      # get by default.
       MHCFLURRY_DATA_DIR: ${{ github.workspace }}/.mhcflurry-data
     defaults:
       run:
@@ -80,17 +81,23 @@ jobs:
 
       - name: Lint Python
         run: ./lint.sh
+
+      # downloads.yml names the release and its archive URLs; this file names
+      # the bundles fetched. Both are hashed into the key. There are no
+      # restore-keys: fetch skips any bundle whose directory exists, so a
+      # fallback cache could keep weights from another catalogue.
       - name: Cache MHCflurry downloads
         uses: actions/cache@v6
         with:
           path: .mhcflurry-data
-          key: mhcflurry-data-${{ runner.os }}-${{ hashFiles('mhcflurry/downloads.yml') }}
-          restore-keys: |
-            mhcflurry-data-${{ runner.os }}-
+          key: mhcflurry-data-${{ runner.os }}-${{ hashFiles('mhcflurry/downloads.yml', '.github/workflows/ci.yml') }}
 
       - name: Download data and models
         run: |
           mhcflurry-downloads fetch data_curated data_mass_spec_annotated models_class1 models_class1_presentation models_class1_processing models_class1_pan allele_sequences
+          # Fixtures recorded from the 2020 public weights load catalogue
+          # 2.2.0 explicitly.
+          mhcflurry-downloads fetch --release 2.2.0 models_class1 models_class1_pan models_class1_presentation
 
       - name: Test with pytest
         run: |

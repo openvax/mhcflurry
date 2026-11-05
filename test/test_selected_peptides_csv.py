@@ -15,6 +15,10 @@ Regression checks against selected-peptides.csv.
 
 Compares current MHCflurry predictions to values recorded from the
 previous public release, and checks NetMHCpan affinity is reasonably close.
+
+The recorded ``mhcflurry_*`` columns came from the 2020 public weights, which
+download catalogues 2.0.0 and 2.2.0 share, so the comparison loads
+``RECORDED_RELEASE`` explicitly.
 """
 import os
 
@@ -35,6 +39,9 @@ DATA_PATH = os.path.join(
     "data",
     "selected-peptides.csv",
 )
+
+# Download catalogue of the weights that produced the mhcflurry_* columns.
+RECORDED_RELEASE = "2.2.0"
 
 
 def _normalize_allele(allele):
@@ -64,7 +71,9 @@ def selected_peptides_predictions():
         alleles_dict = {name: [allele] for name, allele in zip(sample_names, alleles)}
 
         predictor = Class1PresentationPredictor.load(
-            get_path("models_class1_presentation", "models")
+            get_path(
+                "models_class1_presentation", "models",
+                release=RECORDED_RELEASE)
         )
         pred_df = predictor.predict(
             peptides=peptides,

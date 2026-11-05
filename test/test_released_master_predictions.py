@@ -16,6 +16,10 @@ Regression tests for released model predictions.
 Expected values were generated from the TF/Keras implementation on the
 published model weights and are stored under test/data/.  These tests
 verify that the current (PyTorch) code reproduces the same predictions.
+
+The fixture's ``release`` entry names the download catalogue of those weights
+(2.2.0, the 2020 weights). The tests load that release explicitly: there are
+no TF/Keras predictions for later releases to compare against.
 """
 import json
 import os
@@ -23,9 +27,13 @@ import os
 import numpy as np
 import pytest
 
+from mhcflurry import Class1AffinityPredictor
+from mhcflurry.downloads import get_path
 from mhcflurry.testing_utils import startup, cleanup
 
 pytestmark = pytest.mark.downloads
+
+EXPECTED_JSON = "master_released_class1_affinity_predictions.json"
 
 
 def setup_module():
@@ -42,11 +50,12 @@ def _load_expected(name):
         return json.load(f)
 
 
-def test_allele_specific_affinity_predictions(released_affinity_predictors):
-    expected = _load_expected(
-        "master_released_class1_affinity_predictions.json")["allele_specific"]
+def test_allele_specific_affinity_predictions():
+    fixture = _load_expected(EXPECTED_JSON)
+    expected = fixture["allele_specific"]
 
-    predictor = released_affinity_predictors["allele-specific"]
+    predictor = Class1AffinityPredictor.load(
+        get_path("models_class1", "models", release=fixture["release"]))
 
     predictions = predictor.predict(
         peptides=expected["peptides"],
@@ -61,11 +70,14 @@ def test_allele_specific_affinity_predictions(released_affinity_predictors):
     )
 
 
-def test_pan_allele_affinity_predictions(released_affinity_predictors):
-    expected = _load_expected(
-        "master_released_class1_affinity_predictions.json")["pan_allele"]
+def test_pan_allele_affinity_predictions():
+    fixture = _load_expected(EXPECTED_JSON)
+    expected = fixture["pan_allele"]
 
-    predictor = released_affinity_predictors["pan-allele"]
+    predictor = Class1AffinityPredictor.load(
+        get_path(
+            "models_class1_pan", "models.combined",
+            release=fixture["release"]))
 
     predictions = predictor.predict(
         peptides=expected["peptides"],

@@ -17,7 +17,12 @@ Expected values cover peptide+flank contexts where at least one allele
 has a high presentation score (>0.9), including low-scoring alleles for
 the same contexts.  Values were generated from the TF/Keras implementation
 and are stored under test/data/.
+
+The metadata file's ``release`` entry names the download catalogue of the
+weights that produced them (2.2.0, the 2020 weights), and the prediction test
+loads that release explicitly.
 """
+import json
 import os
 import warnings
 
@@ -28,6 +33,7 @@ import pytest
 
 from mhcflurry import Class1AffinityPredictor, Class1PresentationPredictor
 from mhcflurry.common import normalize_sequence_resolved_allele_name
+from mhcflurry.downloads import get_path
 from mhcflurry.testing_utils import startup, cleanup
 
 
@@ -38,6 +44,8 @@ warnings.filterwarnings(
 )
 
 EXPECTED_CSV = "master_released_class1_presentation_highscore_rows.csv.gz"
+EXPECTED_METADATA_JSON = (
+    "master_released_class1_presentation_highscore_rows_metadata.json")
 BASE_COLUMNS = ["row_id", "peptide", "allele", "n_flank", "c_flank"]
 STRING_COLUMNS = ["pres_with_best_allele", "pres_without_best_allele"]
 HIGH_SCORE_COLUMNS = [
@@ -64,6 +72,22 @@ def _load_expected():
         expected[column] = expected[column].map(
             lambda value: mhcgnomes.parse(value).to_string())
     return expected
+
+
+def expected_release():
+    """
+    Return the download catalogue release whose weights produced the
+    expected rows.
+
+    Returns
+    -------
+    str
+        The ``release`` entry of the expected rows' metadata file.
+    """
+    path = os.path.join(
+        os.path.dirname(__file__), "data", EXPECTED_METADATA_JSON)
+    with open(path) as f:
+        return json.load(f)["release"]
 
 
 def _atol_for_output(column):
@@ -102,8 +126,11 @@ def test_expected_data_has_high_and_low_contexts():
 def test_presentation_predictions():
     expected_df = _load_expected()
 
-    affinity_predictor = Class1AffinityPredictor.load()
-    presentation_predictor = Class1PresentationPredictor.load()
+    release = expected_release()
+    affinity_predictor = Class1AffinityPredictor.load(
+        get_path("models_class1_pan", "models.combined", release=release))
+    presentation_predictor = Class1PresentationPredictor.load(
+        get_path("models_class1_presentation", "models", release=release))
 
     peptides = expected_df["peptide"].tolist()
     alleles = expected_df["allele"].tolist()

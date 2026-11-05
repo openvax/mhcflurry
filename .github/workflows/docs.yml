@@ -17,9 +17,7 @@ jobs:
     permissions:
       contents: read
     env:
-      # PRs must build before their new model assets are public. Published docs
-      # use the package's current release; historical fixtures exercise PR examples.
-      MHCFLURRY_DOWNLOADS_CURRENT_RELEASE: ${{ github.event_name == 'pull_request' && '2.2.0' || '' }}
+      # PRs and published docs both use the package's current model release.
       MHCFLURRY_DATA_DIR: ${{ github.workspace }}/.mhcflurry-data
 
     steps:
@@ -46,13 +44,12 @@ jobs:
           python -m pip install -e .
           python -m pip install -r docs/requirements.txt
 
+      # Keyed like ci.yml: by the catalogue and this file, with no restore-keys.
       - name: Cache presentation models
         uses: actions/cache@v6
         with:
           path: .mhcflurry-data
-          key: mhcflurry-docs-data-${{ runner.os }}-${{ hashFiles('mhcflurry/downloads.yml') }}
-          restore-keys: |
-            mhcflurry-docs-data-${{ runner.os }}-
+          key: mhcflurry-docs-data-${{ runner.os }}-${{ hashFiles('mhcflurry/downloads.yml', '.github/workflows/docs.yml') }}
 
       - name: Download presentation models
         run: mhcflurry downloads fetch models_class1_presentation

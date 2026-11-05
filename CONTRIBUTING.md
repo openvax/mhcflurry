@@ -31,8 +31,8 @@ the default presentation bundle:
 python -m pytest -q test -m "not slow and not downloads"
 ```
 
-CI runs the full suite, `python -m pytest test/`, with the `2.2.0` download
-catalogue pinned and several bundles fetched. The fixtures are listed under
+CI runs the full suite, `python -m pytest test/`, against the current download
+catalogue, with several bundles fetched. The fixtures are listed under
 "Full verification" in [docs/testing.md](docs/testing.md). On macOS, use
 `python -m pytest` rather than the `pytest` script so PyTorch can see MPS.
 
