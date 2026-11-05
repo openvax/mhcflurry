@@ -1,8 +1,8 @@
-# MHCflurry 2.3.22
+# MHCflurry 2.3.23
 
 MHCflurry now requires Python 3.11 or later, pandas 3 (`pandas>=3,<4`) and
 NumPy 2 (`numpy>=2,<3`), the baseline shared by the openvax libraries. CI
-tests Python 3.11 through 3.14. On Python 3.10, pip keeps installing 2.3.21
+tests Python 3.11 through 3.14. On Python 3.10, pip keeps installing 2.3.22
 or earlier.
 
 - The historical data-generation scripts in `downloads-generation/` no longer
