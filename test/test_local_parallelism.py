@@ -131,6 +131,7 @@ def test_worker_init_kwargs_propagates_budget_only_to_gpu_workers():
     ]
 
 
+@pytest.mark.usefixtures("preserve_global_random_state")
 def test_worker_init_exports_fixed_device_budget(monkeypatch):
     # Register the key with monkeypatch before worker_init mutates os.environ
     # directly, so the process-level value cannot leak into later sizing tests.

@@ -75,6 +75,7 @@ def test_legacy_worker_init_signature_kept():
     assert "keras_backend" in params
 
 
+@pytest.mark.usefixtures("preserve_global_random_state")
 def test_worker_init_preserves_empty_gpu_assignment(monkeypatch):
     calls = []
 

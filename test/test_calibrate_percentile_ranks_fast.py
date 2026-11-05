@@ -26,6 +26,7 @@ import pandas
 import pytest
 
 from mhcflurry import Class1AffinityPredictor
+from mhcflurry import class1_affinity_predictor
 from mhcflurry import common
 from mhcflurry.affinity import calibration_sizing
 from mhcflurry.common import positional_frequency_matrix, random_peptides
@@ -278,13 +279,47 @@ def test_calibrate_fast_optimized_merged_matches_unoptimized_fast():
         numpy.testing.assert_allclose(a.cdf, b.cdf, rtol=0, atol=1e-12)
 
 
+def record_percentile_fit_inputs(monkeypatch):
+    """
+    Record the reference scores of each percentile fit the predictor makes.
+
+    Wraps ``fit_percent_rank_transform`` where ``Class1AffinityPredictor``
+    calls it, so a test can compare the IC50 predictions that the legacy and
+    fast calibration paths fit.
+
+    Parameters
+    ----------
+    monkeypatch : pytest.MonkeyPatch
+        Fixture that undoes the wrapping after the test.
+
+    Returns
+    -------
+    list of numpy.ndarray
+        Filled with one float64 array per fit, in call order.
+    """
+    inputs = []
+    original = class1_affinity_predictor.fit_percent_rank_transform
+
+    def recording_fit(values, **kwargs):
+        inputs.append(numpy.array(values, dtype=numpy.float64))
+        return original(values, **kwargs)
+
+    monkeypatch.setattr(
+        class1_affinity_predictor, "fit_percent_rank_transform", recording_fit)
+    return inputs
+
+
 @pytest.mark.slow
 @pytest.mark.integration
 @pytest.mark.parametrize("method", ["histogram", "compact"])
-def test_calibrate_fast_parity_with_legacy_path(method):
+def test_calibrate_fast_parity_with_legacy_path(method, monkeypatch):
     predictor = _load_downloaded_pan_allele()
     alleles = _pick_alleles(predictor, 4)
-    peptides = random_peptides(2000, length=9)
+    # A dedicated generator: the global numpy state depends on which tests
+    # ran before this one.
+    peptides = random_peptides(
+        2000, length=9, rng=numpy.random.default_rng(2000))
+    fit_inputs = record_percentile_fit_inputs(monkeypatch)
 
     # Run legacy path
     legacy = Class1AffinityPredictor.load(
@@ -299,10 +334,12 @@ def test_calibrate_fast_parity_with_legacy_path(method):
         motif_summary=False,
         method=method,
     )
+    legacy_inputs = list(fit_inputs)
+    fit_inputs.clear()
 
-    # Run fast path. Pin to CPU so legacy (CPU/float64) and fast paths
-    # produce bit-identical results — without this, MPS on macOS ends
-    # up as the auto-picked device, which uses float32 and drifts.
+    # Run fast path. Pin to CPU so it accumulates in float64 like the
+    # legacy path — without this, MPS on macOS ends up as the auto-picked
+    # device, which uses float32 and drifts.
     predictor.allele_to_percent_rank_transform = {}
     predictor.calibrate_percentile_ranks_fast(
         peptides=peptides,
@@ -314,15 +351,35 @@ def test_calibrate_fast_parity_with_legacy_path(method):
         device=torch.device("cpu"),
     )
 
-    for allele in alleles:
+    one_peptide_percent = 100.0 / len(peptides)
+    if method == "compact":
+        assert len(legacy_inputs) == len(fit_inputs) == len(alleles)
+    for (i, allele) in enumerate(alleles):
         a = legacy.allele_to_percent_rank_transform[allele]
         b = predictor.allele_to_percent_rank_transform[allele]
         if method == "compact":
-            # Compare mapped scores, not knot locations: tiny inference
-            # differences may change the greedy selection of adjacent knots.
-            probes = numpy.geomspace(10, 10000, 100)
+            # Both paths must fit the same IC50 predictions. Exact equality
+            # is not portable: on some CI machines the two paths' float
+            # arithmetic differs in the last bits.
+            legacy_ic50, fast_ic50 = legacy_inputs[i], fit_inputs[i]
             numpy.testing.assert_allclose(
-                a.transform(probes), b.transform(probes), rtol=0, atol=.1)
+                fast_ic50, legacy_ic50, rtol=1e-5,
+                err_msg=f"IC50 mismatch for {allele} (CPU capability "
+                f"{torch.backends.cpu.get_cpu_capability()})")
+            # The greedy knot selection is discontinuous in its input, so
+            # predictions equal to 1e-5 can still move the mapped percentile
+            # at a probe by up to ~0.5 (seen in 200 refits). Each curve's own
+            # error against the empirical CDF hardly moves (at most 0.053),
+            # so require the fast curve to fit the legacy predictions as
+            # well as the legacy curve does, within two peptides.
+            probes = numpy.geomspace(10, 10000, 100)
+            inside = (probes >= legacy_ic50.min()) & (probes <= legacy_ic50.max())
+            empirical = 100.0 * numpy.searchsorted(
+                numpy.sort(legacy_ic50), probes, side="right") / len(legacy_ic50)
+            legacy_error = numpy.abs(a.transform(probes) - empirical)[inside].max()
+            fast_error = numpy.abs(b.transform(probes) - empirical)[inside].max()
+            assert fast_error <= legacy_error + 2 * one_peptide_percent, (
+                allele, fast_error, legacy_error)
             assert a.selection["selected_knots"] in (64, 128)
             assert b.selection["selected_knots"] in (64, 128)
             continue
@@ -337,7 +394,6 @@ def test_calibrate_fast_parity_with_legacy_path(method):
         # tolerance per peptide should stay constant. Bin edges remain exact
         # because they're computed in float64 and not subject to bin-boundary
         # rounding.
-        one_peptide_percent = 100.0 / len(peptides)
         numpy.testing.assert_allclose(
             a.cdf, b.cdf, rtol=0, atol=one_peptide_percent + 1e-9,
             err_msg=f"CDF mismatch for {allele}",
