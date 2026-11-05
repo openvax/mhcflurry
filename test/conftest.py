@@ -13,6 +13,9 @@
 """
 Pytest configuration and session-wide initialization.
 """
+import random
+
+import numpy
 import pytest
 
 from . import initialize
@@ -32,6 +35,26 @@ def _default_pytorch_backend_cpu():
     configure_pytorch(backend="cpu")
     yield
     configure_pytorch(backend="cpu")
+
+
+@pytest.fixture
+def preserve_global_random_state():
+    """
+    Restore numpy's and Python's global random state after the test.
+
+    ``worker_init`` reseeds both from OS entropy, as each pool worker needs.
+    A test that calls it in the test process would otherwise leave every
+    later test drawing different random numbers on each run.
+
+    Yields
+    ------
+    None
+    """
+    numpy_state = numpy.random.get_state()
+    python_state = random.getstate()
+    yield
+    numpy.random.set_state(numpy_state)
+    random.setstate(python_state)
 
 
 @pytest.fixture(scope="session")
