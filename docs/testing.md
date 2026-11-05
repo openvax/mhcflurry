@@ -42,18 +42,23 @@ $ python -m pytest -q test/test_train_pan_allele_models_command.py::test_pretrai
 
 ## Full verification
 
-CI pins download catalogue `2.2.0` for historical model/data regression fixtures.
-Prepare the same fixtures before running the full suite locally:
+CI tests the current download catalogue (`current-release` in
+`mhcflurry/downloads.yml`). Fixtures recorded from the 2020 public weights
+(catalogue `2.2.0`) load that catalogue explicitly, so CI also fetches its
+three model bundles. Fetch the same bundles before running the full suite
+locally, with `MHCFLURRY_DOWNLOADS_CURRENT_RELEASE` unset:
 
 ```shell
-export MHCFLURRY_DOWNLOADS_CURRENT_RELEASE=2.2.0
 mhcflurry downloads fetch data_curated data_mass_spec_annotated models_class1 \
     models_class1_presentation models_class1_processing models_class1_pan allele_sequences
+mhcflurry downloads fetch --release 2.2.0 models_class1 models_class1_pan \
+    models_class1_presentation
 ```
 
-Use a dedicated test shell, or unset the variable afterward to return ordinary
-prediction to the default weights. The 2.3.0 prediction documentation is also
-checked separately against the current presentation bundle.
+A test whose expected values come from particular weights names their
+catalogue and loads it with `get_path(..., release=...)`, instead of relying on
+the default. `test/test_torch_baseline_regression.py` keeps one baseline per
+catalogue; its docstring explains how to add or regenerate one.
 
 Before calling a release-branch change complete, run:
 
@@ -115,7 +120,7 @@ that cannot be covered at a narrower level.
 `downloads`
 : Tests that require locally cached MHCflurry download bundles other than
   the default presentation bundle, or that compare against a specific
-  catalogue (CI pins `2.2.0`). These tests should not fetch from the
+  catalogue (such as `2.2.0`). These tests should not fetch from the
   network; missing bundles should fail or skip with an instruction to run
   `mhcflurry downloads fetch` outside pytest. Load bundles in a fixture or
   test body, not at import time, so deselection works without them.
