@@ -235,7 +235,7 @@ def run(argv=sys.argv[1:]):
         # (e.g. affinity, percentile rank, elution score).
         for (i, allele) in enumerate(alleles):
             sub_df = manifest_df.loc[manifest_df.allele == allele]
-            is_null_matrix[:, i] = result_df[sub_df.col.values].isnull().any(1)
+            is_null_matrix[:, i] = result_df[sub_df.col.values].isnull().any(axis=1)
         print("Fraction null", is_null_matrix.mean())
 
         print("Grouping peptides by alleles")

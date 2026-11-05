@@ -35,7 +35,7 @@ Before telling the user a change is "complete":
 
 ## Code Style
 
-- Python 3.10+
+- Python 3.11+
 - Lint: ruff (concise output)
 - Docstrings: numpy style
 - Bugfixes include a regression test where feasible

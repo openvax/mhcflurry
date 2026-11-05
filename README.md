@@ -22,7 +22,7 @@ NetMHCpan and other tools behind one interface.
 
 ## Install
 
-MHCflurry needs Python 3.10 or later on Linux or macOS. Install the latest
+MHCflurry needs Python 3.11 or later on Linux or macOS. Install the latest
 stable 2.3 patch release and download the pretrained presentation models:
 
 ```shell

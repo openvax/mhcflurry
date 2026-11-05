@@ -13,7 +13,7 @@ All contributions can be made as pull requests on GitHub. One of the core develo
 A few other guidelines:
 
  * Generated resources must include their generation commands, input/source hashes, configuration, random seed and dependency versions. Historical generators live in `downloads-generation/`; the maintained training and release workflows are documented in [scripts/training/README.md](scripts/training/README.md) and [scripts/release/README.md](scripts/release/README.md). Record provenance sufficient to rerun the workflow; exact numerical reproduction across hardware or library versions is not guaranteed.
- * MHCflurry supports Python 3.10+ on Linux and macOS. We can't guarantee support for Windows. If you are having trouble running MHCflurry on Windows we would appreciate contributions that help us address this.
+ * MHCflurry supports Python 3.11+ on Linux and macOS. We can't guarantee support for Windows. If you are having trouble running MHCflurry on Windows we would appreciate contributions that help us address this.
  * All functions should be documented using [numpy-style docstrings](https://numpydoc.readthedocs.io/en/latest/format.html) and associated with unit tests.
  * Bugfixes should be accompanied by a test that illustrates the bug when feasible.
  * Contributions are licensed under Apache 2.0

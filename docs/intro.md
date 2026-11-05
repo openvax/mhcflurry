@@ -99,13 +99,13 @@ For a code version not yet packaged by Bioconda, create a conda environment
 and install from PyPI:
 
 ```shell
-conda create -q -n mhcflurry-env python=3.10
+conda create -q -n mhcflurry-env python=3.12
 conda activate mhcflurry-env
 pip install --upgrade "mhcflurry>=2.3,<2.4"
 mhcflurry downloads fetch models_class1_presentation
 ```
 
-MHCflurry supports Python 3.10+ on Linux and macOS. Windows may work but is not
+MHCflurry supports Python 3.11+ on Linux and macOS. Windows may work but is not
 currently part of the supported test matrix.
 
 ## Getting help and citing MHCflurry

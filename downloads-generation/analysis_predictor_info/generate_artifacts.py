@@ -161,7 +161,7 @@ def run():
 
     distribution = frequency_matrices_df.loc[
         (frequency_matrices_df.cutoff_fraction == 1.0), amino_acids
-    ].mean(0)
+    ].mean(axis=0)
 
     normalized_frequency_matrices = frequency_matrices_df.copy()
     normalized_frequency_matrices.loc[:, amino_acids] = (
@@ -339,7 +339,7 @@ def do_job(tasks, constant_data=GLOBAL_DATA):
             if matrix.shape[0] == 0:
                 return None
 
-            matrix = (matrix.T / matrix.sum(1)).T  # row normalize
+            matrix = (matrix.T / matrix.sum(axis=1)).T  # row normalize
 
             ss_logo = logomaker.Logo(
                 matrix,
