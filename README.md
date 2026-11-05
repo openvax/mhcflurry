@@ -99,6 +99,10 @@ and calibration workflows. The
 [introduction](https://openvax.github.io/mhcflurry/intro.html#understand-the-results)
 explains how to read the output columns.
 
+To complete subcommands and options with Tab, run
+`activate-global-python-argcomplete` once, or add
+`eval "$(register-python-argcomplete mhcflurry)"` to your shell startup file.
+
 Scripts that use the older `mhcflurry-*` command names, such as
 `mhcflurry-predict`, keep working; see the
 [2.3.0 release notes](https://github.com/openvax/mhcflurry/blob/master/RELEASE_NOTES_2.3.0.md).

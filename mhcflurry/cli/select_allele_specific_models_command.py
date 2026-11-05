@@ -1,3 +1,4 @@
+# PYTHON_ARGCOMPLETE_OK
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -14,6 +15,7 @@
 Model select class1 single allele models.
 """
 import argparse
+import argcomplete
 import os
 import sys
 import time
@@ -204,6 +206,7 @@ add_random_seed_arg(parser)
 def run(argv=sys.argv[1:]):
     install_sigusr1_stack_trace_handler()
 
+    argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
     for prefix in ("combined", "mass_spec", "mse", "consensus"):
         minimum = getattr(args, "%s_min_models" % prefix)

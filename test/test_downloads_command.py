@@ -116,3 +116,21 @@ def test_fetch_requested_release_uses_its_own_status_and_destination(
     assert downloads.get_release_downloads("older")["models"]["up_to_date"]
     downloads_command.fetch_subcommand(args)
     assert str(destination / "models") in capsys.readouterr().out
+
+
+def test_download_progress_hook_reports_bytes_transferred():
+    class Bar:
+        n = 0
+        total = None
+
+        def update(self, increment):
+            self.n += increment
+
+    bar = Bar()
+    hook = downloads_command.download_progress_hook(bar)
+    hook(0, 8192, 20000)
+    assert (bar.n, bar.total) == (0, 20000)
+    hook(2, 8192, 20000)
+    assert bar.n == 16384
+    hook(3, 8192)
+    assert (bar.n, bar.total) == (24576, 20000)

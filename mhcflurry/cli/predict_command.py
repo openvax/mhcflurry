@@ -1,3 +1,4 @@
+# PYTHON_ARGCOMPLETE_OK
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -36,6 +37,9 @@ import logging
 import os
 import re
 
+import argcomplete
+
+from .completion import is_completing
 from .help import HelpArgumentParser
 from ..downloads import get_default_class1_presentation_models_dir, get_model_release_dir
 from ..parallelism import add_prediction_parallelism_args
@@ -130,8 +134,11 @@ model_selection.add_argument(
     default=None,
     help="Directory containing models. Either a binding affinity predictor or "
     "a presentation predictor can be used. "
-    "Default: %s" % get_default_class1_presentation_models_dir(
-        test_exists=False))
+    "Default: %s" % (
+        # Resolving the path reads the download catalogue; a Tab press
+        # does not need it.
+        "the models_class1_presentation download" if is_completing()
+        else get_default_class1_presentation_models_dir(test_exists=False)))
 model_selection.add_argument(
     "--model-release",
     metavar="RELEASE",
@@ -280,6 +287,7 @@ def _predict_dataframe_chunk_worker(work_item):
     return work_item["chunk_num"], predictions
 
 def run(argv=sys.argv[1:]):
+    argcomplete.autocomplete(parser)
     if not argv:
         parser.print_help()
         parser.exit(1)
