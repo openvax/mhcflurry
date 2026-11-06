@@ -1,0 +1,464 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>mhcflurry.downloads &mdash; MHCflurry 1.6.0 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> MHCflurry
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.6.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>mhcflurry.downloads</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for mhcflurry.downloads</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Manage local downloaded data.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="p">(</span>
+    <span class="n">print_function</span><span class="p">,</span>
+    <span class="n">division</span><span class="p">,</span>
+    <span class="n">absolute_import</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">yaml</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="k">import</span> <span class="n">join</span><span class="p">,</span> <span class="n">exists</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="k">import</span> <span class="n">environ</span>
+<span class="kn">from</span> <span class="nn">pipes</span> <span class="k">import</span> <span class="n">quote</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="k">import</span> <span class="n">OrderedDict</span>
+<span class="kn">from</span> <span class="nn">appdirs</span> <span class="k">import</span> <span class="n">user_data_dir</span>
+<span class="kn">from</span> <span class="nn">pkg_resources</span> <span class="k">import</span> <span class="n">resource_string</span>
+
+<span class="kn">import</span> <span class="nn">pandas</span>
+
+<span class="n">ENVIRONMENT_VARIABLES</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;MHCFLURRY_DATA_DIR&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;MHCFLURRY_DOWNLOADS_CURRENT_RELEASE&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;MHCFLURRY_DOWNLOADS_DIR&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;MHCFLURRY_DEFAULT_CLASS1_MODELS&quot;</span>
+<span class="p">]</span>
+
+<span class="n">_DOWNLOADS_DIR</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">_CURRENT_RELEASE</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">_METADATA</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">_MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR</span> <span class="o">=</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+    <span class="s2">&quot;MHCFLURRY_DEFAULT_CLASS1_MODELS&quot;</span><span class="p">)</span>
+<span class="n">_MHCFLURRY_DEFAULT_CLASS1_PRESENTATION_MODELS_DIR</span> <span class="o">=</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+    <span class="s2">&quot;MHCFLURRY_DEFAULT_CLASS1_PRESENTATION_MODELS_DIR&quot;</span><span class="p">)</span>
+<span class="n">_MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS_DIR</span> <span class="o">=</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+    <span class="s2">&quot;MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS_DIR&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="get_downloads_dir"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads.get_downloads_dir">[docs]</a><span class="k">def</span> <span class="nf">get_downloads_dir</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return the path to local downloaded data</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">_DOWNLOADS_DIR</span></div>
+
+
+<div class="viewcode-block" id="get_current_release"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads.get_current_release">[docs]</a><span class="k">def</span> <span class="nf">get_current_release</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return the current downloaded data release</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">_CURRENT_RELEASE</span></div>
+
+
+<div class="viewcode-block" id="get_downloads_metadata"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads.get_downloads_metadata">[docs]</a><span class="k">def</span> <span class="nf">get_downloads_metadata</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return the contents of downloads.yml as a dict</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">_METADATA</span>
+    <span class="k">if</span> <span class="n">_METADATA</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">_METADATA</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">resource_string</span><span class="p">(</span><span class="vm">__name__</span><span class="p">,</span> <span class="s2">&quot;downloads.yml&quot;</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">_METADATA</span></div>
+
+
+<div class="viewcode-block" id="get_default_class1_models_dir"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads.get_default_class1_models_dir">[docs]</a><span class="k">def</span> <span class="nf">get_default_class1_models_dir</span><span class="p">(</span><span class="n">test_exists</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return the absolute path to the default class1 models dir.</span>
+
+<span class="sd">    If environment variable MHCFLURRY_DEFAULT_CLASS1_MODELS is set to an</span>
+<span class="sd">    absolute path, return that path. If it&#39;s set to a relative path (i.e. does</span>
+<span class="sd">    not start with /) then return that path taken to be relative to the mhcflurry</span>
+<span class="sd">    downloads dir.</span>
+
+<span class="sd">    If environment variable MHCFLURRY_DEFAULT_CLASS1_MODELS is NOT set,</span>
+<span class="sd">    then return the path to downloaded models in the &quot;models_class1&quot; download.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+
+<span class="sd">    test_exists : boolean, optional</span>
+<span class="sd">        Whether to raise an exception of the path does not exist</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    string : absolute path</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">_MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">get_downloads_dir</span><span class="p">(),</span> <span class="n">_MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">test_exists</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">exists</span><span class="p">(</span><span class="n">result</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">IOError</span><span class="p">(</span><span class="s2">&quot;No such directory: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">result</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span>
+    <span class="k">return</span> <span class="n">get_path</span><span class="p">(</span>
+        <span class="s2">&quot;models_class1_pan&quot;</span><span class="p">,</span> <span class="s2">&quot;models.combined&quot;</span><span class="p">,</span> <span class="n">test_exists</span><span class="o">=</span><span class="n">test_exists</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="get_default_class1_presentation_models_dir"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads.get_default_class1_presentation_models_dir">[docs]</a><span class="k">def</span> <span class="nf">get_default_class1_presentation_models_dir</span><span class="p">(</span><span class="n">test_exists</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return the absolute path to the default class1 presentation models dir.</span>
+
+<span class="sd">    See `get_default_class1_models_dir`.</span>
+
+<span class="sd">    If environment variable MHCFLURRY_DEFAULT_CLASS1_PRESENTATION_MODELS is set</span>
+<span class="sd">    to an absolute path, return that path. If it&#39;s set to a relative path (does</span>
+<span class="sd">    not start with /) then return that path taken to be relative to the mhcflurry</span>
+<span class="sd">    downloads dir.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+
+<span class="sd">    test_exists : boolean, optional</span>
+<span class="sd">        Whether to raise an exception of the path does not exist</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    string : absolute path</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">_MHCFLURRY_DEFAULT_CLASS1_PRESENTATION_MODELS_DIR</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span>
+            <span class="n">get_downloads_dir</span><span class="p">(),</span>
+            <span class="n">_MHCFLURRY_DEFAULT_CLASS1_PRESENTATION_MODELS_DIR</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">test_exists</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">exists</span><span class="p">(</span><span class="n">result</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">IOError</span><span class="p">(</span><span class="s2">&quot;No such directory: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">result</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span>
+    <span class="k">return</span> <span class="n">get_path</span><span class="p">(</span>
+        <span class="s2">&quot;models_class1_presentation&quot;</span><span class="p">,</span> <span class="s2">&quot;models&quot;</span><span class="p">,</span> <span class="n">test_exists</span><span class="o">=</span><span class="n">test_exists</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="get_default_class1_processing_models_dir"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads.get_default_class1_processing_models_dir">[docs]</a><span class="k">def</span> <span class="nf">get_default_class1_processing_models_dir</span><span class="p">(</span><span class="n">test_exists</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return the absolute path to the default class1 processing models dir.</span>
+
+<span class="sd">    See `get_default_class1_models_dir`.</span>
+
+<span class="sd">    If environment variable MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS is set</span>
+<span class="sd">    to an absolute path, return that path. If it&#39;s set to a relative path (does</span>
+<span class="sd">    not start with /) then return that path taken to be relative to the mhcflurry</span>
+<span class="sd">    downloads dir.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+
+<span class="sd">    test_exists : boolean, optional</span>
+<span class="sd">        Whether to raise an exception of the path does not exist</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    string : absolute path</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">_MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS_DIR</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span>
+            <span class="n">get_downloads_dir</span><span class="p">(),</span>
+            <span class="n">_MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS_DIR</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">test_exists</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">exists</span><span class="p">(</span><span class="n">result</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">IOError</span><span class="p">(</span><span class="s2">&quot;No such directory: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">result</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span>
+    <span class="k">return</span> <span class="n">get_path</span><span class="p">(</span>
+        <span class="s2">&quot;models_class1_processing&quot;</span><span class="p">,</span> <span class="s2">&quot;models&quot;</span><span class="p">,</span> <span class="n">test_exists</span><span class="o">=</span><span class="n">test_exists</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="get_current_release_downloads"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads.get_current_release_downloads">[docs]</a><span class="k">def</span> <span class="nf">get_current_release_downloads</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return a dict of all available downloads in the current release.</span>
+
+<span class="sd">    The dict keys are the names of the downloads. The values are a dict</span>
+<span class="sd">    with two entries:</span>
+
+<span class="sd">    downloaded : bool</span>
+<span class="sd">        Whether the download is currently available locally</span>
+
+<span class="sd">    metadata : dict</span>
+<span class="sd">        Info about the download from downloads.yml such as URL</span>
+
+<span class="sd">    up_to_date : bool or None</span>
+<span class="sd">        Whether the download URL(s) match what was used to download the current</span>
+<span class="sd">        data. This is None if it cannot be determined.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">downloads</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">get_downloads_metadata</span><span class="p">()</span>
+        <span class="p">[</span><span class="s1">&#39;releases&#39;</span><span class="p">]</span>
+        <span class="p">[</span><span class="n">get_current_release</span><span class="p">()]</span>
+        <span class="p">[</span><span class="s1">&#39;downloads&#39;</span><span class="p">])</span>
+
+    <span class="k">def</span> <span class="nf">up_to_date</span><span class="p">(</span><span class="nb">dir</span><span class="p">,</span> <span class="n">urls</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="nb">dir</span><span class="p">,</span> <span class="s2">&quot;DOWNLOAD_INFO.csv&quot;</span><span class="p">))</span>
+            <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">url</span><span class="p">)</span> <span class="o">==</span> <span class="nb">list</span><span class="p">(</span><span class="n">urls</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">IOError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">return</span> <span class="n">OrderedDict</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">download</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span> <span class="p">{</span>
+            <span class="s1">&#39;downloaded&#39;</span><span class="p">:</span> <span class="n">exists</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">get_downloads_dir</span><span class="p">(),</span> <span class="n">download</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">])),</span>
+            <span class="s1">&#39;up_to_date&#39;</span><span class="p">:</span> <span class="n">up_to_date</span><span class="p">(</span>
+                <span class="n">join</span><span class="p">(</span><span class="n">get_downloads_dir</span><span class="p">(),</span> <span class="n">download</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]),</span>
+                <span class="p">[</span><span class="n">download</span><span class="p">[</span><span class="s1">&#39;url&#39;</span><span class="p">]]</span> <span class="k">if</span> <span class="s1">&#39;url&#39;</span> <span class="ow">in</span> <span class="n">download</span> <span class="k">else</span> <span class="n">download</span><span class="p">[</span><span class="s1">&#39;part_urls&#39;</span><span class="p">]),</span>
+            <span class="s1">&#39;metadata&#39;</span><span class="p">:</span> <span class="n">download</span><span class="p">,</span>
+        <span class="p">})</span> <span class="k">for</span> <span class="n">download</span> <span class="ow">in</span> <span class="n">downloads</span>
+    <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="get_path"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads.get_path">[docs]</a><span class="k">def</span> <span class="nf">get_path</span><span class="p">(</span><span class="n">download_name</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">test_exists</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Get the local path to a file in a MHCflurry download</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    -----------</span>
+<span class="sd">    download_name : string</span>
+
+<span class="sd">    filename : string</span>
+<span class="sd">        Relative path within the download to the file of interest</span>
+
+<span class="sd">    test_exists : boolean</span>
+<span class="sd">        If True (default) throw an error telling the user how to download the</span>
+<span class="sd">        data if the file does not exist</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -----------</span>
+<span class="sd">    string giving local absolute path</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">assert</span> <span class="s1">&#39;/&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">download_name</span><span class="p">,</span> <span class="s2">&quot;Invalid download: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">download_name</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">get_downloads_dir</span><span class="p">(),</span> <span class="n">download_name</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">test_exists</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">&quot;Missing MHCflurry downloadable file: </span><span class="si">%s</span><span class="s2">. &quot;</span>
+            <span class="s2">&quot;To download this data, run:</span><span class="se">\n\t</span><span class="s2">mhcflurry-downloads fetch </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;in a shell.&quot;</span>
+            <span class="o">%</span> <span class="p">(</span><span class="n">quote</span><span class="p">(</span><span class="n">path</span><span class="p">),</span> <span class="n">download_name</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">path</span></div>
+
+
+<div class="viewcode-block" id="configure"><a class="viewcode-back" href="../../api.html#mhcflurry.downloads.configure">[docs]</a><span class="k">def</span> <span class="nf">configure</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Setup various global variables based on environment variables.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">_DOWNLOADS_DIR</span>
+    <span class="k">global</span> <span class="n">_CURRENT_RELEASE</span>
+
+    <span class="n">_CURRENT_RELEASE</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">_DOWNLOADS_DIR</span> <span class="o">=</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;MHCFLURRY_DOWNLOADS_DIR&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_DOWNLOADS_DIR</span><span class="p">:</span>
+        <span class="n">metadata</span> <span class="o">=</span> <span class="n">get_downloads_metadata</span><span class="p">()</span>
+        <span class="n">_CURRENT_RELEASE</span> <span class="o">=</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;MHCFLURRY_DOWNLOADS_CURRENT_RELEASE&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">_CURRENT_RELEASE</span><span class="p">:</span>
+            <span class="n">_CURRENT_RELEASE</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s1">&#39;current-release&#39;</span><span class="p">]</span>
+
+        <span class="n">current_release_compatability</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;releases&quot;</span><span class="p">][</span><span class="n">_CURRENT_RELEASE</span><span class="p">][</span><span class="s2">&quot;compatibility-version&quot;</span><span class="p">])</span>
+        <span class="n">current_compatability</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;current-compatibility-version&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">current_release_compatability</span> <span class="o">!=</span> <span class="n">current_compatability</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;The specified downloads are not compatible with this version &quot;</span>
+                <span class="s2">&quot;of the MHCflurry codebase. Downloads: release </span><span class="si">%s</span><span class="s2">, &quot;</span>
+                <span class="s2">&quot;compatability version: </span><span class="si">%d</span><span class="s2">. Code compatability version: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">_CURRENT_RELEASE</span><span class="p">,</span>
+                <span class="n">current_release_compatability</span><span class="p">,</span>
+                <span class="n">current_compatability</span><span class="p">)</span>
+
+        <span class="n">data_dir</span> <span class="o">=</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;MHCFLURRY_DATA_DIR&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">data_dir</span><span class="p">:</span>
+            <span class="c1"># increase the version every time we make a breaking change in</span>
+            <span class="c1"># how the data is organized. For changes to e.g. just model</span>
+            <span class="c1"># serialization, the downloads release numbers should be used.</span>
+            <span class="n">data_dir</span> <span class="o">=</span> <span class="n">user_data_dir</span><span class="p">(</span><span class="s2">&quot;mhcflurry&quot;</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">&quot;4&quot;</span><span class="p">)</span>
+        <span class="n">_DOWNLOADS_DIR</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">data_dir</span><span class="p">,</span> <span class="n">_CURRENT_RELEASE</span><span class="p">)</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Configured MHCFLURRY_DOWNLOADS_DIR: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">_DOWNLOADS_DIR</span><span class="p">)</span></div>
+
+
+<span class="n">configure</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright Timothy O&#39;Donnell
+      <span class="lastupdated">
+        Last updated on Mar 23, 2020.
+      </span>
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
