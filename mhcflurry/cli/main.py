@@ -20,9 +20,11 @@ need. This keeps the torch-import cost off the top-level help path.
 
 Two flavors of subcommand:
 
-* **New under the parent**: ``train``, ``eval``, ``compare-models``,
-  ``plot-model-comparison``, ``paper-figures``.
-  Each module exposes ``run_argv(argv)`` which does its own argparse.
+* **New under the parent**: ``train`` and ``eval``. Each module exposes
+  ``run_argv(argv)`` which does its own argparse. ``compare-models``,
+  ``plot-model-comparison`` and ``paper-figures`` also still dispatch at the
+  top level for existing scripts (see :data:`UNLISTED_SUBCOMMANDS`), but the
+  help lists them only under ``mhcflurry eval``.
 * **Historical mhcflurry-* commands**: ``predict``, ``predict-scan``,
   ``downloads``, ``calibrate-percentile-ranks``, the ``class1-train-*`` /
   ``class1-select-*`` family, ``pseudosequences``. Each is wrapped by
@@ -148,10 +150,12 @@ _HELP_GROUPS = (
         "class1-reassign-mass-spec-training-data",
         "pseudosequences",
     )),
-    ("Shortcuts for eval subcommands", (
-        "compare-models", "plot-model-comparison", "paper-figures",
-    )),
 )
+
+#: Subcommands that still dispatch at the top level so existing scripts keep
+#: working, but are not listed in ``mhcflurry --help``: each duplicates an
+#: ``mhcflurry eval`` subcommand (``mhcflurry eval compare-models`` and so on).
+UNLISTED_SUBCOMMANDS = ("compare-models", "plot-model-comparison", "paper-figures")
 
 
 def _check_help_groups():
@@ -162,6 +166,7 @@ def _check_help_groups():
     do not run this check. Duplicate grouping is checked by CLI tests.
     """
     grouped = {name for _, names in _HELP_GROUPS for name in names}
+    grouped |= set(UNLISTED_SUBCOMMANDS)
     missing = set(_SUBCOMMANDS) - grouped
     extra = grouped - set(_SUBCOMMANDS)
     # Raise explicitly rather than ``assert`` so the guard survives ``python -O``
