@@ -49,9 +49,14 @@ def test_top_level_parser_lists_subcommands():
     help_text = parser.format_help()
     assert "train" in help_text
     assert "eval" in help_text
-    assert "compare-models" in help_text
-    assert "plot-model-comparison" in help_text
-    assert "paper-figures" in help_text
+    for name in cli_main.UNLISTED_SUBCOMMANDS:
+        # Still dispatchable for existing scripts...
+        assert name in cli_main._SUBCOMMANDS
+    # ...but the friendly top-level help lists only `mhcflurry eval ...`.
+    friendly = cli_main.format_help()
+    assert "Shortcuts for eval subcommands" not in friendly
+    for name in cli_main.UNLISTED_SUBCOMMANDS:
+        assert "\n  %s " % name not in friendly
 
 
 def test_allele_specific_training_count_threshold_is_inclusive():

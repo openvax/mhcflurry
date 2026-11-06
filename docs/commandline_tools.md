@@ -99,7 +99,8 @@ See {doc}`evaluation` for the workflow and output layout.
 ### Metrics and figures
 
 Existing scripts can keep using the shortcuts `mhcflurry compare-models`,
-`mhcflurry plot-model-comparison`, and `mhcflurry paper-figures`.
+`mhcflurry plot-model-comparison`, and `mhcflurry paper-figures`. They are no
+longer listed in `mhcflurry --help`; use the `mhcflurry eval` forms above.
 
 ```{eval-rst}
 .. _ref-mhcflurry-compare-models:
