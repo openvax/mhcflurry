@@ -46,6 +46,14 @@ def test_all_bundles_have_descriptions():
         assert info['description'] and info['group']
 
 
+def test_download_entries_use_only_known_keys():
+    # A misspelled key such as ``defaultl`` is silently ignored at runtime.
+    for release, info in downloads.get_downloads_metadata()['releases'].items():
+        for item in info['downloads']:
+            assert set(item) in ({'name', 'url', 'default'},
+                                 {'name', 'part_urls', 'default'}), (release, item)
+
+
 def test_shared_archive_versions_are_grouped():
     groups = downloads.get_bundle_versions(BUNDLE)
     assert any(item['releases'] == ['2.2.0', '2.0.0'] for item in groups)
@@ -103,7 +111,7 @@ def test_info_puts_weight_versions_before_history_and_configuration(versioned_ca
     cache = {}
     latest, other, installed = downloads_command._model_versions(BUNDLE, cache)
     assert latest == '2.3.0'
-    assert other == '2.2.0, 1.7.0, 1.6.0'
+    assert other == '2.2.0, 1.6.0'
     assert installed == '2.3.0, 2.2.0'
 
 
@@ -321,7 +329,7 @@ def test_json_remains_uncolored_on_a_terminal(monkeypatch, capsys):
 def test_releases_filter_and_compatibility(capsys):
     downloads_command.run(['releases', BUNDLE, '--json'])
     records = json.loads(capsys.readouterr().out)['releases']
-    assert [item['release'] for item in records] == ['2.3.0', '2.2.0', '2.0.0', '1.7.0', '1.6.0']
+    assert [item['release'] for item in records] == ['2.3.0', '2.2.0', '2.0.0', '1.6.0']
     downloads_command.run(['releases', '--json'])
     records = json.loads(capsys.readouterr().out)['releases']
     assert not next(item for item in records if item['release'] == '0.2.0')['compatible']
