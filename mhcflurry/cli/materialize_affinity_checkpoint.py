@@ -13,7 +13,6 @@
 """Materialize retained affinity checkpoints as an ordinary predictor."""
 
 import argparse
-import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -22,17 +21,10 @@ import uuid
 import pandas
 
 from ..class1_affinity_predictor import Class1AffinityPredictor
+from ..experiment_archive import sha256_file
 
 
 POLICIES = ("terminal", "best")
-
-
-def _sha256(path):
-    digest = hashlib.sha256()
-    with path.open("rb") as fd:
-        for block in iter(lambda: fd.read(8 * 1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 def make_parser(prog="mhcflurry train materialize-affinity-checkpoint"):
@@ -111,11 +103,11 @@ def materialize(models_dir, policy, out_models_dir):
             destination = Path(Class1AffinityPredictor.weights_path(
                 str(temporary), model_name))
             shutil.copy2(checkpoint, destination)
-            digest = _sha256(checkpoint)
+            digest = sha256_file(checkpoint)
             provenance_models.append({
                 "model_name": model_name,
                 "checkpoint_sha256": digest,
-                "primary_weights_sha256": _sha256(destination),
+                "primary_weights_sha256": sha256_file(destination),
             })
 
         manifest["primary_checkpoint_policy"] = policy
@@ -140,7 +132,7 @@ def materialize(models_dir, policy, out_models_dir):
         provenance = {
             "format": 1,
             "source_models_dir": str(source),
-            "source_manifest_sha256": _sha256(manifest_path),
+            "source_manifest_sha256": sha256_file(manifest_path),
             "checkpoint_policy": policy,
             "models": provenance_models,
             "removed_stale_metadata": removed_stale_metadata,

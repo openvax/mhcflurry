@@ -2,7 +2,6 @@
 """Split a trained pan-allele ensemble into fold-complete architectures."""
 
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -10,6 +9,8 @@ import shutil
 import tempfile
 
 import pandas
+
+from mhcflurry.experiment_archive import sha256_file
 
 
 ARCHITECTURE_FIELDS = (
@@ -22,15 +23,6 @@ SHARED_METADATA_NAMES = (
     "info.txt",
     "train_data.csv.bz2",
 )
-
-
-def sha256_file(path):
-    """Return the SHA256 digest of ``path``."""
-    digest = hashlib.sha256()
-    with open(path, "rb") as fd:
-        for chunk in iter(lambda: fd.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def model_record(row):

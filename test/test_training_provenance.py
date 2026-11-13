@@ -11,10 +11,11 @@ import pytest
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.cli.reassign_mass_spec_training_data import reassign_mass_spec_training_data
 from mhcflurry.release_holdout import load_excluded_samples, run_argv
+from mhcflurry.experiment_archive import sha256_file
 from mhcflurry.sample_disjointness import SampleAliases, audit_samples, exclude_source_samples
 from mhcflurry.training_provenance import (
     PROVENANCE_COLUMN, annotate_sources, decode_sources, deduplicate_measurements,
-    encode_sources, file_sha256,
+    encode_sources,
 )
 
 
@@ -42,7 +43,7 @@ def test_annotation_dedup_preserves_measurements_and_every_contributor(tmp_path)
     contributors = decode_sources(result.iloc[0][PROVENANCE_COLUMN])
     assert {(r["study_id"], r["sample_id"], r["source_row"]) for r in contributors} == {
         ("pmid:1", "001", "0"), ("pmid:2", "002", "1")}
-    assert {r["source_sha256"] for r in contributors} == {file_sha256(path)}
+    assert {r["source_sha256"] for r in contributors} == {sha256_file(path)}
     annotated.loc[1, PROVENANCE_COLUMN] = ""
     assert any(not r["complete"] for r in decode_sources(
         deduplicate_measurements(annotated, ["peptide"]).iloc[0][PROVENANCE_COLUMN]))
@@ -129,7 +130,7 @@ def test_audit_union_includes_selection_and_preserves_identical_positive_negativ
     assert kept.hit.tolist() == [1, 0]
     assert report["cohort"]["retained_samples"] == 1
     assert report["cohort"]["input_positives"] == 2
-    assert report["input_files"][str(train)]["sha256"] == file_sha256(train)
+    assert report["input_files"][str(train)]["sha256"] == sha256_file(train)
     assert len(report["generator"]["source_sha256"]) == 64
     assert report["generator"]["random_seed"] is None
     assert report["generator"]["arguments"]["inventory_path"] == str(path)

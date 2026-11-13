@@ -254,7 +254,7 @@ def test_import_uses_only_original_sheets_and_preserves_biological_units(tmp_pat
                                  "Length": [8], "Accession": ["source-protein"]})
 
     monkeypatch.setattr(pandas, "read_excel", read_excel)
-    monkeypatch.setattr(dla_evaluation, "file_sha256", lambda path:
+    monkeypatch.setattr(dla_evaluation, "sha256_file", lambda path:
                         dla_evaluation.WORKBOOK_SHA256[path.name])
     frame = dla_evaluation.prepare_observations(tmp_path)
     assert len(frame) == 8

@@ -11,11 +11,58 @@
 # limitations under the License.
 
 from datetime import datetime, timezone
+import hashlib
 import json
 
 import pandas
 
-from mhcflurry.experiment_archive import sha256_file, snapshot_experiment
+from mhcflurry.experiment_archive import (
+    fingerprint_directory,
+    sha256_file,
+    snapshot_experiment,
+)
+
+
+def test_sha256_file_matches_hashlib_for_str_and_path(tmp_path):
+    path = tmp_path / "weights.bin"
+    # Larger than one read block, so a truncated read would change the digest.
+    content = bytes(range(256)) * 20000
+    path.write_bytes(content)
+    expected = hashlib.sha256(content).hexdigest()
+    assert sha256_file(path) == expected
+    assert sha256_file(str(path)) == expected
+    empty = tmp_path / "empty"
+    empty.write_bytes(b"")
+    assert sha256_file(empty) == (
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    )
+
+
+def test_fingerprint_directory_tracks_names_and_bytes_but_not_training_data(tmp_path):
+    first = tmp_path / "first"
+    (first / "nested").mkdir(parents=True)
+    (first / "manifest.csv").write_text("model_name\n")
+    (first / "nested" / "weights.npz").write_bytes(b"weights")
+    (first / "train_data.csv.bz2").write_bytes(b"training table")
+
+    second = tmp_path / "second"
+    (second / "nested").mkdir(parents=True)
+    (second / "manifest.csv").write_text("model_name\n")
+    (second / "nested" / "weights.npz").write_bytes(b"weights")
+
+    fingerprint = fingerprint_directory(first)
+    assert fingerprint == fingerprint_directory(str(second))
+    assert fingerprint["files"] == 2
+    # Pinned so that recorded provenance stays comparable across releases.
+    assert fingerprint["sha256"] == (
+        "0c123608b012a3c9e0d7247de92858541960721aea97cfb4d2caa614b54d0f84"
+    )
+
+    (second / "nested" / "weights.npz").write_bytes(b"changed")
+    assert fingerprint_directory(second)["sha256"] != fingerprint["sha256"]
+    (second / "nested" / "weights.npz").write_bytes(b"weights")
+    (second / "nested" / "weights.npz").rename(second / "weights.npz")
+    assert fingerprint_directory(second)["sha256"] != fingerprint["sha256"]
 
 
 def test_snapshot_experiment_exports_reconstructable_tables(tmp_path):

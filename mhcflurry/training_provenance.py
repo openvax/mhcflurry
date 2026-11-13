@@ -1,22 +1,14 @@
 """Preserve source identities without changing curated measurement weights."""
 
-import hashlib
 import json
 from pathlib import Path
 
 import pandas
 
+from .experiment_archive import sha256_file
+
 
 PROVENANCE_COLUMN = "source_provenance"
-
-
-def file_sha256(path):
-    """Return the SHA-256 of an artifact's bytes."""
-    digest = hashlib.sha256()
-    with open(path, "rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 def identity_text(value):
@@ -75,7 +67,7 @@ def annotate_sources(frame, path, source, *, study_column=None,
     of all source contributors, not availability of every sample identity.
     """
     result = frame.copy()
-    digest = file_sha256(path)
+    digest = sha256_file(path)
 
     def values(column):
         return (frame[column].map(identity_text).tolist()

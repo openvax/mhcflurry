@@ -2,38 +2,12 @@
 """Compose a processing ensemble from complete predictor directories."""
 
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
 
 from mhcflurry import Class1ProcessingPredictor
-
-
-def sha256_file(path):
-    """Return the SHA256 digest of a file."""
-    digest = hashlib.sha256()
-    with open(path, "rb") as fd:
-        for block in iter(lambda: fd.read(8 * 1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
-def fingerprint_directory(path):
-    """Hash prediction-relevant files in a predictor directory."""
-    path = Path(path).resolve()
-    digest = hashlib.sha256()
-    count = 0
-    for item in sorted(path.rglob("*")):
-        if not item.is_file() or item.name.endswith("train_data.csv.bz2"):
-            continue
-        relative = item.relative_to(path).as_posix()
-        digest.update(relative.encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(sha256_file(item).encode("ascii"))
-        digest.update(b"\0")
-        count += 1
-    return {"sha256": digest.hexdigest(), "files": count}
+from mhcflurry.experiment_archive import fingerprint_directory
 
 
 def parse_predictor(value):

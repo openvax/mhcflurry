@@ -17,4 +17,4 @@ def test_compact_transform_source_resolves_outside_repo_root(tmp_path, monkeypat
     source = module.COMPACT_TRANSFORM_SOURCE
     assert source.is_absolute() and source.is_file()
     assert source == REPO_ROOT / "mhcflurry/compact_percent_rank_transform.py"
-    assert len(module.sha256(source)) == 64
+    assert len(module.sha256_file(source)) == 64
