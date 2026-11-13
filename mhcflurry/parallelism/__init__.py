@@ -52,7 +52,6 @@ _EXPORTS = {
             "hoist_torchinductor_compile_threads",
             "resolve_torchinductor_compile_threads_env",
             "run_single_worker_resource_probe",
-            "run_single_worker_torch_compile_warmup",
         ),
         "worker_pool": (
             "NonDaemonContext",

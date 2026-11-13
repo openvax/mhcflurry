@@ -22,6 +22,7 @@ import weakref
 import itertools
 import os
 import logging
+import warnings
 
 import numpy
 import pandas
@@ -2095,8 +2096,14 @@ class Class1NeuralNetwork(object):
     @staticmethod
     def keras_network_cache_key(network_json):
         """
-        Backward-compatible alias for ``model_cache_key``.
+        Deprecated alias for ``model_cache_key``; will be removed in 2.4.0.
         """
+        warnings.warn(
+            "Class1NeuralNetwork.keras_network_cache_key is deprecated and "
+            "will be removed in 2.4.0. Use model_cache_key instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return Class1NeuralNetwork.model_cache_key(network_json)
 
     def network(self, borrow=False):
@@ -3108,13 +3115,17 @@ class Class1NeuralNetwork(object):
             generator_factory=None,
             generator_batches_are_encoded=False,
             save_all_checkpoints=False):
-        """Backward-compatible alias for :meth:`fit_streaming_batches`.
+        """Deprecated alias for :meth:`fit_streaming_batches`.
 
-        The name is historical from the old Keras API. New internal code should
-        call ``fit_streaming_batches`` because this path is specifically the
-        pan-allele pretraining stream, not a general replacement for
-        :meth:`fit`.
+        The name is historical from the old Keras API and will be removed in
+        2.4.0.
         """
+        warnings.warn(
+            "Class1NeuralNetwork.fit_generator is deprecated and will be "
+            "removed in 2.4.0. Use fit_streaming_batches instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.fit_streaming_batches(
             generator=generator,
             validation_peptide_encoding=validation_peptide_encoding,

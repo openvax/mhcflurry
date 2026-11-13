@@ -385,7 +385,7 @@ def test_fit_generator_self_reproducible(training_df, allele_encoding):
         net = Class1NeuralNetwork(**hp)
         # Create the network via a dummy call to fit() first; or let
         # fit_generator build it.
-        net.fit_generator(
+        net.fit_streaming_batches(
             generator=make_generator(),
             validation_peptide_encoding=peptides,
             validation_affinities=affinities,
@@ -446,7 +446,7 @@ def test_fit_generator_validation_tensors_hoisted_once(
 
     _torch.from_numpy = spy
     try:
-        net.fit_generator(
+        net.fit_streaming_batches(
             generator=make_generator(),
             validation_peptide_encoding=peptides,
             validation_affinities=affinities,
@@ -497,7 +497,7 @@ def test_fit_generator_supports_allele_specific_mode():
             )
 
     net = Class1NeuralNetwork(**hp)
-    net.fit_generator(
+    net.fit_streaming_batches(
         generator=make_generator(),
         validation_peptide_encoding=peptides,
         validation_affinities=affinities,
@@ -546,7 +546,7 @@ def test_fit_generator_supports_variable_tail_batches():
         )
 
     net = Class1NeuralNetwork(**hp)
-    net.fit_generator(
+    net.fit_streaming_batches(
         generator=make_generator(),
         validation_peptide_encoding=peptides,
         validation_affinities=affinities,
@@ -578,7 +578,7 @@ def test_fit_generator_preencoded_batches_support_dataloader_workers():
     hp["dataloader_num_workers"] = 1
 
     net = Class1NeuralNetwork(**hp)
-    net.fit_generator(
+    net.fit_streaming_batches(
         generator=(),
         generator_factory=_make_preencoded_fit_generator,
         generator_batches_are_encoded=True,
@@ -621,7 +621,7 @@ def test_fit_generator_restarts_factory_after_exhaustion():
         )
 
     net = Class1NeuralNetwork(**hp)
-    net.fit_generator(
+    net.fit_streaming_batches(
         generator=(),
         generator_factory=one_batch_factory,
         generator_batches_are_encoded=True,
@@ -657,7 +657,7 @@ def test_fit_generator_validation_interval_skips_off_interval_epochs():
     hp["validation_interval"] = 3
 
     net = Class1NeuralNetwork(**hp)
-    net.fit_generator(
+    net.fit_streaming_batches(
         generator=(),
         generator_factory=_make_preencoded_fit_generator,
         generator_batches_are_encoded=True,
@@ -773,7 +773,7 @@ def test_fit_generator_downgrades_num_workers_without_factory(caplog):
 
     net = Class1NeuralNetwork(**hp)
     with caplog.at_level("WARNING", logger="root"):
-        net.fit_generator(
+        net.fit_streaming_batches(
             generator=_make_preencoded_fit_generator(),
             generator_factory=None,  # the load-bearing omission
             generator_batches_are_encoded=True,
@@ -841,7 +841,7 @@ def test_fit_generator_downgrades_num_workers_on_raw_batches(caplog):
     # that's orthogonal to the assertion here.
     with caplog.at_level("WARNING", logger="root"):
         try:
-            net.fit_generator(
+            net.fit_streaming_batches(
                 generator=raw_batch_factory(),
                 generator_factory=raw_batch_factory,
                 generator_batches_are_encoded=False,  # the trigger

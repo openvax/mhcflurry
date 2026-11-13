@@ -10,13 +10,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import inspect
+import numpy
 import pytest
+import torch
 
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.common import configure_tensorflow
 from mhcflurry.custom_loss import MSEWithInequalities, get_loss
-from mhcflurry.data_dependent_weights_initialization import get_activations
+from mhcflurry.data_dependent_weights_initialization import (
+    get_activations,
+    get_activations_pytorch,
+)
 from mhcflurry.local_parallelism import worker_init
 
 
@@ -70,9 +74,30 @@ def test_legacy_configure_tensorflow_entry_point():
         configure_tensorflow(backend="tensorflow", gpu_device_nums=None, num_threads=1)
 
 
-def test_legacy_worker_init_signature_kept():
-    params = inspect.signature(worker_init).parameters
-    assert "keras_backend" in params
+def test_configure_tensorflow_warns_without_a_backend(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        "mhcflurry.common.configure_pytorch", lambda **kwargs: calls.append(kwargs)
+    )
+    with pytest.warns(FutureWarning, match="configure_pytorch"):
+        configure_tensorflow()
+    assert calls == [
+        {"backend": None, "gpu_device_nums": None, "num_threads": None}
+    ]
+
+
+@pytest.mark.usefixtures("preserve_global_random_state")
+def test_legacy_worker_init_keras_backend_warns_and_is_ignored(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        "mhcflurry.parallelism.worker_runtime.configure_pytorch",
+        lambda **kwargs: calls.append(kwargs),
+    )
+    with pytest.warns(DeprecationWarning, match="keras_backend"):
+        worker_init(
+            keras_backend="tensorflow-cpu", backend="auto", gpu_device_nums=[]
+        )
+    assert calls == [{"backend": "auto", "gpu_device_nums": []}]
 
 
 @pytest.mark.usefixtures("preserve_global_random_state")
@@ -97,20 +122,50 @@ def test_legacy_cache_key_alias():
         '{"dense_layer_l1_regularization": 0.1, '
         '"dense_layer_l2_regularization": 0.2, "layer_sizes": [8]}'
     )
-    assert (
-        Class1NeuralNetwork.keras_network_cache_key(network_json)
-        == Class1NeuralNetwork.model_cache_key(network_json)
+    with pytest.warns(DeprecationWarning, match="model_cache_key"):
+        legacy = Class1NeuralNetwork.keras_network_cache_key(network_json)
+    assert legacy == Class1NeuralNetwork.model_cache_key(network_json)
+
+
+def test_legacy_fit_generator_warns_and_forwards(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        Class1NeuralNetwork,
+        "fit_streaming_batches",
+        lambda self, **kwargs: calls.append(kwargs) or "result",
     )
+    network = Class1NeuralNetwork()
+    with pytest.warns(DeprecationWarning, match="fit_streaming_batches"):
+        result = network.fit_generator("generator", "peptides", "affinities", epochs=3)
+    assert result == "result"
+    assert calls[0]["generator"] == "generator"
+    assert calls[0]["validation_peptide_encoding"] == "peptides"
+    assert calls[0]["validation_affinities"] == "affinities"
+    assert calls[0]["epochs"] == 3
 
 
 def test_legacy_get_keras_loss_accessor():
     standard = get_loss("mse")
-    assert standard.get_keras_loss() == standard.loss
+    with pytest.warns(DeprecationWarning, match="loss attribute"):
+        assert standard.get_keras_loss() == standard.loss
 
     custom = MSEWithInequalities()
-    assert callable(custom.get_keras_loss())
+    with pytest.warns(DeprecationWarning, match="loss attribute"):
+        assert custom.get_keras_loss(reduction="sum") == custom.loss
 
 
-def test_legacy_get_activations_symbol_kept():
-    params = inspect.signature(get_activations).parameters
-    assert tuple(params) == ("model", "layer", "X_batch")
+def test_legacy_get_activations_warns_and_matches_pytorch_helper():
+    class Network(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.dense = torch.nn.Linear(3, 2)
+
+        def forward(self, inputs):
+            return self.dense(inputs["peptide"])
+
+    model = Network()
+    batch = {"peptide": numpy.ones((4, 3), dtype="float32")}
+    expected = get_activations_pytorch(model, "dense", batch)
+    with pytest.warns(DeprecationWarning, match="get_activations_pytorch"):
+        legacy = get_activations(model, "dense", batch)
+    numpy.testing.assert_array_equal(legacy, expected)
