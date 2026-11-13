@@ -702,14 +702,14 @@ def configure_pytorch(backend=None, gpu_device_nums=None, num_threads=None):
 
 def configure_tensorflow(backend=None, gpu_device_nums=None, num_threads=None):
     """
-    Backward-compatible configuration entry point from the TF backend era.
+    Deprecated configuration entry point from the TF backend era; will be
+    removed in 2.4.0. Use :func:`configure_pytorch` instead.
 
     Parameters
     ----------
     backend : str, optional
-        Legacy backend value retained for API compatibility. TensorFlow-era
-        names such as "tensorflow-cpu" are translated to the equivalent
-        PyTorch backend and emit a deprecation warning.
+        TensorFlow-era names such as "tensorflow-cpu" are translated to the
+        equivalent PyTorch backend.
     gpu_device_nums : list of str or int, optional
         GPU device identifiers to potentially use.
     num_threads : int, optional
@@ -718,17 +718,17 @@ def configure_tensorflow(backend=None, gpu_device_nums=None, num_threads=None):
     translated_backend = None
     if backend is not None:
         translated_backend = _TENSORFLOW_BACKEND_ALIASES.get(backend)
-        if translated_backend is not None:
-            warnings.warn(
-                (
-                    "configure_tensorflow(backend=%r) is deprecated; "
-                    "using PyTorch backend=%r. Use configure_pytorch() instead."
-                ) % (backend, translated_backend),
-                FutureWarning,
-                stacklevel=2,
-            )
-        else:
+        if translated_backend is None:
             translated_backend = normalize_pytorch_backend(backend)
+    warnings.warn(
+        (
+            "configure_tensorflow(backend=%r) is deprecated and will be "
+            "removed in 2.4.0; using PyTorch backend=%r. Use "
+            "configure_pytorch() instead."
+        ) % (backend, translated_backend),
+        FutureWarning,
+        stacklevel=2,
+    )
     configure_pytorch(
         backend=translated_backend,
         gpu_device_nums=gpu_device_nums,

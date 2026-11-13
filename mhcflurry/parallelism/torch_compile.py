@@ -432,17 +432,3 @@ def run_single_worker_resource_probe(
 
     refine_local_parallelism_from_warmup(args, reports)
     return len(unique_warmup_items)
-
-
-def run_single_worker_torch_compile_warmup(
-        args,
-        work_items,
-        work_function,
-        constant_data=None):
-    """Compatibility alias for :func:`run_single_worker_resource_probe`."""
-    return run_single_worker_resource_probe(
-        args,
-        work_items,
-        work_function,
-        constant_data=constant_data,
-    )

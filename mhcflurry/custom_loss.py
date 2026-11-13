@@ -19,6 +19,8 @@ if the prediction is less than the given value.
 
 This module now delegates to pytorch_losses.py for the actual loss implementations.
 """
+import warnings
+
 import numpy
 
 # Import PyTorch implementations
@@ -82,14 +84,21 @@ class Loss(object):
 
     def get_keras_loss(self, reduction="sum_over_batch_size"):
         """
-        Backward-compatible accessor from the TF/Keras backend era.
+        Deprecated accessor from the TF/Keras backend era; will be removed
+        in 2.4.0. Use the ``loss`` attribute instead.
 
         Parameters
         ----------
         reduction : string
-            Ignored. Kept for API compatibility.
+            Ignored.
         """
         del reduction  # unused legacy argument
+        warnings.warn(
+            "Loss.get_keras_loss is deprecated and will be removed in 2.4.0. "
+            "Use the loss attribute instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.loss
 
 

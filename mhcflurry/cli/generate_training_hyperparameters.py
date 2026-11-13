@@ -612,26 +612,5 @@ def run_argv(argv=None, prog=None):
     dump_hyperparameters(grid)
 
 
-def run_affinity_argv(argv=None, prog=None):
-    """Compatibility entry point for the old affinity generator script."""
-    if argv is None:
-        argv = sys.argv[1:]
-    return run_argv(["affinity"] + list(argv), prog=prog)
-
-
-def run_processing_base_argv(argv=None, prog=None):
-    """Compatibility entry point for the old processing-base script."""
-    if argv is None:
-        argv = sys.argv[1:]
-    return run_argv(["processing-base"] + list(argv), prog=prog)
-
-
-def run_processing_variant_argv(argv=None, prog=None):
-    """Compatibility entry point for the old processing-variant script."""
-    if argv is None:
-        argv = sys.argv[1:]
-    return run_argv(["processing-variant"] + list(argv), prog=prog)
-
-
 if __name__ == "__main__":
     run_argv()

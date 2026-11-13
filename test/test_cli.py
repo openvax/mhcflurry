@@ -2406,16 +2406,13 @@ def _load_script_module(path, module_name):
     return module
 
 
-def test_affinity_hyperparameter_generator_is_importable():
-    path = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)),
-        "scripts/training/release_exact/generate_hyperparameters.py",
-    )
-    module = _load_script_module(path, "affinity_hyperparameters_under_test")
-    grid = module.build_grid(minibatch_size=2048)
+def test_affinity_hyperparameter_grid():
+    from mhcflurry.cli.generate_training_hyperparameters import build_affinity_grid
+
+    grid = build_affinity_grid(minibatch_size=2048)
     assert len(grid) == 35
     assert {item["minibatch_size"] for item in grid} == {2048}
-    published_recipe_grid = module.build_grid()
+    published_recipe_grid = build_affinity_grid()
     assert {item["minibatch_size"] for item in published_recipe_grid} == {128}
     assert {item["max_epochs"] for item in published_recipe_grid} == {5000}
     assert {item["min_delta"] for item in published_recipe_grid} == {0.0}
@@ -2428,18 +2425,17 @@ def test_affinity_hyperparameter_generator_is_importable():
     } == {1}
 
 
-def test_processing_hyperparameter_generator_is_importable():
-    path = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)),
-        "scripts/training/release_exact/generate_hyperparameters.base.py",
+def test_processing_base_hyperparameter_grid():
+    from mhcflurry.cli.generate_training_hyperparameters import (
+        build_processing_base_grid,
     )
-    module = _load_script_module(path, "processing_hyperparameters_under_test")
-    grid = module.build_grid(minibatch_size=2048)
+
+    grid = build_processing_base_grid(minibatch_size=2048)
     assert len(grid) == 128
     assert {item["minibatch_size"] for item in grid} == {2048}
-    assert {item["minibatch_size"] for item in module.build_grid()} == {512}
+    assert {item["minibatch_size"] for item in build_processing_base_grid()} == {512}
     assert {
-        item["optimizer_implementation"] for item in module.build_grid()
+        item["optimizer_implementation"] for item in build_processing_base_grid()
     } == {"keras"}
 
 

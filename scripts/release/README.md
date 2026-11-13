@@ -193,3 +193,10 @@ release to `mhcflurry/downloads.yml`, also retain the data and historical-model
 bundles needed by supported commands. Publish the GitHub release only after its
 code CI, archives, checksums and download metadata have been verified; the
 publication event triggers the package upload to PyPI.
+
+After editing `mhcflurry/downloads.yml`, confirm that every archive URL in the
+catalogue resolves (one HEAD request per URL; needs network access):
+
+```shell
+python scripts/release/check_download_urls.py
+```
