@@ -21,12 +21,15 @@ from mhcflurry.data_dependent_weights_initialization import (
     get_activations,
     get_activations_pytorch,
 )
-from mhcflurry.local_parallelism import worker_init
+from mhcflurry.parallelism import worker_init
 
 
-def test_old_local_parallelism_import_matches_new_parallelism_package():
-    import mhcflurry.local_parallelism as old_module
+def test_old_local_parallelism_import_warns_and_matches_new_parallelism_package(
+        import_deprecated_module):
     import mhcflurry.parallelism as new_package
+
+    old_module = import_deprecated_module(
+        "mhcflurry.local_parallelism", "mhcflurry.parallelism")
     from mhcflurry.parallelism import (
         cli_args,
         planning,

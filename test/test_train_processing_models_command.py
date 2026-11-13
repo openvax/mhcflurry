@@ -31,7 +31,7 @@ from mhcflurry.class1_processing_predictor import Class1ProcessingPredictor
 from mhcflurry.common import random_peptides
 from mhcflurry import pytorch_sizing
 from mhcflurry.cli import train_processing_models_command as processing_command
-from mhcflurry.train_processing_models_command import estimate_processing_worker_gb
+from mhcflurry.cli.train_processing_models_command import estimate_processing_worker_gb
 
 from mhcflurry.testing_utils import cleanup, startup
 from .pytest_helpers import mhcflurry_cli
@@ -113,7 +113,7 @@ def run_and_check(n_jobs=0, additional_args=None, delete=False):
     train_filename = os.path.join(models_dir, "training.csv")
     train_df.to_csv(train_filename, index=False)
 
-    args = mhcflurry_cli("mhcflurry-class1-train-processing-models") + [
+    args = mhcflurry_cli("class1-train-processing-models") + [
         "--processing-data-policy", "legacy",  # synthetic non-MHC fixture
         "--data", train_filename,
         "--hyperparameters", hyperparameters_filename,
@@ -142,7 +142,7 @@ def run_and_check(n_jobs=0, additional_args=None, delete=False):
     # Run model selection
     models_dir_selected = tempfile.mkdtemp(
         prefix="mhcflurry-test-models-selected")
-    args = mhcflurry_cli("mhcflurry-class1-select-processing-models") + [
+    args = mhcflurry_cli("class1-select-processing-models") + [
         "--processing-data-policy", "legacy",
         "--data", os.path.join(models_dir, "train_data.csv.bz2"),
         "--models-dir", models_dir,

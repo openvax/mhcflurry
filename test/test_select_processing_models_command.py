@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for ``mhcflurry.select_processing_models_command``."""
+"""Unit tests for ``mhcflurry.cli.select_processing_models_command``."""
 import inspect
 
 import numpy
@@ -19,7 +19,7 @@ import pandas
 
 def test_fold_col_parser_rejects_pandas_merge_suffixes():
     """Regression: ``fold_0_x`` must not be parsed as a real fold column."""
-    from mhcflurry import select_processing_models_command as mod
+    from mhcflurry.cli import select_processing_models_command as mod
 
     src = inspect.getsource(mod.run)
     assert r'r"^fold_\d+$"' in src or r"r'^fold_\d+$'" in src, (
@@ -30,7 +30,7 @@ def test_fold_col_parser_rejects_pandas_merge_suffixes():
 
 def test_model_select_uses_numpy_prediction_matrix():
     """Greedy processing selection should not depend on pandas model columns."""
-    from mhcflurry import select_processing_models_command as mod
+    from mhcflurry.cli import select_processing_models_command as mod
 
     class FakeModel:
         def __init__(self, predictions):

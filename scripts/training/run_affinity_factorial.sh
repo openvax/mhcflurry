@@ -383,7 +383,7 @@ while IFS= read -r condition; do
     if [ -f "$unselected/manifest.csv" ]; then
         continue_args=(--continue-incomplete)
     fi
-    mhcflurry-class1-train-pan-allele-models \
+    mhcflurry class1-train-pan-allele-models \
         --data "$TRAIN_DATA" \
         --allele-sequences "$ALLELE_SEQUENCES" \
         --pretrain-data "$PRETRAIN_DATA" \
@@ -423,7 +423,7 @@ while IFS= read -r condition; do
         predictor="$condition_out/models.combined"
         select_done="$condition_out/.select.done"
         if [ ! -f "$select_done" ]; then
-            mhcflurry-class1-select-pan-allele-models \
+            mhcflurry class1-select-pan-allele-models \
                 --data "$unselected/train_data.csv.bz2" \
                 --models-dir "$unselected" \
                 --out-models-dir "$predictor" \
@@ -499,7 +499,7 @@ while IFS= read -r condition; do
         date -u +%Y-%m-%dT%H:%M:%SZ > "$comparison/.done"
     fi
     if [ ! -f "$comparison/.plots.done" ]; then
-        mhcflurry plot-model-comparison \
+        mhcflurry eval plot-comparison \
             --input "$comparison" \
             --components affinity \
             --summary-pdf "$comparison/plots/model_comparison_figures.pdf"

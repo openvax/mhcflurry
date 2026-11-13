@@ -59,6 +59,36 @@ def test_top_level_parser_lists_subcommands():
         assert "\n  %s " % name not in friendly
 
 
+@pytest.mark.parametrize("name,replacement", [
+    ("compare-models", "mhcflurry eval compare-models"),
+    ("plot-model-comparison", "mhcflurry eval plot-comparison"),
+    ("paper-figures", "mhcflurry eval paper-figures render"),
+])
+def test_deprecated_top_level_eval_shortcuts_print_notice(name, replacement, capsys):
+    with pytest.raises(SystemExit) as exit_info:
+        cli_main.main([name, "--help"])
+    assert exit_info.value.code == 0
+    captured = capsys.readouterr()
+    assert captured.err == (
+        "mhcflurry %s is deprecated and will be removed in 2.4.0; use %s.\n"
+        % (name, replacement))
+    # The shortcut still runs the command, whose usage names the new form.
+    assert "usage: %s" % replacement in captured.out
+
+
+def test_eval_subcommands_print_no_deprecation_notice(capsys):
+    with pytest.raises(SystemExit):
+        cli_main.main(["eval", "compare-models", "--help"])
+    assert capsys.readouterr().err == ""
+
+
+def test_eval_plot_model_comparison_alias_is_removed(capsys):
+    with pytest.raises(SystemExit) as exit_info:
+        cli_main.main(["eval", "plot-model-comparison", "--input", "missing"])
+    assert exit_info.value.code == 2
+    assert "plot-comparison" in capsys.readouterr().err
+
+
 def test_allele_specific_training_count_threshold_is_inclusive():
     from mhcflurry.cli import train_allele_specific_models_command as command
 
@@ -1683,7 +1713,8 @@ def test_eval_help_runs(capsys):
     assert "paper-figures external-predictors" in captured
     assert "paper-figures run" in captured
     assert "affinity-candidate-figures" in captured
-    assert "Compatibility:" in captured
+    assert "Compatibility:" not in captured
+    assert "plot-model-comparison" not in captured
 
 
 def test_eval_affinity_candidate_figures_help_runs(capsys):
@@ -2382,8 +2413,74 @@ def test_unknown_subcommand_errors():
         parser.parse_args(["does-not-exist"])
 
 
+def _setup_console_scripts():
+    import ast
+
+    tree = ast.parse(
+        (pathlib.Path(__file__).resolve().parents[1] / "setup.py").read_text())
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Dict):
+            for key, value in zip(node.keys, node.values):
+                if isinstance(key, ast.Constant) and key.value == "console_scripts":
+                    return dict(
+                        (part.strip() for part in spec.split("=", 1))
+                        for spec in ast.literal_eval(value))
+    raise AssertionError("setup.py declares no console_scripts")
+
+
+def test_hyphenated_console_scripts_are_deprecated_except_predict_and_downloads():
+    scripts = {
+        name: target for name, target in _setup_console_scripts().items()
+        if name.startswith("mhcflurry-")
+    }
+    kept = {"mhcflurry-downloads", "mhcflurry-predict", "mhcflurry-predict-scan"}
+    assert kept.issubset(scripts)
+    assert "mhcflurry-pseudosequences" not in scripts
+    deprecated = set(scripts) - kept
+    assert len(deprecated) == 8
+    for name in deprecated:
+        subcommand = name[len("mhcflurry-"):]
+        assert subcommand in cli_main._SUBCOMMANDS
+        assert scripts[name] == (
+            "mhcflurry.cli.deprecated_scripts:%s" % subcommand.replace("-", "_"))
+        module = importlib.import_module("mhcflurry.cli.deprecated_scripts")
+        assert callable(getattr(module, subcommand.replace("-", "_")))
+    for name in kept:
+        assert "deprecated_scripts" not in scripts[name]
+
+
+def test_deprecated_console_script_prints_notice_and_runs_subcommand(
+        monkeypatch, capsys):
+    from mhcflurry.cli import deprecated_scripts
+
+    monkeypatch.setattr(
+        sys, "argv", ["mhcflurry-class1-select-pan-allele-models", "--help"])
+    with pytest.raises(SystemExit) as exit_info:
+        deprecated_scripts.class1_select_pan_allele_models()
+    assert exit_info.value.code == 0
+    captured = capsys.readouterr()
+    assert captured.err == (
+        "mhcflurry-class1-select-pan-allele-models is deprecated and will be "
+        "removed in 2.4.0; use mhcflurry class1-select-pan-allele-models.\n")
+    assert "--out-models-dir" in captured.out
+
+
+def test_deprecated_console_script_is_silent_during_completion(
+        monkeypatch, capsys):
+    from mhcflurry.cli import deprecated_scripts
+
+    calls = []
+    monkeypatch.setattr(
+        "mhcflurry.cli.select_pan_allele_models_command.run", calls.append)
+    monkeypatch.setattr(sys, "argv", ["mhcflurry-class1-select-pan-allele-models"])
+    monkeypatch.setattr(deprecated_scripts, "is_completing", lambda: True)
+    deprecated_scripts.class1_select_pan_allele_models()
+    assert calls == [[]]
+    assert capsys.readouterr().err == ""
+
+
 def test_all_legacy_commands_registered():
-    """All 12 legacy mhcflurry-* commands are reachable as subcommands."""
+    """All 12 historical mhcflurry-* command names are reachable as subcommands."""
     expected = {
         "predict", "predict-scan", "downloads",
         "calibrate-percentile-ranks",
@@ -3180,7 +3277,8 @@ def test_main_help_does_not_import_predict_command():
     )
 
 
-def test_legacy_command_module_shims_reexport_cli_modules():
+def test_legacy_command_module_shims_warn_and_reexport_cli_modules(
+        import_deprecated_module):
     command_modules = [
         "calibrate_percentile_ranks_command",
         "downloads_command",
@@ -3195,16 +3293,19 @@ def test_legacy_command_module_shims_reexport_cli_modules():
         "train_presentation_models_command",
     ]
     for module_name in command_modules:
-        legacy = importlib.import_module("mhcflurry.%s" % module_name)
+        legacy = import_deprecated_module(
+            "mhcflurry.%s" % module_name, "mhcflurry.cli.%s" % module_name)
         canonical = importlib.import_module("mhcflurry.cli.%s" % module_name)
         assert legacy.run is canonical.run
         assert legacy.parser is canonical.parser
 
-    from mhcflurry import predict_command
+    # Names outside ``__all__`` still resolve through the wrapper.
     from mhcflurry.cli import predict_command as cli_predict_command
 
+    legacy = import_deprecated_module(
+        "mhcflurry.predict_command", "mhcflurry.cli.predict_command")
     assert (
-        predict_command._predict_dataframe_chunk
+        legacy._predict_dataframe_chunk
         is cli_predict_command._predict_dataframe_chunk
     )
 

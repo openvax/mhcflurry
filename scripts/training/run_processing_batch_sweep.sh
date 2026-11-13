@@ -135,12 +135,12 @@ train_panel() {
 
     mkdir -p "$processing_root"
     if [ -f "$unselected/manifest.csv" ]; then
-        mhcflurry-class1-train-processing-models \
+        mhcflurry class1-train-processing-models \
             --out-models-dir "$unselected" \
             --continue-incomplete \
             "${TRAINING_PARALLELISM_ARGS[@]}"
     else
-        mhcflurry-class1-train-processing-models \
+        mhcflurry class1-train-processing-models \
             --data "$TRAIN_DATA" \
             --held-out-samples 10 \
             --num-folds 4 \
@@ -152,7 +152,7 @@ train_panel() {
     fi
 
     if [ ! -f "$selected/train_data.csv.bz2" ]; then
-        mhcflurry-class1-select-processing-models \
+        mhcflurry class1-select-processing-models \
             --data "$unselected/train_data.csv.bz2" \
             --models-dir "$unselected" \
             --out-models-dir "$selected" \

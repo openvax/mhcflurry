@@ -587,7 +587,7 @@ def snapshot_experiment(
             "",
             "Rebuild learning curves with `mhcflurry train plot-loss-curves` "
             "against a copied model manifest. Rebuild comparison plots and a "
-            "review PDF with `mhcflurry plot-model-comparison --input "
+            "review PDF with `mhcflurry eval plot-comparison --input "
             "artifacts/<comparison> --summary-pdf <output.pdf>`.",
             "",
         ]))

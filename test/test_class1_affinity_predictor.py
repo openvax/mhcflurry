@@ -429,7 +429,7 @@ def test_missing_percent_rank_error_reports_calibration_command(tmp_path):
     assert "0 percent-rank calibration(s)" not in message
     assert "Calibrate with:" in message
     assert (
-        "mhcflurry-calibrate-percentile-ranks --models-dir %s "
+        "mhcflurry calibrate-percentile-ranks --models-dir %s "
         "--allele %s ..." % (
             shlex.quote(models_dir),
             shlex.quote("HLA-A*02:01"),
@@ -458,7 +458,7 @@ def test_missing_percent_rank_error_infers_models_dir_from_loaded_models(tmp_pat
     message = str(err.value)
     assert "Calibrate with:" in message
     assert (
-        "mhcflurry-calibrate-percentile-ranks --models-dir %s "
+        "mhcflurry calibrate-percentile-ranks --models-dir %s "
         "--allele %s ..." % (
             shlex.quote(models_dir),
             shlex.quote("HLA-A*02:01"),

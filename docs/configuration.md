@@ -115,5 +115,12 @@ mhcflurry-downloads fetch              = mhcflurry downloads fetch
 mhcflurry-class1-train-pan-allele-models = mhcflurry class1-train-pan-allele-models
 ```
 
-Both forms invoke the same implementation. New automation can use the unified
-form; existing scripts do not need to change.
+`mhcflurry-downloads`, `mhcflurry-predict` and `mhcflurry-predict-scan` remain
+supported names for the same implementation; other tools call them.
+
+The hyphenated training, selection and calibration scripts
+(`mhcflurry-class1-train-*`, `mhcflurry-class1-select-*` and
+`mhcflurry-calibrate-percentile-ranks`) are deprecated. They still run, after a
+one-line notice on stderr, and will be removed in 2.4.0; use
+`mhcflurry class1-train-pan-allele-models` and so on.
+`mhcflurry-pseudosequences` is removed; use `mhcflurry pseudosequences`.

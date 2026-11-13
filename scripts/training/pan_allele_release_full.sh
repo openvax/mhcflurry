@@ -313,7 +313,7 @@ fi
 # Processing has a different VRAM profile from affinity training: Conv1d
 # flank models keep encoded sequence tensors resident and run post-fit AUC
 # prediction over large fold splits. Leave worker packing as "auto" here so
-# mhcflurry-class1-train-processing-models can resolve it from the processing
+# mhcflurry class1-train-processing-models can resolve it from the processing
 # data + hyperparameter sweep instead of inheriting affinity's resolved value.
 PROCESSING_NUM_JOBS="${PROCESSING_NUM_JOBS:-auto}"
 PROCESSING_MAX_WORKERS_PER_GPU="${PROCESSING_MAX_WORKERS_PER_GPU:-auto}"
@@ -536,12 +536,12 @@ for kind in $PROCESSING_VARIANTS; do
     echo "processing.$kind: using $ARCH_COUNT architectures"
 
     if [ -f "$(pwd)/models.unselected.$kind/manifest.csv" ]; then
-        mhcflurry-class1-train-processing-models \
+        mhcflurry class1-train-processing-models \
             --out-models-dir "$(pwd)/models.unselected.$kind" \
             --continue-incomplete \
             "${PROCESSING_PARALLELISM_ARGS[@]}"
     else
-        mhcflurry-class1-train-processing-models \
+        mhcflurry class1-train-processing-models \
             --data "$(pwd)/train_data.csv.bz2" \
             --held-out-samples "$PROCESSING_HELD_OUT_SAMPLES" \
             --num-folds 4 \
@@ -552,7 +552,7 @@ for kind in $PROCESSING_VARIANTS; do
             "${PROCESSING_PARALLELISM_ARGS[@]}"
     fi
 
-    mhcflurry-class1-select-processing-models \
+    mhcflurry class1-select-processing-models \
         --data "$(pwd)/models.unselected.$kind/train_data.csv.bz2" \
         --models-dir "$(pwd)/models.unselected.$kind" \
         --out-models-dir "$(pwd)/models.selected.$kind" \
@@ -607,12 +607,12 @@ PY
     BOUNDARY_UNSELECTED="$BASE_OUT/processing/models.unselected.boundary-radius-$BOUNDARY_RADIUS"
     BOUNDARY_SELECTED="$BASE_OUT/processing/models.selected.boundary-radius-$BOUNDARY_RADIUS"
     if [ -f "$BOUNDARY_UNSELECTED/manifest.csv" ]; then
-        mhcflurry-class1-train-processing-models \
+        mhcflurry class1-train-processing-models \
             --out-models-dir "$BOUNDARY_UNSELECTED" \
             --continue-incomplete \
             "${PROCESSING_PARALLELISM_ARGS[@]}"
     else
-        mhcflurry-class1-train-processing-models \
+        mhcflurry class1-train-processing-models \
             --data "$BASE_OUT/processing/train_data.csv.bz2" \
             --held-out-samples "$PROCESSING_HELD_OUT_SAMPLES" \
             --num-folds 4 \
@@ -622,7 +622,7 @@ PY
             --worker-log-dir "$BASE_OUT/processing" \
             "${PROCESSING_PARALLELISM_ARGS[@]}"
     fi
-    mhcflurry-class1-select-processing-models \
+    mhcflurry class1-select-processing-models \
         --data "$BOUNDARY_UNSELECTED/train_data.csv.bz2" \
         --models-dir "$BOUNDARY_UNSELECTED" \
         --out-models-dir "$BOUNDARY_SELECTED" \
@@ -634,7 +634,7 @@ PY
         "$BOUNDARY_SELECTED/train_data.csv.bz2"
 
     LEGACY_FOUR="$BASE_OUT/processing/models.selected.short_flanks.legacy-four"
-    mhcflurry-class1-select-processing-models \
+    mhcflurry class1-select-processing-models \
         --data "$BASE_OUT/processing/models.unselected.short_flanks/train_data.csv.bz2" \
         --models-dir "$BASE_OUT/processing/models.unselected.short_flanks" \
         --out-models-dir "$LEGACY_FOUR" \
@@ -684,7 +684,7 @@ python make_train_data.presentation.py \
     --out "$(pwd)/train_data.csv"
 compress_csv_bzip2 "$(pwd)/train_data.csv"
 
-mhcflurry-class1-train-presentation-models \
+mhcflurry class1-train-presentation-models \
     --data "$(pwd)/train_data.csv.bz2" \
     --affinity-predictor "$AFFINITY_PREDICTOR" \
     --processing-predictor-with-flanks "$PRESENTATION_PROCESSING_WITH_FLANKS_PATH" \
@@ -694,7 +694,7 @@ mhcflurry-class1-train-presentation-models \
     --feature-chunk-size "$PRESENTATION_FEATURE_CHUNK_SIZE" \
     "${PRESENTATION_PARALLELISM_ARGS[@]}"
 
-mhcflurry-calibrate-percentile-ranks \
+mhcflurry calibrate-percentile-ranks \
     --models-dir "$(pwd)/models" \
     --match-amino-acid-distribution-data "$AFFINITY_PREDICTOR/train_data.csv.bz2" \
     --alleles-file "$AFFINITY_PREDICTOR/train_data.csv.bz2" \

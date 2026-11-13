@@ -100,7 +100,7 @@ def test_affinity_public_evaluator_exposes_explicit_cli():
     assert "--affinity-training-overlap-policy exclude" in script
     assert "--skip-affinity-predictions" not in script
     assert "mhcflurry train plot-loss-curves" in script
-    assert "mhcflurry plot-model-comparison" in script
+    assert "mhcflurry eval plot-comparison" in script
     assert "mhcflurry eval affinity-candidate-figures" in script
 
 

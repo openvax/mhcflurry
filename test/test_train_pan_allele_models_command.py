@@ -31,7 +31,7 @@ from mhcflurry.cli import train_pan_allele_models_command as train_command
 from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.downloads import get_path
 from mhcflurry.pseudosequences import LEGACY_ALLELE_SEQUENCES_FILENAME
-from mhcflurry.train_pan_allele_models_command import (
+from mhcflurry.cli.train_pan_allele_models_command import (
     _pop_train_param,
     pretrain_data_iterator,
     pretrain_network_input_iterator,
@@ -322,7 +322,7 @@ def run_and_check(n_jobs=0, delete=True, additional_args=None):
     selected_data_df.to_csv(
         os.path.join(models_dir, "_train_data.csv"), index=False)
 
-    args = mhcflurry_cli("mhcflurry-class1-train-pan-allele-models") + [
+    args = mhcflurry_cli("class1-train-pan-allele-models") + [
         "--data", os.path.join(models_dir, "_train_data.csv"),
         "--allele-sequences", get_path(
             "allele_sequences", LEGACY_ALLELE_SEQUENCES_FILENAME),
@@ -339,7 +339,7 @@ def run_and_check(n_jobs=0, delete=True, additional_args=None):
     # Run model selection
     models_dir_selected = tempfile.mkdtemp(
         prefix="mhcflurry-test-models-selected")
-    args = mhcflurry_cli("mhcflurry-class1-select-pan-allele-models") + [
+    args = mhcflurry_cli("class1-select-pan-allele-models") + [
         "--data", os.path.join(models_dir, "train_data.csv.bz2"),
         "--models-dir", models_dir,
         "--out-models-dir", models_dir_selected,
@@ -431,7 +431,7 @@ def test_training_retains_noncanonical_allele_names():
             fd.write("\n")
         sample.to_csv(os.path.join(models_dir, "_train_data.csv"), index=False)
 
-        args = mhcflurry_cli("mhcflurry-class1-train-pan-allele-models") + [
+        args = mhcflurry_cli("class1-train-pan-allele-models") + [
             "--data", os.path.join(models_dir, "_train_data.csv"),
             "--allele-sequences", allele_sequences_path,
             "--pretrain-data", pretrain_data_filename,
@@ -496,7 +496,7 @@ def test_training_is_reproducible_from_seed():
         out_dir = os.path.join(workdir, run_name)
         os.makedirs(out_dir)
         subprocess.check_call(
-            mhcflurry_cli("mhcflurry-class1-train-pan-allele-models") + [
+            mhcflurry_cli("class1-train-pan-allele-models") + [
                 "--data", data_csv,
                 "--allele-sequences", get_path(
                     "allele_sequences", LEGACY_ALLELE_SEQUENCES_FILENAME),

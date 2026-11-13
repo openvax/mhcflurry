@@ -13,8 +13,8 @@
 """Local parallelism helpers.
 
 This package contains the implementation formerly held in
-``mhcflurry.local_parallelism``. The old module remains as an import
-compatibility shim.
+``mhcflurry.local_parallelism``. The old module is a deprecated wrapper
+that will be removed in 2.4.0.
 """
 
 from importlib import import_module

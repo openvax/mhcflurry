@@ -197,7 +197,7 @@ train_condition() {
     local unselected="$processing_out/models.unselected.short_flanks"
     local hyperparameters="$OUT/conditions/$condition.yaml"
     mkdir -p "$processing_out"
-    mhcflurry-class1-train-processing-models \
+    mhcflurry class1-train-processing-models \
         --data "$TRAIN_DATA" \
         --held-out-samples 10 \
         --num-folds 4 \
@@ -238,7 +238,7 @@ for condition in "${CONDITIONS[@]}"; do
     processing_out="$condition_out/processing"
     unselected="$processing_out/models.unselected.short_flanks"
     selected="$processing_out/models.selected.short_flanks"
-    mhcflurry-class1-select-processing-models \
+    mhcflurry class1-select-processing-models \
         --data "$unselected/train_data.csv.bz2" \
         --models-dir "$unselected" \
         --out-models-dir "$selected" \

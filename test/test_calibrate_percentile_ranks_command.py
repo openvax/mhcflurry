@@ -63,7 +63,7 @@ def run_and_check(n_jobs=0, delete=True, additional_args=None):
     new_predictor = Class1AffinityPredictor.load(dest_models_dir)
     assert len(new_predictor.allele_to_percent_rank_transform) == 0
 
-    args = mhcflurry_cli("mhcflurry-calibrate-percentile-ranks") + [
+    args = mhcflurry_cli("calibrate-percentile-ranks") + [
         "--models-dir", dest_models_dir,
         "--match-amino-acid-distribution-data", get_path(
             "data_curated", "curated_training_data.affinity.csv.bz2"),
@@ -130,7 +130,7 @@ def test_filter_canonicalizable_alleles_passthrough_when_all_valid():
 
 
 def test_percent_rank_status_helpers_count_sequence_equivalent_calibration():
-    from mhcflurry.calibrate_percentile_ranks_command import (
+    from mhcflurry.cli.calibrate_percentile_ranks_command import (
         missing_percent_rank_alleles,
         percent_rank_status_df,
     )
@@ -209,7 +209,7 @@ class FakeAffinityPredictorForAlleleSelection(object):
 
 
 def test_requested_calibration_alleles_uses_presentation_affinity_predictor():
-    from mhcflurry.calibrate_percentile_ranks_command import (
+    from mhcflurry.cli.calibrate_percentile_ranks_command import (
         requested_calibration_alleles,
     )
 
@@ -234,7 +234,7 @@ def test_requested_calibration_alleles_uses_presentation_affinity_predictor():
 
 def test_requested_calibration_alleles_file_uses_presentation_affinity_predictor(
         tmp_path):
-    from mhcflurry.calibrate_percentile_ranks_command import (
+    from mhcflurry.cli.calibrate_percentile_ranks_command import (
         requested_calibration_alleles,
     )
 

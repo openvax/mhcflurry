@@ -182,12 +182,12 @@ while IFS= read -r condition; do
     hyperparameters="$OUT/conditions/$condition.yaml"
     mkdir -p "$processing_out"
     if [ -f "$unselected/manifest.csv" ]; then
-        mhcflurry-class1-train-processing-models \
+        mhcflurry class1-train-processing-models \
             --out-models-dir "$unselected" \
             --continue-incomplete \
             "${TRAINING_PARALLELISM_ARGS[@]}"
     else
-        mhcflurry-class1-train-processing-models \
+        mhcflurry class1-train-processing-models \
             --data "$TRAIN_DATA" \
             --held-out-samples 10 \
             --num-folds 4 \
@@ -198,7 +198,7 @@ while IFS= read -r condition; do
             "${TRAINING_PARALLELISM_ARGS[@]}"
     fi
     if [ ! -f "$selected/train_data.csv.bz2" ]; then
-        mhcflurry-class1-select-processing-models \
+        mhcflurry class1-select-processing-models \
             --data "$unselected/train_data.csv.bz2" \
             --models-dir "$unselected" \
             --out-models-dir "$selected" \
@@ -241,7 +241,7 @@ if [ "$EVALUATION" != none ]; then
                 --processing-modes short_flanks \
                 --out "$comparison" \
                 "${COMMON_PARALLELISM_ARGS[@]}"
-            mhcflurry plot-model-comparison \
+            mhcflurry eval plot-comparison \
                 --input "$comparison" \
                 --components processing \
                 --summary-pdf "$comparison/plots/model_comparison_figures.pdf"

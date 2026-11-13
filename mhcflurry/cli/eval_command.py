@@ -13,21 +13,18 @@
 """Evaluation command namespace.
 
 ``mhcflurry eval`` is the semantic home for model comparison, benchmark score
-generation, and paper-style figures. Historical top-level commands remain
-available as compatibility entry points:
+generation, and paper-style figures:
 
-* ``mhcflurry eval compare-models`` delegates to ``mhcflurry compare-models``.
-* ``mhcflurry eval plot-comparison`` delegates to
-  ``mhcflurry plot-model-comparison``.
-* ``mhcflurry eval paper-figures render`` delegates to
-  ``mhcflurry paper-figures``.
+* ``mhcflurry eval compare-models`` compares two model ensembles.
+* ``mhcflurry eval plot-comparison`` plots a compare-models output directory.
+* ``mhcflurry eval paper-figures render`` renders paper-style figures.
 * ``mhcflurry eval paper-figures score-predictions`` derives reusable AUC/PPV
   score tables from saved benchmark prediction tables.
 * ``mhcflurry eval paper-figures external-predictors`` optionally shells out to
   external-predictor runners such as ``mhctools`` to add columns to a canonical
   saved benchmark prediction table.
-* ``mhcflurry eval paper-figures run`` runs compare-models, paper-figures, and
-  plot-model-comparison as one local evaluation/figure pipeline.
+* ``mhcflurry eval paper-figures run`` runs compare-models, paper-figures
+  render, and plot-comparison as one local evaluation/figure pipeline.
 * ``mhcflurry eval affinity-candidate-figures`` builds a common held-out
   prediction table and paper-figure suite for shortlisted affinity candidates.
 * ``mhcflurry eval merge-external-predictions`` consolidates aligned
@@ -92,11 +89,6 @@ def make_parser(prog="mhcflurry eval"):
     sub.add_parser(
         "plot-comparison",
         help="Render plots from a compare-models output directory.",
-        add_help=False,
-    )
-    sub.add_parser(
-        "plot-model-comparison",
-        help="Compatibility alias for plot-comparison.",
         add_help=False,
     )
     sub.add_parser(
@@ -186,10 +178,10 @@ def run_argv(argv, prog="mhcflurry eval"):
         from . import compare_models
         return _run_existing_command(
             compare_models, rest, "%s compare-models" % prog)
-    if subcommand in ("plot-comparison", "plot-model-comparison"):
+    if subcommand == "plot-comparison":
         from . import plot_model_comparison
         return _run_existing_command(
-            plot_model_comparison, rest, "%s %s" % (prog, subcommand))
+            plot_model_comparison, rest, "%s plot-comparison" % prog)
     if subcommand == "affinity-candidate-figures":
         from . import affinity_candidate_figures
         return affinity_candidate_figures.run_argv(
@@ -252,10 +244,6 @@ def format_help(prog="mhcflurry eval"):
         "  paper-figures external-predictors",
         "                          Add optional external predictor columns.",
         "  paper-figures run       Compare, render paper figures, and write PDFs.",
-        "",
-        "Compatibility:",
-        "  mhcflurry compare-models, mhcflurry plot-model-comparison, and",
-        "  mhcflurry paper-figures remain supported.",
         "",
         "Options:",
         "  -h, --help  show this help message and exit",

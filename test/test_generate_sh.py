@@ -31,7 +31,7 @@ def test_writes_executable_generate_sh():
 
         path = common.write_generate_sh(
             out_dir,
-            argv=["mhcflurry-class1-train-pan-allele-models",
+            argv=["mhcflurry", "class1-train-pan-allele-models",
                   "--data", "/in path/data.csv",
                   "--out-models-dir", out_dir, "--num-jobs", "0"],
             mhcflurry_version="9.9.9-test",
@@ -41,7 +41,8 @@ def test_writes_executable_generate_sh():
         assert os.access(path, os.X_OK)
 
         contents = open(path).read()
-        assert "mhcflurry-class1-train-pan-allele-models" in contents
+        # One argument per continuation line.
+        assert "mhcflurry \\\n    class1-train-pan-allele-models" in contents
         # Spaces in args must round-trip correctly via shlex.quote.
         assert "/in path/data.csv" in contents
         assert "9.9.9-test" in contents

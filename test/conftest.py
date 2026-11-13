@@ -13,7 +13,10 @@
 """
 Pytest configuration and session-wide initialization.
 """
+import importlib
 import random
+import re
+import sys
 
 import numpy
 import pytest
@@ -99,6 +102,28 @@ def released_affinity_predictors_two_pan_models(
         "allele-specific": released_allele_specific_predictor,
         "pan-allele": released_pan_allele_predictor_two_models,
     }
+
+
+@pytest.fixture
+def import_deprecated_module():
+    """
+    Import a deprecated module afresh and check that doing so warns.
+
+    A module-level warning fires only on first import, so the module is
+    dropped from ``sys.modules`` first.
+
+    Returns
+    -------
+    callable
+        ``(name, replacement) -> module``, where the warning must mention
+        the dotted name ``replacement``.
+    """
+    def import_module(name, replacement):
+        sys.modules.pop(name, None)
+        with pytest.warns(DeprecationWarning, match=re.escape(replacement)):
+            return importlib.import_module(name)
+
+    return import_module
 
 
 def pytest_configure(config):

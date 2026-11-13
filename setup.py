@@ -61,25 +61,24 @@ if __name__ == "__main__":
             "console_scripts": [
                 "mhcflurry = mhcflurry.cli.main:main",
                 "mhcflurry-downloads = mhcflurry.cli.downloads_command:run",
-                "mhcflurry-pseudosequences = mhcflurry.pseudosequences:main",
                 "mhcflurry-predict = mhcflurry.cli.predict_command:run",
                 "mhcflurry-predict-scan = mhcflurry.cli.predict_scan_command:run",
                 "mhcflurry-class1-train-allele-specific-models = "
-                "mhcflurry.cli.train_allele_specific_models_command:run",
+                "mhcflurry.cli.deprecated_scripts:class1_train_allele_specific_models",
                 "mhcflurry-class1-train-pan-allele-models = "
-                "mhcflurry.cli.train_pan_allele_models_command:run",
+                "mhcflurry.cli.deprecated_scripts:class1_train_pan_allele_models",
                 "mhcflurry-class1-train-processing-models = "
-                "mhcflurry.cli.train_processing_models_command:run",
+                "mhcflurry.cli.deprecated_scripts:class1_train_processing_models",
                 "mhcflurry-class1-select-allele-specific-models = "
-                "mhcflurry.cli.select_allele_specific_models_command:run",
+                "mhcflurry.cli.deprecated_scripts:class1_select_allele_specific_models",
                 "mhcflurry-class1-select-pan-allele-models = "
-                "mhcflurry.cli.select_pan_allele_models_command:run",
+                "mhcflurry.cli.deprecated_scripts:class1_select_pan_allele_models",
                 "mhcflurry-class1-select-processing-models = "
-                "mhcflurry.cli.select_processing_models_command:run",
+                "mhcflurry.cli.deprecated_scripts:class1_select_processing_models",
                 "mhcflurry-calibrate-percentile-ranks = "
-                "mhcflurry.cli.calibrate_percentile_ranks_command:run",
+                "mhcflurry.cli.deprecated_scripts:calibrate_percentile_ranks",
                 "mhcflurry-class1-train-presentation-models = "
-                "mhcflurry.cli.train_presentation_models_command:run",
+                "mhcflurry.cli.deprecated_scripts:class1_train_presentation_models",
                 "_mhcflurry-cluster-worker-entry-point = "
                 "mhcflurry.cluster_parallelism:worker_entry_point",
             ]

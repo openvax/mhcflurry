@@ -103,8 +103,9 @@ To complete subcommands and options with Tab, run
 `activate-global-python-argcomplete` once, or add
 `eval "$(register-python-argcomplete mhcflurry)"` to your shell startup file.
 
-Scripts that use the older `mhcflurry-*` command names, such as
-`mhcflurry-predict`, keep working; see the
+Scripts that use `mhcflurry-predict`, `mhcflurry-predict-scan` or
+`mhcflurry-downloads` keep working. The other older `mhcflurry-*` names are
+deprecated in favour of `mhcflurry <subcommand>`; see the
 [2.3.0 release notes](https://github.com/openvax/mhcflurry/blob/master/RELEASE_NOTES_2.3.0.md).
 
 ## Documentation

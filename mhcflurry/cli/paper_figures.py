@@ -128,19 +128,14 @@ class FigureInputs:
     monoallelic_predictions: Optional[Path]
 
 
-def make_parser():
-    """Return a standalone parser for documentation tooling."""
-    parser = argparse.ArgumentParser(prog="mhcflurry paper-figures")
-    register_subparser(parser)
-    return parser
-
-
 def run_argv(argv):
-    """Entry point for the lazy ``mhcflurry paper-figures`` dispatcher."""
+    """Entry point for the lazy ``mhcflurry eval paper-figures render`` dispatcher."""
     return run(make_parser().parse_args(argv))
 
 
-def register_subparser(parser):
+def make_parser():
+    """Return the command's argument parser."""
+    parser = argparse.ArgumentParser(prog="mhcflurry eval paper-figures render")
     parser.description = __doc__
     parser.formatter_class = argparse.RawDescriptionHelpFormatter
     parser.epilog = """
@@ -178,7 +173,7 @@ missing_inputs.md instead of being silently fabricated.
     parser.add_argument(
         "--comparison-dir",
         help=(
-            "Optional directory produced by ``mhcflurry compare-models``. "
+            "Optional directory produced by ``mhcflurry eval compare-models``. "
             "When provided, paper-figures generates current-run panels from "
             "fresh MHCflurry side-A vs side-B evaluation outputs instead of "
             "requiring pre-derived score tables."
