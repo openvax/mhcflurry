@@ -15,7 +15,7 @@ import yaml
 from generate_processing_cleavage_boundaries import build_kernel_conditions
 from run_exact_public_processing import Driver, cached_scores, utc_now, write_json
 from mhcflurry.cli.compare_models import _metrics
-from mhcflurry.experiment_archive import sha256_file
+from mhcflurry.experiment_archive import fingerprint_directory, sha256_file
 from mhcflurry.processing_matching import validate_matched_training_data
 from mhcflurry.release_holdout import load_excluded_samples
 
@@ -116,7 +116,6 @@ def save_checkpoint_validation_predictions(model_dir, destination, condition):
     """Save context-joinable, genuinely held-out predictions for every state."""
     from mhcflurry import Class1ProcessingPredictor
     from mhcflurry.training_folds import read_processing_training_data
-    from compose_processing_ensemble import fingerprint_directory
 
     model_dir, destination = Path(model_dir), Path(destination)
     marker = destination.with_name(destination.name + ".json")

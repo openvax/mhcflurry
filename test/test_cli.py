@@ -2253,7 +2253,7 @@ def test_compare_models_reuses_only_row_identical_affinity_predictions(
     assert summary["prediction_sources"]["a"]["mode"] == "computed"
     assert summary["prediction_sources"]["b"]["mode"] == "reused"
     assert summary["prediction_sources"]["b"]["sha256"] == (
-        compare_models._sha256_file(saved_path))
+        compare_models.sha256_file(saved_path))
 
     mismatched = saved.iloc[::-1]
     mismatch_path = tmp_path / "mismatch.csv.bz2"

@@ -2,7 +2,6 @@
 """Fit and evaluate a fixed public/new affinity score ensemble."""
 
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -14,6 +13,7 @@ from sklearn.metrics import average_precision_score, roc_auc_score
 
 from mhcflurry import Class1PresentationPredictor
 from mhcflurry.common import configure_random_seed
+from mhcflurry.experiment_archive import sha256_file
 from mhcflurry.regression_target import from_ic50, to_ic50
 
 
@@ -25,15 +25,6 @@ CONDITIONS = (
     "hybrid_affinity__new_processing",
     "dual_affinity_features__new_processing",
 )
-
-
-def sha256_file(path):
-    """Return the SHA256 digest of a file."""
-    digest = hashlib.sha256()
-    with open(path, "rb") as fd:
-        for block in iter(lambda: fd.read(8 * 1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 def metric_values(targets, scores):

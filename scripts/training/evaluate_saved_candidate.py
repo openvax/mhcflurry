@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 import shutil
 
-from compose_processing_ensemble import fingerprint_directory, sha256_file
+from mhcflurry.experiment_archive import fingerprint_directory, sha256_file
 from run_exact_public_processing import (
     CONDITIONS, Driver, fit_combiners, utc_now, verify_public_inputs, write_json)
 

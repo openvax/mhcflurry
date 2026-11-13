@@ -34,13 +34,56 @@ DEFAULT_MAX_COPY_BYTES = 64 * 1024 * 1024
 HASH_LINE_RE = re.compile(r"^([0-9a-f]{64})\s+(.+)$")
 
 
-def sha256_file(path, chunk_size=1024 * 1024):
-    """Return the SHA256 digest of ``path`` without loading it into memory."""
+def sha256_file(path):
+    """
+    Return the SHA-256 hex digest of a file's bytes.
+
+    This is the one file-hashing function for provenance records. The file
+    is read in blocks, never loaded whole.
+
+    Parameters
+    ----------
+    path : str or os.PathLike
+
+    Returns
+    -------
+    str
+    """
+    with open(path, "rb") as fd:
+        return hashlib.file_digest(fd, "sha256").hexdigest()
+
+
+def fingerprint_directory(path):
+    """
+    Hash the prediction-relevant files of a predictor directory.
+
+    Every file under ``path`` contributes its relative POSIX path and its
+    SHA-256, in sorted order. Files named ``*train_data.csv.bz2`` are
+    skipped, so two directories with the same weights and metadata match
+    whether or not the training table was copied along.
+
+    Parameters
+    ----------
+    path : str or os.PathLike
+
+    Returns
+    -------
+    dict
+        ``{"sha256": str, "files": int}``
+    """
+    path = Path(path).resolve()
     digest = hashlib.sha256()
-    with Path(path).open("rb") as fd:
-        for chunk in iter(lambda: fd.read(chunk_size), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    count = 0
+    for item in sorted(path.rglob("*")):
+        if not item.is_file() or item.name.endswith("train_data.csv.bz2"):
+            continue
+        relative = item.relative_to(path).as_posix()
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(sha256_file(item).encode("ascii"))
+        digest.update(b"\0")
+        count += 1
+    return {"sha256": digest.hexdigest(), "files": count}
 
 
 def _json_value(value):

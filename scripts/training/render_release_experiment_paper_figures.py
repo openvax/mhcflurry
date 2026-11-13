@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -14,6 +13,7 @@ import matplotlib
 import numpy
 import pandas
 
+from mhcflurry.experiment_archive import sha256_file
 from mhcflurry.cli.figure_style import (
     NEGATIVE_DELTA_COLOR,
     POSITIVE_DELTA_COLOR,
@@ -123,15 +123,6 @@ def make_parser():
     parser.add_argument("--out", required=True)
     parser.add_argument("--formats", default="svg,pdf,png")
     return parser
-
-
-def sha256_file(path):
-    """Return the SHA256 digest for one source or output file."""
-    digest = hashlib.sha256()
-    with open(path, "rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def require_file(path, inputs):

@@ -6,7 +6,6 @@ evaluation. No command loads neural-network weights or changes saved models.
 """
 
 import argparse
-import hashlib
 import json
 import sys
 import time
@@ -17,6 +16,7 @@ import pandas as pd
 from sklearn.metrics import average_precision_score, roc_auc_score
 
 from mhcflurry.class1_presentation_predictor import presentation_percent_rank_bins
+from mhcflurry.experiment_archive import sha256_file
 from mhcflurry.compact_percent_rank_transform import CompactPresentationPercentiles
 from mhcflurry.percent_rank_transform import PercentRankTransform
 
@@ -27,14 +27,6 @@ METRICS = ["auprc", "auroc", "ppv_expected_random_ties"]
 # Resolve from this checkout (scripts/training/ is two levels below the root), not the cwd.
 COMPACT_TRANSFORM_SOURCE = (
     Path(__file__).resolve().parents[2] / "mhcflurry" / "compact_percent_rank_transform.py")
-
-
-def sha256(path):
-    digest = hashlib.sha256()
-    with open(path, "rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def write_json(path, data):
@@ -139,7 +131,7 @@ def save_methods(methods, destination):
             count, knots = len(model.cdf) + len(model.bin_edges), len(model.bin_edges)
         records.append(dict(method=name, knots=knots, numeric_scalars=count,
                             coordinate_bytes=count * 8, serialized_bytes=path.stat().st_size,
-                            sha256=sha256(path)))
+                            sha256=sha256_file(path)))
     return records
 
 
@@ -193,9 +185,9 @@ def fit_command(args):
                      out / "model_sizes.csv", index=False)
     provenance = dict(command=sys.argv, seed=args.seed, knots=args.knots,
                       reference_rows=len(reference), reference_peptides=len(peptides),
-                      reference_hashes={str(path): sha256(path) for path in [peptide_path] + paths},
+                      reference_hashes={str(path): sha256_file(path) for path in [peptide_path] + paths},
                       elapsed_seconds=time.perf_counter() - started,
-                      source_hashes={str(path): sha256(path)
+                      source_hashes={str(path): sha256_file(path)
                                      for path in [Path(__file__), COMPACT_TRANSFORM_SOURCE]},
                       notes="Peptide-grouped split; no presentation labels used. Uniform-AA cached "
                       "reference differs from original release calibration policy.")
@@ -277,12 +269,12 @@ def evaluate_command(args):
                         hit=labels, group_id=group_id, **variants)
     write_json(out / "provenance.json", dict(
         command=sys.argv, prediction_source=str(Path(args.predictions).resolve()),
-        prediction_sha256=sha256(args.predictions), rows=len(frame), hits=int(labels.sum()),
+        prediction_sha256=sha256_file(args.predictions), rows=len(frame), hits=int(labels.sum()),
         groups=len(groups), selection=json.loads((root / "selection.json").read_text()),
         elapsed_seconds=time.perf_counter() - started,
-        source_sha256=sha256(__file__),
+        source_sha256=sha256_file(__file__),
         score_convention="All saved score variants are higher-is-better; percentile variants are negated.",
-        model_hashes={str(path): sha256(path) for path in (root / "full_fit").glob("*")}))
+        model_hashes={str(path): sha256_file(path) for path in (root / "full_fit").glob("*")}))
     print(macro.to_string(), flush=True)
 
 
@@ -400,8 +392,8 @@ def plot_command(args):
     plot_inputs.extend(root / mode / name for mode in modes
                        for name in ("macro.csv", "timings.csv", "groups.csv"))
     write_json(root / "plot_provenance.json", dict(
-        command=sys.argv, script_sha256=sha256(__file__), matplotlib_version=matplotlib.__version__,
-        input_hashes={str(path): sha256(path) for path in plot_inputs},
+        command=sys.argv, script_sha256=sha256_file(__file__), matplotlib_version=matplotlib.__version__,
+        input_hashes={str(path): sha256_file(path) for path in plot_inputs},
         notes="Plot-only refinements follow the numerical comparison; its original source is archived."))
 
 

@@ -14,7 +14,7 @@ from .allele_capabilities import (
 from .amino_acid import COMMON_AMINO_ACIDS
 from .common import normalize_sequence_resolved_allele_name
 from .sample_disjointness import audit_samples
-from .training_provenance import file_sha256
+from .experiment_archive import sha256_file
 
 
 STUDY = "pmid:42199926"
@@ -49,7 +49,7 @@ def prepare_observations(supplements_dir):
     records = []
     for filename, expected in WORKBOOK_SHA256.items():
         path = Path(supplements_dir) / filename
-        if file_sha256(path) != expected:
+        if sha256_file(path) != expected:
             raise ValueError(f"Supplement checksum mismatch: {filename}")
         sheets = ([f"DLA-88-{code}" for code in ("00302", "01201", "50101")]
                   if filename == "mmc2.xlsx" else ["All Peptides"])
@@ -99,7 +99,7 @@ def peptide_overlap(cohort, source_paths):
         for arm, frame in cohort.groupby("arm", sort=True):
             unique = set(frame.peptide)
             report.append({
-                "source": name, "source_sha256": file_sha256(path), "arm": arm,
+                "source": name, "source_sha256": sha256_file(path), "arm": arm,
                 "unique_peptides": len(unique), "exact_overlap": len(unique & peptides),
                 "il_overlap": sum(p.replace("I", "L") in folded for p in unique),
                 "il_denominator": "distinct original peptide strings",
@@ -293,7 +293,7 @@ def evaluate_dla(models_dir, supplements_dir, out_dir):
         "sources": {f: {"url": SOURCE_URL + f, "sha256": digest} for f, digest in WORKBOOK_SHA256.items()},
         "excel_reader": {"openpyxl": version("openpyxl")},
         "model_sha256": capabilities["model"]["sha256"],
-        "observations_sha256": file_sha256(cohort_path), "scores_sha256": file_sha256(directory / "scores.csv.gz"),
+        "observations_sha256": sha256_file(cohort_path), "scores_sha256": sha256_file(directory / "scores.csv.gz"),
         "sample_disjointness": {k: audit[k] for k in ("status", "models", "cohort")},
         "held_out_performance": {name: {"status": "not_evaluated", "metrics": None}
                                  for name in ("binding", "processing", "presentation", "calibration")},
@@ -313,7 +313,7 @@ def evaluate_dla(models_dir, supplements_dir, out_dir):
     }
     (directory / "report.json").write_text(json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n")
     capabilities["exploratory_evaluation"] = {
-        "report": "report.json", "sha256": file_sha256(directory / "report.json"),
+        "report": "report.json", "sha256": sha256_file(directory / "report.json"),
         "study": STUDY, "status": "exploratory_only", "held_out_eligible_samples": 0,
     }
     (directory / "capabilities.json").write_text(

@@ -7,8 +7,9 @@ import platform
 import pandas
 
 from . import training_provenance
+from .experiment_archive import sha256_file
 from .training_provenance import (
-    PROVENANCE_COLUMN, decode_sources, file_sha256, identity_text, study_identity,
+    PROVENANCE_COLUMN, decode_sources, identity_text, study_identity,
 )
 from .version import __version__
 
@@ -171,7 +172,7 @@ def audit_samples(inventory_path, cohort_path, out_dir, *, aliases_path=None,
     def record_file(path):
         path = Path(path).resolve()
         if str(path) not in file_records:
-            file_records[str(path)] = {"sha256": file_sha256(path)}
+            file_records[str(path)] = {"sha256": sha256_file(path)}
         return path
 
     def inventory_file(value):
@@ -267,8 +268,8 @@ def audit_samples(inventory_path, cohort_path, out_dir, *, aliases_path=None,
         "generator": {
             "package_version": __version__, "python_version": platform.python_version(),
             "pandas_version": pandas.__version__, "random_seed": None,
-            "source_sha256": file_sha256(__file__),
-            "training_provenance_sha256": file_sha256(training_provenance.__file__),
+            "source_sha256": sha256_file(__file__),
+            "training_provenance_sha256": sha256_file(training_provenance.__file__),
             "function": "mhcflurry.sample_disjointness.audit_samples",
             "arguments": {
                 "inventory_path": str(inventory_path.resolve()),
@@ -283,8 +284,8 @@ def audit_samples(inventory_path, cohort_path, out_dir, *, aliases_path=None,
         "identity_review": identity_review, "models": summaries, "input_files": file_records,
         "cohort": {"input_rows": len(cohort), "retained_rows": len(filtered),
                    "input_samples": len(identities), "retained_samples": len(kept),
-                   "sha256": file_sha256(out_dir / "cohort.csv.gz")},
-        "sample_audit_sha256": file_sha256(out_dir / "sample_audit.csv"),
+                   "sha256": sha256_file(out_dir / "cohort.csv.gz")},
+        "sample_audit_sha256": sha256_file(out_dir / "sample_audit.csv"),
         "limitations": [
             "Separation is conditional on the supplied lineage and identity review.",
             "Peptide/MHC overlap must be checked independently.",

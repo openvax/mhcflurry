@@ -17,7 +17,7 @@ import pandas
 import yaml
 
 from audit_training_data_identity import compare_rows
-from compose_processing_ensemble import fingerprint_directory, sha256_file
+from mhcflurry.experiment_archive import fingerprint_directory, sha256_file
 from generate_processing_cleavage_boundaries import build_conditions
 
 

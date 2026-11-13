@@ -2,7 +2,6 @@
 """Score a fixed weighted ensemble from preserved processing predictions."""
 
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -10,19 +9,11 @@ from pathlib import Path
 import numpy
 import pandas
 
+from mhcflurry.experiment_archive import sha256_file
 from mhcflurry.cli.processing_affinity_control import (
     score_risk_sets,
     summarize_metrics,
 )
-
-
-def sha256_file(path):
-    """Return the SHA256 digest of a file."""
-    digest = hashlib.sha256()
-    with open(path, "rb") as fd:
-        for block in iter(lambda: fd.read(8 * 1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 def parse_member(value):

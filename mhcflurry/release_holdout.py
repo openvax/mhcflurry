@@ -4,7 +4,6 @@
 """Build and validate the frozen evaluation holdout for model releases."""
 
 import argparse
-import hashlib
 import json
 from pathlib import Path
 
@@ -14,6 +13,7 @@ from .common import (
     normalize_class1_genotype,
     normalize_sequence_resolved_allele_name,
 )
+from .experiment_archive import sha256_file
 from .training_provenance import identity_text, study_identity
 
 
@@ -29,14 +29,6 @@ PRESENTATION_SAMPLES_FILE = "presentation_samples.csv"
 POLICY_FILE = "policy.json"
 VALIDATION_FILE = "validation.json"
 PRESENTATION_HOLDOUT_PMIDS = ("31154438",)
-
-
-def _sha256(path):
-    digest = hashlib.sha256()
-    with open(path, "rb") as fd:
-        for block in iter(lambda: fd.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 def _benchmark_rows(path, chunksize):
@@ -163,7 +155,7 @@ def build_release_holdout(
         hit_counts[kind] = hit_count
         input_files[kind] = {
             "path": str(path),
-            "sha256": _sha256(path),
+            "sha256": sha256_file(path),
         }
         if kind == "multiallelic":
             missing = sorted(presentation_samples - benchmark_samples)
@@ -205,7 +197,7 @@ def build_release_holdout(
             (PRESENTATION_SAMPLES_FILE, presentation_frame)):
         holdout_files[filename] = {
             "rows": len(frame),
-            "sha256": _sha256(out_dir / filename),
+            "sha256": sha256_file(out_dir / filename),
         }
 
     policy = {
@@ -234,11 +226,11 @@ def build_release_holdout(
             **input_files,
             "affinity_training_data": {
                 "path": str(training_data),
-                "sha256": _sha256(training_data),
+                "sha256": sha256_file(training_data),
             },
             "mass_spec_data": {
                 "path": str(mass_spec_data),
-                "sha256": _sha256(mass_spec_data),
+                "sha256": sha256_file(mass_spec_data),
             },
         },
         "presentation_holdout_pmids": list(holdout_pmids),
@@ -323,7 +315,7 @@ def validate_holdout_manifests(holdout_dir):
             f"{sorted(holdout_files)}")
     for filename, expected in holdout_files.items():
         path = holdout_dir / filename
-        actual_sha256 = _sha256(path)
+        actual_sha256 = sha256_file(path)
         if actual_sha256 != expected.get("sha256"):
             raise ValueError(
                 f"Release holdout manifest checksum mismatch: {path}")
@@ -386,7 +378,7 @@ def validate_release_holdout(
         "sample_disjointness_reason": (
             "Recorded pMHC/source checks do not establish complete component lineage; "
             "use audit-samples for every compared model."),
-        "policy_sha256": _sha256(holdout_dir / POLICY_FILE),
+        "policy_sha256": sha256_file(holdout_dir / POLICY_FILE),
         "holdout_files": policy["holdout_files"],
         "affinity_overlap_rows": int(affinity_overlap),
         "processing_overlap_rows": int(processing_overlap),

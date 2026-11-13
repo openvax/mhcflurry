@@ -11,7 +11,7 @@ import mhcgnomes
 import pandas
 
 from .common import normalize_allele_name, normalize_sequence_resolved_allele_name
-from .training_provenance import file_sha256
+from .experiment_archive import sha256_file
 from .version import __version__
 
 
@@ -31,7 +31,7 @@ def model_fingerprint(models_dir):
             raise ValueError(f"Model bundle contains a symlink: {path}. "
                              "Use a copy with regular files and directories.")
         if path.is_file():
-            files[path.relative_to(directory).as_posix()] = file_sha256(path)
+            files[path.relative_to(directory).as_posix()] = sha256_file(path)
     if not files:
         raise ValueError("Model directory contains no files")
     digest = hashlib.sha256(json.dumps(
@@ -44,8 +44,8 @@ def generator_metadata(source_file):
     return {"mhcflurry": __version__, "python": platform.python_version(),
             "dependencies": {name: version(name) for name in
                              ("mhcgnomes", "numpy", "pandas", "torch")},
-            "source_sha256": file_sha256(source_file),
-            "source_files": {name: file_sha256(Path(__file__).parent / name) for name in (
+            "source_sha256": sha256_file(source_file),
+            "source_files": {name: sha256_file(Path(__file__).parent / name) for name in (
                 "allele_capabilities.py", "dla_evaluation.py", "common.py",
                 "sample_disjointness.py", "training_provenance.py",
                 "class1_affinity_predictor.py", "class1_processing_predictor.py",
@@ -92,7 +92,7 @@ def training_evidence(models_dir, alleles, lengths):
         columns = pandas.read_csv(path, nrows=0).columns
         countable = "peptide" in columns and any(c in columns for c in ("allele", "hla"))
         result[component] = {
-            "path": filename, "sha256": file_sha256(path), "status": "available",
+            "path": filename, "sha256": sha256_file(path), "status": "available",
             "total_rows": total, "source_provenance_present": "source_provenance" in columns,
             "unresolved_allele_rows": unresolved_allele_rows,
             "scope": "bundled table only; all labels; not complete model lineage",

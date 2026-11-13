@@ -51,6 +51,7 @@ import numpy
 import pandas
 from sklearn.metrics import average_precision_score, roc_auc_score
 
+from ..experiment_archive import sha256_file
 from ..common import (
     normalize_class1_genotype,
     normalize_allele_name,
@@ -1308,14 +1309,6 @@ def _load_presentation_benchmark_for_component(data_dir, args, component):
     )
 
 
-def _sha256_file(path, chunk_size=1024 * 1024):
-    digest = hashlib.sha256()
-    with open(path, "rb") as fd:
-        for chunk in iter(lambda: fd.read(chunk_size), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 def _load_reused_affinity_predictions(
         path, prediction_column, expected_identity, label):
     """Load saved predictions after proving their cohort is identical."""
@@ -1342,7 +1335,7 @@ def _load_reused_affinity_predictions(
         "mode": "reused",
         "path": path,
         "prediction_column": prediction_column,
-        "sha256": _sha256_file(path),
+        "sha256": sha256_file(path),
         "benchmark_identity": identity,
     }
 
