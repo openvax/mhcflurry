@@ -61,14 +61,11 @@ the recorded source commit and generated configuration.
   maintained affinity and processing grids. The affinity minibatch defaults to
   the published value 128; processing defaults to 512. Both can be changed with
   `--minibatch-size`.
-- **`release_exact/generate_hyperparameters*.py`** are compatibility shims for
-  historical direct-script workflows.
 - **`release_exact/make_train_data.processing.py`** and
   **`make_train_data.presentation.py`** prepare annotated hits, decoys, and
   model-family input tables.
 - **`mhcflurry class1-reassign-mass-spec-training-data`** reruns the maintained
-  mass-spec affinity remapping step. Its file under `release_exact/` is a
-  compatibility shim.
+  mass-spec affinity remapping step.
 
 ## Evaluation
 
@@ -145,8 +142,7 @@ paper figures, saved-prediction tables, and external predictors.
 - **`mhcflurry eval release-experiment-figures`** regenerates the release
   training figures from archived experiment inputs.
 - **`mhcflurry train plot-loss-curves`** renders per-architecture loss curves
-  from a trained ensemble. The historical `plot_loss_curves.py` path remains a
-  compatibility shim.
+  from a trained ensemble.
 - **`benchmark_training_profile.py`** reports data-load, encoding, fit, and save
   timings for one architecture.
 
