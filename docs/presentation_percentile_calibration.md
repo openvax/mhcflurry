@@ -72,7 +72,7 @@ merely by loading it. No calibration rule is fitted to evaluation labels.
 
 ## Calibrating a predictor
 
-The existing `mhcflurry-calibrate-percentile-ranks` command uses the new default
+The existing `mhcflurry calibrate-percentile-ranks` command uses the new default
 automatically for `--predictor-kind class1_presentation` (compact by default;
 `--percentile-method histogram` reproduces the earlier tail-bin method). Re-run the original
 calibration recipe on a separate copy of the predictor, retaining

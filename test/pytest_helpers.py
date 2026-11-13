@@ -18,27 +18,13 @@ Test helper functions providing assertion utilities.
 import sys
 
 
-_MHCFLURRY_COMMANDS = {
-    "mhcflurry-calibrate-percentile-ranks": "mhcflurry.cli.calibrate_percentile_ranks_command",
-    "mhcflurry-class1-train-allele-specific-models": "mhcflurry.cli.train_allele_specific_models_command",
-    "mhcflurry-class1-select-allele-specific-models": "mhcflurry.cli.select_allele_specific_models_command",
-    "mhcflurry-class1-train-pan-allele-models": "mhcflurry.cli.train_pan_allele_models_command",
-    "mhcflurry-class1-select-pan-allele-models": "mhcflurry.cli.select_pan_allele_models_command",
-    "mhcflurry-class1-train-processing-models": "mhcflurry.cli.train_processing_models_command",
-    "mhcflurry-class1-select-processing-models": "mhcflurry.cli.select_processing_models_command",
-}
-
-
-def mhcflurry_cli(command):
+def mhcflurry_cli(subcommand):
     """
-    Return argv prefix to run a mhcflurry command using the current interpreter.
+    Return argv prefix to run ``mhcflurry <subcommand>`` using the current interpreter.
 
     This avoids picking up a system-installed mhcflurry that may rely on TensorFlow.
     """
-    module = _MHCFLURRY_COMMANDS.get(command)
-    if module is None:
-        raise ValueError(f"Unknown mhcflurry command: {command}")
-    return [sys.executable, "-c", f"from {module} import run; run()"]
+    return [sys.executable, "-m", "mhcflurry.cli.main", subcommand]
 
 
 def eq_(a, b, msg=None):

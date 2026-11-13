@@ -408,7 +408,7 @@ do
     fi
 
     run_logged_step "train_${kind}" "$TRAIN_LOG" \
-        mhcflurry-class1-train-pan-allele-models \
+        mhcflurry class1-train-pan-allele-models \
         --data "$TRAINING_DATA" \
         --allele-sequences "$ALLELE_SEQUENCES" \
         --pretrain-data "$PRETRAIN_DATA" \
@@ -431,7 +431,7 @@ do
     SELECTED_DIR="models.${kind}"
 
     run_logged_step "select_${kind}" "$SELECT_LOG" \
-        mhcflurry-class1-select-pan-allele-models \
+        mhcflurry class1-select-pan-allele-models \
         --data "$UNSELECTED_DIR/train_data.csv.bz2" \
         --models-dir "$UNSELECTED_DIR" \
         --out-models-dir "$SELECTED_DIR" \
@@ -487,7 +487,7 @@ do
         CALIBRATE_PARALLELISM_ARGS+=(--enable-timing)
     fi
     run_logged_step "calibrate_${kind}" "$CALIBRATE_LOG" \
-        mhcflurry-calibrate-percentile-ranks \
+        mhcflurry calibrate-percentile-ranks \
         --models-dir "$SELECTED_DIR" \
         --match-amino-acid-distribution-data "$UNSELECTED_DIR/train_data.csv.bz2" \
         --motif-summary \

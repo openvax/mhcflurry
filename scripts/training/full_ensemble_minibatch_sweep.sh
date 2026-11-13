@@ -77,7 +77,7 @@ PRETRAIN_DATA="${PRETRAIN_DATA:-$(mhcflurry-downloads path random_peptide_predic
 DATA_EVAL_DIR="${DATA_EVAL_DIR:-$(mhcflurry-downloads path data_evaluation)}"
 GPUS="${GPUS:-8}"
 MAX_TASKS_PER_WORKER="${MAX_TASKS_PER_WORKER:-12}"
-# Model selection bounds. mhcflurry-class1-select-pan-allele-models picks
+# Model selection bounds. mhcflurry class1-select-pan-allele-models picks
 # between MIN_MODELS_PER_FOLD and MAX_MODELS_PER_FOLD models per training
 # fold; with 4 folds, total ensemble size lands in
 # [4*MIN_MODELS_PER_FOLD, 4*MAX_MODELS_PER_FOLD]. Default range matches
@@ -203,7 +203,7 @@ PY
     else
     train_start=$(date +%s)
     start_gpu_telemetry "$SIZE_OUT/gpu_occupancy.csv"
-    mhcflurry-class1-train-pan-allele-models \
+    mhcflurry class1-train-pan-allele-models \
         --data "$TRAIN_DATA" \
         --allele-sequences "$ALLELE_SEQUENCES" \
         --pretrain-data "$PRETRAIN_DATA" \
@@ -234,7 +234,7 @@ PY
     else
     select_start=$(date +%s)
     cd "$SIZE_OUT"
-    mhcflurry-class1-select-pan-allele-models \
+    mhcflurry class1-select-pan-allele-models \
         --data "$SIZE_OUT/models.unselected.combined/train_data.csv.bz2" \
         --models-dir "$SIZE_OUT/models.unselected.combined" \
         --out-models-dir "$SIZE_OUT/models.combined" \
@@ -265,7 +265,7 @@ PY
         echo "=== $CELL_NAME calibrate already complete (${cal_sec}s), skipping ==="
     else
     cal_start=$(date +%s)
-    mhcflurry-calibrate-percentile-ranks \
+    mhcflurry calibrate-percentile-ranks \
         --models-dir "$SIZE_OUT/models.combined" \
         --match-amino-acid-distribution-data "$SIZE_OUT/models.unselected.combined/train_data.csv.bz2" \
         --motif-summary --num-peptides-per-length 50000 \

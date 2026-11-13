@@ -1022,7 +1022,7 @@ class Class1AffinityPredictor(object):
                     "The predictor also lacks an allele sequence for %s; "
                     "affinity prediction is unavailable." % normalized_allele
                 )
-            calibrate_command = ["mhcflurry-calibrate-percentile-ranks"]
+            calibrate_command = ["mhcflurry", "calibrate-percentile-ranks"]
             models_dir = self.models_dir_for_diagnostics()
             if models_dir:
                 calibrate_command.extend(["--models-dir", models_dir])

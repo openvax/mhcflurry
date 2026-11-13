@@ -237,7 +237,7 @@ for kind in $PROCESSING_VARIANTS; do
         "${PROCESSING_VARIANT_HYPERPARAMETER_ARGS[@]}" \
         > "hyperparameters.$kind.yaml"
 
-    mhcflurry-class1-train-processing-models \
+    mhcflurry class1-train-processing-models \
         --data "$(pwd)/train_data.csv.bz2" \
         --held-out-samples "$PROCESSING_HELD_OUT_SAMPLES" \
         --num-folds 4 \
@@ -247,7 +247,7 @@ for kind in $PROCESSING_VARIANTS; do
         --worker-log-dir "$BASE_OUT/processing" \
         "${PROCESSING_PARALLELISM_ARGS[@]}"
 
-    mhcflurry-class1-select-processing-models \
+    mhcflurry class1-select-processing-models \
         --data "$(pwd)/models.unselected.$kind/train_data.csv.bz2" \
         --models-dir "$(pwd)/models.unselected.$kind" \
         --out-models-dir "$(pwd)/models.selected.$kind" \
@@ -283,7 +283,7 @@ python make_train_data.presentation.py \
     --out "$(pwd)/train_data.csv"
 compress_csv_bzip2 "$(pwd)/train_data.csv"
 
-mhcflurry-class1-train-presentation-models \
+mhcflurry class1-train-presentation-models \
     --data "$(pwd)/train_data.csv.bz2" \
     --affinity-predictor "$AFFINITY_PREDICTOR" \
     --processing-predictor-with-flanks "$BASE_OUT/processing/models.selected.$PRESENTATION_PROCESSING_WITH_FLANKS_KIND" \
@@ -293,7 +293,7 @@ mhcflurry-class1-train-presentation-models \
     --feature-chunk-size "$PRESENTATION_FEATURE_CHUNK_SIZE" \
     "${PRESENTATION_PARALLELISM_ARGS[@]}"
 
-mhcflurry-calibrate-percentile-ranks \
+mhcflurry calibrate-percentile-ranks \
     --models-dir "$(pwd)/models" \
     --match-amino-acid-distribution-data "$AFFINITY_PREDICTOR/train_data.csv.bz2" \
     --alleles-file "$AFFINITY_PREDICTOR/train_data.csv.bz2" \

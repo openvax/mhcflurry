@@ -63,7 +63,7 @@ def run_and_check(n_jobs=0, delete=True, additional_args=None):
     new_predictor = Class1AffinityPredictor.load(dest_models_dir)
     assert len(new_predictor.allele_to_percent_rank_transform) == 0
 
-    args = mhcflurry_cli("mhcflurry-calibrate-percentile-ranks") + [
+    args = mhcflurry_cli("calibrate-percentile-ranks") + [
         "--models-dir", dest_models_dir,
         "--match-amino-acid-distribution-data", get_path(
             "data_curated", "curated_training_data.affinity.csv.bz2"),

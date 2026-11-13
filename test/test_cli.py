@@ -2413,8 +2413,74 @@ def test_unknown_subcommand_errors():
         parser.parse_args(["does-not-exist"])
 
 
+def _setup_console_scripts():
+    import ast
+
+    tree = ast.parse(
+        (pathlib.Path(__file__).resolve().parents[1] / "setup.py").read_text())
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Dict):
+            for key, value in zip(node.keys, node.values):
+                if isinstance(key, ast.Constant) and key.value == "console_scripts":
+                    return dict(
+                        (part.strip() for part in spec.split("=", 1))
+                        for spec in ast.literal_eval(value))
+    raise AssertionError("setup.py declares no console_scripts")
+
+
+def test_hyphenated_console_scripts_are_deprecated_except_predict_and_downloads():
+    scripts = {
+        name: target for name, target in _setup_console_scripts().items()
+        if name.startswith("mhcflurry-")
+    }
+    kept = {"mhcflurry-downloads", "mhcflurry-predict", "mhcflurry-predict-scan"}
+    assert kept.issubset(scripts)
+    assert "mhcflurry-pseudosequences" not in scripts
+    deprecated = set(scripts) - kept
+    assert len(deprecated) == 8
+    for name in deprecated:
+        subcommand = name[len("mhcflurry-"):]
+        assert subcommand in cli_main._SUBCOMMANDS
+        assert scripts[name] == (
+            "mhcflurry.cli.deprecated_scripts:%s" % subcommand.replace("-", "_"))
+        module = importlib.import_module("mhcflurry.cli.deprecated_scripts")
+        assert callable(getattr(module, subcommand.replace("-", "_")))
+    for name in kept:
+        assert "deprecated_scripts" not in scripts[name]
+
+
+def test_deprecated_console_script_prints_notice_and_runs_subcommand(
+        monkeypatch, capsys):
+    from mhcflurry.cli import deprecated_scripts
+
+    monkeypatch.setattr(
+        sys, "argv", ["mhcflurry-class1-select-pan-allele-models", "--help"])
+    with pytest.raises(SystemExit) as exit_info:
+        deprecated_scripts.class1_select_pan_allele_models()
+    assert exit_info.value.code == 0
+    captured = capsys.readouterr()
+    assert captured.err == (
+        "mhcflurry-class1-select-pan-allele-models is deprecated and will be "
+        "removed in 2.4.0; use mhcflurry class1-select-pan-allele-models.\n")
+    assert "--out-models-dir" in captured.out
+
+
+def test_deprecated_console_script_is_silent_during_completion(
+        monkeypatch, capsys):
+    from mhcflurry.cli import deprecated_scripts
+
+    calls = []
+    monkeypatch.setattr(
+        "mhcflurry.cli.select_pan_allele_models_command.run", calls.append)
+    monkeypatch.setattr(sys, "argv", ["mhcflurry-class1-select-pan-allele-models"])
+    monkeypatch.setattr(deprecated_scripts, "is_completing", lambda: True)
+    deprecated_scripts.class1_select_pan_allele_models()
+    assert calls == [[]]
+    assert capsys.readouterr().err == ""
+
+
 def test_all_legacy_commands_registered():
-    """All 12 legacy mhcflurry-* commands are reachable as subcommands."""
+    """All 12 historical mhcflurry-* command names are reachable as subcommands."""
     expected = {
         "predict", "predict-scan", "downloads",
         "calibrate-percentile-ranks",
