@@ -59,6 +59,36 @@ def test_top_level_parser_lists_subcommands():
         assert "\n  %s " % name not in friendly
 
 
+@pytest.mark.parametrize("name,replacement", [
+    ("compare-models", "mhcflurry eval compare-models"),
+    ("plot-model-comparison", "mhcflurry eval plot-comparison"),
+    ("paper-figures", "mhcflurry eval paper-figures render"),
+])
+def test_deprecated_top_level_eval_shortcuts_print_notice(name, replacement, capsys):
+    with pytest.raises(SystemExit) as exit_info:
+        cli_main.main([name, "--help"])
+    assert exit_info.value.code == 0
+    captured = capsys.readouterr()
+    assert captured.err == (
+        "mhcflurry %s is deprecated and will be removed in 2.4.0; use %s.\n"
+        % (name, replacement))
+    # The shortcut still runs the command, whose usage names the new form.
+    assert "usage: %s" % replacement in captured.out
+
+
+def test_eval_subcommands_print_no_deprecation_notice(capsys):
+    with pytest.raises(SystemExit):
+        cli_main.main(["eval", "compare-models", "--help"])
+    assert capsys.readouterr().err == ""
+
+
+def test_eval_plot_model_comparison_alias_is_removed(capsys):
+    with pytest.raises(SystemExit) as exit_info:
+        cli_main.main(["eval", "plot-model-comparison", "--input", "missing"])
+    assert exit_info.value.code == 2
+    assert "plot-comparison" in capsys.readouterr().err
+
+
 def test_allele_specific_training_count_threshold_is_inclusive():
     from mhcflurry.cli import train_allele_specific_models_command as command
 
@@ -1683,7 +1713,8 @@ def test_eval_help_runs(capsys):
     assert "paper-figures external-predictors" in captured
     assert "paper-figures run" in captured
     assert "affinity-candidate-figures" in captured
-    assert "Compatibility:" in captured
+    assert "Compatibility:" not in captured
+    assert "plot-model-comparison" not in captured
 
 
 def test_eval_affinity_candidate_figures_help_runs(capsys):

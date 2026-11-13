@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Plot the metric outputs from ``mhcflurry compare-models``.
+"""Plot the metric outputs from ``mhcflurry eval compare-models``.
 
 Reads the CSVs + JSON written by ``compare-models`` and renders ROC / PR
 / scatter / per-allele delta plots under ``<input>/plots/`` for affinity,
@@ -51,19 +51,14 @@ METRIC_DISPLAY_NAMES = {
     "ppv_at_n": "PPV@N",
 }
 
-def make_parser():
-    """Return a standalone parser for documentation tooling (autoprogram)."""
-    parser = argparse.ArgumentParser(prog="mhcflurry plot-model-comparison")
-    register_subparser(parser)
-    return parser
-
-
 def run_argv(argv):
-    """Entry point for the lazy ``mhcflurry plot-model-comparison`` dispatcher."""
+    """Entry point for the lazy ``mhcflurry eval plot-comparison`` dispatcher."""
     return run(make_parser().parse_args(argv))
 
 
-def register_subparser(parser):
+def make_parser():
+    """Return the command's argument parser."""
+    parser = argparse.ArgumentParser(prog="mhcflurry eval plot-comparison")
     parser.description = __doc__
     parser.formatter_class = argparse.RawDescriptionHelpFormatter
     parser.epilog = """
@@ -81,7 +76,7 @@ Plotting layers:
                         help="Explicitly render unmatched processing diagnostics, labelled as such.")
     parser.add_argument(
         "--input", required=True,
-        help="Output directory produced by ``mhcflurry compare-models``.",
+        help="Output directory produced by ``mhcflurry eval compare-models``.",
     )
     parser.add_argument(
         "--max-scatter-points", type=positive_int_arg, default=100_000,
@@ -121,7 +116,7 @@ Plotting layers:
         "--paper-figures-scores-dir",
         help=(
             "Optional saved figure-input directory passed to "
-            "``mhcflurry paper-figures --scores-dir``. This may contain "
+            "``mhcflurry eval paper-figures render --scores-dir``. This may contain "
             "saved prediction tables, derived score tables, and predictor "
             "metadata such as predictor_info.csv."
         ),
@@ -156,12 +151,12 @@ Plotting layers:
     )
     parser.add_argument(
         "--paper-figures-candidate-predictor",
-        help="Candidate predictor passed through to ``mhcflurry paper-figures``.",
+        help="Candidate predictor passed through to ``mhcflurry eval paper-figures render``.",
     )
     parser.add_argument(
         "--paper-figures-external-baselines",
         help=(
-            "External baselines passed through to ``mhcflurry paper-figures`` "
+            "External baselines passed through to ``mhcflurry eval paper-figures render`` "
             "as PREDICTOR or PREDICTOR:PERCENT_CHANGE_SUFFIX."
         ),
     )
@@ -169,35 +164,35 @@ Plotting layers:
         "--paper-figures-multiallelic-predictions",
         help=(
             "Saved multiallelic test-set prediction table passed through to "
-            "``mhcflurry paper-figures``."
+            "``mhcflurry eval paper-figures render``."
         ),
     )
     parser.add_argument(
         "--paper-figures-monoallelic-predictions",
         help=(
             "Saved monoallelic test-set prediction table passed through to "
-            "``mhcflurry paper-figures``."
+            "``mhcflurry eval paper-figures render``."
         ),
     )
     parser.add_argument(
         "--paper-figures-preferred-predictors",
         help=(
             "Comma-separated preferred predictors passed through to "
-            "``mhcflurry paper-figures``."
+            "``mhcflurry eval paper-figures render``."
         ),
     )
     parser.add_argument(
         "--paper-figures-presentation-panel-predictors",
         help=(
             "Comma-separated presentation-panel candidate predictors passed "
-            "through to ``mhcflurry paper-figures``."
+            "through to ``mhcflurry eval paper-figures render``."
         ),
     )
     parser.add_argument(
         "--paper-figures-presentation-panel-baselines",
         help=(
             "Comma-separated presentation-panel baseline predictors passed "
-            "through to ``mhcflurry paper-figures``."
+            "through to ``mhcflurry eval paper-figures render``."
         ),
     )
     return parser

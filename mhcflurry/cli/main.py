@@ -23,8 +23,8 @@ Two flavors of subcommand:
 * **New under the parent**: ``train`` and ``eval``. Each module exposes
   ``run_argv(argv)`` which does its own argparse. ``compare-models``,
   ``plot-model-comparison`` and ``paper-figures`` also still dispatch at the
-  top level for existing scripts (see :data:`UNLISTED_SUBCOMMANDS`), but the
-  help lists them only under ``mhcflurry eval``.
+  top level, with a deprecation notice (see :data:`DEPRECATED_SUBCOMMANDS`);
+  the help lists them only under ``mhcflurry eval``.
 * **Historical mhcflurry-* commands**: ``predict``, ``predict-scan``,
   ``downloads``, ``calibrate-percentile-ranks``, the ``class1-train-*`` /
   ``class1-select-*`` family, ``pseudosequences``. Each is wrapped by
@@ -152,10 +152,17 @@ _HELP_GROUPS = (
     )),
 )
 
-#: Subcommands that still dispatch at the top level so existing scripts keep
-#: working, but are not listed in ``mhcflurry --help``: each duplicates an
-#: ``mhcflurry eval`` subcommand (``mhcflurry eval compare-models`` and so on).
-UNLISTED_SUBCOMMANDS = ("compare-models", "plot-model-comparison", "paper-figures")
+#: Deprecated top-level subcommands, mapped to the ``mhcflurry eval`` form that
+#: replaces each. They still dispatch, after a one-line notice on stderr, and
+#: will be removed in 2.4.0.
+DEPRECATED_SUBCOMMANDS = {
+    "compare-models": "eval compare-models",
+    "plot-model-comparison": "eval plot-comparison",
+    "paper-figures": "eval paper-figures render",
+}
+
+#: Subcommands that dispatch but are not listed in ``mhcflurry --help``.
+UNLISTED_SUBCOMMANDS = tuple(DEPRECATED_SUBCOMMANDS)
 
 
 def _check_help_groups():
@@ -384,6 +391,12 @@ def main(argv=None):
     subcommand = argv[0]
     remaining = argv[1:]
     if subcommand in _SUBCOMMANDS:
+        if subcommand in DEPRECATED_SUBCOMMANDS:
+            print(
+                "mhcflurry %s is deprecated and will be removed in 2.4.0; "
+                "use mhcflurry %s."
+                % (subcommand, DEPRECATED_SUBCOMMANDS[subcommand]),
+                file=sys.stderr)
         module_path, entry, _ = _SUBCOMMANDS[subcommand]
         module = importlib.import_module(module_path)
         # Subcommands' parsers normally default ``prog`` to ``sys.argv[0]``

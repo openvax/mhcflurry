@@ -241,7 +241,7 @@ if [ "$EVALUATION" != none ]; then
                 --processing-modes short_flanks \
                 --out "$comparison" \
                 "${COMMON_PARALLELISM_ARGS[@]}"
-            mhcflurry plot-model-comparison \
+            mhcflurry eval plot-comparison \
                 --input "$comparison" \
                 --components processing \
                 --summary-pdf "$comparison/plots/model_comparison_figures.pdf"

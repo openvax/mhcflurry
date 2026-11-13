@@ -31,7 +31,7 @@ Runs whichever components are available on both sides:
   the multiallelic hit/decoy benchmark, with-flanks and without-flanks.
 
 Writes detailed CSV/JSON artifacts plus release-summary CSV/Markdown tables.
-``mhcflurry plot-model-comparison`` consumes the CSVs to render plots.
+``mhcflurry eval plot-comparison`` consumes the CSVs to render plots.
 """
 from __future__ import annotations
 
@@ -153,19 +153,14 @@ def _parallelism_args_for_component(args, component):
 # ---------------------------------------------------------------------------
 
 
-def make_parser():
-    """Return a standalone parser for documentation tooling (autoprogram)."""
-    parser = argparse.ArgumentParser(prog="mhcflurry compare-models")
-    register_subparser(parser)
-    return parser
-
-
 def run_argv(argv):
-    """Entry point for the lazy ``mhcflurry compare-models`` dispatcher."""
+    """Entry point for the lazy ``mhcflurry eval compare-models`` dispatcher."""
     return run(make_parser().parse_args(argv))
 
 
-def register_subparser(parser):
+def make_parser():
+    """Return the command's argument parser."""
+    parser = argparse.ArgumentParser(prog="mhcflurry eval compare-models")
     parser.description = __doc__
     parser.formatter_class = argparse.RawDescriptionHelpFormatter
     parser.add_argument(

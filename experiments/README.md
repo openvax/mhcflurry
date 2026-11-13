@@ -55,7 +55,7 @@ Each paired comparison can regenerate its ROC/PR, per-allele-delta,
 per-length, and summary-PDF panels without rerunning predictions:
 
 ```bash
-mhcflurry plot-model-comparison \
+mhcflurry eval plot-comparison \
     --input experiments/<snapshot>/artifacts/<condition>/comparison-vs-baseline \
     --summary-pdf experiments/<snapshot>/plots/<condition>-comparison.pdf
 ```

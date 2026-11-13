@@ -499,7 +499,7 @@ while IFS= read -r condition; do
         date -u +%Y-%m-%dT%H:%M:%SZ > "$comparison/.done"
     fi
     if [ ! -f "$comparison/.plots.done" ]; then
-        mhcflurry plot-model-comparison \
+        mhcflurry eval plot-comparison \
             --input "$comparison" \
             --components affinity \
             --summary-pdf "$comparison/plots/model_comparison_figures.pdf"

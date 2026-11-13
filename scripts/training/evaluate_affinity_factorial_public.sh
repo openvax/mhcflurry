@@ -247,7 +247,7 @@ for condition in "${conditions[@]}"; do
         fi
     fi
     if [ ! -f "$comparison/.plots.done" ]; then
-        mhcflurry plot-model-comparison \
+        mhcflurry eval plot-comparison \
             --input "$comparison" \
             --components affinity \
             --summary-pdf "$comparison/plots/model_comparison_figures.pdf"
