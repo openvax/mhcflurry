@@ -37,8 +37,8 @@ def test_filter_select_call_sites():
     these sites, a pseudogene allele in the input predictor would
     crash the parallel selection mid-fold the same way calibrate
     used to."""
-    from mhcflurry import select_pan_allele_models_command as pan_mod
-    from mhcflurry import select_allele_specific_models_command as as_mod
+    from mhcflurry.cli import select_pan_allele_models_command as pan_mod
+    from mhcflurry.cli import select_allele_specific_models_command as as_mod
 
     pan_src = inspect.getsource(pan_mod.run)
     as_src = inspect.getsource(as_mod.run)
@@ -649,8 +649,8 @@ def test_apply_resolved_training_hyperparameters_to_work_items():
 
 def test_affinity_trainers_use_shared_resolved_hyperparameter_helper():
     import inspect
-    from mhcflurry import train_pan_allele_models_command as pan_mod
-    from mhcflurry import train_allele_specific_models_command as as_mod
+    from mhcflurry.cli import train_pan_allele_models_command as pan_mod
+    from mhcflurry.cli import train_allele_specific_models_command as as_mod
 
     assert "apply_resolved_training_hyperparameters_to_work_items" in (
         inspect.getsource(pan_mod.train_models)

@@ -10,10 +10,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Compatibility wrapper for :mod:`mhcflurry.parallelism`."""
+"""Deprecated compatibility wrapper for :mod:`mhcflurry.parallelism`."""
+
+import warnings
 
 from . import parallelism as _parallelism
 from .parallelism import *  # noqa: F403
+
+warnings.warn(
+    "mhcflurry.local_parallelism is deprecated and will be removed in 2.4.0. "
+    "Import mhcflurry.parallelism instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 def __getattr__(name):

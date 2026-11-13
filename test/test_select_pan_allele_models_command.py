@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for ``mhcflurry.select_pan_allele_models_command``."""
+"""Unit tests for ``mhcflurry.cli.select_pan_allele_models_command``."""
 import inspect
 
 import numpy
@@ -23,7 +23,7 @@ def test_fold_col_parser_rejects_pandas_merge_suffixes():
     ``fold_0_x``/``fold_0_y`` etc. The select fold-col parser must
     surface that as a clean error rather than crashing later in
     ``int(col.split("_")[-1])``."""
-    from mhcflurry import select_pan_allele_models_command as mod
+    from mhcflurry.cli import select_pan_allele_models_command as mod
 
     src = inspect.getsource(mod.run)
     assert r'r"^fold_\d+$"' in src or r"r'^fold_\d+$'" in src, (
@@ -45,7 +45,7 @@ def test_train_peptide_hash_computed_before_allele_filter():
     Verifies (via source inspection) that the hash is built over
     ``df.loc[df[col] == 1]`` while ``df`` is still the raw read, i.e.
     before the ``df = df.loc[df.allele.isin(alleles)]`` reassignment."""
-    from mhcflurry import select_pan_allele_models_command as mod
+    from mhcflurry.cli import select_pan_allele_models_command as mod
 
     src = inspect.getsource(mod.run)
     hash_idx = src.index("make_train_peptide_hash(df.loc[df[col] == 1])")
@@ -59,7 +59,7 @@ def test_train_peptide_hash_computed_before_allele_filter():
 
 def test_model_select_can_return_row_level_validation_predictions():
     from mhcflurry import Class1AffinityPredictor
-    from mhcflurry import select_pan_allele_models_command as mod
+    from mhcflurry.cli import select_pan_allele_models_command as mod
     from mhcflurry.regression_target import to_ic50
 
     class FakeModel:

@@ -36,7 +36,7 @@ from mhcflurry.common import (
     positive_float_arg,
     positive_int_arg,
 )
-from mhcflurry.local_parallelism import (
+from mhcflurry.parallelism import (
     add_local_parallelism_args,
     resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,

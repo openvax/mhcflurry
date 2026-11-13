@@ -3180,7 +3180,8 @@ def test_main_help_does_not_import_predict_command():
     )
 
 
-def test_legacy_command_module_shims_reexport_cli_modules():
+def test_legacy_command_module_shims_warn_and_reexport_cli_modules(
+        import_deprecated_module):
     command_modules = [
         "calibrate_percentile_ranks_command",
         "downloads_command",
@@ -3195,16 +3196,19 @@ def test_legacy_command_module_shims_reexport_cli_modules():
         "train_presentation_models_command",
     ]
     for module_name in command_modules:
-        legacy = importlib.import_module("mhcflurry.%s" % module_name)
+        legacy = import_deprecated_module(
+            "mhcflurry.%s" % module_name, "mhcflurry.cli.%s" % module_name)
         canonical = importlib.import_module("mhcflurry.cli.%s" % module_name)
         assert legacy.run is canonical.run
         assert legacy.parser is canonical.parser
 
-    from mhcflurry import predict_command
+    # Names outside ``__all__`` still resolve through the wrapper.
     from mhcflurry.cli import predict_command as cli_predict_command
 
+    legacy = import_deprecated_module(
+        "mhcflurry.predict_command", "mhcflurry.cli.predict_command")
     assert (
-        predict_command._predict_dataframe_chunk
+        legacy._predict_dataframe_chunk
         is cli_predict_command._predict_dataframe_chunk
     )
 

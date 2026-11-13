@@ -54,8 +54,12 @@ def test_public_classes_keep_identity_and_pickle_paths():
         getattr(mhcflurry, 'missing_public_class')
 
 
-def test_parallelism_exports_keep_identity_and_legacy_imports():
-    from mhcflurry import parallelism, local_parallelism
+def test_parallelism_exports_keep_identity_and_legacy_imports(
+        import_deprecated_module):
+    from mhcflurry import parallelism
+
+    local_parallelism = import_deprecated_module(
+        "mhcflurry.local_parallelism", "mhcflurry.parallelism")
     for name, module in parallelism._EXPORTS.items():
         value = getattr(parallelism, name)
         assert value is getattr(importlib.import_module('mhcflurry.parallelism.' + module), name)

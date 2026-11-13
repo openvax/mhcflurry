@@ -10,9 +10,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Compatibility wrapper for :mod:`mhcflurry.cli.downloads_command`."""
+"""Deprecated compatibility wrapper for :mod:`mhcflurry.cli.downloads_command`."""
+
+import warnings
 
 from .cli import downloads_command as _impl
+
+warnings.warn(
+    "mhcflurry.downloads_command is deprecated and will be removed in 2.4.0. "
+    "Import mhcflurry.cli.downloads_command instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 run = _impl.run
 parser = _impl.parser

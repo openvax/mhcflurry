@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for ``mhcflurry.downloads_command``."""
+"""Tests for ``mhcflurry.cli.downloads_command``."""
 from argparse import Namespace
 from collections import OrderedDict
 import io
@@ -19,7 +19,7 @@ import pytest
 
 from mhcflurry import downloads
 from mhcflurry.cli import downloads_command
-from mhcflurry.downloads_command import suspicious_tar_member
+from mhcflurry.cli.downloads_command import suspicious_tar_member
 
 
 def _tar_info(name, type_=tarfile.REGTYPE, linkname=""):

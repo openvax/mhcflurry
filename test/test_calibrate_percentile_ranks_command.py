@@ -130,7 +130,7 @@ def test_filter_canonicalizable_alleles_passthrough_when_all_valid():
 
 
 def test_percent_rank_status_helpers_count_sequence_equivalent_calibration():
-    from mhcflurry.calibrate_percentile_ranks_command import (
+    from mhcflurry.cli.calibrate_percentile_ranks_command import (
         missing_percent_rank_alleles,
         percent_rank_status_df,
     )
@@ -209,7 +209,7 @@ class FakeAffinityPredictorForAlleleSelection(object):
 
 
 def test_requested_calibration_alleles_uses_presentation_affinity_predictor():
-    from mhcflurry.calibrate_percentile_ranks_command import (
+    from mhcflurry.cli.calibrate_percentile_ranks_command import (
         requested_calibration_alleles,
     )
 
@@ -234,7 +234,7 @@ def test_requested_calibration_alleles_uses_presentation_affinity_predictor():
 
 def test_requested_calibration_alleles_file_uses_presentation_affinity_predictor(
         tmp_path):
-    from mhcflurry.calibrate_percentile_ranks_command import (
+    from mhcflurry.cli.calibrate_percentile_ranks_command import (
         requested_calibration_alleles,
     )
 

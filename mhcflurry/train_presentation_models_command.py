@@ -10,9 +10,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Compatibility wrapper for :mod:`mhcflurry.cli.train_presentation_models_command`."""
+"""Deprecated compatibility wrapper for :mod:`mhcflurry.cli.train_presentation_models_command`."""
+
+import warnings
 
 from .cli import train_presentation_models_command as _impl
+
+warnings.warn(
+    "mhcflurry.train_presentation_models_command is deprecated and will be removed in 2.4.0. "
+    "Import mhcflurry.cli.train_presentation_models_command instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 run = _impl.run
 parser = _impl.parser

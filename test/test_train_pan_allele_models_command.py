@@ -31,7 +31,7 @@ from mhcflurry.cli import train_pan_allele_models_command as train_command
 from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.downloads import get_path
 from mhcflurry.pseudosequences import LEGACY_ALLELE_SEQUENCES_FILENAME
-from mhcflurry.train_pan_allele_models_command import (
+from mhcflurry.cli.train_pan_allele_models_command import (
     _pop_train_param,
     pretrain_data_iterator,
     pretrain_network_input_iterator,

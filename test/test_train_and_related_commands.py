@@ -25,10 +25,10 @@ import numpy
 import pandas
 
 from mhcflurry import Class1AffinityPredictor
-from mhcflurry import calibrate_percentile_ranks_command
+from mhcflurry.cli import calibrate_percentile_ranks_command
 from mhcflurry import common
-from mhcflurry import select_allele_specific_models_command
-from mhcflurry import train_allele_specific_models_command
+from mhcflurry.cli import select_allele_specific_models_command
+from mhcflurry.cli import train_allele_specific_models_command
 
 from mhcflurry.testing_utils import cleanup, startup
 
