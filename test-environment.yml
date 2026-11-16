@@ -1,7 +1,0 @@
-name: test-environment
-channels:
-  - conda-forge
-  - defaults
-dependencies:
-  - pip>=23.3
-  - setuptools>=68
