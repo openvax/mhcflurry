@@ -42,7 +42,7 @@ import textwrap
 from itertools import zip_longest
 from shutil import copyfileobj
 from shutil import get_terminal_size
-from tempfile import NamedTemporaryFile
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 
 import posixpath
 import csv
@@ -199,7 +199,7 @@ def suspicious_tar_member(member):
     normalized = posixpath.normpath(name)
     if normalized == ".." or normalized.startswith("../"):
         return True
-    return member.issym() or member.islnk()
+    return not (member.isfile() or member.isdir())
 
 
 def download_progress_hook(progress_bar):
@@ -226,12 +226,6 @@ def download_progress_hook(progress_bar):
 
 
 def fetch_subcommand(args):
-    # Imported here rather than at module level: together they take tens of
-    # milliseconds, and every Tab press imports this module.
-    from urllib.request import urlretrieve
-    from tqdm import tqdm
-    tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
-
     def qprint(msg):
         if not args.quiet:
             print(msg)
@@ -286,10 +280,31 @@ def fetch_subcommand(args):
             yes_no(item in items_to_fetch),
             url_description))
 
-    # TODO: may want to extract into somewhere temporary and then rename to
-    # avoid making an incomplete extract if the process is killed.
     for item in items_to_fetch:
-        metadata = downloads[item]['metadata']
+        _fetch_download(item, downloads[item]['metadata'], args, qprint)
+
+
+def _fetch_download(item, metadata, args, qprint):
+    """Stage one complete bundle and receipt before publishing its directory.
+
+    A per-destination lock coordinates installers across processes. Existing
+    directories, including legacy/custom bundles without receipts, are never
+    overwritten. A failed extraction or receipt write leaves no final bundle.
+    """
+    from filelock import FileLock
+    from urllib.request import urlretrieve
+    from tqdm import tqdm
+
+    tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
+    result_dir = os.path.normpath(get_path(item, test_exists=False, release=args.release))
+    # Keep the lock outside the staged/published directory. OS-backed locks
+    # release on process exit; the small lock file may safely remain.
+    with FileLock(result_dir + ".lock", timeout=600):
+        if os.path.lexists(result_dir):
+            if not os.path.isdir(result_dir):
+                raise FileExistsError("Download destination already exists: %s" % result_dir)
+            qprint("Download already installed; leaving unchanged: %s" % quote(result_dir))
+            return
         urls = (
             [metadata["url"]] if "url" in metadata else metadata["part_urls"])
         temp = NamedTemporaryFile(delete=False, suffix=".tar.bz2")
@@ -320,32 +335,30 @@ def fetch_subcommand(args):
                         os.remove(downloaded_path)
 
             temp.close()
-            tar = tarfile.open(temp.name, 'r:bz2')
-            members = tar.getmembers()
-            names = [member.name for member in members]
-            logging.debug("Extracting: %s" % names)
-            bad_names = [
-                member.name for member in members
-                if suspicious_tar_member(member)
-            ]
-            if bad_names:
-                raise RuntimeError(
-                    "Archive has suspicious names: %s" % bad_names)
-            result_dir = get_path(item, test_exists=False, release=args.release)
-            os.mkdir(result_dir)
-
-            for member in tqdm(members, desc='Extracting', disable=args.quiet):
-                tar.extractall(path=result_dir, members=[member])
-            tar.close()
-
-            # Save URLs that were used for this download.
-            with open(os.path.join(result_dir, "DOWNLOAD_INFO.csv"), "w", newline="") as fd:
-                writer = csv.writer(fd)
-                writer.writerow(["url"])
-                writer.writerows([url] for url in urls)
+            with tarfile.open(temp.name, 'r:bz2') as tar:
+                members = tar.getmembers()
+                names = [member.name for member in members]
+                logging.debug("Extracting: %s" % names)
+                bad_names = [member.name for member in members
+                             if suspicious_tar_member(member)]
+                if bad_names:
+                    raise RuntimeError("Archive has suspicious names: %s" % bad_names)
+                # Same-filesystem rename publishes all payloads and their
+                # receipt together. TemporaryDirectory cleans failed stages.
+                with TemporaryDirectory(
+                        prefix=".%s-stage-" % item,
+                        dir=os.path.dirname(result_dir)) as stage:
+                    for member in tqdm(members, desc='Extracting', disable=args.quiet):
+                        tar.extractall(path=stage, members=[member])
+                    with open(os.path.join(stage, "DOWNLOAD_INFO.csv"), "w", newline="") as fd:
+                        writer = csv.writer(fd)
+                        writer.writerow(["url"])
+                        writer.writerows([url] for url in urls)
+                    os.rename(stage, result_dir)
             qprint("Extracted %d files to: %s" % (
                 len(names), quote(result_dir)))
         finally:
+            temp.close()
             if not args.keep:
                 os.remove(temp.name)
 
