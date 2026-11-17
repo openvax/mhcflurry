@@ -37,6 +37,7 @@ if __name__ == "__main__":
     required_packages = [
         "pandas>=3,<4",
         "appdirs",
+        "filelock>=3",
         "ahocorasick-rs",
         "scikit-learn",
         "threadpoolctl",
