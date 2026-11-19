@@ -21,10 +21,10 @@ readme_dir = os.path.dirname(__file__)
 readme_filename = os.path.join(readme_dir, "README.md")
 
 try:
-    with open(readme_filename, "r") as f:
+    with open(readme_filename, "r", encoding="utf-8") as f:
         readme = f.read()
-except:
-    logging.warning("Failed to load %s" % readme_filename)
+except (OSError, UnicodeDecodeError):
+    logging.warning("Failed to load %s", readme_filename)
     readme = ""
 
 

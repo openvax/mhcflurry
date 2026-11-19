@@ -139,3 +139,83 @@ class KerasAdam(torch.optim.Optimizer):
                 denominator = velocity.sqrt().add_(group["epsilon"])
                 parameter.addcdiv_(momentum, denominator, value=-alpha)
         return loss
+
+
+def create_optimizer(
+        parameters,
+        optimizer_name,
+        implementation="keras",
+        learning_rate=None):
+    """Create a configured optimizer using Keras or PyTorch update equations.
+
+    Parameters
+    ----------
+    parameters : iterable of torch.nn.Parameter
+        Model parameters to optimize.
+    optimizer_name : str
+        Optimizer name: ``"rmsprop"``, ``"adam"``, or ``"sgd"``
+        (case-insensitive).
+    implementation : str, optional
+        ``"keras"`` (default) for historical Keras update equations or
+        ``"pytorch"`` for native ``torch.optim`` implementations.
+    learning_rate : float or None, optional
+        Learning rate override. When ``None``, defaults to ``0.001`` for
+        RMSprop/Adam and ``0.01`` for SGD.
+
+    Returns
+    -------
+    torch.optim.Optimizer
+    """
+    optimizer_name = optimizer_name.lower()
+    implementation = implementation.lower()
+    if implementation not in ("keras", "pytorch"):
+        raise ValueError(
+            "optimizer_implementation must be 'keras' or 'pytorch'; got %r"
+            % implementation
+        )
+
+    if optimizer_name == "rmsprop":
+        lr = 0.001 if learning_rate is None else learning_rate
+        if implementation == "keras":
+            return KerasRMSprop(
+                parameters,
+                lr=lr,
+                rho=0.9,
+                epsilon=1e-7,
+            )
+        return torch.optim.RMSprop(
+            parameters,
+            lr=lr,
+            alpha=0.9,
+            eps=1e-7,
+            weight_decay=0.0,
+            momentum=0.0,
+            centered=False,
+        )
+    elif optimizer_name == "adam":
+        lr = 0.001 if learning_rate is None else learning_rate
+        if implementation == "keras":
+            return KerasAdam(
+                parameters,
+                lr=lr,
+                beta_1=0.9,
+                beta_2=0.999,
+                epsilon=1e-7,
+            )
+        return torch.optim.Adam(
+            parameters,
+            lr=lr,
+            betas=(0.9, 0.999),
+            eps=1e-7,
+            weight_decay=0.0,
+            amsgrad=False,
+        )
+    elif optimizer_name == "sgd":
+        return torch.optim.SGD(
+            parameters,
+            lr=0.01 if learning_rate is None else learning_rate,
+            momentum=0.0,
+            weight_decay=0.0,
+            nesterov=False,
+        )
+    raise ValueError("Unsupported optimizer: %s" % optimizer_name)

@@ -275,7 +275,8 @@ def estimate_processing_worker_gb(args):
         return None
     try:
         row_count = len(pandas.read_csv(data_path, usecols=["peptide"]))
-        hyperparameters_lst = yaml.unsafe_load(open(hyperparameters_path))
+        with open(hyperparameters_path) as fd:
+            hyperparameters_lst = yaml.safe_load(fd)
         if not isinstance(hyperparameters_lst, list):
             return None
 
@@ -373,7 +374,8 @@ def initialize_training(args):
             parser.error("Missing required arg: %s" % arg)
 
     print("Initializing training.")
-    hyperparameters_lst = yaml.unsafe_load(open(args.hyperparameters))
+    with open(args.hyperparameters) as fd:
+        hyperparameters_lst = yaml.safe_load(fd)
     assert isinstance(hyperparameters_lst, list)
     print("Loaded hyperparameters list:")
 

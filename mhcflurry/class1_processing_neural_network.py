@@ -26,7 +26,7 @@ import torch.nn as nn
 from . import amino_acid
 from .hyperparameters import HyperparameterDefaults
 from .class1_training import torch_from_numpy, validation_split_counts
-from .keras_optimizers import KerasAdam, KerasRMSprop
+from .keras_optimizers import create_optimizer
 from .pytorch_sizing import DEFAULT_PREDICT_BATCH_SIZE, env_workers_per_gpu
 from .pytorch_layers import KerasBatchNorm1d, get_activation
 from .flanking_encoding import FlankingEncoding
@@ -1400,60 +1400,12 @@ class Class1ProcessingNeuralNetwork(object):
 
     def _create_optimizer(self, network):
         """Create the configured optimizer using Keras or PyTorch equations."""
-        optimizer_name = self.hyperparameters["optimizer"].lower()
-        implementation = self.hyperparameters["optimizer_implementation"].lower()
-        if implementation not in ("keras", "pytorch"):
-            raise ValueError(
-                "optimizer_implementation must be 'keras' or 'pytorch'; got %r"
-                % implementation
-            )
-        configured_lr = self.hyperparameters["learning_rate"]
-
-        if optimizer_name == "adam":
-            lr = 0.001 if configured_lr is None else configured_lr
-            if implementation == "keras":
-                return KerasAdam(
-                    network.parameters(),
-                    lr=lr,
-                    beta_1=0.9,
-                    beta_2=0.999,
-                    epsilon=1e-7,
-                )
-            return torch.optim.Adam(
-                network.parameters(),
-                lr=lr,
-                betas=(0.9, 0.999),
-                eps=1e-7,
-                weight_decay=0.0,
-                amsgrad=False,
-            )
-        elif optimizer_name == "rmsprop":
-            lr = 0.001 if configured_lr is None else configured_lr
-            if implementation == "keras":
-                return KerasRMSprop(
-                    network.parameters(),
-                    lr=lr,
-                    rho=0.9,
-                    epsilon=1e-7,
-                )
-            return torch.optim.RMSprop(
-                network.parameters(),
-                lr=lr,
-                alpha=0.9,
-                eps=1e-7,
-                weight_decay=0.0,
-                momentum=0.0,
-                centered=False,
-            )
-        elif optimizer_name == "sgd":
-            return torch.optim.SGD(
-                network.parameters(),
-                lr=0.01 if configured_lr is None else configured_lr,
-                momentum=0.0,
-                weight_decay=0.0,
-                nesterov=False,
-            )
-        raise ValueError("Unsupported optimizer: %s" % optimizer_name)
+        return create_optimizer(
+            network.parameters(),
+            optimizer_name=self.hyperparameters["optimizer"],
+            implementation=self.hyperparameters["optimizer_implementation"],
+            learning_rate=self.hyperparameters["learning_rate"],
+        )
 
     def predict(
         self,
