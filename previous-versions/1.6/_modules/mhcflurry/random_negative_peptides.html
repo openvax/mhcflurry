@@ -1,0 +1,481 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>mhcflurry.random_negative_peptides &mdash; MHCflurry 1.6.0 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> MHCflurry
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.6.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>mhcflurry.random_negative_peptides</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for mhcflurry.random_negative_peptides</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">math</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">import</span> <span class="nn">pandas</span>
+
+<span class="kn">from</span> <span class="nn">.hyperparameters</span> <span class="k">import</span> <span class="n">HyperparameterDefaults</span>
+<span class="kn">from</span> <span class="nn">.common</span> <span class="k">import</span> <span class="n">amino_acid_distribution</span><span class="p">,</span> <span class="n">random_peptides</span>
+
+
+<div class="viewcode-block" id="RandomNegativePeptides"><a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.RandomNegativePeptides">[docs]</a><span class="k">class</span> <span class="nc">RandomNegativePeptides</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate random negative (peptide, allele) pairs. These are used during</span>
+<span class="sd">    model training, where they are resampled at each epoch.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">hyperparameter_defaults</span> <span class="o">=</span> <span class="n">HyperparameterDefaults</span><span class="p">(</span>
+        <span class="n">random_negative_rate</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">random_negative_constant</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">random_negative_match_distribution</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">random_negative_distribution_smoothing</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">random_negative_method</span><span class="o">=</span><span class="s2">&quot;recommended&quot;</span><span class="p">,</span>
+        <span class="n">random_negative_binder_threshold</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">random_negative_lengths</span><span class="o">=</span><span class="p">[</span><span class="mi">8</span><span class="p">,</span><span class="mi">9</span><span class="p">,</span><span class="mi">10</span><span class="p">,</span><span class="mi">11</span><span class="p">,</span><span class="mi">12</span><span class="p">,</span><span class="mi">13</span><span class="p">,</span><span class="mi">14</span><span class="p">,</span><span class="mi">15</span><span class="p">])</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Hyperperameters for random negative peptides.</span>
+<span class="sd">    </span>
+<span class="sd">    Number of random negatives will be:</span>
+<span class="sd">        random_negative_rate * (num measurements) + random_negative_constant</span>
+<span class="sd">        </span>
+<span class="sd">    where the exact meaning of (num measurements) depends on the particular</span>
+<span class="sd">    random_negative_method in use.</span>
+<span class="sd">    </span>
+<span class="sd">    If random_negative_match_distribution is True, then the amino acid</span>
+<span class="sd">    frequencies of the training data peptides are used to generate the</span>
+<span class="sd">    random peptides.</span>
+<span class="sd">    </span>
+<span class="sd">    Valid values for random_negative_method are:</span>
+<span class="sd">        &quot;by_length&quot;: used for allele-specific prediction. See description in</span>
+<span class="sd">            `RandomNegativePeptides.plan_by_length` method.</span>
+<span class="sd">        &quot;by_allele&quot;: used for pan-allele prediction. See</span>
+<span class="sd">            `RandomNegativePeptides.plan_by_allele` method.</span>
+<span class="sd">        &quot;by_allele_equalize_nonbinders&quot;: used for pan-allele prediction. See</span>
+<span class="sd">            `RandomNegativePeptides.plan_by_allele_equalize_nonbinders` method.</span>
+<span class="sd">        &quot;recommended&quot;: the default. Use by_length if the predictor is allele-</span>
+<span class="sd">            specific and by_allele if it&#39;s pan-allele.    </span>
+<span class="sd">        </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">hyperparameters</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameter_defaults</span><span class="o">.</span><span class="n">with_defaults</span><span class="p">(</span>
+            <span class="n">hyperparameters</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">aa_distribution</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="RandomNegativePeptides.plan"><a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.RandomNegativePeptides.plan">[docs]</a>    <span class="k">def</span> <span class="nf">plan</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">peptides</span><span class="p">,</span> <span class="n">affinities</span><span class="p">,</span> <span class="n">alleles</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">inequalities</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculate the number of random negatives for each allele and peptide</span>
+<span class="sd">        length. Call this once after instantiating the object.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        peptides : list of string</span>
+<span class="sd">        affinities : list of float</span>
+<span class="sd">        alleles : list of string, optional</span>
+<span class="sd">        inequalities : list of string (&quot;&gt;&quot;, &quot;&lt;&quot;, or &quot;=&quot;), optional</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        pandas.DataFrame indicating number of random negatives for each length</span>
+<span class="sd">        and allele.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">numpy</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_equal</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">affinities</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">alleles</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">numpy</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_equal</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">alleles</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">inequalities</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">numpy</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_equal</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">inequalities</span><span class="p">))</span>
+
+        <span class="n">peptides</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">peptides</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">peptide_lengths</span> <span class="o">=</span> <span class="n">peptides</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;random_negative_match_distribution&#39;</span><span class="p">]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">aa_distribution</span> <span class="o">=</span> <span class="n">amino_acid_distribution</span><span class="p">(</span>
+                <span class="n">peptides</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+                <span class="n">smoothing</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span>
+                    <span class="s1">&#39;random_negative_distribution_smoothing&#39;</span>
+                <span class="p">])</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Using amino acid distribution for random negative:</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">aa_distribution</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())))</span>
+
+        <span class="n">df_all</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+            <span class="s1">&#39;length&#39;</span><span class="p">:</span> <span class="n">peptide_lengths</span><span class="p">,</span>
+            <span class="s1">&#39;affinity&#39;</span><span class="p">:</span> <span class="n">affinities</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="n">df_all</span><span class="p">[</span><span class="s2">&quot;allele&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="n">alleles</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">alleles</span>
+        <span class="n">df_all</span><span class="p">[</span><span class="s2">&quot;inequality&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;=&quot;</span> <span class="k">if</span> <span class="n">inequalities</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">inequalities</span>
+
+        <span class="n">df_binders</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">df_nonbinders</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;random_negative_binder_threshold&#39;</span><span class="p">]:</span>
+            <span class="n">df_nonbinders</span> <span class="o">=</span> <span class="n">df_all</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+                <span class="p">(</span><span class="n">df_all</span><span class="o">.</span><span class="n">inequality</span> <span class="o">!=</span> <span class="s2">&quot;&lt;&quot;</span><span class="p">)</span> <span class="o">&amp;</span>
+                <span class="p">(</span><span class="n">df_all</span><span class="o">.</span><span class="n">affinity</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span>
+                    <span class="s1">&#39;random_negative_binder_threshold&#39;</span>
+                <span class="p">])</span>
+            <span class="p">]</span>
+            <span class="n">df_binders</span> <span class="o">=</span> <span class="n">df_all</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+                <span class="p">(</span><span class="n">df_all</span><span class="o">.</span><span class="n">inequality</span> <span class="o">!=</span> <span class="s2">&quot;&gt;&quot;</span><span class="p">)</span> <span class="o">&amp;</span>
+                <span class="p">(</span><span class="n">df_all</span><span class="o">.</span><span class="n">affinity</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span>
+                    <span class="s1">&#39;random_negative_binder_threshold&#39;</span>
+                <span class="p">])</span>
+            <span class="p">]</span>
+
+        <span class="n">method</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;random_negative_method&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s1">&#39;recommended&#39;</span><span class="p">:</span>
+            <span class="c1"># by_length for allele-specific prediction and by_allele for pan.</span>
+            <span class="n">method</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">&quot;by_length&quot;</span>
+                <span class="k">if</span> <span class="n">alleles</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span>
+                <span class="s2">&quot;by_allele&quot;</span><span class="p">)</span>
+
+        <span class="n">function</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;by_length&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_by_length</span><span class="p">,</span>
+            <span class="s1">&#39;by_allele&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_by_allele</span><span class="p">,</span>
+            <span class="s1">&#39;by_allele_equalize_nonbinders&#39;</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">plan_by_allele_equalize_nonbinders</span><span class="p">,</span>
+        <span class="p">}[</span><span class="n">method</span><span class="p">]</span>
+        <span class="n">function</span><span class="p">(</span><span class="n">df_all</span><span class="p">,</span> <span class="n">df_binders</span><span class="p">,</span> <span class="n">df_nonbinders</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Random negative plan [</span><span class="si">%s</span><span class="s2">]:</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span></div>
+
+<div class="viewcode-block" id="RandomNegativePeptides.plan_by_length"><a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.RandomNegativePeptides.plan_by_length">[docs]</a>    <span class="k">def</span> <span class="nf">plan_by_length</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df_all</span><span class="p">,</span> <span class="n">df_binders</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">df_nonbinders</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate a random negative plan using the &quot;by_length&quot; policy.</span>
+
+<span class="sd">        Parameters are as in the `plan` method. No return value.</span>
+
+<span class="sd">        Used for allele-specific predictors. Does not work well for pan-allele.</span>
+
+<span class="sd">        Different numbers of random negatives per length. Alleles are sampled</span>
+<span class="sd">        proportionally to the number of times they are used in the training</span>
+<span class="sd">        data.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="nb">list</span><span class="p">(</span><span class="n">df_all</span><span class="o">.</span><span class="n">allele</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span> <span class="o">==</span> <span class="p">[</span><span class="s2">&quot;&quot;</span><span class="p">],</span> <span class="p">(</span>
+            <span class="s2">&quot;by_length only recommended for allele specific prediction&quot;</span><span class="p">)</span>
+
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df_all</span> <span class="k">if</span> <span class="n">df_binders</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">df_binders</span>
+        <span class="n">lengths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;random_negative_lengths&#39;</span><span class="p">]</span>
+
+        <span class="n">length_to_num_random_negative</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">length_counts</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">length</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="n">lengths</span><span class="p">:</span>
+            <span class="n">length_to_num_random_negative</span><span class="p">[</span><span class="n">length</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+                <span class="n">length_counts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">*</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;random_negative_rate&#39;</span><span class="p">]</span> <span class="o">+</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;random_negative_constant&#39;</span><span class="p">])</span>
+
+        <span class="n">plan_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="nb">sorted</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">allele</span><span class="o">.</span><span class="n">unique</span><span class="p">()))</span>
+        <span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="n">lengths</span><span class="p">:</span>
+            <span class="n">plan_df</span><span class="p">[</span><span class="n">length</span><span class="p">]</span> <span class="o">=</span> <span class="n">length_to_num_random_negative</span><span class="p">[</span><span class="n">length</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span> <span class="o">=</span> <span class="n">plan_df</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="RandomNegativePeptides.plan_by_allele"><a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.RandomNegativePeptides.plan_by_allele">[docs]</a>    <span class="k">def</span> <span class="nf">plan_by_allele</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df_all</span><span class="p">,</span> <span class="n">df_binders</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">df_nonbinders</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate a random negative plan using the &quot;by_allele&quot; policy.</span>
+
+<span class="sd">        Parameters are as in the `plan` method. No return value.</span>
+
+<span class="sd">        For each allele, a particular number of random negatives are used</span>
+<span class="sd">        for all lengths. Across alleles, the number of random negatives</span>
+<span class="sd">        varies; within an allele, the number of random negatives for each</span>
+<span class="sd">        length is a constant</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">allele_to_num_per_length</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">total_random_peptides_per_length</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df_all</span> <span class="k">if</span> <span class="n">df_binders</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">df_binders</span>
+        <span class="n">lengths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;random_negative_lengths&#39;</span><span class="p">]</span>
+        <span class="n">all_alleles</span> <span class="o">=</span> <span class="n">df_all</span><span class="o">.</span><span class="n">allele</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">allele</span> <span class="ow">in</span> <span class="n">all_alleles</span><span class="p">:</span>
+            <span class="n">sub_df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">df</span><span class="o">.</span><span class="n">allele</span> <span class="o">==</span> <span class="n">allele</span><span class="p">]</span>
+            <span class="n">num_for_allele</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">sub_df</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;random_negative_rate&#39;</span><span class="p">]</span>
+            <span class="p">)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;random_negative_constant&#39;</span><span class="p">]</span>
+            <span class="n">num_per_length</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span>
+                <span class="n">num_for_allele</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">lengths</span><span class="p">)))</span>
+            <span class="n">total_random_peptides_per_length</span> <span class="o">+=</span> <span class="n">num_per_length</span>
+            <span class="n">allele_to_num_per_length</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span> <span class="o">=</span> <span class="n">num_per_length</span>
+
+        <span class="n">plan_df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="nb">sorted</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">allele</span><span class="o">.</span><span class="n">unique</span><span class="p">()))</span>
+        <span class="k">for</span> <span class="n">length</span> <span class="ow">in</span> <span class="n">lengths</span><span class="p">:</span>
+            <span class="n">plan_df</span><span class="p">[</span><span class="n">length</span><span class="p">]</span> <span class="o">=</span> <span class="n">plan_df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">allele_to_num_per_length</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span> <span class="o">=</span> <span class="n">plan_df</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="RandomNegativePeptides.plan_by_allele_equalize_nonbinders"><a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.RandomNegativePeptides.plan_by_allele_equalize_nonbinders">[docs]</a>    <span class="k">def</span> <span class="nf">plan_by_allele_equalize_nonbinders</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">df_all</span><span class="p">,</span> <span class="n">df_binders</span><span class="p">,</span> <span class="n">df_nonbinders</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate a random negative plan using the</span>
+<span class="sd">        &quot;by_allele_equalize_nonbinders&quot; policy.</span>
+
+<span class="sd">        Parameters are as in the `plan` method. No return value.</span>
+
+<span class="sd">        Requires that the random_negative_binder_threshold hyperparameter is set.</span>
+
+<span class="sd">        In a first step, the number of random negatives selected by the</span>
+<span class="sd">        &quot;by_allele&quot; method are added (see `plan_by_allele`). Then, the total</span>
+<span class="sd">        number of non-binders are calculated for each allele and length. This</span>
+<span class="sd">        total includes non-binder measurements in the training data plus the</span>
+<span class="sd">        random negative peptides added in the first step. In a second step,</span>
+<span class="sd">        additional random negative peptides are added so that for each allele,</span>
+<span class="sd">        all peptide lengths have the same total number of non-binders.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">df_binders</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">assert</span> <span class="n">df_nonbinders</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
+        <span class="n">lengths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hyperparameters</span><span class="p">[</span><span class="s1">&#39;random_negative_lengths&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">plan_by_allele</span><span class="p">(</span><span class="n">df_all</span><span class="p">,</span> <span class="n">df_binders</span><span class="p">,</span> <span class="n">df_nonbinders</span><span class="p">)</span>
+        <span class="n">first_pass_plan</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="n">new_plan</span> <span class="o">=</span> <span class="n">first_pass_plan</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">new_plan</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">nan</span>
+
+        <span class="k">for</span> <span class="p">(</span><span class="n">allele</span><span class="p">,</span> <span class="n">first_pass_per_length</span><span class="p">)</span> <span class="ow">in</span> <span class="n">first_pass_plan</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="n">real_nonbinders_by_length</span> <span class="o">=</span> <span class="n">df_nonbinders</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+                <span class="n">df_nonbinders</span><span class="o">.</span><span class="n">allele</span> <span class="o">==</span> <span class="n">allele</span>
+            <span class="p">]</span><span class="o">.</span><span class="n">length</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">reindex</span><span class="p">(</span><span class="n">lengths</span><span class="p">)</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">total_nonbinders_by_length</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">real_nonbinders_by_length</span> <span class="o">+</span> <span class="n">first_pass_per_length</span><span class="p">)</span>
+            <span class="n">new_plan</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">allele</span><span class="p">]</span> <span class="o">=</span> <span class="n">first_pass_per_length</span> <span class="o">+</span> <span class="p">(</span>
+                <span class="n">total_nonbinders_by_length</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">total_nonbinders_by_length</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span> <span class="o">=</span> <span class="n">new_plan</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="RandomNegativePeptides.get_alleles"><a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.RandomNegativePeptides.get_alleles">[docs]</a>    <span class="k">def</span> <span class="nf">get_alleles</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the list of alleles corresponding to each random negative peptide</span>
+<span class="sd">        as returned by `get_peptides`. This does NOT change and can be safely</span>
+<span class="sd">        called once and reused.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list of string</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;Call plan() first&quot;</span>
+        <span class="n">alleles</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">allele</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="n">alleles</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">allele</span><span class="p">]</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">sum</span><span class="p">()))</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">alleles</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_total_count</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">alleles</span></div>
+
+<div class="viewcode-block" id="RandomNegativePeptides.get_peptides"><a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.RandomNegativePeptides.get_peptides">[docs]</a>    <span class="k">def</span> <span class="nf">get_peptides</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the list of random negative peptides. This will be different each</span>
+<span class="sd">        time the method is called.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list of string</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;Call plan() first&quot;</span>
+        <span class="n">peptides</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">allele</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="n">num</span><span class="p">)</span> <span class="ow">in</span> <span class="n">row</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">peptides</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="n">random_peptides</span><span class="p">(</span>
+                        <span class="n">num</span><span class="p">,</span>
+                        <span class="n">length</span><span class="o">=</span><span class="n">length</span><span class="p">,</span>
+                        <span class="n">distribution</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">aa_distribution</span><span class="p">))</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptides</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_total_count</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">peptides</span></div>
+
+<div class="viewcode-block" id="RandomNegativePeptides.get_total_count"><a class="viewcode-back" href="../../api.html#mhcflurry.random_negative_peptides.RandomNegativePeptides.get_total_count">[docs]</a>    <span class="k">def</span> <span class="nf">get_total_count</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Total number of planned random negative peptides.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        int</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_df</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span></div></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright Timothy O&#39;Donnell
+      <span class="lastupdated">
+        Last updated on Mar 23, 2020.
+      </span>
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
