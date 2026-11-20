@@ -201,3 +201,54 @@ def test_normalize_allele_name_scopes_inherited_pseudogene_status():
     # mhcgnomes marks Popy-Ap as a pseudogene but does not leak that property
     # to the similarly named Poab-Ap locus in a sibling orangutan species.
     assert normalize_allele_name("Poab-Ap*01:01") == "Poab-Ap*01:01"
+
+
+def test_numpy_json_encoder_handles_numpy2_scalars_and_arrays():
+    import json
+    import numpy as np
+    from mhcflurry.common import NumpyJSONEncoder
+
+    payload = {
+        "i64": np.int64(7),
+        "u8": np.uint8(3),
+        "f32": np.float32(1.5),
+        "f64": np.float64(2.25),
+        "flag": np.bool_(True),
+        "arr": np.array([1, 2, 3]),
+    }
+    decoded = json.loads(json.dumps(payload, cls=NumpyJSONEncoder))
+    assert decoded == {
+        "i64": 7,
+        "u8": 3,
+        "f32": 1.5,
+        "f64": 2.25,
+        "flag": True,
+        "arr": [1, 2, 3],
+    }
+
+
+def test_write_info_txt_format(tmp_path):
+    from mhcflurry.model_provenance import write_info_txt
+
+    info_path = write_info_txt(tmp_path, environ={})
+    lines = open(info_path, encoding="utf-8").read().splitlines()
+    keys = [line.split("\t", 1)[0] for line in lines]
+    assert keys == ["trained on", "package   ", "hostname  ", "user      "]
+
+
+def test_write_generate_sh_in_place_preserves_generate_sh(tmp_path):
+    from mhcflurry.common import write_generate_sh
+
+    orig = write_generate_sh(str(tmp_path), argv=["mhcflurry", "train"])
+    cal = write_generate_sh(
+        str(tmp_path),
+        argv=["mhcflurry", "calibrate-percentile-ranks", "--models-dir", str(tmp_path)],
+        filename="GENERATE_CALIBRATE.sh",
+        in_place=True,
+    )
+    assert orig.endswith("GENERATE.sh")
+    assert cal.endswith("GENERATE_CALIBRATE.sh")
+    assert "train" in open(orig, encoding="utf-8").read()
+    cal_text = open(cal, encoding="utf-8").read()
+    assert "rm -rf" not in cal_text
+    assert "calibrate-percentile-ranks" in cal_text

@@ -12,11 +12,8 @@
 
 from os.path import join, exists
 from os import mkdir
-from socket import gethostname
-from getpass import getuser
 
 import os
-import time
 import collections
 import logging
 import sys
@@ -28,7 +25,7 @@ import sklearn.linear_model
 import tqdm
 
 from .version import __version__
-from .model_provenance import add_release_provenance
+from .model_provenance import write_info_txt
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .class1_processing_predictor import Class1ProcessingPredictor
 from .pytorch_sizing import (
@@ -1327,17 +1324,7 @@ class Class1PresentationPredictor(object):
             } if self.percent_rank_transform is not None else {})
 
         if write_info:
-            # Write "info.txt"
-            info_path = join(models_dir, "info.txt")
-            rows = [
-                ("trained on", time.asctime()),
-                ("package   ", "mhcflurry %s" % __version__),
-                ("hostname  ", gethostname()),
-                ("user      ", getuser()),
-            ]
-            add_release_provenance(rows)
-            pandas.DataFrame(rows).to_csv(
-                info_path, sep="\t", header=False, index=False)
+            write_info_txt(models_dir)
 
         if write_metadata:
             if self.metadata_dataframes:

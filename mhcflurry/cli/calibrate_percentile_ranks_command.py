@@ -484,7 +484,11 @@ def run_class1_processing_predictor(args):
         os.path.join(args.models_dir, "percent_rank_reference.npz"), scores=scores,
         **{column: frame[column].to_numpy(dtype=str)
            for column in ("peptide", "n_flank", "c_flank") if column in frame})
-    write_generate_sh(args.models_dir)
+    write_generate_sh(
+        args.models_dir,
+        filename="GENERATE_CALIBRATE.sh",
+        in_place=True,
+    )
 
 
 def run_class1_presentation_predictor(args, peptides):
@@ -623,7 +627,11 @@ def run_class1_presentation_predictor(args, peptides):
         write_percent_ranks=True,
         write_info=False,
         write_metadata=False)
-    write_generate_sh(args.models_dir)
+    write_generate_sh(
+        args.models_dir,
+        filename="GENERATE_CALIBRATE.sh",
+        in_place=True,
+    )
     print("Wrote predictor to: %s" % args.models_dir)
 
 
@@ -807,7 +815,11 @@ def run_class1_affinity_predictor(args, peptides):
                 print(df)
 
         predictor.save(args.models_dir, model_names_to_write=[])
-        write_generate_sh(args.models_dir)
+        write_generate_sh(
+            args.models_dir,
+            filename="GENERATE_CALIBRATE.sh",
+            in_place=True,
+        )
 
         percent_rank_calibration_time = time.time() - start
 

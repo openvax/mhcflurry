@@ -12,8 +12,6 @@
 
 from os.path import join, exists, abspath, basename
 from os import mkdir, remove
-from socket import gethostname
-from getpass import getuser
 
 import time
 import json
@@ -26,7 +24,7 @@ import numpy
 import pandas
 
 from .version import __version__
-from .model_provenance import add_release_provenance
+from .model_provenance import write_info_txt
 from .pytorch_sizing import DEFAULT_PREDICT_BATCH_SIZE
 from .flanking_encoding import FlankingEncoding
 from .downloads import get_default_class1_processing_models_dir
@@ -554,17 +552,7 @@ class Class1ProcessingPredictor(object):
             } if self.percent_rank_transform is not None else {})
 
         if write_metadata:
-            # Write "info.txt"
-            info_path = join(models_dir, "info.txt")
-            rows = [
-                ("trained on", time.asctime()),
-                ("package   ", "mhcflurry %s" % __version__),
-                ("hostname  ", gethostname()),
-                ("user      ", getuser()),
-            ]
-            add_release_provenance(rows)
-            pandas.DataFrame(rows).to_csv(
-                info_path, sep="\t", header=False, index=False)
+            write_info_txt(models_dir)
 
             if self.metadata_dataframes:
                 for (name, df) in self.metadata_dataframes.items():

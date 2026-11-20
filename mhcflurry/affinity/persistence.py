@@ -15,12 +15,9 @@
 import collections
 import json
 import logging
-import time
 from functools import partial
-from getpass import getuser
 from os import makedirs, mkdir
 from os.path import abspath, commonpath, dirname, exists, join, realpath, relpath
-from socket import gethostname
 
 import pandas
 from mhcgnomes import parse, parse_gene_class
@@ -34,8 +31,7 @@ from ..pseudosequences import (
     pseudosequence_filename_candidates,
     pseudosequence_filename_for_mapping,
 )
-from ..version import __version__
-from ..model_provenance import add_release_provenance
+from ..model_provenance import write_info_txt
 
 
 # The public 2.2.0 model artifact contains this malformed spelling of the
@@ -191,17 +187,7 @@ def save_predictor(predictor, models_dir, model_names_to_write=None, write_metad
         logging.info("Wrote: %s", manifest_path)
 
         if write_metadata:
-            # Write "info.txt"
-            info_path = join(models_dir, "info.txt")
-            rows = [
-                ("trained on", time.asctime()),
-                ("package   ", "mhcflurry %s" % __version__),
-                ("hostname  ", gethostname()),
-                ("user      ", getuser()),
-            ]
-            add_release_provenance(rows)
-            pandas.DataFrame(rows).to_csv(
-                info_path, sep="\t", header=False, index=False)
+            write_info_txt(models_dir)
 
         # Save pseudosequences. New artifacts get an explicit
         # pseudosequences.<source>.<length>aa.csv filename while still

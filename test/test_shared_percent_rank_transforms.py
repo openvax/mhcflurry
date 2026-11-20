@@ -156,7 +156,7 @@ def test_processing_cli_uses_explicit_context_and_retains_scores(tmp_path, monke
             return np.array([.1, .2, .3])
     predictor = FakePredictor([])
     monkeypatch.setattr(command.Class1ProcessingPredictor, "load", lambda *args, **kwargs: predictor)
-    monkeypatch.setattr(command, "write_generate_sh", lambda *args: None)
+    monkeypatch.setattr(command, "write_generate_sh", lambda *args, **kwargs: None)
     reference = tmp_path / "reference.csv"
     reference.write_text("peptide,n_flank,c_flank\nSIINFEKL,AAAAA,DDDDD\nSIINFEKA,CCCCC,EEEEE\nSIINFEKC,,\n")
     args = SimpleNamespace(models_dir=str(tmp_path), processing_reference_data=str(reference),
