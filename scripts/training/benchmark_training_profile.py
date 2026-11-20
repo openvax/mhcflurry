@@ -11,9 +11,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""CLI wrapper for mhcflurry.training_benchmark."""
+"""CLI wrapper for training_benchmark."""
 
-from mhcflurry.training_benchmark import main
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from training_benchmark import main
 
 
 if __name__ == "__main__":

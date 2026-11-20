@@ -26,7 +26,7 @@ import numpy as np
 import pytest
 import torch
 
-from mhcflurry.testing_utils import startup, cleanup
+from .testing_utils import startup, cleanup
 
 
 @pytest.fixture(autouse=True)
@@ -139,6 +139,42 @@ class TestMSEWithInequalitiesSampleWeights:
         from mhcflurry.pytorch_losses import MSEWithInequalities
         with pytest.raises(ValueError, match="same length"):
             MSEWithInequalities.encode_y([0.5, 0.5], ["="])
+
+    def test_encode_y_basic(self):
+        from mhcflurry.pytorch_losses import MSEWithInequalities
+        y = [0.0, 0.5, 1.0]
+        np.testing.assert_array_equal(MSEWithInequalities.encode_y(y), y)
+        np.testing.assert_array_equal(
+            MSEWithInequalities.encode_y(y, [">", ">", ">"]),
+            [2.0, 2.5, 3.0],
+        )
+        np.testing.assert_array_equal(
+            MSEWithInequalities.encode_y(y, ["<", "<", "<"]),
+            [4.0, 4.5, 5.0],
+        )
+
+    def test_loss_gradient_flow(self):
+        from mhcflurry.pytorch_losses import MSEWithInequalities
+        loss_fn = MSEWithInequalities()
+        y_pred = torch.tensor([[0.5]], requires_grad=True)
+        y_true = torch.tensor([[0.3]])
+        loss = loss_fn(y_pred, y_true)
+        loss.backward()
+        assert y_pred.grad is not None
+        assert y_pred.grad.abs().item() > 0
+
+    def test_inequality_gradient_respects_constraint(self):
+        from mhcflurry.pytorch_losses import MSEWithInequalities
+        loss_fn = MSEWithInequalities()
+        y_pred = torch.tensor([[0.7]], requires_grad=True)
+        y_true = torch.tensor([[2.5]])  # > 0.5
+        loss_fn(y_pred, y_true).backward()
+        assert abs(y_pred.grad.item()) < 1e-6
+
+        y_pred2 = torch.tensor([[0.3]], requires_grad=True)
+        y_true2 = torch.tensor([[2.5]])  # > 0.5
+        loss_fn(y_pred2, y_true2).backward()
+        assert abs(y_pred2.grad.item()) > 0
 
 
 class TestMSEMultiOutputSampleWeights:

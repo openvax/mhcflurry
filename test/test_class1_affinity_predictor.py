@@ -36,7 +36,7 @@ from mhcflurry.pseudosequences import (
     LEGACY_CLASS1_PSEUDOSEQUENCES_FILENAME,
     PSEUDOSEQUENCE_FILENAMES_BY_LENGTH,
 )
-from mhcflurry.testing_utils import cleanup, startup
+from .testing_utils import cleanup, startup
 
 @pytest.fixture(autouse=True, scope="module")
 def setup_teardown():

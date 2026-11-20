@@ -30,7 +30,7 @@ from mhcflurry import common
 from mhcflurry.cli import select_allele_specific_models_command
 from mhcflurry.cli import train_allele_specific_models_command
 
-from mhcflurry.testing_utils import cleanup, startup
+from .testing_utils import cleanup, startup
 
 
 @pytest.fixture(autouse=True, scope="module")

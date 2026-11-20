@@ -155,11 +155,10 @@ def test_training_and_selection_commands_reject_invalid_sizes_early():
 def test_train_help_runs(capsys):
     assert cli_main.main(["train", "--help"]) == 0
     captured = capsys.readouterr().out
-    assert "pan-allele-release" in captured
+    assert "release-holdout" in captured
     assert "plot-loss-curves" in captured
     assert "snapshot-experiment" in captured
-    assert "benchmark-processing-preparation" in captured
-    assert "Deployment is opt-in" in captured
+    assert "validate-processing-data" in captured
 
 
 def test_compare_models_accepts_train_excluded_affinity_source():
@@ -240,34 +239,6 @@ def test_release_affinity_can_audit_overlap_without_excluding(tmp_path):
     assert report["hits_after"] == 2
 
 
-def test_train_pan_allele_release_delegates(monkeypatch, tmp_path):
-    script = tmp_path / "retrain_evaluate_deploy.sh"
-    script.write_text("#!/usr/bin/env bash\n")
-    calls = []
-
-    def fake_call(argv):
-        calls.append(argv)
-        return 17
-
-    monkeypatch.setattr(train_command, "_workflow_script_path", lambda: script)
-    monkeypatch.setattr(train_command.subprocess, "call", fake_call)
-
-    status = cli_main.main([
-        "train",
-        "pan-allele-release",
-        "--run-dir", "runs/2.3.0",
-        "--release", "2.3.0",
-    ])
-
-    assert status == 17
-    assert calls == [[
-        "bash",
-        str(script),
-        "--run-dir", "runs/2.3.0",
-        "--release", "2.3.0",
-    ]]
-
-
 def test_train_materialize_affinity_checkpoint_delegates(monkeypatch):
     calls = []
 
@@ -292,28 +263,6 @@ def test_train_materialize_affinity_checkpoint_delegates(monkeypatch):
         ],
         "mhcflurry train materialize-affinity-checkpoint",
     )]
-
-
-def test_train_compose_processing_ensemble_delegates(monkeypatch, tmp_path):
-    script = tmp_path / "compose_processing_ensemble.py"
-    script.write_text("")
-    calls = []
-    monkeypatch.setattr(
-        train_command, "_training_script_path", lambda _subcommand: script)
-
-    def fake_call(argv, env):
-        calls.append((argv, env["MHCFLURRY_CLI_PROG"]))
-        return 23
-
-    monkeypatch.setattr(train_command.subprocess, "call", fake_call)
-    status = train_command.run_argv([
-        "compose-processing-ensemble", "--out-models-dir", "combined",
-    ])
-
-    assert status == 23
-    assert calls == [([
-        sys.executable, str(script), "--out-models-dir", "combined",
-    ], "mhcflurry train compose-processing-ensemble")]
 
 
 def test_release_workflow_deploy_is_opt_in_by_default(tmp_path):
@@ -1756,36 +1705,6 @@ def test_eval_paper_figures_render_help_runs(capsys):
     captured = capsys.readouterr().out
     assert "usage: mhcflurry eval paper-figures render" in captured
     assert "--scores-dir" in captured
-
-
-@pytest.mark.parametrize("subcommand", [
-    "processing-ensemble",
-    "processing-ensemble-subsets",
-    "presentation-affinity-ensemble",
-    "release-experiment-figures",
-    "processing-recipe-analysis",
-    "processing-confirmation-analysis",
-    "presentation-external-predictors",
-    "processing-fold-ensembles",
-])
-def test_eval_experiment_script_commands_delegate(
-        monkeypatch, tmp_path, subcommand):
-    script = tmp_path / (subcommand + ".py")
-    script.write_text("")
-    calls = []
-    monkeypatch.setitem(eval_command.EVALUATION_SCRIPTS, subcommand, script)
-
-    def fake_call(argv, env):
-        calls.append((argv, env["MHCFLURRY_CLI_PROG"]))
-        return 29
-
-    monkeypatch.setattr(eval_command.subprocess, "call", fake_call)
-    status = eval_command.run_argv([subcommand, "--input", "saved.csv"])
-
-    assert status == 29
-    assert calls == [([
-        sys.executable, str(script), "--input", "saved.csv",
-    ], "mhcflurry eval %s" % subcommand)]
 
 
 def test_eval_paper_figures_score_predictions_writes_cache(tmp_path):

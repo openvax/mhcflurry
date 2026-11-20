@@ -25,7 +25,7 @@ from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.downloads import get_path
 from mhcflurry.pseudosequences import LEGACY_ALLELE_SEQUENCES_FILENAME
 
-from mhcflurry.testing_utils import cleanup, startup
+from .testing_utils import cleanup, startup
 
 pytestmark = pytest.mark.downloads
 

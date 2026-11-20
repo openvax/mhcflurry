@@ -33,7 +33,7 @@ from mhcflurry import pytorch_sizing
 from mhcflurry.cli import train_processing_models_command as processing_command
 from mhcflurry.cli.train_processing_models_command import estimate_processing_worker_gb
 
-from mhcflurry.testing_utils import cleanup, startup
+from .testing_utils import cleanup, startup
 from .pytest_helpers import mhcflurry_cli
 
 

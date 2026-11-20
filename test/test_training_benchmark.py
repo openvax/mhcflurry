@@ -10,11 +10,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import importlib.util
 import json
+from pathlib import Path
 
 import pandas
 
-from mhcflurry.training_benchmark import analyze_training_run
+
+def _load_training_benchmark():
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "scripts"
+        / "training"
+        / "training_benchmark.py"
+    )
+    spec = importlib.util.spec_from_file_location("training_benchmark", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+analyze_training_run = _load_training_benchmark().analyze_training_run
 
 
 def test_analyze_training_run_summarizes_phases_and_logs(tmp_path):

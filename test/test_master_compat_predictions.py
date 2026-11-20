@@ -28,7 +28,7 @@ import pytest
 from mhcflurry.allele_encoding import AlleleEncoding
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.common import configure_pytorch, load_weights
-from mhcflurry.testing_utils import startup, cleanup
+from .testing_utils import startup, cleanup
 from . import available_torch_accelerators
 
 

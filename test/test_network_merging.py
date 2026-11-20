@@ -18,7 +18,7 @@ from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 from mhcflurry.common import random_peptides
 from mhcflurry.downloads import get_path
 
-from mhcflurry.testing_utils import cleanup, startup
+from .testing_utils import cleanup, startup
 
 pytestmark = pytest.mark.downloads
 

@@ -23,7 +23,7 @@ import torch
 
 import mhcflurry.cli.predict_command as predict_command
 
-from mhcflurry.testing_utils import cleanup, startup
+from .testing_utils import cleanup, startup
 
 torch.manual_seed(1)
 

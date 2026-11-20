@@ -26,7 +26,7 @@ import torch
 
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.common import random_peptides
-from mhcflurry.testing_utils import startup, cleanup
+from .testing_utils import startup, cleanup
 
 
 pytestmark = pytest.mark.slow

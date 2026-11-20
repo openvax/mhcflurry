@@ -30,7 +30,7 @@ from mhcflurry.common import random_peptides
 from mhcflurry.amino_acid import AMINO_ACIDS, BLOSUM62_MATRIX
 from mhcflurry.flanking_encoding import FlankingEncoding
 
-from mhcflurry.testing_utils import cleanup, startup
+from .testing_utils import cleanup, startup
 
 numpy.random.seed(0)
 

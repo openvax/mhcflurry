@@ -184,7 +184,11 @@ def _find_occurrences_ahocorasick(peptides, reference_df):
 
 def _find_peptide_occurrences(peptides, reference_df, backend="auto"):
     if backend == "auto":
-        backend = "ahocorasick"
+        try:
+            import ahocorasick_rs  # noqa: F401
+            backend = "ahocorasick"
+        except ImportError:
+            backend = "sliding"
 
     if backend == "ahocorasick":
         print("Using ahocorasick-rs peptide reference lookup", flush=True)

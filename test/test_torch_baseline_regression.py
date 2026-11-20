@@ -46,7 +46,7 @@ import pytest
 from mhcflurry import Class1AffinityPredictor, Class1PresentationPredictor
 from mhcflurry.common import configure_pytorch
 from mhcflurry.downloads import get_path
-from mhcflurry.testing_utils import cleanup, startup
+from .testing_utils import cleanup, startup
 
 pytestmark = pytest.mark.downloads
 
