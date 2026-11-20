@@ -60,18 +60,19 @@ def test_preparation_benchmark_alternates_comparison_order():
 
 def test_preparation_benchmark_saves_parity_timings_and_refuses_overwrite(tmp_path):
     import json
-    from mhcflurry.cli import main as cli_main
+    module = load_script(REPO_ROOT / "scripts/training/benchmark_processing_preparation.py")
     path = tmp_path / "nested" / "benchmark.json"
-    arguments = ["train", "benchmark-processing-preparation", "--out", str(path),
+    arguments = ["--out", str(path),
                  "--proteins", "2", "--protein-length", "30", "--draws", "10", "--repeats", "1"]
-    assert cli_main.main(arguments) == 0
+    assert isinstance(module.run(arguments), dict)
     result = json.loads(path.read_text())
     assert result["sampler"]["exact_export_parity"] is True
     assert len(result["sampler"]["export_strings_seconds"]["seconds"]) == 1
     assert all(len(digest) == 64 for digest in result["source_hashes"].values())
     assert any(key.endswith("numeric_sequences.py") for key in result["source_hashes"])
     before = path.read_bytes()
-    assert cli_main.main(arguments) != 0
+    with pytest.raises(FileExistsError):
+        module.run(arguments)
     assert path.read_bytes() == before
 
 

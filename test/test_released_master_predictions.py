@@ -29,7 +29,7 @@ import pytest
 
 from mhcflurry import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
-from mhcflurry.testing_utils import startup, cleanup
+from .testing_utils import startup, cleanup
 
 pytestmark = pytest.mark.downloads
 

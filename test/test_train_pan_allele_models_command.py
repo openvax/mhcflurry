@@ -38,7 +38,7 @@ from mhcflurry.cli.train_pan_allele_models_command import (
 )
 from .pytest_helpers import mhcflurry_cli
 
-from mhcflurry.testing_utils import cleanup, startup
+from .testing_utils import cleanup, startup
 
 @pytest.fixture(autouse=True, scope="module")
 def setup_module():

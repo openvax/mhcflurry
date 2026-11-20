@@ -64,7 +64,7 @@ from mhcflurry.pytorch_training import (
     validation_forward_network,
 )
 from mhcflurry import pytorch_sizing
-from mhcflurry.testing_utils import startup, cleanup
+from .testing_utils import startup, cleanup
 
 
 @pytest.fixture(autouse=True)

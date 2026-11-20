@@ -34,7 +34,7 @@ import pytest
 from mhcflurry import Class1AffinityPredictor, Class1PresentationPredictor
 from mhcflurry.common import normalize_sequence_resolved_allele_name
 from mhcflurry.downloads import get_path
-from mhcflurry.testing_utils import startup, cleanup
+from .testing_utils import startup, cleanup
 
 
 warnings.filterwarnings(

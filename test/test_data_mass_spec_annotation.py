@@ -18,15 +18,26 @@ from pathlib import Path
 import pandas
 import pytest
 
-from mhcflurry import peptide_reference
 
-
-ANNOTATE_PATH = (
+DATA_MASS_SPEC_DIR = (
     Path(__file__).resolve().parents[1]
     / "downloads-generation"
     / "data_mass_spec_annotated"
-    / "annotate.py"
 )
+ANNOTATE_PATH = DATA_MASS_SPEC_DIR / "annotate.py"
+PEPTIDE_REFERENCE_PATH = DATA_MASS_SPEC_DIR / "peptide_reference.py"
+
+
+def load_peptide_reference_module():
+    spec = importlib.util.spec_from_file_location(
+        "data_mass_spec_annotated_peptide_reference",
+        PEPTIDE_REFERENCE_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+peptide_reference = load_peptide_reference_module()
 
 
 def load_annotate_module():
@@ -151,6 +162,7 @@ def test_annotation_helper_default_matches_sliding(tmp_path):
 
 
 def test_annotation_helper_default_matches_ahocorasick(tmp_path):
+    pytest.importorskip("ahocorasick_rs")
     peptides, reference = write_inputs(tmp_path)
 
     peptide_df = pandas.read_csv(peptides)
@@ -171,6 +183,7 @@ def test_annotation_helper_default_matches_ahocorasick(tmp_path):
 
 
 def test_annotation_ahocorasick_matches_sliding(tmp_path):
+    pytest.importorskip("ahocorasick_rs")
     peptides, reference = write_inputs(tmp_path)
     sliding = annotate_with_backend(peptides, reference, "sliding")
     ahocorasick = annotate_with_backend(peptides, reference, "ahocorasick")

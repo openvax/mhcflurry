@@ -13,8 +13,8 @@
 """
 Utilities used in MHCflurry unit tests.
 """
-from . import Class1NeuralNetwork
-from .common import configure_pytorch
+from mhcflurry import Class1NeuralNetwork
+from mhcflurry.common import configure_pytorch
 
 
 def startup():

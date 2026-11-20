@@ -22,7 +22,7 @@ import mhcflurry.cli.predict_scan_command as predict_scan_command
 
 from . import data_path
 
-from mhcflurry.testing_utils import cleanup, startup
+from .testing_utils import cleanup, startup
 
 @pytest.fixture(autouse=True, scope="module")
 def setup_module():

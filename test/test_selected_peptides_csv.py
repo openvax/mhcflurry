@@ -29,7 +29,7 @@ import pytest
 from mhcflurry import Class1AffinityPredictor, Class1PresentationPredictor
 from mhcflurry.common import allele_locus_name, normalize_allele_name
 from mhcflurry.downloads import get_path
-from mhcflurry.testing_utils import startup, cleanup
+from .testing_utils import startup, cleanup
 
 pytestmark = pytest.mark.downloads
 

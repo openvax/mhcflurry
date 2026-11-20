@@ -17,7 +17,7 @@ import pytest
 
 from mhcflurry import Class1AffinityPredictor, Class1NeuralNetwork
 
-from mhcflurry.testing_utils import cleanup, startup
+from .testing_utils import cleanup, startup
 
 pytestmark = [pytest.mark.slow, pytest.mark.downloads]
 

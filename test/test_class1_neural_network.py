@@ -25,7 +25,7 @@ from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.downloads import get_path
 from mhcflurry.common import random_peptides
 
-from mhcflurry.testing_utils import cleanup, startup
+from .testing_utils import cleanup, startup
 
 
 @pytest.fixture(autouse=True)

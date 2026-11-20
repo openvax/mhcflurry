@@ -22,7 +22,7 @@ from sklearn.metrics import roc_auc_score
 from mhcflurry import Class1AffinityPredictor, Class1ProcessingPredictor
 from mhcflurry.class1_presentation_predictor import Class1PresentationPredictor
 from mhcflurry.downloads import get_path
-from mhcflurry.testing_utils import cleanup, startup
+from .testing_utils import cleanup, startup
 import mhcflurry.class1_presentation_predictor
 
 from . import data_path

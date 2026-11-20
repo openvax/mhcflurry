@@ -16,7 +16,6 @@ import torch
 
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
 from mhcflurry.common import configure_tensorflow
-from mhcflurry.custom_loss import MSEWithInequalities, get_loss
 from mhcflurry.data_dependent_weights_initialization import (
     get_activations,
     get_activations_pytorch,
@@ -145,16 +144,6 @@ def test_legacy_fit_generator_warns_and_forwards(monkeypatch):
     assert calls[0]["validation_peptide_encoding"] == "peptides"
     assert calls[0]["validation_affinities"] == "affinities"
     assert calls[0]["epochs"] == 3
-
-
-def test_legacy_get_keras_loss_accessor():
-    standard = get_loss("mse")
-    with pytest.warns(DeprecationWarning, match="loss attribute"):
-        assert standard.get_keras_loss() == standard.loss
-
-    custom = MSEWithInequalities()
-    with pytest.warns(DeprecationWarning, match="loss attribute"):
-        assert custom.get_keras_loss(reduction="sum") == custom.loss
 
 
 def test_legacy_get_activations_warns_and_matches_pytorch_helper():

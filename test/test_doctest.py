@@ -26,7 +26,7 @@ import mhcflurry.class1_presentation_predictor
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
-from mhcflurry.testing_utils import cleanup, startup
+from .testing_utils import cleanup, startup
 
 @pytest.fixture(autouse=True, scope="module")
 def setup_doctests():

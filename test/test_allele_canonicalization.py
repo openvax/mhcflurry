@@ -32,7 +32,7 @@ from mhcflurry.class1_affinity_predictor import Class1AffinityPredictor
 from mhcflurry.downloads import get_path
 from mhcflurry.pseudosequences import LEGACY_ALLELE_SEQUENCES_FILENAME
 
-from mhcflurry.testing_utils import cleanup, startup
+from .testing_utils import cleanup, startup
 
 
 @pytest.fixture(autouse=True, scope="module")

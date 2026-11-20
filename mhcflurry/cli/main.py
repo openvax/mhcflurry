@@ -309,7 +309,7 @@ def format_help():
         "  mhcflurry predict --alleles HLA-A0201 --peptides SIINFEKL --out out.csv",
         "  mhcflurry eval compare-models --a results/new_run/ --b public --out cmp/",
         "  mhcflurry eval paper-figures run --a results/new_run/ --out eval/",
-        "  mhcflurry train pan-allele-release --run-dir runs/2.3.0 --release 2.3.0",
+        "  mhcflurry train plot-loss-curves --selected-dir models.combined --out plots",
         "  mhcflurry <subcommand> --help",
         "",
         "mhcflurry-downloads, mhcflurry-predict and mhcflurry-predict-scan run",

@@ -12,13 +12,17 @@
 
 """
 """
-import sys
 import argparse
 import os
+import sys
 
 import pandas
 
-from mhcflurry.peptide_reference import annotate_peptide_references
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
+
+from peptide_reference import annotate_peptide_references
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
