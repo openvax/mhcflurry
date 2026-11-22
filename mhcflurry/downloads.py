@@ -23,7 +23,7 @@ from os.path import join, exists, dirname, abspath
 from os import environ
 from shlex import quote
 from collections import OrderedDict
-from appdirs import user_data_dir
+from platformdirs import user_data_dir
 
 import csv
 

@@ -36,7 +36,7 @@ with open("mhcflurry/version.py", "r") as f:
 if __name__ == "__main__":
     required_packages = [
         "pandas>=3,<4",
-        "appdirs",
+        "platformdirs",
         "filelock>=3",
         "scikit-learn",
         "threadpoolctl",
