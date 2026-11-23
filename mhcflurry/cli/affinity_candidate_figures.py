@@ -15,6 +15,7 @@ import numpy
 import pandas
 
 from mhcflurry.experiment_archive import sha256_file
+from ..cli_args import add_out_arg
 from .help import HelpArgumentParser
 
 
@@ -48,7 +49,7 @@ def make_parser(prog="mhcflurry eval affinity-candidate-figures"):
     """Build the shortlisted-candidate figure parser."""
     parser = HelpArgumentParser(prog=prog, description=__doc__)
     parser.add_argument("--factorial-dir", required=True)
-    parser.add_argument("--out", required=True)
+    add_out_arg(parser, required=True)
     parser.add_argument(
         "--condition",
         action="append",

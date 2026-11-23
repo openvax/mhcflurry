@@ -20,6 +20,7 @@ import uuid
 import pandas
 
 from ..class1_affinity_predictor import Class1AffinityPredictor
+from ..cli_args import add_models_dir_arg, add_out_models_dir_arg
 from ..experiment_archive import sha256_file
 from .help import HelpArgumentParser
 
@@ -29,8 +30,8 @@ POLICIES = ("terminal", "best")
 
 def make_parser(prog="mhcflurry train materialize-affinity-checkpoint"):
     parser = HelpArgumentParser(prog=prog, description=__doc__)
-    parser.add_argument(
-        "--models-dir",
+    add_models_dir_arg(
+        parser,
         required=True,
         help="Predictor directory containing retained checkpoint sidecars.",
     )
@@ -40,9 +41,8 @@ def make_parser(prog="mhcflurry train materialize-affinity-checkpoint"):
         choices=POLICIES,
         help="Checkpoint policy to install as the predictor's primary weights.",
     )
-    parser.add_argument(
-        "--out-models-dir",
-        required=True,
+    add_out_models_dir_arg(
+        parser,
         help="New predictor directory to create; it must not already exist.",
     )
     return parser

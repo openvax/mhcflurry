@@ -14,9 +14,9 @@ import yaml
 
 from generate_processing_cleavage_boundaries import build_kernel_conditions
 from run_exact_public_processing import Driver, cached_scores, utc_now, write_json
-from mhcflurry.cli.compare_models import _metrics
 from mhcflurry.experiment_archive import fingerprint_directory, sha256_file
 from mhcflurry.processing_matching import validate_matched_training_data
+from mhcflurry.ranking_metrics import ranking_metrics as _metrics
 from mhcflurry.release_holdout import load_excluded_samples
 
 

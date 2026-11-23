@@ -15,12 +15,12 @@ from pathlib import Path
 import numpy
 import pandas
 
-from .compare_models import _metrics
-from ..common import add_random_seed_arg
+from ..cli_args import add_out_arg, add_random_seed_arg
 from ..experiment_archive import sha256_file
 from ..processing_matching import (
     MATCHING_POLICY, make_affinity_controlled_risk_sets,
     validate_matching_assignments)
+from ..ranking_metrics import ranking_metrics
 
 
 from .help import HelpArgumentParser
@@ -60,7 +60,7 @@ def make_parser(prog="mhcflurry eval processing-affinity-control"):
             "so only the new --score tables are read."
         ),
     )
-    parser.add_argument("--out", required=True)
+    add_out_arg(parser, required=True)
     parser.add_argument("--decoys-per-hit", type=int, default=10)
     add_random_seed_arg(parser)
     parser.add_argument(
@@ -292,7 +292,7 @@ def _concordance(frame, score_column):
 
 
 def _metric_record(frame, score, scope, group):
-    metrics = _metrics(frame.hit.to_numpy(), frame[score].to_numpy())
+    metrics = ranking_metrics(frame.hit.to_numpy(), frame[score].to_numpy())
     return {
         "scope": scope,
         "group": str(group),

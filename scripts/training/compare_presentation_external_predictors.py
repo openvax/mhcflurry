@@ -21,8 +21,9 @@ import shutil
 import numpy
 import pandas
 
-from mhcflurry.cli.compare_models import _metrics, _normalize_benchmark_genotype
+from mhcflurry.cli.compare_models import _normalize_benchmark_genotype
 from mhcflurry.experiment_archive import sha256_file
+from mhcflurry.ranking_metrics import ranking_metrics as _metrics
 
 
 KEYS = ["protein_accession", "peptide", "sample_id", "n_flank", "c_flank", "hit", "hla"]

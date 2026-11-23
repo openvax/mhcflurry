@@ -13,12 +13,12 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import average_precision_score, roc_auc_score
 
 from mhcflurry.class1_presentation_predictor import presentation_percent_rank_bins
 from mhcflurry.experiment_archive import sha256_file
 from mhcflurry.compact_percent_rank_transform import CompactPresentationPercentiles
 from mhcflurry.percent_rank_transform import PercentRankTransform
+from mhcflurry.ranking_metrics import ranking_metrics as _ranking_metrics
 
 
 CUTOFFS = np.array([.001, .003, .01, .03, .1, .3, 1., 3., 10., 30., 50., 90.])
@@ -87,12 +87,12 @@ def ranking_metrics(labels, scores):
     n = int(labels.sum())
     if not 0 < n < len(labels):
         raise ValueError("Ranking evaluation needs both positive and negative rows")
-    cutoff = np.partition(scores, len(scores) - n)[len(scores) - n]
-    above, tied = scores > cutoff, scores == cutoff
-    expected = labels[above].sum() + (n - above.sum()) * labels[tied].mean()
-    return dict(auprc=float(average_precision_score(labels, scores)),
-                auroc=float(roc_auc_score(labels, scores)),
-                ppv_expected_random_ties=float(expected / n))
+    metrics = _ranking_metrics(labels, scores)
+    return dict(
+        auprc=metrics["pr_auc"],
+        auroc=metrics["roc_auc"],
+        ppv_expected_random_ties=metrics["ppv_at_n"],
+    )
 
 
 def fit_methods(reference, budgets):

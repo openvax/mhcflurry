@@ -42,7 +42,7 @@ import subprocess
 import sys
 import tempfile
 
-from ..cli_args import positive_int_arg
+from ..cli_args import add_out_arg, positive_int_arg
 from .help import HelpArgumentParser, style_help
 
 
@@ -267,8 +267,8 @@ def _make_score_predictions_parser(prog):
         required=True,
         help="Saved benchmark prediction table (CSV or CSV.BZ2).",
     )
-    parser.add_argument(
-        "--out",
+    add_out_arg(
+        parser,
         required=True,
         help=(
             "Output CSV path, typically accuracy_scores.multiallelic.csv or "
@@ -361,8 +361,8 @@ def _make_external_predictors_parser(prog):
         required=True,
         help="Canonical benchmark prediction table (CSV or CSV.BZ2).",
     )
-    parser.add_argument(
-        "--out",
+    add_out_arg(
+        parser,
         required=True,
         help="Output benchmark prediction table with added predictor columns.",
     )
@@ -604,8 +604,9 @@ def make_paper_figures_run_parser(prog="mhcflurry eval paper-figures run"):
     )
     parser.add_argument("--a-label", help="Display label for side A.")
     parser.add_argument("--b-label", help="Display label for side B.")
-    parser.add_argument(
-        "--out", required=True,
+    add_out_arg(
+        parser,
+        required=True,
         help="Evaluation output directory. compare-models writes here.",
     )
     parser.add_argument(

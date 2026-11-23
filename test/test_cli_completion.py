@@ -232,6 +232,37 @@ def test_every_listed_subcommand_supports_flag_completion():
     assert set(FLAG_COMPLETION_SUBCOMMANDS) == listed
 
 
+def test_allele_and_alleles_aliases_accepted_everywhere():
+    from mhcflurry.cli import (
+        parsers,
+        predict_command,
+        predict_scan_command,
+    )
+
+    for parser, required_args, dest in (
+        (predict_command.parser, [], "alleles"),
+        (predict_scan_command.parser, [], "alleles"),
+        (
+            parsers.make_train_allele_specific_models_parser(),
+            ["--data", "d.csv", "--out-models-dir", "out", "--hyperparameters", "h.json"],
+            "allele",
+        ),
+        (
+            parsers.make_select_allele_specific_models_parser(),
+            ["--models-dir", "in", "--out-models-dir", "out"],
+            "allele",
+        ),
+        (
+            parsers.make_calibrate_percentile_ranks_parser(),
+            ["--models-dir", "in"],
+            "allele",
+        ),
+    ):
+        for flag in ("--allele", "--alleles"):
+            ns = parser.parse_args(required_args + [flag, "HLA-A*02:01", "HLA-B*07:02"])
+            assert getattr(ns, dest) == ["HLA-A*02:01", "HLA-B*07:02"]
+
+
 @pytest.mark.parametrize("name", sorted(set(USER_SCRIPTS) - {"mhcflurry"}))
 def test_historical_scripts_complete_their_flags(name, tmp_path):
     completions = complete(USER_SCRIPTS[name], "%s -" % name, tmp_path)

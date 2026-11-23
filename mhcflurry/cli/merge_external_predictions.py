@@ -15,6 +15,7 @@ from pathlib import Path
 import pandas
 
 from mhcflurry.experiment_archive import sha256_file
+from ..cli_args import add_out_arg
 from .help import HelpArgumentParser
 
 
@@ -31,7 +32,7 @@ def make_parser(prog="mhcflurry eval merge-external-predictions"):
             "per predictor. The manifests must describe the same base rows."
         ),
     )
-    parser.add_argument("--out", required=True, metavar="CSV[.bz2]")
+    add_out_arg(parser, required=True, metavar="CSV[.bz2]")
     return parser
 
 
