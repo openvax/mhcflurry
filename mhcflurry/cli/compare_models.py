@@ -50,6 +50,7 @@ from typing import Optional
 import numpy
 import pandas
 
+from ..cli_args import add_out_arg
 from ..experiment_archive import sha256_file
 from ..common import (
     normalize_class1_genotype,
@@ -211,8 +212,9 @@ def make_parser():
                 "Default: %%(default)s" % letter
             ),
         )
-    parser.add_argument(
-        "--out", required=True,
+    add_out_arg(
+        parser,
+        required=True,
         help="Output directory. Subdirs per component are created here.",
     )
     parser.add_argument(

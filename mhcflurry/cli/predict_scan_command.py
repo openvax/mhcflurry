@@ -35,6 +35,7 @@ import argcomplete
 
 from .completion import is_completing
 from .help import HelpArgumentParser
+from ..cli_args import add_alleles_arg, add_out_arg
 from ..downloads import get_default_class1_presentation_models_dir, get_model_release_dir
 from ..parallelism import add_prediction_parallelism_args
 from ..version import __version__
@@ -58,10 +59,9 @@ input_args.add_argument(
     default="guess",
     help="Format of input file. By default, it is guessed from the file "
          "extension.")
-input_args.add_argument(
-    "--alleles",
+add_alleles_arg(
+    input_args,
     metavar="ALLELE",
-    nargs="+",
     help="Sample MHC allele or allele-set queries. Each argument is one sample; "
     "delimit alleles within a sample with ',' or ';'.")
 input_args.add_argument(
@@ -124,10 +124,7 @@ results_args.add_argument(
 
 
 output_args = parser.add_argument_group(title="Output options")
-output_args.add_argument(
-    "--out",
-    metavar="OUTPUT.csv",
-    help="Output CSV")
+add_out_arg(output_args, metavar="OUTPUT.csv", help="Output CSV")
 output_args.add_argument(
     "--output-delimiter",
     metavar="CHAR",

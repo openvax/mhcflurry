@@ -211,12 +211,13 @@ def capability_report(models_dir, alleles, lengths=range(8, 16)):
 def run_argv(argv, prog="mhcflurry eval allele-capabilities"):
     """Write a model-bound allele capability report as JSON."""
     from .cli.help import HelpArgumentParser
+    from .cli_args import add_alleles_arg, add_models_dir_arg, add_out_arg
 
     parser = HelpArgumentParser(prog=prog, description=__doc__)
-    parser.add_argument("--models-dir", required=True)
-    parser.add_argument("--alleles", nargs="+", required=True)
+    add_models_dir_arg(parser, required=True)
+    add_alleles_arg(parser, required=True)
     parser.add_argument("--lengths", nargs="+", type=int, default=list(range(8, 16)))
-    parser.add_argument("--out", required=True)
+    add_out_arg(parser, required=True)
     args = parser.parse_args(argv)
     report = capability_report(args.models_dir, args.alleles, args.lengths)
     with open(args.out, "x") as stream:

@@ -43,6 +43,7 @@ from .figure_style import (
 )
 from .help import HelpArgumentParser
 from .model_comparison_constants import path_is_within as _path_is_within
+from ..cli_args import add_out_arg
 from ..common import allele_locus_name, positive_int_arg
 from ..ranking_metrics import ranking_metrics
 
@@ -197,8 +198,8 @@ missing_inputs.md instead of being silently fabricated.
             "accuracy_scores.monoallelic.csv is absent."
         ),
     )
-    parser.add_argument(
-        "--out",
+    add_out_arg(
+        parser,
         required=True,
         help="Output directory for paper figures and manifest files.",
     )

@@ -345,6 +345,7 @@ def _plot_per_fold(selected_keys, all_models, out_path):
 
 def make_parser(prog="mhcflurry train plot-loss-curves"):
     """Return the command-line parser for training-loss diagnostics."""
+    from ..cli_args import add_out_arg
     from .help import HelpArgumentParser
 
     parser = HelpArgumentParser(
@@ -363,7 +364,7 @@ def make_parser(prog="mhcflurry train plot-loss-curves"):
         "--selected-dir", required=True,
         help="Path to models.combined/ (the selected ensemble)",
     )
-    parser.add_argument("--out", required=True, help="Output directory")
+    add_out_arg(parser, required=True, help="Output directory")
     return parser
 
 
