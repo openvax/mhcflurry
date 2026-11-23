@@ -22,8 +22,10 @@ removed in 2.4.0. ``mhcflurry-downloads``, ``mhcflurry-predict`` and
 import importlib
 import sys
 
+import argcomplete
+
 from .completion import is_completing
-from .main import _SUBCOMMANDS
+from .main import _SUBCOMMANDS, load_subcommand_parser
 
 
 def deprecated_script(subcommand):
@@ -45,11 +47,15 @@ def deprecated_script(subcommand):
     module_path, entry, _ = _SUBCOMMANDS[subcommand]
 
     def run():
-        if not is_completing():
-            print(
-                "mhcflurry-%s is deprecated and will be removed in 2.4.0; "
-                "use mhcflurry %s." % (subcommand, subcommand),
-                file=sys.stderr)
+        if is_completing():
+            # Complete options from the lightweight parser without importing
+            # torch/pandas/sklearn.
+            argcomplete.autocomplete(load_subcommand_parser(subcommand))
+            return 0
+        print(
+            "mhcflurry-%s is deprecated and will be removed in 2.4.0; "
+            "use mhcflurry %s." % (subcommand, subcommand),
+            file=sys.stderr)
         return getattr(importlib.import_module(module_path), entry)(sys.argv[1:])
 
     return run

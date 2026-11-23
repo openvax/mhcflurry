@@ -3,7 +3,6 @@
 
 """Build and validate the frozen evaluation holdout for model releases."""
 
-import argparse
 import json
 from pathlib import Path
 
@@ -398,7 +397,9 @@ def validate_release_holdout(
 
 
 def make_parser(prog="mhcflurry train release-holdout"):
-    parser = argparse.ArgumentParser(prog=prog, description=__doc__)
+    from .cli.help import HelpArgumentParser
+
+    parser = HelpArgumentParser(prog=prog, description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
     build = subparsers.add_parser("build")
     build.add_argument("--data-dir", required=True)

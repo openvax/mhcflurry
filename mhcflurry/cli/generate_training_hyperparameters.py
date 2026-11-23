@@ -11,13 +11,11 @@
 # limitations under the License.
 
 """Generate release-training hyperparameter grids."""
-import argparse
 import sys
 from copy import deepcopy
 
-import yaml
-
-from ..common import positive_int_arg
+from ..cli_args import positive_int_arg
+from .help import HelpArgumentParser
 
 
 AFFINITY_DEFAULT_MINIBATCH_SIZE = 128
@@ -471,6 +469,8 @@ def build_processing_batch_sweep_panels(
 
 def read_hyperparameters_yaml(path):
     """Read a YAML hyperparameter list from ``path``."""
+    import yaml
+
     with open(path) as fd:
         hyperparameters = yaml.safe_load(fd)
     if hyperparameters is None:
@@ -484,6 +484,8 @@ def read_hyperparameters_yaml(path):
 
 def dump_hyperparameters(hyperparameters, stream=None):
     """Write hyperparameter dictionaries as safe YAML."""
+    import yaml
+
     yaml.safe_dump(hyperparameters, stream or sys.stdout)
 
 
@@ -515,7 +517,7 @@ def add_optimizer_implementation_argument(parser):
 
 def make_parser(prog=None):
     """Build the argparse parser for the unified generator command."""
-    parser = argparse.ArgumentParser(description=__doc__, prog=prog)
+    parser = HelpArgumentParser(description=__doc__, prog=prog)
     subparsers = parser.add_subparsers(dest="recipe", required=True)
 
     affinity = subparsers.add_parser(

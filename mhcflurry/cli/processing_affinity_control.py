@@ -7,7 +7,6 @@
 """Evaluate processing scores on affinity-controlled hit/decoy risk sets."""
 from __future__ import annotations
 
-import argparse
 import glob
 import json
 import os
@@ -24,6 +23,9 @@ from ..processing_matching import (
     validate_matching_assignments)
 
 
+from .help import HelpArgumentParser
+
+
 IDENTITY_COLUMNS = (
     "sample_id", "peptide", "hit", "n_flank", "c_flank",
 )
@@ -32,7 +34,7 @@ AFFINITY_COLUMN = "mhcflurry_production_affinity"
 
 def make_parser(prog="mhcflurry eval processing-affinity-control"):
     """Return the command-line parser."""
-    parser = argparse.ArgumentParser(prog=prog, description=__doc__)
+    parser = HelpArgumentParser(prog=prog, description=__doc__)
     parser.add_argument(
         "--score", action="append", required=True, metavar="NAME=PATH:COLUMN",
         help=(

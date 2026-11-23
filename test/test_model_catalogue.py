@@ -311,6 +311,7 @@ def test_table_color_preserves_alignment_and_plain_output(monkeypatch, environme
             colors={1: '36', 3: downloads_command._status_color}, wrap_columns=(2, 3))
     assert '\x1b[' not in plain.getvalue()
     assert ('\x1b[' in terminal.getvalue()) == (not environment)
+    assert '\x1b[32m' not in terminal.getvalue()
     assert re.sub(r'\x1b\[[0-9;]*m', '', terminal.getvalue()) == plain.getvalue()
     assert max(map(len, plain.getvalue().splitlines())) <= 80
 

@@ -14,7 +14,6 @@
 """
 Train Class1 presentation models.
 """
-import argparse
 import argcomplete
 import os
 import sys
@@ -32,18 +31,12 @@ from ..class1_processing_predictor import Class1ProcessingPredictor
 from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..class1_presentation_predictor import Class1PresentationPredictor
 from ..common import (
-    add_debug_arg,
-    add_out_models_dir_arg,
-    add_verbosity_arg,
-    add_random_seed_arg,
     configure_logging,
     configure_random_seed,
     install_sigusr1_stack_trace_handler,
-    positive_int_arg,
     write_generate_sh,
 )
 from ..parallelism import (
-    add_local_parallelism_args,
     call_wrapped_kwargs,
     refine_local_parallelism_from_worker_context,
     resolve_local_parallelism_args,
@@ -54,6 +47,7 @@ from ..workload_planning import (
     env_float,
     path_size_bytes,
 )
+from .parsers import make_train_presentation_models_parser
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
@@ -66,51 +60,7 @@ WORKER_CONTEXT = {}
 _PRESENTATION_WORKER_RUNTIME_FLOOR_GB = 6.0
 _PRESENTATION_WORKER_SAFETY_FACTOR = 1.3
 
-parser = argparse.ArgumentParser(usage=__doc__)
-
-parser.add_argument(
-    "--data",
-    metavar="FILE.csv",
-    help="Training data CSV. Expected columns: peptide, n_flank, c_flank, hit")
-add_out_models_dir_arg(
-    parser, help="Directory to write models and manifest")
-parser.add_argument(
-    "--affinity-predictor",
-    metavar="DIR",
-    required=True,
-    help="Affinity predictor models dir")
-parser.add_argument(
-    "--processing-predictor-with-flanks",
-    metavar="DIR",
-    required=True,
-    help="Processing predictor with flanks")
-parser.add_argument(
-    "--processing-predictor-without-flanks",
-    metavar="DIR",
-    required=True,
-    help="Processing predictor without flanks")
-add_verbosity_arg(parser, default=1)
-add_debug_arg(parser)
-parser.add_argument(
-    "--hla-column",
-    default="hla",
-    help="Column in data giving space-separated MHC I alleles")
-parser.add_argument(
-    "--target-column",
-    default="hit",
-    help="Column in data giving hit (1) vs decoy (0)")
-parser.add_argument(
-    "--feature-chunk-size",
-    type=positive_int_arg,
-    default=250000,
-    metavar="N",
-    help=(
-        "Rows per parallel presentation feature-prediction task. Larger "
-        "chunks reduce scheduling overhead but increase worker memory. "
-        "Default: %(default)s"))
-
-add_local_parallelism_args(parser)
-add_random_seed_arg(parser)
+parser = make_train_presentation_models_parser(usage=__doc__)
 
 def run(argv=sys.argv[1:]):
     install_sigusr1_stack_trace_handler()

@@ -21,7 +21,11 @@ import sys
 import pytest
 
 from mhcflurry.cli.completion import completing_subcommand, is_completing
-from mhcflurry.cli.main import FLAG_COMPLETION_SUBCOMMANDS, _SUBCOMMANDS
+from mhcflurry.cli.main import (
+    DEPRECATED_SUBCOMMANDS,
+    FLAG_COMPLETION_SUBCOMMANDS,
+    _SUBCOMMANDS,
+)
 
 REPO_DIR = Path(__file__).resolve().parents[1]
 
@@ -156,17 +160,13 @@ def test_completing_subcommand_without_completion_request():
 
 @pytest.mark.parametrize(
     "subcommand",
-    list(FLAG_COMPLETION_SUBCOMMANDS) + [
-        "class1-train-pan-allele-models", "calibrate-percentile-ranks",
-        "eval", "train", None])
+    sorted(set(_SUBCOMMANDS) - set(DEPRECATED_SUBCOMMANDS)) + [None])
 def test_tab_press_imports_no_heavy_modules(subcommand):
     comp_line = "mhcflurry %s --" % subcommand if subcommand else "mhcflurry "
     env = {key: value for key, value in os.environ.items()
            if not key.startswith("MHCFLURRY_")}
     env["PYTHONPATH"] = str(REPO_DIR)
     env.update(completion_environ(comp_line))
-    flag_completion = subcommand in FLAG_COMPLETION_SUBCOMMANDS
-    module = _SUBCOMMANDS[subcommand][0] if subcommand else None
     script = '''
 import sys
 from mhcflurry.cli.main import build_completion_parser
@@ -174,9 +174,34 @@ build_completion_parser()
 loaded = set(sys.modules)
 heavy = loaded.intersection(%r)
 assert not heavy, heavy
-if %r:
-    assert (%r in loaded) == %r, sorted(m for m in loaded if m.startswith("mhcflurry"))
-''' % (HEAVY_MODULES, module, module, flag_completion)
+''' % (HEAVY_MODULES,)
+    result = subprocess.run(
+        [sys.executable, "-c", script], env=env, cwd=str(REPO_DIR),
+        capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("name", sorted(USER_SCRIPTS))
+def test_console_script_tab_press_imports_no_heavy_modules(name, tmp_path):
+    target = USER_SCRIPTS[name]
+    module, function = target.split(":")
+    out = tmp_path / "completions.txt"
+    env = {key: value for key, value in os.environ.items()
+           if not key.startswith("MHCFLURRY_")}
+    env["PYTHONPATH"] = str(REPO_DIR)
+    env.update(completion_environ(
+        "%s -" % name, _ARGCOMPLETE_STDOUT_FILENAME=str(out)))
+    script = '''
+import sys
+from %s import %s
+try:
+    %s()
+except SystemExit as exc:
+    assert exc.code in (0, None), exc.code
+loaded = set(sys.modules)
+heavy = loaded.intersection(%r)
+assert not heavy, heavy
+''' % (module, function, function, HEAVY_MODULES)
     result = subprocess.run(
         [sys.executable, "-c", script], env=env, cwd=str(REPO_DIR),
         capture_output=True, text=True)
@@ -195,19 +220,35 @@ if %r:
     ("mhcflurry downloads fetch --", {"--release", "--keep",
                                       "--already-downloaded-dir"}),
     ("mhcflurry pseudosequences ", {"filename", "legacy", "path", "list"}),
+    ("mhcflurry class1-train-pan-allele-models --",
+     {"--data", "--out-models-dir", "--hyperparameters", "--num-folds",
+      "--random-seed", "--num-jobs", "--cluster-parallelism"}),
+    ("mhcflurry calibrate-percentile-ranks --",
+     {"--models-dir", "--predictor-kind", "--percentile-method",
+      "--num-peptides-per-length", "--gpu-batched", "--random-seed"}),
+    ("mhcflurry class1-train-processing-models --",
+     {"--data", "--out-models-dir", "--processing-data-policy", "--num-folds"}),
+    ("mhcflurry class1-select-pan-allele-models --",
+     {"--models-dir", "--out-models-dir", "--min-models-per-fold"}),
+    ("mhcflurry eval ",
+     {"allele-capabilities", "compare-models", "plot-comparison",
+      "paper-figures"}),
+    ("mhcflurry train ",
+     {"release-holdout", "plot-loss-curves", "snapshot-experiment",
+      "materialize-affinity-checkpoint", "validate-processing-data"}),
+    ("mhcflurry class1-generate-training-hyperparameters ",
+     {"affinity", "processing-base", "processing-variant"}),
+    ("mhcflurry class1-reassign-mass-spec-training-data --",
+     {"--ms-only", "--drop-negative-ms", "--out-csv"}),
 ])
 def test_mhcflurry_completes_subcommands_and_flags(comp_line, expected, tmp_path):
     completions = complete("mhcflurry.cli.main:main", comp_line, tmp_path)
     assert expected <= completions, completions
 
 
-def test_mhcflurry_completes_other_subcommands_by_name_only(tmp_path):
-    # Their modules import torch or pandas at module level, which would cost
-    # seconds per Tab press.
-    completions = complete(
-        "mhcflurry.cli.main:main",
-        "mhcflurry class1-train-pan-allele-models --", tmp_path)
-    assert completions == set()
+def test_every_listed_subcommand_supports_flag_completion():
+    listed = set(_SUBCOMMANDS) - set(DEPRECATED_SUBCOMMANDS)
+    assert set(FLAG_COMPLETION_SUBCOMMANDS) == listed
 
 
 @pytest.mark.parametrize("name", sorted(set(USER_SCRIPTS) - {"mhcflurry"}))

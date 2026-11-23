@@ -32,21 +32,15 @@ import tqdm  # progress bar
 from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..device_footprint import estimate_affinity_training_device_worker_gb
 from ..common import (
-    add_max_epochs_arg,
-    add_out_models_dir_arg,
-    add_verbosity_arg,
-    add_random_seed_arg,
     configure_logging,
     configure_random_seed,
     derive_seed,
     install_sigusr1_stack_trace_handler,
     normalize_allele_name,
-    positive_float_arg,
     positive_int_arg,
     write_generate_sh,
 )
 from ..parallelism import (
-    add_local_parallelism_args,
     apply_resolved_training_hyperparameters_to_work_items,
     resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
@@ -57,6 +51,10 @@ from ..workload_planning import (
 )
 from ..hyperparameters import HyperparameterDefaults
 from ..allele_encoding import AlleleEncoding
+from .parsers import (
+    held_out_fraction_reciprocal_arg as _held_out_fraction_reciprocal_arg,  # noqa: F401
+    make_train_allele_specific_models_parser,
+)
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
@@ -69,15 +67,6 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 WORKER_CONTEXT = {}
 
 
-def _held_out_fraction_reciprocal_arg(value):
-    result = positive_int_arg(value)
-    if result < 2:
-        raise argparse.ArgumentTypeError(
-            "held-out fraction reciprocal must be at least 2"
-        )
-    return result
-
-
 def _alleles_with_minimum_measurements(allele_counts, minimum):
     """Return alleles meeting the documented inclusive count threshold."""
     return list(allele_counts.loc[allele_counts >= minimum].index)
@@ -86,80 +75,7 @@ def _alleles_with_minimum_measurements(allele_counts, minimum):
 # When running in parallel, avoid using the neural network backend in the main
 # process. Model loading and inference should happen in worker processes.
 
-parser = argparse.ArgumentParser(usage=__doc__)
-
-parser.add_argument(
-    "--data",
-    metavar="FILE.csv",
-    required=True,
-    help=(
-        "Training data CSV. Expected columns: "
-        "allele, peptide, measurement_value"))
-add_out_models_dir_arg(
-    parser, help="Directory to write models and manifest")
-parser.add_argument(
-    "--hyperparameters",
-    metavar="FILE.json",
-    required=True,
-    help="JSON or YAML of hyperparameters")
-parser.add_argument(
-    "--allele",
-    default=None,
-    nargs="+",
-    help="Alleles to train models for. If not specified, all alleles with "
-    "enough measurements will be used.")
-parser.add_argument(
-    "--min-measurements-per-allele",
-    type=positive_int_arg,
-    metavar="N",
-    default=50,
-    help="Train models for alleles with >=N measurements.")
-parser.add_argument(
-    "--held-out-fraction-reciprocal",
-    type=_held_out_fraction_reciprocal_arg,
-    metavar="N",
-    default=None,
-    help="Hold out 1/N fraction of data (for e.g. subsequent model selection. "
-    "For example, specify 5 to hold out 20 percent of the data.")
-parser.add_argument(
-    "--held-out-fraction-seed",
-    type=int,
-    metavar="N",
-    default=None,
-    help="Seed for randomizing which measurements are held out. Only matters "
-    "when --held-out-fraction-reciprocal is specified. When omitted, the "
-    "held-out split "
-    "is derived from --random-seed (so the whole run reproduces from one "
-    "value). Pass this explicitly to control the split directly — e.g. to "
-    "reproduce a pre-2.3.0 split — overriding --random-seed for the split.")
-add_random_seed_arg(parser)
-parser.add_argument(
-    "--ignore-inequalities",
-    action="store_true",
-    default=False,
-    help="Do not use affinity value inequalities even when present in data")
-parser.add_argument(
-    "--n-models",
-    type=positive_int_arg,
-    metavar="N",
-    help="Ensemble size, i.e. how many models to train for each architecture. "
-    "If specified here it overrides any 'n_models' specified in the "
-    "hyperparameters.")
-add_max_epochs_arg(parser)
-parser.add_argument(
-    "--allele-sequences",
-    metavar="FILE.csv",
-    help="Allele sequences file. Used for computing allele similarity matrix.")
-parser.add_argument(
-    "--save-interval",
-    type=positive_float_arg,
-    metavar="N",
-    default=60,
-    help="Write models to disk every N seconds. Only affects parallel runs; "
-    "serial runs write each model to disk as it is trained.")
-add_verbosity_arg(parser)
-
-add_local_parallelism_args(parser)
+parser = make_train_allele_specific_models_parser(usage=__doc__)
 
 TRAIN_DATA_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
     subset="all",

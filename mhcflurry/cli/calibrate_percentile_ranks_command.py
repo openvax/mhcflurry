@@ -14,7 +14,6 @@
 """
 Calibrate percentile ranks for models. Runs in-place.
 """
-import argparse
 import argcomplete
 import os
 import sys
@@ -32,23 +31,18 @@ from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..class1_presentation_predictor import Class1PresentationPredictor
 from ..class1_processing_predictor import Class1ProcessingPredictor
 from ..common import (
-    add_verbosity_arg,
-    add_random_seed_arg,
     allele_locus_name,
     amino_acid_distribution,
     configure_logging,
     configure_pytorch,
     configure_random_seed,
     filter_canonicalizable_alleles,
-    fraction_arg,
     install_sigusr1_stack_trace_handler,
-    positive_int_arg,
     random_peptides,
     write_generate_sh,
 )
 from ..encodable_sequences import EncodableSequences
 from ..parallelism import (
-    add_local_parallelism_args,
     chunk_ranges_for_local_parallelism,
     num_workers_per_gpu_from_args,
     refine_local_parallelism_from_worker_context,
@@ -63,9 +57,11 @@ from ..workload_planning import (
 from ..device_footprint import (
     estimate_affinity_calibration_device_worker_gb,
 )
-from ..cluster_parallelism import (
-    add_cluster_parallelism_args,
-    cluster_results_from_args)
+from ..cluster_parallelism import cluster_results_from_args
+from .parsers import (
+    batch_size_arg as _batch_size_arg,  # noqa: F401
+    make_calibrate_percentile_ranks_parser,
+)
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
@@ -77,175 +73,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # copy-on-write pages instead of receiving a pickled copy.
 WORKER_CONTEXT = {}
 
-parser = argparse.ArgumentParser(usage=__doc__)
-parser.add_argument(
-    "--predictor-kind",
-    choices=("class1_affinity", "class1_processing", "class1_presentation"),
-    default="class1_affinity",
-    help="Type of predictor to calibrate")
-parser.add_argument(
-    "--percentile-method", choices=("compact", "histogram"), default="compact",
-    help="Method for new calibration (default: %(default)s). Loading alone "
-    "never changes saved ranks. Histogram reproduction also requires the "
-    "original reference and bin policy.")
-parser.add_argument(
-    "--max-percentile-knots", type=int, choices=(64, 128), default=128,
-    help="Compact starts at 64; allow 128 only when background validation "
-    "justifies it. This is a ceiling (default: %(default)s), not a fixed size. "
-    "Ignored for histogram calibration.")
-parser.add_argument(
-    "--processing-reference-data",
-    help="Required for processing: independent background CSV with peptide and, "
-    "for a flanked model, n_flank and c_flank columns. No evaluation labels are used. "
-    "Scores and input sequences are saved in percent_rank_reference.npz. "
-    "Requires --num-jobs 0; reference-generation options do not apply.")
-parser.add_argument(
-    "--models-dir",
-    metavar="DIR",
-    required=True,
-    help="Directory to read and write models")
-parser.add_argument(
-    "--allele", "--alleles",
-    dest="allele",
-    default=None,
-    nargs="+",
-    help="Alleles to calibrate percentile ranks for. If not specified all "
-    "alleles are used")
-parser.add_argument(
-    "--match-amino-acid-distribution-data",
-    help="Sample random peptides from the amino acid distribution of the "
-    "peptides listed in the supplied CSV file, which must have a 'peptide' "
-    "column. If not specified a uniform distribution is used.")
-parser.add_argument(
-    "--alleles-file",
-    default=None,
-    help="Use alleles in supplied CSV file, which must have an 'allele' column.")
-parser.add_argument(
-    "--list-percent-rank-status",
-    default=False,
-    action="store_true",
-    help="For class1 affinity predictors, print a CSV indicating which requested "
-    "alleles already have percentile-rank calibration and exit without "
-    "generating calibration peptides.")
-parser.add_argument(
-    "--only-missing",
-    dest="only_missing_percent_ranks",
-    default=False,
-    action="store_true",
-    help="For class1 affinity predictors, calibrate only requested alleles that "
-    "do not already have direct or sequence-equivalent percentile-rank "
-    "calibration.")
-parser.add_argument(
-    "--num-peptides-per-length",
-    type=positive_int_arg,
-    metavar="N",
-    default=int(1e5),
-    help="For affinity/presentation, number of generated peptides per length "
-    "to use to calibrate percent ranks. Processing uses --processing-reference-data. "
-    "Default: %(default)s.")
-parser.add_argument(
-    "--num-genotypes",
-    type=positive_int_arg,
-    metavar="N",
-    default=25,
-    help="Used when calibrating a presentation predictor. Number of MHC allele sets"
-    "to sample")
-parser.add_argument(
-    "--alleles-per-genotype",
-    type=positive_int_arg,
-    metavar="N",
-    default=6,
-    help="Used when calibrating a presentation predictor. Number of alleles "
-    "per MHC allele set. Use 1 to calibrate for single alleles. Default: %(default)s")
-parser.add_argument(
-    "--motif-summary",
-    default=False,
-    action="store_true",
-    help="Calculate motifs and length preferences for each allele")
-parser.add_argument(
-    "--summary-top-peptide-fraction",
-    default=[0.0001, 0.001, 0.01, 0.1, 1.0],
-    nargs="+",
-    type=fraction_arg,
-    metavar="X",
-    help="The top X fraction of predictions (i.e. tightest binders) to use to "
-    "generate motifs and length preferences. Default: %(default)s")
-parser.add_argument(
-    "--length-range",
-    default=(8, 15),
-    type=positive_int_arg,
-    nargs=2,
-    help="Min and max peptide length to calibrate, inclusive. "
-    "Default: %(default)s")
-
-
-def _batch_size_arg(value):
-    """Accept either an int or the literal string 'auto' for --prediction-batch-size.
-
-    ``auto`` (the default) delegates sizing to
-    ``mhcflurry.pytorch_sizing.compute_prediction_batch_size``,
-    which picks a per-GPU-memory batch, reserving the VRAM partition
-    across co-resident workers.
-    """
-    if isinstance(value, str) and value.strip().lower() in ("auto", ""):
-        return "auto"
-    return positive_int_arg(value)
-
-
-parser.add_argument(
-    "--prediction-batch-size",
-    type=_batch_size_arg,
-    default="auto",
-    help="Batch size for predictions. Pass an int to pin, or 'auto' "
-         "(default) to size per GPU free memory / workers-per-GPU — see "
-         "mhcflurry.pytorch_sizing.compute_prediction_batch_size.")
-parser.add_argument(
-    "--alleles-per-work-chunk",
-    type=positive_int_arg,
-    metavar="N",
-    default=1,
-    help="Number of alleles per work chunk. Default: %(default)s.")
-add_verbosity_arg(parser)
-parser.add_argument(
-    "--gpu-batched",
-    default=False,
-    action="store_true",
-    help="[class1 affinity predictors only] Use the GPU-hoisted "
-         "calibration fast path: precompute peptide-side activations "
-         "per network and batch "
-         "--gpu-allele-batch-size alleles into a single forward through "
-         "the merge + main dense path. Uses the same ensemble aggregation "
-         "and percentile method as the ordinary path; floating-point batching "
-         "can change predictions and selected knots slightly, so saved curves "
-         "are not guaranteed bit-identical. Applies to affinity in serial, "
-         "local-pool, and cluster modes; ignored for processing/presentation.")
-parser.add_argument(
-    "--gpu-allele-batch-size",
-    type=_batch_size_arg,
-    default="auto",
-    help="Alleles per GPU forward when --gpu-batched. Pass an int to "
-         "pin; 'auto' (default) partitions the VRAM budget with "
-         "--max-workers-per-gpu. Larger values trade off more VRAM for "
-         "fewer kernel launches.")
-parser.add_argument(
-    "--gpu-peptide-batch-size",
-    type=_batch_size_arg,
-    default="auto",
-    help="Peptide chunk size on device when --gpu-batched. Pass an int "
-         "to pin; 'auto' (default) picks the peptide axis of the "
-         "auto-sized budget. Reducing keeps peak VRAM down on smaller "
-         "GPUs but adds kernel-launch overhead.")
-
-# Calibrate deliberately uses the broader training-flavored parallelism set
-# (add_local_parallelism_args) rather than the prediction subset
-# (add_prediction_parallelism_args used by predict / predict-scan): it needs
-# the training-only knobs (e.g. --max-tasks-per-worker, --worker-log-dir,
-# cluster parallelism). The shared flags (--num-jobs/--gpus/--max-workers-per-
-# gpu) are identical across all three, so do not "simplify" this to the
-# prediction helper.
-add_local_parallelism_args(parser)
-add_cluster_parallelism_args(parser)
-add_random_seed_arg(parser)
+parser = make_calibrate_percentile_ranks_parser(usage=__doc__)
 
 
 def run(argv=sys.argv[1:]):

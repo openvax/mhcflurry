@@ -22,7 +22,6 @@ to ``missing_inputs.md`` and ``manifest.csv`` so a training run can distinguish
 """
 from __future__ import annotations
 
-import argparse
 import json
 import os
 import shutil
@@ -42,6 +41,7 @@ from .figure_style import (
     predictor_color as _predictor_color,
     short_label as _short_label,
 )
+from .help import HelpArgumentParser
 from ..common import allele_locus_name, positive_int_arg
 
 
@@ -135,9 +135,8 @@ def run_argv(argv):
 
 def make_parser():
     """Return the command's argument parser."""
-    parser = argparse.ArgumentParser(prog="mhcflurry eval paper-figures render")
+    parser = HelpArgumentParser(prog="mhcflurry eval paper-figures render")
     parser.description = __doc__
-    parser.formatter_class = argparse.RawDescriptionHelpFormatter
     parser.epilog = """
 Figure input contract:
   * comparison-dir: output from ``mhcflurry eval compare-models``.

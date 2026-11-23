@@ -58,6 +58,7 @@ from ..common import (
     normalize_sequence_resolved_allele_name,
     positive_int_arg,
 )
+from .help import HelpArgumentParser
 from .model_comparison_constants import (
     METRIC_NAMES,
     PRESENTATION_MODES,
@@ -160,9 +161,8 @@ def run_argv(argv):
 
 def make_parser():
     """Return the command's argument parser."""
-    parser = argparse.ArgumentParser(prog="mhcflurry eval compare-models")
+    parser = HelpArgumentParser(prog="mhcflurry eval compare-models")
     parser.description = __doc__
-    parser.formatter_class = argparse.RawDescriptionHelpFormatter
     parser.add_argument(
         "--a", required=True, dest="a",
         help=(

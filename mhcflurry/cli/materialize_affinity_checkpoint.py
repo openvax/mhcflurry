@@ -12,7 +12,6 @@
 
 """Materialize retained affinity checkpoints as an ordinary predictor."""
 
-import argparse
 import json
 from pathlib import Path
 import shutil
@@ -22,13 +21,14 @@ import pandas
 
 from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..experiment_archive import sha256_file
+from .help import HelpArgumentParser
 
 
 POLICIES = ("terminal", "best")
 
 
 def make_parser(prog="mhcflurry train materialize-affinity-checkpoint"):
-    parser = argparse.ArgumentParser(prog=prog, description=__doc__)
+    parser = HelpArgumentParser(prog=prog, description=__doc__)
     parser.add_argument(
         "--models-dir",
         required=True,

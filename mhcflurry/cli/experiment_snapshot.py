@@ -12,17 +12,16 @@
 
 """CLI for timestamped, plot-reconstructable experiment snapshots."""
 
-import argparse
-
 from mhcflurry.experiment_archive import (
     DEFAULT_MAX_COPY_BYTES,
     snapshot_experiment,
 )
+from .help import HelpArgumentParser
 
 
 def make_parser(prog="mhcflurry train snapshot-experiment"):
     """Build the experiment-snapshot argument parser."""
-    parser = argparse.ArgumentParser(prog=prog, description=__doc__)
+    parser = HelpArgumentParser(prog=prog, description=__doc__)
     parser.add_argument("--source-dir", required=True)
     parser.add_argument("--experiments-dir", default="experiments")
     parser.add_argument("--name", required=True)

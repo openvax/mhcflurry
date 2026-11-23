@@ -189,16 +189,26 @@ def _check_help_groups():
 _check_help_groups()
 
 
-# Subcommands whose flags complete on Tab. Their modules import in tens of
-# milliseconds, without torch, numpy or pandas. The other subcommands complete
-# by name only: the training, selection, calibration and evaluation modules
-# import torch or pandas at module level (seconds per Tab), and most ``train``
-# and ``eval`` subcommands shell out to scripts/ in a source checkout.
+# Subcommands whose flags complete on Tab. Every listed subcommand's parser is
+# built without importing torch, numpy, pandas, sklearn, scipy, mhcgnomes,
+# tqdm or yaml, keeping Tab completion within tens of milliseconds.
 FLAG_COMPLETION_SUBCOMMANDS = (
     "predict",
     "predict-scan",
     "downloads",
     "pseudosequences",
+    "train",
+    "eval",
+    "calibrate-percentile-ranks",
+    "class1-train-allele-specific-models",
+    "class1-select-allele-specific-models",
+    "class1-train-pan-allele-models",
+    "class1-select-pan-allele-models",
+    "class1-train-processing-models",
+    "class1-select-processing-models",
+    "class1-train-presentation-models",
+    "class1-generate-training-hyperparameters",
+    "class1-reassign-mass-spec-training-data",
 )
 
 
@@ -239,7 +249,7 @@ def build_parser(subcommand_parsers=None):
 
 
 def load_subcommand_parser(name):
-    """Import one subcommand's module and return its argument parser.
+    """Return one subcommand's argument parser without heavy imports.
 
     Parameters
     ----------
@@ -249,10 +259,14 @@ def load_subcommand_parser(name):
     Returns
     -------
     argparse.ArgumentParser
-        The module's module-level ``parser`` when it has one (the
-        historical command modules do), otherwise ``make_parser()``'s
-        result.
+        The lightweight parser from :mod:`mhcflurry.cli.parsers` for heavy
+        training/selection/calibration commands, otherwise the module's
+        module-level ``parser`` or ``make_parser()`` result.
     """
+    from .parsers import SUBCOMMAND_PARSER_BUILDERS
+
+    if name in SUBCOMMAND_PARSER_BUILDERS:
+        return SUBCOMMAND_PARSER_BUILDERS[name]()
     module = importlib.import_module(_SUBCOMMANDS[name][0])
     parser = getattr(module, "parser", None)
     if parser is None:

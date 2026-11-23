@@ -11,19 +11,15 @@
 # limitations under the License.
 
 """Reassign affinity values for mass-spec training rows."""
-import argparse
 import os
 import sys
 
-import pandas
-
-from mhcflurry.release_holdout import exclude_affinity_pmhcs
-from mhcflurry.sample_disjointness import exclude_source_samples
+from .help import HelpArgumentParser
 
 
 def make_parser(prog=None):
     """Build the command-line parser."""
-    parser = argparse.ArgumentParser(description=__doc__, prog=prog)
+    parser = HelpArgumentParser(description=__doc__, prog=prog)
     parser.add_argument("data", metavar="CSV", help="Training data.")
     parser.add_argument(
         "--ms-only",
@@ -68,6 +64,10 @@ def reassign_mass_spec_training_data(
         exclude_source_samples_manifest=None,
         sample_aliases=None):
     """Return a curated training dataframe with requested MS-row edits."""
+    import pandas
+    from mhcflurry.release_holdout import exclude_affinity_pmhcs
+    from mhcflurry.sample_disjointness import exclude_source_samples
+
     df = pandas.read_csv(data, dtype={"sample_id": str, "study_id": str})
     if sample_aliases and not exclude_source_samples_manifest:
         raise ValueError("sample_aliases requires exclude_source_samples_manifest")
