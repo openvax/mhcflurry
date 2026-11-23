@@ -11,7 +11,6 @@
 # limitations under the License.
 
 import collections
-import argparse
 import datetime
 import hashlib
 import logging
@@ -20,7 +19,6 @@ import shlex
 import sys
 import os
 import json
-import math
 import warnings
 
 import numpy
@@ -36,150 +34,17 @@ from mhcgnomes import (
 
 
 from . import amino_acid
-
-
-# Default master seed for CLI commands that accept --random-seed. A fixed
-# seed supports reproducible sampling; numerical results can still depend on
-# hardware, library versions and nondeterministic kernels.
-DEFAULT_RANDOM_SEED = 42
-
-
-def positive_int_arg(value):
-    """Parse an argparse value as an integer greater than zero."""
-    if isinstance(value, bool):
-        raise argparse.ArgumentTypeError(
-            "expected a positive integer, got %r" % (value,)
-        )
-    try:
-        result = int(value)
-    except (TypeError, ValueError):
-        raise argparse.ArgumentTypeError(
-            "expected a positive integer, got %r" % (value,)
-        ) from None
-    if isinstance(value, (float, numpy.floating)) and not value.is_integer():
-        raise argparse.ArgumentTypeError(
-            "expected a positive integer, got %r" % (value,)
-        )
-    if result < 1:
-        raise argparse.ArgumentTypeError(
-            "expected a positive integer, got %r" % (value,)
-        )
-    return result
-
-
-def positive_float_arg(value):
-    """Parse an argparse value as a finite float greater than zero."""
-    try:
-        result = float(value)
-    except (TypeError, ValueError):
-        raise argparse.ArgumentTypeError(
-            "expected a positive number, got %r" % (value,)
-        ) from None
-    if not math.isfinite(result) or result <= 0:
-        raise argparse.ArgumentTypeError(
-            "expected a positive number, got %r" % (value,)
-        )
-    return result
-
-
-def fraction_arg(value):
-    """Parse an argparse value as a finite fraction in ``(0, 1]``."""
-    result = positive_float_arg(value)
-    if result > 1:
-        raise argparse.ArgumentTypeError(
-            "expected a fraction in (0, 1], got %r" % (value,)
-        )
-    return result
-
-
-def add_random_seed_arg(parser):
-    """Add the standard ``--random-seed`` argument to a CLI parser.
-
-    Training commands use this flag to record a shared source of random seeds.
-    It does not guarantee identical results across devices or library versions.
-    Pair with :func:`configure_random_seed`
-    at the start of the command's ``run``/``main``.
-    """
-    parser.add_argument(
-        "--random-seed",
-        type=int,
-        metavar="N",
-        default=DEFAULT_RANDOM_SEED,
-        help="Master random seed for this command "
-        "(numpy, Python `random`, and torch): data shuffles, fold/held-out "
-        "sampling, weight initialization, and random peptide/negative "
-        "sampling. Default: %(default)s. Exact numerical results can still "
-        "vary with hardware, library versions and nondeterministic kernels.")
-
-
-def add_verbosity_arg(parser, default=0):
-    """Add the standard integer ``--verbosity`` argument to a CLI parser.
-
-    The training and selection commands call
-    ``configure_logging(verbose=args.verbosity > 1)``; most also forward the
-    value to model ``fit`` as ``verbose``.
-
-    Parameters
-    ----------
-    parser : argparse.ArgumentParser
-        Parser to add the argument to.
-    default : int
-        Verbosity used when the flag is not given.
-    """
-    parser.add_argument(
-        "--verbosity",
-        type=int,
-        help="Verbosity. Default: %(default)s",
-        default=default)
-
-
-def add_debug_arg(parser):
-    """Add the standard ``--debug`` flag, which starts pdb on an error.
-
-    Parameters
-    ----------
-    parser : argparse.ArgumentParser
-        Parser to add the flag to.
-    """
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        default=False,
-        help="Launch python debugger on error")
-
-
-def add_out_models_dir_arg(parser, help):
-    """Add the required ``--out-models-dir`` argument to a CLI parser.
-
-    Parameters
-    ----------
-    parser : argparse.ArgumentParser
-        Parser to add the argument to.
-    help : str
-        Command-specific help text, e.g. what is written to the directory.
-    """
-    parser.add_argument(
-        "--out-models-dir",
-        metavar="DIR",
-        required=True,
-        help=help)
-
-
-def add_max_epochs_arg(parser):
-    """Add ``--max-epochs``, which overrides the hyperparameters' ``max_epochs``.
-
-    Parameters
-    ----------
-    parser : argparse.ArgumentParser
-        Parser to add the argument to. The parsed value is a positive int, or
-        ``None`` when the flag is not given.
-    """
-    parser.add_argument(
-        "--max-epochs",
-        type=positive_int_arg,
-        metavar="N",
-        help="Max training epochs. If specified here it overrides any "
-        "'max_epochs' specified in the hyperparameters.")
+from .cli_args import (
+    DEFAULT_RANDOM_SEED as DEFAULT_RANDOM_SEED,
+    add_debug_arg as add_debug_arg,
+    add_max_epochs_arg as add_max_epochs_arg,
+    add_out_models_dir_arg as add_out_models_dir_arg,
+    add_random_seed_arg as add_random_seed_arg,
+    add_verbosity_arg as add_verbosity_arg,
+    fraction_arg as fraction_arg,
+    positive_float_arg as positive_float_arg,
+    positive_int_arg as positive_int_arg,
+)
 
 
 def configure_random_seed(seed=None, name="mhcflurry"):

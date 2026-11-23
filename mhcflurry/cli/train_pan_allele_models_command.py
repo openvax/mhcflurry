@@ -14,7 +14,6 @@
 """
 Train Class1 pan-allele models.
 """
-import argparse
 import argcomplete
 import os
 from os.path import join
@@ -38,22 +37,15 @@ from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..class1_encoding import peptide_sequences_to_network_input
 from ..class1_neural_network import Class1NeuralNetwork
 from ..common import (
-    add_debug_arg,
-    add_max_epochs_arg,
-    add_out_models_dir_arg,
-    add_verbosity_arg,
-    add_random_seed_arg,
     canonicalize_allele_series,
     configure_random_seed,
     configure_logging,
     derive_seed,
     install_sigusr1_stack_trace_handler,
     normalize_allele_name,
-    positive_int_arg,
     write_generate_sh,
 )
 from ..parallelism import (
-    add_local_parallelism_args,
     apply_resolved_training_hyperparameters_to_work_items,
     call_wrapped_kwargs,
     refine_local_parallelism_from_worker_context,
@@ -73,12 +65,11 @@ from ..pytorch_sizing import (
     end_peak_memory_measurement,
     release_unused_torch_memory,
 )
-from ..cluster_parallelism import (
-    add_cluster_parallelism_args,
-    cluster_results_from_args)
+from ..cluster_parallelism import cluster_results_from_args
 from ..allele_encoding import AlleleEncoding
 from ..encodable_sequences import EncodableSequences
 from ..regression_target import from_ic50
+from .parsers import make_train_pan_allele_models_parser
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
@@ -143,84 +134,7 @@ def _log_process_telemetry(marker):
         f"rss_mb={rss_field} num_fds={fd_field}"
     )
 
-parser = argparse.ArgumentParser(usage=__doc__)
-parser.add_argument(
-    "--reuse-folds", action="store_true",
-    help="Use existing fold_0..N columns instead of generating new folds.")
-
-parser.add_argument(
-    "--data",
-    metavar="FILE.csv",
-    help=(
-        "Training data CSV. Expected columns: "
-        "allele, peptide, measurement_value"))
-parser.add_argument(
-    "--pretrain-data",
-    metavar="FILE.csv",
-    help=(
-        "Pre-training data CSV. Expected columns: "
-        "allele, peptide, measurement_value"))
-add_out_models_dir_arg(
-    parser, help="Directory to write models and manifest")
-parser.add_argument(
-    "--hyperparameters",
-    metavar="FILE.json",
-    help="JSON or YAML of hyperparameters")
-parser.add_argument(
-    "--held-out-measurements-per-allele-fraction-and-max",
-    type=float,
-    metavar="X",
-    nargs=2,
-    default=[0.25, 100],
-    help="Fraction of measurements per allele to hold out, and maximum number")
-parser.add_argument(
-    "--ignore-inequalities",
-    action="store_true",
-    default=False,
-    help="Do not use affinity value inequalities even when present in data")
-parser.add_argument(
-    "--num-folds",
-    type=positive_int_arg,
-    default=4,
-    metavar="N",
-    help="Number of training folds.")
-parser.add_argument(
-    "--num-replicates",
-    type=positive_int_arg,
-    metavar="N",
-    default=1,
-    help="Number of replicates per (architecture, fold) pair to train.")
-add_random_seed_arg(parser)
-add_max_epochs_arg(parser)
-parser.add_argument(
-    "--allele-sequences",
-    metavar="FILE.csv",
-    help="Allele sequences file.")
-add_verbosity_arg(parser)
-add_debug_arg(parser)
-parser.add_argument(
-    "--continue-incomplete",
-    action="store_true",
-    default=False,
-    help="Continue training models from an incomplete training run. If this is "
-    "specified then the only required argument is --out-models-dir")
-parser.add_argument(
-    "--only-initialize",
-    action="store_true",
-    default=False,
-    help="Do not actually train models. The initialized run can be continued "
-    "later with --continue-incomplete.")
-parser.add_argument(
-    "--save-all-checkpoints",
-    action="store_true",
-    default=False,
-    help=(
-        "Retain both terminal and minimum-validation weights for every fit. "
-        "The restore_best_weights hyperparameter still selects the primary "
-        "predictor weights."
-    ))
-add_local_parallelism_args(parser)
-add_cluster_parallelism_args(parser)
+parser = make_train_pan_allele_models_parser(usage=__doc__)
 
 
 def assign_folds(df, num_folds, held_out_fraction, held_out_max, seed=None):

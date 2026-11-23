@@ -14,7 +14,6 @@
 """
 Model select class1 single allele models.
 """
-import argparse
 import argcomplete
 import os
 import sys
@@ -32,26 +31,20 @@ import tqdm  # progress bar
 
 from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..common import (
-    add_out_models_dir_arg,
-    add_verbosity_arg,
-    add_random_seed_arg,
     configure_logging,
     configure_random_seed,
     derive_seed,
     filter_canonicalizable_alleles,
     install_sigusr1_stack_trace_handler,
-    positive_int_arg,
     normalize_allele_name,
     random_peptides,
     write_generate_sh,
 )
 from ..encodable_sequences import EncodableSequences
-from ..parallelism import (
-    add_local_parallelism_args,
-    worker_pool_with_gpu_assignments_from_args,
-)
+from ..parallelism import worker_pool_with_gpu_assignments_from_args
 from ..workload_planning import WORKLOAD_AFFINITY_SELECTION, path_size_bytes
 from ..regression_target import from_ic50
+from .parsers import make_select_allele_specific_models_parser
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
@@ -64,143 +57,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 WORKER_CONTEXT = {}
 
 
-parser = argparse.ArgumentParser(usage=__doc__)
-
-parser.add_argument(
-    "--data",
-    metavar="FILE.csv",
-    required=False,
-    help=(
-        "Model selection data CSV. Expected columns: "
-        "allele, peptide, measurement_value"))
-parser.add_argument(
-    "--exclude-data",
-    metavar="FILE.csv",
-    required=False,
-    help=(
-        "Data to EXCLUDE from model selection. Useful to specify the original "
-        "training data used"))
-parser.add_argument(
-    "--models-dir",
-    metavar="DIR",
-    required=True,
-    help="Directory to read models")
-add_out_models_dir_arg(
-    parser, help="Directory to write selected models")
-parser.add_argument(
-    "--out-unselected-predictions",
-    metavar="FILE.csv",
-    help="Write predictions for validation data using unselected predictor to "
-    "FILE.csv")
-parser.add_argument(
-    "--unselected-accuracy-scorer",
-    metavar="SCORER",
-    default="combined:mass-spec,mse")
-parser.add_argument(
-    "--unselected-accuracy-scorer-num-samples",
-    type=positive_int_arg,
-    default=1000)
-parser.add_argument(
-    "--unselected-accuracy-percentile-threshold",
-    type=float,
-    metavar="X",
-    default=95)
-parser.add_argument(
-    "--allele",
-    default=None,
-    nargs="+",
-    help="Alleles to select models for. If not specified, all alleles with "
-    "enough measurements will be used.")
-parser.add_argument(
-    "--combined-min-models",
-    type=positive_int_arg,
-    default=8,
-    metavar="N",
-    help="Min number of models to select per allele when using combined selector")
-parser.add_argument(
-    "--combined-max-models",
-    type=positive_int_arg,
-    default=1000,
-    metavar="N",
-    help="Max number of models to select per allele when using combined selector")
-parser.add_argument(
-    "--combined-min-contribution-percent",
-    type=float,
-    default=1.0,
-    metavar="X",
-    help="Use only model selectors that can contribute at least X %% to the "
-    "total score. Default: %(default)s")
-
-parser.add_argument(
-    "--mass-spec-min-measurements",
-    type=positive_int_arg,
-    metavar="N",
-    default=1,
-    help="Min number of measurements required for an allele to use mass-spec model "
-    "selection")
-parser.add_argument(
-    "--mass-spec-min-models",
-    type=positive_int_arg,
-    default=8,
-    metavar="N",
-    help="Min number of models to select per allele when using mass-spec selector")
-parser.add_argument(
-    "--mass-spec-max-models",
-    type=positive_int_arg,
-    default=1000,
-    metavar="N",
-    help="Max number of models to select per allele when using mass-spec selector")
-parser.add_argument(
-    "--mse-min-measurements",
-    type=positive_int_arg,
-    metavar="N",
-    default=1,
-    help="Min number of measurements required for an allele to use MSE model "
-    "selection")
-parser.add_argument(
-    "--mse-min-models",
-    type=positive_int_arg,
-    default=8,
-    metavar="N",
-    help="Min number of models to select per allele when using MSE selector")
-parser.add_argument(
-    "--mse-max-models",
-    type=positive_int_arg,
-    default=1000,
-    metavar="N",
-    help="Max number of models to select per allele when using MSE selector")
-parser.add_argument(
-    "--scoring",
-    nargs="+",
-    default=["mse", "consensus"],
-    help="Scoring procedures to use in order")
-parser.add_argument(
-    "--consensus-min-models",
-    type=positive_int_arg,
-    default=8,
-    metavar="N",
-    help="Min number of models to select per allele when using consensus selector")
-parser.add_argument(
-    "--consensus-max-models",
-    type=positive_int_arg,
-    default=1000,
-    metavar="N",
-    help="Max number of models to select per allele when using consensus selector")
-parser.add_argument(
-    "--consensus-num-peptides-per-length",
-    type=positive_int_arg,
-    default=10000,
-    help="Num peptides per length to use for consensus scoring")
-parser.add_argument(
-    "--mass-spec-regex",
-    metavar="REGEX",
-    default="mass[- ]spec",
-    help="Regular expression for mass-spec data. Runs on measurement_source col."
-    "Default: %(default)s.")
-add_verbosity_arg(parser)
-
-add_local_parallelism_args(parser)
-add_random_seed_arg(parser)
+parser = make_select_allele_specific_models_parser(usage=__doc__)
 
 
 def run(argv=sys.argv[1:]):

@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import argparse
 import bz2
 import json
 from pathlib import Path
@@ -16,11 +15,12 @@ from pathlib import Path
 import pandas
 
 from mhcflurry.experiment_archive import sha256_file
+from .help import HelpArgumentParser
 
 
 def make_parser(prog="mhcflurry eval merge-external-predictions"):
     """Build the external-prediction merge parser."""
-    parser = argparse.ArgumentParser(prog=prog, description=__doc__)
+    parser = HelpArgumentParser(prog=prog, description=__doc__)
     parser.add_argument(
         "--group",
         action="append",

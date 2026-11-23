@@ -14,7 +14,6 @@
 """
 Train Class1 processing models.
 """
-import argparse
 import argcomplete
 import os
 from os.path import join
@@ -44,20 +43,13 @@ from ..pytorch_sizing import (
 )
 from ..memory_budget import training_module_bytes
 from ..common import (
-    add_debug_arg,
-    add_max_epochs_arg,
-    add_out_models_dir_arg,
-    add_verbosity_arg,
-    add_random_seed_arg,
     configure_random_seed,
     configure_logging,
     derive_seed,
     install_sigusr1_stack_trace_handler,
-    positive_int_arg,
     write_generate_sh,
 )
 from ..parallelism import (
-    add_local_parallelism_args,
     refine_local_parallelism_from_worker_context,
     resolve_local_parallelism_args,
     run_single_worker_resource_probe,
@@ -67,10 +59,9 @@ from ..workload_planning import (
     WORKLOAD_PROCESSING_TRAINING,
     path_size_bytes,
 )
-from ..cluster_parallelism import (
-    add_cluster_parallelism_args,
-    cluster_results_from_args)
+from ..cluster_parallelism import cluster_results_from_args
 from ..processing_matching import validate_matched_training_data, sample_validation_mask
+from .parsers import make_train_processing_models_parser
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
@@ -89,60 +80,7 @@ _PROCESSING_WORKER_SAFETY_FACTOR = 1.3
 # When running in parallel, avoid using the neural network backend in the main
 # process. Model loading and inference should happen in worker processes.
 
-parser = argparse.ArgumentParser(usage=__doc__)
-parser.add_argument("--processing-data-policy", choices=("matched", "legacy"), default="matched",
-                    help="Require matched processing data; legacy is explicit historical replay only.")
-parser.add_argument(
-    "--reuse-folds", action="store_true",
-    help="Use existing fold_0..N columns instead of generating new folds.")
-
-parser.add_argument(
-    "--data",
-    metavar="FILE.csv",
-    help="Training data CSV. Expected columns: peptide, n_flank, c_flank, hit")
-add_out_models_dir_arg(
-    parser, help="Directory to write models and manifest")
-parser.add_argument(
-    "--hyperparameters",
-    metavar="FILE.json",
-    help="JSON or YAML of hyperparameters")
-parser.add_argument(
-    "--held-out-samples",
-    type=positive_int_arg,
-    metavar="N",
-    default=10,
-    help="Number of experiments to hold out per fold")
-parser.add_argument(
-    "--num-folds",
-    type=positive_int_arg,
-    default=4,
-    metavar="N",
-    help="Number of training folds.")
-parser.add_argument(
-    "--num-replicates",
-    type=positive_int_arg,
-    metavar="N",
-    default=1,
-    help="Number of replicates per (architecture, fold) pair to train.")
-add_random_seed_arg(parser)
-add_max_epochs_arg(parser)
-add_verbosity_arg(parser)
-add_debug_arg(parser)
-parser.add_argument(
-    "--continue-incomplete",
-    action="store_true",
-    default=False,
-    help="Continue training models from an incomplete training run. If this is "
-    "specified then the only required argument is --out-models-dir")
-parser.add_argument(
-    "--only-initialize",
-    action="store_true",
-    default=False,
-    help="Do not actually train models. The initialized run can be continued "
-    "later with --continue-incomplete.")
-
-add_local_parallelism_args(parser)
-add_cluster_parallelism_args(parser)
+parser = make_train_processing_models_parser(usage=__doc__)
 
 
 def assign_folds(df, num_folds, held_out_samples, seed=None):

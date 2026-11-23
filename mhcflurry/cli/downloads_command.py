@@ -418,7 +418,7 @@ def _status_color(text):
         return "2"
     if text in ("unknown", "differs") or "?" in text or "!" in text:
         return "33"
-    return "32"
+    return None
 
 
 _PRESENTATION_COMPONENT_DIRS = {

@@ -35,7 +35,6 @@ be added under this namespace rather than as new top-level commands.
 """
 from __future__ import annotations
 
-import argparse
 import os
 import re
 import shlex
@@ -43,18 +42,15 @@ import subprocess
 import sys
 import tempfile
 
-import pandas
-
-from ..common import positive_int_arg
-from ..common import normalize_sequence_resolved_allele_name
+from ..cli_args import positive_int_arg
+from .help import HelpArgumentParser, style_help
 
 
 def make_parser(prog="mhcflurry eval"):
     """Return the lightweight namespace parser used by docs/help tooling."""
-    parser = argparse.ArgumentParser(
+    parser = HelpArgumentParser(
         prog=prog,
         description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     sub = parser.add_subparsers(dest="eval_subcommand", required=True)
     sub.add_parser("allele-capabilities", help="Report model-bound allele execution and evidence.", add_help=False)
@@ -119,7 +115,7 @@ def run_argv(argv, prog="mhcflurry eval"):
     """Dispatch ``mhcflurry eval`` subcommands."""
     argv = list(argv)
     if not argv or argv[0] in ("-h", "--help"):
-        print(format_help(prog))
+        print(style_help(format_help(prog), sys.stdout))
         return 0
 
     subcommand = argv[0]
@@ -192,7 +188,7 @@ def _run_existing_command(module, argv, prog):
 
 def _run_paper_figures(argv, prog):
     if not argv or argv[0] in ("-h", "--help"):
-        print(_format_paper_figures_help(prog))
+        print(style_help(_format_paper_figures_help(prog), sys.stdout))
         return 0
     subcommand = argv[0]
     if subcommand == "render":
@@ -222,7 +218,7 @@ def _run_paper_figures(argv, prog):
 
 
 def _make_paper_figures_parser(prog):
-    paper_parser = argparse.ArgumentParser(prog=prog)
+    paper_parser = HelpArgumentParser(prog=prog)
     sub = paper_parser.add_subparsers(dest="paper_figures_subcommand", required=True)
     sub.add_parser("render", add_help=False)
     sub.add_parser("score-predictions", add_help=False)
@@ -252,7 +248,7 @@ def _format_paper_figures_help(prog):
 
 
 def _make_score_predictions_parser(prog):
-    parser = argparse.ArgumentParser(
+    parser = HelpArgumentParser(
         prog=prog,
         description=(
             "Derive reusable notebook-style AUC/PPV score tables from a saved "
@@ -349,7 +345,7 @@ def _run_score_predictions(args):
 
 
 def _make_external_predictors_parser(prog):
-    parser = argparse.ArgumentParser(
+    parser = HelpArgumentParser(
         prog=prog,
         description=(
             "Add external predictor columns to a canonical benchmark "
@@ -433,6 +429,8 @@ def _parse_external_predictor_spec(spec):
 
 
 def _split_benchmark_alleles(value):
+    from ..common import normalize_sequence_resolved_allele_name
+
     alleles = [
         item for item in re.split(r"[,\s]+", str(value).strip())
         if item
@@ -458,6 +456,8 @@ def _split_benchmark_alleles(value):
 
 
 def _best_external_predictor_rows(raw_df, value_field):
+    import pandas
+
     required = {"peptide", "allele", value_field}
     missing = required.difference(raw_df.columns)
     if missing:
@@ -497,6 +497,8 @@ def _run_mhctools_for_group(
 
 
 def _run_external_predictors(args):
+    import pandas
+
     if args.runner != "mhctools":
         raise ValueError("Unsupported external predictor runner: %s" % args.runner)
     predictor_specs = [
@@ -583,7 +585,7 @@ def _run_external_predictors(args):
 
 def make_paper_figures_run_parser(prog="mhcflurry eval paper-figures run"):
     """Build the ``eval paper-figures run`` parser."""
-    parser = argparse.ArgumentParser(
+    parser = HelpArgumentParser(
         prog=prog,
         description=(
             "Run the local evaluation-to-figures workflow for a trained model. "

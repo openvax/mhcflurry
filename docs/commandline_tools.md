@@ -139,9 +139,11 @@ and external-predictor comparisons.
 
 ## Release and research workflows
 
-`mhcflurry train` groups the release pipeline and research workflows used to
-produce the published models. Most need a source checkout; see
-{doc}`training` and {doc}`maintainers`.
+`mhcflurry train` groups packaged training workflow utilities (holdout
+validation, loss-curve plotting, experiment snapshots, checkpoint
+materialization, and matched processing data validation). Repository-only
+orchestration scripts live under `scripts/`; see {doc}`training` and
+{doc}`maintainers`.
 
 ```{command-output} mhcflurry train --help
 :nostderr:

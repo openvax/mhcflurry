@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import argparse
 import json
 from pathlib import Path
 
@@ -16,6 +15,7 @@ import numpy
 import pandas
 
 from mhcflurry.experiment_archive import sha256_file
+from .help import HelpArgumentParser
 
 
 BASELINE_PUBLIC_COMPARISON = "baseline-vs-public-no-additional-ms"
@@ -46,7 +46,7 @@ EXTERNAL_JOIN_COLUMNS = (
 
 def make_parser(prog="mhcflurry eval affinity-candidate-figures"):
     """Build the shortlisted-candidate figure parser."""
-    parser = argparse.ArgumentParser(prog=prog, description=__doc__)
+    parser = HelpArgumentParser(prog=prog, description=__doc__)
     parser.add_argument("--factorial-dir", required=True)
     parser.add_argument("--out", required=True)
     parser.add_argument(

@@ -15,9 +15,11 @@
 import argparse
 import sys
 
+from .help import HelpArgumentParser, style_help
+
 
 def make_parser(prog="mhcflurry train"):
-    parser = argparse.ArgumentParser(
+    parser = HelpArgumentParser(
         prog=prog,
         description=(
             "Training workflows that compose lower-level MHCflurry training "
@@ -86,12 +88,12 @@ def _format_help(prog):
 
 def run_argv(argv, prog="mhcflurry train"):
     if not argv or argv[0] in ("-h", "--help"):
-        print(_format_help(prog))
+        print(style_help(_format_help(prog), sys.stdout))
         return 0
     if argv[0] == "validate-processing-data":
         import pandas
         from ..processing_matching import validate_matched_training_data
-        validation_parser = argparse.ArgumentParser(prog=prog + " validate-processing-data")
+        validation_parser = HelpArgumentParser(prog=prog + " validate-processing-data")
         validation_parser.add_argument("--data", required=True)
         validation_args = validation_parser.parse_args(argv[1:])
         frame = pandas.read_csv(validation_args.data)

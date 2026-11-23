@@ -24,49 +24,13 @@ import subprocess
 import shutil
 from shlex import quote
 
+from .cli_args import add_cluster_parallelism_args  # noqa: F401
 from .parallelism import (
     call_wrapped_kwargs,
     configure_cluster_worker_torch_compile_threads,
 )
 from .class1_affinity_predictor import Class1AffinityPredictor
 from .common import install_sigusr1_stack_trace_handler
-
-
-def add_cluster_parallelism_args(parser):
-    """
-    Add commandline arguments controlling cluster parallelism to an argparse
-    ArgumentParser.
-
-    Parameters
-    ----------
-    parser : argparse.ArgumentParser
-    """
-    group = parser.add_argument_group("Cluster parallelism")
-    group.add_argument(
-        "--cluster-parallelism",
-        default=False,
-        action="store_true")
-    group.add_argument(
-        "--cluster-submit-command",
-        default='sh',
-        help="Default: %(default)s")
-    group.add_argument(
-        "--cluster-results-workdir",
-        default='./cluster-workdir',
-        help="Default: %(default)s")
-    group.add_argument(
-        "--additional-complete-file",
-        default='STDERR',
-        help="Additional file to monitor for job completion. Default: %(default)s")
-    group.add_argument(
-        '--cluster-script-prefix-path',
-        help="",
-    )
-    group.add_argument(
-        '--cluster-max-retries',
-        type=int,
-        help="How many times to rerun failing jobs. Default: %(default)s",
-        default=3)
 
 
 def cluster_results_from_args(

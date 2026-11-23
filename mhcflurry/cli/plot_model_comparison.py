@@ -19,7 +19,6 @@ the metric pipeline doesn't pay the matplotlib import cost.
 """
 from __future__ import annotations
 
-import argparse
 import json
 import os
 import shutil
@@ -36,6 +35,7 @@ from .figure_style import (
     SIDE_B_COLOR,
     apply_paper_style as _apply_paper_style,
 )
+from .help import HelpArgumentParser
 from .model_comparison_constants import (
     METRIC_NAMES,
     PRESENTATION_MODES,
@@ -58,9 +58,8 @@ def run_argv(argv):
 
 def make_parser():
     """Return the command's argument parser."""
-    parser = argparse.ArgumentParser(prog="mhcflurry eval plot-comparison")
+    parser = HelpArgumentParser(prog="mhcflurry eval plot-comparison")
     parser.description = __doc__
-    parser.formatter_class = argparse.RawDescriptionHelpFormatter
     parser.epilog = """
 Plotting layers:
   * This command always reads an existing compare-models directory and writes

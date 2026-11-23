@@ -2388,13 +2388,14 @@ def test_deprecated_console_script_is_silent_during_completion(
         monkeypatch, capsys):
     from mhcflurry.cli import deprecated_scripts
 
-    calls = []
+    seen_parsers = []
     monkeypatch.setattr(
-        "mhcflurry.cli.select_pan_allele_models_command.run", calls.append)
+        deprecated_scripts.argcomplete, "autocomplete", seen_parsers.append)
     monkeypatch.setattr(sys, "argv", ["mhcflurry-class1-select-pan-allele-models"])
     monkeypatch.setattr(deprecated_scripts, "is_completing", lambda: True)
     deprecated_scripts.class1_select_pan_allele_models()
-    assert calls == [[]]
+    assert len(seen_parsers) == 1
+    assert "--models-dir" in seen_parsers[0].format_help()
     assert capsys.readouterr().err == ""
 
 

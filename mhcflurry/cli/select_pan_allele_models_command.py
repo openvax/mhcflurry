@@ -19,7 +19,6 @@ APPROACH: For each training fold, we select at least min and at most max models
 step-up (forward) selection procedure. The final ensemble is the union of all
 selected models across all folds.
 """
-import argparse
 import argcomplete
 import os
 import re
@@ -37,28 +36,24 @@ from ..class1_affinity_predictor import Class1AffinityPredictor
 from ..encodable_sequences import EncodableSequences
 from ..allele_encoding import AlleleEncoding
 from ..common import (
-    add_out_models_dir_arg,
-    add_verbosity_arg,
     configure_logging,
     filter_canonicalizable_alleles,
     install_sigusr1_stack_trace_handler,
-    positive_int_arg,
     write_generate_sh,
 )
 from ..parallelism import (
     refine_local_parallelism_from_worker_context,
     resolve_local_parallelism_args,
     worker_pool_with_gpu_assignments_from_args,
-    add_local_parallelism_args)
+)
 from ..workload_planning import (
     WORKLOAD_AFFINITY_SELECTION,
     model_artifact_size_bytes,
     path_size_bytes,
 )
-from ..cluster_parallelism import (
-    add_cluster_parallelism_args,
-    cluster_results_from_args)
+from ..cluster_parallelism import cluster_results_from_args
 from ..regression_target import from_ic50, to_ic50
+from .parsers import make_select_pan_allele_models_parser
 
 tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 
@@ -71,53 +66,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 WORKER_CONTEXT = {}
 
 
-parser = argparse.ArgumentParser(usage=__doc__)
-
-parser.add_argument(
-    "--data",
-    metavar="FILE.csv",
-    required=False,
-    help=(
-        "Model selection data CSV. Expected columns: "
-        "allele, peptide, measurement_value"))
-parser.add_argument(
-    "--models-dir",
-    metavar="DIR",
-    required=True,
-    help="Directory to read models")
-add_out_models_dir_arg(
-    parser, help="Directory to write selected models")
-parser.add_argument(
-    "--min-models-per-fold",
-    type=positive_int_arg,
-    default=None,
-    metavar="N",
-    help=(
-        "Min number of models to select per fold. Default: 2, or the "
-        "requested maximum when it is smaller."))
-parser.add_argument(
-    "--max-models-per-fold",
-    type=positive_int_arg,
-    default=1000,
-    metavar="N",
-    help="Max number of models to select per fold")
-parser.add_argument(
-    "--mass-spec-regex",
-    metavar="REGEX",
-    default="mass[- ]spec",
-    help="Regular expression for mass-spec data. Runs on measurement_source col."
-    "Default: %(default)s.")
-add_verbosity_arg(parser)
-parser.add_argument(
-    "--save-validation-predictions",
-    action="store_true",
-    default=False,
-    help=(
-        "Save row-level out-of-fold predictions from the selected ensemble "
-        "as model_selection_predictions.csv.bz2."))
-
-add_local_parallelism_args(parser)
-add_cluster_parallelism_args(parser)
+parser = make_select_pan_allele_models_parser(usage=__doc__)
 
 
 def mse(

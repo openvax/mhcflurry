@@ -45,7 +45,6 @@ Produces (in ``--out``):
 
 from __future__ import annotations
 
-import argparse
 import ast
 import json
 import os
@@ -346,10 +345,11 @@ def _plot_per_fold(selected_keys, all_models, out_path):
 
 def make_parser(prog="mhcflurry train plot-loss-curves"):
     """Return the command-line parser for training-loss diagnostics."""
-    parser = argparse.ArgumentParser(
+    from .help import HelpArgumentParser
+
+    parser = HelpArgumentParser(
         prog=prog,
         description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--unselected-dir",

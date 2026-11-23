@@ -48,7 +48,6 @@ Expected locations:
 """
 from __future__ import annotations
 
-import argparse
 import logging
 from dataclasses import dataclass
 from glob import glob
@@ -239,7 +238,9 @@ def make_parser(prog=None):
     -------
     argparse.ArgumentParser
     """
-    parser = argparse.ArgumentParser(prog=prog, description=__doc__)
+    from .cli.help import HelpArgumentParser
+
+    parser = HelpArgumentParser(prog=prog, description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     filename_parser = subparsers.add_parser(
