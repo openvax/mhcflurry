@@ -29,29 +29,32 @@ offline. Update the package to obtain a newer catalogue.
 
 | Bundle | Contents and use |
 |---|---|
-| `models_class1_presentation` | Full presentation predictor, including affinity, processing, and their combiner. The normal prediction bundle. |
-| `models_class1_pan` | Selected pan-allele affinity ensemble, for standalone affinity prediction. |
-| `models_class1_processing` | Standalone processing ensembles with and without N/C flanks. |
+| `models_class1_presentation` | Full presentation predictor, including affinity, processing, and their combiner. Contains everything needed for affinity, processing, and presentation prediction. |
+| `models_class1_pan` | Optional standalone pan-allele affinity archive (same weights as `models_class1_presentation`'s `affinity_predictor`). |
+| `models_class1_processing` | Optional standalone processing archive with and without N/C flanks. In 2.3.0, its `models.selected.with_flanks` is the separate 15-residue long-flank diagnostic ensemble, not the hybrid embedded in the presentation bundle. |
 | `models_class1` | Legacy allele-specific affinity models. The name does not mean the current general-purpose class I bundle. |
 | `*_unselected` | Candidate networks before ensemble selection. |
 | `*_variants`, `*_refined`, `*_experiments1` | Historical experimental configurations. |
 | `*_with_mass_spec`, `*_no_mass_spec`, `*_minimal` | Historical training variants or smaller subsets. |
 | `data_*`, `allele_sequences`, `analysis_predictor_info`, `random_peptide_predictions`, `cross_validation_class1` | Supporting data and analyses. |
 
-The presentation bundle contains its own affinity and processing components,
-so full presentation prediction works even when the standalone bundles are
-absent. Loading a component predictor by itself behaves differently for each
-component:
+`models_class1_presentation` contains everything needed for affinity, processing,
+and presentation prediction, so users do not need to fetch the standalone
+`models_class1_pan` or `models_class1_processing` bundles for normal inference:
 
-- `Class1AffinityPredictor.load()` can fall back to the default presentation
-  bundle when standalone affinity weights are absent and no affinity-path
-  override is set.
-- `Class1ProcessingPredictor.load()` has no such fallback. Pass an embedded
-  component path explicitly, or use
-  `Class1PresentationPredictor.load().processing_predictor_with_flanks` (or
-  `processing_predictor_without_flanks`).
+- `Class1PresentationPredictor.load()` loads the presentation bundle directly.
+- `Class1AffinityPredictor.load()` falls back to the default presentation
+  bundle's `affinity_predictor` when standalone `models_class1_pan` is absent
+  and no `MHCFLURRY_DEFAULT_CLASS1_MODELS` override is set.
+- `Class1ProcessingPredictor.load()` falls back to the default presentation
+  bundle's `processing_predictor_with_flanks` when standalone
+  `models_class1_processing` is absent and no
+  `MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS_DIR` override is set. For the
+  without-flanks component, pass its embedded path explicitly or use
+  `Class1PresentationPredictor.load().processing_predictor_without_flanks`.
 
-Explicit paths and release selection retain their existing precedence.
+Explicit paths, environment overrides, and `--model-release` retain their
+existing precedence.
 
 ## Compare new and historical weights
 

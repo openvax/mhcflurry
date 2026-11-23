@@ -47,7 +47,8 @@ def setup_module():
 def run_and_check(n_jobs=0, delete=True, additional_args=None):
     if additional_args is None:
         additional_args = []
-    source_models_dir = get_path("models_class1_pan", "models.combined")
+    source_models_dir = get_path(
+        "models_class1_presentation", "models/affinity_predictor")
     dest_models_dir = tempfile.mkdtemp(prefix="mhcflurry-test-models")
 
     # Save a new predictor that has no percent rank calibration data.

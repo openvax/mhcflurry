@@ -24,7 +24,10 @@ from mhcgnomes import parse, parse_gene_class
 
 from ..class1_neural_network import Class1NeuralNetwork
 from ..common import load_weights, normalize_allele_name, save_weights
-from ..downloads import get_default_class1_models_dir
+from ..downloads import (
+    get_default_class1_models_dir,
+    get_default_class1_presentation_models_dir,
+)
 from ..percentile_calibration import load_percent_rank_transforms, save_percent_rank_transforms
 from ..pseudosequences import (
     LEGACY_ALLELE_SEQUENCES_FILENAME,
@@ -274,15 +277,17 @@ def load_predictor(
         try:
             models_dir = get_default_class1_models_dir()
         except RuntimeError as e:
-            # Fall back to the affinity predictor included in presentation
-            # predictor if possible.
-            from mhcflurry.class1_presentation_predictor import (
-                Class1PresentationPredictor)
+            # Fall back to the affinity predictor embedded in the default
+            # presentation bundle when standalone models_class1_pan is absent.
             try:
-                presentation_predictor = Class1PresentationPredictor.load()
-                return presentation_predictor.affinity_predictor
-            except RuntimeError:
+                candidate = join(
+                    get_default_class1_presentation_models_dir(),
+                    "affinity_predictor")
+            except (RuntimeError, IOError):
                 raise e
+            if not exists(join(candidate, "manifest.csv")):
+                raise e
+            models_dir = candidate
 
     if optimization_level is None:
         optimization_level = optimization_level_default
