@@ -9,11 +9,11 @@ from pathlib import Path
 import numpy
 import pandas
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import average_precision_score, roc_auc_score
 
 from mhcflurry import Class1PresentationPredictor
 from mhcflurry.common import configure_random_seed
 from mhcflurry.experiment_archive import sha256_file
+from mhcflurry.ranking_metrics import ranking_metrics
 from mhcflurry.regression_target import from_ic50, to_ic50
 
 
@@ -28,19 +28,16 @@ CONDITIONS = (
 
 
 def metric_values(targets, scores):
-    """Calculate release metrics with deterministic PPV@N ties."""
+    """Calculate release metrics with tie-invariant expected PPV@N."""
     targets = numpy.asarray(targets)
     scores = numpy.asarray(scores)
     if not numpy.isfinite(scores).all():
         raise ValueError("Non-finite score encountered")
-    num_positives = int(targets.sum())
-    if not num_positives or num_positives == len(targets):
-        return {name: numpy.nan for name in METRICS}
-    order = numpy.argsort(-scores, kind="stable")[:num_positives]
+    metrics = ranking_metrics(targets, scores)
     return {
-        "AUROC": float(roc_auc_score(targets, scores)),
-        "AUPRC": float(average_precision_score(targets, scores)),
-        "PPV@N": float(targets[order].sum()) / num_positives,
+        "AUROC": metrics["roc_auc"],
+        "AUPRC": metrics["pr_auc"],
+        "PPV@N": metrics["ppv_at_n"],
     }
 
 
