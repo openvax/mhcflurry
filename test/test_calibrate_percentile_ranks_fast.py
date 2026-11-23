@@ -43,7 +43,8 @@ from . import available_torch_accelerators
 
 def _load_downloaded_pan_allele():
     try:
-        models_dir = get_path("models_class1_pan", "models.combined")
+        models_dir = get_path(
+            "models_class1_presentation", "models/affinity_predictor")
     except Exception as exc:
         pytest.skip(f"public pan-allele models not available: {exc}")
     return Class1AffinityPredictor.load(models_dir, optimization_level=0)
@@ -323,7 +324,7 @@ def test_calibrate_fast_parity_with_legacy_path(method, monkeypatch):
 
     # Run legacy path
     legacy = Class1AffinityPredictor.load(
-        get_path("models_class1_pan", "models.combined"),
+        get_path("models_class1_presentation", "models/affinity_predictor"),
         optimization_level=0,
     )
     # Drop any existing transforms so we compare a fresh fit
@@ -418,7 +419,7 @@ def test_calibrate_fast_parity_with_motif_summary():
     )
 
     legacy = Class1AffinityPredictor.load(
-        get_path("models_class1_pan", "models.combined"),
+        get_path("models_class1_presentation", "models/affinity_predictor"),
         optimization_level=0,
     )
     legacy.allele_to_percent_rank_transform = {}
@@ -706,12 +707,11 @@ def test_processing_nn_auto_batch_matches_explicit_size():
         from mhcflurry import Class1ProcessingPredictor
     except Exception as exc:
         pytest.skip(f"mhcflurry processing predictor imports unavailable: {exc}")
-    # Public release ships multiple flank-mode variants under
-    # models_class1_processing/; pick the with-flanks flavor since
-    # the test passes explicit flanks.
+    # Load the presentation bundle's with-flanks processing predictor directly.
     try:
         models_dir = get_path(
-            "models_class1_processing", "models.selected.with_flanks",
+            "models_class1_presentation",
+            "models/processing_predictor_with_flanks",
         )
     except Exception as exc:
         pytest.skip(f"public processing predictor not available: {exc}")

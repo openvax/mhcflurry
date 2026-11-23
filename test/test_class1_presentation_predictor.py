@@ -40,14 +40,18 @@ def setup_module():
     global PRESENTATION_PREDICTOR
     startup()
     AFFINITY_PREDICTOR = Class1AffinityPredictor.load(
-        get_path("models_class1_pan", "models.combined"),
+        get_path("models_class1_presentation", "models/affinity_predictor"),
         optimization_level=0,
         max_models=1)
     CLEAVAGE_PREDICTOR = Class1ProcessingPredictor.load(
-        get_path("models_class1_processing", "models.selected.with_flanks"),
+        get_path(
+            "models_class1_presentation",
+            "models/processing_predictor_with_flanks"),
         max_models=1)
     CLEAVAGE_PREDICTOR_NO_FLANKING = Class1ProcessingPredictor.load(
-        get_path("models_class1_processing", "models.selected.no_flank"),
+        get_path(
+            "models_class1_presentation",
+            "models/processing_predictor_without_flanks"),
         max_models=1)
     PRESENTATION_PREDICTOR = Class1PresentationPredictor.load()
 

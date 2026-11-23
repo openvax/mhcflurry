@@ -226,7 +226,9 @@ def test_affinity_allele_specific_predictions_match_baseline(baseline):
 def test_affinity_pan_predictions_match_baseline(baseline):
     release = baseline["release"]
     predictions = predict_affinity(
-        get_path("models_class1_pan", "models.combined", release=release),
+        get_path(
+            "models_class1_presentation", "models/affinity_predictor",
+            release=release),
         baseline)
     for allele, expected in baseline["affinity_pan"].items():
         assert_matches_baseline(
@@ -263,9 +265,8 @@ def generate_baseline(release, inputs):
     Parameters
     ----------
     release : str
-        Download catalogue release whose ``models_class1``,
-        ``models_class1_pan`` and ``models_class1_presentation`` bundles are
-        fetched locally.
+        Download catalogue release whose ``models_class1`` and
+        ``models_class1_presentation`` bundles are fetched locally.
     inputs : dict
         Baseline inputs with ``peptides``, ``alleles``, ``n_flanks`` and
         ``c_flanks`` lists.
@@ -282,7 +283,9 @@ def generate_baseline(release, inputs):
         "affinity_allele_specific": predict_affinity(
             get_path("models_class1", "models", release=release), inputs),
         "affinity_pan": predict_affinity(
-            get_path("models_class1_pan", "models.combined", release=release),
+            get_path(
+                "models_class1_presentation", "models/affinity_predictor",
+                release=release),
             inputs),
         **predict_processing(presentation_dir, inputs),
         "presentation_score": predict_presentation(presentation_dir, inputs),

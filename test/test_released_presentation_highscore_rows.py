@@ -128,7 +128,9 @@ def test_presentation_predictions():
 
     release = expected_release()
     affinity_predictor = Class1AffinityPredictor.load(
-        get_path("models_class1_pan", "models.combined", release=release))
+        get_path(
+            "models_class1_presentation", "models/affinity_predictor",
+            release=release))
     presentation_predictor = Class1PresentationPredictor.load(
         get_path("models_class1_presentation", "models", release=release))
 

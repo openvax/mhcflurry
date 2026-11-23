@@ -41,7 +41,8 @@ def setup():
     startup()
     PREDICTORS = {
         'allele-specific': Class1AffinityPredictor.load(get_path("models_class1", "models")),
-        'pan-allele': Class1AffinityPredictor.load(get_path("models_class1_pan", "models.combined")),
+        'pan-allele': Class1AffinityPredictor.load(
+            get_path("models_class1_presentation", "models/affinity_predictor")),
     }
 
 

@@ -27,7 +27,8 @@ Usage:
       --github-release 2.3.0 \
       [--processing-variants "no_flank with_flanks [short_flanks]"] \
       [--repo /path/to/mhcflurry] [--allow-dirty-repo] \
-      [--allow-artifact-source-mismatch] [--training-package-version VERSION] \
+      [--allow-artifact-source-mismatch] [--allow-processing-with-flanks-mismatch] \
+      [--training-package-version VERSION] \
       [--date YYYYMMDD] \
       [--assets-dir /path/to/assets] \
       [--dry-run | --package-only | --draft | --publish | --mode MODE]
@@ -114,6 +115,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="${REPO:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 ALLOW_DIRTY_REPO=0
 ALLOW_ARTIFACT_SOURCE_MISMATCH=0
+ALLOW_PROCESSING_WITH_FLANKS_MISMATCH=0
 TRAINING_PACKAGE_VERSION=
 ASSET_DATE=$(date -u +%Y%m%d)
 MODE=dry-run
@@ -155,6 +157,10 @@ while [ $# -gt 0 ]; do
             ;;
         --allow-artifact-source-mismatch)
             ALLOW_ARTIFACT_SOURCE_MISMATCH=1
+            shift
+            ;;
+        --allow-processing-with-flanks-mismatch)
+            ALLOW_PROCESSING_WITH_FLANKS_MISMATCH=1
             shift
             ;;
         --training-package-version)
@@ -272,6 +278,9 @@ if [ "$ALLOW_DIRTY_REPO" = "1" ]; then
 fi
 if [ "$ALLOW_ARTIFACT_SOURCE_MISMATCH" = "1" ]; then
     PROVENANCE_ARGS+=(--allow-artifact-source-mismatch)
+fi
+if [ "$ALLOW_PROCESSING_WITH_FLANKS_MISMATCH" = "1" ]; then
+    PROVENANCE_ARGS+=(--allow-processing-with-flanks-mismatch)
 fi
 if [ -n "$TRAINING_PACKAGE_VERSION" ]; then
     PROVENANCE_ARGS+=(--training-package-version "$TRAINING_PACKAGE_VERSION")

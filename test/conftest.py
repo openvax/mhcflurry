@@ -72,7 +72,7 @@ def released_pan_allele_predictor():
     from mhcflurry import Class1AffinityPredictor
     from mhcflurry.downloads import get_path
     return Class1AffinityPredictor.load(
-        get_path("models_class1_pan", "models.combined"))
+        get_path("models_class1_presentation", "models/affinity_predictor"))
 
 
 @pytest.fixture(scope="session")
@@ -80,7 +80,7 @@ def released_pan_allele_predictor_two_models():
     from mhcflurry import Class1AffinityPredictor
     from mhcflurry.downloads import get_path
     return Class1AffinityPredictor.load(
-        get_path("models_class1_pan", "models.combined"),
+        get_path("models_class1_presentation", "models/affinity_predictor"),
         max_models=2)
 
 
