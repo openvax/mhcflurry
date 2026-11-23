@@ -63,17 +63,19 @@ Before calling a release-branch change complete, run:
 
 ```shell
 $ ./lint.sh
-$ python -m pytest test/
+$ ./test.sh
 ```
 
-If the run is unexpectedly slow, ask pytest for the slowest tests:
+`./test.sh` runs `python -m pytest test/` (or forwards any arguments directly
+to `python -m pytest`). If the run is unexpectedly slow, ask pytest for the
+slowest tests:
 
 ```shell
-$ python -m pytest -q test --durations=25 --durations-min=0.5
+$ ./test.sh -q --durations=25 --durations-min=0.5
 ```
 
-On macOS, prefer `python -m pytest` over the generated `pytest` console script
-so PyTorch can see MPS accelerators.
+On macOS, prefer `./test.sh` (`python -m pytest`) over the generated `pytest`
+console script so PyTorch can see MPS accelerators.
 
 Tests default to CPU; accelerator-specific cases opt in explicitly. Set
 `MHCFLURRY_TEST_ACCELERATORS=mps` (or `gpu` for CUDA) to require that coverage

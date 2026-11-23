@@ -31,7 +31,7 @@ jobs:
           cache-dependency-path: |
             requirements.txt
             docs/requirements.txt
-            setup.py
+            pyproject.toml
 
       - name: Install system dependencies
         run: |
@@ -44,6 +44,7 @@ jobs:
           # wrappers cheaply. ``bash -n`` parses without executing.
           set -e
           mapfile -t shell_scripts < <(find scripts -type f -name "*.sh")
+          shell_scripts=(develop.sh lint.sh test.sh "${shell_scripts[@]}")
           for script in "${shell_scripts[@]}"; do
               echo "bash -n $script"
               bash -n "$script"

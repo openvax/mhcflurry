@@ -180,7 +180,7 @@ def validate_local_release_source(repo, environ=os.environ):
         [
             "git", "-C", str(repo), "status", "--porcelain",
             "--untracked-files=all", "--", "mhcflurry", "scripts",
-            "setup.py", "setup.cfg",
+            "pyproject.toml",
         ],
         text=True,
     ).strip()

@@ -257,7 +257,7 @@ PROCESSING_ASSET="models_class1_processing.selected.${ASSET_DATE}.tar.bz2"
 PRESENTATION_ASSET="models_class1_presentation.${ASSET_DATE}.tar.bz2"
 SHA_FILE="SHA256SUMS"
 SNIPPET_FILE="downloads.${RELEASE}.snippet.yml"
-RELEASE_NOTES_FILE="$REPO/RELEASE_NOTES_${RELEASE}.md"
+RELEASE_NOTES_FILE="$REPO/release-notes/${RELEASE}.md"
 
 require_command tar
 require_command python3

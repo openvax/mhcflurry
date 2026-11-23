@@ -432,7 +432,7 @@ def test_deploy_creates_draft_noninteractively_with_release_notes(tmp_path):
     calls = gh_log.read_text().splitlines()
     create = next(line for line in calls if line.startswith("release create "))
     assert "--notes-file " in create
-    assert "RELEASE_NOTES_%s.md" % __version__ in create
+    assert "release-notes/%s.md" % __version__ in create
     assert create.startswith("release create %s --draft --title " % __version__)
     assert any(line.startswith("release upload %s " % __version__) for line in calls)
 
@@ -2332,24 +2332,11 @@ def test_unknown_subcommand_errors():
         parser.parse_args(["does-not-exist"])
 
 
-def _setup_console_scripts():
-    import ast
-
-    tree = ast.parse(
-        (pathlib.Path(__file__).resolve().parents[1] / "setup.py").read_text())
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Dict):
-            for key, value in zip(node.keys, node.values):
-                if isinstance(key, ast.Constant) and key.value == "console_scripts":
-                    return dict(
-                        (part.strip() for part in spec.split("=", 1))
-                        for spec in ast.literal_eval(value))
-    raise AssertionError("setup.py declares no console_scripts")
-
-
 def test_hyphenated_console_scripts_are_deprecated_except_predict_and_downloads():
+    from .test_packaging import declared_console_scripts
+
     scripts = {
-        name: target for name, target in _setup_console_scripts().items()
+        name: target for name, target in declared_console_scripts().items()
         if name.startswith("mhcflurry-")
     }
     kept = {"mhcflurry-downloads", "mhcflurry-predict", "mhcflurry-predict-scan"}

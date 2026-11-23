@@ -14,7 +14,7 @@
 
 import json
 import re
-import runpy
+import tomllib
 from pathlib import Path
 
 import setuptools
@@ -22,6 +22,20 @@ from packaging.requirements import Requirement
 from packaging.version import Version
 
 from mhcflurry.version import __version__
+
+REPO_DIR = Path(__file__).resolve().parents[1]
+
+
+def load_pyproject():
+    """Load the repository's ``pyproject.toml``."""
+    return tomllib.loads((REPO_DIR / "pyproject.toml").read_text(encoding="utf-8"))
+
+
+def declared_console_scripts():
+    """Return the console scripts declared in ``pyproject.toml``."""
+    scripts = load_pyproject().get("project", {}).get("scripts", {})
+    assert scripts, "pyproject.toml declares no [project.scripts]"
+    return dict(scripts)
 
 
 def test_install_guidance_targets_current_stable_series():
@@ -63,23 +77,24 @@ def test_install_guidance_targets_current_stable_series():
     assert "mhcflurry-downloads --quiet fetch models_class1_presentation" in source
 
 
-def test_setup_packages_cli_subpackage(monkeypatch):
-    captured = {}
-    repo_dir = Path(__file__).resolve().parents[1]
-
-    def fake_setup(**kwargs):
-        captured.update(kwargs)
-
-    monkeypatch.chdir(repo_dir)
-    monkeypatch.setattr(setuptools, "setup", fake_setup)
-    runpy.run_path(str(repo_dir / "setup.py"), run_name="__main__")
-
-    packages = captured["packages"]
+def test_pyproject_packages_cli_subpackage():
+    pyproject = load_pyproject()
+    find_config = pyproject["tool"]["setuptools"]["packages"]["find"]
+    packages = setuptools.find_packages(
+        where=str(REPO_DIR),
+        include=find_config["include"],
+        exclude=find_config.get("exclude", []),
+    )
     assert "mhcflurry" in packages
     assert "mhcflurry.cli" in packages
     # Guard against ``find_packages()`` picking up the repo's ``test`` dir
     # (it has an ``__init__.py``) and shipping it as a top-level package.
     assert not any(
         p == "test" or p.startswith("test.") for p in packages
-    ), "setup.py must not ship the test package: %r" % packages
-    assert "matplotlib" in captured["install_requires"]
+    ), "pyproject.toml must not ship the test package: %r" % packages
+    assert "matplotlib" in pyproject["project"]["dependencies"]
+    assert "downloads.yml" in pyproject["tool"]["setuptools"]["package-data"]["mhcflurry"]
+    assert (
+        pyproject["tool"]["setuptools"]["dynamic"]["version"]["attr"]
+        == "mhcflurry.version.__version__"
+    )
