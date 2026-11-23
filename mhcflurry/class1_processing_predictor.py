@@ -27,7 +27,10 @@ from .version import __version__
 from .model_provenance import write_info_txt
 from .pytorch_sizing import DEFAULT_PREDICT_BATCH_SIZE
 from .flanking_encoding import FlankingEncoding
-from .downloads import get_default_class1_processing_models_dir
+from .downloads import (
+    get_default_class1_presentation_models_dir,
+    get_default_class1_processing_models_dir,
+)
 from .class1_processing_neural_network import Class1ProcessingNeuralNetwork
 from .common import save_weights, load_weights, NumpyJSONEncoder
 from .percentile_calibration import (
@@ -578,7 +581,21 @@ class Class1ProcessingPredictor(object):
         `Class1ProcessingPredictor` instance
         """
         if models_dir is None:
-            models_dir = get_default_class1_processing_models_dir()
+            try:
+                models_dir = get_default_class1_processing_models_dir()
+            except RuntimeError as e:
+                # Fall back to the with-flanks processing predictor embedded in
+                # the default presentation bundle when standalone
+                # models_class1_processing is absent.
+                try:
+                    candidate = join(
+                        get_default_class1_presentation_models_dir(),
+                        "processing_predictor_with_flanks")
+                except (RuntimeError, IOError):
+                    raise e
+                if not exists(join(candidate, "manifest.csv")):
+                    raise e
+                models_dir = candidate
 
         manifest_path = join(models_dir, "manifest.csv")
         manifest_df = pandas.read_csv(manifest_path, nrows=max_models)

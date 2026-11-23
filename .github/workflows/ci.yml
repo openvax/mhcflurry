@@ -72,10 +72,10 @@ jobs:
 
       - name: Download data and models
         run: |
-          mhcflurry-downloads fetch data_curated data_mass_spec_annotated models_class1 models_class1_presentation models_class1_processing models_class1_pan allele_sequences
+          mhcflurry-downloads fetch data_curated data_mass_spec_annotated models_class1 models_class1_presentation allele_sequences
           # Fixtures recorded from the 2020 public weights load catalogue
           # 2.2.0 explicitly.
-          mhcflurry-downloads fetch --release 2.2.0 models_class1 models_class1_pan models_class1_presentation
+          mhcflurry-downloads fetch --release 2.2.0 models_class1 models_class1_presentation
 
       - name: Test with pytest
         run: |

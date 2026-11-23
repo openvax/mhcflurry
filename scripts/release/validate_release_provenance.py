@@ -14,6 +14,7 @@
 """Validate and record source/model provenance for a release workflow."""
 
 import argparse
+import csv
 import datetime
 import hashlib
 import json
@@ -270,11 +271,87 @@ def collect_artifact_provenance(
     return artifact_provenance
 
 
+def _manifest_weight_hashes(model_dir):
+    """Return ``{model_name: sha256}`` for all models listed in manifest.csv."""
+    model_dir = pathlib.Path(model_dir)
+    manifest_path = model_dir / "manifest.csv"
+    hashes = {}
+    with manifest_path.open("r", newline="") as fd:
+        reader = csv.DictReader(fd)
+        if not reader.fieldnames or "model_name" not in reader.fieldnames:
+            raise ValueError("Missing model_name column in %s" % manifest_path)
+        for row in reader:
+            model_name = (row.get("model_name") or "").strip()
+            if not model_name:
+                continue
+            weights_path = model_dir / ("weights_%s.npz" % model_name)
+            if not weights_path.is_file():
+                raise ValueError(
+                    "Missing weight file referenced by %s: %s" % (
+                        manifest_path, weights_path))
+            hashes[model_name] = sha256(weights_path)
+    return hashes
+
+
+def validate_presentation_component_weights(
+        run_dir, allow_processing_with_flanks_mismatch=False):
+    """Verify embedded presentation components match standalone exports.
+
+    Checks every component pair where both the standalone model directory and
+    the embedded directory under ``presentation/models/`` have a
+    ``manifest.csv``. Raises ``ValueError`` on weight-hash mismatch unless
+    ``allow_processing_with_flanks_mismatch`` explicitly permits a distinct
+    ``processing.with_flanks`` diagnostic ensemble.
+    """
+    run_dir = pathlib.Path(run_dir).resolve()
+    presentation_dir = run_dir / "presentation" / "models"
+    pairs = (
+        (
+            "affinity",
+            run_dir / "affinity" / "models.combined",
+            presentation_dir / "affinity_predictor",
+        ),
+        (
+            "processing.no_flank",
+            run_dir / "processing" / "models.selected.no_flank",
+            presentation_dir / "processing_predictor_without_flanks",
+        ),
+        (
+            "processing.with_flanks",
+            run_dir / "processing" / "models.selected.with_flanks",
+            presentation_dir / "processing_predictor_with_flanks",
+        ),
+    )
+    results = {}
+    for role, standalone_dir, embedded_dir in pairs:
+        if not ((standalone_dir / "manifest.csv").is_file() and
+                (embedded_dir / "manifest.csv").is_file()):
+            continue
+        standalone_hashes = _manifest_weight_hashes(standalone_dir)
+        embedded_hashes = _manifest_weight_hashes(embedded_dir)
+        matches = standalone_hashes == embedded_hashes
+        if not matches and not (
+                role == "processing.with_flanks" and
+                allow_processing_with_flanks_mismatch):
+            raise ValueError(
+                "Presentation embedded %s weights do not match standalone "
+                "weights (%s vs %s)" % (role, embedded_dir, standalone_dir))
+        results[role] = {
+            "matches": matches,
+            "standalone_models": len(standalone_hashes),
+            "embedded_models": len(embedded_hashes),
+        }
+        if not matches:
+            results[role]["allowed_mismatch"] = True
+    return results
+
+
 def collect_provenance(
         repo, run_dir, release, workflow_id="", processing_variants=(),
         require_artifacts=False, allow_dirty_repo=False,
         expected_artifact_workflow_id="",
-        allow_artifact_source_mismatch=False, training_package_version=""):
+        allow_artifact_source_mismatch=False, training_package_version="",
+        allow_processing_with_flanks_mismatch=False):
     """Validate release identity and return serializable provenance."""
     repo = pathlib.Path(repo).resolve()
     run_dir = pathlib.Path(run_dir).resolve()
@@ -325,8 +402,15 @@ def collect_provenance(
         }
     holdout_provenance = collect_holdout_provenance(
         run_dir, require_artifacts=require_artifacts)
+    component_weights = (
+        validate_presentation_component_weights(
+            run_dir,
+            allow_processing_with_flanks_mismatch=(
+                allow_processing_with_flanks_mismatch))
+        if require_artifacts else {}
+    )
 
-    return {
+    result = {
         "schema_version": 2,
         "recorded_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "release": release,
@@ -342,6 +426,9 @@ def collect_provenance(
         "artifacts": artifact_provenance,
         "release_holdout": holdout_provenance,
     }
+    if component_weights:
+        result["presentation_component_weights"] = component_weights
+    return result
 
 
 def make_parser():
@@ -369,6 +456,16 @@ def make_parser():
             "Permit a postprocess/deploy checkout newer than the model-training "
             "commit while still requiring all model artifacts to agree on "
             "their recorded commit and workflow."
+        ),
+    )
+    parser.add_argument(
+        "--allow-processing-with-flanks-mismatch",
+        action="store_true",
+        help=(
+            "Permit presentation's embedded processing_predictor_with_flanks "
+            "to differ from standalone processing/models.selected.with_flanks "
+            "(e.g. when presentation embeds a hybrid ensemble and standalone "
+            "ships a separate long-flank diagnostic grid)."
         ),
     )
     parser.add_argument("--out")
@@ -436,6 +533,8 @@ def main(argv=None):
                 allow_artifact_source_mismatch=(
                     args.allow_artifact_source_mismatch),
                 training_package_version=args.training_package_version,
+                allow_processing_with_flanks_mismatch=(
+                    args.allow_processing_with_flanks_mismatch),
             )
     except (OSError, RuntimeError, ValueError) as error:
         raise SystemExit("ERROR: %s" % error) from error

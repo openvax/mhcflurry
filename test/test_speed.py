@@ -47,7 +47,7 @@ def setup_module():
         get_path("models_class1", "models"))
 
     PAN_ALLELE_PREDICTOR = Class1AffinityPredictor.load(
-        get_path("models_class1_pan", "models.combined"))
+        get_path("models_class1_presentation", "models/affinity_predictor"))
 
 
 def teardown_module():
@@ -63,7 +63,8 @@ DEFAULT_NUM_PREDICTIONS = 10000
 def load_predictors():
     return {
         'allele_specific': Class1AffinityPredictor.load(get_path("models_class1", "models")),
-        'pan_allele': Class1AffinityPredictor.load(get_path("models_class1_pan", "models.combined")),
+        'pan_allele': Class1AffinityPredictor.load(
+            get_path("models_class1_presentation", "models/affinity_predictor")),
     }
 
 

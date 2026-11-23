@@ -834,15 +834,15 @@ bundles:
   models_class1_presentation:
     kind: models
     group: Prediction models
-    description: Full presentation predictor, including affinity and processing components.
+    description: Full presentation predictor, including affinity and processing components (all that is needed for inference).
   models_class1_pan:
     kind: models
     group: Prediction models
-    description: Selected pan-allele binding-affinity ensemble; no presentation combiner.
+    description: Optional standalone pan-allele binding-affinity archive (same weights as the presentation bundle's affinity_predictor).
   models_class1_processing:
     kind: models
     group: Prediction models
-    description: Standalone antigen-processing ensembles with and without N/C flanks.
+    description: Optional standalone antigen-processing archive with and without N/C flanks (in 2.3.0, includes the separate 15-aa long-flank diagnostic ensemble).
   models_class1_pan_unselected:
     kind: models
     group: Historical experiments

@@ -27,7 +27,7 @@ def setup_module():
     global PAN_ALLELE_PREDICTOR
     startup()
     PAN_ALLELE_PREDICTOR = Class1AffinityPredictor.load(
-        get_path("models_class1_pan", "models.combined"),
+        get_path("models_class1_presentation", "models/affinity_predictor"),
         optimization_level=0,)
 
 

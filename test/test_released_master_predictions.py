@@ -76,7 +76,7 @@ def test_pan_allele_affinity_predictions():
 
     predictor = Class1AffinityPredictor.load(
         get_path(
-            "models_class1_pan", "models.combined",
+            "models_class1_presentation", "models/affinity_predictor",
             release=fixture["release"]))
 
     predictions = predictor.predict(

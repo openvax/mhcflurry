@@ -676,8 +676,9 @@ def info_subcommand(args):
                 print('  when its standalone path is absent and no affinity-path override is set.')
                 print('  Browsing does not select weights; use --models DIR or --model-release RELEASE.')
             elif record['name'] == 'models_class1_processing':
-                print('  Use these paths explicitly to select embedded processing components.')
-                print('  Standalone processing loading does not fall back to presentation.')
+                print('  Default processing loading can fall back to the default presentation bundle')
+                print('  (with-flanks component) when its standalone path is absent and no')
+                print('  processing-path override is set. Pass a path explicitly for without-flanks.')
             else:
                 print('  Presentation loading uses these embedded components.')
             source = record['presentation_components'][0]['source_matches']
@@ -722,8 +723,8 @@ def info_subcommand(args):
         _heading("Default prediction paths (before --models / --model-release)")
         for kind, item in config['default_model_paths'].items():
             print("  %s: %s [%s]" % (kind, item['path'], 'exists' if item['exists'] else 'not installed'))
-        print('  Affinity can fall back to presentation when its default standalone path is absent')
-        print('  and no affinity-path override is set. Standalone processing has no such fallback.')
+        print('  Affinity and processing can fall back to the default presentation bundle when')
+        print('  their default standalone paths are absent and no path override is set.')
         _heading('Components inside default presentation predictor')
         _print_presentation_components(config['default_presentation_components'])
     overrides = {key: value for key, value in config['environment_overrides'].items()

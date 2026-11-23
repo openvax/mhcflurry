@@ -45,14 +45,13 @@ $ python -m pytest -q test/test_train_pan_allele_models_command.py::test_pretrai
 CI tests the current download catalogue (`current-release` in
 `mhcflurry/downloads.yml`). Fixtures recorded from the 2020 public weights
 (catalogue `2.2.0`) load that catalogue explicitly, so CI also fetches its
-three model bundles. Fetch the same bundles before running the full suite
+model bundles. Fetch the same bundles before running the full suite
 locally, with `MHCFLURRY_DOWNLOADS_CURRENT_RELEASE` unset:
 
 ```shell
 mhcflurry downloads fetch data_curated data_mass_spec_annotated models_class1 \
-    models_class1_presentation models_class1_processing models_class1_pan allele_sequences
-mhcflurry downloads fetch --release 2.2.0 models_class1 models_class1_pan \
-    models_class1_presentation
+    models_class1_presentation allele_sequences
+mhcflurry downloads fetch --release 2.2.0 models_class1 models_class1_presentation
 ```
 
 A test whose expected values come from particular weights names their

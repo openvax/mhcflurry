@@ -476,15 +476,21 @@ def _resolve_side(letter, spec, label, args):
 def _public_path_for_role(role, release_pin):
     """Resolve a public-install models dir for ``role`` if available."""
     from .. import downloads
-    role_to_download = {
-        "affinity": ("models_class1_pan", "models.combined"),
+    role_to_downloads = {
+        "affinity": (
+            ("models_class1_pan", "models.combined"),
+            ("models_class1_presentation", "models/affinity_predictor"),
+        ),
         "processing": (
-            "models_class1_processing", ""),
-        "presentation": ("models_class1_presentation", "models"),
-        "training": (None, None),
+            ("models_class1_processing", ""),
+        ),
+        "presentation": (
+            ("models_class1_presentation", "models"),
+        ),
+        "training": (),
     }
-    download_name, sub = role_to_download.get(role, (None, None))
-    if download_name is None:
+    candidates = role_to_downloads.get(role, ())
+    if not candidates:
         return None
     release_env = "MHCFLURRY_DOWNLOADS_CURRENT_RELEASE"
     missing = object()
@@ -497,10 +503,11 @@ def _public_path_for_role(role, release_pin):
             except KeyError:
                 # Unknown release name — no path resolvable for any role.
                 return None
-        return downloads.get_path(download_name, sub)
-    except (RuntimeError, OSError, TypeError):
-        # No downloads installed (TypeError when downloads dir is None) or
-        # the specific archive isn't present (RuntimeError from get_path).
+        for download_name, sub in candidates:
+            try:
+                return downloads.get_path(download_name, sub)
+            except (RuntimeError, OSError, TypeError):
+                continue
         return None
     finally:
         if release_pin is not None:

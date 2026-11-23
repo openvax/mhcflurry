@@ -370,3 +370,78 @@ def test_packaging_preserves_explicit_original_training_version(tmp_path):
     with pytest.raises(ValueError, match="does not match explicit"):
         module.collect_provenance(
             **kwargs, training_package_version=f"{other_major}.0.0rc2")
+
+
+def test_validate_presentation_component_weights_catches_mismatch(tmp_path):
+    module = load_module()
+    write_model_info(tmp_path, PACKAGE_VERSION)
+    write_holdout_proof(tmp_path)
+
+    def write_component(path, content):
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "manifest.csv").write_text("model_name\nm0\n")
+        (path / "weights_m0.npz").write_bytes(content)
+
+    write_component(tmp_path / "affinity" / "models.combined", b"aff-weights")
+    write_component(
+        tmp_path / "presentation" / "models" / "affinity_predictor",
+        b"aff-weights")
+    write_component(
+        tmp_path / "processing" / "models.selected.no_flank", b"no-flank")
+    write_component(
+        tmp_path / "presentation" / "models" /
+        "processing_predictor_without_flanks", b"no-flank")
+    write_component(
+        tmp_path / "processing" / "models.selected.with_flanks", b"long-flank")
+    write_component(
+        tmp_path / "presentation" / "models" /
+        "processing_predictor_with_flanks", b"long-flank")
+
+    result = module.collect_provenance(
+        repo=REPO,
+        run_dir=tmp_path,
+        release=RELEASE_VERSION,
+        processing_variants=["with_flanks"],
+        require_artifacts=True,
+        allow_dirty_repo=True,
+    )
+    assert result["presentation_component_weights"]["affinity"]["matches"] is True
+    assert result["presentation_component_weights"]["processing.with_flanks"]["matches"] is True
+
+    # A mismatch in with-flanks fails unless explicitly opted in.
+    (tmp_path / "presentation" / "models" /
+     "processing_predictor_with_flanks" / "weights_m0.npz").write_bytes(b"hybrid")
+    with pytest.raises(ValueError, match="processing.with_flanks weights do not match"):
+        module.collect_provenance(
+            repo=REPO,
+            run_dir=tmp_path,
+            release=RELEASE_VERSION,
+            processing_variants=["with_flanks"],
+            require_artifacts=True,
+            allow_dirty_repo=True,
+        )
+    allowed = module.collect_provenance(
+        repo=REPO,
+        run_dir=tmp_path,
+        release=RELEASE_VERSION,
+        processing_variants=["with_flanks"],
+        require_artifacts=True,
+        allow_dirty_repo=True,
+        allow_processing_with_flanks_mismatch=True,
+    )
+    assert allowed["presentation_component_weights"]["processing.with_flanks"][
+        "allowed_mismatch"] is True
+
+    # Affinity mismatches are never permitted.
+    (tmp_path / "presentation" / "models" /
+     "affinity_predictor" / "weights_m0.npz").write_bytes(b"different-aff")
+    with pytest.raises(ValueError, match="affinity weights do not match"):
+        module.collect_provenance(
+            repo=REPO,
+            run_dir=tmp_path,
+            release=RELEASE_VERSION,
+            processing_variants=["with_flanks"],
+            require_artifacts=True,
+            allow_dirty_repo=True,
+            allow_processing_with_flanks_mismatch=True,
+        )

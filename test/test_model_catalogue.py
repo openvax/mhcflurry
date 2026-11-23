@@ -169,7 +169,7 @@ def test_model_table_checks_embedded_component_directories(versioned_cache, caps
     text = capsys.readouterr().out
     assert str(models / 'processing_predictor_with_flanks') + ' [missing manifest]' in text
     assert str(models / 'processing_predictor_without_flanks') + ' [not installed]' in text
-    assert 'Standalone processing loading does not fall back' in text
+    assert 'Default processing loading can fall back to the default presentation bundle' in text
 
     component_manifest(models / 'affinity_predictor')
     component_manifest(models / 'processing_predictor_with_flanks')
@@ -286,7 +286,7 @@ def test_component_details_follow_browsed_release_not_default_override(
     downloads_command.run(['--verbose', 'info'])
     text = capsys.readouterr().out
     assert str(custom / 'affinity_predictor') in text
-    assert 'no affinity-path override' in text
+    assert 'no path override is set' in text
 
 
 @pytest.mark.parametrize('environment', [{}, {'NO_COLOR': '1'}, {'TERM': 'dumb'}])
@@ -421,3 +421,76 @@ def test_prediction_loads_selected_release(module, versioned_cache, monkeypatch,
     module.run(['--model-release', '2.2.0', '--list-supported-alleles'])
     assert seen == [str(path)]
     assert capsys.readouterr().out.strip() == 'test-allele'
+
+
+def test_default_affinity_and_processing_load_fall_back_to_presentation(
+        versioned_cache, monkeypatch):
+    from mhcflurry import Class1AffinityPredictor, Class1ProcessingPredictor
+    from mhcflurry.class1_neural_network import Class1NeuralNetwork
+    from mhcflurry.class1_processing_neural_network import (
+        Class1ProcessingNeuralNetwork)
+    from mhcflurry.cli import compare_models
+    from mhcflurry.flanking_encoding import FlankingEncoding
+
+    monkeypatch.setattr(downloads, '_MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR', None)
+    monkeypatch.setattr(
+        downloads, '_MHCFLURRY_DEFAULT_CLASS1_PRESENTATION_MODELS_DIR', None)
+    monkeypatch.setattr(
+        downloads, '_MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS_DIR', None)
+
+    presentation_models = versioned_cache / '2.3.0' / BUNDLE / 'models'
+    presentation_models.mkdir(parents=True)
+    affinity_dir = presentation_models / 'affinity_predictor'
+    processing_dir = presentation_models / 'processing_predictor_with_flanks'
+
+    # Save minimal real predictors into the presentation bundle only (no
+    # standalone models_class1_pan or models_class1_processing directories).
+    affinity_net = Class1NeuralNetwork(
+        layer_sizes=[4], max_epochs=1, validation_split=0.0)
+    affinity_net.fit(
+        peptides=['SIINFEKL', 'NLVPMVATV'],
+        affinities=[50.0, 5000.0],
+        verbose=0)
+    Class1AffinityPredictor(
+        allele_to_allele_specific_models={
+            'HLA-A*02:01': [affinity_net, affinity_net],
+        },
+    ).save(str(affinity_dir))
+
+    proc_net = Class1ProcessingNeuralNetwork(
+        n_flank_length=5, c_flank_length=5, convolutional_filters=2,
+        convolutional_kernel_size=3, max_epochs=1, early_stopping=False)
+    proc_net.fit(
+        sequences=FlankingEncoding(
+            ['SIINFEKL', 'NLVPMVATV'], ['AAAAA', 'CCCCC'], ['GGGGG', 'TTTTT']),
+        targets=[1.0, 0.0],
+        verbose=0)
+    Class1ProcessingPredictor(models=[proc_net, proc_net]).save(str(processing_dir))
+
+    # Default load() resolves both affinity and processing from the presentation
+    # bundle and honors max_models.
+    loaded_affinity = Class1AffinityPredictor.load(max_models=1)
+    assert len(loaded_affinity.allele_to_allele_specific_models['HLA-A*02:01']) == 1
+    loaded_processing = Class1ProcessingPredictor.load(max_models=1)
+    assert len(loaded_processing.models) == 1
+    assert compare_models._public_path_for_role('affinity', None) == str(affinity_dir)
+
+    # Standalone directories take precedence when present.
+    standalone_processing = (
+        versioned_cache / '2.3.0' / 'models_class1_processing' /
+        'models.selected.with_flanks')
+    standalone_processing.parent.mkdir(parents=True)
+    Class1ProcessingPredictor(models=[proc_net]).save(str(standalone_processing))
+    assert len(Class1ProcessingPredictor.load().models) == 1
+
+    # Explicit environment overrides never silently fall back.
+    monkeypatch.setattr(
+        downloads, '_MHCFLURRY_DEFAULT_CLASS1_PROCESSING_MODELS_DIR',
+        str(versioned_cache / 'missing-override'))
+    with pytest.raises(IOError, match='No such directory'):
+        Class1ProcessingPredictor.load()
+    monkeypatch.setattr(
+        downloads, '_MHCFLURRY_DEFAULT_CLASS1_MODELS_DIR',
+        str(versioned_cache / 'missing-affinity-override'))
+    with pytest.raises(IOError, match='No such directory'):
+        Class1AffinityPredictor.load()
