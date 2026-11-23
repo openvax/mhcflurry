@@ -42,6 +42,7 @@ from .figure_style import (
     short_label as _short_label,
 )
 from .help import HelpArgumentParser
+from ..cli_args import add_out_arg
 from ..common import allele_locus_name, positive_int_arg
 
 
@@ -195,8 +196,8 @@ missing_inputs.md instead of being silently fabricated.
             "accuracy_scores.monoallelic.csv is absent."
         ),
     )
-    parser.add_argument(
-        "--out",
+    add_out_arg(
+        parser,
         required=True,
         help="Output directory for paper figures and manifest files.",
     )

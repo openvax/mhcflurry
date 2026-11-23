@@ -152,6 +152,63 @@ def add_out_models_dir_arg(parser, help):
         help=help)
 
 
+def add_data_arg(parser, help=None, *, required=False, metavar="FILE.csv"):
+    """Add the standard ``--data`` argument to a CLI parser."""
+    kwargs = {"metavar": metavar, "required": required}
+    if help is not None:
+        kwargs["help"] = help
+    parser.add_argument("--data", **kwargs)
+
+
+def add_models_dir_arg(parser, help=None, *, required=True, metavar="DIR"):
+    """Add the standard ``--models-dir`` argument to a CLI parser."""
+    kwargs = {"metavar": metavar, "required": required}
+    if help is not None:
+        kwargs["help"] = help
+    parser.add_argument("--models-dir", **kwargs)
+
+
+def add_hyperparameters_arg(
+        parser, help=None, *, required=False, metavar="FILE.json"):
+    """Add the standard ``--hyperparameters`` argument to a CLI parser."""
+    kwargs = {"metavar": metavar, "required": required}
+    if help is not None:
+        kwargs["help"] = help
+    parser.add_argument("--hyperparameters", **kwargs)
+
+
+def add_out_arg(parser, help=None, *, required=False, metavar=None):
+    """Add the standard ``--out`` argument to a CLI parser."""
+    kwargs = {"required": required}
+    if metavar is not None:
+        kwargs["metavar"] = metavar
+    if help is not None:
+        kwargs["help"] = help
+    parser.add_argument("--out", **kwargs)
+
+
+def add_alleles_arg(
+        parser,
+        help=None,
+        *,
+        dest="alleles",
+        required=False,
+        default=None,
+        metavar=None):
+    """Add ``--alleles`` / ``--allele`` (accepting both spellings) to a parser."""
+    kwargs = {
+        "dest": dest,
+        "nargs": "+",
+        "default": default,
+        "required": required,
+    }
+    if metavar is not None:
+        kwargs["metavar"] = metavar
+    if help is not None:
+        kwargs["help"] = help
+    parser.add_argument("--alleles", "--allele", **kwargs)
+
+
 def add_max_epochs_arg(parser):
     """Add ``--max-epochs``, which overrides the hyperparameters' ``max_epochs``.
 
