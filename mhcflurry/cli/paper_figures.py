@@ -42,8 +42,10 @@ from .figure_style import (
     short_label as _short_label,
 )
 from .help import HelpArgumentParser
+from .model_comparison_constants import path_is_within as _path_is_within
 from ..cli_args import add_out_arg
 from ..common import allele_locus_name, positive_int_arg
+from ..ranking_metrics import ranking_metrics
 
 
 CANDIDATE_PREDICTOR = "mhcflurry_production"
@@ -634,14 +636,6 @@ def _paper_figure_cleanup_input_conflicts(
     return tuple(dict.fromkeys(conflicts))
 
 
-def _path_is_within(path, directory):
-    try:
-        path.relative_to(directory)
-        return True
-    except ValueError:
-        return False
-
-
 def _resolve_figure_inputs(args, writer):
     scores_value = args.scores_dir or args.artifacts_dir
     comparison_dir = _resolve_comparison_dir(
@@ -1123,13 +1117,10 @@ def _prediction_score_columns(
 def _scores_for_prediction_group(
         group, index_column, group_value, length, length_label,
         predictor_columns, predictor_orientations=None):
-    from sklearn.metrics import average_precision_score, roc_auc_score
-
     labels = pandas.to_numeric(group["hit"], errors="coerce")
     valid_labels = labels.isin([0, 1])
     group = group.loc[valid_labels].copy()
     y_true = labels.loc[valid_labels].astype(int).values
-    tie_breaker = _prediction_tie_breaker(group)
     oriented_scores = {}
     shared_mask = numpy.ones(len(group), dtype=bool)
     for predictor in predictor_columns:
@@ -1143,45 +1134,23 @@ def _scores_for_prediction_group(
     # Otherwise an external predictor can improve its apparent AUC/PPV merely
     # by omitting unsupported or difficult rows.
     y = y_true[shared_mask]
-    ties = tie_breaker[shared_mask]
     rows = []
     for predictor in predictor_columns:
         s = oriented_scores[predictor][shared_mask]
-        if len(y) == 0 or y.sum() == 0 or y.sum() == len(y):
-            auc = numpy.nan
-            pr_auc = numpy.nan
-            ppv = numpy.nan
-        else:
-            auc = float(roc_auc_score(y, s))
-            pr_auc = float(average_precision_score(y, s))
-            ppv = _ppv_at_n(y, s, int(y.sum()), tie_breaker=ties)
+        metrics = ranking_metrics(y, s)
         rows.append({
             index_column: group_value,
             "sample_id": group_value,
             "length": length,
             "length_label": length_label,
             "predictor": predictor,
-            "n": int(len(y)),
-            "n_pos": int(y.sum()),
-            "ppv": ppv,
-            "auc": auc,
-            "pr_auc": pr_auc,
+            "n": metrics["n"],
+            "n_pos": metrics["n_pos"],
+            "ppv": metrics["ppv_at_n"],
+            "auc": metrics["roc_auc"],
+            "pr_auc": metrics["pr_auc"],
         })
     return rows
-
-
-def _prediction_tie_breaker(group):
-    identity_columns = [
-        column for column in (
-            "sample_id", "allele", "hla", "peptide", "n_flank", "c_flank",
-            "length", "peptide_len")
-        if column in group.columns
-    ]
-    if identity_columns:
-        values = pandas.util.hash_pandas_object(
-            group[identity_columns].astype(str), index=False).values
-        return values.astype("float64") / float(numpy.iinfo("uint64").max)
-    return numpy.random.default_rng(0).random(len(group))
 
 
 def _orient_prediction_score(predictor, score, predictor_orientations=None):
@@ -1197,18 +1166,6 @@ def _orient_prediction_score(predictor, score, predictor_orientations=None):
     raise ValueError(
         "No score orientation configured for predictor %s. Add it to "
         "predictor_info.csv with higher_is_better true/false." % predictor)
-
-
-def _ppv_at_n(y_true, y_score, n, tie_breaker=None):
-    if n <= 0:
-        return numpy.nan
-    y_score = numpy.asarray(y_score, dtype=float)
-    if tie_breaker is None:
-        tie_breaker = numpy.zeros(len(y_score))
-    tie_breaker = numpy.asarray(tie_breaker, dtype=float)
-    order = numpy.lexsort((tie_breaker, -y_score))
-    top = order[:n]
-    return float(numpy.asarray(y_true)[top].sum()) / float(n)
 
 
 def _add_percent_change_columns(scores, external_baselines=EXTERNAL_BASELINES):

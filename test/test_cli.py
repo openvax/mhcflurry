@@ -5746,16 +5746,30 @@ def test_paper_figures_monoallelic_scoring_prefers_allele(tmp_path):
     assert len(all_scores) == 2
 
 
-def test_paper_figures_ppv_uses_tie_breaker():
-    # File-order-stable sorting would pick the two hit rows first. The explicit
-    # tie breaker randomizes equal-score ordering deterministically.
-    ppv = paper_figures._ppv_at_n(
-        numpy.array([1, 1, 0, 0]),
-        numpy.array([0.5, 0.5, 0.5, 0.5]),
-        2,
-        tie_breaker=numpy.array([0.8, 0.9, 0.1, 0.2]),
-    )
-    assert ppv == 0.0
+def test_paper_figures_ppv_uses_expected_tie_rule(tmp_path):
+    # Paper-figures shares mhcflurry.ranking_metrics' expected-hits-within-ties
+    # rule so all-tied scores yield the exact random-tie expectation (0.5)
+    # regardless of input row order.
+    predictor_info = pandas.DataFrame([{
+        "predictor": "candidate",
+        "higher_is_better": True,
+    }]).set_index("predictor", drop=False)
+    for hits in ([1, 1, 0, 0], [0, 0, 1, 1], [1, 0, 1, 0]):
+        predictions = tmp_path / ("tied_%s.csv" % "".join(map(str, hits)))
+        pandas.DataFrame({
+            "sample_id": ["s1"] * 4,
+            "peptide": ["SIINFEKL", "NLVPMVATV", "GILGFVFTL", "SLYNTVATL"],
+            "hit": hits,
+            "candidate": [0.5, 0.5, 0.5, 0.5],
+        }).to_csv(predictions, index=False)
+        scores = paper_figures.score_saved_prediction_table(
+            predictions, kind="multiallelic", predictor_info=predictor_info)
+        all_row = scores.loc[
+            (scores["length_label"] == "All") &
+            (scores["predictor"] == "candidate")
+        ]
+        assert len(all_row) == 1
+        assert all_row.iloc[0]["ppv"] == 0.5
 
 
 def test_paper_figures_resolves_run_dir_for_named_comparison_dir(tmp_path):
