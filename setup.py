@@ -35,6 +35,7 @@ with open("mhcflurry/version.py", "r") as f:
 
 if __name__ == "__main__":
     required_packages = [
+        "datacache>=1.34.0,<2",
         "pandas>=3,<4",
         "platformdirs",
         "filelock>=3",
