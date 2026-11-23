@@ -49,7 +49,6 @@ from typing import Optional
 
 import numpy
 import pandas
-from sklearn.metrics import average_precision_score, roc_auc_score
 
 from ..experiment_archive import sha256_file
 from ..common import (
@@ -58,12 +57,15 @@ from ..common import (
     normalize_sequence_resolved_allele_name,
     positive_int_arg,
 )
+from ..ranking_metrics import ppv_at_n, ranking_metrics
 from .help import HelpArgumentParser
 from .model_comparison_constants import (
+    METRIC_DISPLAY_NAMES,
     METRIC_NAMES,
     PRESENTATION_MODES,
     PRESENTATION_SCORE_KINDS,
     PROCESSING_MODES,
+    score_values as _score_values,
 )
 from ..parallelism import (
     add_prediction_parallelism_args,
@@ -752,42 +754,10 @@ def _validate_component_configuration(args, components, side_a, side_b):
 # ---------------------------------------------------------------------------
 
 
-def _ppv_at_n(y_true, y_score, n):
-    """Expected precision among the top N, sampling uniformly within ties."""
-    if n <= 0:
-        return numpy.nan
-    y_true = numpy.asarray(y_true)
-    y_score = numpy.asarray(y_score)
-    if n > len(y_score):
-        raise ValueError("N exceeds the number of scored rows")
-    cutoff = numpy.partition(y_score, len(y_score) - n)[len(y_score) - n]
-    above = y_score > cutoff
-    tied = y_score == cutoff
-    remaining = n - int(above.sum())
-    hits = y_true[above].sum() + remaining * y_true[tied].mean()
-    return float(hits) / float(n)
-
-
-def _metrics(y_true, y_score):
-    y_true = numpy.asarray(y_true)
-    y_score = numpy.asarray(y_score)
-    mask = numpy.isfinite(y_score)
-    y_true = y_true[mask]
-    y_score = y_score[mask]
-    n_pos = int(y_true.sum())
-    n_neg = int(len(y_true) - n_pos)
-    if n_pos == 0 or n_neg == 0:
-        return dict(
-            n=int(len(y_true)), n_pos=n_pos,
-            roc_auc=numpy.nan, pr_auc=numpy.nan, ppv_at_n=numpy.nan,
-        )
-    return dict(
-        n=int(len(y_true)),
-        n_pos=n_pos,
-        roc_auc=float(roc_auc_score(y_true, y_score)),
-        pr_auc=float(average_precision_score(y_true, y_score)),
-        ppv_at_n=_ppv_at_n(y_true, y_score, n_pos),
-    )
+# Compatibility aliases; canonical implementations live in
+# ``mhcflurry.ranking_metrics``.
+_ppv_at_n = ppv_at_n
+_metrics = ranking_metrics
 
 
 def _require_binary_comparison_rows(df, context, require_both_classes=True):
@@ -2026,21 +1996,6 @@ def _normalize_benchmark_genotype(value):
     return " ".join(normalized)
 
 
-def _score_values(df, prefix, score_kind):
-    """Higher = better for the score we feed sklearn.
-
-    ``presentation_score`` and ``processing_score`` are already higher-better;
-    ``presentation_percentile`` is lower-better so we negate it.
-    """
-    if score_kind == "presentation_score":
-        return df["%s_presentation_score" % prefix].values
-    if score_kind == "presentation_percentile":
-        return -df["%s_presentation_percentile" % prefix].values
-    if score_kind == "processing_score":
-        return df["%s_processing_score" % prefix].values
-    raise ValueError("Unknown score kind: %s" % score_kind)
-
-
 def _score_pair_columns(score_kind):
     if score_kind not in METRIC_SCORE_KINDS:
         raise ValueError("Unknown score kind: %s" % score_kind)
@@ -2378,11 +2333,7 @@ def _run_presentation(side_a, side_b, args):
 # ---------------------------------------------------------------------------
 
 
-_METRIC_DISPLAY_NAMES = {
-    "roc_auc": "AUROC",
-    "pr_auc": "AUPRC",
-    "ppv_at_n": "PPV@N",
-}
+_METRIC_DISPLAY_NAMES = METRIC_DISPLAY_NAMES
 
 
 def _pct_change(a_value, b_value):

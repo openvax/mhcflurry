@@ -13,8 +13,8 @@ import shutil
 import numpy
 import pandas
 
-from mhcflurry.cli.compare_models import _metrics
 from mhcflurry.experiment_archive import sha256_file
+from mhcflurry.ranking_metrics import ranking_metrics as _metrics
 
 
 KEYS = ["fold_num", "validation_row_index"]

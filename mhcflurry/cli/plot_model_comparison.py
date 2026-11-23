@@ -37,19 +37,15 @@ from .figure_style import (
 )
 from .help import HelpArgumentParser
 from .model_comparison_constants import (
+    METRIC_DISPLAY_NAMES,
     METRIC_NAMES,
     PRESENTATION_MODES,
     PRESENTATION_SCORE_KINDS,
     PROCESSING_MODES,
+    path_is_within as _path_is_within,
+    score_values as _score_values,
 )
 from ..common import positive_int_arg
-
-
-METRIC_DISPLAY_NAMES = {
-    "roc_auc": "AUROC",
-    "pr_auc": "AUPRC",
-    "ppv_at_n": "PPV@N",
-}
 
 def run_argv(argv):
     """Entry point for the lazy ``mhcflurry eval plot-comparison`` dispatcher."""
@@ -444,14 +440,6 @@ def _clean_directory_except(directory, preserve_directory):
             child.unlink()
 
 
-def _path_is_within(path, directory):
-    try:
-        path.relative_to(directory)
-        return True
-    except ValueError:
-        return False
-
-
 def _append_optional_paper_figure_args(args, paper_args):
     passthrough = {
         "paper_figures_candidate_predictor": "candidate_predictor",
@@ -751,17 +739,6 @@ def _plot_presentation(input_dir, plot_dir, labels, max_scatter_points):
             name_suffix=suffix,
             title_prefix=_score_kind_title(score_kind),
         )
-
-
-def _score_values(df, prefix, score_kind):
-    """Higher = better; mirror the convention from compare_models."""
-    if score_kind == "presentation_score":
-        return df["%s_presentation_score" % prefix].values
-    if score_kind == "presentation_percentile":
-        return -df["%s_presentation_percentile" % prefix].values
-    if score_kind == "processing_score":
-        return df["%s_processing_score" % prefix].values
-    raise ValueError("Unknown score kind: %s" % score_kind)
 
 
 def _plot_release_summary(input_dir, paper_dir, labels):
