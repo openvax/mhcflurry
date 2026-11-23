@@ -93,8 +93,9 @@ def run_argv(argv, prog="mhcflurry train"):
     if argv[0] == "validate-processing-data":
         import pandas
         from ..processing_matching import validate_matched_training_data
+        from ..cli_args import add_data_arg
         validation_parser = HelpArgumentParser(prog=prog + " validate-processing-data")
-        validation_parser.add_argument("--data", required=True)
+        add_data_arg(validation_parser, required=True)
         validation_args = validation_parser.parse_args(argv[1:])
         frame = pandas.read_csv(validation_args.data)
         validate_matched_training_data(frame)

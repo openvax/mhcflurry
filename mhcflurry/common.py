@@ -36,8 +36,13 @@ from mhcgnomes import (
 from . import amino_acid
 from .cli_args import (
     DEFAULT_RANDOM_SEED as DEFAULT_RANDOM_SEED,
+    add_alleles_arg as add_alleles_arg,
+    add_data_arg as add_data_arg,
     add_debug_arg as add_debug_arg,
+    add_hyperparameters_arg as add_hyperparameters_arg,
     add_max_epochs_arg as add_max_epochs_arg,
+    add_models_dir_arg as add_models_dir_arg,
+    add_out_arg as add_out_arg,
     add_out_models_dir_arg as add_out_models_dir_arg,
     add_random_seed_arg as add_random_seed_arg,
     add_verbosity_arg as add_verbosity_arg,

@@ -41,6 +41,7 @@ import argcomplete
 
 from .completion import is_completing
 from .help import HelpArgumentParser
+from ..cli_args import add_alleles_arg, add_out_arg
 from ..downloads import get_default_class1_presentation_models_dir, get_model_release_dir
 from ..parallelism import add_prediction_parallelism_args
 from ..version import __version__
@@ -58,10 +59,9 @@ input_args.add_argument(
     metavar="INPUT.csv",
     nargs="?",
     help="Input CSV")
-input_args.add_argument(
-    "--alleles",
+add_alleles_arg(
+    input_args,
     metavar="ALLELE",
-    nargs="+",
     help="MHC allele or allele-set queries (exclusive with an input CSV). "
     "Separate arguments are independent queries; delimit alleles within one "
     "argument with ';' or ',' to score them as one MHC allele set.")
@@ -100,10 +100,7 @@ input_mod_args.add_argument(
     help="Return NaNs for unsupported alleles or peptides instead of raising")
 
 output_args = parser.add_argument_group(title="Output options")
-output_args.add_argument(
-    "--out",
-    metavar="OUTPUT.csv",
-    help="Output CSV")
+add_out_arg(output_args, metavar="OUTPUT.csv", help="Output CSV")
 output_args.add_argument(
     "--prediction-column-prefix",
     metavar="NAME",

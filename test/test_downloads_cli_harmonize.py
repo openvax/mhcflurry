@@ -24,6 +24,16 @@ from mhcflurry import downloads
 from mhcflurry.cli import downloads_command
 
 
+@pytest.fixture(autouse=True)
+def _restore_downloads_globals():
+    """Preserve global mhcflurry.downloads state across tests."""
+    prev_dir = downloads._DOWNLOADS_DIR
+    prev_release = downloads._CURRENT_RELEASE
+    yield
+    downloads._DOWNLOADS_DIR = prev_dir
+    downloads._CURRENT_RELEASE = prev_release
+
+
 def test_resolve_data_location_precedence_and_legacy_preservation(monkeypatch, tmp_path: Path):
     legacy_dir = tmp_path / "legacy-v4"
     platform_shared = tmp_path / "platform-openvax"

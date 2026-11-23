@@ -21,9 +21,13 @@ module re-exports its parser as module-level ``parser`` so docs generation
 import argparse
 
 from ..cli_args import (
+    add_alleles_arg,
     add_cluster_parallelism_args,
+    add_data_arg,
     add_debug_arg,
+    add_hyperparameters_arg,
     add_max_epochs_arg,
+    add_models_dir_arg,
     add_out_models_dir_arg,
     add_random_seed_arg,
     add_verbosity_arg,
@@ -59,24 +63,21 @@ def batch_size_arg(value):
 
 def make_train_allele_specific_models_parser(usage=None):
     parser = HelpArgumentParser(usage=usage)
-    parser.add_argument(
-        "--data",
-        metavar="FILE.csv",
+    add_data_arg(
+        parser,
         required=True,
         help=(
             "Training data CSV. Expected columns: "
             "allele, peptide, measurement_value"))
     add_out_models_dir_arg(
         parser, help="Directory to write models and manifest")
-    parser.add_argument(
-        "--hyperparameters",
-        metavar="FILE.json",
+    add_hyperparameters_arg(
+        parser,
         required=True,
         help="JSON or YAML of hyperparameters")
-    parser.add_argument(
-        "--allele",
-        default=None,
-        nargs="+",
+    add_alleles_arg(
+        parser,
+        dest="allele",
         help="Alleles to train models for. If not specified, all alleles with "
         "enough measurements will be used.")
     parser.add_argument(
@@ -138,9 +139,8 @@ def make_train_pan_allele_models_parser(usage=None):
     parser.add_argument(
         "--reuse-folds", action="store_true",
         help="Use existing fold_0..N columns instead of generating new folds.")
-    parser.add_argument(
-        "--data",
-        metavar="FILE.csv",
+    add_data_arg(
+        parser,
         help=(
             "Training data CSV. Expected columns: "
             "allele, peptide, measurement_value"))
@@ -152,9 +152,8 @@ def make_train_pan_allele_models_parser(usage=None):
             "allele, peptide, measurement_value"))
     add_out_models_dir_arg(
         parser, help="Directory to write models and manifest")
-    parser.add_argument(
-        "--hyperparameters",
-        metavar="FILE.json",
+    add_hyperparameters_arg(
+        parser,
         help="JSON or YAML of hyperparameters")
     parser.add_argument(
         "--held-out-measurements-per-allele-fraction-and-max",
@@ -224,15 +223,13 @@ def make_train_processing_models_parser(usage=None):
     parser.add_argument(
         "--reuse-folds", action="store_true",
         help="Use existing fold_0..N columns instead of generating new folds.")
-    parser.add_argument(
-        "--data",
-        metavar="FILE.csv",
+    add_data_arg(
+        parser,
         help="Training data CSV. Expected columns: peptide, n_flank, c_flank, hit")
     add_out_models_dir_arg(
         parser, help="Directory to write models and manifest")
-    parser.add_argument(
-        "--hyperparameters",
-        metavar="FILE.json",
+    add_hyperparameters_arg(
+        parser,
         help="JSON or YAML of hyperparameters")
     parser.add_argument(
         "--held-out-samples",
@@ -275,9 +272,8 @@ def make_train_processing_models_parser(usage=None):
 
 def make_train_presentation_models_parser(usage=None):
     parser = HelpArgumentParser(usage=usage)
-    parser.add_argument(
-        "--data",
-        metavar="FILE.csv",
+    add_data_arg(
+        parser,
         help="Training data CSV. Expected columns: peptide, n_flank, c_flank, hit")
     add_out_models_dir_arg(
         parser, help="Directory to write models and manifest")
@@ -322,9 +318,8 @@ def make_train_presentation_models_parser(usage=None):
 
 def make_select_allele_specific_models_parser(usage=None):
     parser = HelpArgumentParser(usage=usage)
-    parser.add_argument(
-        "--data",
-        metavar="FILE.csv",
+    add_data_arg(
+        parser,
         required=False,
         help=(
             "Model selection data CSV. Expected columns: "
@@ -336,9 +331,8 @@ def make_select_allele_specific_models_parser(usage=None):
         help=(
             "Data to EXCLUDE from model selection. Useful to specify the original "
             "training data used"))
-    parser.add_argument(
-        "--models-dir",
-        metavar="DIR",
+    add_models_dir_arg(
+        parser,
         required=True,
         help="Directory to read models")
     add_out_models_dir_arg(
@@ -361,10 +355,9 @@ def make_select_allele_specific_models_parser(usage=None):
         type=float,
         metavar="X",
         default=95)
-    parser.add_argument(
-        "--allele",
-        default=None,
-        nargs="+",
+    add_alleles_arg(
+        parser,
+        dest="allele",
         help="Alleles to select models for. If not specified, all alleles with "
         "enough measurements will be used.")
     parser.add_argument(
@@ -460,16 +453,14 @@ def make_select_allele_specific_models_parser(usage=None):
 
 def make_select_pan_allele_models_parser(usage=None):
     parser = HelpArgumentParser(usage=usage)
-    parser.add_argument(
-        "--data",
-        metavar="FILE.csv",
+    add_data_arg(
+        parser,
         required=False,
         help=(
             "Model selection data CSV. Expected columns: "
             "allele, peptide, measurement_value"))
-    parser.add_argument(
-        "--models-dir",
-        metavar="DIR",
+    add_models_dir_arg(
+        parser,
         required=True,
         help="Directory to read models")
     add_out_models_dir_arg(
@@ -513,16 +504,14 @@ def make_select_processing_models_parser(usage=None):
         "--processing-data-policy",
         choices=("matched", "legacy"),
         default="matched")
-    parser.add_argument(
-        "--data",
-        metavar="FILE.csv",
+    add_data_arg(
+        parser,
         required=False,
         help=(
             "Model selection data CSV. Expected columns: "
             "peptide, hit, fold_0, ..., fold_N"))
-    parser.add_argument(
-        "--models-dir",
-        metavar="DIR",
+    add_models_dir_arg(
+        parser,
         required=True,
         help="Directory to read models")
     add_out_models_dir_arg(
@@ -577,16 +566,13 @@ def make_calibrate_percentile_ranks_parser(usage=None):
         "for a flanked model, n_flank and c_flank columns. No evaluation labels are used. "
         "Scores and input sequences are saved in percent_rank_reference.npz. "
         "Requires --num-jobs 0; reference-generation options do not apply.")
-    parser.add_argument(
-        "--models-dir",
-        metavar="DIR",
+    add_models_dir_arg(
+        parser,
         required=True,
         help="Directory to read and write models")
-    parser.add_argument(
-        "--allele", "--alleles",
+    add_alleles_arg(
+        parser,
         dest="allele",
-        default=None,
-        nargs="+",
         help="Alleles to calibrate percentile ranks for. If not specified all "
         "alleles are used")
     parser.add_argument(
