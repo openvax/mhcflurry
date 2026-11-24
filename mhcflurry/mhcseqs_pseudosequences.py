@@ -82,6 +82,19 @@ _NON_GROOVE_STATUSES = frozenset({"non_groove", "missing_groove"})
 # Lazily populated BLOSUM62 scoring tables to keep module import fast.
 _BLOSUM_CACHE = None
 
+# Default Gotoh penalties used by the standalone fallback aligner.
+_DEFAULT_GAP_OPEN = -10
+_DEFAULT_GAP_EXTEND = -1
+
+
+def _get_mhcseqs_imgt_aligner():
+    """Return ``mhcseqs.align_domain_to_imgt`` when mhcseqs >= 2.9.0 is installed."""
+    try:
+        import mhcseqs
+    except ImportError:
+        return None
+    return getattr(mhcseqs, "align_domain_to_imgt", None)
+
 
 def _get_blosum_tables():
     """Return ``(aa_to_idx, x_idx, score_matrix)`` backed by BLOSUM62."""
@@ -250,44 +263,70 @@ def _align_domain_to_reference(
     return "".join(ref_to_char[p] for p in positions)
 
 
+def _extract_from_imgt_domain_alignment(
+    domain_alignment,
+    mature_positions: Sequence[int],
+) -> str:
+    """Extract sanitized residues at canonical mature positions from a DomainAlignment."""
+    mature_to_aa = domain_alignment.mature_to_aa
+    chars = []
+    for pos in mature_positions:
+        aa = mature_to_aa.get(pos)
+        if aa is None or aa == "-":
+            chars.append("X")
+        else:
+            chars.append(_sanitize_residue(aa))
+    return "".join(chars)
+
+
 def _extract_groove1_residues(
     groove1: str,
     g1_positions: Sequence[int],
     *,
-    gap_open: int = -10,
-    gap_extend: int = -1,
+    gap_open: int = _DEFAULT_GAP_OPEN,
+    gap_extend: int = _DEFAULT_GAP_EXTEND,
     cache: dict[str, str] | None = None,
+    imgt_aligner=None,
 ) -> str:
-    """Extract α1 pseudosequence residues with canonical-length fast paths."""
+    """Extract α1 pseudosequence residues via mhcseqs IMGT alignment or fallback."""
     g1 = (groove1 or "").strip().upper()
     if not g1:
         return "X" * len(g1_positions)
     if cache is not None and g1 in cache:
         return cache[g1]
 
-    seq_len = len(g1)
-    # Fast path 1: canonical 90-aa α1 verified by conserved structural anchors
-    # (Tyr27, Trp58/60, Asn86-Gln87 glycosylation motif).
-    if seq_len == 90 and g1[26] == "Y" and g1[57] == "W" and g1[85:87] == "NQ":
-        result = "".join(_sanitize_residue(g1[p]) for p in g1_positions)
-    # Fast path 2: IMGT partial exon-2 sequence missing only mature residue 1
-    # (leading Gly), leaving 89 aa shifted by -1.
-    elif (
-        seq_len == 89
-        and g1[25] == "Y"
-        and g1[56] == "W"
-        and g1[84:86] == "NQ"
-        and g1[0] != "G"
+    if (
+        imgt_aligner is not None
+        and gap_open == _DEFAULT_GAP_OPEN
+        and gap_extend == _DEFAULT_GAP_EXTEND
     ):
-        result = "".join(_sanitize_residue(g1[p - 1]) for p in g1_positions)
+        domain_aln = imgt_aligner(g1, domain="G-ALPHA1")
+        mature_positions = tuple(p + 1 for p in g1_positions)
+        result = _extract_from_imgt_domain_alignment(domain_aln, mature_positions)
     else:
-        result = _align_domain_to_reference(
-            g1,
-            HLA_A0201_GROOVE1,
-            g1_positions,
-            gap_open=gap_open,
-            gap_extend=gap_extend,
-        )
+        seq_len = len(g1)
+        # Fast path 1: canonical 90-aa α1 verified by conserved structural anchors
+        # (Tyr27, Trp58/60, Asn86-Gln87 glycosylation motif).
+        if seq_len == 90 and g1[26] == "Y" and g1[57] == "W" and g1[85:87] == "NQ":
+            result = "".join(_sanitize_residue(g1[p]) for p in g1_positions)
+        # Fast path 2: IMGT partial exon-2 sequence missing only mature residue 1
+        # (leading Gly), leaving 89 aa shifted by -1.
+        elif (
+            seq_len == 89
+            and g1[25] == "Y"
+            and g1[56] == "W"
+            and g1[84:86] == "NQ"
+            and g1[0] != "G"
+        ):
+            result = "".join(_sanitize_residue(g1[p - 1]) for p in g1_positions)
+        else:
+            result = _align_domain_to_reference(
+                g1,
+                HLA_A0201_GROOVE1,
+                g1_positions,
+                gap_open=gap_open,
+                gap_extend=gap_extend,
+            )
 
     if cache is not None:
         cache[g1] = result
@@ -298,30 +337,40 @@ def _extract_groove2_residues(
     groove2: str,
     g2_positions: Sequence[int],
     *,
-    gap_open: int = -10,
-    gap_extend: int = -1,
+    gap_open: int = _DEFAULT_GAP_OPEN,
+    gap_extend: int = _DEFAULT_GAP_EXTEND,
     cache: dict[str, str] | None = None,
+    imgt_aligner=None,
 ) -> str:
-    """Extract α2 pseudosequence residues with canonical-length fast paths."""
+    """Extract α2 pseudosequence residues via mhcseqs IMGT alignment or fallback."""
     g2 = (groove2 or "").strip().upper()
     if not g2:
         return "X" * len(g2_positions)
     if cache is not None and g2 in cache:
         return cache[g2]
 
-    seq_len = len(g2)
-    # Fast path: canonical 92- or 93-aa α2 verified by the conserved Ig-fold
-    # disulfide pair Cys101 (index 10) and Cys164 (index 73).
-    if seq_len in (92, 93) and g2[10] == "C" and g2[73] == "C":
-        result = "".join(_sanitize_residue(g2[p]) for p in g2_positions)
+    if (
+        imgt_aligner is not None
+        and gap_open == _DEFAULT_GAP_OPEN
+        and gap_extend == _DEFAULT_GAP_EXTEND
+    ):
+        domain_aln = imgt_aligner(g2, domain="G-ALPHA2")
+        mature_positions = tuple(p + len(HLA_A0201_GROOVE1) + 1 for p in g2_positions)
+        result = _extract_from_imgt_domain_alignment(domain_aln, mature_positions)
     else:
-        result = _align_domain_to_reference(
-            g2,
-            HLA_A0201_GROOVE2,
-            g2_positions,
-            gap_open=gap_open,
-            gap_extend=gap_extend,
-        )
+        seq_len = len(g2)
+        # Fast path: canonical 92- or 93-aa α2 verified by the conserved Ig-fold
+        # disulfide pair Cys101 (index 10) and Cys164 (index 73).
+        if seq_len in (92, 93) and g2[10] == "C" and g2[73] == "C":
+            result = "".join(_sanitize_residue(g2[p]) for p in g2_positions)
+        else:
+            result = _align_domain_to_reference(
+                g2,
+                HLA_A0201_GROOVE2,
+                g2_positions,
+                gap_open=gap_open,
+                gap_extend=gap_extend,
+            )
 
     if cache is not None:
         cache[g2] = result
@@ -333,10 +382,14 @@ def extract_class1_pseudosequence_from_grooves(
     groove2: str,
     *,
     length: int = 39,
-    gap_open: int = -10,
-    gap_extend: int = -1,
+    gap_open: int = _DEFAULT_GAP_OPEN,
+    gap_extend: int = _DEFAULT_GAP_EXTEND,
 ) -> str:
     """Extract a fixed-length Class I pseudosequence from α1 and α2 domains.
+
+    When ``mhcseqs >= 2.9.0`` is installed (and default alignment parameters
+    are used), delegates to ``mhcseqs.align_domain_to_imgt``; otherwise uses
+    the built-in BLOSUM62 affine-gap semi-global aligner.
 
     Parameters
     ----------
@@ -359,11 +412,20 @@ def extract_class1_pseudosequence_from_grooves(
         positions are represented as ``"X"``.
     """
     g1_positions, g2_positions = _resolve_groove_indices(length)
+    imgt_aligner = _get_mhcseqs_imgt_aligner()
     p1 = _extract_groove1_residues(
-        groove1, g1_positions, gap_open=gap_open, gap_extend=gap_extend
+        groove1,
+        g1_positions,
+        gap_open=gap_open,
+        gap_extend=gap_extend,
+        imgt_aligner=imgt_aligner,
     )
     p2 = _extract_groove2_residues(
-        groove2, g2_positions, gap_open=gap_open, gap_extend=gap_extend
+        groove2,
+        g2_positions,
+        gap_open=gap_open,
+        gap_extend=gap_extend,
+        imgt_aligner=imgt_aligner,
     )
     return p1 + p2
 
@@ -381,7 +443,7 @@ def _import_mhcseqs():
     return mhcseqs
 
 
-def extract_class1_pseudosequence(
+def extract_class1_pseudosequence_with_alignment(
     sequence: str,
     *,
     length: int = 39,
@@ -389,52 +451,17 @@ def extract_class1_pseudosequence(
     gene: str = "",
     mutations: Sequence[str] = (),
     allow_fragments: bool = False,
-    gap_open: int = -10,
-    gap_extend: int = -1,
-) -> str:
-    """Extract a Class I pseudosequence from a raw MHC protein sequence.
+    warn_on_indels: bool = True,
+    warn_on_noop_mutations: bool = True,
+    gap_open: int = _DEFAULT_GAP_OPEN,
+    gap_extend: int = _DEFAULT_GAP_EXTEND,
+):
+    """Extract a Class I pseudosequence together with its ``mhcseqs`` IMGT alignment.
 
-    Uses ``mhcseqs.decompose_domains(..., mhc_class="I")`` to strip any signal
-    peptide (including truncated N-terminal signal peptides), identify the α1
-    (``groove1``) and α2 (``groove2``) binding-groove domains, optionally apply
-    IEDB-style point mutations (e.g. ``mutations=("K66A",)``), and extract the
-    pinned binding groove positions.
-
-    Parameters
-    ----------
-    sequence : str
-        Full-length, mature, or partial MHC Class I heavy-chain amino acid
-        sequence.
-    length : int, optional
-        Target pseudosequence length: ``39`` (MHCflurry 2.x, default) or
-        ``34`` (NetMHCpan).
-    allele : str, optional
-        Optional allele name passed to ``mhcseqs.decompose_class_i`` for
-        metadata and gene/species cues.
-    gene : str, optional
-        Optional gene symbol passed to ``mhcseqs.decompose_class_i``.
-    mutations : sequence of str, optional
-        Optional mature-numbered point mutations (e.g. ``["W167S"]``) applied
-        by ``mhcseqs`` before groove extraction.
-    allow_fragments : bool, optional
-        If False (default), require both α1 and α2 groove domains to be
-        present. If True, allow partial single-domain fragments (filling the
-        missing domain with ``"X"``).
-    gap_open : int, optional
-        Affine gap-opening score for non-canonical groove lengths.
-    gap_extend : int, optional
-        Affine gap-extension score for non-canonical groove lengths.
-
-    Returns
-    -------
-    str
-        Fixed-length Class I pseudosequence of length ``length``.
-
-    Raises
-    ------
-    ValueError
-        If ``sequence`` is empty, not a valid Class I groove (e.g. Ig-only or
-        non-groove gene), or missing a required groove domain.
+    Returns ``(pseudosequence, groove_alignment)`` where ``groove_alignment``
+    is a ``mhcseqs.GrooveAlignment`` (when ``mhcseqs >= 2.9.0`` is installed
+    and default alignment penalties are used) or ``None`` on older ``mhcseqs``
+    releases.
     """
     _resolve_groove_indices(length)
     cleaned = (sequence or "").strip()
@@ -478,13 +505,144 @@ def extract_class1_pseudosequence(
             % (allele or "<unnamed>", record.status)
         )
 
-    return extract_class1_pseudosequence_from_grooves(
-        record.groove1,
-        record.groove2,
+    align_groove = getattr(mhcseqs, "align_groove_to_imgt", None)
+    groove_alignment = None
+    if (
+        align_groove is not None
+        and gap_open == _DEFAULT_GAP_OPEN
+        and gap_extend == _DEFAULT_GAP_EXTEND
+    ):
+        groove_alignment = align_groove(record)
+        positions = PSEUDOSEQUENCE_MATURE_POSITIONS[int(length)]
+        raw_pseudo = groove_alignment.extract_positions(
+            positions, missing="X", deleted="X"
+        )
+        pseudosequence = "".join(_sanitize_residue(c) for c in raw_pseudo)
+        if warn_on_indels and groove_alignment.has_insertions:
+            logging.warning(
+                "Class I groove for %s contains internal insertion(s) (%s) "
+                "that are omitted by fixed %d-aa pseudosequences; predictions "
+                "for alleles with pocket-reshaping insertions may be less accurate.",
+                allele or "<unnamed>",
+                groove_alignment.summary(),
+                int(length),
+            )
+    else:
+        pseudosequence = extract_class1_pseudosequence_from_grooves(
+            record.groove1,
+            record.groove2,
+            length=length,
+            gap_open=gap_open,
+            gap_extend=gap_extend,
+        )
+
+    if normalized_mutations and warn_on_noop_mutations:
+        wt_record = mhcseqs.decompose_domains(
+            cleaned,
+            mhc_class="I",
+            allele=allele,
+            gene=gene,
+        )
+        if wt_record.status not in _NON_GROOVE_STATUSES and (
+            wt_record.groove1 or wt_record.groove2
+        ):
+            wt_pseudo = extract_class1_pseudosequence_from_grooves(
+                wt_record.groove1,
+                wt_record.groove2,
+                length=length,
+                gap_open=gap_open,
+                gap_extend=gap_extend,
+            )
+            if wt_pseudo == pseudosequence:
+                logging.warning(
+                    "Mutation(s) %r on %s did not change any of the %d "
+                    "extracted pseudosequence positions; predicted binding "
+                    "will be identical to wild-type.",
+                    normalized_mutations,
+                    allele or "<unnamed>",
+                    int(length),
+                )
+
+    return pseudosequence, groove_alignment
+
+
+def extract_class1_pseudosequence(
+    sequence: str,
+    *,
+    length: int = 39,
+    allele: str = "",
+    gene: str = "",
+    mutations: Sequence[str] = (),
+    allow_fragments: bool = False,
+    warn_on_indels: bool = True,
+    warn_on_noop_mutations: bool = True,
+    gap_open: int = _DEFAULT_GAP_OPEN,
+    gap_extend: int = _DEFAULT_GAP_EXTEND,
+) -> str:
+    """Extract a Class I pseudosequence from a raw MHC protein sequence.
+
+    Uses ``mhcseqs.decompose_domains(..., mhc_class="I")`` to strip any signal
+    peptide (including truncated N-terminal signal peptides), identify the α1
+    (``groove1``) and α2 (``groove2``) binding-groove domains, optionally apply
+    IEDB-style point mutations (e.g. ``mutations=("K66A",)``), and extract the
+    pinned binding groove positions.
+
+    Parameters
+    ----------
+    sequence : str
+        Full-length, mature, or partial MHC Class I heavy-chain amino acid
+        sequence.
+    length : int, optional
+        Target pseudosequence length: ``39`` (MHCflurry 2.x, default) or
+        ``34`` (NetMHCpan).
+    allele : str, optional
+        Optional allele name passed to ``mhcseqs.decompose_domains`` for
+        metadata and gene/species cues.
+    gene : str, optional
+        Optional gene symbol passed to ``mhcseqs.decompose_domains``.
+    mutations : sequence of str, optional
+        Optional mature-numbered point mutations (e.g. ``["W167S"]`` or
+        ``"W167S"``) applied by ``mhcseqs`` before groove extraction.
+    allow_fragments : bool, optional
+        If False (default), require both α1 and α2 groove domains to be
+        present. If True, allow partial single-domain fragments (filling the
+        missing domain with ``"X"``).
+    warn_on_indels : bool, optional
+        When True (default) and ``mhcseqs >= 2.9.0`` detects internal
+        insertions in the binding groove, log a warning noting that fixed-width
+        pseudosequences omit inserted residues.
+    warn_on_noop_mutations : bool, optional
+        When True (default) and ``mutations`` does not change any of the
+        extracted pseudosequence positions, log a warning.
+    gap_open : int, optional
+        Affine gap-opening score for non-canonical groove lengths.
+    gap_extend : int, optional
+        Affine gap-extension score for non-canonical groove lengths.
+
+    Returns
+    -------
+    str
+        Fixed-length Class I pseudosequence of length ``length``.
+
+    Raises
+    ------
+    ValueError
+        If ``sequence`` is empty, not a valid Class I groove (e.g. Ig-only or
+        non-groove gene), or missing a required groove domain.
+    """
+    pseudosequence, _alignment = extract_class1_pseudosequence_with_alignment(
+        sequence,
         length=length,
+        allele=allele,
+        gene=gene,
+        mutations=mutations,
+        allow_fragments=allow_fragments,
+        warn_on_indels=warn_on_indels,
+        warn_on_noop_mutations=warn_on_noop_mutations,
         gap_open=gap_open,
         gap_extend=gap_extend,
     )
+    return pseudosequence
 
 
 def _normalize_pseudosequence_allele_key(raw_name: str, prefer_no_alias: bool = True) -> str | None:
@@ -597,6 +755,7 @@ def build_pseudosequences_from_mhcseqs(
 
     g1_cache: dict[str, str] = {}
     g2_cache: dict[str, str] = {}
+    imgt_aligner = _get_mhcseqs_imgt_aligner()
     skipped_unparseable = 0
 
     for row in rows:
@@ -644,6 +803,7 @@ def build_pseudosequences_from_mhcseqs(
                 gap_open=gap_open,
                 gap_extend=gap_extend,
                 cache=g1_cache,
+                imgt_aligner=imgt_aligner,
             )
             + _extract_groove2_residues(
                 groove2,
@@ -651,6 +811,7 @@ def build_pseudosequences_from_mhcseqs(
                 gap_open=gap_open,
                 gap_extend=gap_extend,
                 cache=g2_cache,
+                imgt_aligner=imgt_aligner,
             )
         )
         if max_x is not None and pseudo.count("X") > max_x:

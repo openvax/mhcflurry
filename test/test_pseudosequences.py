@@ -27,6 +27,7 @@ from mhcflurry.pseudosequences import (
     extend_allele_to_sequence_from_mhcseqs,
     extract_class1_pseudosequence,
     extract_class1_pseudosequence_from_grooves,
+    extract_class1_pseudosequence_with_alignment,
     main,
     pseudosequence_filename_for_length,
     pseudosequence_filename_for_mapping,
@@ -304,7 +305,9 @@ def test_pseudosequence_cli_build(tmp_path):
 
 
 @pytest.mark.skipif(not HAS_MHCSEQS, reason="mhcseqs is not installed")
-def test_extract_class1_pseudosequence_with_mhcseqs(capsys):
+def test_extract_class1_pseudosequence_with_mhcseqs(capsys, caplog):
+    import logging
+
     # Full-length protein with 24-aa signal peptide
     assert (
         extract_class1_pseudosequence(HLA_A0201_FULL, allele="HLA-A*02:01", length=39)
@@ -317,9 +320,11 @@ def test_extract_class1_pseudosequence_with_mhcseqs(capsys):
 
     # Mature-numbered point mutation (K66A -> position 66 is index 11 in 39aa),
     # accepting either a tuple or a single mutation string.
-    mutated = extract_class1_pseudosequence(
-        HLA_A0201_FULL, allele="HLA-A*02:01", mutations=("K66A",), length=39
-    )
+    with caplog.at_level(logging.WARNING):
+        mutated = extract_class1_pseudosequence(
+            HLA_A0201_FULL, allele="HLA-A*02:01", mutations=("K66A",), length=39
+        )
+    assert not caplog.records
     mutated_from_str = extract_class1_pseudosequence(
         HLA_A0201_FULL, allele="HLA-A*02:01", mutations="K66A", length=39
     )
@@ -328,6 +333,32 @@ def test_extract_class1_pseudosequence_with_mhcseqs(capsys):
     assert mutated[11] == "A"
     assert mutated[:11] == HLA_A0201_EXPECTED_39AA[:11]
     assert mutated[12:] == HLA_A0201_EXPECTED_39AA[12:]
+
+    # A mutation outside the 39 pseudosequence positions (mature S2A) emits a
+    # clear warning that predicted binding will match wild-type.
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        noop_mut = extract_class1_pseudosequence(
+            HLA_A0201_FULL, allele="HLA-A*02:01", mutations=("S2A",), length=39
+        )
+    assert noop_mut == HLA_A0201_EXPECTED_39AA
+    assert any("did not change any" in rec.message for rec in caplog.records)
+
+    # Bat Ptal-N*01:01 (3-aa MDL insertion at mature pos 51): verify structured
+    # alignment and insertion warning when mhcseqs >= 2.9.0 is installed.
+    ptal_seq = (
+        "GFHSLRYFYTAWSRPGSGEPRFVAVGYVDDTQFVRFDSDNASPRAEPRAPWMDLVEQQDPQYWDRNTRNARDAAQTYRVGLDNVRGYYNQSEA"
+        "GSHTIQRMYGCDVGPHGRLLRGYDQLAYDGADYIALNEDLRSWTAADLAAQNTRRKWEEAGYAERDRAYLEGECVEWLLKHLENGRETLLRAD"
+    )
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        ptal_39, ptal_aln = extract_class1_pseudosequence_with_alignment(
+            ptal_seq, allele="Ptal-N*01:01", length=39
+        )
+    assert ptal_39 == "YYGERAAPYRNNADATYVGNVYGIRYDLYTWAYDAYEWH"
+    if ptal_aln is not None:
+        assert ptal_aln.has_insertions
+        assert any("MDL" in rec.message for rec in caplog.records)
 
     # Pure alpha3 Ig+TM fragment must be rejected
     ig_only = HLA_A0201_FULL[24 + 90 + 93 :]
@@ -430,3 +461,98 @@ def test_train_pan_allele_predictor_with_mhcseqs_pseudosequences_and_extend(tmp_
     assert reloaded.predict(["NLVPMVATV"], allele="BoLA-2*057:01")[0] == pytest.approx(
         bola_pred, rel=1e-6
     )
+
+
+def test_imgt_delegation_and_diagnostic_warnings_mocked(monkeypatch, caplog):
+    """Verify mhcseqs >= 2.9.0 IMGT delegation and insertion/no-op warnings
+    even in environments where the optional mhcseqs package is not installed."""
+    import logging
+    import types
+
+    from mhcflurry import mhcseqs_pseudosequences as mp
+
+    calls = []
+
+    class FakeDomainAlignment:
+        def __init__(self, seq, domain):
+            offset = 0 if domain == "G-ALPHA1" else 90
+            self.mature_to_aa = {offset + i + 1: aa for i, aa in enumerate(seq)}
+
+    class FakeGrooveAlignment:
+        def __init__(self, g1, g2, has_insertions=False):
+            self._full = g1 + g2
+            self.has_insertions = has_insertions
+
+        def extract_positions(self, positions, missing="X", deleted="X"):
+            return "".join(
+                self._full[p - 1] if 1 <= p <= len(self._full) else missing
+                for p in positions
+            )
+
+        def summary(self):
+            return "alpha1: +3aa ins@51(MDL)" if self.has_insertions else "canonical"
+
+    def fake_align_domain_to_imgt(seq, domain="G-ALPHA1"):
+        calls.append(domain)
+        return FakeDomainAlignment(seq, domain)
+
+    def fake_decompose_domains(seq, mhc_class="I", allele="", gene="", mutations=()):
+        g1 = HLA_A0201_GROOVE1
+        g2 = HLA_A0201_GROOVE2
+        return types.SimpleNamespace(
+            status="ok",
+            flags="",
+            groove1=g1,
+            groove2=g2,
+            has_insertions=(allele == "Ptal-N*01:01"),
+        )
+
+    def fake_align_groove_to_imgt(record):
+        return FakeGrooveAlignment(
+            record.groove1,
+            record.groove2,
+            has_insertions=getattr(record, "has_insertions", False),
+        )
+
+    fake_mhcseqs = types.SimpleNamespace(
+        align_domain_to_imgt=fake_align_domain_to_imgt,
+        align_groove_to_imgt=fake_align_groove_to_imgt,
+        decompose_domains=fake_decompose_domains,
+    )
+    monkeypatch.setattr(mp, "_get_mhcseqs_imgt_aligner", lambda: fake_align_domain_to_imgt)
+    monkeypatch.setattr(mp, "_import_mhcseqs", lambda: fake_mhcseqs)
+
+    # Groove extraction delegates to align_domain_to_imgt for both domains.
+    pseudo = extract_class1_pseudosequence_from_grooves(
+        HLA_A0201_GROOVE1, HLA_A0201_GROOVE2, length=39
+    )
+    assert pseudo == HLA_A0201_EXPECTED_39AA
+    assert calls == ["G-ALPHA1", "G-ALPHA2"]
+
+    # Insertion warning and no-op mutation warning both fire cleanly.
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        extracted, aln = extract_class1_pseudosequence_with_alignment(
+            HLA_A0201_FULL,
+            allele="Ptal-N*01:01",
+            mutations="S2A",
+            length=39,
+        )
+    assert extracted == HLA_A0201_EXPECTED_39AA
+    assert aln is not None and aln.has_insertions
+    messages = [rec.message for rec in caplog.records]
+    assert any("MDL" in m for m in messages)
+    assert any("did not change any" in m for m in messages)
+
+    # Disabling warning flags suppresses both warnings.
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        extract_class1_pseudosequence_with_alignment(
+            HLA_A0201_FULL,
+            allele="Ptal-N*01:01",
+            mutations="S2A",
+            length=39,
+            warn_on_indels=False,
+            warn_on_noop_mutations=False,
+        )
+    assert not caplog.records

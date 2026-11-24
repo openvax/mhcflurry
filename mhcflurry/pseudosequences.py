@@ -65,6 +65,7 @@ from .mhcseqs_pseudosequences import (
     extend_allele_to_sequence_from_mhcseqs,
     extract_class1_pseudosequence,
     extract_class1_pseudosequence_from_grooves,
+    extract_class1_pseudosequence_with_alignment,
 )
 
 __all__ = [
@@ -88,6 +89,7 @@ __all__ = [
     "extend_allele_to_sequence_from_mhcseqs",
     "extract_class1_pseudosequence",
     "extract_class1_pseudosequence_from_grooves",
+    "extract_class1_pseudosequence_with_alignment",
     "main",
     "make_parser",
     "pseudosequence_filename_candidates",
