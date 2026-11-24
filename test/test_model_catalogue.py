@@ -50,8 +50,15 @@ def test_download_entries_use_only_known_keys():
     # A misspelled key such as ``defaultl`` is silently ignored at runtime.
     for release, info in downloads.get_downloads_metadata()['releases'].items():
         for item in info['downloads']:
-            assert set(item) in ({'name', 'url', 'default'},
+            keys = set(item)
+            base_keys = keys - {'sha256', 'size'}
+            assert base_keys in ({'name', 'url', 'default'},
                                  {'name', 'part_urls', 'default'}), (release, item)
+            if 'sha256' in keys or 'size' in keys:
+                assert 'sha256' in keys and 'size' in keys, (release, item)
+                assert isinstance(item['sha256'], str) and len(item['sha256']) == 64
+                assert all(c in '0123456789abcdef' for c in item['sha256'])
+                assert isinstance(item['size'], int) and item['size'] > 0
 
 
 def test_shared_archive_versions_are_grouped():

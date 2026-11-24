@@ -22,14 +22,20 @@ releases:
     downloads:
       - name: models_class1_pan
         url: https://github.com/openvax/mhcflurry/releases/download/2.3.0/models_class1_pan.selected.20260928.tar.bz2
+        sha256: cad3f90a84ef532b72758c00e98513421de3a74d2e0c81bfe1c3de46565d05ef
+        size: 180934105
         default: false
 
       - name: models_class1_presentation
         url: https://github.com/openvax/mhcflurry/releases/download/2.3.0/models_class1_presentation.20260928.tar.bz2
+        sha256: 768e360832b3d45dfe9d5e8cde4ffcb90abdb87773ca65f3a86ba7cc20f614db
+        size: 160356140
         default: true
 
       - name: models_class1_processing
         url: https://github.com/openvax/mhcflurry/releases/download/2.3.0/models_class1_processing.selected.20260928.tar.bz2
+        sha256: a5d8fcd8836a97628db51b4b31098a27e0f16b4b8536a3e3312ea14a6afa75a4
+        size: 177897116
         default: false
 
       - name: models_class1_pan_unselected

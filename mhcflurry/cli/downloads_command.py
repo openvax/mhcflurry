@@ -36,16 +36,9 @@ import json
 import logging
 import os
 from shlex import quote
-import errno
-import tarfile
 import textwrap
 from itertools import zip_longest
-from shutil import copyfileobj, get_terminal_size, rmtree
-from tempfile import NamedTemporaryFile, TemporaryDirectory
-
-import posixpath
-import csv
-from urllib.parse import urlsplit
+from shutil import get_terminal_size, rmtree
 
 import argcomplete
 
@@ -55,6 +48,7 @@ from ..downloads import (
     get_bundle_description,
     get_bundle_versions,
     get_download_urls,
+    install_download,
     resolve_data_location,
     resolve_release,
     get_release_downloads,
@@ -107,7 +101,13 @@ parser_fetch.add_argument(
     "--keep",
     action="store_true",
     default=False,
-    help="Don't delete archives after they are extracted")
+    help="Deprecated (ignored): datacache manages archive staging automatically; "
+         "use --already-downloaded-dir to retain local archives")
+parser_fetch.add_argument(
+    "--force",
+    action="store_true",
+    default=False,
+    help="Re-download and install a fresh bundle generation even if already installed")
 parser_fetch.add_argument(
     "--release",
     # The current release comes from the download catalogue, which a Tab
@@ -133,6 +133,11 @@ parser_dirs.add_argument(
 parser_info = subparsers.add_parser('info')
 parser_info.add_argument('download_name', nargs='?', metavar='DOWNLOAD')
 parser_info.add_argument('--json', action='store_true', help='Print machine-readable JSON')
+parser_info.add_argument(
+    '--verify',
+    action='store_true',
+    default=False,
+    help='Hash extracted files in datacache-managed bundles to verify integrity')
 
 parser_list = subparsers.add_parser('list', help='Browse models and supporting data')
 parser_list.add_argument('--kind', choices=('all', 'models', 'data'), default='all')
@@ -196,72 +201,23 @@ def run(argv=sys.argv[1:]):
     }
     try:
         command_functions[args.subparser_name](args)
-    except (ValueError, RuntimeError, datacache.OfflineError) as error:
+    except (
+        ValueError,
+        RuntimeError,
+        datacache.OfflineError,
+        datacache.FileValidationError,
+    ) as error:
         parser.error(str(error))
-
-
-def mkdir_p(path):
-    """
-    Make directories as needed, similar to mkdir -p in a shell.
-
-    From:
-    http://stackoverflow.com/questions/600268/mkdir-p-functionality-in-python
-    """
-    try:
-        os.makedirs(path)
-    except OSError as exc:  # Python >2.5
-        if exc.errno == errno.EEXIST and os.path.isdir(path):
-            pass
-        else:
-            raise
 
 
 def yes_no(boolean):
     return "YES" if boolean else "NO"
 
 
-def suspicious_tar_member(member):
-    """Return whether a tar member should not be extracted."""
-    name = member.name.strip()
-    if not name or posixpath.isabs(name):
-        return True
-    if ".." in name.split("/"):
-        return True
-    # Keep a normalized guard for unusual path spellings that still resolve
-    # above the extraction directory.
-    normalized = posixpath.normpath(name)
-    if normalized == ".." or normalized.startswith("../"):
-        return True
-    return not (member.isfile() or member.isdir())
-
-
-def download_progress_hook(progress_bar):
-    """Return a ``urlretrieve`` report hook that advances a progress bar.
-
-    Parameters
-    ----------
-    progress_bar : tqdm.tqdm
-        Progress bar counting bytes.
-
-    Returns
-    -------
-    callable
-        ``update_to(b=1, bsize=1, tsize=None)``: ``b`` blocks of ``bsize``
-        bytes transferred so far, of ``tsize`` bytes in total. A ``tsize``
-        of None leaves the bar's total unchanged.
-    """
-    def update_to(b=1, bsize=1, tsize=None):
-        if tsize is not None:
-            progress_bar.total = tsize
-        # update() takes the increment; this also sets n = b * bsize.
-        progress_bar.update(b * bsize - progress_bar.n)
-    return update_to
-
-
 def fetch_subcommand(args):
     def qprint(msg):
         if not args.quiet:
-            print(msg)
+            print(msg, file=sys.stderr)
 
     if not args.release:
         raise RuntimeError(
@@ -269,6 +225,14 @@ def fetch_subcommand(args):
             "a custom models directory. Specify --release to indicate "
             "the release to download.")
 
+    if getattr(args, "keep", False):
+        logging.warning(
+            "--keep is deprecated and ignored; datacache manages archive "
+            "staging automatically. Use --already-downloaded-dir to retain "
+            "and reuse local archives."
+        )
+
+    force = bool(getattr(args, "force", False))
     downloads = get_release_downloads(args.release)
     invalid_download_names = set(
         item for item in args.download_name if item not in downloads)
@@ -276,29 +240,34 @@ def fetch_subcommand(args):
         raise ValueError("Unknown download(s): %s. Valid downloads are: %s" % (
             ', '.join(invalid_download_names), ', '.join(downloads)))
 
-    items_to_fetch = set()
+    items_to_fetch = []
     for (name, info) in downloads.items():
         default = not args.download_name and info['metadata']['default']
-        if name in args.download_name and info['downloaded']:
-            print((
-                "*" * 40 +
-                "\nThe requested download '%s' has already been downloaded. "
-                "To re-download this data, first run: \n\t%s\nin a shell "
-                "and then re-run this command.\n" +
-                "*" * 40) % (name, 'rm -rf ' + quote(
-                    get_path(name, release=args.release))))
-        if not info['downloaded'] and (name in args.download_name or default):
-            items_to_fetch.add(name)
+        requested = name in args.download_name or default
+        if not requested:
+            continue
+        if info['downloaded'] and not force:
+            if name in args.download_name:
+                print(
+                    (
+                        "*" * 40
+                        + "\nThe requested download '%s' is already installed at:\n\t%s\n"
+                        "To re-download or repair this data, re-run with --force.\n"
+                        + "*" * 40
+                    )
+                    % (name, quote(get_path(name, release=args.release))),
+                    file=sys.stderr,
+                )
+            continue
+        items_to_fetch.append(name)
 
+    offline_flag = True if getattr(args, "offline", False) else None
     if items_to_fetch and not args.already_downloaded_dir:
         import datacache
 
-        offline_flag = True if getattr(args, "offline", False) else None
-        for item in sorted(items_to_fetch):
+        for item in items_to_fetch:
             for url in get_download_urls(downloads[item]["metadata"]):
                 datacache.require_online(url, offline=offline_flag)
-
-    mkdir_p(get_downloads_dir(args.release))
 
     qprint("Fetching %d/%d downloads from release %s" % (
         len(items_to_fetch), len(downloads), args.release))
@@ -306,11 +275,9 @@ def fetch_subcommand(args):
     qprint(format_string % (
         "DOWNLOAD NAME", "ALREADY DOWNLOADED?", "WILL DOWNLOAD NOW?", "URL"))
 
+    items_to_fetch_set = set(items_to_fetch)
     for (item, info) in downloads.items():
-        urls = (
-            [info['metadata']["url"]]
-            if "url" in info['metadata']
-            else info['metadata']["part_urls"])
+        urls = get_download_urls(info['metadata'])
         url_description = urls[0]
         if len(urls) > 1:
             url_description += " + %d more parts" % (len(urls) - 1)
@@ -318,114 +285,60 @@ def fetch_subcommand(args):
         qprint(format_string % (
             item,
             yes_no(info['downloaded']),
-            yes_no(item in items_to_fetch),
+            yes_no(item in items_to_fetch_set),
             url_description))
 
     for item in items_to_fetch:
-        _fetch_download(item, downloads[item]['metadata'], args, qprint)
+        bundle_path = install_download(
+            item,
+            release=args.release,
+            metadata=downloads[item]['metadata'],
+            already_downloaded_dir=args.already_downloaded_dir,
+            force=force,
+            offline=offline_flag,
+            show_progress=(False if args.quiet else "auto"),
+        )
+        qprint("Installed %s to: %s" % (item, quote(str(bundle_path))))
 
 
-def _fetch_download(item, metadata, args, qprint):
-    """Stage one complete bundle and receipt before publishing its directory.
-
-    A per-destination lock coordinates installers across processes. Existing
-    directories, including legacy/custom bundles without receipts, are never
-    overwritten. A failed extraction or receipt write leaves no final bundle.
-    """
-    import datacache
-    from filelock import FileLock
-    from urllib.request import urlretrieve
-    from tqdm import tqdm
-
-    tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
-    disable_progress = args.quiet or not datacache.should_show_progress("auto")
-    result_dir = os.path.normpath(get_path(item, test_exists=False, release=args.release))
-    # Keep the lock outside the staged/published directory. OS-backed locks
-    # release on process exit; the small lock file may safely remain.
-    with FileLock(result_dir + ".lock", timeout=600):
-        if os.path.lexists(result_dir):
-            if not os.path.isdir(result_dir):
-                raise FileExistsError("Download destination already exists: %s" % result_dir)
-            qprint("Download already installed; leaving unchanged: %s" % quote(result_dir))
-            return
-        urls = (
-            [metadata["url"]] if "url" in metadata else metadata["part_urls"])
-        temp = NamedTemporaryFile(delete=False, suffix=".tar.bz2")
-        try:
-            for (url_num, url) in enumerate(urls):
-                delete_downloaded = True
-                if args.already_downloaded_dir:
-                    filename = posixpath.basename(urlsplit(url).path)
-                    downloaded_path = os.path.join(
-                        args.already_downloaded_dir, filename)
-                    delete_downloaded = False
-                else:
-                    qprint("Downloading [part %d/%d]: %s" % (
-                        url_num + 1, len(urls), url))
-                    (downloaded_path, _) = urlretrieve(
-                        url,
-                        temp.name if len(urls) == 1 else None,
-                        reporthook=download_progress_hook(tqdm(
-                            unit='B', unit_scale=True, miniters=1,
-                            disable=disable_progress)))
-                    qprint("Downloaded to: %s" % quote(downloaded_path))
-
-                if downloaded_path != temp.name:
-                    qprint("Copying to: %s" % temp.name)
-                    with open(downloaded_path, "rb") as fd:
-                        copyfileobj(fd, temp, length=64*1024*1024)
-                    if delete_downloaded:
-                        os.remove(downloaded_path)
-
-            temp.close()
-            with tarfile.open(temp.name, 'r:bz2') as tar:
-                members = tar.getmembers()
-                names = [member.name for member in members]
-                logging.debug("Extracting: %s" % names)
-                bad_names = [member.name for member in members
-                             if suspicious_tar_member(member)]
-                if bad_names:
-                    raise RuntimeError("Archive has suspicious names: %s" % bad_names)
-                # Same-filesystem rename publishes all payloads and their
-                # receipt together. TemporaryDirectory cleans failed stages.
-                with TemporaryDirectory(
-                        prefix=".%s-stage-" % item,
-                        dir=os.path.dirname(result_dir)) as stage:
-                    for member in tqdm(members, desc='Extracting', disable=disable_progress):
-                        tar.extractall(path=stage, members=[member])
-                    with open(os.path.join(stage, "DOWNLOAD_INFO.csv"), "w", newline="") as fd:
-                        writer = csv.writer(fd)
-                        writer.writerow(["url"])
-                        writer.writerows([url] for url in urls)
-                    os.rename(stage, result_dir)
-            qprint("Extracted %d files to: %s" % (
-                len(names), quote(result_dir)))
-        finally:
-            temp.close()
-            if not args.keep:
-                os.remove(temp.name)
-
-
-def _download_records(release, kind="all"):
+def _download_records(release, kind="all", verify_files=False):
     records = []
-    downloads = get_release_downloads(release)
+    downloads = get_release_downloads(release, verify_files=verify_files)
     presentation = downloads.get('models_class1_presentation')
     for name, info in downloads.items():
         description = get_bundle_description(name)
         if kind != "all" and description["kind"] != kind:
             continue
-        status = (
-            "not installed" if not info["downloaded"] else
-            "installed; source unknown" if info["up_to_date"] is None else
-            "installed; source matches" if info["up_to_date"] else
-            "installed; source differs")
+        if not info["downloaded"]:
+            status = (
+                "invalid installation"
+                if info.get("install_status") == "invalid"
+                else "not installed"
+            )
+        elif info.get("verified"):
+            status = "installed; verified"
+        elif info["up_to_date"] is None:
+            status = "installed; source unknown"
+        elif info["up_to_date"]:
+            status = "installed; source matches"
+        else:
+            status = "installed; source differs"
         records.append(dict(
             name=name, release=release, **description,
             status=status, downloaded=info["downloaded"],
             source_matches=info["up_to_date"],
             path=os.path.abspath(get_path(name, test_exists=False, release=release)),
             urls=get_download_urls(info["metadata"]),
-            default=info["metadata"].get("default", False)))
+            default=info["metadata"].get("default", False),
+            layout=info.get("layout"),
+            install_status=info.get("install_status"),
+            verified=bool(info.get("verified")),
+            trusted_checksum=bool(info.get("trusted_checksum")),
+            fetched_at=info.get("fetched_at"),
+            archive_size=info.get("archive_size"),
+            recorded_sha256=info.get("recorded_sha256"),
+            recorded_urls=info.get("source_urls"),
+        ))
         if presentation and (name == 'models_class1_presentation' or
                              name in _PRESENTATION_COMPONENT_DIRS):
             records[-1]['presentation_components'] = _presentation_components(
@@ -435,8 +348,8 @@ def _download_records(release, kind="all"):
     return records
 
 
-def _find_download(release, name):
-    records = _download_records(release)
+def _find_download(release, name, verify_files=False):
+    records = _download_records(release, verify_files=verify_files)
     for record in records:
         if record["name"] == name:
             return record
@@ -689,8 +602,9 @@ def releases_subcommand(args):
 def info_subcommand(args):
     """Show resolved configuration or a bundle's purpose, sources and usage."""
     release = resolve_release(args.release)
+    verify_files = bool(getattr(args, "verify", False))
     if args.download_name:
-        record = _find_download(release, args.download_name)
+        record = _find_download(release, args.download_name, verify_files=verify_files)
         record['versions'] = get_bundle_versions(record['name'])
         fetch = "mhcflurry downloads fetch %s --release %s" % (record['name'], release)
         record['fetch_command'] = fetch
@@ -704,6 +618,17 @@ def info_subcommand(args):
         print(('Standalone bundle status: ' if record['name'] in _PRESENTATION_COMPONENT_DIRS
                else 'Status: ') + record['status'])
         print("Directory: " + record['path'])
+        if record.get('layout'):
+            print("Storage layout: " + record['layout'])
+        if record.get('fetched_at'):
+            print("Fetched at: " + record['fetched_at'])
+        if record.get('recorded_sha256'):
+            size_part = (
+                " (%d bytes)" % record['archive_size']
+                if record.get('archive_size') is not None
+                else ""
+            )
+            print("Observed archive SHA-256: %s%s" % (record['recorded_sha256'], size_part))
         print("\nFetch: " + fetch)
         print("Locate: mhcflurry downloads path %s --release %s" % (record['name'], release))
         if 'predict_command' in record:
@@ -733,7 +658,13 @@ def info_subcommand(args):
             print("  " + ', '.join(version['releases']))
             for url in version['urls']:
                 print("    " + url)
-        print("\nSource match compares recorded URLs, not file integrity.")
+        if verify_files:
+            if record['verified']:
+                print("\nFull file verification passed against trusted catalogue checksums.")
+            else:
+                print("\nFull verification was not established against trusted catalogue checksums.")
+        else:
+            print("\nSource match compares recorded URLs, not file integrity (pass --verify to hash files).")
         return
 
     defaults = dict(
@@ -750,7 +681,7 @@ def info_subcommand(args):
                              for key, value in defaults.items()},
         default_presentation_components=_presentation_components(defaults['presentation']),
         environment_overrides={key: os.environ.get(key) or None for key in ENVIRONMENT_VARIABLES},
-        downloads=_download_records(release))
+        downloads=_download_records(release, verify_files=verify_files))
     if args.json:
         print(json.dumps(config, indent=2))
         return
