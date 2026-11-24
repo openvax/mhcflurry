@@ -18,7 +18,6 @@ import random
 import sys
 import time
 import traceback
-import warnings
 from multiprocessing.util import Finalize
 
 import numpy
@@ -122,19 +121,12 @@ def worker_init_entry_point(
 
 
 def worker_init(
-        keras_backend=None, backend=None, gpu_device_nums=None,
+        backend=None, gpu_device_nums=None,
         worker_log_dir=None, max_workers_per_gpu=None,
         cpu_threads_per_worker=None,
         cpu_threads_per_worker_was_auto=True,
         worker_context_module=None, worker_context_data=None,
         device_memory_budget_bytes=None):
-    if keras_backend is not None:
-        warnings.warn(
-            "worker_init(keras_backend=...) is ignored, deprecated, and will "
-            "be removed in 2.4.0. Use backend instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
     if worker_log_dir:
         os.makedirs(worker_log_dir, exist_ok=True)
         # Line buffering (buffering=1) ensures every print/traceback flushes

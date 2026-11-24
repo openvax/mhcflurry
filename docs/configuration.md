@@ -105,22 +105,21 @@ training batch alongside the seed. See the
 [PyTorch reproducibility guide](https://docs.pytorch.org/docs/stable/notes/randomness.html)
 for backend-specific determinism controls.
 
-## Unified and historical command names
+## Unified and standalone command names
 
-MHCflurry 2.3 groups commands under one `mhcflurry` entry point. For example:
+MHCflurry groups commands under one `mhcflurry` entry point. For example:
 
 ```text
-mhcflurry-predict                       = mhcflurry predict
-mhcflurry-downloads fetch              = mhcflurry downloads fetch
-mhcflurry-class1-train-pan-allele-models = mhcflurry class1-train-pan-allele-models
+mhcflurry-predict          = mhcflurry predict
+mhcflurry-predict-scan     = mhcflurry predict-scan
+mhcflurry-downloads fetch  = mhcflurry downloads fetch
 ```
 
 `mhcflurry-downloads`, `mhcflurry-predict` and `mhcflurry-predict-scan` remain
-supported names for the same implementation; other tools call them.
+supported standalone scripts for the same implementation; other tools call them.
 
-The hyphenated training, selection and calibration scripts
-(`mhcflurry-class1-train-*`, `mhcflurry-class1-select-*` and
-`mhcflurry-calibrate-percentile-ranks`) are deprecated. They still run, after a
-one-line notice on stderr, and will be removed in 2.4.0; use
-`mhcflurry class1-train-pan-allele-models` and so on.
-`mhcflurry-pseudosequences` is removed; use `mhcflurry pseudosequences`.
+The older hyphenated training, selection, calibration, and pseudosequence
+scripts (`mhcflurry-class1-train-*`, `mhcflurry-class1-select-*`,
+`mhcflurry-calibrate-percentile-ranks`, and `mhcflurry-pseudosequences`) were
+removed in 2.4.0; use `mhcflurry class1-train-pan-allele-models`,
+`mhcflurry calibrate-percentile-ranks`, `mhcflurry pseudosequences`, and so on.

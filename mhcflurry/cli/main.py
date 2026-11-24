@@ -20,18 +20,15 @@ need. This keeps the torch-import cost off the top-level help path.
 
 Two flavors of subcommand:
 
-* **New under the parent**: ``train`` and ``eval``. Each module exposes
-  ``run_argv(argv)`` which does its own argparse. ``compare-models``,
-  ``plot-model-comparison`` and ``paper-figures`` also still dispatch at the
-  top level, with a deprecation notice (see :data:`DEPRECATED_SUBCOMMANDS`);
-  the help lists them only under ``mhcflurry eval``.
-* **Historical mhcflurry-* commands**: ``predict``, ``predict-scan``,
-  ``downloads``, ``calibrate-percentile-ranks``, the ``class1-train-*`` /
-  ``class1-select-*`` family, ``pseudosequences``. Each is wrapped by
-  invoking the command module's existing ``run(argv)`` (or ``main(argv)``
-  for ``pseudosequences``) on the post-subcommand argv. All
-  ``mhcflurry-*`` console scripts in ``pyproject.toml`` remain installed as
-  compat shims pointing at the same underlying entry functions.
+* **Grouped workflows**: ``train`` and ``eval``. Each module exposes
+  ``run_argv(argv)`` which does its own argparse.
+* **Direct subcommands**: ``predict``, ``predict-scan``, ``downloads``,
+  ``calibrate-percentile-ranks``, the ``class1-train-*`` / ``class1-select-*``
+  family, ``pseudosequences``. Each is wrapped by invoking the command module's
+  ``run(argv)`` (or ``main(argv)`` for ``pseudosequences``) on the
+  post-subcommand argv. The standalone console scripts ``mhcflurry-downloads``,
+  ``mhcflurry-predict`` and ``mhcflurry-predict-scan`` point at the same
+  underlying entry functions.
 
 Shell tab completion (argcomplete) completes subcommand names from
 :func:`build_parser`. For the subcommands in ``FLAG_COMPLETION_SUBCOMMANDS``
@@ -61,15 +58,6 @@ _SUBCOMMANDS = {
     "eval": (
         "mhcflurry.cli.eval_command", "run_argv",
         "Evaluation, model comparison, and paper-figure workflows."),
-    "compare-models": (
-        "mhcflurry.cli.compare_models", "run_argv",
-        "Compare two model ensembles on data_evaluation."),
-    "plot-model-comparison": (
-        "mhcflurry.cli.plot_model_comparison", "run_argv",
-        "Render plots from a compare-models output directory."),
-    "paper-figures": (
-        "mhcflurry.cli.paper_figures", "run_argv",
-        "Render paper-style figures from retraining artifacts."),
     "predict": (
         "mhcflurry.cli.predict_command", "run",
         "Predict affinity, processing and presentation for peptides and MHC alleles."),
@@ -152,28 +140,14 @@ _HELP_GROUPS = (
     )),
 )
 
-#: Deprecated top-level subcommands, mapped to the ``mhcflurry eval`` form that
-#: replaces each. They still dispatch, after a one-line notice on stderr, and
-#: will be removed in 2.4.0.
-DEPRECATED_SUBCOMMANDS = {
-    "compare-models": "eval compare-models",
-    "plot-model-comparison": "eval plot-comparison",
-    "paper-figures": "eval paper-figures render",
-}
-
-#: Subcommands that dispatch but are not listed in ``mhcflurry --help``.
-UNLISTED_SUBCOMMANDS = tuple(DEPRECATED_SUBCOMMANDS)
-
-
 def _check_help_groups():
     """Fail-fast at import time if _HELP_GROUPS drifts from _SUBCOMMANDS.
 
     Missing or unknown command names prevent importing this dispatcher.
-    Historical console scripts import their command modules directly and
+    Standalone console scripts import their command modules directly and
     do not run this check. Duplicate grouping is checked by CLI tests.
     """
     grouped = {name for _, names in _HELP_GROUPS for name in names}
-    grouped |= set(UNLISTED_SUBCOMMANDS)
     missing = set(_SUBCOMMANDS) - grouped
     extra = grouped - set(_SUBCOMMANDS)
     # Raise explicitly rather than ``assert`` so the guard survives ``python -O``
@@ -406,12 +380,6 @@ def main(argv=None):
     subcommand = argv[0]
     remaining = argv[1:]
     if subcommand in _SUBCOMMANDS:
-        if subcommand in DEPRECATED_SUBCOMMANDS:
-            print(
-                "mhcflurry %s is deprecated and will be removed in 2.4.0; "
-                "use mhcflurry %s."
-                % (subcommand, DEPRECATED_SUBCOMMANDS[subcommand]),
-                file=sys.stderr)
         module_path, entry, _ = _SUBCOMMANDS[subcommand]
         module = importlib.import_module(module_path)
         # Subcommands' parsers normally default ``prog`` to ``sys.argv[0]``

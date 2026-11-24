@@ -21,7 +21,6 @@ import pytest
 
 from mhcflurry.cli.completion import completing_subcommand, is_completing
 from mhcflurry.cli.main import (
-    DEPRECATED_SUBCOMMANDS,
     FLAG_COMPLETION_SUBCOMMANDS,
     _SUBCOMMANDS,
 )
@@ -141,7 +140,7 @@ def test_completing_subcommand_without_completion_request():
 
 @pytest.mark.parametrize(
     "subcommand",
-    sorted(set(_SUBCOMMANDS) - set(DEPRECATED_SUBCOMMANDS)) + [None])
+    sorted(_SUBCOMMANDS) + [None])
 def test_tab_press_imports_no_heavy_modules(subcommand):
     comp_line = "mhcflurry %s --" % subcommand if subcommand else "mhcflurry "
     env = {key: value for key, value in os.environ.items()
@@ -228,8 +227,7 @@ def test_mhcflurry_completes_subcommands_and_flags(comp_line, expected, tmp_path
 
 
 def test_every_listed_subcommand_supports_flag_completion():
-    listed = set(_SUBCOMMANDS) - set(DEPRECATED_SUBCOMMANDS)
-    assert set(FLAG_COMPLETION_SUBCOMMANDS) == listed
+    assert set(FLAG_COMPLETION_SUBCOMMANDS) == set(_SUBCOMMANDS)
 
 
 def test_allele_and_alleles_aliases_accepted_everywhere():

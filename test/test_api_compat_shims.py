@@ -10,45 +10,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy
+import importlib
+import inspect
+
 import pytest
-import torch
 
+from mhcflurry import common, data_dependent_weights_initialization
 from mhcflurry.class1_neural_network import Class1NeuralNetwork
-from mhcflurry.common import configure_tensorflow
-from mhcflurry.data_dependent_weights_initialization import (
-    get_activations,
-    get_activations_pytorch,
-)
 from mhcflurry.parallelism import worker_init
-
-
-def test_old_local_parallelism_import_warns_and_matches_new_parallelism_package(
-        import_deprecated_module):
-    import mhcflurry.parallelism as new_package
-
-    old_module = import_deprecated_module(
-        "mhcflurry.local_parallelism", "mhcflurry.parallelism")
-    from mhcflurry.parallelism import (
-        cli_args,
-        planning,
-        torch_compile,
-        worker_pool,
-        worker_runtime,
-    )
-
-    assert old_module.worker_init is worker_runtime.worker_init
-    assert old_module.add_local_parallelism_args is cli_args.add_local_parallelism_args
-    assert old_module.resolve_local_parallelism_args is planning.resolve_local_parallelism_args
-    assert (
-        old_module.worker_pool_with_gpu_assignments
-        is worker_pool.worker_pool_with_gpu_assignments
-    )
-    assert (
-        old_module.resolve_torchinductor_compile_threads_env
-        is torch_compile.resolve_torchinductor_compile_threads_env
-    )
-    assert old_module.__all__ == new_package.__all__
 
 
 def test_class1_neural_network_public_helpers_remain_importable():
@@ -71,37 +40,6 @@ def test_class1_neural_network_public_helpers_remain_importable():
     )
 
 
-def test_legacy_configure_tensorflow_entry_point():
-    with pytest.warns(FutureWarning, match="configure_tensorflow"):
-        configure_tensorflow(backend="tensorflow", gpu_device_nums=None, num_threads=1)
-
-
-def test_configure_tensorflow_warns_without_a_backend(monkeypatch):
-    calls = []
-    monkeypatch.setattr(
-        "mhcflurry.common.configure_pytorch", lambda **kwargs: calls.append(kwargs)
-    )
-    with pytest.warns(FutureWarning, match="configure_pytorch"):
-        configure_tensorflow()
-    assert calls == [
-        {"backend": None, "gpu_device_nums": None, "num_threads": None}
-    ]
-
-
-@pytest.mark.usefixtures("preserve_global_random_state")
-def test_legacy_worker_init_keras_backend_warns_and_is_ignored(monkeypatch):
-    calls = []
-    monkeypatch.setattr(
-        "mhcflurry.parallelism.worker_runtime.configure_pytorch",
-        lambda **kwargs: calls.append(kwargs),
-    )
-    with pytest.warns(DeprecationWarning, match="keras_backend"):
-        worker_init(
-            keras_backend="tensorflow-cpu", backend="auto", gpu_device_nums=[]
-        )
-    assert calls == [{"backend": "auto", "gpu_device_nums": []}]
-
-
 @pytest.mark.usefixtures("preserve_global_random_state")
 def test_worker_init_preserves_empty_gpu_assignment(monkeypatch):
     calls = []
@@ -119,45 +57,11 @@ def test_worker_init_preserves_empty_gpu_assignment(monkeypatch):
     assert calls == [{"backend": "auto", "gpu_device_nums": []}]
 
 
-def test_legacy_cache_key_alias():
-    network_json = (
-        '{"dense_layer_l1_regularization": 0.1, '
-        '"dense_layer_l2_regularization": 0.2, "layer_sizes": [8]}'
-    )
-    with pytest.warns(DeprecationWarning, match="model_cache_key"):
-        legacy = Class1NeuralNetwork.keras_network_cache_key(network_json)
-    assert legacy == Class1NeuralNetwork.model_cache_key(network_json)
-
-
-def test_legacy_fit_generator_warns_and_forwards(monkeypatch):
-    calls = []
-    monkeypatch.setattr(
-        Class1NeuralNetwork,
-        "fit_streaming_batches",
-        lambda self, **kwargs: calls.append(kwargs) or "result",
-    )
-    network = Class1NeuralNetwork()
-    with pytest.warns(DeprecationWarning, match="fit_streaming_batches"):
-        result = network.fit_generator("generator", "peptides", "affinities", epochs=3)
-    assert result == "result"
-    assert calls[0]["generator"] == "generator"
-    assert calls[0]["validation_peptide_encoding"] == "peptides"
-    assert calls[0]["validation_affinities"] == "affinities"
-    assert calls[0]["epochs"] == 3
-
-
-def test_legacy_get_activations_warns_and_matches_pytorch_helper():
-    class Network(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.dense = torch.nn.Linear(3, 2)
-
-        def forward(self, inputs):
-            return self.dense(inputs["peptide"])
-
-    model = Network()
-    batch = {"peptide": numpy.ones((4, 3), dtype="float32")}
-    expected = get_activations_pytorch(model, "dense", batch)
-    with pytest.warns(DeprecationWarning, match="get_activations_pytorch"):
-        legacy = get_activations(model, "dense", batch)
-    numpy.testing.assert_array_equal(legacy, expected)
+def test_removed_keras_era_aliases_are_absent():
+    assert not hasattr(common, "configure_tensorflow")
+    assert not hasattr(Class1NeuralNetwork, "keras_network_cache_key")
+    assert not hasattr(Class1NeuralNetwork, "fit_generator")
+    assert not hasattr(data_dependent_weights_initialization, "get_activations")
+    assert "keras_backend" not in inspect.signature(worker_init).parameters
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("mhcflurry.local_parallelism")

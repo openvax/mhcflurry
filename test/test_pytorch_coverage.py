@@ -562,38 +562,3 @@ class TestConfigurePyTorch:
             assert common._pytorch_backend == "auto"
         finally:
             common._pytorch_backend = old_backend
-
-    def test_configure_tensorflow_cpu_backend_maps_to_cpu(self):
-        from mhcflurry import common
-        old_backend = common._pytorch_backend
-        try:
-            with pytest.warns(FutureWarning, match="configure_tensorflow"):
-                common.configure_tensorflow(backend="tensorflow-cpu")
-            assert common._pytorch_backend == "cpu"
-            assert str(common.get_pytorch_device()) == "cpu"
-        finally:
-            common._pytorch_backend = old_backend
-
-    def test_configure_tensorflow_default_alias_maps_to_auto(self):
-        from mhcflurry import common
-        old_backend = common._pytorch_backend
-        try:
-            common.configure_pytorch(backend="cpu")
-            with pytest.warns(FutureWarning, match="configure_tensorflow"):
-                common.configure_tensorflow(backend="tensorflow-default")
-            assert common._pytorch_backend == "auto"
-        finally:
-            common._pytorch_backend = old_backend
-
-    def test_configure_tensorflow_gpu_backend_maps_to_gpu(self):
-        from mhcflurry import common
-        old_backend = common._pytorch_backend
-        try:
-            with pytest.warns(FutureWarning, match="configure_tensorflow"):
-                common.configure_tensorflow(backend="tensorflow-gpu")
-            assert common._pytorch_backend == "gpu"
-            if not torch.cuda.is_available():
-                with pytest.raises(RuntimeError, match="CUDA is not available"):
-                    common.get_pytorch_device()
-        finally:
-            common._pytorch_backend = old_backend

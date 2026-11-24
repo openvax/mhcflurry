@@ -19,7 +19,6 @@ import shlex
 import sys
 import os
 import json
-import warnings
 
 import numpy
 import pandas
@@ -506,12 +505,6 @@ _pytorch_backend = "auto"
 _PYTORCH_BACKEND_ALIASES = {
     "default": "auto",
 }
-_TENSORFLOW_BACKEND_ALIASES = {
-    "tensorflow": "auto",
-    "tensorflow-default": "auto",
-    "tensorflow-gpu": "gpu",
-    "tensorflow-cpu": "cpu",
-}
 _VALID_PYTORCH_BACKENDS = ("auto", "gpu", "mps", "cpu")
 
 
@@ -568,42 +561,6 @@ def configure_pytorch(backend=None, gpu_device_nums=None, num_threads=None):
     if num_threads:
         import torch
         torch.set_num_threads(num_threads)
-
-
-def configure_tensorflow(backend=None, gpu_device_nums=None, num_threads=None):
-    """
-    Deprecated configuration entry point from the TF backend era; will be
-    removed in 2.4.0. Use :func:`configure_pytorch` instead.
-
-    Parameters
-    ----------
-    backend : str, optional
-        TensorFlow-era names such as "tensorflow-cpu" are translated to the
-        equivalent PyTorch backend.
-    gpu_device_nums : list of str or int, optional
-        GPU device identifiers to potentially use.
-    num_threads : int, optional
-        Number of threads for backend operations.
-    """
-    translated_backend = None
-    if backend is not None:
-        translated_backend = _TENSORFLOW_BACKEND_ALIASES.get(backend)
-        if translated_backend is None:
-            translated_backend = normalize_pytorch_backend(backend)
-    warnings.warn(
-        (
-            "configure_tensorflow(backend=%r) is deprecated and will be "
-            "removed in 2.4.0; using PyTorch backend=%r. Use "
-            "configure_pytorch() instead."
-        ) % (backend, translated_backend),
-        FutureWarning,
-        stacklevel=2,
-    )
-    configure_pytorch(
-        backend=translated_backend,
-        gpu_device_nums=gpu_device_nums,
-        num_threads=num_threads,
-    )
 
 
 def get_pytorch_device():

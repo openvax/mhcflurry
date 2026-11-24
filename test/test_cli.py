@@ -49,31 +49,23 @@ def test_top_level_parser_lists_subcommands():
     help_text = parser.format_help()
     assert "train" in help_text
     assert "eval" in help_text
-    for name in cli_main.UNLISTED_SUBCOMMANDS:
-        # Still dispatchable for existing scripts...
-        assert name in cli_main._SUBCOMMANDS
-    # ...but the friendly top-level help lists only `mhcflurry eval ...`.
     friendly = cli_main.format_help()
     assert "Shortcuts for eval subcommands" not in friendly
-    for name in cli_main.UNLISTED_SUBCOMMANDS:
+    for name in ("compare-models", "plot-model-comparison", "paper-figures"):
+        assert name not in cli_main._SUBCOMMANDS
         assert "\n  %s " % name not in friendly
 
 
-@pytest.mark.parametrize("name,replacement", [
-    ("compare-models", "mhcflurry eval compare-models"),
-    ("plot-model-comparison", "mhcflurry eval plot-comparison"),
-    ("paper-figures", "mhcflurry eval paper-figures render"),
+@pytest.mark.parametrize("name", [
+    "compare-models",
+    "plot-model-comparison",
+    "paper-figures",
 ])
-def test_deprecated_top_level_eval_shortcuts_print_notice(name, replacement, capsys):
+def test_removed_top_level_eval_shortcuts_error(name, capsys):
     with pytest.raises(SystemExit) as exit_info:
         cli_main.main([name, "--help"])
-    assert exit_info.value.code == 0
-    captured = capsys.readouterr()
-    assert captured.err == (
-        "mhcflurry %s is deprecated and will be removed in 2.4.0; use %s.\n"
-        % (name, replacement))
-    # The shortcut still runs the command, whose usage names the new form.
-    assert "usage: %s" % replacement in captured.out
+    assert exit_info.value.code == 2
+    assert "invalid choice" in capsys.readouterr().err
 
 
 def test_eval_subcommands_print_no_deprecation_notice(capsys):
@@ -2076,7 +2068,7 @@ def test_compare_models_help_runs(capsys):
     the legacy module is actually invoked.
     """
     with pytest.raises(SystemExit):
-        cli_main.main(["compare-models", "--help"])
+        cli_main.main(["eval", "compare-models", "--help"])
     captured = capsys.readouterr().out
     for flag in ["--a", "--b", "--include", "--out", "--data-dir",
                  "--num-jobs", "--gpus", "--max-workers-per-gpu",
@@ -2266,7 +2258,7 @@ def test_compare_models_presentation_parallelism_overrides():
 
 def test_plot_help_runs(capsys):
     with pytest.raises(SystemExit):
-        cli_main.main(["plot-model-comparison", "--help"])
+        cli_main.main(["eval", "plot-comparison", "--help"])
     captured = capsys.readouterr().out
     assert "--input" in captured
     assert "--a-label" in captured
@@ -2315,7 +2307,7 @@ def test_plot_model_comparison_dispatches_paper_figures(tmp_path, monkeypatch):
 
 def test_paper_figures_help_runs(capsys):
     with pytest.raises(SystemExit):
-        cli_main.main(["paper-figures", "--help"])
+        cli_main.main(["eval", "paper-figures", "render", "--help"])
     captured = capsys.readouterr().out
     assert "--scores-dir" in captured
     assert "--artifacts-dir" in captured
@@ -2332,7 +2324,7 @@ def test_unknown_subcommand_errors():
         parser.parse_args(["does-not-exist"])
 
 
-def test_hyphenated_console_scripts_are_deprecated_except_predict_and_downloads():
+def test_only_supported_hyphenated_console_scripts_remain():
     from .test_packaging import declared_console_scripts
 
     scripts = {
@@ -2340,50 +2332,9 @@ def test_hyphenated_console_scripts_are_deprecated_except_predict_and_downloads(
         if name.startswith("mhcflurry-")
     }
     kept = {"mhcflurry-downloads", "mhcflurry-predict", "mhcflurry-predict-scan"}
-    assert kept.issubset(scripts)
-    assert "mhcflurry-pseudosequences" not in scripts
-    deprecated = set(scripts) - kept
-    assert len(deprecated) == 8
-    for name in deprecated:
-        subcommand = name[len("mhcflurry-"):]
-        assert subcommand in cli_main._SUBCOMMANDS
-        assert scripts[name] == (
-            "mhcflurry.cli.deprecated_scripts:%s" % subcommand.replace("-", "_"))
-        module = importlib.import_module("mhcflurry.cli.deprecated_scripts")
-        assert callable(getattr(module, subcommand.replace("-", "_")))
-    for name in kept:
-        assert "deprecated_scripts" not in scripts[name]
-
-
-def test_deprecated_console_script_prints_notice_and_runs_subcommand(
-        monkeypatch, capsys):
-    from mhcflurry.cli import deprecated_scripts
-
-    monkeypatch.setattr(
-        sys, "argv", ["mhcflurry-class1-select-pan-allele-models", "--help"])
-    with pytest.raises(SystemExit) as exit_info:
-        deprecated_scripts.class1_select_pan_allele_models()
-    assert exit_info.value.code == 0
-    captured = capsys.readouterr()
-    assert captured.err == (
-        "mhcflurry-class1-select-pan-allele-models is deprecated and will be "
-        "removed in 2.4.0; use mhcflurry class1-select-pan-allele-models.\n")
-    assert "--out-models-dir" in captured.out
-
-
-def test_deprecated_console_script_is_silent_during_completion(
-        monkeypatch, capsys):
-    from mhcflurry.cli import deprecated_scripts
-
-    seen_parsers = []
-    monkeypatch.setattr(
-        deprecated_scripts.argcomplete, "autocomplete", seen_parsers.append)
-    monkeypatch.setattr(sys, "argv", ["mhcflurry-class1-select-pan-allele-models"])
-    monkeypatch.setattr(deprecated_scripts, "is_completing", lambda: True)
-    deprecated_scripts.class1_select_pan_allele_models()
-    assert len(seen_parsers) == 1
-    assert "--models-dir" in seen_parsers[0].format_help()
-    assert capsys.readouterr().err == ""
+    assert set(scripts) == kept
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("mhcflurry.cli.deprecated_scripts")
 
 
 def test_all_legacy_commands_registered():
@@ -3165,7 +3116,7 @@ def test_remote_launcher_rejects_dirty_or_mislabeled_release_source(
 
 def test_main_help_does_not_import_predict_command():
     """``mhcflurry --help`` must not pay the cost of importing every
-    legacy command module. Lazy-import is the whole reason build_parser
+    command module. Lazy-import is the whole reason build_parser
     only registers subcommand names."""
     import subprocess
     import sys as _sys
@@ -3174,8 +3125,7 @@ def test_main_help_does_not_import_predict_command():
          "import sys; from mhcflurry.cli.main import build_parser; "
          "build_parser(); "
          "print('\\n'.join(name for name in ("
-         "'mhcflurry.predict_command', "
-         "'mhcflurry.cli.predict_command') if name in sys.modules))"],
+         "'mhcflurry.cli.predict_command',) if name in sys.modules))"],
         capture_output=True, text=True, check=True,
     )
     assert result.stdout.strip() == "", (
@@ -3184,8 +3134,7 @@ def test_main_help_does_not_import_predict_command():
     )
 
 
-def test_legacy_command_module_shims_warn_and_reexport_cli_modules(
-        import_deprecated_module):
+def test_removed_legacy_command_module_shims_raise_module_not_found():
     command_modules = [
         "calibrate_percentile_ranks_command",
         "downloads_command",
@@ -3200,21 +3149,11 @@ def test_legacy_command_module_shims_warn_and_reexport_cli_modules(
         "train_presentation_models_command",
     ]
     for module_name in command_modules:
-        legacy = import_deprecated_module(
-            "mhcflurry.%s" % module_name, "mhcflurry.cli.%s" % module_name)
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module("mhcflurry.%s" % module_name)
         canonical = importlib.import_module("mhcflurry.cli.%s" % module_name)
-        assert legacy.run is canonical.run
-        assert legacy.parser is canonical.parser
-
-    # Names outside ``__all__`` still resolve through the wrapper.
-    from mhcflurry.cli import predict_command as cli_predict_command
-
-    legacy = import_deprecated_module(
-        "mhcflurry.predict_command", "mhcflurry.cli.predict_command")
-    assert (
-        legacy._predict_dataframe_chunk
-        is cli_predict_command._predict_dataframe_chunk
-    )
+        assert callable(canonical.run)
+        assert canonical.parser is not None
 
 
 def test_main_dispatches_pseudosequences_list(capsys):

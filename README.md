@@ -23,10 +23,10 @@ NetMHCpan and other tools behind one interface.
 ## Install
 
 MHCflurry needs Python 3.11 or later on Linux or macOS. Install the latest
-stable 2.3 patch release and download the pretrained presentation models:
+stable 2.4 patch release and download the pretrained presentation models:
 
 ```shell
-pip install --upgrade "mhcflurry>=2.3,<2.4"
+pip install --upgrade "mhcflurry>=2.4,<2.5"
 mhcflurry downloads fetch models_class1_presentation
 ```
 
@@ -104,9 +104,10 @@ To complete subcommands and options with Tab, run
 `eval "$(register-python-argcomplete mhcflurry)"` to your shell startup file.
 
 Scripts that use `mhcflurry-predict`, `mhcflurry-predict-scan` or
-`mhcflurry-downloads` keep working. The other older `mhcflurry-*` names are
-deprecated in favour of `mhcflurry <subcommand>`; see the
-[2.3.0 release notes](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.3.0.md).
+`mhcflurry-downloads` keep working. The older hyphenated training, selection,
+and calibration scripts were removed in 2.4.0 in favour of
+`mhcflurry <subcommand>`; see the
+[2.4.0 release notes](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.4.0.md).
 
 ## Documentation
 

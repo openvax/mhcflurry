@@ -50,8 +50,6 @@ See:
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import warnings
-
 import numpy
 import torch
 import torch.nn as nn
@@ -161,32 +159,6 @@ def get_activations_pytorch(
     handle.remove()
 
     return activations['output']
-
-
-def get_activations(model, layer, X_batch):
-    """
-    Deprecated activation helper from the TF backend era; will be removed
-    in 2.4.0. Use :func:`get_activations_pytorch` instead.
-
-    Parameters
-    ----------
-    model : nn.Module
-    layer : str or object with ``name`` attribute
-    X_batch : dict
-        Network input dictionary.
-    """
-    warnings.warn(
-        "get_activations is deprecated and will be removed in 2.4.0. "
-        "Use get_activations_pytorch instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    layer_name = layer if isinstance(layer, str) else getattr(layer, "name", None)
-    if layer_name is None:
-        raise ValueError("Layer must be a layer name or an object with a name attribute.")
-    if not isinstance(X_batch, dict):
-        raise ValueError("X_batch must be a dict of model inputs.")
-    return get_activations_pytorch(model, layer_name, X_batch)
 
 
 def lsuv_init(
