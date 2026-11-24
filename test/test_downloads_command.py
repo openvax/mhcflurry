@@ -533,3 +533,31 @@ def test_legacy_posix_allele_filenames_install_and_verify(tmp_path, monkeypatch)
     assert info["install_status"] == "available"
 
 
+def test_install_download_forwards_default_timeout_and_retries(tmp_path, monkeypatch):
+    """Regression test for #462: bound hung downloads with explicit timeout and retries."""
+    seen = []
+
+    def fake_install_archive(store_dir, sources, **kwargs):
+        seen.append(kwargs["download_options"])
+        return Path(store_dir) / "bundles" / "fake"
+
+    monkeypatch.setattr(datacache, "install_archive", fake_install_archive)
+    monkeypatch.setattr(downloads, "_DOWNLOADS_DIR", str(tmp_path))
+    monkeypatch.setattr(downloads, "_CURRENT_RELEASE", "test")
+    entry = {
+        "name": "models",
+        "url": "https://example.invalid/models.tar.bz2",
+    }
+
+    downloads.install_download("models", release="test", metadata=entry)
+    assert seen[-1]["timeout"] == downloads.DEFAULT_DOWNLOAD_TIMEOUT
+    assert seen[-1]["max_retries"] == downloads.DEFAULT_DOWNLOAD_MAX_RETRIES
+
+    downloads.install_download(
+        "models", release="test", metadata=entry, timeout=15, max_retries=1
+    )
+    assert seen[-1]["timeout"] == 15
+    assert seen[-1]["max_retries"] == 1
+
+
+
