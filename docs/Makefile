@@ -47,7 +47,7 @@ help:
 # Added by Tim
 .PHONY: generate
 generate:
-	sphinx-apidoc -M -f -o _build/ ../mhcflurry ../mhcflurry/local_parallelism.py
+	sphinx-apidoc -M -f -o _build/ ../mhcflurry
 
 .PHONY: clean
 clean:

@@ -22,7 +22,6 @@ import weakref
 import itertools
 import os
 import logging
-import warnings
 
 import numpy
 import pandas
@@ -2093,19 +2092,6 @@ class Class1NeuralNetwork(object):
         description = json.loads(network_json, object_hook=drop_properties)
         return json.dumps(description)
 
-    @staticmethod
-    def keras_network_cache_key(network_json):
-        """
-        Deprecated alias for ``model_cache_key``; will be removed in 2.4.0.
-        """
-        warnings.warn(
-            "Class1NeuralNetwork.keras_network_cache_key is deprecated and "
-            "will be removed in 2.4.0. Use model_cache_key instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return Class1NeuralNetwork.model_cache_key(network_json)
-
     def network(self, borrow=False):
         """
         Return the PyTorch model associated with this predictor.
@@ -3094,58 +3080,6 @@ class Class1NeuralNetwork(object):
         if first_batch_time is not None:
             fit_info["first_batch_time"] = first_batch_time
         self.fit_info.append(dict(fit_info))
-
-    def fit_generator(
-            self,
-            generator,
-            validation_peptide_encoding,
-            validation_affinities,
-            validation_allele_encoding=None,
-            validation_inequalities=None,
-            validation_output_indices=None,
-            steps_per_epoch=10,
-            epochs=1000,
-            min_epochs=0,
-            patience=10,
-            min_delta=0.0,
-            verbose=1,
-            progress_callback=None,
-            progress_preamble="",
-            progress_print_interval=5.0,
-            generator_factory=None,
-            generator_batches_are_encoded=False,
-            save_all_checkpoints=False):
-        """Deprecated alias for :meth:`fit_streaming_batches`.
-
-        The name is historical from the old Keras API and will be removed in
-        2.4.0.
-        """
-        warnings.warn(
-            "Class1NeuralNetwork.fit_generator is deprecated and will be "
-            "removed in 2.4.0. Use fit_streaming_batches instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.fit_streaming_batches(
-            generator=generator,
-            validation_peptide_encoding=validation_peptide_encoding,
-            validation_affinities=validation_affinities,
-            validation_allele_encoding=validation_allele_encoding,
-            validation_inequalities=validation_inequalities,
-            validation_output_indices=validation_output_indices,
-            steps_per_epoch=steps_per_epoch,
-            epochs=epochs,
-            min_epochs=min_epochs,
-            patience=patience,
-            min_delta=min_delta,
-            verbose=verbose,
-            progress_callback=progress_callback,
-            progress_preamble=progress_preamble,
-            progress_print_interval=progress_print_interval,
-            generator_factory=generator_factory,
-            generator_batches_are_encoded=generator_batches_are_encoded,
-            save_all_checkpoints=save_all_checkpoints,
-        )
 
     def _random_negatives_pool_for_fit(
             self,

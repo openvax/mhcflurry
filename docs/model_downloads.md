@@ -1,8 +1,9 @@
 # Downloading and selecting model weights
 
-Code and weights have separate versions. A code patch can keep the same default
-weights: the current package uses the 2.3.0 weight release. New weight releases
-identify changed model artifacts; they need not accompany every code release.
+Code and weights have separate versions. Code releases can keep the same
+default weights: the current package uses the 2.3.0 weight release. New weight
+releases identify changed model artifacts; they need not accompany every code
+release.
 Historical catalogue names remain available for reproducibility.
 
 ## Browse what is available

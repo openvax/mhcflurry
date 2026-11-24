@@ -10,12 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Local parallelism helpers.
-
-This package contains the implementation formerly held in
-``mhcflurry.local_parallelism``. The old module is a deprecated wrapper
-that will be removed in 2.4.0.
-"""
+"""Local parallelism helpers for training and prediction workers."""
 
 from importlib import import_module
 

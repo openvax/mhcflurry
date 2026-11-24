@@ -54,16 +54,12 @@ def test_public_classes_keep_identity_and_pickle_paths():
         getattr(mhcflurry, 'missing_public_class')
 
 
-def test_parallelism_exports_keep_identity_and_legacy_imports(
-        import_deprecated_module):
+def test_parallelism_exports_keep_identity():
     from mhcflurry import parallelism
 
-    local_parallelism = import_deprecated_module(
-        "mhcflurry.local_parallelism", "mhcflurry.parallelism")
     for name, module in parallelism._EXPORTS.items():
         value = getattr(parallelism, name)
         assert value is getattr(importlib.import_module('mhcflurry.parallelism.' + module), name)
-        assert getattr(local_parallelism, name) is value
         assert name in dir(parallelism)
     with pytest.raises(AttributeError):
         getattr(parallelism, 'missing_worker_helper')

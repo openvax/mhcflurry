@@ -30,8 +30,6 @@ Do not change the API include to a plain Markdown include: the build can then
 silently omit the actual class and method documentation. The `api_coverage`
 extension fails builds that omit any class in `mhcflurry.__all__` or a
 method the guides link to.
-The legacy `local_parallelism` re-export module is excluded from generation;
-its canonical API is documented under `mhcflurry.parallelism`.
 
 The shared percentile guide also has executable Python examples and CLI
 templates checked by `test/test_percentile_documentation.py`. Keep its
