@@ -957,6 +957,163 @@ class Class1AffinityPredictor(object):
             self.save(
                 models_dir_for_save, model_names_to_write=[model_name])
 
+    def _sync_allele_to_canonical_for_keys(self, canonical_keys):
+        """Update ``self.allele_to_canonical`` for newly registered allele keys."""
+        if self.allele_to_sequence is None:
+            return
+        for canonical_name in canonical_keys:
+            # If a previously aliased target is now present directly, remove the
+            # stale redirect so exact keys take precedence.
+            self.allele_to_canonical.pop(canonical_name, None)
+            aliased = normalize_allele_name(
+                canonical_name,
+                raise_on_error=False,
+                use_allele_aliases=True,
+            )
+            if (
+                aliased is not None
+                and aliased != canonical_name
+                and aliased not in self.allele_to_sequence
+            ):
+                self.allele_to_canonical[aliased] = canonical_name
+
+    def add_allele_from_sequence(
+            self,
+            allele,
+            protein_sequence,
+            *,
+            gene="",
+            mutations=(),
+            allow_fragments=False,
+            overwrite=False):
+        """Extract a Class I pseudosequence via ``mhcseqs`` and register it.
+
+        Allows predicting binding affinity for a novel allele, non-model
+        species, or point mutant from its raw heavy-chain amino acid sequence
+        without modifying existing alleles.
+
+        Parameters
+        ----------
+        allele : str
+            MHC Class I allele name. Normalized via ``mhcgnomes``.
+        protein_sequence : str
+            Full-length, mature, or partial Class I heavy-chain protein
+            sequence.
+        gene : str, optional
+            Optional gene symbol hint passed to ``mhcseqs``.
+        mutations : sequence of str, optional
+            Optional mature-numbered point mutations (e.g. ``("K66A",)``)
+            applied before binding-groove extraction.
+        allow_fragments : bool, optional
+            If True, allow single-domain fragments (padding the missing groove
+            domain with ``"X"``). Default: False.
+        overwrite : bool, optional
+            If True, allow replacing an existing pseudosequence for ``allele``.
+            Default: False.
+
+        Returns
+        -------
+        str
+            The extracted fixed-length pseudosequence registered for
+            ``allele``.
+        """
+        from .pseudosequences import (
+            extract_class1_pseudosequence,
+            pseudosequence_length,
+        )
+
+        if self.allele_to_sequence is None:
+            raise ValueError(
+                "This predictor has no allele_to_sequence table (not a "
+                "pan-allele predictor)."
+            )
+        length = pseudosequence_length(self.allele_to_sequence)
+        if length is None:
+            raise ValueError(
+                "Cannot infer a uniform pseudosequence length from "
+                "self.allele_to_sequence."
+            )
+
+        canonical = normalize_allele_name(allele, use_allele_aliases=False)
+        if not overwrite and canonical in self.allele_to_sequence:
+            raise ValueError(
+                "Allele %r is already in allele_to_sequence. Pass "
+                "overwrite=True to replace it." % canonical
+            )
+
+        pseudosequence = extract_class1_pseudosequence(
+            protein_sequence,
+            length=length,
+            allele=canonical,
+            gene=gene,
+            mutations=mutations,
+            allow_fragments=allow_fragments,
+        )
+        self.allele_to_sequence[canonical] = pseudosequence
+        self._sync_allele_to_canonical_for_keys((canonical,))
+        self._master_allele_encoding = None
+        self._cache.clear()
+        return pseudosequence
+
+    def extend_alleles_from_mhcseqs(
+            self,
+            sequences_csv=None,
+            *,
+            rows=None,
+            prefer_existing=True,
+            max_x=None,
+            include_fragments=False):
+        """Strictly generalize ``self.allele_to_sequence`` using ``mhcseqs``.
+
+        Preserves all existing non-``X`` allele pseudosequences by default
+        (``prefer_existing=True``), upgrades ``X``-containing entries when
+        ``mhcseqs`` supplies more complete grooves, and adds all newly covered
+        Class I alleles from ``mhcseqs``.
+
+        Parameters
+        ----------
+        sequences_csv : str, optional
+            Path to ``mhc-full-seqs.csv`` (defaults to the standard ``mhcseqs``
+            search order). Ignored when ``rows`` is supplied.
+        rows : iterable of mapping, optional
+            Pre-loaded ``mhcseqs`` row mappings.
+        prefer_existing : bool, optional
+            Preserve existing non-``X`` pseudosequences verbatim so predictions
+            on previously supported alleles never drift. Default: True.
+        max_x : int, optional
+            Maximum allowed ``"X"`` characters in added pseudosequences.
+        include_fragments : bool, optional
+            Include single-domain groove fragments padded with ``"X"``.
+
+        Returns
+        -------
+        int
+            Number of newly added alleles.
+        """
+        from .pseudosequences import extend_allele_to_sequence_from_mhcseqs
+
+        if self.allele_to_sequence is None:
+            raise ValueError(
+                "This predictor has no allele_to_sequence table (not a "
+                "pan-allele predictor)."
+            )
+        before = set(self.allele_to_sequence)
+        updated = extend_allele_to_sequence_from_mhcseqs(
+            self.allele_to_sequence,
+            sequences_csv=sequences_csv,
+            rows=rows,
+            prefer_existing=prefer_existing,
+            max_x=max_x,
+            include_fragments=include_fragments,
+            normalize_alleles=True,
+        )
+        added_keys = set(updated) - before
+        self.allele_to_sequence = updated
+        self._sync_allele_to_canonical_for_keys(added_keys)
+        self._master_allele_encoding = None
+        self._cache.clear()
+        return len(added_keys)
+
     def percentile_ranks(self, affinities, allele=None, alleles=None, throw=True):
         """
         Return percentile ranks for the given ic50 affinities and alleles.

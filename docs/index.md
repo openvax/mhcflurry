@@ -19,6 +19,9 @@ presentation.
   predictors on identical data.
 - {doc}`dla_validation` reports DLA support, training evidence, and the limits
   of the exploratory canine evaluation.
+- {doc}`cross_species_validation` shows how to predict on newly sequenced
+  species and pocket mutants via `mhcseqs`, and reports zero-shot cross-species
+  validation benchmarks.
 - {doc}`training` fits custom models from your own measurements.
 - {doc}`evaluation` compares a trained model with a released one.
 
@@ -57,6 +60,7 @@ docker
 model_downloads
 release_model_evaluation
 dla_validation
+cross_species_validation
 training
 evaluation
 ```

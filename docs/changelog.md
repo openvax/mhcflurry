@@ -6,7 +6,18 @@ Full per-version notes live in the repository's
 [`release-notes/` directory](https://github.com/openvax/mhcflurry/tree/master/release-notes)
 and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
-## 2.4 series (current)
+## 2.5 series (current)
+
+- **[2.5.0](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.0.md)**:
+  Adds `mhcseqs`-backed Class I binding-groove pseudosequence extraction
+  (`mhcflurry.pseudosequences`, `Class1AffinityPredictor.add_allele_from_sequence`,
+  `extend_alleles_from_mhcseqs`, and `mhcflurry pseudosequences extract|build`),
+  delegating to `mhcseqs >= 2.9.0` IMGT G-DOMAIN alignment with groove-insertion
+  and no-op-mutation diagnostic warnings. Includes zero-shot cross-species
+  validation benchmarks and figures ({doc}`cross_species_validation`). Existing
+  `2.3.0` weights and predictions are unchanged.
+
+## 2.4 series
 
 - **2.4.1**: Documentation navigation cleanup (moves internal training-recipe
   notes under {doc}`maintainers`, adds a public API overview to {doc}`api`,
