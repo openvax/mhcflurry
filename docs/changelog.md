@@ -8,6 +8,13 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.1](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.1.md)**:
+  Migrates `mhcflurry downloads fetch` onto `datacache>=1.37.0`
+  (`install_archive` / `inspect_archive`) with pinned `2.3.0` SHA-256 checksums
+  and byte sizes, `--force` refresh/repair, `downloads info --verify`,
+  read-only legacy directory preservation, and `portable_names` support for
+  historical POSIX tarballs (#484). Existing weights and predictions are
+  unchanged.
 - **[2.5.0](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.0.md)**:
   Adds `mhcseqs`-backed Class I binding-groove pseudosequence extraction
   (`mhcflurry.pseudosequences`, `Class1AffinityPredictor.add_allele_from_sequence`,

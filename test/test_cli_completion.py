@@ -197,7 +197,7 @@ assert not heavy, heavy
     ("mhcflurry predict-scan --seq", {"--sequences", "--sequence-id-column",
                                       "--sequence-column"}),
     ("mhcflurry downloads ", {"fetch", "info", "list", "releases", "path", "url"}),
-    ("mhcflurry downloads fetch --", {"--release", "--keep",
+    ("mhcflurry downloads fetch --", {"--release", "--keep", "--force", "--offline",
                                       "--already-downloaded-dir"}),
     ("mhcflurry pseudosequences ", {"filename", "legacy", "path", "list"}),
     ("mhcflurry class1-train-pan-allele-models --",

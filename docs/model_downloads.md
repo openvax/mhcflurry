@@ -131,10 +131,15 @@ resolved configuration. Use `mhcflurry downloads --verbose info` for configured
 default predictor paths, components inside the default presentation predictor,
 and environment variables.
 
-On macOS the default root is `~/Library/Application Support/mhcflurry/4/`; each
-weight release has its own subdirectory, and the presentation predictor is
-inside `models_class1_presentation/models`. The `4` is the cache-layout
-version, not a model version.
+On macOS the default shared OpenVax cache root is
+`~/Library/Caches/openvax/mhcflurry/` (historical installs under
+`~/Library/Application Support/mhcflurry/4/` are detected and preserved
+automatically). Each weight release has its own subdirectory; newly fetched
+archives are installed transactionally through `datacache` under
+`<release>/.datacache/<bundle>/`, while existing legacy `<release>/<bundle>/`
+directories continue to be read without migration. Always resolve paths with
+`mhcflurry downloads path <bundle>` or `mhcflurry.downloads.get_path(...)`
+rather than assuming a fixed physical directory layout.
 
 These environment variables are optional overrides. In `info` output, `unset`
 means the default is in use, not that the local path is missing.
@@ -142,6 +147,7 @@ means the default is in use, not that the local path is missing.
 | Variable | Effect |
 |---|---|
 | `MHCFLURRY_DATA_DIR` | Changes the parent of the release directories. |
+| `OPENVAX_DATA_CACHE` | Sets the shared OpenVax cache root (`<dir>/mhcflurry`). |
 | `MHCFLURRY_DOWNLOADS_CURRENT_RELEASE` | Changes the active catalogue. |
 | `MHCFLURRY_DOWNLOADS_DIR` | Selects an unversioned custom download directory. |
 | `MHCFLURRY_DEFAULT_CLASS1_*` | Overrides individual predictor defaults; `info` lists each variable. |
@@ -154,11 +160,14 @@ source URLs matching the requested bundle; otherwise it asks you to use a
 versioned cache or select the local model explicitly with `--models`. A
 release selector must not silently load another release's weights.
 
-“Installed” means a directory exists. “Source matches” means its
-`DOWNLOAD_INFO.csv` URLs match the catalogue; it does not verify every file's
-integrity. Public model checksums are attached to the corresponding GitHub
-release. The `--release` option is supported consistently by `fetch`, `list`,
-`info`, `path`, and `url`.
+Ordinary `list` and `info` commands stay offline and fast: they inspect
+manifests and recorded source URLs without hashing every model file. Pass
+`mhcflurry downloads info <bundle> --verify` to hash extracted files in a
+`datacache`-managed bundle against trusted catalogue checksums (pinned for the
+`2.3.0` model archives), and use `mhcflurry downloads fetch <bundle> --force`
+to refresh or repair an installation without disrupting active readers. The
+`--release` option is supported consistently by `fetch`, `list`, `info`,
+`path`, and `url`.
 
 ## Why archive tags differ
 

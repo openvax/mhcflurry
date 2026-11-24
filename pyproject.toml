@@ -26,10 +26,9 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 dependencies = [
-    "datacache>=1.34.0,<2",
+    "datacache>=1.37.0,<2",
     "pandas>=3,<4",
     "platformdirs",
-    "filelock>=3",
     "scikit-learn",
     "threadpoolctl",
     "matplotlib",
