@@ -29,6 +29,7 @@ import csv
 
 ENVIRONMENT_VARIABLES = [
     "MHCFLURRY_DATA_DIR",
+    "OPENVAX_DATA_CACHE",
     "MHCFLURRY_DOWNLOADS_CURRENT_RELEASE",
     "MHCFLURRY_DOWNLOADS_DIR",
     "MHCFLURRY_DEFAULT_CLASS1_MODELS",
@@ -338,14 +339,32 @@ def get_path(download_name, filename='', test_exists=True, release=None):
     return path
 
 
+def resolve_data_location():
+    """Resolve the base MHCflurry data directory and explain why (read-only).
+
+    Precedence: ``MHCFLURRY_DATA_DIR`` -> ``OPENVAX_DATA_CACHE/mhcflurry`` ->
+    populated shared platform cache -> populated legacy
+    ``user_data_dir("mhcflurry", version="4")`` -> default shared platform cache.
+    """
+    import datacache
+
+    # Increase the legacy version only on breaking layout changes; historical
+    # installs under platformdirs version="4" are preserved automatically.
+    return datacache.resolve_cache_dir(
+        "mhcflurry",
+        "MHCFLURRY_DATA_DIR",
+        legacy=(user_data_dir("mhcflurry", version="4"),),
+    )
+
+
 def configure():
     """
     Setup various global variables based on environment variables.
 
     Runs automatically the first time the download directory or current
     release is needed. Call it again after changing
-    ``MHCFLURRY_DOWNLOADS_DIR``, ``MHCFLURRY_DOWNLOADS_CURRENT_RELEASE`` or
-    ``MHCFLURRY_DATA_DIR``.
+    ``MHCFLURRY_DOWNLOADS_DIR``, ``MHCFLURRY_DOWNLOADS_CURRENT_RELEASE``,
+    ``MHCFLURRY_DATA_DIR``, or ``OPENVAX_DATA_CACHE``.
     """
     global _DOWNLOADS_DIR
     global _CURRENT_RELEASE
@@ -371,12 +390,7 @@ def configure():
                 current_release_compatability,
                 current_compatability)
 
-        data_dir = environ.get("MHCFLURRY_DATA_DIR")
-        if not data_dir:
-            # increase the version every time we make a breaking change in
-            # how the data is organized. For changes to e.g. just model
-            # serialization, the downloads release numbers should be used.
-            data_dir = user_data_dir("mhcflurry", version="4")
+        data_dir = resolve_data_location().path
         _DOWNLOADS_DIR = join(data_dir, _CURRENT_RELEASE)
 
     logging.debug("Configured MHCFLURRY_DOWNLOADS_DIR: %s", _DOWNLOADS_DIR)

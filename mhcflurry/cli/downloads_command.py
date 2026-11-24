@@ -40,8 +40,7 @@ import errno
 import tarfile
 import textwrap
 from itertools import zip_longest
-from shutil import copyfileobj
-from shutil import get_terminal_size
+from shutil import copyfileobj, get_terminal_size, rmtree
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
 import posixpath
@@ -56,6 +55,7 @@ from ..downloads import (
     get_bundle_description,
     get_bundle_versions,
     get_download_urls,
+    resolve_data_location,
     resolve_release,
     get_release_downloads,
     get_downloads_dir,
@@ -118,6 +118,17 @@ parser_fetch.add_argument(
     "--already-downloaded-dir",
     metavar="DIR",
     help="Don't download files, get them from DIR")
+parser_fetch.add_argument(
+    "--offline",
+    action="store_true",
+    default=False,
+    help="Disallow network downloads (also honors OPENVAX_OFFLINE / DATACACHE_OFFLINE)")
+
+parser_dirs = subparsers.add_parser(
+    'dirs',
+    help='Show data cache locations, sizes, and offline status (read-only)')
+parser_dirs.add_argument(
+    '--json', action='store_true', help='Print machine-readable JSON')
 
 parser_info = subparsers.add_parser('info')
 parser_info.add_argument('download_name', nargs='?', metavar='DOWNLOAD')
@@ -136,6 +147,24 @@ parser_path.add_argument(
     "download_name",
     nargs="?",
     default='')
+parser_path.add_argument('--json', action='store_true', help='Print machine-readable JSON')
+
+parser_prune = subparsers.add_parser(
+    'prune',
+    help='Remove non-current downloaded release directories (dry-run by default)')
+parser_prune.add_argument(
+    '--yes',
+    action='store_true',
+    default=False,
+    help='Actually delete non-current release directories (default is dry-run)')
+parser_prune.add_argument(
+    '--keep-release',
+    action='append',
+    default=None,
+    metavar='RELEASE',
+    help='Additional catalogue release(s) to preserve (repeatable)')
+parser_prune.add_argument(
+    '--json', action='store_true', help='Print machine-readable JSON')
 
 parser_url = subparsers.add_parser('url')
 parser_url.add_argument(
@@ -147,23 +176,27 @@ for subparser in (parser_info, parser_list, parser_path, parser_url):
 
 
 def run(argv=sys.argv[1:]):
+    import datacache
+
     argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
     logging.basicConfig(level=(logging.DEBUG if args.verbose else
                                logging.WARNING if args.quiet else logging.INFO))
 
     command_functions = {
+        "dirs": dirs_subcommand,
         "fetch": fetch_subcommand,
         "info": info_subcommand,
         "list": list_subcommand,
         "releases": releases_subcommand,
         "path": path_subcommand,
+        "prune": prune_subcommand,
         "url": url_subcommand,
         None: lambda args: parser.print_help(),
     }
     try:
         command_functions[args.subparser_name](args)
-    except (ValueError, RuntimeError) as error:
+    except (ValueError, RuntimeError, datacache.OfflineError) as error:
         parser.error(str(error))
 
 
@@ -257,6 +290,14 @@ def fetch_subcommand(args):
         if not info['downloaded'] and (name in args.download_name or default):
             items_to_fetch.add(name)
 
+    if items_to_fetch and not args.already_downloaded_dir:
+        import datacache
+
+        offline_flag = True if getattr(args, "offline", False) else None
+        for item in sorted(items_to_fetch):
+            for url in get_download_urls(downloads[item]["metadata"]):
+                datacache.require_online(url, offline=offline_flag)
+
     mkdir_p(get_downloads_dir(args.release))
 
     qprint("Fetching %d/%d downloads from release %s" % (
@@ -291,11 +332,13 @@ def _fetch_download(item, metadata, args, qprint):
     directories, including legacy/custom bundles without receipts, are never
     overwritten. A failed extraction or receipt write leaves no final bundle.
     """
+    import datacache
     from filelock import FileLock
     from urllib.request import urlretrieve
     from tqdm import tqdm
 
     tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
+    disable_progress = args.quiet or not datacache.should_show_progress("auto")
     result_dir = os.path.normpath(get_path(item, test_exists=False, release=args.release))
     # Keep the lock outside the staged/published directory. OS-backed locks
     # release on process exit; the small lock file may safely remain.
@@ -324,7 +367,7 @@ def _fetch_download(item, metadata, args, qprint):
                         temp.name if len(urls) == 1 else None,
                         reporthook=download_progress_hook(tqdm(
                             unit='B', unit_scale=True, miniters=1,
-                            disable=args.quiet)))
+                            disable=disable_progress)))
                     qprint("Downloaded to: %s" % quote(downloaded_path))
 
                 if downloaded_path != temp.name:
@@ -348,7 +391,7 @@ def _fetch_download(item, metadata, args, qprint):
                 with TemporaryDirectory(
                         prefix=".%s-stage-" % item,
                         dir=os.path.dirname(result_dir)) as stage:
-                    for member in tqdm(members, desc='Extracting', disable=args.quiet):
+                    for member in tqdm(members, desc='Extracting', disable=disable_progress):
                         tar.extractall(path=stage, members=[member])
                     with open(os.path.join(stage, "DOWNLOAD_INFO.csv"), "w", newline="") as fd:
                         writer = csv.writer(fd)
@@ -739,14 +782,220 @@ def info_subcommand(args):
         print("\nFull paths and overrides: mhcflurry downloads --verbose info")
 
 
+def _dir_size_bytes(path):
+    if not os.path.exists(path):
+        return 0
+    if os.path.isfile(path):
+        try:
+            return os.path.getsize(path)
+        except OSError:
+            return 0
+    total = 0
+    for dirpath, _dirnames, filenames in os.walk(path):
+        for name in filenames:
+            try:
+                total += os.path.getsize(os.path.join(dirpath, name))
+            except OSError:
+                continue
+    return total
+
+
+def _installed_release_dirs():
+    """Return installed known-release directories under the configured data root."""
+    current = get_current_release()
+    if current is None:
+        return []
+    root = os.path.dirname(os.path.abspath(get_downloads_dir()))
+    if not os.path.isdir(root):
+        return []
+    known_releases = set(get_downloads_metadata()['releases'])
+    entries = []
+    for name in sorted(os.listdir(root)):
+        if name not in known_releases:
+            continue
+        full = os.path.join(root, name)
+        if os.path.islink(full) or not os.path.isdir(full):
+            continue
+        entries.append(dict(
+            release=name,
+            path=full,
+            size_bytes=_dir_size_bytes(full),
+            is_current=(name == current),
+        ))
+    return entries
+
+
+def dirs_subcommand(args):
+    """Show resolved data locations, disk usage, and offline state (read-only)."""
+    import datacache
+
+    loc = resolve_data_location()
+    active_dir = os.path.abspath(get_downloads_dir())
+    custom_dir = os.environ.get("MHCFLURRY_DOWNLOADS_DIR") or None
+    current_release = get_current_release()
+    installed_releases = _installed_release_dirs()
+    offline_src = datacache.offline_source()
+
+    data_root_exists = os.path.exists(loc.path)
+    data_root_bytes = _dir_size_bytes(loc.path)
+    active_exists = os.path.exists(active_dir)
+    active_bytes = _dir_size_bytes(active_dir)
+
+    payload = dict(
+        package="mhcflurry",
+        version=__version__,
+        offline=offline_src is not None,
+        offline_source=offline_src,
+        configured_release=current_release,
+        custom_downloads_dir=custom_dir,
+        data_root=dict(
+            path=os.path.abspath(loc.path),
+            origin=loc.origin,
+            detail=loc.detail,
+            exists=data_root_exists,
+            size_bytes=data_root_bytes,
+        ),
+        active_downloads_dir=dict(
+            path=active_dir,
+            exists=active_exists,
+            size_bytes=active_bytes,
+        ),
+        installed_releases=installed_releases,
+    )
+    if args.json:
+        print(json.dumps(payload, indent=2))
+        return
+
+    origin_text = (
+        "%s (%s)" % (loc.origin, loc.detail) if loc.detail else loc.origin
+    )
+    print("mhcflurry data locations (code %s)" % __version__)
+    print("  data_root        : %s [%s; %s]" % (
+        payload["data_root"]["path"],
+        origin_text,
+        datacache.format_bytes(data_root_bytes),
+    ))
+    print("  active_downloads : %s [%s]" % (
+        active_dir,
+        datacache.format_bytes(active_bytes) if active_exists else "not created",
+    ))
+    if custom_dir:
+        print("  custom_override  : MHCFLURRY_DOWNLOADS_DIR=%s" % quote(custom_dir))
+    if installed_releases:
+        print("  installed_releases:")
+        for entry in installed_releases:
+            tag = " (current)" if entry["is_current"] else ""
+            print("    %-10s %10s  %s%s" % (
+                entry["release"],
+                datacache.format_bytes(entry["size_bytes"]),
+                entry["path"],
+                tag,
+            ))
+    if offline_src:
+        print("  offline          : enabled (%s)" % offline_src)
+    else:
+        print("  offline          : disabled")
+
+
+def prune_subcommand(args):
+    """Remove non-current downloaded release directories (dry-run by default)."""
+    import datacache
+
+    dry_run = not args.yes
+    current = get_current_release()
+    if current is None:
+        payload = dict(
+            dry_run=dry_run,
+            configured_release=None,
+            data_root=None,
+            kept=[],
+            candidates=[],
+            deleted=[],
+            reclaimable_bytes=0,
+            freed_bytes=0,
+            note="MHCFLURRY_DOWNLOADS_DIR points to a custom unversioned directory; skipping prune.",
+        )
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print(payload["note"])
+        return
+
+    keep_set = {current}
+    for rel in (args.keep_release or ()):
+        keep_set.add(resolve_release(rel))
+
+    entries = _installed_release_dirs()
+    kept = [e for e in entries if e["release"] in keep_set]
+    candidates = [e for e in entries if e["release"] not in keep_set]
+    reclaimable_bytes = sum(e["size_bytes"] for e in candidates)
+    deleted = []
+    if not dry_run:
+        for entry in candidates:
+            rmtree(entry["path"])
+            deleted.append(entry)
+    freed_bytes = sum(e["size_bytes"] for e in deleted)
+    root = os.path.dirname(os.path.abspath(get_downloads_dir()))
+    payload = dict(
+        dry_run=dry_run,
+        configured_release=current,
+        data_root=root,
+        kept=kept,
+        candidates=candidates,
+        deleted=deleted,
+        reclaimable_bytes=reclaimable_bytes,
+        freed_bytes=freed_bytes,
+    )
+    if args.json:
+        print(json.dumps(payload, indent=2))
+        return
+
+    print("mhcflurry downloads root: %s" % root)
+    if not entries:
+        print("No installed release directories found; nothing to prune.")
+        return
+    for entry in entries:
+        action = "DELETE" if entry in candidates else "keep  "
+        marker = " (current)" if entry["is_current"] else ""
+        print("  %s  %-10s %10s  %s%s" % (
+            action,
+            entry["release"],
+            datacache.format_bytes(entry["size_bytes"]),
+            entry["path"],
+            marker,
+        ))
+    if not candidates:
+        print("Nothing to prune.")
+        return
+    if dry_run:
+        print(
+            "\nDry run — would free %s across %d release dir(s). "
+            "Re-run with --yes to delete."
+            % (datacache.format_bytes(reclaimable_bytes), len(candidates))
+        )
+        return
+    print(
+        "\nDeleted %d release dir(s), freed %s."
+        % (len(deleted), datacache.format_bytes(freed_bytes))
+    )
+
+
 def path_subcommand(args):
     """Print a bundle directory or the download root for the selected release."""
     release = resolve_release(args.release)
     if args.download_name:
         _find_download(release, args.download_name)
-        print(get_path(args.download_name, release=release))
+        path = get_path(args.download_name, release=release)
     else:
-        print(get_downloads_dir(release))
+        path = get_downloads_dir(release)
+    if getattr(args, "json", False):
+        print(json.dumps(dict(
+            release=release,
+            download=args.download_name or None,
+            path=path,
+        ), indent=2))
+    else:
+        print(path)
 
 
 def url_subcommand(args):
