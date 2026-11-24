@@ -406,21 +406,25 @@ def test_prediction_loads_selected_release(module, versioned_cache, monkeypatch,
     path = versioned_cache / '2.2.0' / BUNDLE / 'models'
     path.mkdir(parents=True)
     (path / 'weights.csv').touch()
-    seen = []
+    seen_alleles = []
+    seen_lengths = []
 
-    class Predictor:
-        supported_alleles = ['test-allele']
+    def list_alleles(directory):
+        seen_alleles.append(directory)
+        return ['test-allele']
 
-    def load(directory):
-        seen.append(directory)
-        if module is predict_command:
-            return Predictor(), False
-        return Predictor()
+    def list_lengths(directory):
+        seen_lengths.append(directory)
+        return (8, 11)
 
-    monkeypatch.setattr(module, '_load_predictor_for_command', load)
+    monkeypatch.setattr(module, '_supported_alleles_for_command', list_alleles)
+    monkeypatch.setattr(module, '_supported_peptide_lengths_for_command', list_lengths)
     module.run(['--model-release', '2.2.0', '--list-supported-alleles'])
-    assert seen == [str(path)]
+    assert seen_alleles == [str(path)]
     assert capsys.readouterr().out.strip() == 'test-allele'
+    module.run(['--model-release', '2.2.0', '--list-supported-peptide-lengths'])
+    assert seen_lengths == [str(path)]
+    assert capsys.readouterr().out.strip().splitlines() == ['8', '9', '10', '11']
 
 
 def test_default_affinity_and_processing_load_fall_back_to_presentation(

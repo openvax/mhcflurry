@@ -13,6 +13,7 @@
 """Persistence helpers for class I affinity predictors."""
 
 import collections
+import csv
 import json
 import logging
 from functools import partial
@@ -22,12 +23,13 @@ from os.path import abspath, commonpath, dirname, exists, join, realpath, relpat
 import pandas
 from mhcgnomes import parse, parse_gene_class
 
-from ..class1_neural_network import Class1NeuralNetwork
+from ..class1_encoding import peptide_sequences_to_network_input
 from ..common import load_weights, normalize_allele_name, save_weights
 from ..downloads import (
     get_default_class1_models_dir,
     get_default_class1_presentation_models_dir,
 )
+from ..encodable_sequences import EncodingError
 from ..percentile_calibration import load_percent_rank_transforms, save_percent_rank_transforms
 from ..pseudosequences import (
     LEGACY_ALLELE_SEQUENCES_FILENAME,
@@ -240,62 +242,19 @@ def save_predictor(predictor, models_dir, model_names_to_write=None, write_metad
     predictor.models_dir = abspath(models_dir)
 
 
-def load_predictor(
-        predictor_class,
-        models_dir=None,
-        max_models=None,
-        optimization_level=None,
-        optimization_level_default=None):
+def _resolve_affinity_models_dir(models_dir):
+    """Return the affinity predictor directory for an affinity or presentation bundle."""
+    if exists(join(models_dir, "weights.csv")):
+        return join(models_dir, "affinity_predictor")
+    return models_dir
+
+
+def _load_allele_sequences(models_dir, build_alias_map=True):
+    """Load and normalize pseudosequences from a saved affinity predictor directory.
+
+    Returns ``(allele_to_sequence, allele_to_canonical)`` where
+    ``allele_to_sequence`` is ``None`` when no pseudosequence file is present.
     """
-    Deserialize a predictor from a directory on disk.
-
-    Parameters
-    ----------
-    predictor_class : type
-        Predictor class to instantiate.
-
-    models_dir : string
-        Path to directory. If unspecified the default downloaded models are
-        used.
-
-    max_models : int, optional
-        Maximum number of `Class1NeuralNetwork` instances to load
-
-    optimization_level : int or None
-        If >0, model optimization will be attempted. When None, use
-        optimization_level_default supplied by the public loader.
-
-    optimization_level_default : int or None
-        Fallback supplied by the public loader when no explicit level is set.
-        That loader reads MHCFLURRY_OPTIMIZATION_LEVEL with a default of 1.
-
-    Returns
-    -------
-    `Class1AffinityPredictor` instance
-    """
-    if models_dir is None:
-        try:
-            models_dir = get_default_class1_models_dir()
-        except RuntimeError as e:
-            # Fall back to the affinity predictor embedded in the default
-            # presentation bundle when standalone models_class1_pan is absent.
-            try:
-                candidate = join(
-                    get_default_class1_presentation_models_dir(),
-                    "affinity_predictor")
-            except (RuntimeError, IOError):
-                raise e
-            if not exists(join(candidate, "manifest.csv")):
-                raise e
-            models_dir = candidate
-
-    if optimization_level is None:
-        optimization_level = optimization_level_default
-
-    manifest_path = join(models_dir, "manifest.csv")
-    manifest_df = pandas.read_csv(manifest_path, nrows=max_models)
-
-    # ----- Load pseudosequences first so we can canonicalize -----
     allele_to_sequence = None
     allele_to_canonical = {}
     allele_sequences_filename = None
@@ -360,15 +319,126 @@ def load_predictor(
                 ", ".join(sorted(skipped_unparseable)[:10])
                 + (" ..." if len(skipped_unparseable) > 10 else ""))
 
-        # Map mhcgnomes-aliased forms back to pseudosequence keys.
-        # e.g. Mamu-A1*007:01 -> Mamu-A*07:01
-        for canonical_name in allele_to_sequence:
-            aliased = normalize_allele_name(
-                canonical_name, raise_on_error=False,
-                use_allele_aliases=True)
-            if (aliased is not None and aliased != canonical_name
-                    and aliased not in allele_to_sequence):
-                allele_to_canonical[aliased] = canonical_name
+        if build_alias_map:
+            # Map mhcgnomes-aliased forms back to pseudosequence keys.
+            # e.g. Mamu-A1*007:01 -> Mamu-A*07:01
+            for canonical_name in allele_to_sequence:
+                aliased = normalize_allele_name(
+                    canonical_name, raise_on_error=False,
+                    use_allele_aliases=True)
+                if (aliased is not None and aliased != canonical_name
+                        and aliased not in allele_to_sequence):
+                    allele_to_canonical[aliased] = canonical_name
+
+    return allele_to_sequence, allele_to_canonical
+
+
+def read_supported_alleles(models_dir):
+    """Read supported alleles from a predictor directory without loading weights or torch."""
+    affinity_dir = _resolve_affinity_models_dir(models_dir)
+    with open(join(affinity_dir, "manifest.csv"), newline="") as fd:
+        allele_specific = {
+            row["allele"]
+            for row in csv.DictReader(fd)
+            if row["allele"] and row["allele"] != "pan-class1"
+        }
+    allele_to_sequence, allele_to_canonical = _load_allele_sequences(
+        affinity_dir, build_alias_map=bool(allele_specific))
+
+    def to_canonical(raw_name):
+        normalized = normalize_allele_name(raw_name, raise_on_error=False) or raw_name
+        return allele_to_canonical.get(normalized, normalized)
+
+    result = {to_canonical(allele) for allele in allele_specific}
+    if allele_to_sequence:
+        result.update(allele_to_sequence)
+    return sorted(result)
+
+
+def read_supported_peptide_lengths(models_dir):
+    """Read supported ``(min_len, max_len)`` from a predictor directory without loading weights or torch."""
+    affinity_dir = _resolve_affinity_models_dir(models_dir)
+    with open(join(affinity_dir, "manifest.csv"), newline="") as fd:
+        unique_configs = {
+            row["config_json"]
+            for row in csv.DictReader(fd)
+            if row.get("config_json")
+        }
+    length_ranges = set()
+    for config_json in unique_configs:
+        config = json.loads(config_json)
+        peptide_encoding = config["hyperparameters"]["peptide_encoding"]
+        try:
+            peptide_sequences_to_network_input([""], peptide_encoding=peptide_encoding)
+        except EncodingError as error:
+            length_ranges.add(error.supported_peptide_lengths)
+        else:
+            raise RuntimeError("peptide_sequences_to_network_input did not raise")
+    return (
+        max(lower for (lower, upper) in length_ranges),
+        min(upper for (lower, upper) in length_ranges),
+    )
+
+
+def load_predictor(
+        predictor_class,
+        models_dir=None,
+        max_models=None,
+        optimization_level=None,
+        optimization_level_default=None):
+    """
+    Deserialize a predictor from a directory on disk.
+
+    Parameters
+    ----------
+    predictor_class : type
+        Predictor class to instantiate.
+
+    models_dir : string
+        Path to directory. If unspecified the default downloaded models are
+        used.
+
+    max_models : int, optional
+        Maximum number of `Class1NeuralNetwork` instances to load
+
+    optimization_level : int or None
+        If >0, model optimization will be attempted. When None, use
+        optimization_level_default supplied by the public loader.
+
+    optimization_level_default : int or None
+        Fallback supplied by the public loader when no explicit level is set.
+        That loader reads MHCFLURRY_OPTIMIZATION_LEVEL with a default of 1.
+
+    Returns
+    -------
+    `Class1AffinityPredictor` instance
+    """
+    from ..class1_neural_network import Class1NeuralNetwork
+
+    if models_dir is None:
+        try:
+            models_dir = get_default_class1_models_dir()
+        except RuntimeError as e:
+            # Fall back to the affinity predictor embedded in the default
+            # presentation bundle when standalone models_class1_pan is absent.
+            try:
+                candidate = join(
+                    get_default_class1_presentation_models_dir(),
+                    "affinity_predictor")
+            except (RuntimeError, IOError):
+                raise e
+            if not exists(join(candidate, "manifest.csv")):
+                raise e
+            models_dir = candidate
+
+    if optimization_level is None:
+        optimization_level = optimization_level_default
+
+    manifest_path = join(models_dir, "manifest.csv")
+    manifest_df = pandas.read_csv(manifest_path, nrows=max_models)
+
+    # ----- Load pseudosequences first so we can canonicalize -----
+    allele_to_sequence, allele_to_canonical = _load_allele_sequences(models_dir)
 
     def to_canonical(raw_name):
         """Normalize a raw allele name to its canonical pseudosequence key."""

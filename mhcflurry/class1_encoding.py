@@ -13,6 +13,7 @@
 """Peptide encoding helpers for class I neural networks."""
 
 import logging
+import sys
 
 from . import amino_acid
 from .encodable_sequences import EncodableSequences
@@ -149,8 +150,8 @@ def peptide_sequences_to_network_input(
     """
     if not peptide_amino_acid_encoding_torch:
         _warn_legacy_peptide_vector_encoding(peptide_amino_acid_encoding_torch)
-    from .numeric_sequences import NumericSequences
-    if isinstance(peptides, NumericSequences):
+    numeric_mod = sys.modules.get(__package__ + ".numeric_sequences")
+    if numeric_mod is not None and isinstance(peptides, numeric_mod.NumericSequences):
         return peptides.aligned_tensor(peptide_encoding, device=device)
     encoder = EncodableSequences.create(peptides)
     return (

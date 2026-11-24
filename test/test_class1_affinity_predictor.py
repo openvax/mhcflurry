@@ -255,6 +255,38 @@ def test_invalid_alleles_raise_or_return_row_aligned_nans(caplog):
     assert numpy.isnan(ranks).all()
 
 
+def test_validation_does_not_log_warning_when_throwing(caplog):
+    """Regression test for #443: throw=True raises without duplicate WARNING logs."""
+    class ConstantModel:
+        supported_peptide_lengths = (8, 15)
+
+        def predict(self, peptides, **kwargs):
+            return numpy.full(len(peptides), 123.0)
+
+    predictor = Class1AffinityPredictor(
+        allele_to_allele_specific_models={
+            "HLA-A*02:01": [ConstantModel()],
+        },
+    )
+
+    for peptides, allele, expected_match in [
+        (["SIINFEKL!"], "HLA-A*02:01", "nonstandard amino acids"),
+        (["SHORT"], "HLA-A*02:01", "outside of supported range"),
+        (["SIINFEKL"], "HLA-B*07:02", "No single-allele models"),
+    ]:
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
+            with pytest.raises(ValueError, match=expected_match):
+                predictor.predict(peptides, allele=allele, throw=True)
+        assert not caplog.records, [r.message for r in caplog.records]
+
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
+            result = predictor.predict(peptides, allele=allele, throw=False)
+        assert numpy.isnan(result).all()
+        assert any(expected_match in r.message for r in caplog.records)
+
+
 def test_tolerant_prediction_handles_nan_normalized_allele(monkeypatch):
     """Pandas may coerce the internal None sentinel to floating NaN."""
     class ConstantModel:
