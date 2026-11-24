@@ -324,7 +324,7 @@ before compiling losses to avoid the PyTorch 2.4 / Triton
    Document the rule the orchestrator applies.
 3. If worker-private: just read it from `os.environ` inside `fit()`
    or wherever it's consumed. Document it in
-   `RELEASE_NOTES_<version>.md`.
+   `release-notes/<version>.md`.
 
 ### Adding a new worker-side filter
 

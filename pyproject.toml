@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mhcflurry"
+dynamic = ["version"]
+description = "MHC Binding Predictor"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+authors = [
+    { name = "Tim O'Donnell and Alex Rubinsteyn", email = "timodonnell@gmail.com" },
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+    "pandas>=3,<4",
+    "platformdirs",
+    "filelock>=3",
+    "scikit-learn",
+    "threadpoolctl",
+    "matplotlib",
+    "mhcgnomes>=3.33.6",
+    "numpy>=2,<3",
+    "pyyaml",
+    "tqdm",
+    "torch>=2.0.0",
+    "argcomplete>=3",
+]
+
+[project.urls]
+Homepage = "https://github.com/openvax/mhcflurry"
+Repository = "https://github.com/openvax/mhcflurry"
+Documentation = "https://openvax.github.io/mhcflurry/"
+Issues = "https://github.com/openvax/mhcflurry/issues"
+
+[project.scripts]
+mhcflurry = "mhcflurry.cli.main:main"
+mhcflurry-downloads = "mhcflurry.cli.downloads_command:run"
+mhcflurry-predict = "mhcflurry.cli.predict_command:run"
+mhcflurry-predict-scan = "mhcflurry.cli.predict_scan_command:run"
+mhcflurry-class1-train-allele-specific-models = "mhcflurry.cli.deprecated_scripts:class1_train_allele_specific_models"
+mhcflurry-class1-train-pan-allele-models = "mhcflurry.cli.deprecated_scripts:class1_train_pan_allele_models"
+mhcflurry-class1-train-processing-models = "mhcflurry.cli.deprecated_scripts:class1_train_processing_models"
+mhcflurry-class1-select-allele-specific-models = "mhcflurry.cli.deprecated_scripts:class1_select_allele_specific_models"
+mhcflurry-class1-select-pan-allele-models = "mhcflurry.cli.deprecated_scripts:class1_select_pan_allele_models"
+mhcflurry-class1-select-processing-models = "mhcflurry.cli.deprecated_scripts:class1_select_processing_models"
+mhcflurry-calibrate-percentile-ranks = "mhcflurry.cli.deprecated_scripts:calibrate_percentile_ranks"
+mhcflurry-class1-train-presentation-models = "mhcflurry.cli.deprecated_scripts:class1_train_presentation_models"
+_mhcflurry-cluster-worker-entry-point = "mhcflurry.cluster_parallelism:worker_entry_point"
+
+[tool.setuptools.dynamic]
+version = { attr = "mhcflurry.version.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["mhcflurry", "mhcflurry.*"]
+
+[tool.setuptools.package-data]
+mhcflurry = ["downloads.yml"]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint]
+# Keep the release gate focused on correctness. Formatting and modernization
+# rules are intentionally not enabled: applying them to this legacy scientific
+# codebase would produce a large, prediction-risking mechanical rewrite.
+# The rule set is listed explicitly so Ruff upgrades do not silently enable
+# additional style rules across the existing codebase (issue #361).
+select = [
+    "E4",
+    "E7",
+    "E9",
+    "F",
+    "B006",
+    "B023",
+    "PLW1508",
+    "RUF100",
+]

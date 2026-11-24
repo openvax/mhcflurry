@@ -37,7 +37,7 @@ app = App("mhcflurry-" + RUN_ID)
 # A git archive has no .git ancestor. runplz otherwise falls back to the
 # nested launcher's directory, staging scripts/training rather than the package.
 app.repo_root = Path(__file__).resolve().parents[2]
-if not (app.repo_root / "setup.py").is_file():
+if not (app.repo_root / "pyproject.toml").is_file():
     raise ValueError("Launch from a complete mhcflurry source archive")
 image = (Image.from_registry("pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime")
          .apt_install("python-is-python3", "bzip2", "build-essential", "git")
