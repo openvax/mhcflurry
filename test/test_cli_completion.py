@@ -12,7 +12,6 @@
 
 """Shell tab completion (argcomplete) stays wired up and import-light."""
 
-import ast
 import os
 from pathlib import Path
 import subprocess
@@ -26,6 +25,7 @@ from mhcflurry.cli.main import (
     FLAG_COMPLETION_SUBCOMMANDS,
     _SUBCOMMANDS,
 )
+from .test_packaging import declared_console_scripts
 
 REPO_DIR = Path(__file__).resolve().parents[1]
 
@@ -37,28 +37,9 @@ HEAVY_MODULES = (
 )
 
 
-def console_scripts():
-    """Read the console scripts that setup.py installs.
-
-    Returns
-    -------
-    dict
-        Script name mapped to its ``"module:function"`` entry point.
-    """
-    tree = ast.parse((REPO_DIR / "setup.py").read_text())
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Dict):
-            for key, value in zip(node.keys, node.values):
-                if isinstance(key, ast.Constant) and key.value == "console_scripts":
-                    return dict(
-                        (part.strip() for part in spec.split("=", 1))
-                        for spec in ast.literal_eval(value))
-    raise AssertionError("setup.py declares no console_scripts")
-
-
 # The underscore-prefixed cluster worker is internal; nobody types it.
 USER_SCRIPTS = {
-    name: target for name, target in console_scripts().items()
+    name: target for name, target in declared_console_scripts().items()
     if not name.startswith("_")
 }
 

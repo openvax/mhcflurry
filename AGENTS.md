@@ -16,21 +16,20 @@ Guide for coding agents working in this repo. Read this before touching code.
 
 ## Repo Shape (read before scripting)
 
-Unlike its siblings, mhcflurry does **not** have `test.sh`, `deploy.sh`, or `format.sh`. It has:
-
 - `develop.sh` — **source** this (`source develop.sh`) to create/activate `.venv` and editable-install. Do not `./develop.sh` (its venv activation won't persist).
 - `lint.sh` — `ruff check mhcflurry/ test/` (note: tests live in `test/`, singular).
-- `setup.py` — packaging.
-- No `pyproject.toml`.
+- `test.sh` — runs `python -m pytest test/` (or forwards arguments to `python -m pytest "$@"`) so PyTorch can see MPS accelerators on macOS.
+- `pyproject.toml` — packaging, Ruff, and pytest configuration.
+- `release-notes/<version>.md` — per-version release notes.
 
-If you want to add `test.sh` / `deploy.sh` / `format.sh` to match the other openvax repos, that's a welcome foundational PR — discuss with Alex first.
+mhcflurry does not currently have `deploy.sh` or `format.sh`.
 
 ## Before Completing Any Task
 
 Before telling the user a change is "complete":
 
 1. **`./lint.sh`** — must pass (ruff check)
-2. **Run tests**: `python -m pytest test/` (no `test.sh` wrapper). On macOS this matters: the generated `pytest` console script can hide PyTorch MPS accelerators. For the slow ML suite you may need downloaded models — see `docker/` or `.github/workflows/ci.yml`.
+2. **Run tests**: `./test.sh` (runs `python -m pytest test/`; extra args are forwarded to pytest). On macOS this matters: the generated `pytest` console script can hide PyTorch MPS accelerators. For the slow ML suite you may need downloaded models — see `docker/` or `.github/workflows/ci.yml`.
 3. For a PR: **CI must be green on GitHub**, then merge, then release (see Golden Rule 3).
 
 ## Code Style

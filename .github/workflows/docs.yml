@@ -31,7 +31,7 @@ jobs:
           cache: pip
           cache-dependency-path: |
             docs/requirements.txt
-            setup.py
+            pyproject.toml
 
       - name: Install system dependencies
         run: |

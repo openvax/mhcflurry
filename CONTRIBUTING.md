@@ -28,15 +28,16 @@ the default presentation bundle:
 
 ```shell
 ./lint.sh
-python -m pytest -q test -m "not slow and not downloads"
+./test.sh -q -m "not slow and not downloads"
 ```
 
-CI runs the full suite, `python -m pytest test/`, against the current download
-catalogue, with several bundles fetched. The fixtures are listed under
-"Full verification" in [docs/testing.md](docs/testing.md). On macOS, use
-`python -m pytest` rather than the `pytest` script so PyTorch can see MPS.
+CI runs the full suite, `./test.sh` (which invokes `python -m pytest test/`),
+against the current download catalogue, with several bundles fetched. The
+fixtures are listed under "Full verification" in [docs/testing.md](docs/testing.md).
+On macOS, `test.sh` uses `python -m pytest` rather than the `pytest` script so
+PyTorch can see MPS.
 
-CI uses Ruff 0.16.0 and the checked-in `.ruff.toml`. The selected rules focus
+CI uses Ruff 0.16.0 and the `[tool.ruff]` configuration in `pyproject.toml`. The selected rules focus
 on syntax, undefined names, mutable defaults, unsafe loop closures, environment
 default types, and stale suppressions. Formatting and broad modernization are
 kept out of the release gate so they can be reviewed separately from scientific
@@ -50,7 +51,7 @@ request does not authorize it. Versions and tags are bare `MAJOR.MINOR.PATCH`
 not match `mhcflurry/version.py`.
 
 1. **Choose the version.** Bump `mhcflurry/version.py` and add
-   `RELEASE_NOTES_<version>.md`. The version must be unused on PyPI, including
+   `release-notes/<version>.md`. The version must be unused on PyPI, including
    pre-release and development builds, and not already taken on `master` or by
    another open pull request. Model training versions are provenance and must
    not be rewritten to match a tag.
@@ -77,7 +78,7 @@ not match `mhcflurry/version.py`.
 
    ```shell
    gh release create <version> --target <merge-commit-sha> \
-       --title "MHCflurry <version>" --notes-file RELEASE_NOTES_<version>.md
+       --title "MHCflurry <version>" --notes-file release-notes/<version>.md
    ```
 
    Publishing the release, not pushing a tag, starts
@@ -101,7 +102,7 @@ not match `mhcflurry/version.py`.
    [Bioconda recipe](https://github.com/bioconda/bioconda-recipes/tree/master/recipes/mhcflurry)
    with the SHA-256 of the source distribution downloaded from PyPI, not a
    local build. Keep dependencies and console entry points aligned with
-   `setup.py`. Every dependency must be available as a Conda package; add
+   `pyproject.toml`. Every dependency must be available as a Conda package; add
    missing dependencies to conda-forge or Bioconda before the MHCflurry recipe
    can build. Verify the package in the channel after upstream CI and review
    complete.

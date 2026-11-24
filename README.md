@@ -106,7 +106,7 @@ To complete subcommands and options with Tab, run
 Scripts that use `mhcflurry-predict`, `mhcflurry-predict-scan` or
 `mhcflurry-downloads` keep working. The other older `mhcflurry-*` names are
 deprecated in favour of `mhcflurry <subcommand>`; see the
-[2.3.0 release notes](https://github.com/openvax/mhcflurry/blob/master/RELEASE_NOTES_2.3.0.md).
+[2.3.0 release notes](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.3.0.md).
 
 ## Documentation
 
@@ -130,7 +130,7 @@ Contributions are welcome. Start with [CONTRIBUTING.md](https://github.com/openv
 ```shell
 source develop.sh          # create/activate .venv and editable-install
 ./lint.sh                  # ruff check mhcflurry/ test/
-python -m pytest test/     # tests live in test/, singular
+./test.sh                  # python -m pytest test/ (tests live in test/, singular)
 ```
 
 The [testing guide](https://openvax.github.io/mhcflurry/testing.html) describes

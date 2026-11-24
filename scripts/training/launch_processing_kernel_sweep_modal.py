@@ -37,7 +37,7 @@ VOLUME = "mhcflurry-230-final-weights"
 PRIOR_VOLUME = "mhcflurry-processing-cleavage-f50c70f8c-20260904"
 app = App("mhcflurry-" + RUN_ID)
 app.repo_root = Path(__file__).resolve().parents[2]
-if not (app.repo_root / "setup.py").is_file():
+if not (app.repo_root / "pyproject.toml").is_file():
     raise ValueError("Launch from a complete frozen mhcflurry source extraction")
 image = (Image.from_registry("pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime")
          .apt_install("python-is-python3", "bzip2", "build-essential", "git")

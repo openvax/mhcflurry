@@ -30,7 +30,7 @@ Two flavors of subcommand:
   ``class1-select-*`` family, ``pseudosequences``. Each is wrapped by
   invoking the command module's existing ``run(argv)`` (or ``main(argv)``
   for ``pseudosequences``) on the post-subcommand argv. All
-  ``mhcflurry-*`` console_scripts in ``setup.py`` remain installed as
+  ``mhcflurry-*`` console scripts in ``pyproject.toml`` remain installed as
   compat shims pointing at the same underlying entry functions.
 
 Shell tab completion (argcomplete) completes subcommand names from
