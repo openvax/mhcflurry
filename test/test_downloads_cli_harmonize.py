@@ -42,9 +42,14 @@ def test_resolve_data_location_precedence_and_legacy_preservation(monkeypatch, t
     monkeypatch.delenv("MHCFLURRY_DATA_DIR", raising=False)
     monkeypatch.delenv("OPENVAX_DATA_CACHE", raising=False)
     monkeypatch.setattr(downloads, "user_data_dir", lambda *a, **kw: str(legacy_dir))
+    platform_cache_attr = (
+        "platform_cache_dir"
+        if hasattr(dc_common, "platform_cache_dir")
+        else "_platform_cache_dir"
+    )
     monkeypatch.setattr(
         dc_common,
-        "_platform_cache_dir",
+        platform_cache_attr,
         lambda app: str(platform_shared if app == "openvax" else tmp_path / app),
     )
 

@@ -29,7 +29,6 @@ dependencies = [
     "datacache>=1.34.0,<2",
     "pandas>=3,<4",
     "platformdirs",
-    "filelock>=3",
     "scikit-learn",
     "threadpoolctl",
     "matplotlib",
