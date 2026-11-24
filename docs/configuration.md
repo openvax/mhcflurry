@@ -54,9 +54,22 @@ overrides.
 
 ## Environment overrides
 
-These variables are intended for custom model locations, debugging, and
-controlled benchmarks. See {doc}`model_downloads` for release selection and
-download-directory overrides.
+These variables are intended for custom model locations, shared OpenVax data
+caches, offline execution, debugging, and controlled benchmarks. See
+{doc}`model_downloads` for release selection and download-directory overrides.
+
+`MHCFLURRY_DATA_DIR`
+: Base directory containing versioned download release subdirectories (highest
+  precedence over `OPENVAX_DATA_CACHE` and platform defaults).
+
+`OPENVAX_DATA_CACHE`
+: Shared cache root for OpenVax tools (`<dir>/mhcflurry`). Used when
+  `MHCFLURRY_DATA_DIR` is unset; existing legacy installations under the
+  historical `platformdirs` directory are preserved automatically.
+
+`OPENVAX_OFFLINE` / `DATACACHE_OFFLINE`
+: Set to `1` to disable network downloads (equivalent to passing `--offline`
+  to `mhcflurry downloads fetch`).
 
 `MHCFLURRY_DEFAULT_CLASS1_MODELS`
 : Path to the default affinity predictor. Without this override,
