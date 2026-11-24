@@ -49,6 +49,20 @@ others reference.
 - {doc}`saved_candidate_evaluation` evaluates a completed training run with
   `mhcflurry eval saved-candidate`, without retraining.
 
+```{toctree}
+:maxdepth: 1
+:hidden:
+
+release_training_recipe
+release_neural_hyperparameter_audit
+final_230_candidate_experiment
+affinity_dual_checkpoint_workflow
+processing_preparation_acceleration
+probabilistic_processing_matching
+presentation_percentile_calibration
+saved_candidate_evaluation
+```
+
 ## Experiment notes
 
 Controlled-experiment write-ups (cleavage-boundary models, kernel-width sweeps,

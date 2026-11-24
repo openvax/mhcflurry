@@ -11,26 +11,24 @@ presentation.
 - {doc}`docker` runs the same tools from a published image, without installing
   anything on the host.
 
-## Choosing and trusting models
+## User guides
 
-- {doc}`model_downloads` lists the available weights and shows how to select an
-  older release.
+- {doc}`model_downloads` lists the available weights, manages the local data
+  cache, and shows how to select an older release.
 - {doc}`release_model_evaluation` compares the released weights with other
   predictors on identical data.
-- {doc}`dla_validation` reports DLA support, training evidence and the limits
+- {doc}`dla_validation` reports DLA support, training evidence, and the limits
   of the exploratory canine evaluation.
-
-## Training your own models
-
 - {doc}`training` fits custom models from your own measurements.
 - {doc}`evaluation` compares a trained model with a released one.
 
 ## Reference
 
 - {doc}`commandline_tools` documents the command-line options.
-- {doc}`api` documents every Python class and method.
-- {doc}`configuration` covers hardware autosizing, environment overrides, and
-  reproducibility.
+- {doc}`api` summarizes the public Python API and lists every module.
+- {doc}`configuration` covers hardware autosizing, cache and environment
+  overrides, and reproducibility.
+- {doc}`changelog` summarizes release highlights and links to per-version notes.
 
 ## Advanced topics
 
@@ -58,6 +56,7 @@ docker
 
 model_downloads
 release_model_evaluation
+dla_validation
 training
 evaluation
 ```
@@ -70,6 +69,7 @@ evaluation
 commandline_tools
 api
 configuration
+changelog
 ```
 
 ```{toctree}
@@ -79,7 +79,6 @@ configuration
 
 shared_percent_rank_transforms
 training_provenance
-dla_validation
 ```
 
 ```{toctree}
@@ -92,19 +91,4 @@ testing
 development
 orchestrator
 auto_sizing_audit
-```
-
-```{toctree}
-:maxdepth: 2
-:caption: Maintainer notes: training internals
-:hidden:
-
-release_training_recipe
-release_neural_hyperparameter_audit
-final_230_candidate_experiment
-affinity_dual_checkpoint_workflow
-processing_preparation_acceleration
-probabilistic_processing_matching
-presentation_percentile_calibration
-saved_candidate_evaluation
 ```
