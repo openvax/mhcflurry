@@ -23,10 +23,10 @@ NetMHCpan and other tools behind one interface.
 ## Install
 
 MHCflurry needs Python 3.11 or later on Linux or macOS. Install the latest
-stable 2.4 patch release and download the pretrained presentation models:
+stable 2.5 patch release and download the pretrained presentation models:
 
 ```shell
-pip install --upgrade "mhcflurry>=2.4,<2.5"
+pip install --upgrade "mhcflurry>=2.5,<2.6"
 mhcflurry downloads fetch models_class1_presentation
 ```
 

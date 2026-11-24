@@ -54,6 +54,52 @@ from glob import glob
 from os.path import basename, exists, join
 
 
+from .mhcseqs_pseudosequences import (
+    HLA_A0201_GROOVE1,
+    HLA_A0201_GROOVE2,
+    MHCFLURRY_39AA_MATURE_POSITIONS,
+    MHCFLURRY_EXTRA_MATURE_POSITIONS,
+    NETMHCPAN_34AA_MATURE_POSITIONS,
+    PSEUDOSEQUENCE_MATURE_POSITIONS,
+    build_pseudosequences_from_mhcseqs,
+    extend_allele_to_sequence_from_mhcseqs,
+    extract_class1_pseudosequence,
+    extract_class1_pseudosequence_from_grooves,
+    extract_class1_pseudosequence_with_alignment,
+)
+
+__all__ = [
+    "HLA_A0201_GROOVE1",
+    "HLA_A0201_GROOVE2",
+    "LEGACY_ALLELE_SEQUENCES_FILENAME",
+    "LEGACY_CLASS1_PSEUDOSEQUENCES_FILENAME",
+    "LEGACY_FILENAMES",
+    "LEGACY_NO_DIFFERENTIATION_FILENAME",
+    "MHCFLURRY_39AA_MATURE_POSITIONS",
+    "MHCFLURRY_EXTRA_MATURE_POSITIONS",
+    "NETMHCPAN_34AA_MATURE_POSITIONS",
+    "PSEUDOSEQUENCE_DEFINITIONS",
+    "PSEUDOSEQUENCE_DEFINITIONS_BY_LENGTH",
+    "PSEUDOSEQUENCE_FILENAME_PREFERENCE",
+    "PSEUDOSEQUENCE_FILENAMES_BY_LENGTH",
+    "PSEUDOSEQUENCE_GLOB",
+    "PSEUDOSEQUENCE_MATURE_POSITIONS",
+    "PseudosequenceDefinition",
+    "build_pseudosequences_from_mhcseqs",
+    "extend_allele_to_sequence_from_mhcseqs",
+    "extract_class1_pseudosequence",
+    "extract_class1_pseudosequence_from_grooves",
+    "extract_class1_pseudosequence_with_alignment",
+    "main",
+    "make_parser",
+    "pseudosequence_filename_candidates",
+    "pseudosequence_filename_for_length",
+    "pseudosequence_filename_for_mapping",
+    "pseudosequence_length",
+    "pseudosequence_path",
+]
+
+
 LEGACY_ALLELE_SEQUENCES_FILENAME = "allele_sequences.csv"
 LEGACY_CLASS1_PSEUDOSEQUENCES_FILENAME = "class1_pseudosequences.csv"
 LEGACY_NO_DIFFERENTIATION_FILENAME = "allele_sequences.no_differentiation.csv"
@@ -226,6 +272,66 @@ def _run_list(_args):
         ))
 
 
+def _run_extract(args):
+    pseudo = extract_class1_pseudosequence(
+        args.sequence,
+        length=args.length,
+        allele=args.allele or "",
+        gene=args.gene or "",
+        mutations=tuple(args.mutation or ()),
+        allow_fragments=args.allow_fragments,
+    )
+    print(pseudo)
+
+
+def _run_build(args):
+    import csv
+
+    existing = None
+    if args.existing_csv:
+        existing = {}
+        with open(args.existing_csv, newline="", encoding="utf-8") as fd:
+            reader = csv.reader(fd)
+            header = next(reader, None)
+            if header is not None and len(header) >= 2:
+                # If the first row doesn't look like a header, keep it.
+                col0 = header[0].strip().lower()
+                col1 = header[1].strip().lower()
+                if col0 not in ("allele", "normalized_allele", "") and col1 not in (
+                    "sequence",
+                    "pseudosequence",
+                ):
+                    existing[header[0].strip()] = header[1].strip()
+            for row in reader:
+                if len(row) >= 2 and row[0].strip() and row[1].strip():
+                    existing[row[0].strip()] = row[1].strip()
+
+    mapping = build_pseudosequences_from_mhcseqs(
+        sequences_csv=args.mhcseqs_csv,
+        length=args.length,
+        existing_allele_to_sequence=existing,
+        prefer_existing=args.prefer_existing,
+        max_x=args.max_x,
+        include_fragments=args.include_fragments,
+        normalize_alleles=not args.no_normalize_alleles,
+    )
+
+    if args.out:
+        with open(args.out, "w", newline="", encoding="utf-8") as fd:
+            writer = csv.writer(fd)
+            writer.writerow(["allele", "pseudosequence"])
+            for allele, seq in mapping.items():
+                writer.writerow([allele, seq])
+        logging.info("Wrote %d pseudosequences to %s", len(mapping), args.out)
+    else:
+        import sys
+
+        writer = csv.writer(sys.stdout)
+        writer.writerow(["allele", "pseudosequence"])
+        for allele, seq in mapping.items():
+            writer.writerow([allele, seq])
+
+
 def make_parser(prog=None):
     """Build the ``mhcflurry pseudosequences`` argument parser.
 
@@ -270,6 +376,82 @@ def make_parser(prog=None):
         "list",
         help="List canonical pseudosequence definitions.")
     list_parser.set_defaults(func=_run_list)
+
+    extract_parser = subparsers.add_parser(
+        "extract",
+        help="Extract a Class I pseudosequence from a protein sequence using mhcseqs.")
+    extract_parser.add_argument(
+        "--sequence",
+        required=True,
+        help="Class I heavy-chain protein sequence (full-length, mature, or partial).")
+    extract_parser.add_argument(
+        "--length",
+        type=int,
+        choices=sorted(PSEUDOSEQUENCE_MATURE_POSITIONS),
+        default=39,
+        help="Pseudosequence length (39=MHCflurry 2.x, 34=NetMHCpan). Default: 39.")
+    extract_parser.add_argument(
+        "--allele",
+        default="",
+        help="Optional allele name hint passed to mhcseqs.")
+    extract_parser.add_argument(
+        "--gene",
+        default="",
+        help="Optional gene symbol hint passed to mhcseqs.")
+    extract_parser.add_argument(
+        "--mutation",
+        action="append",
+        default=None,
+        help="Optional mature-numbered point mutation (e.g. K66A); repeatable.")
+    extract_parser.add_argument(
+        "--allow-fragments",
+        action="store_true",
+        default=False,
+        help="Allow single-domain fragments, padding the missing domain with 'X'.")
+    extract_parser.set_defaults(func=_run_extract)
+
+    build_parser = subparsers.add_parser(
+        "build",
+        help="Build a Class I pseudosequence CSV from mhcseqs.")
+    build_parser.add_argument(
+        "--mhcseqs-csv",
+        default=None,
+        help="Path to mhc-full-seqs.csv (defaults to mhcseqs's standard search order).")
+    build_parser.add_argument(
+        "--length",
+        type=int,
+        choices=sorted(PSEUDOSEQUENCE_MATURE_POSITIONS),
+        default=39,
+        help="Pseudosequence length (39=MHCflurry 2.x, 34=NetMHCpan). Default: 39.")
+    build_parser.add_argument(
+        "--existing-csv",
+        default=None,
+        help="Optional existing pseudosequence CSV to strictly generalize.")
+    build_parser.add_argument(
+        "--prefer-existing",
+        action="store_true",
+        default=False,
+        help="When --existing-csv is given, preserve existing non-X sequences verbatim.")
+    build_parser.add_argument(
+        "--max-x",
+        type=int,
+        default=None,
+        help="Drop emitted pseudosequences with more than N 'X' positions.")
+    build_parser.add_argument(
+        "--include-fragments",
+        action="store_true",
+        default=False,
+        help="Include single-domain groove fragments (padded with 'X').")
+    build_parser.add_argument(
+        "--no-normalize-alleles",
+        action="store_true",
+        default=False,
+        help="Keep raw mhcseqs allele/accession identifiers without mhcgnomes filtering.")
+    build_parser.add_argument(
+        "--out",
+        default=None,
+        help="Output CSV path (default: stdout).")
+    build_parser.set_defaults(func=_run_build)
     return parser
 
 

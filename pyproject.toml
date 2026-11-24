@@ -26,7 +26,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 dependencies = [
-    "datacache>=1.34.0,<2",
+    "datacache>=1.37.0,<2",
     "pandas>=3,<4",
     "platformdirs",
     "scikit-learn",
@@ -38,6 +38,11 @@ dependencies = [
     "tqdm",
     "torch>=2.0.0",
     "argcomplete>=3",
+]
+
+[project.optional-dependencies]
+mhcseqs = [
+    "mhcseqs>=2.9.0",
 ]
 
 [project.urls]

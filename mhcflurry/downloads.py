@@ -21,6 +21,7 @@ here needs them.
 import csv
 import io
 import logging
+import os
 import posixpath
 from collections import OrderedDict
 from os import environ
@@ -428,6 +429,7 @@ def install_download(
         force=force,
         verified=has_trusted_checksum,
         download_options=download_options,
+        portable_names=(os.name == "nt"),
     )
 
 

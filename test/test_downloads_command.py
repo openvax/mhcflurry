@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import tarfile
 from threading import Barrier
@@ -512,4 +513,23 @@ def test_model_loading_smoke_from_datacache_installed_archive(tmp_path, monkeypa
     )
     actual_pred = loaded.predict(["SIINFEKL", "NLVPMVATV"], allele="HLA-A*02:01")
     numpy.testing.assert_allclose(actual_pred, expected_pred, rtol=1e-6, atol=0.0)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX-only allele filenames with * and :")
+def test_legacy_posix_allele_filenames_install_and_verify(tmp_path, monkeypatch):
+    member = "models/weights_HLA-A*02:06-1-50c5f97331dc8241.npz"
+    args, _dest, _digest, _size = local_bundle(
+        tmp_path,
+        monkeypatch,
+        pinned=False,
+        files=[(member, b"legacy-npz-bytes"), ("manifest.csv", b"model_name\n")],
+    )
+    downloads_command.fetch_subcommand(args)
+    installed = Path(downloads.get_path("models", release="test"))
+    assert (installed / member).read_bytes() == b"legacy-npz-bytes"
+    info = downloads.get_release_downloads("test", verify_files=True)["models"]
+    assert info["downloaded"] is True
+    assert info["up_to_date"] is True
+    assert info["install_status"] == "available"
+
 
