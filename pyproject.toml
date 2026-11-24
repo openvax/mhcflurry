@@ -41,6 +41,11 @@ dependencies = [
     "argcomplete>=3",
 ]
 
+[project.optional-dependencies]
+mhcseqs = [
+    "mhcseqs>=2.7.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/openvax/mhcflurry"
 Repository = "https://github.com/openvax/mhcflurry"
