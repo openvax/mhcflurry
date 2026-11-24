@@ -530,9 +530,9 @@ def build_pseudosequences_from_mhcseqs(
         Only relevant when ``existing_allele_to_sequence`` is given. When True,
         keep existing non-``X`` pseudosequences verbatim so predictions on
         previously supported alleles never drift (while still replacing
-        ``X``-containing entries if ``mhcseqs`` provides strictly fewer ``X``s).
-        When False (default), ``mhcseqs`` values overwrite existing entries
-        unless the existing entry has strictly fewer ``X``s.
+        ``X``-containing entries if ``mhcseqs`` provides strictly fewer ``X``
+        positions). When False (default), ``mhcseqs`` values overwrite existing
+        entries unless the existing entry has strictly fewer ``X`` positions.
     max_x : int, optional
         Maximum allowed ``"X"`` characters in emitted pseudosequences. Entries
         exceeding ``max_x`` are omitted (existing entries are still subject to

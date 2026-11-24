@@ -1052,7 +1052,7 @@ class Class1AffinityPredictor(object):
         Parameters
         ----------
         sequences_csv : str, optional
-            Path to ``mhc-full-seqs.csv`` (defaults to ``mhcseqs``'s standard
+            Path to ``mhc-full-seqs.csv`` (defaults to the standard ``mhcseqs``
             search order). Ignored when ``rows`` is supplied.
         rows : iterable of mapping, optional
             Pre-loaded ``mhcseqs`` row mappings.
