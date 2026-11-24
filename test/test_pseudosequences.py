@@ -315,10 +315,15 @@ def test_extract_class1_pseudosequence_with_mhcseqs(capsys):
         == HLA_A0201_EXPECTED_34AA
     )
 
-    # Mature-numbered point mutation (K66A -> position 66 is index 11 in 39aa)
+    # Mature-numbered point mutation (K66A -> position 66 is index 11 in 39aa),
+    # accepting either a tuple or a single mutation string.
     mutated = extract_class1_pseudosequence(
         HLA_A0201_FULL, allele="HLA-A*02:01", mutations=("K66A",), length=39
     )
+    mutated_from_str = extract_class1_pseudosequence(
+        HLA_A0201_FULL, allele="HLA-A*02:01", mutations="K66A", length=39
+    )
+    assert mutated == mutated_from_str
     assert HLA_A0201_EXPECTED_39AA[11] == "K"
     assert mutated[11] == "A"
     assert mutated[:11] == HLA_A0201_EXPECTED_39AA[:11]
@@ -340,3 +345,88 @@ def test_extract_class1_pseudosequence_with_mhcseqs(capsys):
     # CLI extract subcommand
     main(["extract", "--sequence", HLA_A0201_FULL, "--allele", "HLA-A*02:01"])
     assert capsys.readouterr().out.strip() == HLA_A0201_EXPECTED_39AA
+
+
+def test_train_pan_allele_predictor_with_mhcseqs_pseudosequences_and_extend(tmp_path):
+    """End-to-end check: train a tiny pan-allele predictor on pseudosequences
+    built via build_pseudosequences_from_mhcseqs, extend it with a novel allele
+    and a retired-alias allele, predict, and round-trip save/load."""
+    bola_g1 = "GSHSLRYFYTAVSRPGLGEPSFIIVGYVDDTQFVRFDSNTPNPRMEPRARWVEQEGPEYWDRETRISKETAQTFRVDLNTLRGYYNQSEA"
+    bola_g2 = "GSHNIQEMYGCDVGPDGLLRGYDQFAYDGRDYLALNEDLRSWTAADTAAQITKRKWEAEGYAESLRNYLEGRCVEGLRRYLENGKDTLLRAD"
+    initial_mapping = build_pseudosequences_from_mhcseqs(
+        rows=[
+            {
+                "two_field_allele": "HLA-A*02:01",
+                "mhc_class": "I",
+                "groove1": HLA_A0201_GROOVE1,
+                "groove2": HLA_A0201_GROOVE2,
+                "groove_status": "ok",
+            },
+        ],
+        length=39,
+    )
+    predictor = Class1AffinityPredictor(allele_to_sequence=initial_mapping)
+    predictor.fit_class1_pan_allele_models(
+        n_models=1,
+        architecture_hyperparameters={
+            "max_epochs": 1,
+            "layer_sizes": [8],
+            "allele_dense_layer_sizes": [],
+            "peptide_allele_merge_method": "concatenate",
+            "validation_split": 0.0,
+            "early_stopping": False,
+            "random_negative_rate": 0.0,
+            "random_negative_constant": 0,
+            "data_dependent_initialization_method": None,
+            "minibatch_size": 4,
+            "locally_connected_layers": [],
+        },
+        alleles=["HLA-A*02:01"] * 4,
+        peptides=["SIINFEKL", "NLVPMVATV", "GILGFVFTL", "LLFGYPVYV"],
+        affinities=[50.0, 20.0, 15.0, 100.0],
+        inequalities=["="] * 4,
+        verbose=0,
+        seed=42,
+    )
+    baseline_pred = predictor.predict(["NLVPMVATV"], allele="HLA-A*02:01")[0]
+
+    # Extend the trained predictor with a new non-human allele and an allele
+    # whose mhcgnomes alias differs from its no-alias canonical form.
+    added = predictor.extend_alleles_from_mhcseqs(
+        rows=[
+            {
+                "two_field_allele": "BoLA-2*057:01",
+                "mhc_class": "I",
+                "groove1": bola_g1,
+                "groove2": bola_g2,
+                "groove_status": "ok",
+            },
+            {
+                "two_field_allele": "HLA-C*01:01",
+                "mhc_class": "I",
+                "groove1": HLA_A0201_GROOVE1,
+                "groove2": HLA_A0201_GROOVE2,
+                "groove_status": "ok",
+            },
+        ],
+        prefer_existing=True,
+    )
+    assert added == 2
+    assert "BoLA-2*057:01" in predictor.supported_alleles
+    # Existing allele prediction is bit-for-bit unchanged.
+    after_pred = predictor.predict(["NLVPMVATV"], allele="HLA-A*02:01")[0]
+    assert after_pred == pytest.approx(baseline_pred, rel=1e-6)
+    # Newly added allele predicts finite nM affinity cleanly.
+    bola_pred = predictor.predict(["NLVPMVATV"], allele="BoLA-2*057:01")[0]
+    assert 0.0 < bola_pred <= 50000.0
+    # Retired alias maps cleanly back to the newly registered key.
+    assert predictor.canonicalize_allele_name("HLA-C*01:02") == "HLA-C*01:01"
+
+    # Save and reload round-trip preserves all alleles and predictions.
+    models_dir = str(tmp_path / "trained_pan")
+    predictor.save(models_dir)
+    reloaded = Class1AffinityPredictor.load(models_dir, optimization_level=0)
+    assert "BoLA-2*057:01" in reloaded.supported_alleles
+    assert reloaded.predict(["NLVPMVATV"], allele="BoLA-2*057:01")[0] == pytest.approx(
+        bola_pred, rel=1e-6
+    )

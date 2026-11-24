@@ -441,13 +441,22 @@ def extract_class1_pseudosequence(
     if not cleaned:
         raise ValueError("Cannot extract Class I pseudosequence from an empty sequence.")
 
+    if isinstance(mutations, str):
+        normalized_mutations = (mutations.strip(),) if mutations.strip() else ()
+    elif mutations:
+        normalized_mutations = tuple(
+            str(m).strip() for m in mutations if str(m).strip()
+        )
+    else:
+        normalized_mutations = ()
+
     mhcseqs = _import_mhcseqs()
     record = mhcseqs.decompose_domains(
         cleaned,
         mhc_class="I",
         allele=allele,
         gene=gene,
-        mutations=tuple(mutations) if mutations else (),
+        mutations=normalized_mutations,
     )
     if record.status in _NON_GROOVE_STATUSES:
         raise ValueError(

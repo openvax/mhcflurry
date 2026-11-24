@@ -957,6 +957,26 @@ class Class1AffinityPredictor(object):
             self.save(
                 models_dir_for_save, model_names_to_write=[model_name])
 
+    def _sync_allele_to_canonical_for_keys(self, canonical_keys):
+        """Update ``self.allele_to_canonical`` for newly registered allele keys."""
+        if self.allele_to_sequence is None:
+            return
+        for canonical_name in canonical_keys:
+            # If a previously aliased target is now present directly, remove the
+            # stale redirect so exact keys take precedence.
+            self.allele_to_canonical.pop(canonical_name, None)
+            aliased = normalize_allele_name(
+                canonical_name,
+                raise_on_error=False,
+                use_allele_aliases=True,
+            )
+            if (
+                aliased is not None
+                and aliased != canonical_name
+                and aliased not in self.allele_to_sequence
+            ):
+                self.allele_to_canonical[aliased] = canonical_name
+
     def add_allele_from_sequence(
             self,
             allele,
@@ -1030,6 +1050,7 @@ class Class1AffinityPredictor(object):
             allow_fragments=allow_fragments,
         )
         self.allele_to_sequence[canonical] = pseudosequence
+        self._sync_allele_to_canonical_for_keys((canonical,))
         self._master_allele_encoding = None
         self._cache.clear()
         return pseudosequence
@@ -1086,10 +1107,12 @@ class Class1AffinityPredictor(object):
             include_fragments=include_fragments,
             normalize_alleles=True,
         )
+        added_keys = set(updated) - before
         self.allele_to_sequence = updated
+        self._sync_allele_to_canonical_for_keys(added_keys)
         self._master_allele_encoding = None
         self._cache.clear()
-        return len(set(updated) - before)
+        return len(added_keys)
 
     def percentile_ranks(self, affinities, allele=None, alleles=None, throw=True):
         """

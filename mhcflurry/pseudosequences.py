@@ -293,7 +293,12 @@ def _run_build(args):
             header = next(reader, None)
             if header is not None and len(header) >= 2:
                 # If the first row doesn't look like a header, keep it.
-                if header[1].strip().lower() not in ("sequence", "pseudosequence"):
+                col0 = header[0].strip().lower()
+                col1 = header[1].strip().lower()
+                if col0 not in ("allele", "normalized_allele", "") and col1 not in (
+                    "sequence",
+                    "pseudosequence",
+                ):
                     existing[header[0].strip()] = header[1].strip()
             for row in reader:
                 if len(row) >= 2 and row[0].strip() and row[1].strip():
