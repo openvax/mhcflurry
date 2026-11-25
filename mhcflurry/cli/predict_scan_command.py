@@ -28,8 +28,9 @@ CSV columns: sequence_id, sequence. Each --alleles argument is one sample;
 delimit alleles within a quoted argument with commas or semicolons to give
 a sample MHC allele set.
 """
-import sys
 import collections
+import re
+import sys
 
 import argcomplete
 
@@ -246,12 +247,20 @@ def parse_peptide_lengths(value):
             (start, end) = value.split("-", 2)
             start = int(start.strip())
             end = int(end.strip())
+            if start <= 0 or end < start:
+                raise ValueError(
+                    "Invalid peptide length range: %r" % (value,)
+                )
             peptide_lengths = list(range(start, end + 1))
         else:
             peptide_lengths = [
                 int(length.strip())
                 for length in value.split(",")
             ]
+            if not peptide_lengths or any(length <= 0 for length in peptide_lengths):
+                raise ValueError(
+                    "Invalid peptide lengths: %r" % (value,)
+                )
     except ValueError:
         raise ValueError("Couldn't parse peptide lengths: ", value)
     return peptide_lengths
@@ -309,13 +318,32 @@ def run(argv=sys.argv[1:]):
 
     peptide_lengths = parse_peptide_lengths(args.peptide_lengths)
 
-    threshold_args = [
-        args.threshold_presentation_score,
-        args.threshold_processing_score,
-        args.threshold_affinity,
-        args.threshold_affinity_percentile,
-    ]
-    if not args.results_all and all(x is None for x in threshold_args):
+    explicit_thresholds = {
+        col
+        for col, val in (
+            ("presentation_score", args.threshold_presentation_score),
+            ("processing_score", args.threshold_processing_score),
+            ("affinity", args.threshold_affinity),
+            ("affinity_percentile", args.threshold_affinity_percentile),
+        )
+        if val is not None
+    }
+    if "affinity_percentile" in explicit_thresholds and args.no_affinity_percentile:
+        parser.error(
+            "--threshold-affinity-percentile cannot be combined with "
+            "--no-affinity-percentile"
+        )
+    if not args.alleles:
+        for col in ("affinity", "affinity_percentile", "presentation_score"):
+            if col in explicit_thresholds:
+                parser.error(
+                    "--threshold-%s requires --alleles" % col.replace("_", "-")
+                )
+    if (
+            not args.results_all
+            and not explicit_thresholds
+            and args.alleles
+            and not args.no_affinity_percentile):
         print(
             "Filtering by affinity-percentile <= %s" % default_thresholds["affinity_percentile"],
             file=sys.stderr)
@@ -331,13 +359,16 @@ def run(argv=sys.argv[1:]):
 
         input_format = args.input_format
         if input_format == "guess":
-            extension = args.input.lower().split(".")[-1]
-            if extension in ["gz", "bzip2"]:
-                extension = args.input.lower().split(".")[-2]
+            parts = args.input.lower().split(".")
+            extension = parts[-1]
+            compression = None
+            if extension in ("gz", "gzip", "bz2", "bzip2") and len(parts) >= 2:
+                compression = extension
+                extension = parts[-2]
 
             if extension == "csv":
                 input_format = "csv"
-            elif extension in ["fasta", "fa"]:
+            elif extension in ("fasta", "fa") and compression not in ("bz2", "bzip2"):
                 input_format = "fasta"
             else:
                 parser.error(
@@ -349,7 +380,8 @@ def run(argv=sys.argv[1:]):
                 file=sys.stderr)
 
         if input_format == "csv":
-            df = pandas.read_csv(args.input)
+            df = pandas.read_csv(
+                args.input, keep_default_na=False, dtype=str)
             print(
                 "Read input CSV with %d rows, columns are: %s" % (
                     len(df), ", ".join(df.columns)),
@@ -383,9 +415,17 @@ def run(argv=sys.argv[1:]):
     df = df.set_index(args.sequence_id_column)
 
     if args.alleles:
-        genotypes = pandas.Series(args.alleles).str.split(r"[;,\s]+")
-        genotypes.index = genotypes.index.map(lambda i: "genotype_%02d" % i)
-        alleles = genotypes.to_dict()
+        alleles = {}
+        for i, allele_string in enumerate(args.alleles):
+            parsed = [
+                token for token in re.split(r"[;,\s]+", allele_string.strip())
+                if token
+            ]
+            if not parsed:
+                parser.error(
+                    "Empty allele specification in --alleles: %r" % (
+                        allele_string,))
+            alleles["genotype_%02d" % i] = parsed
     else:
         print(
             "No alleles specified. Will perform processing prediction only.",
@@ -507,7 +547,14 @@ def run(argv=sys.argv[1:]):
         ("affinity_percentile", args.threshold_affinity_percentile, "le"),
     ]
     for col, thresh, op in threshold_filters:
-        if thresh is None or col not in result_df.columns:
+        if thresh is None:
+            continue
+        if col not in result_df.columns:
+            if col in explicit_thresholds:
+                parser.error(
+                    "Cannot apply --threshold-%s: column '%s' is not present "
+                    "in prediction output" % (col.replace("_", "-"), col)
+                )
             continue
         if op == "ge":
             result_df = result_df.loc[result_df[col] >= thresh]

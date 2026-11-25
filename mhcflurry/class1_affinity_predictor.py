@@ -780,11 +780,16 @@ class Class1AffinityPredictor(object):
             self.allele_to_allele_specific_models[allele] = []
 
         encodable_peptides = EncodableSequences.create(peptides)
+        affinities = numpy.asarray(affinities)
+        inequalities = (
+            None if inequalities is None else numpy.asarray(inequalities)
+        )
         peptides_affinities_inequalities_per_round = [
             (encodable_peptides, affinities, inequalities)
         ]
 
         if train_rounds is not None:
+            train_rounds = numpy.asarray(train_rounds)
             for round in sorted(set(train_rounds)):
                 round_mask = train_rounds > round
                 if round_mask.any():

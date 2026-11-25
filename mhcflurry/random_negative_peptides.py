@@ -199,7 +199,7 @@ class RandomNegativePeptides(object):
                 self.hyperparameters['random_negative_rate'] +
                 self.hyperparameters['random_negative_constant'])
 
-        plan_df = pandas.DataFrame(index=sorted(df.allele.unique()))
+        plan_df = pandas.DataFrame(index=sorted(df_all.allele.unique()))
         for length in lengths:
             plan_df[length] = length_to_num_random_negative[length]
         self.plan_df = plan_df.astype(int)
@@ -230,7 +230,7 @@ class RandomNegativePeptides(object):
             total_random_peptides_per_length += num_per_length
             allele_to_num_per_length[allele] = num_per_length
 
-        plan_df = pandas.DataFrame(index=sorted(df.allele.unique()))
+        plan_df = pandas.DataFrame(index=sorted(all_alleles))
         for length in lengths:
             plan_df[length] = plan_df.index.map(allele_to_num_per_length)
         self.plan_df = plan_df.astype(int)

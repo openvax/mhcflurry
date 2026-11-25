@@ -55,7 +55,11 @@ def ppv_at_n(y_true, y_score, n=None):
         If ``n`` exceeds the number of scored rows.
     """
     y_true = numpy.asarray(y_true)
-    y_score = numpy.asarray(y_score)
+    y_score = numpy.asarray(y_score, dtype=float)
+    valid = ~numpy.isnan(y_score)
+    if not valid.all():
+        y_true = y_true[valid]
+        y_score = y_score[valid]
     if n is None:
         n = int(y_true.sum())
     if n <= 0:

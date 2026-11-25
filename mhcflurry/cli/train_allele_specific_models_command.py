@@ -517,9 +517,7 @@ def train_model(
             alleles.append(similar_alleles.pop(0))
         data = data.loc[data.allele.isin(alleles)]
         assert len(data) >= pretrain_min_points, (len(data), pretrain_min_points)
-        train_rounds = (data.allele == allele).astype(int).values
     else:
-        train_rounds = None
         data = data.loc[data.allele == allele]
 
     progress_preamble = (
@@ -539,6 +537,10 @@ def train_model(
         random_state=(
             None if work_item_seed is None
             else work_item_seed % (2 ** 32)))
+    train_rounds = (
+        (train_data.allele == allele).astype(int).values
+        if pretrain_min_points else None
+    )
     predictor.fit_allele_specific_predictors(
         n_models=n_models,
         architecture_hyperparameters_list=[hyperparameters],
