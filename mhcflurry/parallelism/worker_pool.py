@@ -136,7 +136,9 @@ if NonDaemonForkServerContext is not None:
 def non_daemon_context(start_method=None):
     """Return a multiprocessing context whose workers are non-daemonic."""
     if start_method is None:
-        return NonDaemonContext()
+        start_method = multiprocessing.get_start_method(allow_none=True)
+        if start_method is None:
+            start_method = multiprocessing.get_context().get_start_method()
     try:
         context_class = _NON_DAEMON_CONTEXT_BY_START_METHOD[start_method]
     except KeyError:
@@ -186,7 +188,9 @@ def chunk_ranges_for_local_parallelism(
     if num_items <= 0:
         return []
 
-    num_jobs = max(int(num_jobs or 0), 1)
+    num_jobs = int(num_jobs or 0)
+    if num_jobs <= 0:
+        return [(0, 0, num_items)]
     target_chunks = min(num_items, max(1, num_jobs * int(chunks_per_worker)))
     chunk_size = int(numpy.ceil(float(num_items) / target_chunks))
     return [

@@ -444,6 +444,8 @@ class AlleleKeyResolver(object):
     def resolve(self, raw_name, raise_on_error=False):
         """Best-effort resolution. See the class docstring for the contract."""
         if self.valid_keys:
+            if isinstance(raw_name, str) and raw_name in self.valid_keys:
+                return raw_name
             no_alias = normalize_allele_name(
                 raw_name, raise_on_error=False, use_allele_aliases=False)
             if no_alias is not None and no_alias in self.valid_keys:

@@ -166,3 +166,19 @@ def test_allele_specific_normalization_merges_spellings():
     assert canonical == {"HLA-A*02:01"}, canonical
     # Unparseable names resolve to None (dropped at ingestion).
     assert normalize_allele_name("NONSENSE", raise_on_error=False) is None
+
+
+def test_resolver_accepts_registered_custom_non_mhcgnomes_key():
+    """Regression test for #597: custom keys registered verbatim (e.g. via
+    add_allele_from_sequence(..., normalize_allele=False)) must resolve
+    directly without failing mhcgnomes parsing."""
+    keys = {"HLA-A*02:01", "FLA-E*018:01_W167S", "custom_mutant_1"}
+    resolver = AlleleKeyResolver(keys)
+    assert resolver.resolve("FLA-E*018:01_W167S", raise_on_error=True) == "FLA-E*018:01_W167S"
+    assert resolver.resolve("custom_mutant_1", raise_on_error=True) == "custom_mutant_1"
+    assert resolver.resolve_to_key("FLA-E*018:01_W167S") == "FLA-E*018:01_W167S"
+    assert resolver.resolve("HLA-A0201", raise_on_error=True) == "HLA-A*02:01"
+    assert canonicalize_allele_series(["FLA-E*018:01_W167S", "HLA-A0201"], keys) == [
+        "FLA-E*018:01_W167S",
+        "HLA-A*02:01",
+    ]

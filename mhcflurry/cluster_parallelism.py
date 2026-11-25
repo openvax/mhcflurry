@@ -298,6 +298,7 @@ def cluster_results(
                     print("Relaunching", launch_command)
                     attempt_dir = os.path.join(
                         result_item['work_dir'], "attempt.%d" % retry_num)
+                    os.makedirs(attempt_dir, exist_ok=True)
                     if os.path.exists(complete_dir):
                         shutil.move(complete_dir, attempt_dir)  # directory
                     if additional_complete_file and os.path.exists(
@@ -305,6 +306,8 @@ def cluster_results(
                         shutil.move(additional_complete_file_path, attempt_dir)
                     if os.path.exists(error_path):
                         shutil.move(error_path, attempt_dir)
+                    if os.path.exists(result_path):
+                        shutil.move(result_path, attempt_dir)
                     subprocess.check_call(launch_command, shell=True)
                     print("Invoked", launch_command)
                     result_item['retry_num'] += 1
@@ -364,14 +367,16 @@ parser.add_argument(
     default="pickle")
 
 
-def worker_entry_point(argv=sys.argv[1:]):
+def worker_entry_point(argv=None):
     """
     Entry point for the worker command.
 
     Parameters
     ----------
-    argv : list of string
+    argv : list of string, optional
     """
+    if argv is None:
+        argv = sys.argv[1:]
     install_sigusr1_stack_trace_handler()
 
     args = parser.parse_args(argv)

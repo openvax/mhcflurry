@@ -104,6 +104,22 @@ def _positive_int_arg(value):
     return v
 
 
+def _gpus_arg(value):
+    """argparse type for ``--gpus``. Accepts an integer >= 0."""
+    import argparse
+    try:
+        v = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            "--gpus must be an integer >= 0, got %r" % (value,)
+        ) from None
+    if v < 0:
+        raise argparse.ArgumentTypeError(
+            "--gpus must be >= 0, got %d" % (v,)
+        )
+    return v
+
+
 def add_local_parallelism_args(parser):
     """
     Add local parallelism arguments to the given argparse.ArgumentParser.
@@ -135,7 +151,7 @@ def add_local_parallelism_args(parser):
              "to CPU.")
     group.add_argument(
         "--gpus",
-        type=int,
+        type=_gpus_arg,
         metavar="N",
         help="Number of CUDA GPUs to assign across parallel workers. When "
              "CUDA_VISIBLE_DEVICES is set, this is a count within that "
@@ -256,7 +272,7 @@ def add_prediction_parallelism_args(parser):
              "When --gpus is set, GPU-assigned workers use CUDA.")
     group.add_argument(
         "--gpus",
-        type=int,
+        type=_gpus_arg,
         metavar="N",
         help="Number of CUDA GPUs to assign across parallel prediction "
              "workers. Defaults to all visible CUDA devices with the auto "

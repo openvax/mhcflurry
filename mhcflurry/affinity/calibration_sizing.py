@@ -481,8 +481,11 @@ def choose_calibration_batch_shape(
     min_peptide_batch = max(int(min_peptide_batch), 1)
     max_allele_batch = max(int(max_allele_batch), 1)
 
-    # Mixed pin/auto: hold the pinned axis fixed and size the other axis
-    # against the same row budget so peak VRAM isn't underestimated.
+    # Mixed pin/auto or dual-pin: hold pinned axis/axes fixed.
+    if fixed_allele_batch is not None and fixed_peptide_batch is not None:
+        peptide_batch = min(max(int(fixed_peptide_batch), 1), n_peptides)
+        allele_batch = min(max(int(fixed_allele_batch), 1), n_alleles)
+        return int(peptide_batch), int(allele_batch)
     if fixed_allele_batch is not None and fixed_peptide_batch is None:
         allele_batch = min(max(int(fixed_allele_batch), 1), n_alleles)
         peptide_batch = max(total_rows // allele_batch, 1)

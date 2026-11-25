@@ -872,7 +872,10 @@ def test_serial_resolution_applies_auto_cpu_thread_budget(monkeypatch):
 
     assert args.cpu_threads_per_worker_was_auto is True
     assert native_calls == [(args.cpu_threads_per_worker, True)]
-    assert pytorch_calls == [{"num_threads": args.cpu_threads_per_worker}]
+    assert pytorch_calls == [{
+        "backend": "cpu",
+        "num_threads": args.cpu_threads_per_worker,
+    }]
 
 
 def test_resolve_local_parallelism_args_caps_auto_num_jobs(monkeypatch):

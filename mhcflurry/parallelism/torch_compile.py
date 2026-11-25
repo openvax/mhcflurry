@@ -66,10 +66,18 @@ def _auto_torchinductor_compile_threads(num_jobs, phase="production"):
 
 
 def _compile_threads_env_is_auto_owned():
-    return (
-        os.environ.get("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO") == "1"
-        or os.environ.get("TORCHINDUCTOR_COMPILE_THREADS") == "auto"
+    current = os.environ.get("TORCHINDUCTOR_COMPILE_THREADS")
+    if current == "auto":
+        return True
+    marker = os.environ.get("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO")
+    if not marker:
+        return False
+    auto_value = os.environ.get(
+        "MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO_VALUE"
     )
+    if auto_value is not None:
+        return current == auto_value
+    return current in (None, "", marker)
 
 
 def _set_auto_torchinductor_compile_threads(num_jobs, phase="production"):
@@ -77,6 +85,9 @@ def _set_auto_torchinductor_compile_threads(num_jobs, phase="production"):
     threads = _auto_torchinductor_compile_threads(num_jobs, phase=phase)
     os.environ["TORCHINDUCTOR_COMPILE_THREADS"] = str(threads)
     os.environ["MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO"] = "1"
+    os.environ["MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO_VALUE"] = (
+        str(threads)
+    )
     return threads
 
 
@@ -98,18 +109,18 @@ def resolve_torchinductor_compile_threads_env(num_jobs=1, phase="production"):
 
     This helper is for entry points that do not run the full local-parallelism
     resolver before importing or spawning PyTorch work. It leaves unset and
-    user-pinned integer values alone, resolves orchestrator-owned ``auto`` to a
-    numeric value, and fails early on other invalid values with a clearer
+    user-pinned integer values alone, clears empty-string values that would
+    crash Inductor's ``int(...)`` parser, resolves orchestrator-owned ``auto``
+    to a numeric value, and fails early on other invalid values with a clearer
     message than the downstream Inductor traceback.
     """
     value = os.environ.get("TORCHINDUCTOR_COMPILE_THREADS")
-    if value in (None, ""):
+    if value is None:
         return None
-    auto_owned = (
-        value == "auto"
-        or os.environ.get("MHCFLURRY_TORCHINDUCTOR_COMPILE_THREADS_AUTO") == "1"
-    )
-    if auto_owned:
+    if value == "":
+        os.environ.pop("TORCHINDUCTOR_COMPILE_THREADS", None)
+        return None
+    if _compile_threads_env_is_auto_owned():
         return _set_auto_torchinductor_compile_threads(
             num_jobs=_compile_threads_num_jobs(num_jobs),
             phase=phase,
@@ -142,7 +153,7 @@ def configure_cluster_worker_torch_compile_threads():
     if not _torch_compile_enabled():
         resolve_torchinductor_compile_threads_env(num_jobs=1)
         return
-    if "TORCHINDUCTOR_COMPILE_THREADS" in os.environ and not (
+    if os.environ.get("TORCHINDUCTOR_COMPILE_THREADS") not in (None, "") and not (
             _compile_threads_env_is_auto_owned()):
         resolve_torchinductor_compile_threads_env(num_jobs=1)
         return
@@ -195,7 +206,7 @@ def hoist_torchinductor_compile_threads(args, phase="production"):
         )
         return
     auto_owned = _compile_threads_env_is_auto_owned()
-    if "TORCHINDUCTOR_COMPILE_THREADS" in os.environ and not auto_owned:
+    if os.environ.get("TORCHINDUCTOR_COMPILE_THREADS") not in (None, "") and not auto_owned:
         # User pinned explicitly; don't second-guess.
         resolve_torchinductor_compile_threads_env(
             num_jobs=getattr(args, "num_jobs", 1),
@@ -352,7 +363,7 @@ def run_single_worker_resource_probe(
     )
 
     explicit_threads = compile_enabled and (
-        "TORCHINDUCTOR_COMPILE_THREADS" in os.environ
+        os.environ.get("TORCHINDUCTOR_COMPILE_THREADS") not in (None, "")
         and not _compile_threads_env_is_auto_owned()
     )
     if compile_enabled and not explicit_threads:
@@ -423,6 +434,7 @@ def run_single_worker_resource_probe(
             ),
             file=sys.stderr,
         )
+        refine_local_parallelism_from_warmup(args, reports)
     finally:
         if warmup_pool is not None:
             warmup_pool.terminate()
@@ -430,5 +442,4 @@ def run_single_worker_resource_probe(
         if compile_enabled:
             hoist_torchinductor_compile_threads(args, phase="production")
 
-    refine_local_parallelism_from_warmup(args, reports)
     return len(unique_warmup_items)
