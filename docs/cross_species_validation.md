@@ -212,6 +212,10 @@ character diffs** on every trained allele in `curated_training_data.csv.bz2`.
 Pass `MHCFLURRY_ALLELE_SEQUENCES_BACKEND=legacy` to run the original
 `wget + clustalo + make_allele_sequences.py` workflow.
 
+For the full dated experiment write-up—including the 16-cohort groove-specificity
+synthesis figure, complete results table, and upstream data-hygiene audit—see
+{doc}`experiment_25x_cross_species_hitlist` in the {doc}`experiments` log.
+
 ## Reproducing the benchmark and figures
 
 The complete evaluation and plotting pipeline lives in

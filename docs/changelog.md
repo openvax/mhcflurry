@@ -8,6 +8,14 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.8](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.8.md)**:
+  Adds the published {doc}`experiments` log and full `2.5.x` cross-species
+  `hitlist` + IEDB validation experiment report
+  ({doc}`experiment_25x_cross_species_hitlist`) with a new 16-cohort
+  groove-specificity & training-parity synthesis figure, and defensively guards
+  `build_pseudosequences_from_mhcseqs(normalize_alleles=True)` against bare
+  UniProt accessions being misparsed as MHC alleles (`pirl-unc/mhcgnomes#306`).
+  Existing `2.3.0` weights and predictions are unchanged.
 - **[2.5.7](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.7.md)**:
   Adds `--lock-existing` / `lock_existing=True` to freeze baseline alleles
   verbatim, switches `downloads-generation/allele_sequences/GENERATE.sh` to

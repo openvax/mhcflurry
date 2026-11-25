@@ -33,6 +33,7 @@ the 5 MHCflurry disambiguation positions (``16, 19, 21, 47, 91``).
 from __future__ import annotations
 
 import logging
+import re
 from typing import Iterable, Mapping, Sequence
 
 
@@ -658,11 +659,27 @@ def extract_class1_pseudosequence(
     return pseudosequence
 
 
+# Standard 6- or 10-character UniProtKB accessions (without MHC separators).
+# Guarded before mhcgnomes parsing so accessions like Japanese medaka fish
+# H2LR16..H2LR44 cannot be misparsed as mouse H2-L*r16..r44 (mhcgnomes#306).
+_BARE_UNIPROT_ACCESSION_RE = re.compile(
+    r"^(?:[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9](?:[A-Z][A-Z0-9]{2}[0-9]){1,2})$"
+)
+
+
+def _is_bare_uniprot_accession(raw_name: str) -> bool:
+    """Return True if ``raw_name`` is a bare UniProtKB accession string."""
+    text = (raw_name or "").strip()
+    if not text or "-" in text or "*" in text or ":" in text:
+        return False
+    return bool(_BARE_UNIPROT_ACCESSION_RE.match(text))
+
+
 def _normalize_pseudosequence_allele_key(raw_name: str, prefer_no_alias: bool = True) -> str | None:
     """Normalize an allele key with mhcgnomes, matching predictor persistence."""
     from .common import normalize_allele_name
 
-    if not raw_name:
+    if not raw_name or _is_bare_uniprot_accession(raw_name):
         return None
     if prefer_no_alias:
         normalized = normalize_allele_name(

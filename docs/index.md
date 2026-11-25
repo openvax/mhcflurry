@@ -22,6 +22,8 @@ presentation.
 - {doc}`cross_species_validation` shows how to predict on newly sequenced
   species and pocket mutants via `mhcseqs`, and reports zero-shot cross-species
   validation benchmarks.
+- {doc}`experiments` collects dated validation campaigns, cross-species
+  benchmarks, and controlled ablation studies.
 - {doc}`training` fits custom models from your own measurements.
 - {doc}`evaluation` compares a trained model with a released one.
 
@@ -61,6 +63,7 @@ model_downloads
 release_model_evaluation
 dla_validation
 cross_species_validation
+experiments
 training
 evaluation
 ```

@@ -725,3 +725,37 @@ def test_lock_existing_freezes_x_containing_entries_and_cli(tmp_path):
                 training_data_csv=str(train_csv),
                 expected_length=39,
             )
+
+
+def test_bare_uniprot_accessions_not_misparsed_as_mhc_alleles():
+    """Regression guard for pirl-unc/mhcgnomes#306: bare UniProt accessions
+    such as Oryzias latipes fish H2LR16..H2LR44 or mouse/rat P01898 must not
+    leak into normalize_alleles=True output as H2-L*r16 or HLA-P*01:898."""
+    rows = [
+        {
+            "two_field_allele": "HLA-A*02:01",
+            "mhc_class": "I",
+            "groove1": HLA_A0201_GROOVE1,
+            "groove2": HLA_A0201_GROOVE2,
+            "groove_status": "ok",
+        },
+        {
+            "two_field_allele": "H2LR16",
+            "mhc_class": "I",
+            "groove1": HLA_A0201_GROOVE1,
+            "groove2": HLA_A0201_GROOVE2,
+            "groove_status": "ok",
+        },
+        {
+            "two_field_allele": "P01898",
+            "mhc_class": "I",
+            "groove1": HLA_A0201_GROOVE1,
+            "groove2": HLA_A0201_GROOVE2,
+            "groove_status": "ok",
+        },
+    ]
+    built = build_pseudosequences_from_mhcseqs(rows=rows, normalize_alleles=True)
+    assert set(built) == {"HLA-A*02:01"}
+
+    built_raw = build_pseudosequences_from_mhcseqs(rows=rows, normalize_alleles=False)
+    assert set(built_raw) == {"HLA-A*02:01", "H2LR16", "P01898"}
