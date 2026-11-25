@@ -311,6 +311,7 @@ def _run_build(args):
         length=args.length,
         existing_allele_to_sequence=existing,
         prefer_existing=args.prefer_existing,
+        lock_existing=args.lock_existing,
         max_x=args.max_x,
         include_fragments=args.include_fragments,
         normalize_alleles=not args.no_normalize_alleles,
@@ -432,6 +433,15 @@ def make_parser(prog=None):
         action="store_true",
         default=False,
         help="When --existing-csv is given, preserve existing non-X sequences verbatim.")
+    build_parser.add_argument(
+        "--lock-existing",
+        action="store_true",
+        default=False,
+        help=(
+            "When --existing-csv is given, freeze every existing entry verbatim "
+            "(including X-containing entries) so trained alleles never change."
+        ),
+    )
     build_parser.add_argument(
         "--max-x",
         type=int,

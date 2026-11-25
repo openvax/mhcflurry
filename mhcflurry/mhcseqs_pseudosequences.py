@@ -682,6 +682,7 @@ def build_pseudosequences_from_mhcseqs(
     length: int = 39,
     existing_allele_to_sequence: Mapping[str, str] | None = None,
     prefer_existing: bool = False,
+    lock_existing: bool = False,
     max_x: int | None = None,
     include_fragments: bool = False,
     normalize_alleles: bool = True,
@@ -713,10 +714,16 @@ def build_pseudosequences_from_mhcseqs(
         ``X``-containing entries if ``mhcseqs`` provides strictly fewer ``X``
         positions). When False (default), ``mhcseqs`` values overwrite existing
         entries unless the existing entry has strictly fewer ``X`` positions.
+    lock_existing : bool, optional
+        Only relevant when ``existing_allele_to_sequence`` is given. When True,
+        every existing entry is locked bit-for-bit verbatim (even entries
+        containing ``"X"``, and exempt from ``max_x`` filtering) so previously
+        trained alleles can never change; ``mhcseqs`` only adds alleles not
+        already present in ``existing_allele_to_sequence``.
     max_x : int, optional
         Maximum allowed ``"X"`` characters in emitted pseudosequences. Entries
-        exceeding ``max_x`` are omitted (existing entries are still subject to
-        ``max_x`` only if they exceed it and ``max_x`` is explicitly set).
+        exceeding ``max_x`` are omitted (except entries locked via
+        ``lock_existing=True``).
     include_fragments : bool, optional
         If False (default), skip records missing either α1 or α2.
     normalize_alleles : bool, optional
@@ -838,6 +845,9 @@ def build_pseudosequences_from_mhcseqs(
             continue
 
         if key in result:
+            if key in existing_keys and lock_existing:
+                # Exact-lock mode: never alter any existing entry, even if it has X's.
+                continue
             existing_seq = result[key]
             new_x = pseudo.count("X")
             old_x = existing_seq.count("X")
@@ -852,7 +862,11 @@ def build_pseudosequences_from_mhcseqs(
             result[key] = pseudo
 
     if max_x is not None:
-        result = {k: v for k, v in result.items() if v.count("X") <= max_x}
+        result = {
+            k: v
+            for k, v in result.items()
+            if (lock_existing and k in existing_keys) or v.count("X") <= max_x
+        }
 
     if skipped_unparseable:
         logging.debug(
@@ -870,6 +884,7 @@ def extend_allele_to_sequence_from_mhcseqs(
     sequences_csv: str | None = None,
     rows: Iterable[Mapping[str, object]] | None = None,
     prefer_existing: bool = True,
+    lock_existing: bool = False,
     max_x: int | None = None,
     include_fragments: bool = False,
     normalize_alleles: bool = True,
@@ -879,7 +894,8 @@ def extend_allele_to_sequence_from_mhcseqs(
     Infers the pseudosequence length (39 or 34) from ``allele_to_sequence``,
     preserves all existing non-``X`` entries verbatim by default
     (``prefer_existing=True``), upgrades ``X``-containing entries when
-    ``mhcseqs`` supplies more complete grooves, and adds all newly covered
+    ``mhcseqs`` supplies more complete grooves (unless ``lock_existing=True``,
+    which freezes every existing entry verbatim), and adds all newly covered
     Class I alleles from ``mhcseqs``.
     """
     from .pseudosequences import pseudosequence_length
@@ -896,6 +912,7 @@ def extend_allele_to_sequence_from_mhcseqs(
         length=length,
         existing_allele_to_sequence=allele_to_sequence,
         prefer_existing=prefer_existing,
+        lock_existing=lock_existing,
         max_x=max_x,
         include_fragments=include_fragments,
         normalize_alleles=normalize_alleles,

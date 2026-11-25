@@ -1109,14 +1109,16 @@ class Class1AffinityPredictor(object):
             *,
             rows=None,
             prefer_existing=True,
+            lock_existing=False,
             max_x=None,
             include_fragments=False):
         """Strictly generalize ``self.allele_to_sequence`` using ``mhcseqs``.
 
         Preserves all existing non-``X`` allele pseudosequences by default
         (``prefer_existing=True``), upgrades ``X``-containing entries when
-        ``mhcseqs`` supplies more complete grooves, and adds all newly covered
-        Class I alleles from ``mhcseqs``.
+        ``mhcseqs`` supplies more complete grooves (unless
+        ``lock_existing=True``, which freezes every existing entry verbatim),
+        and adds all newly covered Class I alleles from ``mhcseqs``.
 
         Parameters
         ----------
@@ -1128,6 +1130,10 @@ class Class1AffinityPredictor(object):
         prefer_existing : bool, optional
             Preserve existing non-``X`` pseudosequences verbatim so predictions
             on previously supported alleles never drift. Default: True.
+        lock_existing : bool, optional
+            Freeze every existing entry verbatim (even entries containing
+            ``"X"``) so previously trained alleles can never change.
+            Default: False.
         max_x : int, optional
             Maximum allowed ``"X"`` characters in added pseudosequences.
         include_fragments : bool, optional
@@ -1151,6 +1157,7 @@ class Class1AffinityPredictor(object):
             sequences_csv=sequences_csv,
             rows=rows,
             prefer_existing=prefer_existing,
+            lock_existing=lock_existing,
             max_x=max_x,
             include_fragments=include_fragments,
             normalize_alleles=True,
