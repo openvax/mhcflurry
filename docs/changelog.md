@@ -8,6 +8,12 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.6](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.6.md)**:
+  Fixes `Class1NeuralNetwork` batch normalization & merging (`#564`, `#565`),
+  `robust_mean` (`#566`), percentile-rank calibration & empty-input prediction
+  (`#567`–`#569`, `#577`), `Class1ProcessingModel` / `predict_sequences` /
+  `ProcessingProteome` (`#572`, `#575`, `#578`), and `FastaParser` (`#579`).
+  Existing `2.3.0` weights and predictions are unchanged.
 - **[2.5.5](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.5.md)**:
   Fixes training-loop, `RandomNegativePeptides`, `ppv_at_n`,
   `compare-models`, allele-specific model selection, and `predict` /
