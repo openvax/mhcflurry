@@ -44,7 +44,12 @@ class AlleleEncoding(object):
         """
 
         if alleles is not None:
-            alleles = pandas.Series(alleles)
+            # Keep None entries as Python None (Pandas 3 StringDtype coerces
+            # None to float('nan'), breaking allele_to_index lookups/mapping).
+            alleles = pandas.Series(
+                [None if pandas.isna(allele) else allele for allele in alleles],
+                dtype=object,
+            )
         self.borrow_from = borrow_from
         self.allele_to_sequence = allele_to_sequence
 
@@ -71,9 +76,13 @@ class AlleleEncoding(object):
         if alleles is not None:
             assert all(
                 allele in self.allele_to_index for allele in alleles),\
-                "Missing alleles: " + " ".join(set(
-                    a for a in alleles if a not in self.allele_to_index))
-            self.indices = alleles.map(self.allele_to_index)
+                "Missing alleles: " + " ".join(sorted({
+                    str(a) for a in alleles if a not in self.allele_to_index
+                }))
+            self.indices = pandas.Series(
+                [self.allele_to_index[allele] for allele in alleles],
+                index=alleles.index,
+            )
             assert not self.indices.isnull().any()
             self.alleles = alleles
         else:

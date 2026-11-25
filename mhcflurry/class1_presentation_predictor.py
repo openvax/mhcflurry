@@ -449,9 +449,22 @@ class Class1PresentationPredictor(object):
                 new_df["best_allele"] = best_allele_by_sample[sample_name]
                 dfs.append(new_df)
 
-            result_df = pandas.concat(dfs, ignore_index=True)
+            if dfs:
+                result_df = pandas.concat(dfs, ignore_index=True)
+            else:
+                result_df = pandas.DataFrame(
+                    columns=[
+                        "peptide",
+                        "peptide_num",
+                        "sample_name",
+                        "affinity",
+                        "best_allele",
+                    ]
+                )
         else:
             df["sample_name"] = numpy.asarray(sample_names)
+            df["affinity"] = numpy.nan
+            df["best_allele"] = None
 
             iterator = df.groupby("sample_name")
             if verbose > 0:
@@ -873,9 +886,12 @@ class Class1PresentationPredictor(object):
                     "is expected to be the same length as peptides."
                     % MAX_ALLELES_PER_SAMPLE)
 
-            alleles = {
-                "sample1": alleles,
-            }
+            if len(alleles) == 0:
+                alleles = {}
+            else:
+                alleles = {
+                    "sample1": alleles,
+                }
 
         if (n_flanks is None) != (c_flanks is None):
             raise ValueError("Specify both or neither of n_flanks, c_flanks")
@@ -915,8 +931,12 @@ class Class1PresentationPredictor(object):
                 pandas.Series(processing_scores))
             if n_flanks is not None:
                 flank_df = pandas.DataFrame({
-                    "n_flank": df.peptide_num.map(pandas.Series(n_flanks)),
-                    "c_flank": df.peptide_num.map(pandas.Series(c_flanks)),
+                    "n_flank": df.peptide_num.map(
+                        pandas.Series(numpy.asarray(n_flanks, dtype=object))
+                    ),
+                    "c_flank": df.peptide_num.map(
+                        pandas.Series(numpy.asarray(c_flanks, dtype=object))
+                    ),
                 })
                 leading_columns = [df.columns[0]]
                 df = pandas.concat(
@@ -934,14 +954,12 @@ class Class1PresentationPredictor(object):
                     "without_flanks"
                 model = self.get_model(model_name)
                 input_matrix = df[self.model_inputs]
-                null_mask = None
-                if not throw:
-                    # Invalid peptides will be null.
-                    null_mask = input_matrix.isnull().any(axis=1)
+                null_mask = input_matrix.isnull().any(axis=1)
+                if null_mask.any():
                     input_matrix = input_matrix.fillna(0.0)
                 df["presentation_score"] = model.predict_proba(
                     input_matrix.values)[:,1]
-                if null_mask is not None:
+                if null_mask.any():
                     df.loc[null_mask, "presentation_score"] = numpy.nan
                 df["presentation_percentile"] = self.percentile_ranks(
                     df["presentation_score"], throw=False)

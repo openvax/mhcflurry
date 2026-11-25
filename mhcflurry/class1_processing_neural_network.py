@@ -1060,7 +1060,12 @@ class Class1ProcessingNeuralNetwork(object):
 
         # Initialization may overwrite only a network created by this call,
         # never weights built, restored or trained before it.
-        created_network = self._network is None
+        has_serialized_network = (
+            self.network_json is not None
+            or self.network_weights is not None
+            or getattr(self, "network_weights_loader", None) is not None
+        )
+        created_network = self._network is None and not has_serialized_network
         if created_network:
             self._network = self.make_network(
                 **self.network_hyperparameter_defaults.subselect(self.hyperparameters)

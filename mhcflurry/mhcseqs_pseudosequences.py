@@ -306,15 +306,15 @@ def _extract_groove1_residues(
     else:
         seq_len = len(g1)
         # Fast path 1: canonical 90-aa α1 verified by conserved structural anchors
-        # (Tyr27, Trp58/60, Asn86-Gln87 glycosylation motif).
-        if seq_len == 90 and g1[26] == "Y" and g1[57] == "W" and g1[85:87] == "NQ":
+        # (Tyr27 at index 26, Trp60 at index 59, Asn86-Gln87 glycosylation motif).
+        if seq_len == 90 and g1[26] == "Y" and g1[59] == "W" and g1[85:87] == "NQ":
             result = "".join(_sanitize_residue(g1[p]) for p in g1_positions)
         # Fast path 2: IMGT partial exon-2 sequence missing only mature residue 1
         # (leading Gly), leaving 89 aa shifted by -1.
         elif (
             seq_len == 89
             and g1[25] == "Y"
-            and g1[56] == "W"
+            and g1[58] == "W"
             and g1[84:86] == "NQ"
             and g1[0] != "G"
         ):
@@ -358,19 +358,16 @@ def _extract_groove2_residues(
         mature_positions = tuple(p + len(HLA_A0201_GROOVE1) + 1 for p in g2_positions)
         result = _extract_from_imgt_domain_alignment(domain_aln, mature_positions)
     else:
-        seq_len = len(g2)
-        # Fast path: canonical 92- or 93-aa α2 verified by the conserved Ig-fold
-        # disulfide pair Cys101 (index 10) and Cys164 (index 73).
-        if seq_len in (92, 93) and g2[10] == "C" and g2[73] == "C":
-            result = "".join(_sanitize_residue(g2[p]) for p in g2_positions)
-        else:
-            result = _align_domain_to_reference(
-                g2,
-                HLA_A0201_GROOVE2,
-                g2_positions,
-                gap_open=gap_open,
-                gap_extend=gap_extend,
-            )
+        # Always align in the fallback path: conserved Cys101/Cys164 spacing
+        # alone does not guard against compensating internal indels between
+        # the disulfide cysteines (which shift α2 binding-pocket residues).
+        result = _align_domain_to_reference(
+            g2,
+            HLA_A0201_GROOVE2,
+            g2_positions,
+            gap_open=gap_open,
+            gap_extend=gap_extend,
+        )
 
     if cache is not None:
         cache[g2] = result
@@ -731,11 +728,21 @@ def build_pseudosequences_from_mhcseqs(
     result: dict[str, str] = {}
     existing_keys: set[str] = set()
 
+    def _clean_text(value: object) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, float) and value != value:
+            return ""
+        text = str(value).strip()
+        if text.lower() in ("nan", "<na>"):
+            return ""
+        return text
+
     if existing_allele_to_sequence:
         for raw_allele, seq in existing_allele_to_sequence.items():
-            if seq is None:
+            seq_str = _clean_text(seq).upper()
+            if not seq_str:
                 continue
-            seq_str = str(seq).strip().upper()
             if len(seq_str) != length:
                 raise ValueError(
                     "Existing pseudosequence for %r has length %d, expected %d."
@@ -759,32 +766,27 @@ def build_pseudosequences_from_mhcseqs(
     skipped_unparseable = 0
 
     for row in rows:
-        mhc_class = str(row.get("mhc_class") or "").strip().upper()
+        mhc_class = _clean_text(row.get("mhc_class")).upper()
         if mhc_class != "I":
             continue
-        status = str(
-            row.get("groove_status") or row.get("status") or ""
-        ).strip().lower()
+        status = (
+            _clean_text(row.get("groove_status")) or _clean_text(row.get("status"))
+        ).lower()
         if status in _NON_GROOVE_STATUSES:
             continue
 
-        groove1 = str(row.get("groove1") or "").strip()
-        groove2 = str(row.get("groove2") or "").strip()
-        if groove1.lower() == "nan":
-            groove1 = ""
-        if groove2.lower() == "nan":
-            groove2 = ""
+        groove1 = _clean_text(row.get("groove1"))
+        groove2 = _clean_text(row.get("groove2"))
         if not include_fragments and not (groove1 and groove2):
             continue
         if not (groove1 or groove2):
             continue
 
-        raw_name = str(
-            row.get("two_field_allele")
-            or row.get("allele")
-            or row.get("representative_allele")
-            or ""
-        ).strip()
+        raw_name = (
+            _clean_text(row.get("two_field_allele"))
+            or _clean_text(row.get("allele"))
+            or _clean_text(row.get("representative_allele"))
+        )
         if not raw_name:
             continue
 

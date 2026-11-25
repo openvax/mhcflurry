@@ -8,6 +8,11 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.3](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.3.md)**:
+  Fixes `2.5.x` regressions (`#550`–`#555`), NumPy 2 / Pandas 3 compatibility
+  crashes (`#556`–`#559`), and core affinity/processing/presentation bugs
+  (`#560`–`#563`, `#570`, `#571`, `#573`, `#574`, `#576`). Existing `2.3.0`
+  weights and predictions are unchanged.
 - **[2.5.2](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.2.md)**:
   Adds a torch-free fast path for `--list-supported-alleles` and
   `--list-supported-peptide-lengths` in `mhcflurry predict` and

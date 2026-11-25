@@ -2151,7 +2151,11 @@ class Class1NeuralNetwork(object):
                         layer.out_features for layer in subnet.dense_layers
                     ]
                     sub_config['locally_connected_layers'] = [
-                        {'filters': layer.out_channels, 'kernel_size': layer.kernel_size}
+                        {
+                            'filters': layer.out_channels,
+                            'kernel_size': layer.kernel_size,
+                            'activation': layer.activation_name,
+                        }
                         for layer in subnet.lc_layers
                     ] if hasattr(subnet, 'lc_layers') else []
                     sub_config['peptide_dense_layer_sizes'] = [
@@ -2341,6 +2345,8 @@ class Class1NeuralNetwork(object):
         else:
             # Store weights for later application
             self.network_weights = weights
+        if self.prediction_cache is not None:
+            self.prediction_cache.clear()
 
     @staticmethod
     def _copy_weights_list(weights):
@@ -2641,6 +2647,8 @@ class Class1NeuralNetwork(object):
         that remains controlled by the ``restore_best_weights`` hyperparameter.
         """
         self._clear_training_checkpoints()
+        if self.prediction_cache is not None:
+            self.prediction_cache.clear()
         device = self.get_device()
         configure_matmul_precision(device)
 
@@ -3185,6 +3193,8 @@ class Class1NeuralNetwork(object):
             ``restore_best_weights`` hyperparameter.
         """
         self._clear_training_checkpoints()
+        if self.prediction_cache is not None:
+            self.prediction_cache.clear()
         device = self.get_device()
         configure_matmul_precision(device)
 
@@ -3321,9 +3331,9 @@ class Class1NeuralNetwork(object):
                 shuffle_permutation
             ]
         if sample_weights is not None:
-            sample_weights = numpy.array(sample_weights, copy=False)[shuffle_permutation]
+            sample_weights = numpy.asarray(sample_weights)[shuffle_permutation]
         if output_indices is not None:
-            output_indices = numpy.array(output_indices, copy=False)[shuffle_permutation]
+            output_indices = numpy.asarray(output_indices)[shuffle_permutation]
 
         loss_obj = get_pytorch_loss(self.hyperparameters["loss"])
 
@@ -4018,8 +4028,10 @@ class Class1NeuralNetwork(object):
 
         assert self.prediction_cache is not None
         use_cache = allele_encoding is None and isinstance(peptides, EncodableSequences)
-        if use_cache and peptides in self.prediction_cache:
-            return self.prediction_cache[peptides].copy()
+        if use_cache:
+            cached_by_output = self.prediction_cache.get(peptides)
+            if cached_by_output is not None and output_index in cached_by_output:
+                return cached_by_output[output_index].copy()
 
         device = self.get_device()
         configure_matmul_precision(device)
@@ -4122,7 +4134,12 @@ class Class1NeuralNetwork(object):
 
         result = to_ic50(predictions)
         if use_cache:
-            self.prediction_cache[peptides] = result
+            cached_by_output = self.prediction_cache.get(peptides)
+            if cached_by_output is None:
+                cached_by_output = {}
+                self.prediction_cache[peptides] = cached_by_output
+            cached_by_output[output_index] = result
+            return result.copy()
         return result
 
     @classmethod

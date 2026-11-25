@@ -37,7 +37,7 @@ def encode_sources(records):
 
 def decode_sources(value):
     """Read source records, refusing malformed JSON schemas."""
-    if value is None or (isinstance(value, float) and pandas.isna(value)) or value == "":
+    if value is None or (not isinstance(value, (list, dict, tuple, set)) and bool(pandas.isna(value))) or value == "":
         return []
     try:
         records = json.loads(value)
@@ -95,6 +95,8 @@ def deduplicate_measurements(frame, subset):
     original_index = frame.index
     frame = frame.reset_index(drop=True)
     result = frame.drop_duplicates(subset).copy()
+    if result[PROVENANCE_COLUMN].dtype != object:
+        result[PROVENANCE_COLUMN] = result[PROVENANCE_COLUMN].astype(object)
     duplicated = frame.duplicated(subset, keep=False)
     for _, group in frame.loc[duplicated].groupby(subset, sort=False, dropna=False):
         records = []

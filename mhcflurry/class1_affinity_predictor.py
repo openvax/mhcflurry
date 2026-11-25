@@ -198,6 +198,7 @@ class Class1AffinityPredictor(object):
         their own if needed.
         """
         self._cache.clear()
+        self.clear_calibration_fast_cache()
         self.provenance_string = None
         self.models_dir = None
 
@@ -275,9 +276,18 @@ class Class1AffinityPredictor(object):
         if len(predictors) == 1:
             return predictors[0]
 
+        for idx, predictor in enumerate(predictors):
+            if predictor.optimization_info.get("pan_models_merged"):
+                raise ValueError(
+                    "Cannot merge optimized (merged) pan-allele predictor at "
+                    "index %d; load predictors with optimization_level=0 before "
+                    "merging." % idx
+                )
+
         allele_to_allele_specific_models = collections.defaultdict(list)
         class1_pan_allele_models = []
         allele_to_sequence = cls._allele_to_sequence_for_merge(predictors)
+        allele_to_canonical = {}
 
         for predictor in predictors:
             for (allele, networks) in (
@@ -285,12 +295,20 @@ class Class1AffinityPredictor(object):
                 allele_to_allele_specific_models[allele].extend(networks)
             class1_pan_allele_models.extend(
                 predictor.class1_pan_allele_models)
+            for alias, target in getattr(predictor, "allele_to_canonical", {}).items():
+                if (
+                    allele_to_sequence is None
+                    or (target in allele_to_sequence and alias not in allele_to_sequence)
+                ):
+                    allele_to_canonical.setdefault(alias, target)
 
-        return Class1AffinityPredictor(
+        merged = Class1AffinityPredictor(
             allele_to_allele_specific_models=allele_to_allele_specific_models,
             class1_pan_allele_models=class1_pan_allele_models,
             allele_to_sequence=allele_to_sequence
         )
+        merged.allele_to_canonical = allele_to_canonical
+        return merged
 
     def merge_in_place(self, others):
         """
@@ -306,6 +324,15 @@ class Class1AffinityPredictor(object):
         list of string : names of newly added models
         """
         others = list(others)
+        if self.optimization_info.get("pan_models_merged") or any(
+            predictor.optimization_info.get("pan_models_merged")
+            for predictor in others
+        ):
+            raise ValueError(
+                "Cannot merge_in_place with optimized (merged) pan-allele "
+                "predictors; load predictors with optimization_level=0 before "
+                "merging."
+            )
         allele_to_sequence = self._allele_to_sequence_for_merge(
             [self] + others)
         new_model_names = []
@@ -581,7 +608,17 @@ class Class1AffinityPredictor(object):
         """
         num_class1_pan_allele_models = len(self.class1_pan_allele_models)
         if num_class1_pan_allele_models > 1:
+            if any(
+                model.hyperparameters.get("num_outputs", 1) != 1
+                for model in self.class1_pan_allele_models
+            ):
+                if warn:
+                    logging.warning(
+                        "Skipping pan-allele merge optimization for multi-output models."
+                    )
+                return False
             provenance_string = self.provenance_string
+            models_dir = self.models_dir
             try:
                 self.class1_pan_allele_models = [
                     Class1NeuralNetwork.merge(
@@ -598,6 +635,7 @@ class Class1AffinityPredictor(object):
             self.optimization_info["num_pan_models_merged"] = (
                 num_class1_pan_allele_models)
             self.provenance_string = provenance_string
+            self.models_dir = models_dir
         else:
             return False
         return True
@@ -941,7 +979,12 @@ class Class1AffinityPredictor(object):
         models_dir_for_save : string
             Directory to save resulting ensemble to
         """
-        model_name = self.model_name("pan-class1", 1)
+        if self.optimization_info.get("pan_models_merged"):
+            raise ValueError(
+                "Cannot add_pan_allele_model to an optimized (merged) pan-allele "
+                "predictor; load with optimization_level=0 before adding models."
+            )
+        model_name = self.model_name("pan-class1", len(self.class1_pan_allele_models))
         row = pandas.Series(collections.OrderedDict([
             ("model_name", model_name),
             ("allele", "pan-class1"),
@@ -2366,7 +2409,22 @@ class Class1AffinityPredictor(object):
         allele_batch_size = int(allele_batch_size)
 
         if cache_hit:
-            cached_stages = cache.cached_stages
+            # Always synchronize allele embeddings on cache hit: predict() calls
+            # .compact() and overwrites/NaN-pads allele_embedding rows, and
+            # add_allele_from_sequence()/extend_alleles_from_mhcseqs() change
+            # master_allele_encoding indices.
+            refreshed_stages = []
+            for (net_obj, _cached_model, cached_tensor) in cache.cached_stages:
+                (_, allele_reps) = net_obj.allele_encoding_to_network_input(
+                    AlleleEncoding(alleles=[], borrow_from=master),
+                )
+                net_obj.set_allele_representations(allele_reps)
+                model = net_obj.network(borrow=True)
+                model.to(device)
+                model.eval()
+                refreshed_stages.append((net_obj, model, cached_tensor))
+            cached_stages = refreshed_stages
+            cache.cached_stages = cached_stages
         else:
             # Drop stale cache before building the new one — releases
             # the previous peptide-stage tensor's VRAM before we
