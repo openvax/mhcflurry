@@ -611,3 +611,117 @@ def test_short_fragment_status_guard(monkeypatch):
         short_g1 + short_g2, allele="HLA-B*07:02", allow_fragments=True
     )
     assert len(pseudo) == 39
+
+
+def test_lock_existing_freezes_x_containing_entries_and_cli(tmp_path):
+    """lock_existing=True / --lock-existing must freeze every existing entry
+    bit-for-bit verbatim (including X-containing trained alleles such as
+    Gaga-BF) and exempt them from max_x filtering while adding new mhcseqs
+    alleles."""
+    bola_g1 = "GSHSLRYFYTAVSRPGLGEPSFIIVGYVDDTQFVRFDSNTPNPRMEPRARWVEQEGPEYWDRETRISKETAQTFRVDLNTLRGYYNQSEA"
+    bola_g2 = "GSHNIQEMYGCDVGPDGLLRGYDQFAYDGRDYLALNEDLRSWTAADTAAQITKRKWEAEGYAESLRNYLEGRCVEGLRRYLENGKDTLLRAD"
+    rows = [
+        {
+            "two_field_allele": "HLA-A*02:01",
+            "mhc_class": "I",
+            "groove1": HLA_A0201_GROOVE1,
+            "groove2": HLA_A0201_GROOVE2,
+            "groove_status": "ok",
+        },
+        {
+            "two_field_allele": "BoLA-2*057:01",
+            "mhc_class": "I",
+            "groove1": bola_g1,
+            "groove2": bola_g2,
+            "groove_status": "ok",
+        },
+    ]
+    x_existing = "X" + HLA_A0201_EXPECTED_39AA[1:]
+    existing = {"HLA-A*02:01": x_existing}
+
+    # prefer_existing upgrades X-containing entries, whereas lock_existing freezes them.
+    upgraded = build_pseudosequences_from_mhcseqs(
+        rows=rows, existing_allele_to_sequence=existing, prefer_existing=True
+    )
+    assert upgraded["HLA-A*02:01"] == HLA_A0201_EXPECTED_39AA
+
+    locked = build_pseudosequences_from_mhcseqs(
+        rows=rows,
+        existing_allele_to_sequence=existing,
+        lock_existing=True,
+        max_x=0,
+    )
+    assert locked["HLA-A*02:01"] == x_existing
+    assert locked["BoLA-2*057:01"] == "YYGESIMPYREISETTFVDTLYGIEYDFYTWEYLNYRGY"
+
+    # Predictor helper forwards lock_existing cleanly.
+    predictor = Class1AffinityPredictor(allele_to_sequence=dict(existing))
+    added = predictor.extend_alleles_from_mhcseqs(rows=rows, lock_existing=True)
+    assert added == 1
+    assert predictor.allele_to_sequence["HLA-A*02:01"] == x_existing
+    assert "BoLA-2*057:01" in predictor.allele_to_sequence
+
+    # CLI --lock-existing round-trip + verify_trained_allele_parity script.
+    if HAS_MHCSEQS:
+        existing_csv = tmp_path / "baseline.csv"
+        existing_csv.write_text(
+            f"allele,pseudosequence\nHLA-A*02:01,{x_existing}\n",
+            encoding="utf-8",
+        )
+        mhcseqs_csv = tmp_path / "mhcseqs.csv"
+        with open(mhcseqs_csv, "w", newline="", encoding="utf-8") as fd:
+            writer = csv.DictWriter(
+                fd,
+                fieldnames=["two_field_allele", "mhc_class", "groove1", "groove2", "groove_status"],
+            )
+            writer.writeheader()
+            writer.writerows(rows)
+        out_csv = tmp_path / "locked.csv"
+        main([
+            "build",
+            "--mhcseqs-csv", str(mhcseqs_csv),
+            "--existing-csv", str(existing_csv),
+            "--lock-existing",
+            "--out", str(out_csv),
+        ])
+        out_rows = {r["allele"]: r["pseudosequence"] for r in csv.DictReader(out_csv.open())}
+        assert out_rows["HLA-A*02:01"] == x_existing
+        assert "BoLA-2*057:01" in out_rows
+
+        import importlib.util as _ilu
+        from pathlib import Path
+
+        spec = _ilu.spec_from_file_location(
+            "verify_trained_allele_parity",
+            Path(__file__).resolve().parents[1]
+            / "downloads-generation"
+            / "allele_sequences"
+            / "verify_trained_allele_parity.py",
+        )
+        mod = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+
+        train_csv = tmp_path / "train.csv"
+        train_csv.write_text("allele,peptide\nHLA-A0201,SIINFEKL\n", encoding="utf-8")
+        stats = mod.verify_trained_allele_parity(
+            baseline_csv=str(existing_csv),
+            generated_csv=str(out_csv),
+            training_data_csv=str(train_csv),
+            expected_length=39,
+        )
+        assert stats["trained_alleles_verified"] == 1
+        assert stats["net_added_alleles"] == 1
+
+        # Verify parity check fails loudly if a trained allele drifts by even 1 aa.
+        drifted_csv = tmp_path / "drifted.csv"
+        drifted_csv.write_text(
+            f"allele,pseudosequence\nHLA-A*02:01,{HLA_A0201_EXPECTED_39AA}\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="1 trained alleles changed"):
+            mod.verify_trained_allele_parity(
+                baseline_csv=str(existing_csv),
+                generated_csv=str(drifted_csv),
+                training_data_csv=str(train_csv),
+                expected_length=39,
+            )

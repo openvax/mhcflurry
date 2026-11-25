@@ -162,6 +162,56 @@ on mutant-specific IEDB ligands:
 Single-residue binding-pocket substitutions extracted via mhcseqs mutations=(...) outperform their wild-type grooves on mutant-specific ligands for both Pig SLA-1*04:01 R156A (ΔAUROC = +0.010, 95% paired CI [+0.007, +0.013]) and Cat FLA-E*018:01 W167S (ΔAUROC = +0.006, 95% paired CI [+0.000, +0.015]).
 ```
 
+## Zero-shot Presentation with real proteome flanks (`hitlist` validation)
+
+Beyond affinity-only ligand ranking, MHCflurry `2.5.x` also supports zero-shot
+**Class I Presentation** (`Class1PresentationPredictor`, combining pan-allele
+affinity with MHCflurry's human-trained antigen-processing model) on previously
+unseen vertebrate species. Evaluating frozen `2.3.0` weights against
+[`hitlist`](https://github.com/pirl-unc/hitlist) Class I MS immunopeptidomics,
+direct ligands, and experimental `+/-` binding assays across **11 unseen
+vertebrate species** (+184 net new vertebrate species in `mhcseqs 2.12.x` vs
+`2.3.0`) demonstrates that antigen processing and real species proteome flanks
+transfer even across ~160 Myr of divergence to marsupials:
+
+```{figure} _static/release-2.5.7/fig1_species_and_validation_landscape.svg
+:alt: Taxonomic expansion of complete Class I grooves from 47 species in MHCflurry 2.3.0 to 227 species in mhcseqs 2.12, paired with a heatmap of hitlist Class I validation datasets by species and experimental modality.
+
+Left: distinct vertebrate species with complete Class I grooves by clade (+184 net new species vs MHCflurry 2.3.0). Right: hitlist Class I validation data availability across unseen vertebrate species, unseen alleles/mutants, and trained reference controls by experimental modality.
+```
+
+```{figure} _static/release-2.5.7/fig2_hitlist_presentation_vs_affinity.svg
+:alt: Presentation with and without real species proteome flanks versus Affinity and Processing alone on hitlist MS elutions for zero-shot Tasmanian devil and trained Dog and Rhesus macaque reference alleles.
+
+Zero-shot Presentation with real proteome flanks versus Affinity on hitlist MS elutions (10:1 same-proteome length-matched decoys, 95% bootstrap CI). On Tasmanian devil (Sarcophilus harrisii, 0 training rows, 15,301 proteome-mapped ligands), adding MHCflurry's human-trained processing model and real marsupial flanks lifts AUROC from 0.749 to 0.806 (+0.057) and PPV@N from 0.273 to 0.356 (+30% relative enrichment).
+```
+
+```{figure} _static/release-2.5.7/fig3_hitlist_zeroshot_binding_and_ligands.svg
+:alt: Experimental positive versus negative binding assay AUROC without synthetic decoys and zero-shot Affinity versus Presentation ligand ranking AUROC across 11 unseen vertebrate species and binding-pocket mutants.
+
+Left: experimental positive-versus-negative binding assays (no synthetic decoys) from hitlist/binding.parquet. Right: zero-shot Affinity (solid) and no-flank Presentation (hatched) ligand ranking AUROC against 10:1 length-matched background decoys across 11 unseen vertebrate species and 3 engineered binding-pocket mutants.
+```
+
+## Pan-allele training parity & `GENERATE.sh` migration
+
+Auditing all **307** trained alleles in `curated_training_data.csv.bz2`
+(`988,285` rows) against `mhcseqs 2.12` shows **300 / 307** are already
+bit-for-bit identical (39/39 residues), while **7 / 307** chicken `Gaga-BF1/BF2`
+alleles had an `X` in `2.3.0` that `mhcseqs` resolves. In a controlled A/B
+pan-allele training run (`[1024, 1024]` architecture, all 307 trained alleles,
+30,760 train / 7,690 held-out test, seed 42), locking existing alleles verbatim
+via `--lock-existing` reproduces legacy `clustalo` training **bit-for-bit**
+(`Max abs diff = 0.0`, `log10 Pearson r = 1.000000`, `AUROC = 0.80169` on both
+arms) while adding all +184 new vertebrate species.
+
+Accordingly, `downloads-generation/allele_sequences/GENERATE.sh` now defaults
+to `MHCFLURRY_ALLELE_SEQUENCES_BACKEND=mhcseqs`, running
+`mhcflurry pseudosequences build --existing-csv ... --lock-existing` followed
+by `verify_trained_allele_parity.py` to enforce **0 missing alleles and 0
+character diffs** on every trained allele in `curated_training_data.csv.bz2`.
+Pass `MHCFLURRY_ALLELE_SEQUENCES_BACKEND=legacy` to run the original
+`wget + clustalo + make_allele_sequences.py` workflow.
+
 ## Reproducing the benchmark and figures
 
 The complete evaluation and plotting pipeline lives in
