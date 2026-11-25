@@ -290,7 +290,7 @@ def inspect_download(download_name, release=None, *, metadata=None, verify_files
             return {
                 "downloaded": False,
                 "up_to_date": None,
-                "path": legacy_dir,
+                "path": store_dir,
                 "layout": "datacache",
                 "install_status": receipt.status,
                 "verified": False,
@@ -498,18 +498,19 @@ def _resolve_default_override_path(override_value, test_exists=True):
     if isabs(override_value):
         result = override_value
     else:
-        result = join(get_downloads_dir(), override_value)
-        if not exists(result):
-            # Support relative overrides like ``models_class1_pan/models.combined``
-            # against datacache-managed archive stores as well as legacy dirs.
-            normalized = override_value.replace("\\", "/").lstrip("/")
-            parts = normalized.split("/", 1)
-            bundle_name = parts[0]
-            subpath = parts[1] if len(parts) > 1 else ""
-            if bundle_name and exists(get_managed_store_dir(bundle_name)):
-                candidate = get_path(bundle_name, subpath, test_exists=False)
-                if exists(candidate):
-                    result = candidate
+        # Match get_path()/inspect_download() precedence: check datacache-managed
+        # archive stores before falling back to legacy directories.
+        result = None
+        normalized = override_value.replace("\\", "/").lstrip("/")
+        parts = normalized.split("/", 1)
+        bundle_name = parts[0]
+        subpath = parts[1] if len(parts) > 1 else ""
+        if bundle_name and exists(get_managed_store_dir(bundle_name)):
+            candidate = get_path(bundle_name, subpath, test_exists=False)
+            if exists(candidate):
+                result = candidate
+        if result is None:
+            result = join(get_downloads_dir(), override_value)
     if test_exists and not exists(result):
         raise IOError("No such directory: %s" % result)
     return result
@@ -650,8 +651,12 @@ def get_current_release_downloads():
     return get_release_downloads(get_current_release())
 
 
-def _resolve_bundle_root(download_name, release=None):
-    """Return the extracted tree root for ``download_name`` (managed or legacy)."""
+def _resolve_bundle_root(download_name, release=None, *, allow_invalid_managed=False):
+    """Return the extracted tree root for ``download_name`` (managed or legacy).
+
+    When a ``datacache``-managed store exists and is invalid or inaccessible,
+    never silently fall back to a stale legacy directory.
+    """
     store_dir = get_managed_store_dir(download_name, release=release)
     if exists(store_dir):
         import datacache
@@ -659,6 +664,21 @@ def _resolve_bundle_root(download_name, release=None):
         inspection = datacache.inspect_archive(store_dir, verify_files=False)
         if inspection.status == "available" and inspection.bundle:
             return inspection.bundle
+        if inspection.status != "missing":
+            if allow_invalid_managed:
+                return store_dir
+            release_flag = " --release " + quote(release) if release else ""
+            detail = (
+                " (%s)" % inspection.error
+                if inspection.error is not None
+                else ""
+            )
+            raise RuntimeError(
+                "MHCflurry managed download store %s is %s%s. "
+                "To repair this download, run:\n\tmhcflurry downloads fetch %s%s --force\n"
+                "in a shell."
+                % (quote(store_dir), inspection.status, detail, download_name, release_flag)
+            )
     return join(get_downloads_dir(release), download_name)
 
 
@@ -688,7 +708,9 @@ def get_path(download_name, filename='', test_exists=True, release=None):
     string giving local absolute path
     """
     assert '/' not in download_name, "Invalid download: %s" % download_name
-    base = _resolve_bundle_root(download_name, release=release)
+    base = _resolve_bundle_root(
+        download_name, release=release, allow_invalid_managed=not test_exists
+    )
     path = join(base, filename) if filename else base
     if test_exists and not exists(path):
         raise RuntimeError(

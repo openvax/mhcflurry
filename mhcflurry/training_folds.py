@@ -11,8 +11,16 @@ def read_processing_training_data(path):
     Sample identifiers stay strings, including purely numeric identifiers.
     """
     return pandas.read_csv(
-        path, float_precision="round_trip", dtype={
-            "sample_id": str, "matching_affinity_reference_sha256": str})
+        path,
+        float_precision="round_trip",
+        dtype={
+            "sample_id": str,
+            "matching_affinity_reference_sha256": str,
+            "n_flank": str,
+            "c_flank": str,
+        },
+        keep_default_na=False,
+    )
 
 
 def extract_training_folds(data, num_folds, reuse=False):

@@ -97,7 +97,8 @@ def main(args):
 
     df = pandas.read_csv(
         args.data,
-        dtype={"sample_id": str},
+        dtype={"sample_id": str, "n_flank": str, "c_flank": str},
+        keep_default_na=False,
         low_memory=False,
     )
     print("Loaded training data: %s" % (str(df.shape)))

@@ -94,6 +94,8 @@ def reassign_mass_spec_training_data(
 
     if set_measurement_value is not None:
         indexer = df.measurement_kind == "mass_spec"
+        if not pandas.api.types.is_float_dtype(df["measurement_value"]):
+            df["measurement_value"] = df["measurement_value"].astype(float)
         df.loc[indexer, "measurement_value"] = set_measurement_value
         print(
             "Reassigned measurement_value for %d MS rows to %s" % (

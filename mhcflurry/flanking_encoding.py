@@ -56,10 +56,16 @@ class FlankingEncoding(object):
         c_flanks : list of string [same length as peptides]
             Downstream sequences
         """
+        def _as_flank_strings(values):
+            return [
+                "" if (value is None or pandas.isna(value)) else str(value)
+                for value in values
+            ]
+
         self.dataframe = pandas.DataFrame({
-            "peptide": peptides,
-            "n_flank": n_flanks,
-            "c_flank": c_flanks,
+            "peptide": [str(p) for p in peptides],
+            "n_flank": _as_flank_strings(n_flanks),
+            "c_flank": _as_flank_strings(c_flanks),
         }, dtype=str)
         self.encoding_cache = {}
         self.tensor_cache = {}
@@ -276,7 +282,7 @@ class FlankingEncoding(object):
             if throw:
                 raise EncodingError(
                     message,
-                    supported_peptide_lengths=(1, peptide_max_length + 1))
+                    supported_peptide_lengths=(1, peptide_max_length))
             logging.warning(message)
 
             # Replace invalid peptides with X's. The encoding will be set to

@@ -519,6 +519,8 @@ class Class1ProcessingPredictor(object):
                     save_weights(weights, join(models_dir, filename))
                     if column not in self.manifest_df.columns:
                         self.manifest_df[column] = None
+                    if self.manifest_df[column].dtype != object:
+                        self.manifest_df[column] = self.manifest_df[column].astype(object)
                     self.manifest_df.at[row.name, column] = filename
                 # A dropped policy must not leave its sidecar on disk, where
                 # it would reach release tarballs and directory fingerprints.

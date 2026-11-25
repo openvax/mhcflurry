@@ -16,6 +16,7 @@ import collections
 import csv
 import json
 import logging
+import sys
 from functools import partial
 from os import makedirs, mkdir
 from os.path import abspath, commonpath, dirname, exists, join, realpath, relpath
@@ -170,6 +171,8 @@ def save_predictor(predictor, models_dir, model_names_to_write=None, write_metad
                 column = _checkpoint_manifest_column(policy)
                 if column not in predictor.manifest_df.columns:
                     predictor.manifest_df[column] = None
+                if predictor.manifest_df[column].dtype != object:
+                    predictor.manifest_df[column] = predictor.manifest_df[column].astype(object)
                 predictor.manifest_df.at[row.name, column] = relpath(
                     checkpoint_path, models_dir)
                 row.model.set_checkpoint_weights_loader(
@@ -333,15 +336,29 @@ def _load_allele_sequences(models_dir, build_alias_map=True):
     return allele_to_sequence, allele_to_canonical
 
 
+def _read_manifest_rows(manifest_path):
+    """Read manifest.csv rows without hitting Python's 128 KB CSV field limit."""
+    previous_limit = csv.field_size_limit()
+    try:
+        try:
+            csv.field_size_limit(sys.maxsize)
+        except OverflowError:
+            csv.field_size_limit(2 ** 31 - 1)
+        with open(manifest_path, newline="") as fd:
+            return list(csv.DictReader(fd))
+    finally:
+        csv.field_size_limit(previous_limit)
+
+
 def read_supported_alleles(models_dir):
     """Read supported alleles from a predictor directory without loading weights or torch."""
     affinity_dir = _resolve_affinity_models_dir(models_dir)
-    with open(join(affinity_dir, "manifest.csv"), newline="") as fd:
-        allele_specific = {
-            row["allele"]
-            for row in csv.DictReader(fd)
-            if row["allele"] and row["allele"] != "pan-class1"
-        }
+    rows = _read_manifest_rows(join(affinity_dir, "manifest.csv"))
+    allele_specific = {
+        row["allele"]
+        for row in rows
+        if row.get("allele") and row["allele"] != "pan-class1"
+    }
     allele_to_sequence, allele_to_canonical = _load_allele_sequences(
         affinity_dir, build_alias_map=bool(allele_specific))
 
@@ -358,12 +375,12 @@ def read_supported_alleles(models_dir):
 def read_supported_peptide_lengths(models_dir):
     """Read supported ``(min_len, max_len)`` from a predictor directory without loading weights or torch."""
     affinity_dir = _resolve_affinity_models_dir(models_dir)
-    with open(join(affinity_dir, "manifest.csv"), newline="") as fd:
-        unique_configs = {
-            row["config_json"]
-            for row in csv.DictReader(fd)
-            if row.get("config_json")
-        }
+    rows = _read_manifest_rows(join(affinity_dir, "manifest.csv"))
+    unique_configs = {
+        row["config_json"]
+        for row in rows
+        if row.get("config_json")
+    }
     length_ranges = set()
     for config_json in unique_configs:
         config = json.loads(config_json)

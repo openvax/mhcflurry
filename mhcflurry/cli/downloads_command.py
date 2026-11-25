@@ -438,7 +438,7 @@ def _print_table(headers, rows, colors=None, wrap_columns=()):
             print("  ".join(output).rstrip())
 
 
-def _model_versions(name, releases):
+def _model_versions(name, releases, verify_files=False):
     """Describe archive sources and installed standalone or embedded models."""
     versions = get_bundle_versions(name)
     installed = []
@@ -456,14 +456,16 @@ def _model_versions(name, releases):
         if release not in candidate_releases:
             continue
         if release not in releases:
-            releases[release] = get_release_downloads(release)
+            releases[release] = get_release_downloads(release, verify_files=verify_files)
         release_downloads = releases[release]
         sources = []
         standalone = release_downloads.get(name)
         if standalone and standalone['downloaded']:
             sources.append((standalone, ''))
+        elif standalone and standalone.get('install_status') in ('invalid', 'inaccessible'):
+            sources.append((standalone, ' (invalid)'))
         presentation = release_downloads.get('models_class1_presentation')
-        if presentation and name in _PRESENTATION_COMPONENT_DIRS:
+        if presentation and presentation.get('downloaded') and name in _PRESENTATION_COMPONENT_DIRS:
             components = _presentation_components(get_path(
                 'models_class1_presentation', 'models', test_exists=False,
                 release=release), name)
@@ -476,8 +478,11 @@ def _model_versions(name, releases):
                     suffix += ' (%s only)' % variant
                 sources.append((presentation, suffix))
         for info, suffix in sources:
-            marker = ("" if info['up_to_date'] is True else
-                      "?" if info['up_to_date'] is None else "!")
+            if info.get('install_status') in ('invalid', 'inaccessible'):
+                marker = "!"
+            else:
+                marker = ("" if info['up_to_date'] is True else
+                          "?" if info['up_to_date'] is None else "!")
             if custom:
                 custom_candidates.setdefault(suffix, []).append((release, marker))
             else:
@@ -499,7 +504,7 @@ def _model_versions(name, releases):
             ', '.join(installed) or '—')
 
 
-def _print_downloads(records):
+def _print_downloads(records, verify_files=False):
     primary = [record for record in records if record['group'] == 'Prediction models']
     primary.sort(key=lambda record: record['name'] != 'models_class1_presentation')
     historical = [record for record in records if record['group'] != 'Prediction models']
@@ -510,14 +515,14 @@ def _print_downloads(records):
             print()
         releases = {}
         rows = [(record['name'] + (' (affinity)' if record['name'] == 'models_class1_pan' else ''),
-                 *_model_versions(record['name'], releases))
+                 *_model_versions(record['name'], releases, verify_files=verify_files))
                 for record in primary]
         _print_table(('MODEL', 'LATEST', 'OTHER VERSIONS', 'INSTALLED'), rows,
                      colors={1: '36', 3: _status_color}, wrap_columns=(2, 3))
         print("Shared archive aliases are grouped under one version; 'releases NAME' lists all.")
         print("'via presentation' identifies embedded components, not standalone bundle installs.")
         if any('?' in row[3] or '!' in row[3] for row in rows):
-            print('Installed: ? unknown source; ! recorded source differs from that catalogue.')
+            print('Installed: ? unknown source; ! recorded source differs or installation is invalid.')
     for group, kind in (('Historical models', 'models'), ('Supporting data', 'data')):
         items = [record for record in historical if record['kind'] == kind]
         if not items:
@@ -525,13 +530,21 @@ def _print_downloads(records):
         _heading(group)
         rows = []
         for record in items:
-            source = ('—' if not record['downloaded'] else
-                      'unknown' if record['source_matches'] is None else
-                      'matches' if record['source_matches'] else 'differs')
-            rows.append((record['name'], yes_no(record['downloaded']), source))
+            if record.get('install_status') in ('invalid', 'inaccessible'):
+                local_label = 'invalid'
+                source = 'corrupt'
+            else:
+                local_label = yes_no(record['downloaded'])
+                source = ('—' if not record['downloaded'] else
+                          'unknown' if record['source_matches'] is None else
+                          'matches' if record['source_matches'] else 'differs')
+            rows.append((record['name'], local_label, source))
         _print_table(('DOWNLOAD', 'LOCAL', 'SOURCE'), rows,
                      colors={1: _status_color, 2: _status_color})
-    print("\nLocal status checks directories, component manifests and recorded source URLs, not file integrity.")
+    if verify_files:
+        print("\nFull file verification checked managed bundle files against manifests and trusted catalogue checksums.")
+    else:
+        print("\nLocal status checks directories, component manifests and recorded source URLs, not file integrity.")
     print("Details: mhcflurry downloads info NAME | Versions: mhcflurry downloads releases NAME")
 
 
@@ -686,7 +699,7 @@ def info_subcommand(args):
         print(json.dumps(config, indent=2))
         return
     print("Download catalogue %s (code %s)" % (release, __version__))
-    _print_downloads(config['downloads'])
+    _print_downloads(config['downloads'], verify_files=verify_files)
     _heading("Resolved configuration")
     print("  Code version:       " + __version__)
     print("  Default weights:    " + config['default_release'])
