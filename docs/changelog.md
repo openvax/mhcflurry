@@ -8,6 +8,14 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.7](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.7.md)**:
+  Adds `--lock-existing` / `lock_existing=True` to freeze baseline alleles
+  verbatim, switches `downloads-generation/allele_sequences/GENERATE.sh` to
+  `mhcflurry pseudosequences build --lock-existing` with a hard 0-diff parity
+  gate on all trained alleles (`verify_trained_allele_parity.py`), adds the
+  `hitlist` zero-shot Presentation-vs-Affinity validation figures to
+  {doc}`cross_species_validation`, and bumps `mhcgnomes>=3.79.0` /
+  `mhcseqs>=2.12.5`. Existing `2.3.0` weights and predictions are unchanged.
 - **[2.5.6](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.6.md)**:
   Fixes `Class1NeuralNetwork` batch normalization & merging (`#564`, `#565`),
   `robust_mean` (`#566`), percentile-rank calibration & empty-input prediction
