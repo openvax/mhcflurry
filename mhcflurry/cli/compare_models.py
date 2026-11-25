@@ -745,10 +745,19 @@ def _validate_component_configuration(args, components, side_a, side_b):
         modes = _requested_modes(
             args.processing_modes, PROCESSING_MODES, "--processing-modes")
         _processing_model_dirs(side_a, side_b, modes)
+        policy = getattr(args, "processing_negative_policy", "matched")
+        prepared_cohort = getattr(args, "processing_matched_cohort", None)
+        if prepared_cohort and policy != "matched":
+            raise ValueError(
+                "A prepared processing cohort requires the matched policy"
+            )
     if "presentation" in components:
         _requested_modes(
             args.presentation_modes, PRESENTATION_MODES,
             "--presentation-modes")
+        _requested_modes(
+            args.presentation_score_kinds, PRESENTATION_SCORE_KINDS,
+            "--presentation-score-kinds")
 
 
 # ---------------------------------------------------------------------------
@@ -1099,7 +1108,11 @@ def _read_holdout_benchmark_files(files, samples, context):
     empty = None
     loaded = retained = 0
     for index, path in enumerate(files):
-        with pandas.read_csv(path, chunksize=100000) as reader:
+        with pandas.read_csv(
+                path,
+                chunksize=100000,
+                dtype={"sample_id": str},
+                keep_default_na=False) as reader:
             for frame in reader:
                 _require_complete_benchmark_rows(
                     frame, ("peptide", "sample_id", "hla", "hit"), context)
@@ -1139,7 +1152,7 @@ def _load_affinity_benchmark(data_dir, source, limit_files, samples=None):
         return _read_holdout_benchmark_files(files, samples, "Affinity benchmark")
     dfs = []
     for i, f in enumerate(files):
-        df = pandas.read_csv(f)
+        df = pandas.read_csv(f, dtype={"sample_id": str}, keep_default_na=False)
         df["source_file"] = os.path.basename(f)
         dfs.append(df)
         if (i + 1) % 50 == 0:
@@ -1514,7 +1527,7 @@ def _affinity_per_length(test):
         m_b_L = _metrics(sub.hit.values, sub.b_score.values)
         per_allele_L = []
         for allele, group in sub.groupby("hla"):
-            if len(group) < 30 or group.hit.sum() == 0:
+            if len(group) < 30 or group.hit.nunique() < 2:
                 continue
             ma_a = _metrics(group.hit.values, group.a_score.values)
             ma_b = _metrics(group.hit.values, group.b_score.values)
@@ -1922,7 +1935,8 @@ def _load_presentation_benchmark(data_dir, limit_files, row_filter=None, samples
     else:
         dfs = []
         for i, path in enumerate(files):
-            df = pandas.read_csv(path)
+            df = pandas.read_csv(
+                path, dtype={"sample_id": str}, keep_default_na=False)
             df["source_file"] = os.path.basename(path)
             dfs.append(df)
             if (i + 1) % 25 == 0:

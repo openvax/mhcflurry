@@ -379,8 +379,8 @@ def run(argv=sys.argv[1:]):
 
         pairs = list(itertools.product(args.alleles, args.peptides))
         df = pandas.DataFrame({
-            "allele": [p[0] for p in pairs],
-            "peptide": [p[1] for p in pairs],
+            args.allele_column: [p[0] for p in pairs],
+            args.peptide_column: [p[1] for p in pairs],
         })
         logging.info(
             "Predicting for %d alleles and %d peptides = %d predictions" % (

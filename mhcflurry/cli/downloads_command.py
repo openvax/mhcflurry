@@ -59,7 +59,6 @@ from ..downloads import (
     get_path,
     ENVIRONMENT_VARIABLES)
 from ..version import __version__
-from .completion import is_completing
 from .help import HelpArgumentParser, color_enabled
 
 parser = HelpArgumentParser(
@@ -110,10 +109,8 @@ parser_fetch.add_argument(
     help="Re-download and install a fresh bundle generation even if already installed")
 parser_fetch.add_argument(
     "--release",
-    # The current release comes from the download catalogue, which a Tab
-    # press does not need to read.
-    default=None if is_completing() else get_current_release(),
-    help="Release to download. Default: %(default)s")
+    default=None,
+    help="Release to download. Default: current release")
 parser_fetch.add_argument(
     "--already-downloaded-dir",
     metavar="DIR",
@@ -219,7 +216,8 @@ def fetch_subcommand(args):
         if not args.quiet:
             print(msg, file=sys.stderr)
 
-    if not args.release:
+    release = args.release if args.release is not None else get_current_release()
+    if not release:
         raise RuntimeError(
             "No release defined. This can happen when you are specifying "
             "a custom models directory. Specify --release to indicate "
@@ -233,7 +231,7 @@ def fetch_subcommand(args):
         )
 
     force = bool(getattr(args, "force", False))
-    downloads = get_release_downloads(args.release)
+    downloads = get_release_downloads(release)
     invalid_download_names = set(
         item for item in args.download_name if item not in downloads)
     if invalid_download_names:
@@ -255,7 +253,7 @@ def fetch_subcommand(args):
                         "To re-download or repair this data, re-run with --force.\n"
                         + "*" * 40
                     )
-                    % (name, quote(get_path(name, release=args.release))),
+                    % (name, quote(get_path(name, release=release))),
                     file=sys.stderr,
                 )
             continue
@@ -270,7 +268,7 @@ def fetch_subcommand(args):
                 datacache.require_online(url, offline=offline_flag)
 
     qprint("Fetching %d/%d downloads from release %s" % (
-        len(items_to_fetch), len(downloads), args.release))
+        len(items_to_fetch), len(downloads), release))
     format_string = "%-40s  %-20s   %-20s  %-20s "
     qprint(format_string % (
         "DOWNLOAD NAME", "ALREADY DOWNLOADED?", "WILL DOWNLOAD NOW?", "URL"))
@@ -291,7 +289,7 @@ def fetch_subcommand(args):
     for item in items_to_fetch:
         bundle_path = install_download(
             item,
-            release=args.release,
+            release=release,
             metadata=downloads[item]['metadata'],
             already_downloaded_dir=args.already_downloaded_dir,
             force=force,

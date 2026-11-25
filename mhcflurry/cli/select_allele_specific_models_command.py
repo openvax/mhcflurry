@@ -108,7 +108,16 @@ def run(argv=sys.argv[1:]):
         print("Subselected to 8-15mers: %s" % (str(df.shape)))
 
         # Allele names in data are assumed to be already normalized.
-        df = df.loc[df.allele.isin(alleles)].dropna()
+        required_cols = [
+            col for col in (
+                "allele",
+                "peptide",
+                "measurement_value",
+                "measurement_source",
+            )
+            if col in df.columns
+        ]
+        df = df.loc[df.allele.isin(alleles)].dropna(subset=required_cols)
         print("Selected %d alleles: %s" % (len(alleles), ' '.join(alleles)))
 
         if args.exclude_data:
@@ -146,13 +155,14 @@ def run(argv=sys.argv[1:]):
 
     selectors = {}
     selector_to_model_selection_kwargs = {}
+    selector_cache = {}
 
     def make_selector(
             scoring,
             combined_min_contribution_percent=args.combined_min_contribution_percent):
-        if scoring in selectors:
-            return (
-                selectors[scoring], selector_to_model_selection_kwargs[scoring])
+        cache_key = (scoring, combined_min_contribution_percent)
+        if cache_key in selector_cache:
+            return selector_cache[cache_key]
 
         start = time.time()
         if scoring.startswith("combined:"):
@@ -201,7 +211,9 @@ def run(argv=sys.argv[1:]):
             raise ValueError("Unsupported scoring method: %s" % scoring)
         print("Instantiated model selector %s in %0.2f sec." % (
             scoring, time.time() - start))
-        return (selector, model_selection_kwargs)
+        result = (selector, model_selection_kwargs)
+        selector_cache[cache_key] = result
+        return result
 
     for scoring in args.scoring:
         (selector, model_selection_kwargs) = make_selector(scoring)
@@ -608,10 +620,13 @@ class MSEModelSelector(object):
                     eq_df = sub_df.loc[
                         sub_df.measurement_inequality == "="
                         ]
-                additional_metadata_out["score_pearsonr"] = (
-                    pearsonr(
-                        numpy.log(eq_df.measurement_value.values),
-                        numpy.log(predictions[eq_df.index.values]))[0])
+                if len(eq_df) >= 2:
+                    additional_metadata_out["score_pearsonr"] = (
+                        pearsonr(
+                            numpy.log(eq_df.measurement_value.values),
+                            numpy.log(predictions[eq_df.index.values]))[0])
+                else:
+                    additional_metadata_out["score_pearsonr"] = numpy.nan
 
                 for threshold in [500, 5000, 15000]:
                     if (eq_df.measurement_value < threshold).nunique() == 2:

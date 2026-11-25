@@ -543,8 +543,9 @@ def initialize_training(args):
     df = df.loc[mask]
     print("Filtered to valid (len, non-null, known-allele): %s" % (str(df.shape)))
 
-    print("Data inequalities:")
-    print(df.measurement_inequality.value_counts())
+    if "measurement_inequality" in df.columns:
+        print("Data inequalities:")
+        print(df.measurement_inequality.value_counts())
 
     if args.ignore_inequalities and "measurement_inequality" in df.columns:
         print("Dropping measurement_inequality column")
@@ -1102,7 +1103,7 @@ def train_model(
                 pretrain_network_input_iterator,
                 filename=pretrain_data_filename,
                 master_allele_encoding=allele_encoding,
-                peptide_encoding=hyperparameters["peptide_encoding"],
+                peptide_encoding=model.hyperparameters["peptide_encoding"],
                 peptides_per_chunk=pretrain_peptides_per_step,
                 compact_peptide_repeats=True,
                 peptide_amino_acid_encoding_torch=(
@@ -1117,7 +1118,11 @@ def train_model(
                 validation_peptide_encoding=train_peptides,
                 validation_affinities=train_data.measurement_value.values,
                 validation_allele_encoding=train_alleles,
-                validation_inequalities=train_data.measurement_inequality.values,
+                validation_inequalities=(
+                    train_data.measurement_inequality.values
+                    if "measurement_inequality" in train_data.columns
+                    else None
+                ),
                 patience=pretrain_patience,
                 min_delta=pretrain_min_delta,
                 steps_per_epoch=pretrain_steps_per_epoch,
