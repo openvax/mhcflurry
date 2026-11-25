@@ -1799,7 +1799,7 @@ class Class1NeuralNetwork(object):
                 architecture.get(
                     'normalization',
                     hyperparameters.get('normalization', 'none'),
-                ) == 'layer'):
+                ) in ('batch', 'layer')):
             peptide_offset += 2
 
         n = len(network_weights)
@@ -2172,8 +2172,11 @@ class Class1NeuralNetwork(object):
                         0.0,
                     )
                     sub_config['batch_normalization'] = (
-                        hasattr(subnet, 'batch_norms') and bool(subnet.batch_norms) and
-                        any(bn is not None for bn in subnet.batch_norms)
+                        getattr(subnet, 'batch_norm_early', None) is not None or (
+                            hasattr(subnet, 'batch_norms')
+                            and bool(subnet.batch_norms)
+                            and any(bn is not None for bn in subnet.batch_norms)
+                        )
                     )
                     sub_config['normalization'] = getattr(
                         subnet, 'normalization', 'none')
@@ -4085,6 +4088,21 @@ class Class1NeuralNetwork(object):
                 batch_array = numpy.asarray(batch_array, dtype=numpy.float32)
             return torch.from_numpy(batch_array).to(device)
 
+        if n_samples == 0:
+            if output_index is not None:
+                return numpy.empty(0, dtype="float64")
+            if hasattr(network, "output_layer"):
+                out_dim = int(network.output_layer.out_features)
+            elif hasattr(network, "networks"):
+                out_dim = (
+                    sum(int(n.output_layer.out_features) for n in network.networks)
+                    if getattr(network, "merge_method", None) == "concatenate"
+                    else int(network.networks[0].output_layer.out_features)
+                )
+            else:
+                out_dim = int(self.hyperparameters.get("num_outputs", 1))
+            return numpy.empty((0, out_dim), dtype="float64")
+
         while True:
             all_predictions = []
             try:
@@ -4163,6 +4181,20 @@ class Class1NeuralNetwork(object):
         assert len(models) > 1
         if any(not model.network().has_allele for model in models):
             raise NotImplementedError("Merging allele-specific models is not implemented")
+
+        shared_encoding_keys = (
+            "allele_amino_acid_encoding",
+            "peptide_encoding",
+            "peptide_amino_acid_encoding",
+            "peptide_amino_acid_encoding_torch",
+        )
+        first_hp = models[0].hyperparameters
+        for key in shared_encoding_keys:
+            first_val = first_hp.get(key)
+            if any(model.hyperparameters.get(key) != first_val for model in models[1:]):
+                raise NotImplementedError(
+                    "Cannot merge models with mismatched %s" % key
+                )
 
         # For now, we create a simple ensemble wrapper
         # that averages predictions

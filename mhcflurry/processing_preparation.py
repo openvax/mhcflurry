@@ -250,6 +250,9 @@ def sample_preparation_steps(args, sample, hits, seed, initial_pool, additional_
                 # numerically instead of trusting the callback to honor it.
                 known = sequence_keys(NumericSequences.from_strings(pool.peptide, MAX_PROCESSING_LENGTH).indices.numpy())
                 windows = windows.take(numpy.flatnonzero(~numpy.isin(windows.keys, known)))
+                if len(windows):
+                    _, first = numpy.unique(windows.keys, return_index=True)
+                    windows = windows.take(numpy.sort(first))
                 unscored = NumericCandidatePool(parts[0].hits, windows, sample, parts[0].flank_length)
                 count = len(windows)
                 valid_lengths = numpy.isin(windows.lengths, lengths).all()

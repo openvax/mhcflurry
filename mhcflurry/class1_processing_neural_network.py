@@ -632,6 +632,17 @@ class Class1ProcessingModel(nn.Module):
                 continue
             yield name, buffer
 
+    def _weights_match_pytorch_shapes(self, weights):
+        expected = [param.shape for _, param in self.named_parameters()] + [
+            buf.shape for _, buf in self._named_persistent_buffers()
+        ]
+        if len(weights) != len(expected):
+            return False
+        return all(
+            tuple(w.shape) == tuple(exp)
+            for w, exp in zip(weights, expected)
+        )
+
     def set_weights_list(self, weights, auto_convert_keras=True):
         """
         Set weights from a list of numpy arrays.
@@ -651,8 +662,9 @@ class Class1ProcessingModel(nn.Module):
         #   conv1, n_post_0, n_post_1, c_post_0, c_post_1, n_avg, c_avg, output
         # We need to reorder Keras weights to match PyTorch parameter order
 
-        if auto_convert_keras:
-            weights = self._reorder_keras_weights(list(weights))
+        weights = list(weights)
+        if auto_convert_keras and not self._weights_match_pytorch_shapes(weights):
+            weights = self._reorder_keras_weights(weights)
 
         idx = 0
         for name, param in self.named_parameters():
@@ -710,19 +722,20 @@ class Class1ProcessingModel(nn.Module):
             return weights
 
         # Find indices in Keras weight list
-        # Structure: conv1_w, conv1_b, [n_post_i_w, n_post_i_b, c_post_i_w, c_post_i_b]...,
+        # Structure: prefix params (conv1 + optional norm/boundary),
+        #            [n_post_i_w, n_post_i_b, c_post_i_w, c_post_i_b]...,
         #            n_avg_w, n_avg_b, c_avg_w, c_avg_b, out_w, out_b
-
-        reordered = []
-
-        # Conv1 weights (indices 0, 1)
-        reordered.append(weights[0])
-        reordered.append(weights[1])
-
-        # Keras has interleaved: n_post_0, c_post_0, n_post_1, c_post_1, ...
-        # We need: n_post_0, n_post_1, ..., c_post_0, c_post_1, ...
-        post_conv_start = 2
+        param_names = [name for name, _ in self.named_parameters()]
+        post_conv_start = next(
+            (i for i, name in enumerate(param_names)
+             if name.startswith("n_flank_post_convs.")),
+            2,
+        )
         post_conv_end = post_conv_start + n_post_conv_layers * 4  # 4 = n_w, n_b, c_w, c_b per layer
+        if post_conv_end > len(weights):
+            return weights
+
+        reordered = list(weights[:post_conv_start])
 
         # Extract n_flank and c_flank post-conv weights separately
         n_flank_weights = []

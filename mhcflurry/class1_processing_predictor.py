@@ -122,7 +122,16 @@ class Class1ProcessingPredictor(object):
         """
         method = calibration_method(method, bins)
         if method == "histogram" and bins is None:
-            bins = numpy.unique(numpy.quantile(scores, numpy.linspace(0, 1, 10001)))
+            finite_scores = numpy.asarray(scores, dtype=float)
+            finite_scores = finite_scores[numpy.isfinite(finite_scores)]
+            if finite_scores.size == 0:
+                raise ValueError("Cannot calibrate percentile ranks on empty/non-finite scores")
+            bins = numpy.unique(
+                numpy.quantile(finite_scores, numpy.linspace(0, 1, 10001))
+            )
+            if bins.size < 2:
+                raise ValueError("Cannot calibrate a constant score distribution")
+            scores = finite_scores
         self.percent_rank_transform = fit_percent_rank_transform(
             scores, method=method, bins=bins, score_transform="logit",
             survival=True, max_knots=max_knots, groups=groups)

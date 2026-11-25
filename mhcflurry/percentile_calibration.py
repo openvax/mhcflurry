@@ -120,7 +120,9 @@ def fit_percent_rank_transform(values, *, method=None, bins=None,
         # Avoid trying to validate cutoffs supported by fewer than ten scores.
         cutoffs = np.array([.03, .1, .3, 1., 3., 10.])
         cutoffs = cutoffs[cutoffs * len(validation_values) / 100 >= 10]
-        if (len(cutoffs) >= 2 and len(np.unique(fit_values)) >= 2):
+        if (
+                len(cutoffs) >= 2
+                and len(np.unique(model._coordinates(fit_values))) >= 2):
             errors = {}
             for budget in (64, 128):
                 trial = CompactPercentRankTransform(score_transform).fit(fit_values, budget)
