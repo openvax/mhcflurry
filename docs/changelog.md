@@ -8,6 +8,11 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.5](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.5.md)**:
+  Fixes training-loop, `RandomNegativePeptides`, `ppv_at_n`,
+  `compare-models`, allele-specific model selection, and `predict` /
+  `predict-scan` / `downloads` CLI edge cases (`#588`–`#595`). Existing
+  `2.3.0` weights and predictions are unchanged.
 - **[2.5.4](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.4.md)**:
   Fixes local parallelism, GPU/batch auto-sizing, `torch.compile`, and cluster
   retry bugs (`#580`–`#587`), accepts registered custom non-`mhcgnomes` allele
