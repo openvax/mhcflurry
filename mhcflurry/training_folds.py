@@ -13,8 +13,13 @@ def read_processing_training_data(path):
     return pandas.read_csv(
         path,
         float_precision="round_trip",
-        dtype={"sample_id": str, "matching_affinity_reference_sha256": str},
-        converters={"n_flank": str, "c_flank": str},
+        dtype={
+            "sample_id": str,
+            "matching_affinity_reference_sha256": str,
+            "n_flank": str,
+            "c_flank": str,
+        },
+        keep_default_na=False,
     )
 
 
