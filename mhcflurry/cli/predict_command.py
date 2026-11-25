@@ -204,6 +204,18 @@ def _detect_affinity_only_models(models_dir):
     return not os.path.exists(os.path.join(models_dir, "weights.csv"))
 
 
+def _supported_alleles_for_command(models_dir):
+    from ..affinity.persistence import read_supported_alleles
+
+    return read_supported_alleles(models_dir)
+
+
+def _supported_peptide_lengths_for_command(models_dir):
+    from ..affinity.persistence import read_supported_peptide_lengths
+
+    return read_supported_peptide_lengths(models_dir)
+
+
 def _load_predictor_for_command(models_dir):
     """
     Load a presentation predictor or wrap an affinity-only predictor.
@@ -297,6 +309,22 @@ def run(argv=sys.argv[1:]):
     except (ValueError, RuntimeError) as error:
         parser.error(str(error))
 
+    models_dir = args.models or selected_models_dir
+    if models_dir is None:
+        # The reason we set the default here instead of in the argument parser
+        # is that we want to test_exists at this point, so the user gets a
+        # message instructing them to download the models if needed.
+        models_dir = get_default_class1_presentation_models_dir(test_exists=True)
+
+    if args.list_supported_alleles:
+        print("\n".join(_supported_alleles_for_command(models_dir)))
+        return
+
+    if args.list_supported_peptide_lengths:
+        min_len, max_len = _supported_peptide_lengths_for_command(models_dir)
+        print("\n".join([str(length) for length in range(min_len, max_len + 1)]))
+        return
+
     import pandas
     from ..parallelism import (
         chunk_ranges_for_local_parallelism,
@@ -315,13 +343,6 @@ def run(argv=sys.argv[1:]):
     if args.output_delimiter == "\\t":
         args.output_delimiter = "\t"
 
-    models_dir = args.models or selected_models_dir
-    if models_dir is None:
-        # The reason we set the default here instead of in the argument parser
-        # is that we want to test_exists at this point, so the user gets a
-        # message instructing them to download the models if needed.
-        models_dir = get_default_class1_presentation_models_dir(test_exists=True)
-
     # Detect models type by file presence so the parent stays torch-free
     # on paths that will fork workers. Workers pin to GPUs via
     # CUDA_VISIBLE_DEVICES, which only works when the parent has not
@@ -332,17 +353,6 @@ def run(argv=sys.argv[1:]):
             "Specified models are an affinity predictor, which implies "
             "--affinity-only. Specify this argument to silence this warning.")
         args.affinity_only = True
-
-    if args.list_supported_alleles:
-        predictor, _ = _load_predictor_for_command(models_dir)
-        print("\n".join(predictor.supported_alleles))
-        return
-
-    if args.list_supported_peptide_lengths:
-        predictor, _ = _load_predictor_for_command(models_dir)
-        min_len, max_len = predictor.supported_peptide_lengths
-        print("\n".join([str(length) for length in range(min_len, max_len + 1)]))
-        return
 
     if args.input:
         if args.alleles or args.peptides:

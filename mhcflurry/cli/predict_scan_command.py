@@ -190,6 +190,18 @@ helper_args.add_argument(
 _PREDICTOR_CACHE = {}
 
 
+def _supported_alleles_for_command(models_dir):
+    from ..affinity.persistence import read_supported_alleles
+
+    return read_supported_alleles(models_dir)
+
+
+def _supported_peptide_lengths_for_command(models_dir):
+    from ..affinity.persistence import read_supported_peptide_lengths
+
+    return read_supported_peptide_lengths(models_dir)
+
+
 def _load_predictor_for_command(models_dir):
     from ..class1_presentation_predictor import Class1PresentationPredictor
 
@@ -259,6 +271,22 @@ def run(argv=sys.argv[1:]):
     except (ValueError, RuntimeError) as error:
         parser.error(str(error))
 
+    models_dir = args.models or selected_models_dir
+    if models_dir is None:
+        # The reason we set the default here instead of in the argument parser
+        # is that we want to test_exists at this point, so the user gets a
+        # message instructing them to download the models if needed.
+        models_dir = get_default_class1_presentation_models_dir(test_exists=True)
+
+    if args.list_supported_alleles:
+        print("\n".join(_supported_alleles_for_command(models_dir)))
+        return
+
+    if args.list_supported_peptide_lengths:
+        min_len, max_len = _supported_peptide_lengths_for_command(models_dir)
+        print("\n".join([str(length) for length in range(min_len, max_len + 1)]))
+        return
+
     import pandas
     from ..parallelism import (
         chunk_ranges_for_local_parallelism,
@@ -295,24 +323,6 @@ def run(argv=sys.argv[1:]):
             "to show all predictions, pass --results-all",
             file=sys.stderr)
         args.threshold_affinity_percentile = default_thresholds["affinity_percentile"]
-
-    models_dir = args.models or selected_models_dir
-    if models_dir is None:
-        # The reason we set the default here instead of in the argument parser
-        # is that we want to test_exists at this point, so the user gets a
-        # message instructing them to download the models if needed.
-        models_dir = get_default_class1_presentation_models_dir(test_exists=True)
-
-    if args.list_supported_alleles:
-        predictor = _load_predictor_for_command(models_dir)
-        print("\n".join(predictor.supported_alleles))
-        return
-
-    if args.list_supported_peptide_lengths:
-        predictor = _load_predictor_for_command(models_dir)
-        min_len, max_len = predictor.supported_peptide_lengths
-        print("\n".join([str(length) for length in range(min_len, max_len + 1)]))
-        return
 
     if args.input:
         if args.sequences:

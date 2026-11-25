@@ -8,6 +8,13 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.2](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.2.md)**:
+  Adds a torch-free fast path for `--list-supported-alleles` and
+  `--list-supported-peptide-lengths` in `mhcflurry predict` and
+  `mhcflurry predict-scan`, suppresses duplicate `WARNING` logs when
+  `Class1AffinityPredictor` raises under `throw=True` (#443), and sets explicit
+  default `timeout=60`s and `max_retries=3` in `install_download` (#462).
+  Existing weights and predictions are unchanged.
 - **[2.5.1](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.1.md)**:
   Migrates `mhcflurry downloads fetch` onto `datacache>=1.37.0`
   (`install_archive` / `inspect_archive`) with pinned `2.3.0` SHA-256 checksums

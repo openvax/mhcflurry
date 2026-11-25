@@ -1419,9 +1419,9 @@ class Class1AffinityPredictor(object):
                     min_peptide_length,
                     max_peptide_length,
                     str(peptide_df.loc[~supported_peptide].peptide.unique())))
-            logging.warning(msg)
             if throw:
                 raise ValueError(msg)
+            logging.warning(msg)
 
         peptide_has_valid_amino_acids = (
             (~supported_peptide) |
@@ -1436,9 +1436,9 @@ class Class1AffinityPredictor(object):
                     str(peptide_df.loc[
                         ~peptide_has_valid_amino_acids
                     ].peptide.unique())))
-            logging.warning(msg)
             if throw:
                 raise ValueError(msg)
+            logging.warning(msg)
 
         normalized_alleles = self._canonicalize_prediction_alleles(
             alleles, throw=throw)
@@ -1452,9 +1452,9 @@ class Class1AffinityPredictor(object):
         if unsupported_alleles:
             msg = "No sequences for allele(s): %s." % " ".join(
                 unsupported_alleles)
-            logging.warning(msg)
             if throw:
                 raise ValueError(msg)
+            logging.warning(msg)
         supported_allele_indices = numpy.asarray([
             i for (i, allele) in enumerate(normalized_alleles)
             if (
@@ -1730,9 +1730,9 @@ class Class1AffinityPredictor(object):
                         min_peptide_length,
                         max_peptide_length,
                         str(df.loc[~df.supported_peptide].peptide.unique())))
-                logging.warning(msg)
                 if throw:
                     raise ValueError(msg)
+                logging.warning(msg)
         else:
             # Handle common case efficiently.
             df["supported_peptide"] = True
@@ -1751,9 +1751,9 @@ class Class1AffinityPredictor(object):
                 "%s" % (
                     (~peptide_has_valid_amino_acids).sum(),
                     str(df.loc[~peptide_has_valid_amino_acids].peptide.unique())))
-            logging.warning(msg)
             if throw:
                 raise ValueError(msg)
+            logging.warning(msg)
 
         num_pan_models = (
             len(self.class1_pan_allele_models)
@@ -1785,9 +1785,9 @@ class Class1AffinityPredictor(object):
                     "No sequences for allele(s): %s.\n"
                     "Supported alleles: %s" % (
                         " ".join(unsupported_alleles), allele_string))
-                logging.warning(msg)
                 if throw:
                     raise ValueError(msg)
+                logging.warning(msg)
             mask = df.supported_peptide & df.normalized_allele.notnull() & (
                 ~df.normalized_allele.isin(unsupported_alleles))
 
@@ -1843,9 +1843,9 @@ class Class1AffinityPredictor(object):
                     "Supported alleles are: %s" % (
                         " ".join(unsupported_alleles),
                         " ".join(sorted(self.allele_to_allele_specific_models))))
-                logging.warning(msg)
                 if throw:
                     raise ValueError(msg)
+                logging.warning(msg)
 
             for allele in unique_alleles:
                 models = self.allele_to_allele_specific_models.get(allele, [])

@@ -32,6 +32,8 @@ from urllib.parse import urlsplit
 from platformdirs import user_data_dir
 
 MANAGED_ARCHIVES_DIRNAME = ".datacache"
+DEFAULT_DOWNLOAD_TIMEOUT = 60
+DEFAULT_DOWNLOAD_MAX_RETRIES = 3
 
 ENVIRONMENT_VARIABLES = [
     "MHCFLURRY_DATA_DIR",
@@ -347,8 +349,8 @@ def install_download(
     force=False,
     offline=None,
     show_progress="auto",
-    timeout=None,
-    max_retries=None,
+    timeout=DEFAULT_DOWNLOAD_TIMEOUT,
+    max_retries=DEFAULT_DOWNLOAD_MAX_RETRIES,
 ):
     """Install or refresh one download bundle through ``datacache.install_archive``.
 
@@ -372,9 +374,11 @@ def install_download(
     show_progress : bool or str, optional
         Progress bar policy (``"auto"``, ``True``, or ``False``).
     timeout : float or None, optional
-        Optional per-request timeout in seconds forwarded to ``datacache``.
+        Per-attempt connect/read timeout in seconds forwarded to ``datacache``.
+        Defaults to ``DEFAULT_DOWNLOAD_TIMEOUT`` (60 seconds).
     max_retries : int or None, optional
-        Optional retry count forwarded to ``datacache``.
+        Maximum transient transport retry attempts forwarded to ``datacache``.
+        Defaults to ``DEFAULT_DOWNLOAD_MAX_RETRIES`` (3).
 
     Returns
     -------
