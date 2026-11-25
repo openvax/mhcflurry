@@ -358,7 +358,8 @@ def auto_max_workers_per_gpu(
     # ``num_jobs`` may arrive as ``"auto"`` when called from
     # ``resolve_local_parallelism_args`` (which resolves MWPG before
     # num_jobs); treat that as "user delegated" — same as ``num_jobs=0``.
-    if isinstance(num_jobs, str) and num_jobs.strip().lower() == "auto":
+    if num_jobs is None or (
+            isinstance(num_jobs, str) and num_jobs.strip().lower() == "auto"):
         num_jobs_int = 0
     else:
         num_jobs_int = int(num_jobs)
@@ -377,7 +378,8 @@ def auto_max_workers_per_gpu(
     if hard_cap is not None:
         by_vram = min(by_vram, hard_cap)
     if num_jobs_int > 0:
-        by_jobs = max(1, num_jobs_int // max(int(num_gpus), 1))
+        num_gpus_int = max(int(num_gpus), 1)
+        by_jobs = max(1, (num_jobs_int + num_gpus_int - 1) // num_gpus_int)
         chosen = max(1, min(by_jobs, by_vram))
         by_jobs_log = str(by_jobs)
     else:
@@ -859,19 +861,18 @@ def resolve_local_parallelism_args(
     refresh_device_memory_budget(args)
     plan = args.workload_plan
 
-    if (
-            plan.num_jobs == 0
-            and not getattr(args, "cluster_parallelism", False)
-            and cpu_threads_per_worker_was_auto):
+    if plan.num_jobs == 0 and not getattr(args, "cluster_parallelism", False):
         # Serial commands execute the work function directly in this process,
-        # so worker_init never gets a chance to resize native/PyTorch pools
-        # that were initialized before planning ran.
-        from .worker_runtime import configure_worker_cpu_threads
-        applied_threads = configure_worker_cpu_threads(
-            cpu_threads_per_worker,
-            auto_owned=True,
-        )
-        configure_pytorch(num_threads=applied_threads)
+        # so worker_init never gets a chance to configure backend or resize
+        # native/PyTorch pools that were initialized before planning ran.
+        applied_threads = None
+        if cpu_threads_per_worker_was_auto:
+            from .worker_runtime import configure_worker_cpu_threads
+            applied_threads = configure_worker_cpu_threads(
+                cpu_threads_per_worker,
+                auto_owned=True,
+            )
+        configure_pytorch(backend=plan.backend, num_threads=applied_threads)
 
     # Promote orchestrator-owned tuning knobs from CLI to env so the
     # existing call sites (pytorch_training.maybe_compile_network,
@@ -899,7 +900,11 @@ def resolve_local_parallelism_args(
         num_jobs=plan.num_jobs,
         per_gpu_free_vram_gb=detect_free_vram_per_gpu_gb(plan.gpus),
         device_worker_gb=plan.device_worker_gb,
-        available_ram_gb=plan.host_memory_available_gb,
+        available_ram_gb=(
+            plan.host_memory_available_gb
+            if plan.host_memory_available_gb is not None
+            else plan.host_memory_total_gb
+        ),
         host_worker_gb=plan.host_worker_gb,
         cpu_count=os.cpu_count(),
     )
@@ -1055,7 +1060,9 @@ def refine_local_parallelism_from_warmup(args, reports):
     if plan.num_jobs_was_auto and new_num_jobs > 0 and plan.gpus > 0:
         new_num_jobs = min(new_num_jobs, plan.gpus * new_mwpg)
     host_cap = plan.host_memory_num_jobs_cap
-    if plan.host_memory_available_gb is not None:
+    if (
+            plan.host_memory_available_gb is not None
+            or plan.host_memory_total_gb is not None):
         host_cap = host_memory_num_jobs_cap(
             {
                 "available_gb": plan.host_memory_available_gb,
@@ -1266,13 +1273,16 @@ def refine_local_parallelism_from_spawn_context(
     if new_num_jobs == 0 and int(plan.num_jobs) > 0:
         # Commands decide between their serial and parallel branches
         # immediately after this late, context-aware refinement. Apply the
-        # runtime limit here because no worker initializer will run.
+        # backend and runtime limit here because no worker initializer will run.
         from .worker_runtime import configure_worker_cpu_threads
         applied_threads = configure_worker_cpu_threads(
             cpu_threads_per_worker,
             auto_owned=cpu_threads_per_worker_was_auto,
         )
-        configure_pytorch(num_threads=applied_threads)
+        configure_pytorch(
+            backend=refined.backend,
+            num_threads=applied_threads,
+        )
     if refined != plan:
         print(
             "Loaded spawn-context memory refinement: %s" % refined,

@@ -857,14 +857,17 @@ def plan_local_parallelism(
         gpus = int(detect_num_cuda_devices())
     else:
         gpus = int(gpus_raw or 0)
+        if gpus < 0:
+            raise ValueError("gpus must be >= 0, got %d" % (gpus,))
         if gpus_raw is not None:
             cli_overrides.append("gpus")
 
     mwpg_raw = getattr(args, "max_workers_per_gpu", None)
     mwpg_was_auto = is_auto_value(mwpg_raw)
     if mwpg_was_auto:
+        raw_num_jobs = getattr(args, "num_jobs", 0)
         max_workers_per_gpu = int(auto_max_workers_per_gpu(
-            num_jobs=getattr(args, "num_jobs", 0),
+            num_jobs="auto" if is_auto_value(raw_num_jobs) else raw_num_jobs,
             num_gpus=gpus,
             backend=backend,
             per_worker_gb=memory_plan["device_worker_gb"],

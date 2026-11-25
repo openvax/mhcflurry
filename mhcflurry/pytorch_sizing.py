@@ -359,11 +359,13 @@ def estimate_peak_bytes_per_row(model):
     # batch overshoots VRAM by Nx (~8x for the production 8-network
     # release ensemble) and OOMs in calibrate's cartesian forward.
     sub_networks = getattr(model, "networks", None)
-    if sub_networks is not None and not hasattr(model, "peptide_encoding_shape"):
+    if sub_networks and not hasattr(model, "peptide_encoding_shape"):
         try:
-            return int(sum(
+            total_peak = int(sum(
                 estimate_peak_bytes_per_row(net) for net in sub_networks
             ))
+            if total_peak > 0:
+                return total_peak
         except (AttributeError, TypeError) as exc:
             logging.warning(
                 "Could not estimate peak per-row bytes for merged ensemble; "
