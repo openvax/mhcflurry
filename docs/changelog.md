@@ -8,6 +8,12 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.4](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.4.md)**:
+  Fixes local parallelism, GPU/batch auto-sizing, `torch.compile`, and cluster
+  retry bugs (`#580`–`#587`), accepts registered custom non-`mhcgnomes` allele
+  keys in `AlleleKeyResolver` (`#597`), and guards `mhcseqs >= 2.12.2`
+  fragment statuses (`status="short"`, `alpha1_only`, `alpha2_only`,
+  `fragment_fallback`). Existing `2.3.0` weights and predictions are unchanged.
 - **[2.5.3](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.3.md)**:
   Fixes `2.5.x` regressions (`#550`–`#555`), NumPy 2 / Pandas 3 compatibility
   crashes (`#556`–`#559`), and core affinity/processing/presentation bugs
