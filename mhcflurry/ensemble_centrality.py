@@ -66,6 +66,7 @@ def robust_mean(log_values):
         return result
 
     valid_rows = log_values[row_has_values]
+    valid_counts = (~numpy.isnan(valid_rows)).sum(axis=1)
     without_nans = numpy.nan_to_num(valid_rows)  # replace nan with 0
     p75 = numpy.nanpercentile(valid_rows, 75, axis=1).reshape((-1, 1))
     p25 = numpy.nanpercentile(valid_rows, 25, axis=1).reshape((-1, 1))
@@ -78,6 +79,9 @@ def robust_mean(log_values):
     denominator = mask_f.sum(axis=1)
     robust = numpy.full(valid_rows.shape[0], numpy.nan, dtype="float64")
     numpy.divide(numerator, denominator, out=robust, where=denominator > 0)
+    fallback = (valid_counts <= 3) | (denominator == 0)
+    if fallback.any():
+        robust[fallback] = _nanmean_no_warnings(valid_rows[fallback])
     result[row_has_values] = robust
     return result
 

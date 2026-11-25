@@ -1257,7 +1257,15 @@ class Class1AffinityPredictor(object):
         df = pandas.DataFrame({"affinity": affinities})
         df["allele"] = alleles
         df["result"] = numpy.nan
-        for (allele, sub_df) in df.groupby("allele"):
+        missing_mask = df["allele"].isna()
+        if missing_mask.any():
+            msg = "Missing (None/NaN) allele in %d row(s)" % int(
+                missing_mask.sum()
+            )
+            if throw:
+                raise ValueError(msg)
+            warnings.warn(msg)
+        for (allele, sub_df) in df.loc[~missing_mask].groupby("allele"):
             df.loc[sub_df.index, "result"] = self.percentile_ranks(
                 sub_df.affinity, allele=allele, throw=throw)
         return df.result.values
@@ -1749,15 +1757,21 @@ class Class1AffinityPredictor(object):
         if len(df) == 0:
             # No predictions.
             logging.warning("Predicting for 0 peptides.")
-            empty_result = pandas.DataFrame(
-                columns=[
-                    'peptide',
-                    'allele',
-                    'prediction',
-                    'prediction_low',
-                    'prediction_high'
-                ])
-            return empty_result
+            columns = ['peptide', 'allele', 'prediction']
+            if include_confidence_intervals:
+                columns.extend(['prediction_low', 'prediction_high'])
+            if include_individual_model_predictions:
+                num_pan_models = (
+                    self.optimization_info["num_pan_models_merged"]
+                    if self.optimization_info
+                    and "num_pan_models_merged" in self.optimization_info
+                    else len(self.class1_pan_allele_models)
+                )
+                for i in range(num_pan_models):
+                    columns.append("model_pan_%d" % i)
+            if include_percentile_ranks and self.allele_to_percent_rank_transform:
+                columns.append('prediction_percentile')
+            return pandas.DataFrame(columns=columns)
 
         (min_peptide_length, max_peptide_length) = (
             self.supported_peptide_lengths)
@@ -2080,7 +2094,8 @@ class Class1AffinityPredictor(object):
             transform = fit_percent_rank_transform(
                 predictions, method=method, bins=bins, score_transform="log",
                 max_knots=max_knots, group_codes=group_codes)
-            self.allele_to_percent_rank_transform[allele] = transform
+            canonical_allele = self.canonicalize_allele_name(allele)
+            self.allele_to_percent_rank_transform[canonical_allele] = transform
 
             if frequency_matrices is not None:
                 predictions_df = pandas.DataFrame({

@@ -125,4 +125,6 @@ class NumericSequences:
             raise NotImplementedError("Unsupported alignment method: " + method)
         if not len(self):
             return torch.empty(source.shape, dtype=torch.int8, device=data.device)
+        if data.shape[1] == 0:
+            return torch.full(source.shape, UNKNOWN_INDEX, dtype=torch.int8, device=data.device)
         return torch.where(valid, data.gather(1, source.clamp(0, data.shape[1] - 1)), UNKNOWN_INDEX)

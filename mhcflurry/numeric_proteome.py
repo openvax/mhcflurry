@@ -95,7 +95,11 @@ class ProcessingProteome:
             proteins.append(numpy.full(len(candidates), i, dtype="int64"))
         starts = numpy.concatenate(starts) if starts else numpy.empty(0, dtype="int64")
         proteins = numpy.concatenate(proteins) if proteins else numpy.empty(0, dtype="int64")
-        excluded = [p for p in excluded if len(p) == length]
+        valid_chars = set(AMINO_ACID_INDEX)
+        excluded = [
+            p for p in excluded
+            if len(p) == length and set(p).issubset(valid_chars)
+        ]
         excluded_keys = sequence_keys(NumericSequences.from_strings(excluded, MAX_PROCESSING_LENGTH).indices.numpy())
         order = rng.permutation(len(starts))
         retained = []

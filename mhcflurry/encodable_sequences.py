@@ -364,10 +364,11 @@ class EncodableSequences(object):
                 ]
 
                 # Set right edge.
-                result[
-                    sub_df.index,
-                    -right_edge:
-                ] = fixed_length_sequences[:, -right_edge:]
+                if right_edge > 0:
+                    result[
+                        sub_df.index,
+                        -right_edge:
+                    ] = fixed_length_sequences[:, -right_edge:]
         elif alignment_method == "left_pad_right_pad":
             if trim:
                 raise NotImplementedError("trim not supported")

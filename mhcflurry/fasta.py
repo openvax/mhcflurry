@@ -20,6 +20,7 @@ We're doing this to avoid adding another dependency to MHCflurry, however.
 
 from gzip import GzipFile
 import logging
+import os
 
 import pandas
 
@@ -58,41 +59,47 @@ class FastaParser(object):
         """
         Generator that yields identifiers paired with sequences.
         """
-        with self.open_file(fasta_path) as f:
-            for line in f:
-                line = line.rstrip()
+        self.current_id = None
+        self.current_lines = []
+        try:
+            with self.open_file(fasta_path) as f:
+                for line in f:
+                    line = line.rstrip()
 
-                if len(line) == 0:
-                    continue
+                    if len(line) == 0:
+                        continue
 
-                # have to slice into a bytes object or else get a single integer
-                first_char = line[0:1]
+                    # have to slice into a bytes object or else get a single integer
+                    first_char = line[0:1]
 
-                if first_char == b">":
-                    previous_entry = self._current_entry()
-                    self.current_id = self._parse_header_id(
-                        line, full_description=full_descriptions)
+                    if first_char == b">":
+                        previous_entry = self._current_entry()
+                        self.current_id = self._parse_header_id(
+                            line, full_description=full_descriptions)
 
-                    if len(self.current_id) == 0:
-                        logging.warning(
-                            "Unable to parse ID from header line: %s", line)
+                        if len(self.current_id) == 0:
+                            logging.warning(
+                                "Unable to parse ID from header line: %s", line)
 
-                    self.current_lines = []
+                        self.current_lines = []
 
-                    if previous_entry is not None:
-                        yield previous_entry
+                        if previous_entry is not None:
+                            yield previous_entry
 
-                elif first_char == b";":
-                    # semicolon are comment characters
-                    continue
-                else:
-                    self.current_lines.append(line)
+                    elif first_char == b";":
+                        # semicolon are comment characters
+                        continue
+                    else:
+                        self.current_lines.append(line)
 
-        # the last sequence is still in the lines buffer after we're done with
-        # the file so make sure to yield it
-        id_and_seq = self._current_entry()
-        if id_and_seq is not None:
-            yield id_and_seq
+            # the last sequence is still in the lines buffer after we're done with
+            # the file so make sure to yield it
+            id_and_seq = self._current_entry()
+            if id_and_seq is not None:
+                yield id_and_seq
+        finally:
+            self.current_id = None
+            self.current_lines = []
 
     def _current_entry(self):
         # when we hit a new entry, if this isn't the first
@@ -109,10 +116,11 @@ class FastaParser(object):
         """
         Open either a text file or compressed gzip file as a stream of bytes.
         """
-        if fasta_path.endswith("gz") or fasta_path.endswith("gzip"):
-            return GzipFile(fasta_path, 'rb')
+        path_str = os.fspath(fasta_path)
+        if path_str.endswith("gz") or path_str.endswith("gzip"):
+            return GzipFile(path_str, 'rb')
         else:
-            return open(fasta_path, 'rb')
+            return open(path_str, 'rb')
 
     @staticmethod
     def _parse_header_id(line, full_description=False):
@@ -135,4 +143,4 @@ class FastaParser(object):
         else:
             identifier = line[1:]
 
-        return identifier.decode("ascii")
+        return identifier.decode("utf-8")

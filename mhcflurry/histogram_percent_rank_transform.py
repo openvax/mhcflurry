@@ -52,6 +52,11 @@ class HistogramPercentRankTransform(object):
         assert self.bin_edges is None
         assert len(values) > 0
         (hist, self.bin_edges) = numpy.histogram(values, bins=bins)
+        if len(hist) == 0 or numpy.sum(hist) == 0:
+            raise ValueError(
+                "Histogram calibration requires at least 2 distinct bin edges "
+                "and at least 1 score within the bin range."
+            )
         self.cdf = numpy.ones(len(hist) + 3) * numpy.nan
         self.cdf[0] = 0.0
         self.cdf[1] = 0.0

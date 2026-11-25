@@ -969,7 +969,9 @@ class Class1PresentationPredictor(object):
             del df["affinity_score"]
         return df
 
-    def resolve_comparison_quantity(self, alleles, comparison_quantity=None):
+    def resolve_comparison_quantity(
+            self, alleles, comparison_quantity=None,
+            include_affinity_percentile=True):
         """
         Resolve the column used to rank scan predictions.
 
@@ -989,6 +991,8 @@ class Class1PresentationPredictor(object):
             If None, a default is chosen: ``presentation_score`` when alleles
             are given and presentation is supported, else ``affinity`` when
             alleles are given, else ``processing_score``.
+        include_affinity_percentile : bool, default True
+            Whether ``affinity_percentile`` will be present in predictions.
 
         Returns
         -------
@@ -1008,6 +1012,9 @@ class Class1PresentationPredictor(object):
             if not self.supports_presentation_prediction:
                 raise ValueError(
                     "Presentation prediction not supported by this predictor")
+            if len(alleles) == 0:
+                raise ValueError(
+                    "comparison_quantity='presentation_score' requires alleles")
         elif comparison_quantity == "processing_score":
             if not self.supports_processing_prediction:
                 raise ValueError(
@@ -1016,6 +1023,16 @@ class Class1PresentationPredictor(object):
             if not self.supports_affinity_prediction:
                 raise ValueError(
                     "Affinity prediction not supported by this predictor")
+            if len(alleles) == 0:
+                raise ValueError(
+                    "comparison_quantity=%r requires alleles"
+                    % (comparison_quantity,))
+            if (
+                    comparison_quantity == "affinity_percentile"
+                    and not include_affinity_percentile):
+                raise ValueError(
+                    "comparison_quantity='affinity_percentile' requires "
+                    "include_affinity_percentile=True")
         else:
             raise ValueError(
                 "Unknown comparison quantity: %s" % comparison_quantity)
@@ -1139,11 +1156,16 @@ class Class1PresentationPredictor(object):
                 "Affinity prediction not supported by this predictor")
 
         comparison_quantity = self.resolve_comparison_quantity(
-            alleles, comparison_quantity)
+            alleles,
+            comparison_quantity,
+            include_affinity_percentile=include_affinity_percentile,
+        )
 
         processing_predictor = self.processing_predictor_with_flanks
         if not use_flanks or processing_predictor is None:
             processing_predictor = self.processing_predictor_without_flanks
+            if self.processing_predictor_with_flanks is None:
+                use_flanks = False
 
         if processing_predictor is not None:
             supported_sequence_lengths = processing_predictor.sequence_lengths
