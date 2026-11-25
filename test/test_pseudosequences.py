@@ -556,3 +556,58 @@ def test_imgt_delegation_and_diagnostic_warnings_mocked(monkeypatch, caplog):
             warn_on_noop_mutations=False,
         )
     assert not caplog.records
+
+
+def test_short_fragment_status_guard(monkeypatch):
+    """mhcseqs >= 2.12.2 emits status='short' for short both-halves exon
+    fragments; reject them unless allow_fragments / include_fragments is True."""
+    import types
+    from mhcflurry import mhcseqs_pseudosequences as mp
+
+    short_g1 = HLA_A0201_GROOVE1[15:75]  # 60 aa (<70 aa)
+    short_g2 = HLA_A0201_GROOVE2[15:75]  # 60 aa (<70 aa)
+
+    rows = [
+        {
+            "two_field_allele": "HLA-A*02:01",
+            "mhc_class": "I",
+            "groove1": HLA_A0201_GROOVE1,
+            "groove2": HLA_A0201_GROOVE2,
+            "groove_status": "ok",
+        },
+        {
+            "two_field_allele": "HLA-B*07:02",
+            "mhc_class": "I",
+            "groove1": short_g1,
+            "groove2": short_g2,
+            "groove_status": "short",
+        },
+        {
+            "two_field_allele": "HLA-C*07:01",
+            "mhc_class": "I",
+            "groove1": short_g1,
+            "groove2": short_g2,
+            "groove_status": "too_short",
+        },
+    ]
+
+    strict = build_pseudosequences_from_mhcseqs(rows=rows, include_fragments=False)
+    assert set(strict) == {"HLA-A*02:01"}
+
+    with_frags = build_pseudosequences_from_mhcseqs(rows=rows, include_fragments=True)
+    assert set(with_frags) == {"HLA-A*02:01", "HLA-B*07:02"}
+    assert "HLA-C*07:01" not in with_frags  # too_short is always non-groove
+
+    fake_mhcseqs = types.SimpleNamespace(
+        decompose_domains=lambda seq, **kwargs: types.SimpleNamespace(
+            status="short", flags=("short_groove",), groove1=short_g1, groove2=short_g2
+        ),
+        align_groove_to_imgt=None,
+    )
+    monkeypatch.setattr(mp, "_import_mhcseqs", lambda: fake_mhcseqs)
+    with pytest.raises(ValueError, match="Incomplete Class I groove"):
+        extract_class1_pseudosequence(short_g1 + short_g2, allele="HLA-B*07:02")
+    pseudo = extract_class1_pseudosequence(
+        short_g1 + short_g2, allele="HLA-B*07:02", allow_fragments=True
+    )
+    assert len(pseudo) == 39

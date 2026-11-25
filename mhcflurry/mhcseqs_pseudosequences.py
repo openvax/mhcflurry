@@ -77,7 +77,19 @@ _GROOVE_INDICES_BY_LENGTH: dict[int, tuple[tuple[int, ...], tuple[int, ...]]] = 
 }
 
 _STANDARD_AMINO_ACIDS = frozenset("ACDEFGHIKLMNPQRSTVWY")
-_NON_GROOVE_STATUSES = frozenset({"non_groove", "missing_groove"})
+_NON_GROOVE_STATUSES = frozenset({
+    "non_groove",
+    "missing_groove",
+    "too_short",
+    "invalid_boundaries",
+    "chain_inference_failed",
+})
+_FRAGMENT_STATUSES = frozenset({
+    "short",
+    "alpha1_only",
+    "alpha2_only",
+    "fragment_fallback",
+})
 
 # Lazily populated BLOSUM62 scoring tables to keep module import fast.
 _BLOSUM_CACHE = None
@@ -490,10 +502,14 @@ def extract_class1_pseudosequence_with_alignment(
         )
     has_g1 = bool(record.groove1)
     has_g2 = bool(record.groove2)
-    if not allow_fragments and not (has_g1 and has_g2):
+    record_status = (record.status or "").strip().lower()
+    if not allow_fragments and (
+        not (has_g1 and has_g2) or record_status in _FRAGMENT_STATUSES
+    ):
         raise ValueError(
             "Incomplete Class I groove for %s (groove1=%d aa, groove2=%d aa, "
-            "status=%r). Pass allow_fragments=True to pad missing domains with 'X'."
+            "status=%r). Pass allow_fragments=True to allow partial/short "
+            "grooves and pad missing residues with 'X'."
             % (allele or "<unnamed>", len(record.groove1), len(record.groove2), record.status)
         )
     if not (has_g1 or has_g2):
@@ -773,6 +789,8 @@ def build_pseudosequences_from_mhcseqs(
             _clean_text(row.get("groove_status")) or _clean_text(row.get("status"))
         ).lower()
         if status in _NON_GROOVE_STATUSES:
+            continue
+        if not include_fragments and status in _FRAGMENT_STATUSES:
             continue
 
         groove1 = _clean_text(row.get("groove1"))
