@@ -93,6 +93,7 @@ def test_581_non_daemon_context_follows_runtime_start_method(monkeypatch):
 
 
 def test_582_auto_max_workers_per_gpu_uses_ceiling_division(monkeypatch):
+    monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
     monkeypatch.setenv("MHCFLURRY_AUTO_MAX_WORKERS_PER_GPU_FREE_VRAM_GB", "80")
     mwpg = auto_max_workers_per_gpu(
         num_jobs=3, num_gpus=2, backend="auto", per_worker_gb=4.0
