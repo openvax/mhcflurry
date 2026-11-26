@@ -8,6 +8,18 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.11](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.11.md)**:
+  Codebase cleanup and modularization (`#506`, `#419`, partial `#513`): splits
+  legacy Keras config/weight loading out of `class1_neural_network.py` into
+  `mhcflurry/keras_model_config.py`, breaks `fit()` and
+  `fit_streaming_batches()` into standalone-tested phase helpers in
+  `mhcflurry/class1_training.py`, removes the deprecated dense-vector encoding
+  remnants (`FlankingEncoding.vector_encode`/`encode`,
+  `EncodableSequences.variable_length_to_fixed_length_vector_encoding`, and
+  `Class1NeuralNetworkModel(peptide_input_is_indices=False)`), and drops the
+  undeclared optional `pyarrow` CSV engine fallback in pan-allele training.
+  Verified bit-identical (`179/179` arrays, `max_abs_diff=0.0`) against `2.5.10`
+  across released `2.0.0`/`2.2.0`/`2.3.0` models and deterministic training.
 - **[2.5.10](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.10.md)**:
   CLI UX polish across prediction, downloads, training/selection/calibration,
   and `pseudosequences` (`#424`–`#428`): adds `--float-format` and documents
