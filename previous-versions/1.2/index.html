@@ -1,0 +1,387 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>MHCflurry documentation &mdash; MHCflurry 1.2.0 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="MHCflurry 1.2.0 documentation" href="#"/>
+        <link rel="next" title="Introduction and setup" href="intro.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="#" class="icon icon-home"> MHCflurry
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.2.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models_supported_alleles.html">Supported alleles and peptide lengths</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Details on the released predictor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">MHCflurry</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="#">Docs</a> &raquo;</li>
+        
+      <li>MHCflurry documentation</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="mhcflurry-documentation">
+<h1>MHCflurry documentation<a class="headerlink" href="#mhcflurry-documentation" title="Permalink to this headline">¶</a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and setup</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#installation-pip">Installation (pip)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#using-conda">Using conda</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="commandline_tutorial.html#downloading-models">Downloading models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="commandline_tutorial.html#generating-predictions">Generating predictions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="commandline_tutorial.html#fitting-your-own-models">Fitting your own models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="commandline_tutorial.html#scanning-protein-sequences-for-predicted-epitopes">Scanning protein sequences for predicted epitopes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="python_tutorial.html#predicting">Predicting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="python_tutorial.html#training">Training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="python_tutorial.html#lower-level-interface">Lower level interface</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="models_supported_alleles.html">Supported alleles and peptide lengths</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Details on the released predictor</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="models.html#alleles">Alleles</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="models.html#supported-alleles">Supported alleles</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#rejected-alleles">Rejected alleles</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="models.html#neural-network-architectures">Neural network architectures</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-1-80-all-data-size-32-lc-0-reg-0-001">Architecture 1 / 80 all-data,size=32,lc=0,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-2-80-all-data-size-64-lc-0-reg-0-001">Architecture 2 / 80 all-data,size=64,lc=0,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-3-80-quantitative-data-size-32-lc-0-reg-0-001">Architecture 3 / 80 quantitative-data,size=32,lc=0,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-4-80-all-data-size-16-lc-1-reg-0-001">Architecture 4 / 80 all-data,size=16,lc=1,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-5-80-all-data-size-8-lc-0-reg-0-001">Architecture 5 / 80 all-data,size=8,lc=0,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-6-80-all-data-size-64-lc-2-no-reg">Architecture 6 / 80 all-data,size=64,lc=2,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-7-80-quantitative-data-size-32-lc-1-reg-0-001">Architecture 7 / 80 quantitative-data,size=32,lc=1,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-8-80-quantitative-data-size-8-lc-0-reg-0-001">Architecture 8 / 80 quantitative-data,size=8,lc=0,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-9-80-all-data-size-16-lc-0-reg-0-001">Architecture 9 / 80 all-data,size=16,lc=0,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-10-80-quantitative-data-size-64-lc-2-no-reg">Architecture 10 / 80 quantitative-data,size=64,lc=2,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-11-80-quantitative-data-size-16-lc-1-reg-0-001">Architecture 11 / 80 quantitative-data,size=16,lc=1,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-12-80-quantitative-data-size-64-lc-0-reg-0-001">Architecture 12 / 80 quantitative-data,size=64,lc=0,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-13-80-all-data-size-64-lc-1-no-reg">Architecture 13 / 80 all-data,size=64,lc=1,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-14-80-all-data-size-64-lc-1-reg-0-001">Architecture 14 / 80 all-data,size=64,lc=1,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-15-80-quantitative-data-size-32-lc-1-reg-0-001">Architecture 15 / 80 quantitative-data,size=32,lc=1,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-16-80-all-data-size-8-lc-1-reg-0-001">Architecture 16 / 80 all-data,size=8,lc=1,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-17-80-all-data-size-16-lc-1-reg-0-001">Architecture 17 / 80 all-data,size=16,lc=1,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-18-80-quantitative-data-size-64-lc-1-no-reg">Architecture 18 / 80 quantitative-data,size=64,lc=1,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-19-80-quantitative-data-size-64-lc-1-reg-0-001">Architecture 19 / 80 quantitative-data,size=64,lc=1,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-20-80-all-data-size-16-lc-2-no-reg">Architecture 20 / 80 all-data,size=16,lc=2,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-21-80-all-data-size-8-lc-1-reg-0-001">Architecture 21 / 80 all-data,size=8,lc=1,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-22-80-quantitative-data-size-16-lc-1-reg-0-001">Architecture 22 / 80 quantitative-data,size=16,lc=1,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-23-80-all-data-size-64-lc-1-no-reg">Architecture 23 / 80 all-data,size=64,lc=1,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-24-80-all-data-size-32-lc-2-no-reg">Architecture 24 / 80 all-data,size=32,lc=2,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-25-80-quantitative-data-size-8-lc-1-reg-0-001">Architecture 25 / 80 quantitative-data,size=8,lc=1,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-26-80-all-data-size-8-lc-2-reg-0-001">Architecture 26 / 80 all-data,size=8,lc=2,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-27-80-all-data-size-16-lc-2-reg-0-001">Architecture 27 / 80 all-data,size=16,lc=2,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-28-80-quantitative-data-size-32-lc-2-reg-0-001">Architecture 28 / 80 quantitative-data,size=32,lc=2,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-29-80-all-data-size-16-lc-1-no-reg">Architecture 29 / 80 all-data,size=16,lc=1,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-30-80-all-data-size-32-lc-1-no-reg">Architecture 30 / 80 all-data,size=32,lc=1,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-31-80-quantitative-data-size-64-lc-1-reg-0-001">Architecture 31 / 80 quantitative-data,size=64,lc=1,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-32-80-all-data-size-8-lc-2-no-reg">Architecture 32 / 80 all-data,size=8,lc=2,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-33-80-quantitative-data-size-32-lc-1-no-reg">Architecture 33 / 80 quantitative-data,size=32,lc=1,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-34-80-quantitative-data-size-32-lc-2-no-reg">Architecture 34 / 80 quantitative-data,size=32,lc=2,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-35-80-quantitative-data-size-64-lc-0-no-reg">Architecture 35 / 80 quantitative-data,size=64,lc=0,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-36-80-all-data-size-32-lc-1-reg-0-001">Architecture 36 / 80 all-data,size=32,lc=1,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-37-80-all-data-size-32-lc-1-reg-0-001">Architecture 37 / 80 all-data,size=32,lc=1,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-38-80-quantitative-data-size-64-lc-1-no-reg">Architecture 38 / 80 quantitative-data,size=64,lc=1,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-39-80-quantitative-data-size-8-lc-2-reg-0-001">Architecture 39 / 80 quantitative-data,size=8,lc=2,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-40-80-all-data-size-64-lc-0-no-reg">Architecture 40 / 80 all-data,size=64,lc=0,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-41-80-all-data-size-64-lc-1-reg-0-001">Architecture 41 / 80 all-data,size=64,lc=1,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-42-80-all-data-size-16-lc-1-no-reg">Architecture 42 / 80 all-data,size=16,lc=1,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-43-80-all-data-size-32-lc-1-no-reg">Architecture 43 / 80 all-data,size=32,lc=1,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-44-80-quantitative-data-size-32-lc-1-no-reg">Architecture 44 / 80 quantitative-data,size=32,lc=1,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-45-80-all-data-size-64-lc-2-no-reg">Architecture 45 / 80 all-data,size=64,lc=2,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-46-80-all-data-size-32-lc-2-reg-0-001">Architecture 46 / 80 all-data,size=32,lc=2,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-47-80-quantitative-data-size-8-lc-1-reg-0-001">Architecture 47 / 80 quantitative-data,size=8,lc=1,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-48-80-quantitative-data-size-64-lc-2-reg-0-001">Architecture 48 / 80 quantitative-data,size=64,lc=2,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-49-80-all-data-size-64-lc-2-reg-0-001">Architecture 49 / 80 all-data,size=64,lc=2,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-50-80-all-data-size-32-lc-2-reg-0-001">Architecture 50 / 80 all-data,size=32,lc=2,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-51-80-quantitative-data-size-16-lc-0-reg-0-001">Architecture 51 / 80 quantitative-data,size=16,lc=0,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-52-80-all-data-size-8-lc-2-reg-0-001">Architecture 52 / 80 all-data,size=8,lc=2,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-53-80-quantitative-data-size-8-lc-2-no-reg">Architecture 53 / 80 quantitative-data,size=8,lc=2,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-54-80-quantitative-data-size-8-lc-2-reg-0-001">Architecture 54 / 80 quantitative-data,size=8,lc=2,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-55-80-quantitative-data-size-16-lc-2-no-reg">Architecture 55 / 80 quantitative-data,size=16,lc=2,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-56-80-quantitative-data-size-16-lc-2-reg-0-001">Architecture 56 / 80 quantitative-data,size=16,lc=2,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-57-80-all-data-size-32-lc-2-no-reg">Architecture 57 / 80 all-data,size=32,lc=2,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-58-80-quantitative-data-size-64-lc-2-no-reg">Architecture 58 / 80 quantitative-data,size=64,lc=2,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-59-80-all-data-size-8-lc-1-no-reg">Architecture 59 / 80 all-data,size=8,lc=1,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-60-80-quantitative-data-size-32-lc-2-reg-0-001">Architecture 60 / 80 quantitative-data,size=32,lc=2,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-61-80-all-data-size-16-lc-2-reg-0-001">Architecture 61 / 80 all-data,size=16,lc=2,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-62-80-quantitative-data-size-32-lc-2-no-reg">Architecture 62 / 80 quantitative-data,size=32,lc=2,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-63-80-quantitative-data-size-16-lc-2-reg-0-001">Architecture 63 / 80 quantitative-data,size=16,lc=2,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-64-80-quantitative-data-size-8-lc-2-no-reg">Architecture 64 / 80 quantitative-data,size=8,lc=2,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-65-80-all-data-size-16-lc-2-no-reg">Architecture 65 / 80 all-data,size=16,lc=2,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-66-80-quantitative-data-size-32-lc-0-no-reg">Architecture 66 / 80 quantitative-data,size=32,lc=0,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-67-80-quantitative-data-size-16-lc-1-no-reg">Architecture 67 / 80 quantitative-data,size=16,lc=1,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-68-80-all-data-size-64-lc-2-reg-0-001">Architecture 68 / 80 all-data,size=64,lc=2,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-69-80-quantitative-data-size-16-lc-2-no-reg">Architecture 69 / 80 quantitative-data,size=16,lc=2,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-70-80-all-data-size-32-lc-0-no-reg">Architecture 70 / 80 all-data,size=32,lc=0,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-71-80-all-data-size-8-lc-1-no-reg">Architecture 71 / 80 all-data,size=8,lc=1,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-72-80-all-data-size-16-lc-0-no-reg">Architecture 72 / 80 all-data,size=16,lc=0,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-73-80-quantitative-data-size-8-lc-1-no-reg">Architecture 73 / 80 quantitative-data,size=8,lc=1,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-74-80-quantitative-data-size-8-lc-0-no-reg">Architecture 74 / 80 quantitative-data,size=8,lc=0,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-75-80-quantitative-data-size-64-lc-2-reg-0-001">Architecture 75 / 80 quantitative-data,size=64,lc=2,reg=0.001</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-76-80-quantitative-data-size-16-lc-1-no-reg">Architecture 76 / 80 quantitative-data,size=16,lc=1,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-77-80-quantitative-data-size-16-lc-0-no-reg">Architecture 77 / 80 quantitative-data,size=16,lc=0,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-78-80-all-data-size-8-lc-2-no-reg">Architecture 78 / 80 all-data,size=8,lc=2,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-79-80-all-data-size-8-lc-0-no-reg">Architecture 79 / 80 all-data,size=8,lc=0,no-reg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="models.html#architecture-80-80-quantitative-data-size-8-lc-1-no-reg">Architecture 80 / 80 quantitative-data,size=8,lc=1,no-reg</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="commandline_tools.html#mhcflurry-predict">mhcflurry-predict</a></li>
+<li class="toctree-l2"><a class="reference internal" href="commandline_tools.html#mhcflurry-downloads">mhcflurry-downloads</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="commandline_tools.html#mhcflurry-downloads-fetch">mhcflurry-downloads fetch</a></li>
+<li class="toctree-l3"><a class="reference internal" href="commandline_tools.html#mhcflurry-downloads-info">mhcflurry-downloads info</a></li>
+<li class="toctree-l3"><a class="reference internal" href="commandline_tools.html#mhcflurry-downloads-path">mhcflurry-downloads path</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="commandline_tools.html#mhcflurry-class1-train-allele-specific-models">mhcflurry-class1-train-allele-specific-models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="commandline_tools.html#mhcflurry-calibrate-percentile-ranks">mhcflurry-calibrate-percentile-ranks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="commandline_tools.html#mhcflurry-class1-select-allele-specific-models">mhcflurry-class1-select-allele-specific-models</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.allele_encoding">mhcflurry.allele_encoding module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.amino_acid">mhcflurry.amino_acid module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.calibrate_percentile_ranks_command">mhcflurry.calibrate_percentile_ranks_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.class1_affinity_predictor">mhcflurry.class1_affinity_predictor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.class1_neural_network">mhcflurry.class1_neural_network module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.common">mhcflurry.common module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.custom_loss">mhcflurry.custom_loss module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.downloads">mhcflurry.downloads module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.downloads_command">mhcflurry.downloads_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.encodable_sequences">mhcflurry.encodable_sequences module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.ensemble_centrality">mhcflurry.ensemble_centrality module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.hyperparameters">mhcflurry.hyperparameters module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.parallelism">mhcflurry.parallelism module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.percent_rank_transform">mhcflurry.percent_rank_transform module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.predict_command">mhcflurry.predict_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.regression_target">mhcflurry.regression_target module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.scoring">mhcflurry.scoring module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.select_allele_specific_models_command">mhcflurry.select_allele_specific_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.train_allele_specific_models_command">mhcflurry.train_allele_specific_models_command module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-mhcflurry.version">mhcflurry.version module</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="intro.html" class="btn btn-neutral float-right" title="Introduction and setup" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, Timothy O&#39;Donnell.
+      Last updated on Feb 26, 2018.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'1.2.0',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

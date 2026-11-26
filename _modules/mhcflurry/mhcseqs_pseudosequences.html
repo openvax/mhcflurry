@@ -1,0 +1,1086 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.mhcseqs_pseudosequences &mdash; MHCflurry 2.5.11 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=b06e8534"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../docker.html">Running MHCflurry in Docker</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../cross_species_validation.html">Cross-species alleles, pseudosequences, and zero-shot validation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../experiments.html">Experiment log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Release notes and changelog</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.mhcseqs_pseudosequences</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.mhcseqs_pseudosequences</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Class I MHC binding-groove pseudosequence extraction backed by ``mhcseqs``.</span>
+
+<span class="sd">Extracts fixed-length MHCflurry 39-aa (or NetMHCpan 34-aa) Class I</span>
+<span class="sd">pseudosequences from arbitrary MHC Class I heavy-chain protein sequences or</span>
+<span class="sd">from an ``mhcseqs`` sequence table, strictly generalizing the alignment-based</span>
+<span class="sd">pseudosequence pipeline without requiring external ``clustalo`` or Biopython</span>
+<span class="sd">installations.</span>
+
+<span class="sd">Compatibility with existing MHCflurry 2.x weights is preserved by pinning the</span>
+<span class="sd">exact 39 mature Class I positions (1-based on the canonical ``HLA-A*02:01``</span>
+<span class="sd">α1/α2 reference domains):</span>
+
+<span class="sd">* 22 α1 (``groove1``) positions:</span>
+<span class="sd">  ``7, 9, 16, 19, 21, 24, 45, 47, 59, 62, 63, 66, 67, 69, 70, 73, 74, 76, 77, 80, 81, 84``</span>
+<span class="sd">* 17 α2 (``groove2``) positions:</span>
+<span class="sd">  ``91, 95, 97, 99, 114, 116, 118, 143, 147, 150, 152, 156, 158, 159, 163, 167, 171``</span>
+
+<span class="sd">The 34-aa NetMHCpan pseudosequence is the exact subset obtained by omitting</span>
+<span class="sd">the 5 MHCflurry disambiguation positions (``16, 19, 21, 47, 91``).</span>
+<span class="sd">"""</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">Sequence</span>
+
+
+<span class="c1"># Canonical HLA-A*02:01 mature α1 (90 aa, mature 1..90) and α2 (93 aa, mature</span>
+<span class="c1"># 91..183) binding-groove reference domains.</span>
+<span class="n">HLA_A0201_GROOVE1</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="s2">"GSHSMRYFFTSVSRPGRGEPRFIAVGYVDDTQFVRFDSDAASQRMEPRAPWIEQEGPEYWDGETRKVKAHSQTHRVDLGTLRGYYNQSEA"</span>
+<span class="p">)</span>
+<span class="n">HLA_A0201_GROOVE2</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="s2">"GSHTVQRMYGCDVGSDWRFLRGYHQYAYDGKDYIALKEDLRSWTAADMAAQTTKHKWEAAHVAEQLRAYLEGTCVEWLRRYLENGKETLQRTD"</span>
+<span class="p">)</span>
+
+<span class="c1"># 1-based mature Class I coordinates on HLA-A*02:01 (α1 = 1..90, α2 = 91..183).</span>
+<span class="n">MHCFLURRY_39AA_MATURE_POSITIONS</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="mi">7</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="mi">19</span><span class="p">,</span> <span class="mi">21</span><span class="p">,</span> <span class="mi">24</span><span class="p">,</span> <span class="mi">45</span><span class="p">,</span> <span class="mi">47</span><span class="p">,</span> <span class="mi">59</span><span class="p">,</span> <span class="mi">62</span><span class="p">,</span> <span class="mi">63</span><span class="p">,</span> <span class="mi">66</span><span class="p">,</span> <span class="mi">67</span><span class="p">,</span> <span class="mi">69</span><span class="p">,</span> <span class="mi">70</span><span class="p">,</span> <span class="mi">73</span><span class="p">,</span> <span class="mi">74</span><span class="p">,</span> <span class="mi">76</span><span class="p">,</span> <span class="mi">77</span><span class="p">,</span>
+    <span class="mi">80</span><span class="p">,</span> <span class="mi">81</span><span class="p">,</span> <span class="mi">84</span><span class="p">,</span>
+    <span class="mi">91</span><span class="p">,</span> <span class="mi">95</span><span class="p">,</span> <span class="mi">97</span><span class="p">,</span> <span class="mi">99</span><span class="p">,</span> <span class="mi">114</span><span class="p">,</span> <span class="mi">116</span><span class="p">,</span> <span class="mi">118</span><span class="p">,</span> <span class="mi">143</span><span class="p">,</span> <span class="mi">147</span><span class="p">,</span> <span class="mi">150</span><span class="p">,</span> <span class="mi">152</span><span class="p">,</span> <span class="mi">156</span><span class="p">,</span> <span class="mi">158</span><span class="p">,</span> <span class="mi">159</span><span class="p">,</span> <span class="mi">163</span><span class="p">,</span>
+    <span class="mi">167</span><span class="p">,</span> <span class="mi">171</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># The 5 extra positions added by MHCflurry to disambiguate training alleles</span>
+<span class="c1"># with identical NetMHCpan 34-aa pseudosequences.</span>
+<span class="n">MHCFLURRY_EXTRA_MATURE_POSITIONS</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span><span class="mi">16</span><span class="p">,</span> <span class="mi">19</span><span class="p">,</span> <span class="mi">21</span><span class="p">,</span> <span class="mi">47</span><span class="p">,</span> <span class="mi">91</span><span class="p">})</span>
+
+<span class="n">NETMHCPAN_34AA_MATURE_POSITIONS</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+    <span class="n">pos</span> <span class="k">for</span> <span class="n">pos</span> <span class="ow">in</span> <span class="n">MHCFLURRY_39AA_MATURE_POSITIONS</span>
+    <span class="k">if</span> <span class="n">pos</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">MHCFLURRY_EXTRA_MATURE_POSITIONS</span>
+<span class="p">)</span>
+
+<span class="n">PSEUDOSEQUENCE_MATURE_POSITIONS</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="mi">34</span><span class="p">:</span> <span class="n">NETMHCPAN_34AA_MATURE_POSITIONS</span><span class="p">,</span>
+    <span class="mi">39</span><span class="p">:</span> <span class="n">MHCFLURRY_39AA_MATURE_POSITIONS</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="c1"># Precomputed 0-based indices into groove1 (len 90) and groove2 (len 93).</span>
+<span class="n">_GROOVE_INDICES_BY_LENGTH</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">length</span><span class="p">:</span> <span class="p">(</span>
+        <span class="nb">tuple</span><span class="p">(</span><span class="n">p</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">positions</span> <span class="k">if</span> <span class="n">p</span> <span class="o">&lt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">HLA_A0201_GROOVE1</span><span class="p">)),</span>
+        <span class="nb">tuple</span><span class="p">(</span><span class="n">p</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">HLA_A0201_GROOVE1</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">positions</span> <span class="k">if</span> <span class="n">p</span> <span class="o">&gt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">HLA_A0201_GROOVE1</span><span class="p">)),</span>
+    <span class="p">)</span>
+    <span class="k">for</span> <span class="n">length</span><span class="p">,</span> <span class="n">positions</span> <span class="ow">in</span> <span class="n">PSEUDOSEQUENCE_MATURE_POSITIONS</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+<span class="p">}</span>
+
+<span class="n">_STANDARD_AMINO_ACIDS</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span><span class="s2">"ACDEFGHIKLMNPQRSTVWY"</span><span class="p">)</span>
+<span class="n">_NON_GROOVE_STATUSES</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span>
+    <span class="s2">"non_groove"</span><span class="p">,</span>
+    <span class="s2">"missing_groove"</span><span class="p">,</span>
+    <span class="s2">"too_short"</span><span class="p">,</span>
+    <span class="s2">"invalid_boundaries"</span><span class="p">,</span>
+    <span class="s2">"chain_inference_failed"</span><span class="p">,</span>
+<span class="p">})</span>
+<span class="n">_FRAGMENT_STATUSES</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span>
+    <span class="s2">"short"</span><span class="p">,</span>
+    <span class="s2">"alpha1_only"</span><span class="p">,</span>
+    <span class="s2">"alpha2_only"</span><span class="p">,</span>
+    <span class="s2">"fragment_fallback"</span><span class="p">,</span>
+<span class="p">})</span>
+
+<span class="c1"># Lazily populated BLOSUM62 scoring tables to keep module import fast.</span>
+<span class="n">_BLOSUM_CACHE</span> <span class="o">=</span> <span class="kc">None</span>
+
+<span class="c1"># Default Gotoh penalties used by the standalone fallback aligner.</span>
+<span class="n">_DEFAULT_GAP_OPEN</span> <span class="o">=</span> <span class="o">-</span><span class="mi">10</span>
+<span class="n">_DEFAULT_GAP_EXTEND</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_mhcseqs_imgt_aligner</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Return ``mhcseqs.align_domain_to_imgt`` when mhcseqs &gt;= 2.9.0 is installed."""</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">mhcseqs</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">mhcseqs</span><span class="p">,</span> <span class="s2">"align_domain_to_imgt"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_blosum_tables</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Return ``(aa_to_idx, x_idx, score_matrix)`` backed by BLOSUM62."""</span>
+    <span class="k">global</span> <span class="n">_BLOSUM_CACHE</span>
+    <span class="k">if</span> <span class="n">_BLOSUM_CACHE</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">amino_acid</span>
+
+        <span class="n">matrix</span> <span class="o">=</span> <span class="n">amino_acid</span><span class="o">.</span><span class="n">BLOSUM62_MATRIX</span>
+        <span class="n">aa_to_idx</span> <span class="o">=</span> <span class="p">{</span><span class="n">aa</span><span class="p">:</span> <span class="n">idx</span> <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">aa</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">matrix</span><span class="o">.</span><span class="n">index</span><span class="p">)}</span>
+        <span class="n">x_idx</span> <span class="o">=</span> <span class="n">aa_to_idx</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
+        <span class="n">score_matrix</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">"int32"</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+        <span class="n">_BLOSUM_CACHE</span> <span class="o">=</span> <span class="p">(</span><span class="n">aa_to_idx</span><span class="p">,</span> <span class="n">x_idx</span><span class="p">,</span> <span class="n">score_matrix</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_BLOSUM_CACHE</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_sanitize_residue</span><span class="p">(</span><span class="n">char</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Normalize a single extracted residue to standard 20-AA alphabet or X."""</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">char</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">c</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">_STANDARD_AMINO_ACIDS</span> <span class="k">else</span> <span class="s2">"X"</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_resolve_groove_indices</span><span class="p">(</span><span class="n">length</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">"""Return ``(g1_indices, g2_indices)`` for a supported pseudosequence length."""</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_GROOVE_INDICES_BY_LENGTH</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">length</span><span class="p">)]</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+        <span class="n">supported</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">_GROOVE_INDICES_BY_LENGTH</span><span class="p">))</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Unsupported pseudosequence length </span><span class="si">%r</span><span class="s2">. Supported lengths: </span><span class="si">%s</span><span class="s2">."</span>
+            <span class="o">%</span> <span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="n">supported</span><span class="p">)</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_align_domain_to_reference</span><span class="p">(</span>
+    <span class="n">seq</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">ref</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">positions</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">gap_open</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">10</span><span class="p">,</span>
+    <span class="n">gap_extend</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">free_end_gaps</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Semi-global affine-gap Gotoh alignment of ``seq`` onto ``ref``.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    seq : str</span>
+<span class="sd">        Query groove domain sequence (α1 or α2).</span>
+<span class="sd">    ref : str</span>
+<span class="sd">        Canonical reference groove domain sequence (``HLA_A0201_GROOVE1`` or</span>
+<span class="sd">        ``HLA_A0201_GROOVE2``).</span>
+<span class="sd">    positions : sequence of int</span>
+<span class="sd">        0-based reference coordinates to extract.</span>
+<span class="sd">    gap_open : int, optional</span>
+<span class="sd">        Affine gap-opening score (negative). Default: -10.</span>
+<span class="sd">    gap_extend : int, optional</span>
+<span class="sd">        Affine gap-extension score (negative). Default: -1.</span>
+<span class="sd">    free_end_gaps : bool, optional</span>
+<span class="sd">        If True (default), terminal gaps at either end of ``seq`` or ``ref``</span>
+<span class="sd">        are unpenalized so partial exon-2/exon-3 fragments align accurately.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str</span>
+<span class="sd">        Extracted residues at ``positions`` (``"X"`` where gapped or missing).</span>
+<span class="sd">    """</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">ref</span><span class="p">)</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">seq</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">m</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">"X"</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">positions</span><span class="p">)</span>
+
+    <span class="n">aa_to_idx</span><span class="p">,</span> <span class="n">x_idx</span><span class="p">,</span> <span class="n">score_mat</span> <span class="o">=</span> <span class="n">_get_blosum_tables</span><span class="p">()</span>
+    <span class="n">ref_idx</span> <span class="o">=</span> <span class="p">[</span><span class="n">aa_to_idx</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">x_idx</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">ref</span><span class="p">]</span>
+    <span class="n">seq_upper</span> <span class="o">=</span> <span class="n">seq</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+    <span class="n">seq_idx</span> <span class="o">=</span> <span class="p">[</span><span class="n">aa_to_idx</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">x_idx</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">seq_upper</span><span class="p">]</span>
+
+    <span class="n">neg_inf</span> <span class="o">=</span> <span class="o">-</span><span class="p">(</span><span class="mi">10</span><span class="o">**</span><span class="mi">9</span><span class="p">)</span>
+    <span class="n">m_dp</span> <span class="o">=</span> <span class="p">[[</span><span class="n">neg_inf</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">m</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span>
+    <span class="n">ix_dp</span> <span class="o">=</span> <span class="p">[[</span><span class="n">neg_inf</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">m</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span>
+    <span class="n">iy_dp</span> <span class="o">=</span> <span class="p">[[</span><span class="n">neg_inf</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">m</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span>
+    <span class="c1"># Traceback codes: 0 = match/mismatch (M), 1 = gap in seq (Ix, up),</span>
+    <span class="c1"># 2 = gap in ref (Iy, left).</span>
+    <span class="n">tb_m</span> <span class="o">=</span> <span class="p">[</span><span class="nb">bytearray</span><span class="p">(</span><span class="n">m</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span>
+    <span class="n">tb_ix</span> <span class="o">=</span> <span class="p">[</span><span class="nb">bytearray</span><span class="p">(</span><span class="n">m</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span>
+    <span class="n">tb_iy</span> <span class="o">=</span> <span class="p">[</span><span class="nb">bytearray</span><span class="p">(</span><span class="n">m</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span>
+
+    <span class="n">m_dp</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">ix_dp</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">free_end_gaps</span> <span class="k">else</span> <span class="p">(</span><span class="n">gap_open</span> <span class="o">+</span> <span class="p">(</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">gap_extend</span><span class="p">)</span>
+        <span class="n">tb_ix</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">m</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">iy_dp</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">free_end_gaps</span> <span class="k">else</span> <span class="p">(</span><span class="n">gap_open</span> <span class="o">+</span> <span class="p">(</span><span class="n">j</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">gap_extend</span><span class="p">)</span>
+        <span class="n">tb_iy</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="mi">2</span> <span class="k">if</span> <span class="n">j</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="mi">0</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">row_s</span> <span class="o">=</span> <span class="n">score_mat</span><span class="p">[</span><span class="n">ref_idx</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]]</span>
+        <span class="n">m_prev</span><span class="p">,</span> <span class="n">ix_prev</span><span class="p">,</span> <span class="n">iy_prev</span> <span class="o">=</span> <span class="n">m_dp</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">],</span> <span class="n">ix_dp</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">],</span> <span class="n">iy_dp</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="n">m_cur</span><span class="p">,</span> <span class="n">ix_cur</span><span class="p">,</span> <span class="n">iy_cur</span> <span class="o">=</span> <span class="n">m_dp</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">ix_dp</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">iy_dp</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="n">tbm_i</span><span class="p">,</span> <span class="n">tbix_i</span><span class="p">,</span> <span class="n">tbiy_i</span> <span class="o">=</span> <span class="n">tb_m</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">tb_ix</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">tb_iy</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="n">lo_i</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="p">(</span><span class="n">free_end_gaps</span> <span class="ow">and</span> <span class="n">i</span> <span class="o">==</span> <span class="n">n</span><span class="p">)</span> <span class="k">else</span> <span class="n">gap_open</span>
+        <span class="n">le_i</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="p">(</span><span class="n">free_end_gaps</span> <span class="ow">and</span> <span class="n">i</span> <span class="o">==</span> <span class="n">n</span><span class="p">)</span> <span class="k">else</span> <span class="n">gap_extend</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">m</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">row_s</span><span class="p">[</span><span class="n">seq_idx</span><span class="p">[</span><span class="n">j</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]]</span>
+            <span class="n">v0</span> <span class="o">=</span> <span class="n">m_prev</span><span class="p">[</span><span class="n">j</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+            <span class="n">v1</span> <span class="o">=</span> <span class="n">ix_prev</span><span class="p">[</span><span class="n">j</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+            <span class="n">v2</span> <span class="o">=</span> <span class="n">iy_prev</span><span class="p">[</span><span class="n">j</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">v0</span> <span class="o">&gt;=</span> <span class="n">v1</span> <span class="ow">and</span> <span class="n">v0</span> <span class="o">&gt;=</span> <span class="n">v2</span><span class="p">:</span>
+                <span class="n">m_cur</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">v0</span> <span class="o">+</span> <span class="n">s</span>
+                <span class="n">tbm_i</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">elif</span> <span class="n">v1</span> <span class="o">&gt;=</span> <span class="n">v2</span><span class="p">:</span>
+                <span class="n">m_cur</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">v1</span> <span class="o">+</span> <span class="n">s</span>
+                <span class="n">tbm_i</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">m_cur</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">v2</span> <span class="o">+</span> <span class="n">s</span>
+                <span class="n">tbm_i</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="mi">2</span>
+
+            <span class="k">if</span> <span class="n">free_end_gaps</span> <span class="ow">and</span> <span class="n">j</span> <span class="o">==</span> <span class="n">m</span><span class="p">:</span>
+                <span class="n">u0</span> <span class="o">=</span> <span class="n">m_prev</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+                <span class="n">u1</span> <span class="o">=</span> <span class="n">ix_prev</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">u0</span> <span class="o">=</span> <span class="n">m_prev</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">+</span> <span class="n">gap_open</span>
+                <span class="n">u1</span> <span class="o">=</span> <span class="n">ix_prev</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">+</span> <span class="n">gap_extend</span>
+            <span class="k">if</span> <span class="n">u0</span> <span class="o">&gt;=</span> <span class="n">u1</span><span class="p">:</span>
+                <span class="n">ix_cur</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">u0</span>
+                <span class="n">tbix_i</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">ix_cur</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">u1</span>
+                <span class="n">tbix_i</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+
+            <span class="n">w0</span> <span class="o">=</span> <span class="n">m_cur</span><span class="p">[</span><span class="n">j</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">lo_i</span>
+            <span class="n">w2</span> <span class="o">=</span> <span class="n">iy_cur</span><span class="p">[</span><span class="n">j</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">le_i</span>
+            <span class="k">if</span> <span class="n">w0</span> <span class="o">&gt;=</span> <span class="n">w2</span><span class="p">:</span>
+                <span class="n">iy_cur</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">w0</span>
+                <span class="n">tbiy_i</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">iy_cur</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">w2</span>
+                <span class="n">tbiy_i</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="mi">2</span>
+
+    <span class="n">e0</span><span class="p">,</span> <span class="n">e1</span><span class="p">,</span> <span class="n">e2</span> <span class="o">=</span> <span class="n">m_dp</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="n">m</span><span class="p">],</span> <span class="n">ix_dp</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="n">m</span><span class="p">],</span> <span class="n">iy_dp</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="n">m</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">e0</span> <span class="o">&gt;=</span> <span class="n">e1</span> <span class="ow">and</span> <span class="n">e0</span> <span class="o">&gt;=</span> <span class="n">e2</span><span class="p">:</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">elif</span> <span class="n">e1</span> <span class="o">&gt;=</span> <span class="n">e2</span><span class="p">:</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="mi">2</span>
+
+    <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="o">=</span> <span class="n">n</span><span class="p">,</span> <span class="n">m</span>
+    <span class="n">ref_to_char</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"X"</span><span class="p">]</span> <span class="o">*</span> <span class="n">n</span>
+    <span class="k">while</span> <span class="n">i</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">j</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">state</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">prev</span> <span class="o">=</span> <span class="n">tb_m</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">]</span>
+            <span class="n">ref_to_char</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">_sanitize_residue</span><span class="p">(</span><span class="n">seq_upper</span><span class="p">[</span><span class="n">j</span> <span class="o">-</span> <span class="mi">1</span><span class="p">])</span>
+            <span class="n">i</span> <span class="o">-=</span> <span class="mi">1</span>
+            <span class="n">j</span> <span class="o">-=</span> <span class="mi">1</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="n">prev</span>
+        <span class="k">elif</span> <span class="n">state</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">prev</span> <span class="o">=</span> <span class="n">tb_ix</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">]</span>
+            <span class="n">ref_to_char</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"X"</span>
+            <span class="n">i</span> <span class="o">-=</span> <span class="mi">1</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="n">prev</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">prev</span> <span class="o">=</span> <span class="n">tb_iy</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">]</span>
+            <span class="n">j</span> <span class="o">-=</span> <span class="mi">1</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="n">prev</span>
+
+    <span class="k">return</span> <span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ref_to_char</span><span class="p">[</span><span class="n">p</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">positions</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_extract_from_imgt_domain_alignment</span><span class="p">(</span>
+    <span class="n">domain_alignment</span><span class="p">,</span>
+    <span class="n">mature_positions</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Extract sanitized residues at canonical mature positions from a DomainAlignment."""</span>
+    <span class="n">mature_to_aa</span> <span class="o">=</span> <span class="n">domain_alignment</span><span class="o">.</span><span class="n">mature_to_aa</span>
+    <span class="n">chars</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">pos</span> <span class="ow">in</span> <span class="n">mature_positions</span><span class="p">:</span>
+        <span class="n">aa</span> <span class="o">=</span> <span class="n">mature_to_aa</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pos</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">aa</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">aa</span> <span class="o">==</span> <span class="s2">"-"</span><span class="p">:</span>
+            <span class="n">chars</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">"X"</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">chars</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_sanitize_residue</span><span class="p">(</span><span class="n">aa</span><span class="p">))</span>
+    <span class="k">return</span> <span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">chars</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_extract_groove1_residues</span><span class="p">(</span>
+    <span class="n">groove1</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">g1_positions</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">gap_open</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_DEFAULT_GAP_OPEN</span><span class="p">,</span>
+    <span class="n">gap_extend</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_DEFAULT_GAP_EXTEND</span><span class="p">,</span>
+    <span class="n">cache</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">imgt_aligner</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Extract α1 pseudosequence residues via mhcseqs IMGT alignment or fallback."""</span>
+    <span class="n">g1</span> <span class="o">=</span> <span class="p">(</span><span class="n">groove1</span> <span class="ow">or</span> <span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">g1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">"X"</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">g1_positions</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">cache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">g1</span> <span class="ow">in</span> <span class="n">cache</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">cache</span><span class="p">[</span><span class="n">g1</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">imgt_aligner</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="ow">and</span> <span class="n">gap_open</span> <span class="o">==</span> <span class="n">_DEFAULT_GAP_OPEN</span>
+        <span class="ow">and</span> <span class="n">gap_extend</span> <span class="o">==</span> <span class="n">_DEFAULT_GAP_EXTEND</span>
+    <span class="p">):</span>
+        <span class="n">domain_aln</span> <span class="o">=</span> <span class="n">imgt_aligner</span><span class="p">(</span><span class="n">g1</span><span class="p">,</span> <span class="n">domain</span><span class="o">=</span><span class="s2">"G-ALPHA1"</span><span class="p">)</span>
+        <span class="n">mature_positions</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">p</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">g1_positions</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">_extract_from_imgt_domain_alignment</span><span class="p">(</span><span class="n">domain_aln</span><span class="p">,</span> <span class="n">mature_positions</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">seq_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">g1</span><span class="p">)</span>
+        <span class="c1"># Fast path 1: canonical 90-aa α1 verified by conserved structural anchors</span>
+        <span class="c1"># (Tyr27 at index 26, Trp60 at index 59, Asn86-Gln87 glycosylation motif).</span>
+        <span class="k">if</span> <span class="n">seq_len</span> <span class="o">==</span> <span class="mi">90</span> <span class="ow">and</span> <span class="n">g1</span><span class="p">[</span><span class="mi">26</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"Y"</span> <span class="ow">and</span> <span class="n">g1</span><span class="p">[</span><span class="mi">59</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"W"</span> <span class="ow">and</span> <span class="n">g1</span><span class="p">[</span><span class="mi">85</span><span class="p">:</span><span class="mi">87</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"NQ"</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">_sanitize_residue</span><span class="p">(</span><span class="n">g1</span><span class="p">[</span><span class="n">p</span><span class="p">])</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">g1_positions</span><span class="p">)</span>
+        <span class="c1"># Fast path 2: IMGT partial exon-2 sequence missing only mature residue 1</span>
+        <span class="c1"># (leading Gly), leaving 89 aa shifted by -1.</span>
+        <span class="k">elif</span> <span class="p">(</span>
+            <span class="n">seq_len</span> <span class="o">==</span> <span class="mi">89</span>
+            <span class="ow">and</span> <span class="n">g1</span><span class="p">[</span><span class="mi">25</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"Y"</span>
+            <span class="ow">and</span> <span class="n">g1</span><span class="p">[</span><span class="mi">58</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"W"</span>
+            <span class="ow">and</span> <span class="n">g1</span><span class="p">[</span><span class="mi">84</span><span class="p">:</span><span class="mi">86</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"NQ"</span>
+            <span class="ow">and</span> <span class="n">g1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">"G"</span>
+        <span class="p">):</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">_sanitize_residue</span><span class="p">(</span><span class="n">g1</span><span class="p">[</span><span class="n">p</span> <span class="o">-</span> <span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">g1_positions</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">_align_domain_to_reference</span><span class="p">(</span>
+                <span class="n">g1</span><span class="p">,</span>
+                <span class="n">HLA_A0201_GROOVE1</span><span class="p">,</span>
+                <span class="n">g1_positions</span><span class="p">,</span>
+                <span class="n">gap_open</span><span class="o">=</span><span class="n">gap_open</span><span class="p">,</span>
+                <span class="n">gap_extend</span><span class="o">=</span><span class="n">gap_extend</span><span class="p">,</span>
+            <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">cache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">cache</span><span class="p">[</span><span class="n">g1</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_extract_groove2_residues</span><span class="p">(</span>
+    <span class="n">groove2</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">g2_positions</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">gap_open</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_DEFAULT_GAP_OPEN</span><span class="p">,</span>
+    <span class="n">gap_extend</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_DEFAULT_GAP_EXTEND</span><span class="p">,</span>
+    <span class="n">cache</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">imgt_aligner</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Extract α2 pseudosequence residues via mhcseqs IMGT alignment or fallback."""</span>
+    <span class="n">g2</span> <span class="o">=</span> <span class="p">(</span><span class="n">groove2</span> <span class="ow">or</span> <span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">g2</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">"X"</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">g2_positions</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">cache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">g2</span> <span class="ow">in</span> <span class="n">cache</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">cache</span><span class="p">[</span><span class="n">g2</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">imgt_aligner</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="ow">and</span> <span class="n">gap_open</span> <span class="o">==</span> <span class="n">_DEFAULT_GAP_OPEN</span>
+        <span class="ow">and</span> <span class="n">gap_extend</span> <span class="o">==</span> <span class="n">_DEFAULT_GAP_EXTEND</span>
+    <span class="p">):</span>
+        <span class="n">domain_aln</span> <span class="o">=</span> <span class="n">imgt_aligner</span><span class="p">(</span><span class="n">g2</span><span class="p">,</span> <span class="n">domain</span><span class="o">=</span><span class="s2">"G-ALPHA2"</span><span class="p">)</span>
+        <span class="n">mature_positions</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">p</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">HLA_A0201_GROOVE1</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">g2_positions</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">_extract_from_imgt_domain_alignment</span><span class="p">(</span><span class="n">domain_aln</span><span class="p">,</span> <span class="n">mature_positions</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Always align in the fallback path: conserved Cys101/Cys164 spacing</span>
+        <span class="c1"># alone does not guard against compensating internal indels between</span>
+        <span class="c1"># the disulfide cysteines (which shift α2 binding-pocket residues).</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">_align_domain_to_reference</span><span class="p">(</span>
+            <span class="n">g2</span><span class="p">,</span>
+            <span class="n">HLA_A0201_GROOVE2</span><span class="p">,</span>
+            <span class="n">g2_positions</span><span class="p">,</span>
+            <span class="n">gap_open</span><span class="o">=</span><span class="n">gap_open</span><span class="p">,</span>
+            <span class="n">gap_extend</span><span class="o">=</span><span class="n">gap_extend</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">cache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">cache</span><span class="p">[</span><span class="n">g2</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<div class="viewcode-block" id="extract_class1_pseudosequence_from_grooves">
+<a class="viewcode-back" href="../../api.html#mhcflurry.mhcseqs_pseudosequences.extract_class1_pseudosequence_from_grooves">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">extract_class1_pseudosequence_from_grooves</span><span class="p">(</span>
+    <span class="n">groove1</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">groove2</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">39</span><span class="p">,</span>
+    <span class="n">gap_open</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_DEFAULT_GAP_OPEN</span><span class="p">,</span>
+    <span class="n">gap_extend</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_DEFAULT_GAP_EXTEND</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Extract a fixed-length Class I pseudosequence from α1 and α2 domains.</span>
+
+<span class="sd">    When ``mhcseqs &gt;= 2.9.0`` is installed (and default alignment parameters</span>
+<span class="sd">    are used), delegates to ``mhcseqs.align_domain_to_imgt``; otherwise uses</span>
+<span class="sd">    the built-in BLOSUM62 affine-gap semi-global aligner.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    groove1 : str</span>
+<span class="sd">        Class I α1 (G-ALPHA1) binding-groove domain sequence.</span>
+<span class="sd">    groove2 : str</span>
+<span class="sd">        Class I α2 (G-ALPHA2) binding-groove domain sequence.</span>
+<span class="sd">    length : int, optional</span>
+<span class="sd">        Target pseudosequence length: ``39`` (MHCflurry 2.x, default) or</span>
+<span class="sd">        ``34`` (NetMHCpan).</span>
+<span class="sd">    gap_open : int, optional</span>
+<span class="sd">        Affine gap-opening score for non-canonical lengths. Default: -10.</span>
+<span class="sd">    gap_extend : int, optional</span>
+<span class="sd">        Affine gap-extension score for non-canonical lengths. Default: -1.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str</span>
+<span class="sd">        Fixed-length pseudosequence of length ``length``. Missing or gapped</span>
+<span class="sd">        positions are represented as ``"X"``.</span>
+<span class="sd">    """</span>
+    <span class="n">g1_positions</span><span class="p">,</span> <span class="n">g2_positions</span> <span class="o">=</span> <span class="n">_resolve_groove_indices</span><span class="p">(</span><span class="n">length</span><span class="p">)</span>
+    <span class="n">imgt_aligner</span> <span class="o">=</span> <span class="n">_get_mhcseqs_imgt_aligner</span><span class="p">()</span>
+    <span class="n">p1</span> <span class="o">=</span> <span class="n">_extract_groove1_residues</span><span class="p">(</span>
+        <span class="n">groove1</span><span class="p">,</span>
+        <span class="n">g1_positions</span><span class="p">,</span>
+        <span class="n">gap_open</span><span class="o">=</span><span class="n">gap_open</span><span class="p">,</span>
+        <span class="n">gap_extend</span><span class="o">=</span><span class="n">gap_extend</span><span class="p">,</span>
+        <span class="n">imgt_aligner</span><span class="o">=</span><span class="n">imgt_aligner</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">p2</span> <span class="o">=</span> <span class="n">_extract_groove2_residues</span><span class="p">(</span>
+        <span class="n">groove2</span><span class="p">,</span>
+        <span class="n">g2_positions</span><span class="p">,</span>
+        <span class="n">gap_open</span><span class="o">=</span><span class="n">gap_open</span><span class="p">,</span>
+        <span class="n">gap_extend</span><span class="o">=</span><span class="n">gap_extend</span><span class="p">,</span>
+        <span class="n">imgt_aligner</span><span class="o">=</span><span class="n">imgt_aligner</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">p1</span> <span class="o">+</span> <span class="n">p2</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_import_mhcseqs</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Import ``mhcseqs`` lazily with an actionable error if unavailable."""</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">mhcseqs</span>
+    <span class="k">except</span> <span class="ne">ImportError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+            <span class="s2">"mhcseqs is required to decompose full MHC protein sequences or "</span>
+            <span class="s2">"build pseudosequences from the mhcseqs database. Install it with: "</span>
+            <span class="s2">"pip install 'mhcseqs&gt;=2.7.0'"</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
+    <span class="k">return</span> <span class="n">mhcseqs</span>
+
+
+<div class="viewcode-block" id="extract_class1_pseudosequence_with_alignment">
+<a class="viewcode-back" href="../../api.html#mhcflurry.mhcseqs_pseudosequences.extract_class1_pseudosequence_with_alignment">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">extract_class1_pseudosequence_with_alignment</span><span class="p">(</span>
+    <span class="n">sequence</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">39</span><span class="p">,</span>
+    <span class="n">allele</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span>
+    <span class="n">gene</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span>
+    <span class="n">mutations</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
+    <span class="n">allow_fragments</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">warn_on_indels</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">warn_on_noop_mutations</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">gap_open</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_DEFAULT_GAP_OPEN</span><span class="p">,</span>
+    <span class="n">gap_extend</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_DEFAULT_GAP_EXTEND</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Extract a Class I pseudosequence together with its ``mhcseqs`` IMGT alignment.</span>
+
+<span class="sd">    Returns ``(pseudosequence, groove_alignment)`` where ``groove_alignment``</span>
+<span class="sd">    is a ``mhcseqs.GrooveAlignment`` (when ``mhcseqs &gt;= 2.9.0`` is installed</span>
+<span class="sd">    and default alignment penalties are used) or ``None`` on older ``mhcseqs``</span>
+<span class="sd">    releases.</span>
+<span class="sd">    """</span>
+    <span class="n">_resolve_groove_indices</span><span class="p">(</span><span class="n">length</span><span class="p">)</span>
+    <span class="n">cleaned</span> <span class="o">=</span> <span class="p">(</span><span class="n">sequence</span> <span class="ow">or</span> <span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">cleaned</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Cannot extract Class I pseudosequence from an empty sequence."</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mutations</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">normalized_mutations</span> <span class="o">=</span> <span class="p">(</span><span class="n">mutations</span><span class="o">.</span><span class="n">strip</span><span class="p">(),)</span> <span class="k">if</span> <span class="n">mutations</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">else</span> <span class="p">()</span>
+    <span class="k">elif</span> <span class="n">mutations</span><span class="p">:</span>
+        <span class="n">normalized_mutations</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+            <span class="nb">str</span><span class="p">(</span><span class="n">m</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">mutations</span> <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">m</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">normalized_mutations</span> <span class="o">=</span> <span class="p">()</span>
+
+    <span class="n">mhcseqs</span> <span class="o">=</span> <span class="n">_import_mhcseqs</span><span class="p">()</span>
+    <span class="n">record</span> <span class="o">=</span> <span class="n">mhcseqs</span><span class="o">.</span><span class="n">decompose_domains</span><span class="p">(</span>
+        <span class="n">cleaned</span><span class="p">,</span>
+        <span class="n">mhc_class</span><span class="o">=</span><span class="s2">"I"</span><span class="p">,</span>
+        <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">,</span>
+        <span class="n">gene</span><span class="o">=</span><span class="n">gene</span><span class="p">,</span>
+        <span class="n">mutations</span><span class="o">=</span><span class="n">normalized_mutations</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">status</span> <span class="ow">in</span> <span class="n">_NON_GROOVE_STATUSES</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Sequence </span><span class="si">%s</span><span class="s2"> does not contain a Class I binding groove "</span>
+            <span class="s2">"(mhcseqs status=</span><span class="si">%r</span><span class="s2">, flags=</span><span class="si">%r</span><span class="s2">)."</span>
+            <span class="o">%</span> <span class="p">(</span><span class="n">allele</span> <span class="ow">or</span> <span class="s2">"&lt;unnamed&gt;"</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">flags</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="n">has_g1</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">groove1</span><span class="p">)</span>
+    <span class="n">has_g2</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">groove2</span><span class="p">)</span>
+    <span class="n">record_status</span> <span class="o">=</span> <span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">status</span> <span class="ow">or</span> <span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">allow_fragments</span> <span class="ow">and</span> <span class="p">(</span>
+        <span class="ow">not</span> <span class="p">(</span><span class="n">has_g1</span> <span class="ow">and</span> <span class="n">has_g2</span><span class="p">)</span> <span class="ow">or</span> <span class="n">record_status</span> <span class="ow">in</span> <span class="n">_FRAGMENT_STATUSES</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Incomplete Class I groove for </span><span class="si">%s</span><span class="s2"> (groove1=</span><span class="si">%d</span><span class="s2"> aa, groove2=</span><span class="si">%d</span><span class="s2"> aa, "</span>
+            <span class="s2">"status=</span><span class="si">%r</span><span class="s2">). Pass allow_fragments=True to allow partial/short "</span>
+            <span class="s2">"grooves and pad missing residues with 'X'."</span>
+            <span class="o">%</span> <span class="p">(</span><span class="n">allele</span> <span class="ow">or</span> <span class="s2">"&lt;unnamed&gt;"</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">groove1</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">groove2</span><span class="p">),</span> <span class="n">record</span><span class="o">.</span><span class="n">status</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">has_g1</span> <span class="ow">or</span> <span class="n">has_g2</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"No Class I groove domains extracted for </span><span class="si">%s</span><span class="s2"> (status=</span><span class="si">%r</span><span class="s2">)."</span>
+            <span class="o">%</span> <span class="p">(</span><span class="n">allele</span> <span class="ow">or</span> <span class="s2">"&lt;unnamed&gt;"</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">status</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="n">align_groove</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">mhcseqs</span><span class="p">,</span> <span class="s2">"align_groove_to_imgt"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">groove_alignment</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">align_groove</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="ow">and</span> <span class="n">gap_open</span> <span class="o">==</span> <span class="n">_DEFAULT_GAP_OPEN</span>
+        <span class="ow">and</span> <span class="n">gap_extend</span> <span class="o">==</span> <span class="n">_DEFAULT_GAP_EXTEND</span>
+    <span class="p">):</span>
+        <span class="n">groove_alignment</span> <span class="o">=</span> <span class="n">align_groove</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+        <span class="n">positions</span> <span class="o">=</span> <span class="n">PSEUDOSEQUENCE_MATURE_POSITIONS</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">length</span><span class="p">)]</span>
+        <span class="n">raw_pseudo</span> <span class="o">=</span> <span class="n">groove_alignment</span><span class="o">.</span><span class="n">extract_positions</span><span class="p">(</span>
+            <span class="n">positions</span><span class="p">,</span> <span class="n">missing</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span> <span class="n">deleted</span><span class="o">=</span><span class="s2">"X"</span>
+        <span class="p">)</span>
+        <span class="n">pseudosequence</span> <span class="o">=</span> <span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">_sanitize_residue</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">raw_pseudo</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">warn_on_indels</span> <span class="ow">and</span> <span class="n">groove_alignment</span><span class="o">.</span><span class="n">has_insertions</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">"Class I groove for </span><span class="si">%s</span><span class="s2"> contains internal insertion(s) (</span><span class="si">%s</span><span class="s2">) "</span>
+                <span class="s2">"that are omitted by fixed </span><span class="si">%d</span><span class="s2">-aa pseudosequences; predictions "</span>
+                <span class="s2">"for alleles with pocket-reshaping insertions may be less accurate."</span><span class="p">,</span>
+                <span class="n">allele</span> <span class="ow">or</span> <span class="s2">"&lt;unnamed&gt;"</span><span class="p">,</span>
+                <span class="n">groove_alignment</span><span class="o">.</span><span class="n">summary</span><span class="p">(),</span>
+                <span class="nb">int</span><span class="p">(</span><span class="n">length</span><span class="p">),</span>
+            <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">pseudosequence</span> <span class="o">=</span> <span class="n">extract_class1_pseudosequence_from_grooves</span><span class="p">(</span>
+            <span class="n">record</span><span class="o">.</span><span class="n">groove1</span><span class="p">,</span>
+            <span class="n">record</span><span class="o">.</span><span class="n">groove2</span><span class="p">,</span>
+            <span class="n">length</span><span class="o">=</span><span class="n">length</span><span class="p">,</span>
+            <span class="n">gap_open</span><span class="o">=</span><span class="n">gap_open</span><span class="p">,</span>
+            <span class="n">gap_extend</span><span class="o">=</span><span class="n">gap_extend</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">normalized_mutations</span> <span class="ow">and</span> <span class="n">warn_on_noop_mutations</span><span class="p">:</span>
+        <span class="n">wt_record</span> <span class="o">=</span> <span class="n">mhcseqs</span><span class="o">.</span><span class="n">decompose_domains</span><span class="p">(</span>
+            <span class="n">cleaned</span><span class="p">,</span>
+            <span class="n">mhc_class</span><span class="o">=</span><span class="s2">"I"</span><span class="p">,</span>
+            <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">,</span>
+            <span class="n">gene</span><span class="o">=</span><span class="n">gene</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">wt_record</span><span class="o">.</span><span class="n">status</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_NON_GROOVE_STATUSES</span> <span class="ow">and</span> <span class="p">(</span>
+            <span class="n">wt_record</span><span class="o">.</span><span class="n">groove1</span> <span class="ow">or</span> <span class="n">wt_record</span><span class="o">.</span><span class="n">groove2</span>
+        <span class="p">):</span>
+            <span class="n">wt_pseudo</span> <span class="o">=</span> <span class="n">extract_class1_pseudosequence_from_grooves</span><span class="p">(</span>
+                <span class="n">wt_record</span><span class="o">.</span><span class="n">groove1</span><span class="p">,</span>
+                <span class="n">wt_record</span><span class="o">.</span><span class="n">groove2</span><span class="p">,</span>
+                <span class="n">length</span><span class="o">=</span><span class="n">length</span><span class="p">,</span>
+                <span class="n">gap_open</span><span class="o">=</span><span class="n">gap_open</span><span class="p">,</span>
+                <span class="n">gap_extend</span><span class="o">=</span><span class="n">gap_extend</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">wt_pseudo</span> <span class="o">==</span> <span class="n">pseudosequence</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">"Mutation(s) </span><span class="si">%r</span><span class="s2"> on </span><span class="si">%s</span><span class="s2"> did not change any of the </span><span class="si">%d</span><span class="s2"> "</span>
+                    <span class="s2">"extracted pseudosequence positions; predicted binding "</span>
+                    <span class="s2">"will be identical to wild-type."</span><span class="p">,</span>
+                    <span class="n">normalized_mutations</span><span class="p">,</span>
+                    <span class="n">allele</span> <span class="ow">or</span> <span class="s2">"&lt;unnamed&gt;"</span><span class="p">,</span>
+                    <span class="nb">int</span><span class="p">(</span><span class="n">length</span><span class="p">),</span>
+                <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">pseudosequence</span><span class="p">,</span> <span class="n">groove_alignment</span></div>
+
+
+
+<div class="viewcode-block" id="extract_class1_pseudosequence">
+<a class="viewcode-back" href="../../api.html#mhcflurry.mhcseqs_pseudosequences.extract_class1_pseudosequence">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">extract_class1_pseudosequence</span><span class="p">(</span>
+    <span class="n">sequence</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">39</span><span class="p">,</span>
+    <span class="n">allele</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span>
+    <span class="n">gene</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span>
+    <span class="n">mutations</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
+    <span class="n">allow_fragments</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">warn_on_indels</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">warn_on_noop_mutations</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">gap_open</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_DEFAULT_GAP_OPEN</span><span class="p">,</span>
+    <span class="n">gap_extend</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_DEFAULT_GAP_EXTEND</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Extract a Class I pseudosequence from a raw MHC protein sequence.</span>
+
+<span class="sd">    Uses ``mhcseqs.decompose_domains(..., mhc_class="I")`` to strip any signal</span>
+<span class="sd">    peptide (including truncated N-terminal signal peptides), identify the α1</span>
+<span class="sd">    (``groove1``) and α2 (``groove2``) binding-groove domains, optionally apply</span>
+<span class="sd">    IEDB-style point mutations (e.g. ``mutations=("K66A",)``), and extract the</span>
+<span class="sd">    pinned binding groove positions.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    sequence : str</span>
+<span class="sd">        Full-length, mature, or partial MHC Class I heavy-chain amino acid</span>
+<span class="sd">        sequence.</span>
+<span class="sd">    length : int, optional</span>
+<span class="sd">        Target pseudosequence length: ``39`` (MHCflurry 2.x, default) or</span>
+<span class="sd">        ``34`` (NetMHCpan).</span>
+<span class="sd">    allele : str, optional</span>
+<span class="sd">        Optional allele name passed to ``mhcseqs.decompose_domains`` for</span>
+<span class="sd">        metadata and gene/species cues.</span>
+<span class="sd">    gene : str, optional</span>
+<span class="sd">        Optional gene symbol passed to ``mhcseqs.decompose_domains``.</span>
+<span class="sd">    mutations : sequence of str, optional</span>
+<span class="sd">        Optional mature-numbered point mutations (e.g. ``["W167S"]`` or</span>
+<span class="sd">        ``"W167S"``) applied by ``mhcseqs`` before groove extraction.</span>
+<span class="sd">    allow_fragments : bool, optional</span>
+<span class="sd">        If False (default), require both α1 and α2 groove domains to be</span>
+<span class="sd">        present. If True, allow partial single-domain fragments (filling the</span>
+<span class="sd">        missing domain with ``"X"``).</span>
+<span class="sd">    warn_on_indels : bool, optional</span>
+<span class="sd">        When True (default) and ``mhcseqs &gt;= 2.9.0`` detects internal</span>
+<span class="sd">        insertions in the binding groove, log a warning noting that fixed-width</span>
+<span class="sd">        pseudosequences omit inserted residues.</span>
+<span class="sd">    warn_on_noop_mutations : bool, optional</span>
+<span class="sd">        When True (default) and ``mutations`` does not change any of the</span>
+<span class="sd">        extracted pseudosequence positions, log a warning.</span>
+<span class="sd">    gap_open : int, optional</span>
+<span class="sd">        Affine gap-opening score for non-canonical groove lengths.</span>
+<span class="sd">    gap_extend : int, optional</span>
+<span class="sd">        Affine gap-extension score for non-canonical groove lengths.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str</span>
+<span class="sd">        Fixed-length Class I pseudosequence of length ``length``.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If ``sequence`` is empty, not a valid Class I groove (e.g. Ig-only or</span>
+<span class="sd">        non-groove gene), or missing a required groove domain.</span>
+<span class="sd">    """</span>
+    <span class="n">pseudosequence</span><span class="p">,</span> <span class="n">_alignment</span> <span class="o">=</span> <span class="n">extract_class1_pseudosequence_with_alignment</span><span class="p">(</span>
+        <span class="n">sequence</span><span class="p">,</span>
+        <span class="n">length</span><span class="o">=</span><span class="n">length</span><span class="p">,</span>
+        <span class="n">allele</span><span class="o">=</span><span class="n">allele</span><span class="p">,</span>
+        <span class="n">gene</span><span class="o">=</span><span class="n">gene</span><span class="p">,</span>
+        <span class="n">mutations</span><span class="o">=</span><span class="n">mutations</span><span class="p">,</span>
+        <span class="n">allow_fragments</span><span class="o">=</span><span class="n">allow_fragments</span><span class="p">,</span>
+        <span class="n">warn_on_indels</span><span class="o">=</span><span class="n">warn_on_indels</span><span class="p">,</span>
+        <span class="n">warn_on_noop_mutations</span><span class="o">=</span><span class="n">warn_on_noop_mutations</span><span class="p">,</span>
+        <span class="n">gap_open</span><span class="o">=</span><span class="n">gap_open</span><span class="p">,</span>
+        <span class="n">gap_extend</span><span class="o">=</span><span class="n">gap_extend</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">pseudosequence</span></div>
+
+
+
+<span class="c1"># Standard 6- or 10-character UniProtKB accessions (without MHC separators).</span>
+<span class="c1"># Guarded before mhcgnomes parsing so accessions like Japanese medaka fish</span>
+<span class="c1"># H2LR16..H2LR44 cannot be misparsed as mouse H2-L*r16..r44 (mhcgnomes#306).</span>
+<span class="n">_BARE_UNIPROT_ACCESSION_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="sa">r</span><span class="s2">"^(?:[OPQ][0-9][A-Z0-9]</span><span class="si">{3}</span><span class="s2">[0-9]|[A-NR-Z][0-9](?:[A-Z][A-Z0-9]</span><span class="si">{2}</span><span class="s2">[0-9]){1,2})$"</span>
+<span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_is_bare_uniprot_accession</span><span class="p">(</span><span class="n">raw_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return True if ``raw_name`` is a bare UniProtKB accession string."""</span>
+    <span class="n">text</span> <span class="o">=</span> <span class="p">(</span><span class="n">raw_name</span> <span class="ow">or</span> <span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">text</span> <span class="ow">or</span> <span class="s2">"-"</span> <span class="ow">in</span> <span class="n">text</span> <span class="ow">or</span> <span class="s2">"*"</span> <span class="ow">in</span> <span class="n">text</span> <span class="ow">or</span> <span class="s2">":"</span> <span class="ow">in</span> <span class="n">text</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="n">_BARE_UNIPROT_ACCESSION_RE</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">text</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_normalize_pseudosequence_allele_key</span><span class="p">(</span><span class="n">raw_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">prefer_no_alias</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Normalize an allele key with mhcgnomes, matching predictor persistence."""</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">normalize_allele_name</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">raw_name</span> <span class="ow">or</span> <span class="n">_is_bare_uniprot_accession</span><span class="p">(</span><span class="n">raw_name</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">prefer_no_alias</span><span class="p">:</span>
+        <span class="n">normalized</span> <span class="o">=</span> <span class="n">normalize_allele_name</span><span class="p">(</span>
+            <span class="n">raw_name</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_allele_aliases</span><span class="o">=</span><span class="kc">False</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">normalized</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">normalized</span>
+    <span class="k">return</span> <span class="n">normalize_allele_name</span><span class="p">(</span>
+        <span class="n">raw_name</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_allele_aliases</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+
+
+<div class="viewcode-block" id="build_pseudosequences_from_mhcseqs">
+<a class="viewcode-back" href="../../api.html#mhcflurry.mhcseqs_pseudosequences.build_pseudosequences_from_mhcseqs">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">build_pseudosequences_from_mhcseqs</span><span class="p">(</span>
+    <span class="n">sequences_csv</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">rows</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">]]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">39</span><span class="p">,</span>
+    <span class="n">existing_allele_to_sequence</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">prefer_existing</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">lock_existing</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">max_x</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">include_fragments</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">normalize_alleles</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">gap_open</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">10</span><span class="p">,</span>
+    <span class="n">gap_extend</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Build a Class I ``allele -&gt; pseudosequence`` mapping from ``mhcseqs``.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    sequences_csv : str, optional</span>
+<span class="sd">        Path to ``mhc-full-seqs.csv``. Ignored when ``rows`` is supplied. When</span>
+<span class="sd">        both are None, uses ``mhcseqs.load_sequences_dict()``.</span>
+<span class="sd">    rows : iterable of mapping, optional</span>
+<span class="sd">        Pre-loaded ``mhcseqs`` row mappings (each containing at least</span>
+<span class="sd">        ``mhc_class``, ``two_field_allele`` or ``allele``, ``groove1``, and</span>
+<span class="sd">        ``groove2``).</span>
+<span class="sd">    length : int, optional</span>
+<span class="sd">        Pseudosequence length: ``39`` (MHCflurry 2.x, default) or ``34``</span>
+<span class="sd">        (NetMHCpan).</span>
+<span class="sd">    existing_allele_to_sequence : mapping of str -&gt; str, optional</span>
+<span class="sd">        Optional existing pseudosequence table to strictly generalize. Every</span>
+<span class="sd">        valid entry in ``existing_allele_to_sequence`` is retained; new alleles</span>
+<span class="sd">        from ``mhcseqs`` are added.</span>
+<span class="sd">    prefer_existing : bool, optional</span>
+<span class="sd">        Only relevant when ``existing_allele_to_sequence`` is given. When True,</span>
+<span class="sd">        keep existing non-``X`` pseudosequences verbatim so predictions on</span>
+<span class="sd">        previously supported alleles never drift (while still replacing</span>
+<span class="sd">        ``X``-containing entries if ``mhcseqs`` provides strictly fewer ``X``</span>
+<span class="sd">        positions). When False (default), ``mhcseqs`` values overwrite existing</span>
+<span class="sd">        entries unless the existing entry has strictly fewer ``X`` positions.</span>
+<span class="sd">    lock_existing : bool, optional</span>
+<span class="sd">        Only relevant when ``existing_allele_to_sequence`` is given. When True,</span>
+<span class="sd">        every existing entry is locked bit-for-bit verbatim (even entries</span>
+<span class="sd">        containing ``"X"``, and exempt from ``max_x`` filtering) so previously</span>
+<span class="sd">        trained alleles can never change; ``mhcseqs`` only adds alleles not</span>
+<span class="sd">        already present in ``existing_allele_to_sequence``.</span>
+<span class="sd">    max_x : int, optional</span>
+<span class="sd">        Maximum allowed ``"X"`` characters in emitted pseudosequences. Entries</span>
+<span class="sd">        exceeding ``max_x`` are omitted (except entries locked via</span>
+<span class="sd">        ``lock_existing=True``).</span>
+<span class="sd">    include_fragments : bool, optional</span>
+<span class="sd">        If False (default), skip records missing either α1 or α2.</span>
+<span class="sd">    normalize_alleles : bool, optional</span>
+<span class="sd">        If True (default), canonicalize allele names with ``mhcgnomes`` via</span>
+<span class="sd">        :func:`mhcflurry.common.normalize_allele_name`, skipping non-Class-I,</span>
+<span class="sd">        null, questionable, pseudogene, or unparseable names so every emitted</span>
+<span class="sd">        key is directly usable by ``Class1AffinityPredictor``. If False, retain</span>
+<span class="sd">        raw ``two_field_allele`` identifiers (including UniProt accessions).</span>
+<span class="sd">    gap_open : int, optional</span>
+<span class="sd">        Affine gap-opening score for non-canonical groove lengths.</span>
+<span class="sd">    gap_extend : int, optional</span>
+<span class="sd">        Affine gap-extension score for non-canonical groove lengths.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict of str -&gt; str</span>
+<span class="sd">        Sorted ``{allele: pseudosequence}`` mapping.</span>
+<span class="sd">    """</span>
+    <span class="n">g1_positions</span><span class="p">,</span> <span class="n">g2_positions</span> <span class="o">=</span> <span class="n">_resolve_groove_indices</span><span class="p">(</span><span class="n">length</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">rows</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">mhcseqs</span> <span class="o">=</span> <span class="n">_import_mhcseqs</span><span class="p">()</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="n">mhcseqs</span><span class="o">.</span><span class="n">load_sequences_dict</span><span class="p">(</span><span class="n">sequences_csv</span><span class="p">)</span>
+
+    <span class="n">result</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">existing_keys</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_clean_text</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">""</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span> <span class="o">!=</span> <span class="n">value</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">""</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">text</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"nan"</span><span class="p">,</span> <span class="s2">"&lt;na&gt;"</span><span class="p">):</span>
+            <span class="k">return</span> <span class="s2">""</span>
+        <span class="k">return</span> <span class="n">text</span>
+
+    <span class="k">if</span> <span class="n">existing_allele_to_sequence</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">raw_allele</span><span class="p">,</span> <span class="n">seq</span> <span class="ow">in</span> <span class="n">existing_allele_to_sequence</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">seq_str</span> <span class="o">=</span> <span class="n">_clean_text</span><span class="p">(</span><span class="n">seq</span><span class="p">)</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">seq_str</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">seq_str</span><span class="p">)</span> <span class="o">!=</span> <span class="n">length</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"Existing pseudosequence for </span><span class="si">%r</span><span class="s2"> has length </span><span class="si">%d</span><span class="s2">, expected </span><span class="si">%d</span><span class="s2">."</span>
+                    <span class="o">%</span> <span class="p">(</span><span class="n">raw_allele</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">seq_str</span><span class="p">),</span> <span class="n">length</span><span class="p">)</span>
+                <span class="p">)</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">_normalize_pseudosequence_allele_key</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">raw_allele</span><span class="p">))</span>
+                <span class="k">if</span> <span class="n">normalize_alleles</span>
+                <span class="k">else</span> <span class="nb">str</span><span class="p">(</span><span class="n">raw_allele</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">key</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">result</span> <span class="ow">and</span> <span class="n">seq_str</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">"X"</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">result</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">"X"</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">seq_str</span>
+            <span class="n">existing_keys</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+    <span class="n">g1_cache</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">g2_cache</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">imgt_aligner</span> <span class="o">=</span> <span class="n">_get_mhcseqs_imgt_aligner</span><span class="p">()</span>
+    <span class="n">skipped_unparseable</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">:</span>
+        <span class="n">mhc_class</span> <span class="o">=</span> <span class="n">_clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"mhc_class"</span><span class="p">))</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">mhc_class</span> <span class="o">!=</span> <span class="s2">"I"</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">status</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">_clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"groove_status"</span><span class="p">))</span> <span class="ow">or</span> <span class="n">_clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"status"</span><span class="p">))</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">status</span> <span class="ow">in</span> <span class="n">_NON_GROOVE_STATUSES</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">include_fragments</span> <span class="ow">and</span> <span class="n">status</span> <span class="ow">in</span> <span class="n">_FRAGMENT_STATUSES</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="n">groove1</span> <span class="o">=</span> <span class="n">_clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"groove1"</span><span class="p">))</span>
+        <span class="n">groove2</span> <span class="o">=</span> <span class="n">_clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"groove2"</span><span class="p">))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">include_fragments</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="n">groove1</span> <span class="ow">and</span> <span class="n">groove2</span><span class="p">):</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">groove1</span> <span class="ow">or</span> <span class="n">groove2</span><span class="p">):</span>
+            <span class="k">continue</span>
+
+        <span class="n">raw_name</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">_clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"two_field_allele"</span><span class="p">))</span>
+            <span class="ow">or</span> <span class="n">_clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"allele"</span><span class="p">))</span>
+            <span class="ow">or</span> <span class="n">_clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"representative_allele"</span><span class="p">))</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">raw_name</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="k">if</span> <span class="n">normalize_alleles</span><span class="p">:</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="n">_normalize_pseudosequence_allele_key</span><span class="p">(</span><span class="n">raw_name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">skipped_unparseable</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">continue</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="n">raw_name</span>
+
+        <span class="n">pseudo</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">_extract_groove1_residues</span><span class="p">(</span>
+                <span class="n">groove1</span><span class="p">,</span>
+                <span class="n">g1_positions</span><span class="p">,</span>
+                <span class="n">gap_open</span><span class="o">=</span><span class="n">gap_open</span><span class="p">,</span>
+                <span class="n">gap_extend</span><span class="o">=</span><span class="n">gap_extend</span><span class="p">,</span>
+                <span class="n">cache</span><span class="o">=</span><span class="n">g1_cache</span><span class="p">,</span>
+                <span class="n">imgt_aligner</span><span class="o">=</span><span class="n">imgt_aligner</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="o">+</span> <span class="n">_extract_groove2_residues</span><span class="p">(</span>
+                <span class="n">groove2</span><span class="p">,</span>
+                <span class="n">g2_positions</span><span class="p">,</span>
+                <span class="n">gap_open</span><span class="o">=</span><span class="n">gap_open</span><span class="p">,</span>
+                <span class="n">gap_extend</span><span class="o">=</span><span class="n">gap_extend</span><span class="p">,</span>
+                <span class="n">cache</span><span class="o">=</span><span class="n">g2_cache</span><span class="p">,</span>
+                <span class="n">imgt_aligner</span><span class="o">=</span><span class="n">imgt_aligner</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">max_x</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">pseudo</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">"X"</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">max_x</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">existing_keys</span> <span class="ow">and</span> <span class="n">lock_existing</span><span class="p">:</span>
+                <span class="c1"># Exact-lock mode: never alter any existing entry, even if it has X's.</span>
+                <span class="k">continue</span>
+            <span class="n">existing_seq</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+            <span class="n">new_x</span> <span class="o">=</span> <span class="n">pseudo</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">"X"</span><span class="p">)</span>
+            <span class="n">old_x</span> <span class="o">=</span> <span class="n">existing_seq</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">"X"</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">existing_keys</span> <span class="ow">and</span> <span class="n">prefer_existing</span><span class="p">:</span>
+                <span class="c1"># Strict compatibility mode: only replace if mhcseqs fills in X's.</span>
+                <span class="k">if</span> <span class="n">new_x</span> <span class="o">&lt;</span> <span class="n">old_x</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">pseudo</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">new_x</span> <span class="o">&lt;=</span> <span class="n">old_x</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">pseudo</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">pseudo</span>
+
+    <span class="k">if</span> <span class="n">max_x</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">k</span><span class="p">:</span> <span class="n">v</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">lock_existing</span> <span class="ow">and</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">existing_keys</span><span class="p">)</span> <span class="ow">or</span> <span class="n">v</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">"X"</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">max_x</span>
+        <span class="p">}</span>
+
+    <span class="k">if</span> <span class="n">skipped_unparseable</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">"Skipped </span><span class="si">%d</span><span class="s2"> mhcseqs Class I rows that could not be canonicalized "</span>
+            <span class="s2">"to a Class I allele name by mhcgnomes (e.g. unannotated UniProt accessions)."</span><span class="p">,</span>
+            <span class="n">skipped_unparseable</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">items</span><span class="p">()))</span></div>
+
+
+
+<div class="viewcode-block" id="extend_allele_to_sequence_from_mhcseqs">
+<a class="viewcode-back" href="../../api.html#mhcflurry.mhcseqs_pseudosequences.extend_allele_to_sequence_from_mhcseqs">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">extend_allele_to_sequence_from_mhcseqs</span><span class="p">(</span>
+    <span class="n">allele_to_sequence</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">sequences_csv</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">rows</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">]]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">prefer_existing</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">lock_existing</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">max_x</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">include_fragments</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">normalize_alleles</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Return a strictly generalized copy of ``allele_to_sequence`` using ``mhcseqs``.</span>
+
+<span class="sd">    Infers the pseudosequence length (39 or 34) from ``allele_to_sequence``,</span>
+<span class="sd">    preserves all existing non-``X`` entries verbatim by default</span>
+<span class="sd">    (``prefer_existing=True``), upgrades ``X``-containing entries when</span>
+<span class="sd">    ``mhcseqs`` supplies more complete grooves (unless ``lock_existing=True``,</span>
+<span class="sd">    which freezes every existing entry verbatim), and adds all newly covered</span>
+<span class="sd">    Class I alleles from ``mhcseqs``.</span>
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.pseudosequences</span><span class="w"> </span><span class="kn">import</span> <span class="n">pseudosequence_length</span>
+
+    <span class="n">length</span> <span class="o">=</span> <span class="n">pseudosequence_length</span><span class="p">(</span><span class="n">allele_to_sequence</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">length</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">PSEUDOSEQUENCE_MATURE_POSITIONS</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Cannot infer supported pseudosequence length (34 or 39) from "</span>
+            <span class="s2">"allele_to_sequence (inferred length=</span><span class="si">%r</span><span class="s2">)."</span> <span class="o">%</span> <span class="p">(</span><span class="n">length</span><span class="p">,)</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">build_pseudosequences_from_mhcseqs</span><span class="p">(</span>
+        <span class="n">sequences_csv</span><span class="o">=</span><span class="n">sequences_csv</span><span class="p">,</span>
+        <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span>
+        <span class="n">length</span><span class="o">=</span><span class="n">length</span><span class="p">,</span>
+        <span class="n">existing_allele_to_sequence</span><span class="o">=</span><span class="n">allele_to_sequence</span><span class="p">,</span>
+        <span class="n">prefer_existing</span><span class="o">=</span><span class="n">prefer_existing</span><span class="p">,</span>
+        <span class="n">lock_existing</span><span class="o">=</span><span class="n">lock_existing</span><span class="p">,</span>
+        <span class="n">max_x</span><span class="o">=</span><span class="n">max_x</span><span class="p">,</span>
+        <span class="n">include_fragments</span><span class="o">=</span><span class="n">include_fragments</span><span class="p">,</span>
+        <span class="n">normalize_alleles</span><span class="o">=</span><span class="n">normalize_alleles</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Nov 26, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

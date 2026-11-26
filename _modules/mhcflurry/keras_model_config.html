@@ -1,0 +1,998 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.keras_model_config &mdash; MHCflurry 2.5.11 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=b06e8534"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../docker.html">Running MHCflurry in Docker</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../cross_species_validation.html">Cross-species alleles, pseudosequences, and zero-shot validation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../experiments.html">Experiment log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration and performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Release notes and changelog</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.keras_model_config</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.keras_model_config</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Legacy Keras JSON config parsing, weight conversion, and model reconstruction.</span>
+
+<span class="sd">Historical MHCflurry releases serialized ``Class1NeuralNetwork`` architectures</span>
+<span class="sd">as Keras Functional/Model JSON configs paired with Keras-layout NPZ weight</span>
+<span class="sd">arrays. Newer PyTorch releases serialize native hyperparameter/merged configs</span>
+<span class="sd">with PyTorch-layout weight lists. This module isolates the config inspection,</span>
+<span class="sd">allele-representation width inference, legacy Keras weight conversion, and</span>
+<span class="sd">architecture reconstruction helpers used by :class:`Class1NeuralNetwork`.</span>
+<span class="sd">"""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.amino_acid</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_vector_encoding_df</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.class1_encoding</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">_peptide_torch_encoding_name</span><span class="p">,</span>
+    <span class="n">_peptide_torch_encoding_shape</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="is_keras_model_config">
+<a class="viewcode-back" href="../../api.html#mhcflurry.keras_model_config.is_keras_model_config">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">is_keras_model_config</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return True when ``config`` is a legacy Keras Model/Functional JSON dict."""</span>
+    <span class="k">return</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"class_name"</span><span class="p">)</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"Model"</span><span class="p">,</span> <span class="s2">"Functional"</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="parse_keras_json_config">
+<a class="viewcode-back" href="../../api.html#mhcflurry.keras_model_config.parse_keras_json_config">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">parse_keras_json_config</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Parse a legacy Keras model JSON config to extract hyperparameters.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    config : dict</span>
+<span class="sd">        Keras model JSON config with ``'class_name'``, ``'config'``, etc.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    tuple of (dict, dict)</span>
+<span class="sd">        First dict: hyperparameters compatible with ``Class1NeuralNetwork``.</span>
+<span class="sd">        Second dict: metadata about Keras model structure (e.g., embedding info).</span>
+<span class="sd">    """</span>
+    <span class="n">layers</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"config"</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"layers"</span><span class="p">,</span> <span class="p">[])</span>
+
+    <span class="n">hyperparameters</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"locally_connected_layers"</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="s2">"layer_sizes"</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="s2">"activation"</span><span class="p">:</span> <span class="s2">"tanh"</span><span class="p">,</span>
+        <span class="s2">"output_activation"</span><span class="p">:</span> <span class="s2">"sigmoid"</span><span class="p">,</span>
+        <span class="s2">"dropout_probability"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="s2">"batch_normalization"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s2">"dense_layer_l1_regularization"</span><span class="p">:</span> <span class="mf">0.001</span><span class="p">,</span>
+        <span class="s2">"dense_layer_l2_regularization"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="s2">"peptide_allele_merge_method"</span><span class="p">:</span> <span class="s2">"multiply"</span><span class="p">,</span>  <span class="c1"># Default</span>
+    <span class="p">}</span>
+
+    <span class="c1"># Metadata about Keras structure</span>
+    <span class="n">keras_metadata</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"has_embedding"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s2">"embedding_input_dim"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s2">"embedding_output_dim"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s2">"skip_embedding_weights"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="n">dense_layers</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">peptide_dense_sizes</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">allele_dense_sizes</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">concatenate_count</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">layers</span><span class="p">:</span>
+        <span class="n">layer_class</span> <span class="o">=</span> <span class="n">layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"class_name"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
+        <span class="n">layer_config</span> <span class="o">=</span> <span class="n">layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"config"</span><span class="p">,</span> <span class="p">{})</span>
+
+        <span class="k">if</span> <span class="n">layer_class</span> <span class="o">==</span> <span class="s2">"LocallyConnected1D"</span><span class="p">:</span>
+            <span class="n">kernel_size</span> <span class="o">=</span> <span class="n">layer_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"kernel_size"</span><span class="p">,</span> <span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+            <span class="n">lc_config</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">"filters"</span><span class="p">:</span> <span class="n">layer_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"filters"</span><span class="p">,</span> <span class="mi">8</span><span class="p">),</span>
+                <span class="s2">"kernel_size"</span><span class="p">:</span> <span class="p">(</span>
+                    <span class="n">kernel_size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kernel_size</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">else</span> <span class="n">kernel_size</span>
+                <span class="p">),</span>
+                <span class="s2">"activation"</span><span class="p">:</span> <span class="n">layer_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"activation"</span><span class="p">,</span> <span class="s2">"tanh"</span><span class="p">),</span>
+            <span class="p">}</span>
+            <span class="n">hyperparameters</span><span class="p">[</span><span class="s2">"locally_connected_layers"</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">lc_config</span><span class="p">)</span>
+            <span class="n">hyperparameters</span><span class="p">[</span><span class="s2">"activation"</span><span class="p">]</span> <span class="o">=</span> <span class="n">lc_config</span><span class="p">[</span><span class="s2">"activation"</span><span class="p">]</span>
+
+        <span class="k">elif</span> <span class="n">layer_class</span> <span class="o">==</span> <span class="s2">"Dense"</span><span class="p">:</span>
+            <span class="n">units</span> <span class="o">=</span> <span class="n">layer_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"units"</span><span class="p">,</span> <span class="mi">32</span><span class="p">)</span>
+            <span class="n">activation</span> <span class="o">=</span> <span class="n">layer_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"activation"</span><span class="p">,</span> <span class="s2">"tanh"</span><span class="p">)</span>
+            <span class="n">layer_name</span> <span class="o">=</span> <span class="n">layer_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">layer_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"peptide_dense_"</span><span class="p">):</span>
+                <span class="n">peptide_dense_sizes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">units</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">layer_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"allele_dense_"</span><span class="p">):</span>
+                <span class="n">allele_dense_sizes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">units</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">dense_layers</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s2">"units"</span><span class="p">:</span> <span class="n">units</span><span class="p">,</span> <span class="s2">"activation"</span><span class="p">:</span> <span class="n">activation</span><span class="p">})</span>
+
+            <span class="c1"># Extract regularization from first dense layer</span>
+            <span class="n">kernel_reg</span> <span class="o">=</span> <span class="n">layer_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"kernel_regularizer"</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">kernel_reg</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kernel_reg</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                <span class="n">reg_config</span> <span class="o">=</span> <span class="n">kernel_reg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"config"</span><span class="p">,</span> <span class="p">{})</span>
+                <span class="k">if</span> <span class="s2">"l1"</span> <span class="ow">in</span> <span class="n">reg_config</span><span class="p">:</span>
+                    <span class="n">hyperparameters</span><span class="p">[</span><span class="s2">"dense_layer_l1_regularization"</span><span class="p">]</span> <span class="o">=</span> <span class="n">reg_config</span><span class="p">[</span><span class="s2">"l1"</span><span class="p">]</span>
+                <span class="k">if</span> <span class="s2">"l2"</span> <span class="ow">in</span> <span class="n">reg_config</span><span class="p">:</span>
+                    <span class="n">hyperparameters</span><span class="p">[</span><span class="s2">"dense_layer_l2_regularization"</span><span class="p">]</span> <span class="o">=</span> <span class="n">reg_config</span><span class="p">[</span><span class="s2">"l2"</span><span class="p">]</span>
+
+        <span class="k">elif</span> <span class="n">layer_class</span> <span class="o">==</span> <span class="s2">"Dropout"</span><span class="p">:</span>
+            <span class="n">rate</span> <span class="o">=</span> <span class="n">layer_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"rate"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+            <span class="n">hyperparameters</span><span class="p">[</span><span class="s2">"dropout_probability"</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="n">rate</span>
+
+        <span class="k">elif</span> <span class="n">layer_class</span> <span class="o">==</span> <span class="s2">"BatchNormalization"</span><span class="p">:</span>
+            <span class="n">hyperparameters</span><span class="p">[</span><span class="s2">"batch_normalization"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">elif</span> <span class="n">layer_class</span> <span class="o">==</span> <span class="s2">"LayerNormalization"</span><span class="p">:</span>
+            <span class="n">hyperparameters</span><span class="p">[</span><span class="s2">"normalization"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"layer"</span>
+
+        <span class="k">elif</span> <span class="n">layer_class</span> <span class="o">==</span> <span class="s2">"Embedding"</span><span class="p">:</span>
+            <span class="n">keras_metadata</span><span class="p">[</span><span class="s2">"has_embedding"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">keras_metadata</span><span class="p">[</span><span class="s2">"embedding_input_dim"</span><span class="p">]</span> <span class="o">=</span> <span class="n">layer_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"input_dim"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">keras_metadata</span><span class="p">[</span><span class="s2">"embedding_output_dim"</span><span class="p">]</span> <span class="o">=</span> <span class="n">layer_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"output_dim"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="c1"># If input_dim is 0, it's a placeholder and weights should be skipped</span>
+            <span class="k">if</span> <span class="n">layer_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"input_dim"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">keras_metadata</span><span class="p">[</span><span class="s2">"skip_embedding_weights"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">elif</span> <span class="n">layer_class</span> <span class="o">==</span> <span class="s2">"Concatenate"</span><span class="p">:</span>
+            <span class="n">concatenate_count</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="c1"># Only set merge_method to concatenate if there's just one Concatenate</span>
+            <span class="c1"># and it's likely for peptide-allele merging (not DenseNet skip connections)</span>
+            <span class="k">if</span> <span class="n">concatenate_count</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">hyperparameters</span><span class="p">[</span><span class="s2">"peptide_allele_merge_method"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"concatenate"</span>
+
+        <span class="k">elif</span> <span class="n">layer_class</span> <span class="o">==</span> <span class="s2">"Multiply"</span><span class="p">:</span>
+            <span class="n">hyperparameters</span><span class="p">[</span><span class="s2">"peptide_allele_merge_method"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"multiply"</span>
+
+    <span class="c1"># Multiple Concatenate layers indicate DenseNet topology with skip connections.</span>
+    <span class="c1"># The first Concatenate is typically for peptide-allele merging;</span>
+    <span class="c1"># subsequent ones are for DenseNet skip connections.</span>
+    <span class="k">if</span> <span class="n">concatenate_count</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">hyperparameters</span><span class="p">[</span><span class="s2">"topology"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"with-skip-connections"</span>
+
+    <span class="c1"># The last Dense layer is the output layer</span>
+    <span class="k">if</span> <span class="n">dense_layers</span><span class="p">:</span>
+        <span class="n">hyperparameters</span><span class="p">[</span><span class="s2">"output_activation"</span><span class="p">]</span> <span class="o">=</span> <span class="n">dense_layers</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="s2">"activation"</span><span class="p">]</span>
+        <span class="n">hyperparameters</span><span class="p">[</span><span class="s2">"num_outputs"</span><span class="p">]</span> <span class="o">=</span> <span class="n">dense_layers</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="s2">"units"</span><span class="p">]</span>
+        <span class="n">hyperparameters</span><span class="p">[</span><span class="s2">"layer_sizes"</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">d</span><span class="p">[</span><span class="s2">"units"</span><span class="p">]</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">dense_layers</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]]</span>
+        <span class="k">if</span> <span class="n">dense_layers</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="n">hyperparameters</span><span class="p">[</span><span class="s2">"activation"</span><span class="p">]</span> <span class="o">=</span> <span class="n">dense_layers</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">"activation"</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">peptide_dense_sizes</span><span class="p">:</span>
+        <span class="n">hyperparameters</span><span class="p">[</span><span class="s2">"peptide_dense_layer_sizes"</span><span class="p">]</span> <span class="o">=</span> <span class="n">peptide_dense_sizes</span>
+    <span class="k">if</span> <span class="n">allele_dense_sizes</span><span class="p">:</span>
+        <span class="n">hyperparameters</span><span class="p">[</span><span class="s2">"allele_dense_layer_sizes"</span><span class="p">]</span> <span class="o">=</span> <span class="n">allele_dense_sizes</span>
+
+    <span class="k">return</span> <span class="n">hyperparameters</span><span class="p">,</span> <span class="n">keras_metadata</span></div>
+
+
+
+<div class="viewcode-block" id="infer_allele_representation_dim_from_weights">
+<a class="viewcode-back" href="../../api.html#mhcflurry.keras_model_config.infer_allele_representation_dim_from_weights">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">infer_allele_representation_dim_from_weights</span><span class="p">(</span>
+    <span class="n">network_weights</span><span class="p">,</span> <span class="n">hyperparameters</span><span class="p">,</span> <span class="n">network_config</span><span class="o">=</span><span class="kc">None</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Infer flattened allele representation width from serialized weights.</span>
+
+<span class="sd">    Strategy:</span>
+<span class="sd">      1. Compute the position of the first allele-stage weight from</span>
+<span class="sd">         the architecture config. In ``named_parameters()`` order the</span>
+<span class="sd">         layout is::</span>
+
+<span class="sd">            locally_connected -&gt; peptide_dense -&gt; batch_norm_early?</span>
+<span class="sd">              -&gt; allele_dense -&gt; allele_embedding -&gt; dense_layers</span>
+<span class="sd">              -&gt; output</span>
+
+<span class="sd">         so ``weights[peptide_offset]`` is the first allele_dense</span>
+<span class="sd">         weight (when allele_dense layers exist) or the</span>
+<span class="sd">         allele_embedding weight (otherwise). Either way its</span>
+<span class="sd">         ``shape[1]`` equals the flattened allele representation</span>
+<span class="sd">         width.</span>
+
+<span class="sd">      2. Cross-check using a structural invariant: when allele_dense</span>
+<span class="sd">         layers exist, both the allele_dense first-layer weight and</span>
+<span class="sd">         the allele_embedding weight have ``shape[1]`` equal to</span>
+<span class="sd">         ``allele_rep_width``. That value appears at two distinct</span>
+<span class="sd">         positions in the weight list. Peptide-stage Linear weights</span>
+<span class="sd">         chain through different shape[1] values, so no peptide</span>
+<span class="sd">         weight will produce a duplicate match.</span>
+
+<span class="sd">      3. Return ``None`` if neither check is conclusive. The caller</span>
+<span class="sd">         falls back to ``default_sequence_length`` (39).</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">network_weights</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"allele_amino_acid_encoding"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">encoding_dim</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span>
+            <span class="n">get_vector_encoding_df</span><span class="p">(</span>
+                <span class="n">hyperparameters</span><span class="p">[</span><span class="s2">"allele_amino_acid_encoding"</span><span class="p">]</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">columns</span>
+        <span class="p">)</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">if</span> <span class="n">network_config</span> <span class="ow">and</span> <span class="n">network_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"merged_networks"</span><span class="p">):</span>
+        <span class="n">architecture</span> <span class="o">=</span> <span class="n">network_config</span><span class="p">[</span><span class="s2">"merged_networks"</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">network_config</span><span class="p">:</span>
+        <span class="n">architecture</span> <span class="o">=</span> <span class="n">network_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"hyperparameters"</span><span class="p">,</span> <span class="n">network_config</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">architecture</span> <span class="o">=</span> <span class="n">hyperparameters</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">valid_dim</span><span class="p">(</span><span class="n">dim</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">dim</span> <span class="o">%</span> <span class="n">encoding_dim</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="n">sequence_length</span> <span class="o">=</span> <span class="n">dim</span> <span class="o">//</span> <span class="n">encoding_dim</span>
+        <span class="k">return</span> <span class="mi">20</span> <span class="o">&lt;=</span> <span class="n">sequence_length</span> <span class="o">&lt;=</span> <span class="mi">60</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">candidate_dim</span><span class="p">(</span><span class="n">weight</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">weight</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">weight</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">dim</span> <span class="o">=</span> <span class="n">weight</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">valid_dim</span><span class="p">(</span><span class="n">dim</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">dim</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">allele_dense_sizes</span> <span class="o">=</span> <span class="n">architecture</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+        <span class="s2">"allele_dense_layer_sizes"</span><span class="p">,</span>
+        <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"allele_dense_layer_sizes"</span><span class="p">,</span> <span class="p">[]),</span>
+    <span class="p">)</span>
+
+    <span class="n">peptide_offset</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">peptide_offset</span> <span class="o">+=</span> <span class="mi">2</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span>
+        <span class="n">architecture</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="s2">"locally_connected_layers"</span><span class="p">,</span>
+            <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"locally_connected_layers"</span><span class="p">,</span> <span class="p">[]),</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">peptide_offset</span> <span class="o">+=</span> <span class="mi">2</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span>
+        <span class="n">architecture</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="s2">"peptide_dense_layer_sizes"</span><span class="p">,</span>
+            <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"peptide_dense_layer_sizes"</span><span class="p">,</span> <span class="p">[]),</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">architecture</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+        <span class="s2">"batch_normalization"</span><span class="p">,</span>
+        <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"batch_normalization"</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+    <span class="p">)</span> <span class="ow">or</span> <span class="p">(</span>
+        <span class="n">architecture</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="s2">"normalization"</span><span class="p">,</span>
+            <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"normalization"</span><span class="p">,</span> <span class="s2">"none"</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="ow">in</span> <span class="p">(</span><span class="s2">"batch"</span><span class="p">,</span> <span class="s2">"layer"</span><span class="p">)</span>
+    <span class="p">):</span>
+        <span class="n">peptide_offset</span> <span class="o">+=</span> <span class="mi">2</span>
+
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">network_weights</span><span class="p">)</span>
+
+    <span class="c1"># Position-based primary lookup.</span>
+    <span class="n">primary_dim</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">candidate_dim</span><span class="p">(</span><span class="n">network_weights</span><span class="p">[</span><span class="n">peptide_offset</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">peptide_offset</span> <span class="o">&lt;</span> <span class="n">n</span>
+        <span class="k">else</span> <span class="kc">None</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Cross-check: when allele_dense layers exist, the same shape[1]</span>
+    <span class="c1"># must appear at the embedding position (peptide_offset +</span>
+    <span class="c1"># 2*n_allele_dense_layers). If they disagree, the offset is</span>
+    <span class="c1"># wrong and we fall back to a duplicate-shape scan.</span>
+    <span class="k">if</span> <span class="n">primary_dim</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">allele_dense_sizes</span><span class="p">:</span>
+        <span class="n">embedding_idx</span> <span class="o">=</span> <span class="n">peptide_offset</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">allele_dense_sizes</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">embedding_idx</span> <span class="o">&lt;</span> <span class="n">n</span><span class="p">:</span>
+            <span class="n">embedding_dim</span> <span class="o">=</span> <span class="n">candidate_dim</span><span class="p">(</span><span class="n">network_weights</span><span class="p">[</span><span class="n">embedding_idx</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">embedding_dim</span> <span class="o">==</span> <span class="n">primary_dim</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">primary_dim</span>
+            <span class="c1"># Disagreement: don't trust either value here, scan below.</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Can't confirm via embedding slot; trust the primary.</span>
+            <span class="k">return</span> <span class="n">primary_dim</span>
+    <span class="k">elif</span> <span class="n">primary_dim</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># No allele_dense — only one matching slot exists.</span>
+        <span class="k">return</span> <span class="n">primary_dim</span>
+
+    <span class="c1"># Fallback: duplicate-shape[1] scan. Only the allele block</span>
+    <span class="c1"># (allele_dense weight + allele_embedding weight) produces two</span>
+    <span class="c1"># 2D weights with the same shape[1] in this architecture.</span>
+    <span class="k">if</span> <span class="n">allele_dense_sizes</span><span class="p">:</span>
+        <span class="n">seen</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+            <span class="n">dim</span> <span class="o">=</span> <span class="n">candidate_dim</span><span class="p">(</span><span class="n">network_weights</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">dim</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">"Allele width inferred via duplicate-shape fallback "</span>
+                    <span class="s2">"(positions </span><span class="si">%d</span><span class="s2"> and </span><span class="si">%d</span><span class="s2"> -&gt; width </span><span class="si">%d</span><span class="s2">). Position-based "</span>
+                    <span class="s2">"lookup failed: the saved layer count may not match "</span>
+                    <span class="s2">"the architecture used to write these weights."</span><span class="p">,</span>
+                    <span class="n">seen</span><span class="p">[</span><span class="n">dim</span><span class="p">],</span>
+                    <span class="n">i</span><span class="p">,</span>
+                    <span class="n">dim</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="n">dim</span>
+            <span class="n">seen</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="n">i</span>
+    <span class="k">return</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="placeholder_allele_representations">
+<a class="viewcode-back" href="../../api.html#mhcflurry.keras_model_config.placeholder_allele_representations">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">placeholder_allele_representations</span><span class="p">(</span>
+    <span class="n">hyperparameters</span><span class="p">,</span>
+    <span class="n">network_weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">network_config</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">default_sequence_length</span><span class="o">=</span><span class="mi">39</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Create a shape-compatible placeholder for pan-allele models.</span>
+
+<span class="sd">    Public artifacts have used several pseudosequence widths over time</span>
+<span class="sd">    (including 2.1.x-era weights). Prefer the width encoded in the saved</span>
+<span class="sd">    weights; fall back to the current 39-residue sequence only when no</span>
+<span class="sd">    weights are available to guide reconstruction.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"allele_amino_acid_encoding"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">encoding_name</span> <span class="o">=</span> <span class="n">hyperparameters</span><span class="p">[</span><span class="s2">"allele_amino_acid_encoding"</span><span class="p">]</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">encoding_df</span> <span class="o">=</span> <span class="n">get_vector_encoding_df</span><span class="p">(</span><span class="n">encoding_name</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">embedding_dim</span> <span class="o">=</span> <span class="n">infer_allele_representation_dim_from_weights</span><span class="p">(</span>
+        <span class="n">network_weights</span><span class="p">,</span>
+        <span class="n">hyperparameters</span><span class="p">,</span>
+        <span class="n">network_config</span><span class="o">=</span><span class="n">network_config</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">embedding_dim</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">embedding_dim</span> <span class="o">=</span> <span class="n">default_sequence_length</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">encoding_df</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="n">embedding_dim</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_assign_keras_dense</span><span class="p">(</span><span class="n">layer</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">b</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">shape</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">or</span> <span class="p">(</span>
+        <span class="n">w</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">shape</span> <span class="ow">and</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="p">):</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">T</span>
+    <span class="k">if</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Weight shape mismatch for </span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s2">: got </span><span class="si">{</span><span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, "</span>
+            <span class="sa">f</span><span class="s2">"expected </span><span class="si">{</span><span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">b</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">layer</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Bias shape mismatch for </span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s2">: got </span><span class="si">{</span><span class="n">b</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, "</span>
+            <span class="sa">f</span><span class="s2">"expected </span><span class="si">{</span><span class="n">layer</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+    <span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">w</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+        <span class="n">device</span><span class="o">=</span><span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">layer</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">b</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+        <span class="n">device</span><span class="o">=</span><span class="n">layer</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">layer</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_assign_keras_locally_connected</span><span class="p">(</span><span class="n">layer</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">b</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">5</span> <span class="ow">and</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">out_len</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">in_ch</span><span class="p">,</span> <span class="n">out_ch</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">out_len</span><span class="p">,</span> <span class="n">k</span> <span class="o">*</span> <span class="n">in_ch</span><span class="p">,</span> <span class="n">out_ch</span><span class="p">)</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span> <span class="ow">and</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">layer</span><span class="o">.</span><span class="n">output_length</span><span class="p">:</span>
+        <span class="c1"># Keras (out_len, k*in_ch, out_ch) -&gt; PyTorch (out_len, out_ch, in_ch*k)</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+            <span class="ow">and</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="p">):</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">kernel_size</span> <span class="o">=</span> <span class="n">layer</span><span class="o">.</span><span class="n">kernel_size</span>
+            <span class="n">out_len</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">k_times_in_ch</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">out_ch</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+            <span class="n">in_ch</span> <span class="o">=</span> <span class="n">k_times_in_ch</span> <span class="o">//</span> <span class="n">kernel_size</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">out_len</span><span class="p">,</span> <span class="n">kernel_size</span><span class="p">,</span> <span class="n">in_ch</span><span class="p">,</span> <span class="n">out_ch</span><span class="p">)</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">out_len</span><span class="p">,</span> <span class="n">in_ch</span> <span class="o">*</span> <span class="n">kernel_size</span><span class="p">,</span> <span class="n">out_ch</span><span class="p">)</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Weight shape mismatch for </span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s2">: got </span><span class="si">{</span><span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, "</span>
+            <span class="sa">f</span><span class="s2">"expected </span><span class="si">{</span><span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">b</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">layer</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Bias shape mismatch for </span><span class="si">{</span><span class="n">layer</span><span class="si">}</span><span class="s2">: got </span><span class="si">{</span><span class="n">b</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, "</span>
+            <span class="sa">f</span><span class="s2">"expected </span><span class="si">{</span><span class="n">layer</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+    <span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">w</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+        <span class="n">device</span><span class="o">=</span><span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">layer</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">b</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+        <span class="n">device</span><span class="o">=</span><span class="n">layer</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">layer</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_assign_keras_batch_norm</span><span class="p">(</span><span class="n">layer</span><span class="p">,</span> <span class="n">gamma</span><span class="p">,</span> <span class="n">beta</span><span class="p">,</span> <span class="n">mean</span><span class="p">,</span> <span class="n">var</span><span class="p">):</span>
+    <span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">gamma</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+        <span class="n">device</span><span class="o">=</span><span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">layer</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">dtype</span>
+    <span class="p">)</span>
+    <span class="n">layer</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">beta</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+        <span class="n">device</span><span class="o">=</span><span class="n">layer</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">layer</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">dtype</span>
+    <span class="p">)</span>
+    <span class="n">layer</span><span class="o">.</span><span class="n">running_mean</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">mean</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+        <span class="n">device</span><span class="o">=</span><span class="n">layer</span><span class="o">.</span><span class="n">running_mean</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">layer</span><span class="o">.</span><span class="n">running_mean</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">layer</span><span class="o">.</span><span class="n">running_var</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">var</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+        <span class="n">device</span><span class="o">=</span><span class="n">layer</span><span class="o">.</span><span class="n">running_var</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">layer</span><span class="o">.</span><span class="n">running_var</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+    <span class="p">)</span>
+
+
+<div class="viewcode-block" id="load_keras_weights_into_model">
+<a class="viewcode-back" href="../../api.html#mhcflurry.keras_model_config.load_keras_weights_into_model">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_keras_weights_into_model</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">weights</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">keras_config</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">keras_metadata</span><span class="o">=</span><span class="kc">None</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Convert and assign Keras-layout weight arrays into ``model``.</span>
+
+<span class="sd">    When ``keras_config`` is provided, weights are assigned in the layer order</span>
+<span class="sd">    recorded in the Keras JSON graph. Otherwise, weights are matched against</span>
+<span class="sd">    ``model.named_parameters()`` with Keras-to-PyTorch shape transposition and</span>
+<span class="sd">    BatchNormalization moving-statistic unpacking.</span>
+<span class="sd">    """</span>
+    <span class="n">skip_keras_embedding</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span>
+        <span class="n">keras_metadata</span> <span class="ow">and</span> <span class="n">keras_metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"skip_embedding_weights"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">keras_config</span><span class="p">:</span>
+        <span class="n">keras_layers</span> <span class="o">=</span> <span class="n">keras_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"config"</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"layers"</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">keras_layers</span><span class="p">:</span>
+            <span class="n">layer_class</span> <span class="o">=</span> <span class="n">layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"class_name"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
+            <span class="n">layer_name</span> <span class="o">=</span> <span class="n">layer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"config"</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">layer_class</span> <span class="o">==</span> <span class="s2">"Dense"</span><span class="p">:</span>
+                <span class="n">w</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+                <span class="n">b</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+                <span class="n">idx</span> <span class="o">+=</span> <span class="mi">2</span>
+                <span class="k">if</span> <span class="n">layer_name</span> <span class="o">==</span> <span class="s2">"output"</span><span class="p">:</span>
+                    <span class="n">_assign_keras_dense</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">output_layer</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">layer_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"dense_"</span><span class="p">):</span>
+                    <span class="n">dense_idx</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">layer_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"_"</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="n">_assign_keras_dense</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">dense_layers</span><span class="p">[</span><span class="n">dense_idx</span><span class="p">],</span> <span class="n">w</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">layer_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"peptide_dense_"</span><span class="p">):</span>
+                    <span class="n">dense_idx</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">layer_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"_"</span><span class="p">)[</span><span class="mi">2</span><span class="p">])</span>
+                    <span class="n">_assign_keras_dense</span><span class="p">(</span>
+                        <span class="n">model</span><span class="o">.</span><span class="n">peptide_dense_layers</span><span class="p">[</span><span class="n">dense_idx</span><span class="p">],</span> <span class="n">w</span><span class="p">,</span> <span class="n">b</span>
+                    <span class="p">)</span>
+                <span class="k">elif</span> <span class="n">layer_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"allele_dense_"</span><span class="p">):</span>
+                    <span class="n">dense_idx</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">layer_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"_"</span><span class="p">)[</span><span class="mi">2</span><span class="p">])</span>
+                    <span class="n">_assign_keras_dense</span><span class="p">(</span>
+                        <span class="n">model</span><span class="o">.</span><span class="n">allele_dense_layers</span><span class="p">[</span><span class="n">dense_idx</span><span class="p">],</span> <span class="n">w</span><span class="p">,</span> <span class="n">b</span>
+                    <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">layer_class</span> <span class="o">==</span> <span class="s2">"LocallyConnected1D"</span><span class="p">:</span>
+                <span class="n">w</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+                <span class="n">b</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+                <span class="n">idx</span> <span class="o">+=</span> <span class="mi">2</span>
+                <span class="n">lc_idx</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">layer_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"_"</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="n">_assign_keras_locally_connected</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">lc_layers</span><span class="p">[</span><span class="n">lc_idx</span><span class="p">],</span> <span class="n">w</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">layer_class</span> <span class="o">==</span> <span class="s2">"Embedding"</span><span class="p">:</span>
+                <span class="n">w</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+                <span class="n">idx</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">if</span> <span class="n">skip_keras_embedding</span> <span class="ow">or</span> <span class="n">model</span><span class="o">.</span><span class="n">allele_embedding</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">model</span><span class="o">.</span><span class="n">allele_embedding</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+                    <span class="n">target</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">allele_embedding</span><span class="o">.</span><span class="n">weight</span>
+                    <span class="n">model</span><span class="o">.</span><span class="n">allele_embedding</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span>
+                        <span class="n">w</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+                    <span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">target</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">target</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">layer_class</span> <span class="o">==</span> <span class="s2">"BatchNormalization"</span><span class="p">:</span>
+                <span class="n">gamma</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+                <span class="n">beta</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+                <span class="n">mean</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="mi">2</span><span class="p">]</span>
+                <span class="n">var</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="mi">3</span><span class="p">]</span>
+                <span class="n">idx</span> <span class="o">+=</span> <span class="mi">4</span>
+                <span class="k">if</span> <span class="n">layer_name</span> <span class="o">==</span> <span class="s2">"batch_norm_early"</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">model</span><span class="o">.</span><span class="n">batch_norm_early</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">_assign_keras_batch_norm</span><span class="p">(</span>
+                            <span class="n">model</span><span class="o">.</span><span class="n">batch_norm_early</span><span class="p">,</span> <span class="n">gamma</span><span class="p">,</span> <span class="n">beta</span><span class="p">,</span> <span class="n">mean</span><span class="p">,</span> <span class="n">var</span>
+                        <span class="p">)</span>
+                <span class="k">elif</span> <span class="n">layer_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"batch_norm_"</span><span class="p">):</span>
+                    <span class="n">bn_idx</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">layer_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"_"</span><span class="p">)[</span><span class="mi">2</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="n">model</span><span class="o">.</span><span class="n">batch_norms</span><span class="p">[</span><span class="n">bn_idx</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">_assign_keras_batch_norm</span><span class="p">(</span>
+                            <span class="n">model</span><span class="o">.</span><span class="n">batch_norms</span><span class="p">[</span><span class="n">bn_idx</span><span class="p">],</span> <span class="n">gamma</span><span class="p">,</span> <span class="n">beta</span><span class="p">,</span> <span class="n">mean</span><span class="p">,</span> <span class="n">var</span>
+                        <span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">idx</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">named_modules</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">named_modules</span><span class="p">())</span>
+
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">named_parameters</span><span class="p">():</span>
+        <span class="c1"># Skip allele_embedding when loading Keras weights with placeholder</span>
+        <span class="k">if</span> <span class="n">skip_keras_embedding</span> <span class="ow">and</span> <span class="s2">"allele_embedding"</span> <span class="ow">in</span> <span class="n">name</span><span class="p">:</span>
+            <span class="c1"># Placeholder embeddings have shape (0, embed_dim)</span>
+            <span class="k">while</span> <span class="p">(</span>
+                <span class="n">idx</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span>
+                <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">weights</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
+                <span class="ow">and</span> <span class="n">weights</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span>
+            <span class="p">):</span>
+                <span class="n">idx</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">continue</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">extra_keras_skip</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">module</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="s2">"."</span> <span class="ow">in</span> <span class="n">name</span><span class="p">:</span>
+            <span class="n">module_name</span> <span class="o">=</span> <span class="n">name</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">"."</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">module</span> <span class="o">=</span> <span class="n">named_modules</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">module_name</span><span class="p">)</span>
+
+        <span class="c1"># Skip allele_embedding if shapes don't match (pan-allele models);</span>
+        <span class="c1"># the embedding will be set by set_allele_representations later.</span>
+        <span class="k">if</span> <span class="s2">"allele_embedding"</span> <span class="ow">in</span> <span class="n">name</span> <span class="ow">and</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">param</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+            <span class="n">idx</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">continue</span>
+
+        <span class="c1"># Dense/Linear layer: Keras (in, out) -&gt; PyTorch (out, in).</span>
+        <span class="c1"># Must transpose even when shapes match (square matrices).</span>
+        <span class="n">is_linear_weight</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">"weight"</span> <span class="ow">in</span> <span class="n">name</span> <span class="ow">and</span> <span class="s2">"embedding"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">name</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">is_linear_weight</span> <span class="ow">and</span> <span class="p">(</span>
+            <span class="n">w</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">param</span><span class="o">.</span><span class="n">shape</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="ow">or</span> <span class="p">(</span><span class="n">w</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">param</span><span class="o">.</span><span class="n">shape</span> <span class="ow">and</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="p">):</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">T</span>
+        <span class="c1"># LocallyConnected1D weight: Keras (out_len, 1, k, in_ch, out_ch)</span>
+        <span class="c1"># -&gt; PyTorch (out_len, out_ch, in_ch * k)</span>
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">5</span> <span class="ow">and</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">out_len</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">in_ch</span><span class="p">,</span> <span class="n">out_ch</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">out_len</span><span class="p">,</span> <span class="n">k</span> <span class="o">*</span> <span class="n">in_ch</span><span class="p">,</span> <span class="n">out_ch</span><span class="p">)</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="c1"># LocallyConnected1D weight (3D): Keras (out_len, k*in_ch, out_ch)</span>
+        <span class="c1"># -&gt; PyTorch (out_len, out_ch, k*in_ch)</span>
+        <span class="k">elif</span> <span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span>
+            <span class="ow">and</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">param</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="ow">and</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">param</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+            <span class="ow">and</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="n">param</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="p">):</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="c1"># LocallyConnected1D bias: Keras (out_len * out_ch,) -&gt; PyTorch (out_len, out_ch)</span>
+        <span class="k">elif</span> <span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span>
+            <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">param</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
+            <span class="ow">and</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">param</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">param</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="p">):</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">param</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+
+        <span class="c1"># BatchNorm: Keras provides gamma, beta, moving_mean, moving_var.</span>
+        <span class="c1"># PyTorch exposes gamma/beta as params and moving stats as buffers.</span>
+        <span class="k">if</span> <span class="n">module</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm1d</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">"bias"</span><span class="p">)</span> <span class="ow">and</span> <span class="n">idx</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">weights</span><span class="p">):</span>
+                <span class="n">running_mean</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+                <span class="n">running_var</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">module</span><span class="o">.</span><span class="n">running_mean</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">running_mean</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+                    <span class="n">module</span><span class="o">.</span><span class="n">running_mean</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span>
+                        <span class="n">running_mean</span>
+                    <span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+                        <span class="n">device</span><span class="o">=</span><span class="n">module</span><span class="o">.</span><span class="n">running_mean</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+                        <span class="n">dtype</span><span class="o">=</span><span class="n">module</span><span class="o">.</span><span class="n">running_mean</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="k">if</span> <span class="n">module</span><span class="o">.</span><span class="n">running_var</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">running_var</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+                    <span class="n">module</span><span class="o">.</span><span class="n">running_var</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">running_var</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+                        <span class="n">device</span><span class="o">=</span><span class="n">module</span><span class="o">.</span><span class="n">running_var</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+                        <span class="n">dtype</span><span class="o">=</span><span class="n">module</span><span class="o">.</span><span class="n">running_var</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="n">extra_keras_skip</span> <span class="o">=</span> <span class="mi">2</span>
+
+        <span class="k">if</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">param</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Weight shape mismatch for </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: "</span>
+                <span class="sa">f</span><span class="s2">"got </span><span class="si">{</span><span class="n">weights</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, expected </span><span class="si">{</span><span class="n">param</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+
+        <span class="n">param</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">w</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+            <span class="n">device</span><span class="o">=</span><span class="n">param</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">param</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">idx</span> <span class="o">+=</span> <span class="mi">1</span> <span class="o">+</span> <span class="n">extra_keras_skip</span></div>
+
+
+
+<div class="viewcode-block" id="create_model_from_config">
+<a class="viewcode-back" href="../../api.html#mhcflurry.keras_model_config.create_model_from_config">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_model_from_config</span><span class="p">(</span>
+    <span class="n">config</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">model_cls</span><span class="p">,</span>
+    <span class="n">merged_model_cls</span><span class="p">,</span>
+    <span class="n">network_cls</span><span class="p">,</span>
+    <span class="n">instance_hyperparameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">network_weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Create a ``Class1NeuralNetworkModel`` (or merged model) from config.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    config : dict</span>
+<span class="sd">        Configuration dictionary (either legacy Keras JSON, native</span>
+<span class="sd">        hyperparameters dict, or merged-network dict).</span>
+<span class="sd">    model_cls : type</span>
+<span class="sd">        ``Class1NeuralNetworkModel`` class.</span>
+<span class="sd">    merged_model_cls : type</span>
+<span class="sd">        ``MergedClass1NeuralNetwork`` class.</span>
+<span class="sd">    network_cls : type</span>
+<span class="sd">        ``Class1NeuralNetwork`` class.</span>
+<span class="sd">    instance_hyperparameters : dict, optional</span>
+<span class="sd">        Hyperparameters from the ``Class1NeuralNetwork`` instance.</span>
+<span class="sd">        These take precedence for things like ``peptide_encoding``.</span>
+<span class="sd">    network_weights : list of numpy.ndarray, optional</span>
+<span class="sd">        Saved weights used to infer the placeholder allele representation.</span>
+<span class="sd">    """</span>
+    <span class="n">keras_metadata</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="c1"># Check if this is a merged network config</span>
+    <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"merged_networks"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">create_merged_model_from_config</span><span class="p">(</span>
+            <span class="n">config</span><span class="p">,</span>
+            <span class="n">model_cls</span><span class="o">=</span><span class="n">model_cls</span><span class="p">,</span>
+            <span class="n">merged_model_cls</span><span class="o">=</span><span class="n">merged_model_cls</span><span class="p">,</span>
+            <span class="n">network_cls</span><span class="o">=</span><span class="n">network_cls</span><span class="p">,</span>
+            <span class="n">instance_hyperparameters</span><span class="o">=</span><span class="n">instance_hyperparameters</span><span class="p">,</span>
+            <span class="n">network_weights</span><span class="o">=</span><span class="n">network_weights</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Check if this is a legacy Keras JSON config</span>
+    <span class="k">if</span> <span class="n">is_keras_model_config</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
+        <span class="n">hyperparameters</span><span class="p">,</span> <span class="n">keras_metadata</span> <span class="o">=</span> <span class="n">parse_keras_json_config</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">hyperparameters</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"hyperparameters"</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+
+    <span class="c1"># Merge with instance hyperparameters if provided; instance</span>
+    <span class="c1"># hyperparameters take precedence for things like peptide_encoding.</span>
+    <span class="k">if</span> <span class="n">instance_hyperparameters</span><span class="p">:</span>
+        <span class="n">merged</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">instance_hyperparameters</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="s2">"layer_sizes"</span><span class="p">,</span>
+            <span class="s2">"locally_connected_layers"</span><span class="p">,</span>
+            <span class="s2">"dropout_probability"</span><span class="p">,</span>
+            <span class="s2">"batch_normalization"</span><span class="p">,</span>
+            <span class="s2">"normalization"</span><span class="p">,</span>
+            <span class="s2">"activation"</span><span class="p">,</span>
+            <span class="s2">"output_activation"</span><span class="p">,</span>
+            <span class="s2">"peptide_allele_merge_method"</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">hyperparameters</span><span class="p">:</span>
+                <span class="n">merged</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">hyperparameters</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+        <span class="n">hyperparameters</span> <span class="o">=</span> <span class="n">merged</span>
+
+    <span class="n">hyperparameters</span> <span class="o">=</span> <span class="n">network_cls</span><span class="o">.</span><span class="n">hyperparameter_defaults</span><span class="o">.</span><span class="n">with_defaults</span><span class="p">(</span>
+        <span class="n">network_cls</span><span class="o">.</span><span class="n">apply_hyperparameter_renames</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">))</span>
+    <span class="p">)</span>
+
+    <span class="n">temp</span> <span class="o">=</span> <span class="n">network_cls</span><span class="p">(</span><span class="o">**</span><span class="n">hyperparameters</span><span class="p">)</span>
+    <span class="n">peptide_encoding_shape</span> <span class="o">=</span> <span class="n">temp</span><span class="o">.</span><span class="n">peptides_to_network_input</span><span class="p">([])</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+    <span class="n">peptide_torch_encoding_name</span> <span class="o">=</span> <span class="n">_peptide_torch_encoding_name</span><span class="p">(</span><span class="n">hyperparameters</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">peptide_torch_encoding_name</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptide_encoding_shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">peptide_encoding_shape</span> <span class="o">=</span> <span class="n">_peptide_torch_encoding_shape</span><span class="p">(</span>
+            <span class="n">peptide_encoding_shape</span><span class="p">,</span>
+            <span class="n">peptide_torch_encoding_name</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">allele_representations</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"allele_representations"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">allele_representations</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">allele_representations</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">allele_representations</span><span class="p">)</span>
+
+    <span class="c1"># For pan-allele Keras models with placeholder embedding (input_dim=0),</span>
+    <span class="c1"># create a placeholder allele representation to ensure correct architecture.</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">allele_representations</span> <span class="ow">is</span> <span class="kc">None</span>
+        <span class="ow">and</span> <span class="n">keras_metadata</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="ow">and</span> <span class="n">keras_metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"has_embedding"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="ow">and</span> <span class="n">keras_metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"embedding_output_dim"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+    <span class="p">):</span>
+        <span class="n">embedding_dim</span> <span class="o">=</span> <span class="n">keras_metadata</span><span class="p">[</span><span class="s2">"embedding_output_dim"</span><span class="p">]</span>
+        <span class="n">allele_representations</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+            <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">embedding_dim</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float32</span>
+        <span class="p">)</span>
+
+    <span class="c1"># For PyTorch-format configs without allele_representations but with</span>
+    <span class="c1"># allele_amino_acid_encoding (pan-allele models), create placeholder.</span>
+    <span class="n">has_allele</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"has_allele"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">allele_representations</span> <span class="ow">is</span> <span class="kc">None</span>
+        <span class="ow">and</span> <span class="n">keras_metadata</span> <span class="ow">is</span> <span class="kc">None</span>
+        <span class="ow">and</span> <span class="n">has_allele</span>
+        <span class="ow">and</span> <span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"allele_amino_acid_encoding"</span><span class="p">)</span>
+    <span class="p">):</span>
+        <span class="n">allele_representations</span> <span class="o">=</span> <span class="n">placeholder_allele_representations</span><span class="p">(</span>
+            <span class="n">hyperparameters</span><span class="p">,</span>
+            <span class="n">network_weights</span><span class="o">=</span><span class="n">network_weights</span><span class="p">,</span>
+            <span class="n">network_config</span><span class="o">=</span><span class="n">config</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">model</span> <span class="o">=</span> <span class="n">model_cls</span><span class="p">(</span>
+        <span class="n">peptide_encoding_shape</span><span class="o">=</span><span class="n">peptide_encoding_shape</span><span class="p">,</span>
+        <span class="n">allele_representations</span><span class="o">=</span><span class="n">allele_representations</span><span class="p">,</span>
+        <span class="n">locally_connected_layers</span><span class="o">=</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="s2">"locally_connected_layers"</span><span class="p">,</span> <span class="p">[]</span>
+        <span class="p">),</span>
+        <span class="n">peptide_dense_layer_sizes</span><span class="o">=</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="s2">"peptide_dense_layer_sizes"</span><span class="p">,</span> <span class="p">[]</span>
+        <span class="p">),</span>
+        <span class="n">allele_dense_layer_sizes</span><span class="o">=</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="s2">"allele_dense_layer_sizes"</span><span class="p">,</span> <span class="p">[]</span>
+        <span class="p">),</span>
+        <span class="n">layer_sizes</span><span class="o">=</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"layer_sizes"</span><span class="p">,</span> <span class="p">[</span><span class="mi">32</span><span class="p">]),</span>
+        <span class="n">peptide_allele_merge_method</span><span class="o">=</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="s2">"peptide_allele_merge_method"</span><span class="p">,</span> <span class="s2">"multiply"</span>
+        <span class="p">),</span>
+        <span class="n">peptide_allele_merge_activation</span><span class="o">=</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="s2">"peptide_allele_merge_activation"</span><span class="p">,</span> <span class="s2">""</span>
+        <span class="p">),</span>
+        <span class="n">activation</span><span class="o">=</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"activation"</span><span class="p">,</span> <span class="s2">"tanh"</span><span class="p">),</span>
+        <span class="n">output_activation</span><span class="o">=</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"output_activation"</span><span class="p">,</span> <span class="s2">"sigmoid"</span><span class="p">),</span>
+        <span class="n">dropout_probability</span><span class="o">=</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"dropout_probability"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+        <span class="n">batch_normalization</span><span class="o">=</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"batch_normalization"</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+        <span class="n">normalization</span><span class="o">=</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"normalization"</span><span class="p">,</span> <span class="s2">"none"</span><span class="p">),</span>
+        <span class="n">dense_layer_l1_regularization</span><span class="o">=</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="s2">"dense_layer_l1_regularization"</span><span class="p">,</span> <span class="mf">0.001</span>
+        <span class="p">),</span>
+        <span class="n">dense_layer_l2_regularization</span><span class="o">=</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="s2">"dense_layer_l2_regularization"</span><span class="p">,</span> <span class="mf">0.0</span>
+        <span class="p">),</span>
+        <span class="n">topology</span><span class="o">=</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"topology"</span><span class="p">,</span> <span class="s2">"feedforward"</span><span class="p">),</span>
+        <span class="n">num_outputs</span><span class="o">=</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"num_outputs"</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+        <span class="n">init</span><span class="o">=</span><span class="n">hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"init"</span><span class="p">,</span> <span class="s2">"glorot_uniform"</span><span class="p">),</span>
+        <span class="n">peptide_input_vector_encoding_name</span><span class="o">=</span><span class="n">peptide_torch_encoding_name</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">keras_metadata</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">model</span><span class="o">.</span><span class="n">_keras_metadata</span> <span class="o">=</span> <span class="n">keras_metadata</span>
+        <span class="n">model</span><span class="o">.</span><span class="n">_keras_config</span> <span class="o">=</span> <span class="n">config</span>
+
+    <span class="k">return</span> <span class="n">model</span></div>
+
+
+
+<div class="viewcode-block" id="create_merged_model_from_config">
+<a class="viewcode-back" href="../../api.html#mhcflurry.keras_model_config.create_merged_model_from_config">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_merged_model_from_config</span><span class="p">(</span>
+    <span class="n">config</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">model_cls</span><span class="p">,</span>
+    <span class="n">merged_model_cls</span><span class="p">,</span>
+    <span class="n">network_cls</span><span class="p">,</span>
+    <span class="n">instance_hyperparameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">network_weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Create a ``MergedClass1NeuralNetwork`` from a merged configuration dict.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    config : dict</span>
+<span class="sd">        Configuration dictionary with ``'merged_networks'`` key.</span>
+<span class="sd">    model_cls : type</span>
+<span class="sd">        ``Class1NeuralNetworkModel`` class.</span>
+<span class="sd">    merged_model_cls : type</span>
+<span class="sd">        ``MergedClass1NeuralNetwork`` class.</span>
+<span class="sd">    network_cls : type</span>
+<span class="sd">        ``Class1NeuralNetwork`` class.</span>
+<span class="sd">    instance_hyperparameters : dict, optional</span>
+<span class="sd">        Hyperparameters from the ``Class1NeuralNetwork`` instance.</span>
+<span class="sd">    network_weights : list of numpy.ndarray, optional</span>
+<span class="sd">        Saved weights used to infer the placeholder allele representation.</span>
+<span class="sd">    """</span>
+    <span class="n">merged_configs</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s2">"merged_networks"</span><span class="p">]</span>
+    <span class="n">merge_method</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"merge_method"</span><span class="p">,</span> <span class="s2">"average"</span><span class="p">)</span>
+
+    <span class="n">base_hyperparameters</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"hyperparameters"</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="k">if</span> <span class="n">instance_hyperparameters</span><span class="p">:</span>
+        <span class="n">base_hyperparameters</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">instance_hyperparameters</span><span class="p">)</span>
+        <span class="n">base_hyperparameters</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"hyperparameters"</span><span class="p">,</span> <span class="p">{}))</span>
+    <span class="n">base_hyperparameters</span> <span class="o">=</span> <span class="n">network_cls</span><span class="o">.</span><span class="n">hyperparameter_defaults</span><span class="o">.</span><span class="n">with_defaults</span><span class="p">(</span>
+        <span class="n">network_cls</span><span class="o">.</span><span class="n">apply_hyperparameter_renames</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">base_hyperparameters</span><span class="p">))</span>
+    <span class="p">)</span>
+    <span class="n">temp</span> <span class="o">=</span> <span class="n">network_cls</span><span class="p">(</span><span class="o">**</span><span class="n">base_hyperparameters</span><span class="p">)</span>
+    <span class="n">peptide_encoding_shape</span> <span class="o">=</span> <span class="n">temp</span><span class="o">.</span><span class="n">peptides_to_network_input</span><span class="p">([])</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+    <span class="n">peptide_torch_encoding_name</span> <span class="o">=</span> <span class="n">_peptide_torch_encoding_name</span><span class="p">(</span>
+        <span class="n">base_hyperparameters</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">peptide_torch_encoding_name</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">peptide_encoding_shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">peptide_encoding_shape</span> <span class="o">=</span> <span class="n">_peptide_torch_encoding_shape</span><span class="p">(</span>
+            <span class="n">peptide_encoding_shape</span><span class="p">,</span>
+            <span class="n">peptide_torch_encoding_name</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">allele_representations</span> <span class="o">=</span> <span class="n">placeholder_allele_representations</span><span class="p">(</span>
+        <span class="n">base_hyperparameters</span><span class="p">,</span>
+        <span class="n">network_weights</span><span class="o">=</span><span class="n">network_weights</span><span class="p">,</span>
+        <span class="n">network_config</span><span class="o">=</span><span class="n">config</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">sub_networks</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">sub_config</span> <span class="ow">in</span> <span class="n">merged_configs</span><span class="p">:</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">model_cls</span><span class="p">(</span>
+            <span class="n">peptide_encoding_shape</span><span class="o">=</span><span class="n">peptide_encoding_shape</span><span class="p">,</span>
+            <span class="n">allele_representations</span><span class="o">=</span><span class="n">allele_representations</span><span class="p">,</span>
+            <span class="n">locally_connected_layers</span><span class="o">=</span><span class="n">sub_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                <span class="s2">"locally_connected_layers"</span><span class="p">,</span> <span class="p">[]</span>
+            <span class="p">),</span>
+            <span class="n">peptide_dense_layer_sizes</span><span class="o">=</span><span class="n">sub_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                <span class="s2">"peptide_dense_layer_sizes"</span><span class="p">,</span> <span class="p">[]</span>
+            <span class="p">),</span>
+            <span class="n">allele_dense_layer_sizes</span><span class="o">=</span><span class="n">sub_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                <span class="s2">"allele_dense_layer_sizes"</span><span class="p">,</span> <span class="p">[]</span>
+            <span class="p">),</span>
+            <span class="n">layer_sizes</span><span class="o">=</span><span class="n">sub_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"layer_sizes"</span><span class="p">,</span> <span class="p">[</span><span class="mi">32</span><span class="p">]),</span>
+            <span class="n">peptide_allele_merge_method</span><span class="o">=</span><span class="n">sub_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                <span class="s2">"peptide_allele_merge_method"</span><span class="p">,</span> <span class="s2">"multiply"</span>
+            <span class="p">),</span>
+            <span class="n">peptide_allele_merge_activation</span><span class="o">=</span><span class="n">sub_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                <span class="s2">"peptide_allele_merge_activation"</span><span class="p">,</span> <span class="s2">""</span>
+            <span class="p">),</span>
+            <span class="n">activation</span><span class="o">=</span><span class="n">sub_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"activation"</span><span class="p">,</span> <span class="s2">"tanh"</span><span class="p">),</span>
+            <span class="n">output_activation</span><span class="o">=</span><span class="n">sub_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"output_activation"</span><span class="p">,</span> <span class="s2">"sigmoid"</span><span class="p">),</span>
+            <span class="n">dropout_probability</span><span class="o">=</span><span class="n">sub_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"dropout_probability"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+            <span class="n">batch_normalization</span><span class="o">=</span><span class="n">sub_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"batch_normalization"</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+            <span class="n">normalization</span><span class="o">=</span><span class="n">sub_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"normalization"</span><span class="p">,</span> <span class="s2">"none"</span><span class="p">),</span>
+            <span class="n">dense_layer_l1_regularization</span><span class="o">=</span><span class="n">base_hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                <span class="s2">"dense_layer_l1_regularization"</span><span class="p">,</span> <span class="mf">0.001</span>
+            <span class="p">),</span>
+            <span class="n">dense_layer_l2_regularization</span><span class="o">=</span><span class="n">base_hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                <span class="s2">"dense_layer_l2_regularization"</span><span class="p">,</span> <span class="mf">0.0</span>
+            <span class="p">),</span>
+            <span class="n">topology</span><span class="o">=</span><span class="n">sub_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"topology"</span><span class="p">,</span> <span class="s2">"feedforward"</span><span class="p">),</span>
+            <span class="n">num_outputs</span><span class="o">=</span><span class="n">sub_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"num_outputs"</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">init</span><span class="o">=</span><span class="n">base_hyperparameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"init"</span><span class="p">,</span> <span class="s2">"glorot_uniform"</span><span class="p">),</span>
+            <span class="n">peptide_input_vector_encoding_name</span><span class="o">=</span><span class="n">peptide_torch_encoding_name</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">sub_networks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">merged_model_cls</span><span class="p">(</span><span class="n">sub_networks</span><span class="p">,</span> <span class="n">merge_method</span><span class="o">=</span><span class="n">merge_method</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Nov 26, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

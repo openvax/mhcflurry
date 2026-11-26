@@ -1,0 +1,527 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>mhcflurry.local_parallelism &mdash; MHCflurry 1.6.0 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> MHCflurry
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.6.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../intro.html">Introduction and setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../python_tutorial.html">Python library tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">MHCflurry</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>mhcflurry.local_parallelism</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for mhcflurry.local_parallelism</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Infrastructure for &quot;local&quot; parallelism, i.e. multiprocess parallelism on one</span>
+<span class="sd">compute node.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">traceback</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">multiprocessing</span> <span class="k">import</span> <span class="n">Pool</span><span class="p">,</span> <span class="n">Queue</span><span class="p">,</span> <span class="n">cpu_count</span>
+<span class="kn">from</span> <span class="nn">six.moves</span> <span class="k">import</span> <span class="n">queue</span>
+<span class="kn">from</span> <span class="nn">multiprocessing.util</span> <span class="k">import</span> <span class="n">Finalize</span>
+<span class="kn">from</span> <span class="nn">pprint</span> <span class="k">import</span> <span class="n">pprint</span>
+<span class="kn">import</span> <span class="nn">random</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span>
+
+<span class="kn">from</span> <span class="nn">.common</span> <span class="k">import</span> <span class="n">set_keras_backend</span>
+
+
+<div class="viewcode-block" id="add_local_parallelism_args"><a class="viewcode-back" href="../../api.html#mhcflurry.local_parallelism.add_local_parallelism_args">[docs]</a><span class="k">def</span> <span class="nf">add_local_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Add local parallelism arguments to the given argparse.ArgumentParser.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    parser : argparse.ArgumentParser</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">group</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_argument_group</span><span class="p">(</span><span class="s2">&quot;Local parallelism&quot;</span><span class="p">)</span>
+
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--num-jobs&quot;</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;N&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Number of local processes to parallelize training over. &quot;</span>
+             <span class="s2">&quot;Set to 0 for serial run. Default: </span><span class="si">%(default)s</span><span class="s2">.&quot;</span><span class="p">)</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--backend&quot;</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;tensorflow-gpu&quot;</span><span class="p">,</span> <span class="s2">&quot;tensorflow-cpu&quot;</span><span class="p">,</span> <span class="s2">&quot;tensorflow-default&quot;</span><span class="p">),</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Keras backend. If not specified will use system default.&quot;</span><span class="p">)</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--gpus&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;N&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Number of GPUs to attempt to parallelize across. Requires running &quot;</span>
+             <span class="s2">&quot;in parallel.&quot;</span><span class="p">)</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--max-workers-per-gpu&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;N&quot;</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Maximum number of workers to assign to a GPU. Additional tasks will &quot;</span>
+             <span class="s2">&quot;run on CPU.&quot;</span><span class="p">)</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--max-tasks-per-worker&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;N&quot;</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Restart workers after N tasks. Workaround for tensorflow memory &quot;</span>
+             <span class="s2">&quot;leaks. Requires Python &gt;=3.2.&quot;</span><span class="p">)</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--worker-log-dir&quot;</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Write worker stdout and stderr logs to given directory.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="worker_pool_with_gpu_assignments_from_args"><a class="viewcode-back" href="../../api.html#mhcflurry.local_parallelism.worker_pool_with_gpu_assignments_from_args">[docs]</a><span class="k">def</span> <span class="nf">worker_pool_with_gpu_assignments_from_args</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create a multiprocessing.Pool where each worker uses its own GPU.</span>
+
+<span class="sd">    Uses commandline arguments. See `worker_pool_with_gpu_assignments`.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    args : argparse.ArgumentParser</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    multiprocessing.Pool</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">return</span> <span class="n">worker_pool_with_gpu_assignments</span><span class="p">(</span>
+        <span class="n">num_jobs</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">num_jobs</span><span class="p">,</span>
+        <span class="n">num_gpus</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">gpus</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">backend</span><span class="p">,</span>
+        <span class="n">max_workers_per_gpu</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">max_workers_per_gpu</span><span class="p">,</span>
+        <span class="n">max_tasks_per_worker</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">max_tasks_per_worker</span><span class="p">,</span>
+        <span class="n">worker_log_dir</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">worker_log_dir</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="worker_pool_with_gpu_assignments"><a class="viewcode-back" href="../../api.html#mhcflurry.local_parallelism.worker_pool_with_gpu_assignments">[docs]</a><span class="k">def</span> <span class="nf">worker_pool_with_gpu_assignments</span><span class="p">(</span>
+        <span class="n">num_jobs</span><span class="p">,</span>
+        <span class="n">num_gpus</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">max_workers_per_gpu</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">max_tasks_per_worker</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">worker_log_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create a multiprocessing.Pool where each worker uses its own GPU.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    num_jobs : int</span>
+<span class="sd">        Number of worker processes.</span>
+<span class="sd">    num_gpus : int</span>
+<span class="sd">    backend : string</span>
+<span class="sd">    max_workers_per_gpu : int</span>
+<span class="sd">    max_tasks_per_worker : int</span>
+<span class="sd">    worker_log_dir : string</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    multiprocessing.Pool</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">num_jobs</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">backend</span><span class="p">:</span>
+            <span class="n">set_keras_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">worker_init_kwargs</span> <span class="o">=</span> <span class="p">[{}</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_jobs</span><span class="p">)]</span>
+    <span class="k">if</span> <span class="n">num_gpus</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Attempting to round-robin assign each worker a GPU.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">backend</span> <span class="o">!=</span> <span class="s2">&quot;tensorflow-default&quot;</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Forcing keras backend to be tensorflow-default&quot;</span><span class="p">)</span>
+            <span class="n">backend</span> <span class="o">=</span> <span class="s2">&quot;tensorflow-default&quot;</span>
+
+        <span class="n">gpu_assignments_remaining</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">((</span>
+            <span class="p">(</span><span class="n">gpu</span><span class="p">,</span> <span class="n">max_workers_per_gpu</span><span class="p">)</span> <span class="k">for</span> <span class="n">gpu</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_gpus</span><span class="p">)</span>
+        <span class="p">))</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">worker_num</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">worker_init_kwargs</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">gpu_assignments_remaining</span><span class="p">:</span>
+                <span class="c1"># Use a GPU</span>
+                <span class="n">gpu_num</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span>
+                    <span class="n">gpu_assignments_remaining</span><span class="p">,</span>
+                    <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">key</span><span class="p">:</span> <span class="n">gpu_assignments_remaining</span><span class="p">[</span><span class="n">key</span><span class="p">])[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">gpu_assignments_remaining</span><span class="p">[</span><span class="n">gpu_num</span><span class="p">]</span> <span class="o">-=</span> <span class="mi">1</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">gpu_assignments_remaining</span><span class="p">[</span><span class="n">gpu_num</span><span class="p">]:</span>
+                    <span class="k">del</span> <span class="n">gpu_assignments_remaining</span><span class="p">[</span><span class="n">gpu_num</span><span class="p">]</span>
+                <span class="n">gpu_assignment</span> <span class="o">=</span> <span class="p">[</span><span class="n">gpu_num</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Use CPU</span>
+                <span class="n">gpu_assignment</span> <span class="o">=</span> <span class="p">[]</span>
+
+            <span class="n">kwargs</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="s1">&#39;gpu_device_nums&#39;</span><span class="p">:</span> <span class="n">gpu_assignment</span><span class="p">,</span>
+                <span class="s1">&#39;keras_backend&#39;</span><span class="p">:</span> <span class="n">backend</span>
+            <span class="p">})</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Worker </span><span class="si">%d</span><span class="s2"> assigned GPUs: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">worker_num</span><span class="p">,</span> <span class="n">gpu_assignment</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="n">worker_log_dir</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">kwargs</span> <span class="ow">in</span> <span class="n">worker_init_kwargs</span><span class="p">:</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;worker_log_dir&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">worker_log_dir</span>
+
+    <span class="n">worker_pool</span> <span class="o">=</span> <span class="n">make_worker_pool</span><span class="p">(</span>
+        <span class="n">processes</span><span class="o">=</span><span class="n">num_jobs</span><span class="p">,</span>
+        <span class="n">initializer</span><span class="o">=</span><span class="n">worker_init</span><span class="p">,</span>
+        <span class="n">initializer_kwargs_per_process</span><span class="o">=</span><span class="n">worker_init_kwargs</span><span class="p">,</span>
+        <span class="n">max_tasks_per_worker</span><span class="o">=</span><span class="n">max_tasks_per_worker</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">worker_pool</span></div>
+
+
+<div class="viewcode-block" id="make_worker_pool"><a class="viewcode-back" href="../../api.html#mhcflurry.local_parallelism.make_worker_pool">[docs]</a><span class="k">def</span> <span class="nf">make_worker_pool</span><span class="p">(</span>
+        <span class="n">processes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">initializer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">initializer_kwargs_per_process</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">max_tasks_per_worker</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convenience wrapper to create a multiprocessing.Pool.</span>
+
+<span class="sd">    This function adds support for per-worker initializer arguments, which are</span>
+<span class="sd">    not natively supported by the multiprocessing module. The motivation for</span>
+<span class="sd">    this feature is to support allocating each worker to a (different) GPU.</span>
+
+<span class="sd">    IMPLEMENTATION NOTE:</span>
+<span class="sd">        The per-worker initializer arguments are implemented using a Queue. Each</span>
+<span class="sd">        worker reads its arguments from this queue when it starts. When it</span>
+<span class="sd">        terminates, it adds its initializer arguments back to the queue, so a</span>
+<span class="sd">        future process can initialize itself using these arguments.</span>
+
+<span class="sd">        There is one issue with this approach, however. If a worker crashes, it</span>
+<span class="sd">        never repopulates the queue of initializer arguments. This will prevent</span>
+<span class="sd">        any future worker from re-using those arguments. To deal with this</span>
+<span class="sd">        issue we add a second &#39;backup queue&#39;. This queue always contains the</span>
+<span class="sd">        full set of initializer arguments: whenever a worker reads from it, it</span>
+<span class="sd">        always pushes the pop&#39;d args back to the end of the queue immediately.</span>
+<span class="sd">        If the primary arg queue is ever empty, then workers will read</span>
+<span class="sd">        from this backup queue.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    processes : int</span>
+<span class="sd">        Number of workers. Default: num CPUs.</span>
+
+<span class="sd">    initializer : function, optional</span>
+<span class="sd">        Init function to call in each worker</span>
+
+<span class="sd">    initializer_kwargs_per_process : list of dict, optional</span>
+<span class="sd">        Arguments to pass to initializer function for each worker. Length of</span>
+<span class="sd">        list must equal the number of workers.</span>
+
+<span class="sd">    max_tasks_per_worker : int, optional</span>
+<span class="sd">        Restart workers after this many tasks. Requires Python &gt;=3.2.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    multiprocessing.Pool</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">processes</span><span class="p">:</span>
+        <span class="n">processes</span> <span class="o">=</span> <span class="n">cpu_count</span><span class="p">()</span>
+
+    <span class="n">pool_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;processes&#39;</span><span class="p">:</span> <span class="n">processes</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="n">max_tasks_per_worker</span><span class="p">:</span>
+        <span class="n">pool_kwargs</span><span class="p">[</span><span class="s2">&quot;maxtasksperchild&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">max_tasks_per_worker</span>
+
+    <span class="k">if</span> <span class="n">initializer</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">initializer_kwargs_per_process</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">initializer_kwargs_per_process</span><span class="p">)</span> <span class="o">==</span> <span class="n">processes</span>
+            <span class="n">kwargs_queue</span> <span class="o">=</span> <span class="n">Queue</span><span class="p">()</span>
+            <span class="n">kwargs_queue_backup</span> <span class="o">=</span> <span class="n">Queue</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">kwargs</span> <span class="ow">in</span> <span class="n">initializer_kwargs_per_process</span><span class="p">:</span>
+                <span class="n">kwargs_queue</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">kwargs</span><span class="p">)</span>
+                <span class="n">kwargs_queue_backup</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="n">pool_kwargs</span><span class="p">[</span><span class="s2">&quot;initializer&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">worker_init_entry_point</span>
+            <span class="n">pool_kwargs</span><span class="p">[</span><span class="s2">&quot;initargs&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">initializer</span><span class="p">,</span> <span class="n">kwargs_queue</span><span class="p">,</span> <span class="n">kwargs_queue_backup</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">pool_kwargs</span><span class="p">[</span><span class="s2">&quot;initializer&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">initializer</span>
+
+    <span class="n">worker_pool</span> <span class="o">=</span> <span class="n">Pool</span><span class="p">(</span><span class="o">**</span><span class="n">pool_kwargs</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Started pool: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">str</span><span class="p">(</span><span class="n">worker_pool</span><span class="p">))</span>
+    <span class="n">pprint</span><span class="p">(</span><span class="n">pool_kwargs</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">worker_pool</span></div>
+
+
+<div class="viewcode-block" id="worker_init_entry_point"><a class="viewcode-back" href="../../api.html#mhcflurry.local_parallelism.worker_init_entry_point">[docs]</a><span class="k">def</span> <span class="nf">worker_init_entry_point</span><span class="p">(</span>
+        <span class="n">init_function</span><span class="p">,</span> <span class="n">arg_queue</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">backup_arg_queue</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="n">arg_queue</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">kwargs</span> <span class="o">=</span> <span class="n">arg_queue</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">block</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">queue</span><span class="o">.</span><span class="n">Empty</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Argument queue empty. Using round robin arg queue.&quot;</span><span class="p">)</span>
+            <span class="n">kwargs</span> <span class="o">=</span> <span class="n">backup_arg_queue</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">block</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">backup_arg_queue</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="c1"># On exit we add the init args back to the queue so restarted workers</span>
+        <span class="c1"># (e.g. when when running with maxtasksperchild) will pickup init</span>
+        <span class="c1"># arguments from a previously exited worker.</span>
+        <span class="n">Finalize</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">arg_queue</span><span class="o">.</span><span class="n">put</span><span class="p">,</span> <span class="p">(</span><span class="n">kwargs</span><span class="p">,),</span> <span class="n">exitpriority</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Initializing worker: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">str</span><span class="p">(</span><span class="n">kwargs</span><span class="p">))</span>
+    <span class="n">init_function</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="worker_init"><a class="viewcode-back" href="../../api.html#mhcflurry.local_parallelism.worker_init">[docs]</a><span class="k">def</span> <span class="nf">worker_init</span><span class="p">(</span><span class="n">keras_backend</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">gpu_device_nums</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">worker_log_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">worker_log_dir</span><span class="p">:</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="n">worker_log_dir</span><span class="p">,</span>
+            <span class="s2">&quot;LOG-worker.</span><span class="si">%d</span><span class="s2">.</span><span class="si">%d</span><span class="s2">.txt&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">(),</span> <span class="nb">int</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()))),</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Each worker needs distinct random numbers</span>
+    <span class="n">numpy</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">()</span>
+    <span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">keras_backend</span> <span class="ow">or</span> <span class="n">gpu_device_nums</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;WORKER pid=</span><span class="si">%d</span><span class="s2"> assigned GPU devices: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">(),</span> <span class="n">gpu_device_nums</span><span class="p">))</span>
+        <span class="n">set_keras_backend</span><span class="p">(</span>
+            <span class="n">keras_backend</span><span class="p">,</span> <span class="n">gpu_device_nums</span><span class="o">=</span><span class="n">gpu_device_nums</span><span class="p">)</span></div>
+
+
+<span class="c1"># Solution suggested in https://bugs.python.org/issue13831</span>
+<div class="viewcode-block" id="WrapException"><a class="viewcode-back" href="../../api.html#mhcflurry.local_parallelism.WrapException">[docs]</a><span class="k">class</span> <span class="nc">WrapException</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Add traceback info to exception so exceptions raised in worker processes</span>
+<span class="sd">    can still show traceback info when re-raised in the parent.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">exc_tb</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">exception</span> <span class="o">=</span> <span class="n">exc_value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">formatted</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">traceback</span><span class="o">.</span><span class="n">format_exception</span><span class="p">(</span><span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">))</span>
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="se">\n</span><span class="s1">Original traceback:</span><span class="se">\n</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="ne">Exception</span><span class="o">.</span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">formatted</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="call_wrapped"><a class="viewcode-back" href="../../api.html#mhcflurry.local_parallelism.call_wrapped">[docs]</a><span class="k">def</span> <span class="nf">call_wrapped</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Run function on args and kwargs and return result, wrapping any exception</span>
+<span class="sd">    raised in a WrapException.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    function : arbitrary function</span>
+
+<span class="sd">    Any other arguments provided are passed to the function.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    object</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">function</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">except</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">WrapException</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="call_wrapped_kwargs"><a class="viewcode-back" href="../../api.html#mhcflurry.local_parallelism.call_wrapped_kwargs">[docs]</a><span class="k">def</span> <span class="nf">call_wrapped_kwargs</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Invoke function on given kwargs and return result, wrapping any exception</span>
+<span class="sd">    raised in a WrapException.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    function : arbitrary function</span>
+<span class="sd">    kwargs : dict</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    object</span>
+
+<span class="sd">    result of calling function(**kwargs)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">call_wrapped</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright Timothy O&#39;Donnell
+      <span class="lastupdated">
+        Last updated on Mar 23, 2020.
+      </span>
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

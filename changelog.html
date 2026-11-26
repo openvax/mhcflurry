@@ -1,0 +1,289 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Release notes and changelog &mdash; MHCflurry 2.5.11 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=b06e8534"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Percentile calibration for all predictors" href="shared_percent_rank_transforms.html" />
+    <link rel="prev" title="Configuration and performance" href="configuration.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docker.html">Running MHCflurry in Docker</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dla_validation.html">DLA evidence and canine evaluation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cross_species_validation.html">Cross-species alleles, pseudosequences, and zero-shot validation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="experiments.html">Experiment log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Release notes and changelog</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#series-current">2.5 series (current)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#series">2.4 series</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id1">2.3 series</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#earlier-releases">Earlier releases</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Release notes and changelog</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/changelog.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="release-notes-and-changelog">
+<h1>Release notes and changelog<a class="headerlink" href="#release-notes-and-changelog" title="Link to this heading"></a></h1>
+<p>MHCflurry separates <strong>code versions</strong> (published on PyPI) from <strong>weight
+catalogue releases</strong> (such as <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> and <code class="docutils literal notranslate"><span class="pre">2.2.0</span></code>; see <a class="reference internal" href="model_downloads.html"><span class="doc">Downloading and selecting model weights</span></a>).
+Full per-version notes live in the repository’s
+<a class="reference external" href="https://github.com/openvax/mhcflurry/tree/master/release-notes"><code class="docutils literal notranslate"><span class="pre">release-notes/</span></code> directory</a>
+and on <a class="reference external" href="https://github.com/openvax/mhcflurry/releases">GitHub Releases</a>.</p>
+<section id="series-current">
+<h2>2.5 series (current)<a class="headerlink" href="#series-current" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong><a class="reference external" href="https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.11.md">2.5.11</a></strong>:
+Codebase cleanup and modularization (<code class="docutils literal notranslate"><span class="pre">#506</span></code>, <code class="docutils literal notranslate"><span class="pre">#419</span></code>, partial <code class="docutils literal notranslate"><span class="pre">#513</span></code>): splits
+legacy Keras config/weight loading out of <code class="docutils literal notranslate"><span class="pre">class1_neural_network.py</span></code> into
+<code class="docutils literal notranslate"><span class="pre">mhcflurry/keras_model_config.py</span></code>, breaks <code class="docutils literal notranslate"><span class="pre">fit()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">fit_streaming_batches()</span></code> into standalone-tested phase helpers in
+<code class="docutils literal notranslate"><span class="pre">mhcflurry/class1_training.py</span></code>, removes the deprecated dense-vector encoding
+remnants (<code class="docutils literal notranslate"><span class="pre">FlankingEncoding.vector_encode</span></code>/<code class="docutils literal notranslate"><span class="pre">encode</span></code>,
+<code class="docutils literal notranslate"><span class="pre">EncodableSequences.variable_length_to_fixed_length_vector_encoding</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">Class1NeuralNetworkModel(peptide_input_is_indices=False)</span></code>), and drops the
+undeclared optional <code class="docutils literal notranslate"><span class="pre">pyarrow</span></code> CSV engine fallback in pan-allele training.
+Verified bit-identical (<code class="docutils literal notranslate"><span class="pre">179/179</span></code> arrays, <code class="docutils literal notranslate"><span class="pre">max_abs_diff=0.0</span></code>) against <code class="docutils literal notranslate"><span class="pre">2.5.10</span></code>
+across released <code class="docutils literal notranslate"><span class="pre">2.0.0</span></code>/<code class="docutils literal notranslate"><span class="pre">2.2.0</span></code>/<code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> models and deterministic training.</p></li>
+<li><p><strong><a class="reference external" href="https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.10.md">2.5.10</a></strong>:
+CLI UX polish across prediction, downloads, training/selection/calibration,
+and <code class="docutils literal notranslate"><span class="pre">pseudosequences</span></code> (<code class="docutils literal notranslate"><span class="pre">#424</span></code>–<code class="docutils literal notranslate"><span class="pre">#428</span></code>): adds <code class="docutils literal notranslate"><span class="pre">--float-format</span></code> and documents
+units on <code class="docutils literal notranslate"><span class="pre">predict</span></code>/<code class="docutils literal notranslate"><span class="pre">predict-scan</span></code>, eliminates duplicated flank columns and
+inconsistent processing-only scan columns, silences noisy default repr/plan/
+unused-key logs, replaces routine user-error tracebacks with one-line CLI
+errors, fixes train/select/calibrate <code class="docutils literal notranslate"><span class="pre">--help</span></code> usage synopses and stray
+<code class="docutils literal notranslate"><span class="pre">SIGUSR1</span></code> banners, and fixes <code class="docutils literal notranslate"><span class="pre">downloads</span> <span class="pre">--verbose</span></code>/<code class="docutils literal notranslate"><span class="pre">--quiet</span></code> and subcommand
+help. Existing <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> weights and predictions are unchanged.</p></li>
+<li><p><strong><a class="reference external" href="https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.9.md">2.5.9</a></strong>:
+Adds first-class <code class="docutils literal notranslate"><span class="pre">mhcgnomes.AccessionedAllele</span></code> support in
+<code class="docutils literal notranslate"><span class="pre">mhcflurry/common.py</span></code> so all <code class="docutils literal notranslate"><span class="pre">2,884</span></code> sequence-backed non-model vertebrate
+Class I alleles from <code class="docutils literal notranslate"><span class="pre">mhcseqs</span> <span class="pre">2.14.0</span></code> (e.g.,
+<code class="docutils literal notranslate"><span class="pre">TriakisScyllium-UAA*uniprot:O46817</span></code>, <code class="docutils literal notranslate"><span class="pre">Saha*uniprot:G3V1L5</span> <span class="pre">class</span> <span class="pre">I</span></code>) flow
+cleanly through <code class="docutils literal notranslate"><span class="pre">normalize_allele_name</span></code>,
+<code class="docutils literal notranslate"><span class="pre">build_pseudosequences_from_mhcseqs(normalize_alleles=True)</span></code> (<code class="docutils literal notranslate"><span class="pre">26,156</span></code>
+alleles across <code class="docutils literal notranslate"><span class="pre">223</span></code> canonical vertebrate species with <code class="docutils literal notranslate"><span class="pre">0</span></code> unparsed rows),
+and <code class="docutils literal notranslate"><span class="pre">Class1AffinityPredictor</span></code>; publishes the speculative pan-class Class I →
+Class II transfer experiment against <code class="docutils literal notranslate"><span class="pre">NetMHCIIpan-4.3</span></code> in
+<a class="reference internal" href="experiment_25x_pan_class_ii.html"><span class="doc">Experiment 2026-11-25: Speculative pan-class Class I → Class II transfer via mhcseqs IMGT alignments</span></a> (<a class="reference internal" href="experiments.html"><span class="doc">Experiment log</span></a>); and bumps
+<code class="docutils literal notranslate"><span class="pre">mhcgnomes&gt;=3.87.2</span></code> / optional <code class="docutils literal notranslate"><span class="pre">mhcseqs&gt;=2.14.0</span></code>. Existing <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> weights
+and predictions are unchanged.</p></li>
+<li><p><strong><a class="reference external" href="https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.8.md">2.5.8</a></strong>:
+Adds the published <a class="reference internal" href="experiments.html"><span class="doc">Experiment log</span></a> log and full <code class="docutils literal notranslate"><span class="pre">2.5.x</span></code> cross-species
+<code class="docutils literal notranslate"><span class="pre">hitlist</span></code> + IEDB validation experiment report
+(<a class="reference internal" href="experiment_25x_cross_species_hitlist.html"><span class="doc">Experiment 2026-11-25: Cross-species hitlist validation &amp; mhcseqs training parity</span></a>) with a new 16-cohort
+groove-specificity &amp; training-parity synthesis figure, and defensively guards
+<code class="docutils literal notranslate"><span class="pre">build_pseudosequences_from_mhcseqs(normalize_alleles=True)</span></code> against bare
+UniProt accessions being misparsed as MHC alleles (<code class="docutils literal notranslate"><span class="pre">pirl-unc/mhcgnomes#306</span></code>).
+Existing <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> weights and predictions are unchanged.</p></li>
+<li><p><strong><a class="reference external" href="https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.7.md">2.5.7</a></strong>:
+Adds <code class="docutils literal notranslate"><span class="pre">--lock-existing</span></code> / <code class="docutils literal notranslate"><span class="pre">lock_existing=True</span></code> to freeze baseline alleles
+verbatim, switches <code class="docutils literal notranslate"><span class="pre">downloads-generation/allele_sequences/GENERATE.sh</span></code> to
+<code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">pseudosequences</span> <span class="pre">build</span> <span class="pre">--lock-existing</span></code> with a hard 0-diff parity
+gate on all trained alleles (<code class="docutils literal notranslate"><span class="pre">verify_trained_allele_parity.py</span></code>), adds the
+<code class="docutils literal notranslate"><span class="pre">hitlist</span></code> zero-shot Presentation-vs-Affinity validation figures to
+<a class="reference internal" href="cross_species_validation.html"><span class="doc">Cross-species alleles, pseudosequences, and zero-shot validation</span></a>, and bumps <code class="docutils literal notranslate"><span class="pre">mhcgnomes&gt;=3.79.0</span></code> /
+<code class="docutils literal notranslate"><span class="pre">mhcseqs&gt;=2.12.5</span></code>. Existing <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> weights and predictions are unchanged.</p></li>
+<li><p><strong><a class="reference external" href="https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.6.md">2.5.6</a></strong>:
+Fixes <code class="docutils literal notranslate"><span class="pre">Class1NeuralNetwork</span></code> batch normalization &amp; merging (<code class="docutils literal notranslate"><span class="pre">#564</span></code>, <code class="docutils literal notranslate"><span class="pre">#565</span></code>),
+<code class="docutils literal notranslate"><span class="pre">robust_mean</span></code> (<code class="docutils literal notranslate"><span class="pre">#566</span></code>), percentile-rank calibration &amp; empty-input prediction
+(<code class="docutils literal notranslate"><span class="pre">#567</span></code>–<code class="docutils literal notranslate"><span class="pre">#569</span></code>, <code class="docutils literal notranslate"><span class="pre">#577</span></code>), <code class="docutils literal notranslate"><span class="pre">Class1ProcessingModel</span></code> / <code class="docutils literal notranslate"><span class="pre">predict_sequences</span></code> /
+<code class="docutils literal notranslate"><span class="pre">ProcessingProteome</span></code> (<code class="docutils literal notranslate"><span class="pre">#572</span></code>, <code class="docutils literal notranslate"><span class="pre">#575</span></code>, <code class="docutils literal notranslate"><span class="pre">#578</span></code>), and <code class="docutils literal notranslate"><span class="pre">FastaParser</span></code> (<code class="docutils literal notranslate"><span class="pre">#579</span></code>).
+Existing <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> weights and predictions are unchanged.</p></li>
+<li><p><strong><a class="reference external" href="https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.5.md">2.5.5</a></strong>:
+Fixes training-loop, <code class="docutils literal notranslate"><span class="pre">RandomNegativePeptides</span></code>, <code class="docutils literal notranslate"><span class="pre">ppv_at_n</span></code>,
+<code class="docutils literal notranslate"><span class="pre">compare-models</span></code>, allele-specific model selection, and <code class="docutils literal notranslate"><span class="pre">predict</span></code> /
+<code class="docutils literal notranslate"><span class="pre">predict-scan</span></code> / <code class="docutils literal notranslate"><span class="pre">downloads</span></code> CLI edge cases (<code class="docutils literal notranslate"><span class="pre">#588</span></code>–<code class="docutils literal notranslate"><span class="pre">#595</span></code>). Existing
+<code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> weights and predictions are unchanged.</p></li>
+<li><p><strong><a class="reference external" href="https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.4.md">2.5.4</a></strong>:
+Fixes local parallelism, GPU/batch auto-sizing, <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code>, and cluster
+retry bugs (<code class="docutils literal notranslate"><span class="pre">#580</span></code>–<code class="docutils literal notranslate"><span class="pre">#587</span></code>), accepts registered custom non-<code class="docutils literal notranslate"><span class="pre">mhcgnomes</span></code> allele
+keys in <code class="docutils literal notranslate"><span class="pre">AlleleKeyResolver</span></code> (<code class="docutils literal notranslate"><span class="pre">#597</span></code>), and guards <code class="docutils literal notranslate"><span class="pre">mhcseqs</span> <span class="pre">&gt;=</span> <span class="pre">2.12.2</span></code>
+fragment statuses (<code class="docutils literal notranslate"><span class="pre">status=&quot;short&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">alpha1_only</span></code>, <code class="docutils literal notranslate"><span class="pre">alpha2_only</span></code>,
+<code class="docutils literal notranslate"><span class="pre">fragment_fallback</span></code>). Existing <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> weights and predictions are unchanged.</p></li>
+<li><p><strong><a class="reference external" href="https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.3.md">2.5.3</a></strong>:
+Fixes <code class="docutils literal notranslate"><span class="pre">2.5.x</span></code> regressions (<code class="docutils literal notranslate"><span class="pre">#550</span></code>–<code class="docutils literal notranslate"><span class="pre">#555</span></code>), NumPy 2 / Pandas 3 compatibility
+crashes (<code class="docutils literal notranslate"><span class="pre">#556</span></code>–<code class="docutils literal notranslate"><span class="pre">#559</span></code>), and core affinity/processing/presentation bugs
+(<code class="docutils literal notranslate"><span class="pre">#560</span></code>–<code class="docutils literal notranslate"><span class="pre">#563</span></code>, <code class="docutils literal notranslate"><span class="pre">#570</span></code>, <code class="docutils literal notranslate"><span class="pre">#571</span></code>, <code class="docutils literal notranslate"><span class="pre">#573</span></code>, <code class="docutils literal notranslate"><span class="pre">#574</span></code>, <code class="docutils literal notranslate"><span class="pre">#576</span></code>). Existing <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code>
+weights and predictions are unchanged.</p></li>
+<li><p><strong><a class="reference external" href="https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.2.md">2.5.2</a></strong>:
+Adds a torch-free fast path for <code class="docutils literal notranslate"><span class="pre">--list-supported-alleles</span></code> and
+<code class="docutils literal notranslate"><span class="pre">--list-supported-peptide-lengths</span></code> in <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">predict</span></code> and
+<code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">predict-scan</span></code>, suppresses duplicate <code class="docutils literal notranslate"><span class="pre">WARNING</span></code> logs when
+<code class="docutils literal notranslate"><span class="pre">Class1AffinityPredictor</span></code> raises under <code class="docutils literal notranslate"><span class="pre">throw=True</span></code> (#443), and sets explicit
+default <code class="docutils literal notranslate"><span class="pre">timeout=60</span></code>s and <code class="docutils literal notranslate"><span class="pre">max_retries=3</span></code> in <code class="docutils literal notranslate"><span class="pre">install_download</span></code> (#462).
+Existing weights and predictions are unchanged.</p></li>
+<li><p><strong><a class="reference external" href="https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.1.md">2.5.1</a></strong>:
+Migrates <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">downloads</span> <span class="pre">fetch</span></code> onto <code class="docutils literal notranslate"><span class="pre">datacache&gt;=1.37.0</span></code>
+(<code class="docutils literal notranslate"><span class="pre">install_archive</span></code> / <code class="docutils literal notranslate"><span class="pre">inspect_archive</span></code>) with pinned <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> SHA-256 checksums
+and byte sizes, <code class="docutils literal notranslate"><span class="pre">--force</span></code> refresh/repair, <code class="docutils literal notranslate"><span class="pre">downloads</span> <span class="pre">info</span> <span class="pre">--verify</span></code>,
+read-only legacy directory preservation, and <code class="docutils literal notranslate"><span class="pre">portable_names</span></code> support for
+historical POSIX tarballs (#484). Existing weights and predictions are
+unchanged.</p></li>
+<li><p><strong><a class="reference external" href="https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.0.md">2.5.0</a></strong>:
+Adds <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code>-backed Class I binding-groove pseudosequence extraction
+(<code class="docutils literal notranslate"><span class="pre">mhcflurry.pseudosequences</span></code>, <code class="docutils literal notranslate"><span class="pre">Class1AffinityPredictor.add_allele_from_sequence</span></code>,
+<code class="docutils literal notranslate"><span class="pre">extend_alleles_from_mhcseqs</span></code>, and <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">pseudosequences</span> <span class="pre">extract|build</span></code>),
+delegating to <code class="docutils literal notranslate"><span class="pre">mhcseqs</span> <span class="pre">&gt;=</span> <span class="pre">2.9.0</span></code> IMGT G-DOMAIN alignment with groove-insertion
+and no-op-mutation diagnostic warnings. Includes zero-shot cross-species
+validation benchmarks and figures (<a class="reference internal" href="cross_species_validation.html"><span class="doc">Cross-species alleles, pseudosequences, and zero-shot validation</span></a>). Existing
+<code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> weights and predictions are unchanged.</p></li>
+</ul>
+</section>
+<section id="series">
+<h2>2.4 series<a class="headerlink" href="#series" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>2.4.1</strong>: Documentation navigation cleanup (moves internal training-recipe
+notes under <a class="reference internal" href="maintainers.html"><span class="doc">Maintainer workflows</span></a>, adds a public API overview to <a class="reference internal" href="api.html"><span class="doc">API Documentation</span></a>,
+adds this release-notes page, and documents <code class="docutils literal notranslate"><span class="pre">OPENVAX_DATA_CACHE</span></code> /
+<code class="docutils literal notranslate"><span class="pre">OPENVAX_OFFLINE</span></code> in <a class="reference internal" href="configuration.html"><span class="doc">Configuration and performance</span></a>), plus <code class="docutils literal notranslate"><span class="pre">datacache</span> <span class="pre">1.35.0</span></code> test
+compatibility.</p></li>
+<li><p><strong><a class="reference external" href="https://github.com/openvax/mhcflurry/blob/master/release-notes/2.4.0.md">2.4.0</a></strong>:
+Removes deprecated Keras-era Python API aliases, legacy top-level
+<code class="docutils literal notranslate"><span class="pre">mhcflurry.*_command</span></code> module wrappers, duplicate <code class="docutils literal notranslate"><span class="pre">mhcflurry</span></code> evaluation
+shortcuts, and deprecated hyphenated training/selection/calibration console
+scripts. Keeps <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> model weights and predictions unchanged.</p></li>
+</ul>
+</section>
+<section id="id1">
+<h2>2.3 series<a class="headerlink" href="#id1" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong><a class="reference external" href="https://github.com/openvax/mhcflurry/blob/master/release-notes/2.3.38.md">2.3.38</a></strong>:
+Harmonizes the data cache and downloads CLI on <code class="docutils literal notranslate"><span class="pre">datacache&gt;=1.34.0</span></code>
+(<code class="docutils literal notranslate"><span class="pre">OPENVAX_DATA_CACHE</span></code>, <code class="docutils literal notranslate"><span class="pre">OPENVAX_OFFLINE</span></code>, <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">downloads</span> <span class="pre">dirs</span></code>,
+<code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">downloads</span> <span class="pre">prune</span></code>, and <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">downloads</span> <span class="pre">path</span> <span class="pre">--json</span></code>) while
+preserving existing legacy cache directories.</p></li>
+<li><p><strong><a class="reference external" href="https://github.com/openvax/mhcflurry/blob/master/release-notes/2.3.0.md">2.3.0</a></strong>:
+PyTorch-native rewrite, updated <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> presentation/affinity/processing
+weights (see <a class="reference internal" href="release_model_evaluation.html"><span class="doc">Evaluation of the 2.3.0 weights</span></a>), automatic GPU/CPU workload
+planning, unified <code class="docutils literal notranslate"><span class="pre">mhcflurry</span></code> CLI, and compact percentile calibration.</p></li>
+</ul>
+</section>
+<section id="earlier-releases">
+<h2>Earlier releases<a class="headerlink" href="#earlier-releases" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>2.2.0 / 2.1.x / 2.0.x</strong>: MHCflurry 2.0 pan-allele binding and antigen
+processing models (weights remain available via <code class="docutils literal notranslate"><span class="pre">--model-release</span> <span class="pre">2.2.0</span></code>).</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="configuration.html" class="btn btn-neutral float-left" title="Configuration and performance" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="shared_percent_rank_transforms.html" class="btn btn-neutral float-right" title="Percentile calibration for all predictors" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Nov 26, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

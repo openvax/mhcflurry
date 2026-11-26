@@ -1,0 +1,415 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Experiment 2026-11-25: Speculative pan-class Class I → Class II transfer via mhcseqs IMGT alignments &mdash; MHCflurry 2.5.11 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=b06e8534"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Experiment 2026-11-25: Cross-species hitlist validation &amp; mhcseqs training parity" href="experiment_25x_cross_species_hitlist.html" />
+    <link rel="prev" title="Experiment log" href="experiments.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docker.html">Running MHCflurry in Docker</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dla_validation.html">DLA evidence and canine evaluation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cross_species_validation.html">Cross-species alleles, pseudosequences, and zero-shot validation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="experiments.html">Experiment log</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="experiments.html#series">2.5 series</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="experiments.html#id1">2.3 series</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Experiment 2026-11-25: Speculative pan-class Class I → Class II transfer via <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code> IMGT alignments</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#methodology-pan-class-imgt-coordinate-mapping">1. Methodology: pan-class IMGT coordinate mapping</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#summary-results-across-15-hla-dr-dq-dp-alleles">2. Summary results across 15 HLA-DR / DQ / DP alleles</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#complete-per-allele-breakdown-15-alleles-500-15-mers-each">3. Complete per-allele breakdown (15 alleles, 500 15-mers each)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#three-mechanistic-takeaways">4. Three mechanistic takeaways</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="experiment_25x_cross_species_hitlist.html">Experiment 2026-11-25: Cross-species <code class="docutils literal notranslate"><span class="pre">hitlist</span></code> validation &amp; <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code> training parity</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Release notes and changelog</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="experiments.html">Experiment log</a></li>
+      <li class="breadcrumb-item active">Experiment 2026-11-25: Speculative pan-class Class I → Class II transfer via <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code> IMGT alignments</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/experiment_25x_pan_class_ii.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="experiment-2026-11-25-speculative-pan-class-class-i-class-ii-transfer-via-mhcseqs-imgt-alignments">
+<h1>Experiment 2026-11-25: Speculative pan-class Class I → Class II transfer via <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code> IMGT alignments<a class="headerlink" href="#experiment-2026-11-25-speculative-pan-class-class-i-class-ii-transfer-via-mhcseqs-imgt-alignments" title="Link to this heading"></a></h1>
+<p><strong>Date:</strong> 2026-11-25
+<strong>Software:</strong> <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">2.5.9</span></code>, frozen Class I <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> weights (<code class="docutils literal notranslate"><span class="pre">models_class1_presentation</span></code>), <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code> IMGT pan-class G-DOMAIN aligner, <code class="docutils literal notranslate"><span class="pre">NetMHCIIpan-4.3</span></code> (BA and EL), <a class="reference external" href="https://github.com/pirl-unc/hitlist"><code class="docutils literal notranslate"><span class="pre">hitlist</span></code></a> quantitative Class II IC50 dataset
+<strong>Goal:</strong> Test whether structurally equivalent 39-aa Class II binding-groove pseudosequences—extracted through <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code>’s shared pan-class IMGT G-DOMAIN numbering (<code class="docutils literal notranslate"><span class="pre">G-ALPHA1</span> <span class="pre">↔</span> <span class="pre">G-ALPHA</span></code>, <code class="docutils literal notranslate"><span class="pre">G-ALPHA2</span> <span class="pre">↔</span> <span class="pre">G-BETA</span></code>)—allow <strong>frozen Class I MHCflurry <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> weights</strong> (trained exclusively on Class I MHC) to predict Class II 15-mer binding affinity zero-shot, compared head-to-head against <code class="docutils literal notranslate"><span class="pre">NetMHCIIpan-4.3</span></code> and an unrelated Class I negative control (<code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code>).</p>
+<p><strong>Bottom line:</strong> <strong>Negative result — informative and clean.</strong> Frozen Class I MHCflurry weights do <strong>not</strong> transfer across the Class I / Class II structural boundary (<code class="docutils literal notranslate"><span class="pre">mean</span> <span class="pre">AUROC</span> <span class="pre">=</span> <span class="pre">0.551</span></code> with 9-mer core scanning vs <code class="docutils literal notranslate"><span class="pre">0.598</span></code> for <code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code> negative control and <code class="docutils literal notranslate"><span class="pre">0.923</span></code> for <code class="docutils literal notranslate"><span class="pre">NetMHCIIpan-4.3</span> <span class="pre">BA</span></code>), and direct 15-mer scoring is systematically <strong>anti-correlated</strong> (<code class="docutils literal notranslate"><span class="pre">mean</span> <span class="pre">AUROC</span> <span class="pre">=</span> <span class="pre">0.394</span></code>, <code class="docutils literal notranslate"><span class="pre">Spearman</span> <span class="pre">ρ</span> <span class="pre">=</span> <span class="pre">-0.224</span></code>; down to <code class="docutils literal notranslate"><span class="pre">0.235</span> <span class="pre">/</span> <span class="pre">ρ</span> <span class="pre">=</span> <span class="pre">-0.521</span></code> on HLA-DP). Cross-allele specificity shows zero diagonal enrichment (<code class="docutils literal notranslate"><span class="pre">mean</span> <span class="pre">diag</span> <span class="pre">0.551</span></code> vs <code class="docutils literal notranslate"><span class="pre">mean</span> <span class="pre">off-diag</span> <span class="pre">0.556</span></code>, <code class="docutils literal notranslate"><span class="pre">Δ</span> <span class="pre">=</span> <span class="pre">-0.005</span></code>), proving that pan-class transfer requires <strong>joint pan-class training</strong> rather than zero-shot weight reuse.</p>
+<hr class="docutils" />
+<section id="methodology-pan-class-imgt-coordinate-mapping">
+<h2>1. Methodology: pan-class IMGT coordinate mapping<a class="headerlink" href="#methodology-pan-class-imgt-coordinate-mapping" title="Link to this heading"></a></h2>
+<p>Because MHC Class I (<code class="docutils literal notranslate"><span class="pre">α1</span></code>/<code class="docutils literal notranslate"><span class="pre">α2</span></code> heavy chain) and Class II (<code class="docutils literal notranslate"><span class="pre">α1</span></code> from <code class="docutils literal notranslate"><span class="pre">DRA</span></code>/<code class="docutils literal notranslate"><span class="pre">DQA1</span></code>/<code class="docutils literal notranslate"><span class="pre">DPA1</span></code>, <code class="docutils literal notranslate"><span class="pre">β1</span></code> from <code class="docutils literal notranslate"><span class="pre">DRB1</span></code>/<code class="docutils literal notranslate"><span class="pre">DQB1</span></code>/<code class="docutils literal notranslate"><span class="pre">DPB1</span></code>) share the homologous G-DOMAIN fold, <code class="docutils literal notranslate"><span class="pre">mhcseqs.align_domain_to_imgt(...)</span></code> aligns all four domains onto the same 3D Kabsch-calibrated IMGT G-DOMAIN coordinate system:</p>
+<ul class="simple">
+<li><p><strong>α1 half (<code class="docutils literal notranslate"><span class="pre">22</span></code> of <code class="docutils literal notranslate"><span class="pre">39</span></code> MHCflurry positions):</strong> Map <code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code> <code class="docutils literal notranslate"><span class="pre">G-ALPHA1</span></code> mature positions (<code class="docutils literal notranslate"><span class="pre">7,</span> <span class="pre">9,</span> <span class="pre">16,</span> <span class="pre">19,</span> <span class="pre">21,</span> <span class="pre">24,</span> <span class="pre">45,</span> <span class="pre">47,</span> <span class="pre">59,</span> <span class="pre">62,</span> <span class="pre">63,</span> <span class="pre">66,</span> <span class="pre">67,</span> <span class="pre">69,</span> <span class="pre">70,</span> <span class="pre">73,</span> <span class="pre">74,</span> <span class="pre">76,</span> <span class="pre">77,</span> <span class="pre">80,</span> <span class="pre">81,</span> <span class="pre">84</span></code>) into their IMGT G-DOMAIN coordinates, then extract the structurally equivalent residues from Class II <code class="docutils literal notranslate"><span class="pre">G-ALPHA</span></code> (<code class="docutils literal notranslate"><span class="pre">HLA-DRA*01:01</span></code>, <code class="docutils literal notranslate"><span class="pre">HLA-DQA1*</span></code>, <code class="docutils literal notranslate"><span class="pre">HLA-DPA1*</span></code>).</p></li>
+<li><p><strong>α2 / β1 half (<code class="docutils literal notranslate"><span class="pre">17</span></code> of <code class="docutils literal notranslate"><span class="pre">39</span></code> MHCflurry positions):</strong> Map <code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code> <code class="docutils literal notranslate"><span class="pre">G-ALPHA2</span></code> mature positions (<code class="docutils literal notranslate"><span class="pre">91,</span> <span class="pre">95,</span> <span class="pre">97,</span> <span class="pre">99,</span> <span class="pre">114,</span> <span class="pre">116,</span> <span class="pre">118,</span> <span class="pre">143,</span> <span class="pre">147,</span> <span class="pre">150,</span> <span class="pre">152,</span> <span class="pre">156,</span> <span class="pre">158,</span> <span class="pre">159,</span> <span class="pre">163,</span> <span class="pre">167,</span> <span class="pre">171</span></code>) into their IMGT G-DOMAIN coordinates, then extract the structurally equivalent residues from Class II <code class="docutils literal notranslate"><span class="pre">G-BETA</span></code> (<code class="docutils literal notranslate"><span class="pre">HLA-DRB1*</span></code>, <code class="docutils literal notranslate"><span class="pre">HLA-DQB1*</span></code>, <code class="docutils literal notranslate"><span class="pre">HLA-DPB1*</span></code>).</p></li>
+<li><p><strong>Occupancy:</strong> <strong><code class="docutils literal notranslate"><span class="pre">36</span> <span class="pre">/</span> <span class="pre">39</span></code></strong> positions are directly occupied across Class II heterodimers; only <code class="docutils literal notranslate"><span class="pre">3</span></code> Class I-specific α1 loop positions (<code class="docutils literal notranslate"><span class="pre">mature</span> <span class="pre">16,</span> <span class="pre">19,</span> <span class="pre">59</span></code> → IMGT <code class="docutils literal notranslate"><span class="pre">G-ALPHA1</span></code> positions absent in Class II <code class="docutils literal notranslate"><span class="pre">G-ALPHA</span></code>) are padded with <code class="docutils literal notranslate"><span class="pre">&quot;X&quot;</span></code>.</p></li>
+</ul>
+<section id="benchmark-dataset-scoring-modes">
+<h3>Benchmark dataset &amp; scoring modes<a class="headerlink" href="#benchmark-dataset-scoring-modes" title="Link to this heading"></a></h3>
+<p>From <code class="docutils literal notranslate"><span class="pre">hitlist</span></code> quantitative Class II binding data (<code class="docutils literal notranslate"><span class="pre">30,381</span></code> unique <code class="docutils literal notranslate"><span class="pre">(allele,</span> <span class="pre">15-mer)</span></code> quantitative IC50 nM pairs across 15 HLA-DR, HLA-DQ, and HLA-DP alleles), we sampled <code class="docutils literal notranslate"><span class="pre">500</span></code> unique 15-mer peptides per allele (<code class="docutils literal notranslate"><span class="pre">7,500</span></code> total pairs; binary binder threshold <code class="docutils literal notranslate"><span class="pre">IC50</span> <span class="pre">≤</span> <span class="pre">500</span> <span class="pre">nM</span></code>, plus full continuous <code class="docutils literal notranslate"><span class="pre">Spearman</span> <span class="pre">ρ</span></code> against <code class="docutils literal notranslate"><span class="pre">-log10(IC50)</span></code>):</p>
+<ol class="arabic simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">NetMHCIIpan-4.3</span> <span class="pre">(BA)</span></code></strong> and <strong><code class="docutils literal notranslate"><span class="pre">NetMHCIIpan-4.3</span> <span class="pre">(EL)</span></code></strong> — gold-standard pan-specific Class II reference models (exact <code class="docutils literal notranslate"><span class="pre">DRB1_*</span></code> / <code class="docutils literal notranslate"><span class="pre">HLA-DQA1*-DQB1*</span></code> / <code class="docutils literal notranslate"><span class="pre">HLA-DPA1*-DPB1*</span></code> allele names).</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">MHCflurry</span> <span class="pre">2.3</span> <span class="pre">Class</span> <span class="pre">I</span> <span class="pre">(pan-class</span> <span class="pre">9-mer</span> <span class="pre">core)</span></code></strong> — register each Class II pan-class 39-aa pseudosequence on frozen <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> Class I weights and take the strongest predicted IC50 (<code class="docutils literal notranslate"><span class="pre">min</span> <span class="pre">IC50</span></code>) across the 7 overlapping 9-mer binding cores inside each 15-mer.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">MHCflurry</span> <span class="pre">2.3</span> <span class="pre">Class</span> <span class="pre">I</span> <span class="pre">(pan-class</span> <span class="pre">direct</span> <span class="pre">15-mer)</span></code></strong> — pass the full 15-mer directly into frozen <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> Class I weights (which internally encode 15-mers as a bulging closed-groove peptide with pinned N- and C-termini).</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code> negative control (<code class="docutils literal notranslate"><span class="pre">9-mer</span> <span class="pre">core</span></code> and <code class="docutils literal notranslate"><span class="pre">direct</span> <span class="pre">15-mer</span></code>)</strong> — score the exact same 15-mers using an unrelated human Class I groove to separate generic peptide hydrophobicity/composition effects from genuine Class II groove recognition.</p></li>
+</ol>
+</section>
+</section>
+<hr class="docutils" />
+<section id="summary-results-across-15-hla-dr-dq-dp-alleles">
+<h2>2. Summary results across 15 HLA-DR / DQ / DP alleles<a class="headerlink" href="#summary-results-across-15-hla-dr-dq-dp-alleles" title="Link to this heading"></a></h2>
+<figure class="align-default" id="id1">
+<img alt="Three-panel benchmark comparing NetMHCIIpan-4.3 BA against frozen Class I MHCflurry 2.3 using mhcseqs pan-class IMGT 39-aa Class II pseudosequences (9-mer core and direct 15-mer) and an HLA-A*02:01 negative control across 15 HLA-DR, DQ, and DP alleles, plus the 15x15 cross-allele specificity matrix." src="_images/fig_pan_class_ii_experiment.svg" />
+<figcaption>
+<p><span class="caption-text">Panels A and B: per-allele AUROC (IC50 &lt;= 500 nM) and continuous Spearman rank correlation against experimental -log10(IC50) across 15 HLA Class II alleles (500 15-mers each). Panel C: 15x15 cross-allele specificity matrix (AUROC minus row mean using pan-class 9-mer core scoring), showing column-dominated vertical bands rather than diagonal groove specificity.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head text-left"><p>Method</p></th>
+<th class="head text-left"><p>Scoring mode</p></th>
+<th class="head text-right"><p>Mean AUROC (<code class="docutils literal notranslate"><span class="pre">≤</span> <span class="pre">500</span> <span class="pre">nM</span></code>)</p></th>
+<th class="head text-right"><p>Mean Spearman <code class="docutils literal notranslate"><span class="pre">ρ</span></code> (<code class="docutils literal notranslate"><span class="pre">-log10</span> <span class="pre">IC50</span></code>)</p></th>
+<th class="head text-left"><p>Interpretation</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td class="text-left"><p><strong><code class="docutils literal notranslate"><span class="pre">NetMHCIIpan-4.3</span> <span class="pre">(BA)</span></code></strong></p></td>
+<td class="text-left"><p>Native Class II BA</p></td>
+<td class="text-right"><p><strong>0.923</strong></p></td>
+<td class="text-right"><p><strong>+0.801</strong></p></td>
+<td class="text-left"><p>Reference ceiling on quantitative 15-mer IC50</p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><strong><code class="docutils literal notranslate"><span class="pre">NetMHCIIpan-4.3</span> <span class="pre">(EL)</span></code></strong></p></td>
+<td class="text-left"><p>Native Class II EL</p></td>
+<td class="text-right"><p><strong>0.763</strong></p></td>
+<td class="text-right"><p><strong>+0.493</strong></p></td>
+<td class="text-left"><p>Eluted-ligand score on binding-affinity assay</p></td>
+</tr>
+<tr class="row-even"><td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code> negative control</p></td>
+<td class="text-left"><p>9-mer core (<code class="docutils literal notranslate"><span class="pre">min</span> <span class="pre">IC50</span></code>)</p></td>
+<td class="text-right"><p><code class="docutils literal notranslate"><span class="pre">0.598</span></code></p></td>
+<td class="text-right"><p><code class="docutils literal notranslate"><span class="pre">+0.187</span></code></p></td>
+<td class="text-left"><p>Shared hydrophobic-core composition baseline</p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><strong>Frozen Class I MHCflurry <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code></strong></p></td>
+<td class="text-left"><p><strong>Pan-class 9-mer core</strong></p></td>
+<td class="text-right"><p><code class="docutils literal notranslate"><span class="pre">0.551</span></code></p></td>
+<td class="text-right"><p><code class="docutils literal notranslate"><span class="pre">+0.115</span></code></p></td>
+<td class="text-left"><p>Below <code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code> control (<code class="docutils literal notranslate"><span class="pre">Δ</span> <span class="pre">=</span> <span class="pre">-0.047</span></code>)</p></td>
+</tr>
+<tr class="row-even"><td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code> negative control</p></td>
+<td class="text-left"><p>Direct 15-mer</p></td>
+<td class="text-right"><p><code class="docutils literal notranslate"><span class="pre">0.430</span></code></p></td>
+<td class="text-right"><p><code class="docutils literal notranslate"><span class="pre">-0.146</span></code></p></td>
+<td class="text-left"><p>Closed-groove N/C terminus mismatch</p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><strong>Frozen Class I MHCflurry <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code></strong></p></td>
+<td class="text-left"><p><strong>Pan-class direct 15-mer</strong></p></td>
+<td class="text-right"><p><code class="docutils literal notranslate"><span class="pre">0.394</span></code></p></td>
+<td class="text-right"><p><code class="docutils literal notranslate"><span class="pre">-0.224</span></code></p></td>
+<td class="text-left"><p>Anti-correlated (down to <code class="docutils literal notranslate"><span class="pre">0.235</span> <span class="pre">/</span> <span class="pre">-0.521</span></code> on DP)</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<hr class="docutils" />
+<section id="complete-per-allele-breakdown-15-alleles-500-15-mers-each">
+<h2>3. Complete per-allele breakdown (15 alleles, 500 15-mers each)<a class="headerlink" href="#complete-per-allele-breakdown-15-alleles-500-15-mers-each" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head text-left"><p>Allele</p></th>
+<th class="head text-center"><p>Locus</p></th>
+<th class="head text-right"><p>Binders (<code class="docutils literal notranslate"><span class="pre">≤</span> <span class="pre">500</span> <span class="pre">nM</span></code>)</p></th>
+<th class="head text-right"><p><code class="docutils literal notranslate"><span class="pre">NetMHCIIpan</span></code> BA (AUROC / <code class="docutils literal notranslate"><span class="pre">ρ</span></code>)</p></th>
+<th class="head text-right"><p><code class="docutils literal notranslate"><span class="pre">NetMHCIIpan</span></code> EL (AUROC / <code class="docutils literal notranslate"><span class="pre">ρ</span></code>)</p></th>
+<th class="head text-right"><p>MHCflurry 9-mer core (AUROC / <code class="docutils literal notranslate"><span class="pre">ρ</span></code>)</p></th>
+<th class="head text-right"><p><code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code> 9-mer ctrl (AUROC / <code class="docutils literal notranslate"><span class="pre">ρ</span></code>)</p></th>
+<th class="head text-right"><p>MHCflurry direct 15-mer (AUROC / <code class="docutils literal notranslate"><span class="pre">ρ</span></code>)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">HLA-DRB1*01:01</span></code></p></td>
+<td class="text-center"><p>DR</p></td>
+<td class="text-right"><p>301 / 500</p></td>
+<td class="text-right"><p>0.908 / +0.824</p></td>
+<td class="text-right"><p>0.734 / +0.481</p></td>
+<td class="text-right"><p>0.592 / +0.180</p></td>
+<td class="text-right"><p>0.619 / +0.235</p></td>
+<td class="text-right"><p>0.410 / -0.170</p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">HLA-DRB1*03:01</span></code></p></td>
+<td class="text-center"><p>DR</p></td>
+<td class="text-right"><p>128 / 500</p></td>
+<td class="text-right"><p>0.918 / +0.785</p></td>
+<td class="text-right"><p>0.793 / +0.544</p></td>
+<td class="text-right"><p>0.568 / +0.163</p></td>
+<td class="text-right"><p>0.592 / +0.183</p></td>
+<td class="text-right"><p>0.438 / -0.192</p></td>
+</tr>
+<tr class="row-even"><td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">HLA-DRB1*04:01</span></code></p></td>
+<td class="text-center"><p>DR</p></td>
+<td class="text-right"><p>173 / 500</p></td>
+<td class="text-right"><p>0.859 / +0.649</p></td>
+<td class="text-right"><p>0.730 / +0.360</p></td>
+<td class="text-right"><p>0.498 / +0.081</p></td>
+<td class="text-right"><p>0.557 / +0.174</p></td>
+<td class="text-right"><p>0.406 / -0.245</p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">HLA-DRB1*07:01</span></code></p></td>
+<td class="text-center"><p>DR</p></td>
+<td class="text-right"><p>244 / 500</p></td>
+<td class="text-right"><p>0.924 / +0.851</p></td>
+<td class="text-right"><p>0.760 / +0.525</p></td>
+<td class="text-right"><p>0.617 / +0.257</p></td>
+<td class="text-right"><p>0.645 / +0.300</p></td>
+<td class="text-right"><p>0.319 / -0.355</p></td>
+</tr>
+<tr class="row-even"><td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">HLA-DRB1*08:02</span></code></p></td>
+<td class="text-center"><p>DR</p></td>
+<td class="text-right"><p>161 / 500</p></td>
+<td class="text-right"><p>0.894 / +0.714</p></td>
+<td class="text-right"><p>0.721 / +0.433</p></td>
+<td class="text-right"><p>0.525 / +0.033</p></td>
+<td class="text-right"><p>0.577 / +0.116</p></td>
+<td class="text-right"><p>0.404 / -0.183</p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">HLA-DRB1*09:01</span></code></p></td>
+<td class="text-center"><p>DR</p></td>
+<td class="text-right"><p>207 / 500</p></td>
+<td class="text-right"><p>0.896 / +0.774</p></td>
+<td class="text-right"><p>0.772 / +0.511</p></td>
+<td class="text-right"><p>0.622 / +0.181</p></td>
+<td class="text-right"><p>0.586 / +0.135</p></td>
+<td class="text-right"><p>0.413 / -0.195</p></td>
+</tr>
+<tr class="row-even"><td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">HLA-DRB1*11:01</span></code></p></td>
+<td class="text-center"><p>DR</p></td>
+<td class="text-right"><p>202 / 500</p></td>
+<td class="text-right"><p>0.929 / +0.836</p></td>
+<td class="text-right"><p>0.818 / +0.631</p></td>
+<td class="text-right"><p>0.484 / -0.018</p></td>
+<td class="text-right"><p>0.592 / +0.117</p></td>
+<td class="text-right"><p>0.333 / -0.356</p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">HLA-DRB1*13:02</span></code></p></td>
+<td class="text-center"><p>DR</p></td>
+<td class="text-right"><p>193 / 500</p></td>
+<td class="text-right"><p>0.920 / +0.777</p></td>
+<td class="text-right"><p>0.652 / +0.367</p></td>
+<td class="text-right"><p>0.567 / +0.133</p></td>
+<td class="text-right"><p>0.591 / +0.159</p></td>
+<td class="text-right"><p>0.409 / -0.163</p></td>
+</tr>
+<tr class="row-even"><td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">HLA-DRB1*15:01</span></code></p></td>
+<td class="text-center"><p>DR</p></td>
+<td class="text-right"><p>206 / 500</p></td>
+<td class="text-right"><p>0.893 / +0.797</p></td>
+<td class="text-right"><p>0.768 / +0.529</p></td>
+<td class="text-right"><p>0.518 / +0.052</p></td>
+<td class="text-right"><p>0.569 / +0.176</p></td>
+<td class="text-right"><p>0.363 / -0.308</p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">HLA-DQA1*05:01/DQB1*02:01</span></code></p></td>
+<td class="text-center"><p>DQ</p></td>
+<td class="text-right"><p>104 / 500</p></td>
+<td class="text-right"><p>0.930 / +0.825</p></td>
+<td class="text-right"><p>0.797 / +0.555</p></td>
+<td class="text-right"><p>0.543 / +0.089</p></td>
+<td class="text-right"><p>0.521 / +0.095</p></td>
+<td class="text-right"><p>0.491 / -0.065</p></td>
+</tr>
+<tr class="row-even"><td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">HLA-DQA1*05:01/DQB1*03:01</span></code></p></td>
+<td class="text-center"><p>DQ</p></td>
+<td class="text-right"><p>238 / 500</p></td>
+<td class="text-right"><p>0.945 / +0.859</p></td>
+<td class="text-right"><p>0.807 / +0.610</p></td>
+<td class="text-right"><p>0.534 / +0.093</p></td>
+<td class="text-right"><p>0.531 / +0.070</p></td>
+<td class="text-right"><p>0.650 / +0.269</p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">HLA-DQA1*01:02/DQB1*06:02</span></code></p></td>
+<td class="text-center"><p>DQ</p></td>
+<td class="text-right"><p>151 / 500</p></td>
+<td class="text-right"><p>0.940 / +0.873</p></td>
+<td class="text-right"><p>0.805 / +0.580</p></td>
+<td class="text-right"><p>0.565 / +0.181</p></td>
+<td class="text-right"><p>0.593 / +0.247</p></td>
+<td class="text-right"><p>0.532 / -0.021</p></td>
+</tr>
+<tr class="row-even"><td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">HLA-DPA1*01:03/DPB1*04:01</span></code></p></td>
+<td class="text-center"><p>DP</p></td>
+<td class="text-right"><p>84 / 500</p></td>
+<td class="text-right"><p>0.961 / +0.827</p></td>
+<td class="text-right"><p>0.840 / +0.519</p></td>
+<td class="text-right"><p>0.514 / +0.087</p></td>
+<td class="text-right"><p>0.634 / +0.262</p></td>
+<td class="text-right"><p>0.250 / -0.521</p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">HLA-DPA1*02:01/DPB1*01:01</span></code></p></td>
+<td class="text-center"><p>DP</p></td>
+<td class="text-right"><p>85 / 500</p></td>
+<td class="text-right"><p>0.969 / +0.797</p></td>
+<td class="text-right"><p>0.694 / +0.351</p></td>
+<td class="text-right"><p>0.566 / +0.076</p></td>
+<td class="text-right"><p>0.660 / +0.215</p></td>
+<td class="text-right"><p>0.255 / -0.398</p></td>
+</tr>
+<tr class="row-even"><td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">HLA-DPA1*03:01/DPB1*04:02</span></code></p></td>
+<td class="text-center"><p>DP</p></td>
+<td class="text-right"><p>76 / 500</p></td>
+<td class="text-right"><p>0.964 / +0.826</p></td>
+<td class="text-right"><p>0.745 / +0.401</p></td>
+<td class="text-right"><p>0.553 / +0.135</p></td>
+<td class="text-right"><p>0.697 / +0.322</p></td>
+<td class="text-right"><p>0.235 / -0.459</p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><strong>Mean (15 alleles)</strong></p></td>
+<td class="text-center"><p>—</p></td>
+<td class="text-right"><p><strong>167 / 500</strong></p></td>
+<td class="text-right"><p><strong>0.923 / +0.801</strong></p></td>
+<td class="text-right"><p><strong>0.763 / +0.493</strong></p></td>
+<td class="text-right"><p><strong>0.551 / +0.115</strong></p></td>
+<td class="text-right"><p><strong>0.598 / +0.187</strong></p></td>
+<td class="text-right"><p><strong>0.394 / -0.224</strong></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<hr class="docutils" />
+<section id="three-mechanistic-takeaways">
+<h2>4. Three mechanistic takeaways<a class="headerlink" href="#three-mechanistic-takeaways" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p><strong>9-mer core scanning recovers peptide-level hydrophobicity, not Class II groove specificity.</strong>
+Taking <code class="docutils literal notranslate"><span class="pre">min</span> <span class="pre">IC50</span></code> over the seven 9-mer substrings lifts AUROC from <code class="docutils literal notranslate"><span class="pre">0.394</span></code> to <code class="docutils literal notranslate"><span class="pre">0.551</span></code>, because Class II 15-mer binders generally contain an internal hydrophobic anchor core (<code class="docutils literal notranslate"><span class="pre">P1</span></code> aromatic/aliphatic) that Class I predictors also favor in 9-mers. However, <code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code> alone scores <strong>higher</strong> (<code class="docutils literal notranslate"><span class="pre">0.598</span></code> vs <code class="docutils literal notranslate"><span class="pre">0.551</span></code>) on the identical peptides, showing that the pan-class Class II pseudosequences are out-of-distribution for Class I weights.</p></li>
+<li><p><strong>Direct 15-mer scoring fails catastrophically on HLA-DP (<code class="docutils literal notranslate"><span class="pre">AUROC</span> <span class="pre">=</span> <span class="pre">0.235–0.255</span></code>, <code class="docutils literal notranslate"><span class="pre">ρ</span> <span class="pre">=</span> <span class="pre">-0.40</span> <span class="pre">to</span> <span class="pre">-0.52</span></code>).</strong>
+Class I MHC binds 15-mers in a <strong>closed groove</strong> by pinning the exact N- and C-terminal residues and bulging the middle out, whereas Class II MHC binds an <strong>open groove</strong> where the 9-mer core sits anywhere inside the 15-mer with overhangs extending out both ends. On HLA-DP (whose <code class="docutils literal notranslate"><span class="pre">P1</span></code>/<code class="docutils literal notranslate"><span class="pre">P6</span></code> aromatic anchors sit inside the 15-mer while terminal overhangs are frequently charged/polar), Class I’s fixed-terminus encoding actively penalizes true binders.</p></li>
+<li><p><strong>Zero diagonal transfer in the <code class="docutils literal notranslate"><span class="pre">15</span> <span class="pre">×</span> <span class="pre">15</span></code> specificity matrix proves joint training is required.</strong>
+In Panel C, the mean on-diagonal AUROC (<code class="docutils literal notranslate"><span class="pre">0.551</span></code>) is slightly <strong>below</strong> the mean off-diagonal AUROC (<code class="docutils literal notranslate"><span class="pre">0.556</span></code>, <code class="docutils literal notranslate"><span class="pre">Δ</span> <span class="pre">=</span> <span class="pre">-0.005</span></code>, diagonal beats off-diagonal on only <code class="docutils literal notranslate"><span class="pre">9</span> <span class="pre">/</span> <span class="pre">15</span></code> rows). The strong vertical stripes (e.g., <code class="docutils literal notranslate"><span class="pre">DRB1*07:01</span></code> scoring higher on nearly every row while <code class="docutils literal notranslate"><span class="pre">DQA05:01/DQB02:01</span></code> and <code class="docutils literal notranslate"><span class="pre">DP</span></code> score lower on nearly every row) confirm that frozen Class I weights respond to global sequence-distribution shifts across the 39-aa vector rather than decoding Class II pocket chemistry (<code class="docutils literal notranslate"><span class="pre">P1</span></code>/<code class="docutils literal notranslate"><span class="pre">P4</span></code>/<code class="docutils literal notranslate"><span class="pre">P6</span></code>/<code class="docutils literal notranslate"><span class="pre">P9</span></code> vs Class I <code class="docutils literal notranslate"><span class="pre">P2</span></code>/<code class="docutils literal notranslate"><span class="pre">P9</span></code>). Conversely, <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code>’s shared 3D IMGT G-DOMAIN coordinate system gives us a clean, structurally aligned representation ready for <strong>joint pan-class training</strong> in a future architecture (where a model sees both Class I closed-groove and Class II open-groove binding modes during training).</p></li>
+</ol>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="experiments.html" class="btn btn-neutral float-left" title="Experiment log" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="experiment_25x_cross_species_hitlist.html" class="btn btn-neutral float-right" title="Experiment 2026-11-25: Cross-species hitlist validation &amp; mhcseqs training parity" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Nov 26, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

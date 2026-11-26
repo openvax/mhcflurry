@@ -1,0 +1,456 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cross-species alleles, pseudosequences, and zero-shot validation &mdash; MHCflurry 2.5.11 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=b06e8534"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Experiment log" href="experiments.html" />
+    <link rel="prev" title="DLA evidence and canine evaluation" href="dla_validation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docker.html">Running MHCflurry in Docker</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dla_validation.html">DLA evidence and canine evaluation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Cross-species alleles, pseudosequences, and zero-shot validation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#predicting-on-new-species-or-binding-pocket-mutants">Predicting on new species or binding-pocket mutants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#taxonomic-expansion-and-groove-indel-landscape">Taxonomic expansion and groove-indel landscape</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#zero-shot-cross-species-generalization-of-frozen-2-3-0-weights">Zero-shot cross-species generalization of frozen 2.3.0 weights</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#zero-shot-motif-recovery-and-insertion-failure-mode">Zero-shot motif recovery and insertion failure mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#binding-pocket-point-mutant-sensitivity">Binding-pocket point-mutant sensitivity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#zero-shot-presentation-with-real-proteome-flanks-hitlist-validation">Zero-shot Presentation with real proteome flanks (<code class="docutils literal notranslate"><span class="pre">hitlist</span></code> validation)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pan-allele-training-parity-generate-sh-migration">Pan-allele training parity &amp; <code class="docutils literal notranslate"><span class="pre">GENERATE.sh</span></code> migration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#reproducing-the-benchmark-and-figures">Reproducing the benchmark and figures</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="experiments.html">Experiment log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Release notes and changelog</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Cross-species alleles, pseudosequences, and zero-shot validation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/cross_species_validation.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="cross-species-alleles-pseudosequences-and-zero-shot-validation">
+<h1>Cross-species alleles, pseudosequences, and zero-shot validation<a class="headerlink" href="#cross-species-alleles-pseudosequences-and-zero-shot-validation" title="Link to this heading"></a></h1>
+<p>MHCflurry 2.5.0 integrates optional <a class="reference external" href="https://github.com/pirl-unc/mhcseqs"><code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code></a>
+support to extract Class I binding-groove pseudosequences directly from any
+MHC Class I heavy-chain protein sequence — without external <code class="docutils literal notranslate"><span class="pre">clustalo</span></code> or
+Biopython binaries. Existing <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> model weights and predictions on
+previously supported alleles remain unchanged.</p>
+<p>Install the optional <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code> extra to enable raw sequence decomposition and
+full-database extension:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"mhcflurry[mhcseqs]&gt;=2.5,&lt;2.6"</span>
+</pre></div>
+</div>
+<section id="predicting-on-new-species-or-binding-pocket-mutants">
+<h2>Predicting on new species or binding-pocket mutants<a class="headerlink" href="#predicting-on-new-species-or-binding-pocket-mutants" title="Link to this heading"></a></h2>
+<p>Register a novel allele or engineered binding-pocket mutant on any loaded
+pan-allele predictor at runtime:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">mhcflurry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Class1AffinityPredictor</span>
+
+<span class="n">predictor</span> <span class="o">=</span> <span class="n">Class1AffinityPredictor</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+
+<span class="c1"># Register a novel heavy-chain sequence (signal peptide stripped automatically)</span>
+<span class="n">predictor</span><span class="o">.</span><span class="n">add_allele_from_sequence</span><span class="p">(</span><span class="s2">"FLA-E*003:01"</span><span class="p">,</span> <span class="n">cat_heavy_chain_seq</span><span class="p">)</span>
+<span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">([</span><span class="s2">"APRGPGRAF"</span><span class="p">],</span> <span class="n">allele</span><span class="o">=</span><span class="s2">"FLA-E*003:01"</span><span class="p">)</span>
+
+<span class="c1"># Evaluate a mature-numbered binding-pocket point mutant</span>
+<span class="n">predictor</span><span class="o">.</span><span class="n">add_allele_from_sequence</span><span class="p">(</span>
+    <span class="s2">"FLA-E*018:01_W167S"</span><span class="p">,</span>
+    <span class="n">cat_e018_seq</span><span class="p">,</span>
+    <span class="n">mutations</span><span class="o">=</span><span class="p">(</span><span class="s2">"W167S"</span><span class="p">,),</span>
+<span class="p">)</span>
+
+<span class="c1"># Strictly generalize all supported alleles from mhcseqs (preserving existing</span>
+<span class="c1"># 2.3.0 non-X pseudosequences verbatim by default)</span>
+<span class="n">predictor</span><span class="o">.</span><span class="n">extend_alleles_from_mhcseqs</span><span class="p">(</span><span class="n">prefer_existing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>From the command line:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>mhcflurry<span class="w"> </span>pseudosequences<span class="w"> </span>extract<span class="w"> </span>--sequence<span class="w"> </span><span class="s2">"</span><span class="nv">$SEQ</span><span class="s2">"</span><span class="w"> </span>--allele<span class="w"> </span><span class="s2">"FLA-E*018:01"</span><span class="w"> </span>--mutation<span class="w"> </span>W167S
+mhcflurry<span class="w"> </span>pseudosequences<span class="w"> </span>build<span class="w"> </span>--existing-csv<span class="w"> </span>allele_sequences.csv<span class="w"> </span>--prefer-existing<span class="w"> </span>--out<span class="w"> </span>extended.csv
+</pre></div>
+</div>
+<p>When <code class="docutils literal notranslate"><span class="pre">mhcseqs</span> <span class="pre">&gt;=</span> <span class="pre">2.9.0</span></code> is installed, MHCflurry delegates binding-groove
+alignment to <code class="docutils literal notranslate"><span class="pre">mhcseqs.align_domain_to_imgt</span></code> / <code class="docutils literal notranslate"><span class="pre">mhcseqs.align_groove_to_imgt</span></code>
+and logs a warning whenever a groove contains internal insertions omitted by
+fixed 39-aa pseudosequences or when a requested point mutation does not alter
+any of the 39 extracted positions. Call
+<code class="docutils literal notranslate"><span class="pre">mhcflurry.pseudosequences.extract_class1_pseudosequence_with_alignment(...)</span></code>
+to inspect the structured <code class="docutils literal notranslate"><span class="pre">GrooveAlignment</span></code> object directly.</p>
+</section>
+<section id="taxonomic-expansion-and-groove-indel-landscape">
+<h2>Taxonomic expansion and groove-indel landscape<a class="headerlink" href="#taxonomic-expansion-and-groove-indel-landscape" title="Link to this heading"></a></h2>
+<p>Across the 19,886 non-<code class="docutils literal notranslate"><span class="pre">X</span></code> overlapping Class I alleles in MHCflurry 2.3.0’s
+legacy <code class="docutils literal notranslate"><span class="pre">allele_sequences.csv</span></code>, <code class="docutils literal notranslate"><span class="pre">mhcseqs</span> <span class="pre">2.9.0</span></code> IMGT extraction achieves
+<strong>99.45% exact 39-for-39 match (19,777 / 19,886)</strong> and <strong>99.98% per-residue
+identity (775,385 / 775,554)</strong> while expanding complete Class I groove coverage
+from <strong>47 species (20,205 alleles)</strong> in <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> to <strong>241 distinct vertebrate
+species (27,243 complete Class I grooves)</strong> in <code class="docutils literal notranslate"><span class="pre">mhcseqs</span> <span class="pre">2.9.0</span></code>.</p>
+<figure class="align-default" id="id1">
+<img alt="Taxonomic expansion of Class I MHC groove coverage from 47 species in MHCflurry 2.3.0 to 241 vertebrate species in mhcseqs 2.9.0, alongside the distribution of binding-groove insertions and deletions across 27,243 Class I alleles." src="_images/species_coverage.svg" />
+<figcaption>
+<p><span class="caption-text">Left: distinct vertebrate species with complete Class I grooves in MHCflurry 2.3.0 versus MHCflurry 2.5.0 + mhcseqs 2.9.0. Right: IMGT-aligned insertion and deletion counts by canonical mature Class I position across all 27,243 complete grooves in mhcseqs 2.9.0.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>Non-canonical insertions and deletions cluster into six recurring structural
+loops rather than occurring uniformly across the groove: the α1 CD-turn
+(positions 39–42, <code class="docutils literal notranslate"><span class="pre">-2</span> <span class="pre">aa</span></code> in birds and frogs), the α1 N-helix hinge (positions
+51–58, <code class="docutils literal notranslate"><span class="pre">+1</span></code> to <code class="docutils literal notranslate"><span class="pre">+3</span> <span class="pre">aa</span></code> in bats and marsupials), the α2 AB-turn (positions
+103–109, <code class="docutils literal notranslate"><span class="pre">-1</span></code> to <code class="docutils literal notranslate"><span class="pre">-2</span> <span class="pre">aa</span></code>), and the α2 helix kink (positions 145–155, <code class="docutils literal notranslate"><span class="pre">+1</span></code> to
+<code class="docutils literal notranslate"><span class="pre">+2</span> <span class="pre">aa</span></code>).</p>
+</section>
+<section id="zero-shot-cross-species-generalization-of-frozen-2-3-0-weights">
+<h2>Zero-shot cross-species generalization of frozen 2.3.0 weights<a class="headerlink" href="#zero-shot-cross-species-generalization-of-frozen-2-3-0-weights" title="Link to this heading"></a></h2>
+<p>To test how well MHCflurry’s existing pan-allele <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> weights generalize to
+<strong>previously unsupported species and clades (0 training rows in 2.3.0)</strong> using
+<code class="docutils literal notranslate"><span class="pre">mhcseqs</span> <span class="pre">2.9.0</span></code> 39-aa pseudosequences, we evaluated frozen <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> pan-allele
+affinity ensembles against monoallelic mass-spectrometry ligands, multi-allelic
+MS elutions, and IEDB binding assays across marsupials (~160 Myr diverged from
+placentals), felines, birds (~310 Myr diverged), equines, amphibians (~350 Myr
+diverged), and bats.</p>
+<p>For every ligand set, we paired true ligands against 10:1 length-matched
+background decoys (seed 42) and also scored the identical peptides with an
+unrelated human negative control (<code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code>) to separate genuine
+groove-specific recognition from peptide-composition bias.</p>
+<figure class="align-default" id="id2">
+<img alt="Zero-shot ligand ranking AUROC with 95 percent bootstrap intervals versus HLA-A*02:01 negative control, and median predicted IC50 separation between true ligands and background decoys across ten previously unsupported vertebrate Class I alleles." src="_images/zero_shot_cross_species.svg" />
+<figcaption>
+<p><span class="caption-text">Zero-shot generalization of frozen MHCflurry 2.3.0 weights using mhcseqs-extracted 39-aa grooves (every allele has 0 training rows in 2.3.0). Left: AUROC with 95% stratified bootstrap CI compared to an HLA-A*02:01 negative control on identical peptides. Right: median predicted IC50 (nM) for true ligands versus length-matched background decoys.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Allele (clade)</p></th>
+<th class="head text-right"><p>Positive ligands</p></th>
+<th class="head"><p>Groove alignment (<code class="docutils literal notranslate"><span class="pre">mhcseqs</span> <span class="pre">2.9.0</span></code>)</p></th>
+<th class="head text-right"><p>Zero-shot AUROC (95% CI)</p></th>
+<th class="head text-right"><p><code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code> ctrl AUROC</p></th>
+<th class="head text-right"><p>PPV&#64;N</p></th>
+<th class="head text-right"><p>Median IC50 pos / dec (nM)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Cat <code class="docutils literal notranslate"><span class="pre">FLA-E*018:01</span></code> (Carnivora)</p></td>
+<td class="text-right"><p>24</p></td>
+<td><p>canonical</p></td>
+<td class="text-right"><p><strong>0.978</strong> [0.950, 0.996]</p></td>
+<td class="text-right"><p>0.648</p></td>
+<td class="text-right"><p>0.833</p></td>
+<td class="text-right"><p>94 / 21,630 (230×)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Horse <code class="docutils literal notranslate"><span class="pre">Eqca-N*006:02</span></code> (Perissodactyla)</p></td>
+<td class="text-right"><p>7</p></td>
+<td><p>canonical</p></td>
+<td class="text-right"><p><strong>0.965</strong> [0.914, 1.000]</p></td>
+<td class="text-right"><p>0.527</p></td>
+<td class="text-right"><p>0.714</p></td>
+<td class="text-right"><p>1,258 / 26,389 (21×)</p></td>
+</tr>
+<tr class="row-even"><td><p>Duck <code class="docutils literal notranslate"><span class="pre">Anpl-UAA*01</span></code> (Aves)</p></td>
+<td class="text-right"><p>31</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">+1aa</span> <span class="pre">&#64;52(V),</span> <span class="pre">-2aa</span> <span class="pre">&#64;40–41;</span> <span class="pre">+1aa</span> <span class="pre">&#64;148(Q),</span> <span class="pre">-2aa</span> <span class="pre">&#64;107–108</span></code></p></td>
+<td class="text-right"><p><strong>0.894</strong> [0.847, 0.938]</p></td>
+<td class="text-right"><p>0.852</p></td>
+<td class="text-right"><p>0.387</p></td>
+<td class="text-right"><p>25 / 600 (24×)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Cat <code class="docutils literal notranslate"><span class="pre">FLA-K*007:01</span></code> (Carnivora)</p></td>
+<td class="text-right"><p>491</p></td>
+<td><p>canonical</p></td>
+<td class="text-right"><p><strong>0.880</strong> [0.863, 0.895]</p></td>
+<td class="text-right"><p>0.659</p></td>
+<td class="text-right"><p>0.464</p></td>
+<td class="text-right"><p>1,440 / 21,670 (15×)</p></td>
+</tr>
+<tr class="row-even"><td><p>Possum <code class="docutils literal notranslate"><span class="pre">Trvu-UB*01:01</span></code> (Marsupialia, MS)</p></td>
+<td class="text-right"><p>5,607</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">+3aa</span> <span class="pre">&#64;53(RVG);</span> <span class="pre">+1aa</span> <span class="pre">&#64;149(D)</span></code></p></td>
+<td class="text-right"><p><strong>0.852</strong> [0.847, 0.857]</p></td>
+<td class="text-right"><p>0.551</p></td>
+<td class="text-right"><p>0.409</p></td>
+<td class="text-right"><p>164 / 2,958 (18×)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Cat <code class="docutils literal notranslate"><span class="pre">FLA-E*003:01</span></code> (Carnivora, MS)</p></td>
+<td class="text-right"><p>1,612</p></td>
+<td><p>canonical</p></td>
+<td class="text-right"><p><strong>0.830</strong> [0.821, 0.839]</p></td>
+<td class="text-right"><p>0.562</p></td>
+<td class="text-right"><p>0.372</p></td>
+<td class="text-right"><p>6,004 / 23,365 (3.9×)</p></td>
+</tr>
+<tr class="row-even"><td><p>Duck <code class="docutils literal notranslate"><span class="pre">Anpl-UAA*76</span></code> (Aves)</p></td>
+<td class="text-right"><p>33</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">+1aa</span> <span class="pre">&#64;52(A),</span> <span class="pre">-2aa</span> <span class="pre">&#64;40–41;</span> <span class="pre">+1aa</span> <span class="pre">&#64;152(D),</span> <span class="pre">-1aa</span> <span class="pre">&#64;109</span></code></p></td>
+<td class="text-right"><p><strong>0.824</strong> [0.737, 0.896]</p></td>
+<td class="text-right"><p>0.593</p></td>
+<td class="text-right"><p>0.394</p></td>
+<td class="text-right"><p>183 / 1,032 (5.6×)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Frog <code class="docutils literal notranslate"><span class="pre">Xela-UAAg</span></code> (Amphibia)</p></td>
+<td class="text-right"><p>26</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">+1aa</span> <span class="pre">&#64;54(K),</span> <span class="pre">-2aa</span> <span class="pre">&#64;40–41;</span> <span class="pre">+2aa</span> <span class="pre">&#64;152(NA),</span> <span class="pre">-1aa</span> <span class="pre">&#64;107</span></code></p></td>
+<td class="text-right"><p>0.818 [0.708, 0.904]</p></td>
+<td class="text-right"><p>0.815</p></td>
+<td class="text-right"><p>0.538</p></td>
+<td class="text-right"><p>139 / 9,733 (70×)</p></td>
+</tr>
+<tr class="row-even"><td><p>Tas. devil <code class="docutils literal notranslate"><span class="pre">Saha</span></code> (Marsupialia, 10 alleles, MS)</p></td>
+<td class="text-right"><p>981</p></td>
+<td><p>multi-allelic UniProt grooves</p></td>
+<td class="text-right"><p><strong>0.764</strong> [0.750, 0.779]</p></td>
+<td class="text-right"><p>0.651</p></td>
+<td class="text-right"><p>0.317</p></td>
+<td class="text-right"><p>124 / 847 (6.8×)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Bat <code class="docutils literal notranslate"><span class="pre">Ptal-N*01:01</span></code> (Chiroptera)</p></td>
+<td class="text-right"><p>38</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">+3aa</span> <span class="pre">&#64;51(MDL)</span></code> <em>(A-pocket ins)</em></p></td>
+<td class="text-right"><p><strong>0.625</strong> [0.529, 0.717]</p></td>
+<td class="text-right"><p>0.490</p></td>
+<td class="text-right"><p>0.184</p></td>
+<td class="text-right"><p>26,031 / 28,998 (1.1×)</p></td>
+</tr>
+</tbody>
+</table>
+<p>On experimental positive-versus-negative binding assays (no synthetic decoys)
+with at least 10 positives and 10 negatives, Cat <code class="docutils literal notranslate"><span class="pre">FLA-E*018:01</span></code> achieves
+<strong>AUROC 0.684</strong> (24+ / 12−, median predicted IC50 94 vs 383 nM, vs <code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code>
+control 0.417), whereas Bat <code class="docutils literal notranslate"><span class="pre">Ptal-N*01:01</span></code> achieves <strong>AUROC 0.599</strong> (38+ / 32−,
+median IC50 26,031 vs 29,560 nM).</p>
+</section>
+<section id="zero-shot-motif-recovery-and-insertion-failure-mode">
+<h2>Zero-shot motif recovery and insertion failure mode<a class="headerlink" href="#zero-shot-motif-recovery-and-insertion-failure-mode" title="Link to this heading"></a></h2>
+<p>Comparing empirical 9-mer MS ligands against the top 1% of 30,000 random 9-mers
+scored zero-shot by frozen <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> weights shows both why transfer works and
+where fixed-length pseudosequences reach their structural limit:</p>
+<figure class="align-default" id="id3">
+<img alt="Empirical versus zero-shot predicted 9-mer information-content sequence logos for Brushtail possum Trvu-UB*01:01, Cat FLA-E*003:01, Tasmanian devil Saha, and Bat Ptal-N*01:01." src="_images/zero_shot_motifs.svg" />
+<figcaption>
+<p><span class="caption-text">Empirical 9-mer ligands (top row) compared against the top 1% zero-shot predicted 9-mers from 30,000 random background peptides (bottom row).</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<ul class="simple">
+<li><p><strong>Cat <code class="docutils literal notranslate"><span class="pre">FLA-E*003:01</span></code> (canonical groove, n = 1,610 9-mers):</strong> zero-shot
+predictions recover both the P2-Pro and P9-Arg/Lys anchor preferences without
+any feline training data.</p></li>
+<li><p><strong>Brushtail possum <code class="docutils literal notranslate"><span class="pre">Trvu-UB*01:01</span></code> (n = 5,597 9-mers) and Tasmanian devil
+<code class="docutils literal notranslate"><span class="pre">Saha</span></code>:</strong> despite ~160 Myr of divergence and zero marsupial training data,
+frozen <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> weights recover the aromatic/hydrophobic P9 anchor chemistry
+and achieve AUROC 0.852 (vs 0.551 for <code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code>).</p></li>
+<li><p><strong>Bat <code class="docutils literal notranslate"><span class="pre">Ptal-N*01:01</span></code> (honest failure mode):</strong> <code class="docutils literal notranslate"><span class="pre">Ptal-N*01:01</span></code> carries a 3-aa
+<code class="docutils literal notranslate"><span class="pre">MDL</span></code> insertion at mature position 51 that remodels the A-pocket (driving a
+strong empirical P1-Asp and P9-Pro preference) together with a rare <code class="docutils literal notranslate"><span class="pre">Y171H</span></code>
+substitution. Because a fixed 39-aa pseudosequence omits the <code class="docutils literal notranslate"><span class="pre">MDL</span></code> insertion
+and <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> has zero bat training data, predicted affinities collapse to flat
+~26–30 µM IC50s (1.1× separation). <code class="docutils literal notranslate"><span class="pre">mhcseqs</span> <span class="pre">&gt;=</span> <span class="pre">2.9.0</span></code> explicitly flags these
+insertions via <code class="docutils literal notranslate"><span class="pre">logging.warning</span></code>.</p></li>
+<li><p><strong>Amphibian <code class="docutils literal notranslate"><span class="pre">Xela-UAAg</span></code> and Duck <code class="docutils literal notranslate"><span class="pre">Anpl-UAA*01</span></code> caveat:</strong> on <code class="docutils literal notranslate"><span class="pre">Xela-UAAg</span></code>
+(carrying both <code class="docutils literal notranslate"><span class="pre">+1</span> <span class="pre">aa</span> <span class="pre">K</span></code> and <code class="docutils literal notranslate"><span class="pre">+2</span> <span class="pre">aa</span> <span class="pre">NA</span></code> pocket insertions), the target groove
+AUROC (0.818) matches the <code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code> negative control (0.815), indicating
+that ranking performance on those 26 peptides reflects shared hydrophobic
+composition rather than frog-specific groove accuracy. Always inspect the
+negative control and alignment warnings when predicting on deeply diverged
+clades.</p></li>
+</ul>
+</section>
+<section id="binding-pocket-point-mutant-sensitivity">
+<h2>Binding-pocket point-mutant sensitivity<a class="headerlink" href="#binding-pocket-point-mutant-sensitivity" title="Link to this heading"></a></h2>
+<p>Using <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code> mature-numbered <code class="docutils literal notranslate"><span class="pre">mutations=...</span></code>, single-residue binding-pocket
+substitutions improve discrimination over the corresponding wild-type grooves
+on mutant-specific IEDB ligands:</p>
+<figure class="align-default" id="id4">
+<img alt="Wild-type versus point-mutant groove AUROC and paired per-peptide log10 IC50 scatter plots for Pig SLA-1*04:01 R156A and Cat FLA-E*018:01 W167S." src="_images/pocket_mutants.svg" />
+<figcaption>
+<p><span class="caption-text">Single-residue binding-pocket substitutions extracted via mhcseqs mutations=(…) outperform their wild-type grooves on mutant-specific ligands for both Pig SLA-1<em>04:01 R156A (ΔAUROC = +0.010, 95% paired CI [+0.007, +0.013]) and Cat FLA-E</em>018:01 W167S (ΔAUROC = +0.006, 95% paired CI [+0.000, +0.015]).</span><a class="headerlink" href="#id4" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="zero-shot-presentation-with-real-proteome-flanks-hitlist-validation">
+<h2>Zero-shot Presentation with real proteome flanks (<code class="docutils literal notranslate"><span class="pre">hitlist</span></code> validation)<a class="headerlink" href="#zero-shot-presentation-with-real-proteome-flanks-hitlist-validation" title="Link to this heading"></a></h2>
+<p>Beyond affinity-only ligand ranking, MHCflurry <code class="docutils literal notranslate"><span class="pre">2.5.x</span></code> also supports zero-shot
+<strong>Class I Presentation</strong> (<code class="docutils literal notranslate"><span class="pre">Class1PresentationPredictor</span></code>, combining pan-allele
+affinity with MHCflurry’s human-trained antigen-processing model) on previously
+unseen vertebrate species. Evaluating frozen <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> weights against
+<a class="reference external" href="https://github.com/pirl-unc/hitlist"><code class="docutils literal notranslate"><span class="pre">hitlist</span></code></a> Class I MS immunopeptidomics,
+direct ligands, and experimental <code class="docutils literal notranslate"><span class="pre">+/-</span></code> binding assays across <strong>11 unseen
+vertebrate species</strong> (+184 net new vertebrate species in <code class="docutils literal notranslate"><span class="pre">mhcseqs</span> <span class="pre">2.12.x</span></code> vs
+<code class="docutils literal notranslate"><span class="pre">2.3.0</span></code>) demonstrates that antigen processing and real species proteome flanks
+transfer even across ~160 Myr of divergence to marsupials:</p>
+<figure class="align-default" id="id5">
+<img alt="Taxonomic expansion of complete Class I grooves from 47 species in MHCflurry 2.3.0 to 227 species in mhcseqs 2.12, paired with a heatmap of hitlist Class I validation datasets by species and experimental modality." src="_images/fig1_species_and_validation_landscape.svg" />
+<figcaption>
+<p><span class="caption-text">Left: distinct vertebrate species with complete Class I grooves by clade (+184 net new species vs MHCflurry 2.3.0). Right: hitlist Class I validation data availability across unseen vertebrate species, unseen alleles/mutants, and trained reference controls by experimental modality.</span><a class="headerlink" href="#id5" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<figure class="align-default" id="id6">
+<img alt="Presentation with and without real species proteome flanks versus Affinity and Processing alone on hitlist MS elutions for zero-shot Tasmanian devil and trained Dog and Rhesus macaque reference alleles." src="_images/fig2_hitlist_presentation_vs_affinity.svg" />
+<figcaption>
+<p><span class="caption-text">Zero-shot Presentation with real proteome flanks versus Affinity on hitlist MS elutions (10:1 same-proteome length-matched decoys, 95% bootstrap CI). On Tasmanian devil (Sarcophilus harrisii, 0 training rows, 15,301 proteome-mapped ligands), adding MHCflurry’s human-trained processing model and real marsupial flanks lifts AUROC from 0.749 to 0.806 (+0.057) and PPV&#64;N from 0.273 to 0.356 (+30% relative enrichment).</span><a class="headerlink" href="#id6" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<figure class="align-default" id="id7">
+<img alt="Experimental positive versus negative binding assay AUROC without synthetic decoys and zero-shot Affinity versus Presentation ligand ranking AUROC across 11 unseen vertebrate species and binding-pocket mutants." src="_images/fig3_hitlist_zeroshot_binding_and_ligands.svg" />
+<figcaption>
+<p><span class="caption-text">Left: experimental positive-versus-negative binding assays (no synthetic decoys) from hitlist/binding.parquet. Right: zero-shot Affinity (solid) and no-flank Presentation (hatched) ligand ranking AUROC against 10:1 length-matched background decoys across 11 unseen vertebrate species and 3 engineered binding-pocket mutants.</span><a class="headerlink" href="#id7" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="pan-allele-training-parity-generate-sh-migration">
+<h2>Pan-allele training parity &amp; <code class="docutils literal notranslate"><span class="pre">GENERATE.sh</span></code> migration<a class="headerlink" href="#pan-allele-training-parity-generate-sh-migration" title="Link to this heading"></a></h2>
+<p>Auditing all <strong>307</strong> trained alleles in <code class="docutils literal notranslate"><span class="pre">curated_training_data.csv.bz2</span></code>
+(<code class="docutils literal notranslate"><span class="pre">988,285</span></code> rows) against <code class="docutils literal notranslate"><span class="pre">mhcseqs</span> <span class="pre">2.12</span></code> shows <strong>300 / 307</strong> are already
+bit-for-bit identical (39/39 residues), while <strong>7 / 307</strong> chicken <code class="docutils literal notranslate"><span class="pre">Gaga-BF1/BF2</span></code>
+alleles had an <code class="docutils literal notranslate"><span class="pre">X</span></code> in <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> that <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code> resolves. In a controlled A/B
+pan-allele training run (<code class="docutils literal notranslate"><span class="pre">[1024,</span> <span class="pre">1024]</span></code> architecture, all 307 trained alleles,
+30,760 train / 7,690 held-out test, seed 42), locking existing alleles verbatim
+via <code class="docutils literal notranslate"><span class="pre">--lock-existing</span></code> reproduces legacy <code class="docutils literal notranslate"><span class="pre">clustalo</span></code> training <strong>bit-for-bit</strong>
+(<code class="docutils literal notranslate"><span class="pre">Max</span> <span class="pre">abs</span> <span class="pre">diff</span> <span class="pre">=</span> <span class="pre">0.0</span></code>, <code class="docutils literal notranslate"><span class="pre">log10</span> <span class="pre">Pearson</span> <span class="pre">r</span> <span class="pre">=</span> <span class="pre">1.000000</span></code>, <code class="docutils literal notranslate"><span class="pre">AUROC</span> <span class="pre">=</span> <span class="pre">0.80169</span></code> on both
+arms) while adding all +184 new vertebrate species.</p>
+<p>Accordingly, <code class="docutils literal notranslate"><span class="pre">downloads-generation/allele_sequences/GENERATE.sh</span></code> now defaults
+to <code class="docutils literal notranslate"><span class="pre">MHCFLURRY_ALLELE_SEQUENCES_BACKEND=mhcseqs</span></code>, running
+<code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">pseudosequences</span> <span class="pre">build</span> <span class="pre">--existing-csv</span> <span class="pre">...</span> <span class="pre">--lock-existing</span></code> followed
+by <code class="docutils literal notranslate"><span class="pre">verify_trained_allele_parity.py</span></code> to enforce <strong>0 missing alleles and 0
+character diffs</strong> on every trained allele in <code class="docutils literal notranslate"><span class="pre">curated_training_data.csv.bz2</span></code>.
+Pass <code class="docutils literal notranslate"><span class="pre">MHCFLURRY_ALLELE_SEQUENCES_BACKEND=legacy</span></code> to run the original
+<code class="docutils literal notranslate"><span class="pre">wget</span> <span class="pre">+</span> <span class="pre">clustalo</span> <span class="pre">+</span> <span class="pre">make_allele_sequences.py</span></code> workflow.</p>
+<p>For the full dated experiment write-ups—including the 16-cohort
+groove-specificity synthesis figure, complete results tables, upstream
+nomenclature unification (<code class="docutils literal notranslate"><span class="pre">mhcgnomes.AccessionedAllele</span></code> across 230+ vertebrate
+species in <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">&gt;=</span> <span class="pre">2.5.9</span></code>), and our speculative zero-shot Class I →
+Class II pan-class experiment against <code class="docutils literal notranslate"><span class="pre">NetMHCIIpan-4.3</span></code>—see
+<a class="reference internal" href="experiment_25x_cross_species_hitlist.html"><span class="doc">Experiment 2026-11-25: Cross-species hitlist validation &amp; mhcseqs training parity</span></a> and
+<a class="reference internal" href="experiment_25x_pan_class_ii.html"><span class="doc">Experiment 2026-11-25: Speculative pan-class Class I → Class II transfer via mhcseqs IMGT alignments</span></a> in the <a class="reference internal" href="experiments.html"><span class="doc">Experiment log</span></a> log.</p>
+</section>
+<section id="reproducing-the-benchmark-and-figures">
+<h2>Reproducing the benchmark and figures<a class="headerlink" href="#reproducing-the-benchmark-and-figures" title="Link to this heading"></a></h2>
+<p>The complete evaluation and plotting pipeline lives in
+<a class="reference external" href="https://github.com/openvax/mhcflurry/blob/master/scripts/benchmark_cross_species_mhcseqs.py"><code class="docutils literal notranslate"><span class="pre">scripts/benchmark_cross_species_mhcseqs.py</span></code></a>:</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>scripts/benchmark_cross_species_mhcseqs.py<span class="w"> </span>--collect<span class="w"> </span>--plot<span class="w"> </span>--out-dir<span class="w"> </span>./cross_species_250
+</pre></div>
+</div>
+<p>It uses frozen MHCflurry <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> weights (<code class="docutils literal notranslate"><span class="pre">models_class1_presentation</span></code>),
+<code class="docutils literal notranslate"><span class="pre">mhcseqs</span> <span class="pre">2.9.0</span></code> (<code class="docutils literal notranslate"><span class="pre">mhc-full-seqs.csv</span></code>), PDB heavy chains <code class="docutils literal notranslate"><span class="pre">6A2B</span></code> (<code class="docutils literal notranslate"><span class="pre">Xela-UAAg</span></code>)
+and <code class="docutils literal notranslate"><span class="pre">4ZUU</span></code> (<code class="docutils literal notranslate"><span class="pre">Eqca-N*006:02</span></code>), <code class="docutils literal notranslate"><span class="pre">curated_training_data.csv.bz2</span></code> (to enforce zero
+training overlap), and live IEDB Class I queries cached locally under
+<code class="docutils literal notranslate"><span class="pre">--out-dir/cache/</span></code>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="dla_validation.html" class="btn btn-neutral float-left" title="DLA evidence and canine evaluation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="experiments.html" class="btn btn-neutral float-right" title="Experiment log" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Nov 26, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

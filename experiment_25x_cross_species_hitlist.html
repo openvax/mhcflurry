@@ -1,0 +1,404 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Experiment 2026-11-25: Cross-species hitlist validation &amp; mhcseqs training parity &mdash; MHCflurry 2.5.11 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=b06e8534"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Training models" href="training.html" />
+    <link rel="prev" title="Experiment 2026-11-25: Speculative pan-class Class I → Class II transfer via mhcseqs IMGT alignments" href="experiment_25x_pan_class_ii.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_tutorial.html">Python library tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docker.html">Running MHCflurry in Docker</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dla_validation.html">DLA evidence and canine evaluation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cross_species_validation.html">Cross-species alleles, pseudosequences, and zero-shot validation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="experiments.html">Experiment log</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="experiments.html#series">2.5 series</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="experiments.html#id1">2.3 series</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="experiment_25x_pan_class_ii.html">Experiment 2026-11-25: Speculative pan-class Class I → Class II transfer via <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code> IMGT alignments</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Experiment 2026-11-25: Cross-species <code class="docutils literal notranslate"><span class="pre">hitlist</span></code> validation &amp; <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code> training parity</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#taxonomic-expansion-hitlist-validation-data-landscape">1. Taxonomic expansion &amp; <code class="docutils literal notranslate"><span class="pre">hitlist</span></code> validation data landscape</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#zero-shot-presentation-real-proteome-flanks-vs-affinity-on-hitlist-ms-elutions">2. Zero-shot Presentation (+ real proteome flanks) vs Affinity on <code class="docutils literal notranslate"><span class="pre">hitlist</span></code> MS elutions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#experimental-binding-broad-zero-shot-ranking-across-16-unseen-species-mutant-sets">3. Experimental <code class="docutils literal notranslate"><span class="pre">+/-</span></code> binding &amp; broad zero-shot ranking across 16 unseen-species &amp; mutant sets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#controlled-a-b-pan-allele-training-parity-generate-sh-gate">4. Controlled A/B pan-allele training parity &amp; <code class="docutils literal notranslate"><span class="pre">GENERATE.sh</span></code> gate</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#upstream-data-hygiene-nomenclature-unification-issues">Upstream data hygiene &amp; nomenclature unification issues</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Release notes and changelog</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="experiments.html">Experiment log</a></li>
+      <li class="breadcrumb-item active">Experiment 2026-11-25: Cross-species <code class="docutils literal notranslate"><span class="pre">hitlist</span></code> validation &amp; <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code> training parity</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/experiment_25x_cross_species_hitlist.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="experiment-2026-11-25-cross-species-hitlist-validation-mhcseqs-training-parity">
+<h1>Experiment 2026-11-25: Cross-species <code class="docutils literal notranslate"><span class="pre">hitlist</span></code> validation &amp; <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code> training parity<a class="headerlink" href="#experiment-2026-11-25-cross-species-hitlist-validation-mhcseqs-training-parity" title="Link to this heading"></a></h1>
+<p><strong>Date:</strong> 2026-11-25
+<strong>Software:</strong> <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">2.5.x</span></code>, frozen <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> weights (<code class="docutils literal notranslate"><span class="pre">models_class1_presentation</span></code>), <code class="docutils literal notranslate"><span class="pre">mhcseqs</span> <span class="pre">2.12.x</span></code>, <code class="docutils literal notranslate"><span class="pre">mhcgnomes</span> <span class="pre">3.77–3.81</span></code>
+<strong>Goal:</strong> Quantify (1) vertebrate species expansion from <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code>, (2) zero-shot Class I Affinity and Presentation (with real species proteome flanks) accuracy on previously unseen species in <a class="reference external" href="https://github.com/pirl-unc/hitlist"><code class="docutils literal notranslate"><span class="pre">hitlist</span></code></a> and IEDB, and (3) controlled A/B pan-allele training parity before migrating <code class="docutils literal notranslate"><span class="pre">downloads-generation/allele_sequences/GENERATE.sh</span></code> to <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code>.</p>
+<hr class="docutils" />
+<section id="taxonomic-expansion-hitlist-validation-data-landscape">
+<h2>1. Taxonomic expansion &amp; <code class="docutils literal notranslate"><span class="pre">hitlist</span></code> validation data landscape<a class="headerlink" href="#taxonomic-expansion-hitlist-validation-data-landscape" title="Link to this heading"></a></h2>
+<p>Complete Class I binding-groove coverage expands from <strong>47 species</strong> (only <strong>10 species / 308 alleles</strong> trained in <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code>) to <strong>227 species</strong> in <code class="docutils literal notranslate"><span class="pre">mhcseqs</span> <span class="pre">2.12</span></code> (<strong>231 union</strong>, <strong>26,549 complete grooves</strong>, <strong>+184 net new vertebrate species</strong> across 14 clades): bony fish <code class="docutils literal notranslate"><span class="pre">2→53</span> <span class="pre">(+51)</span></code>, birds <code class="docutils literal notranslate"><span class="pre">1→42</span> <span class="pre">(+41)</span></code>, other mammals <code class="docutils literal notranslate"><span class="pre">0→28</span> <span class="pre">(+28)</span></code>, reptiles <code class="docutils literal notranslate"><span class="pre">0→17</span> <span class="pre">(+17)</span></code>, amphibians <code class="docutils literal notranslate"><span class="pre">0→17</span> <span class="pre">(+17)</span></code>, rodents <code class="docutils literal notranslate"><span class="pre">2→15</span> <span class="pre">(+13)</span></code>, marsupials <code class="docutils literal notranslate"><span class="pre">0→7</span> <span class="pre">(+7)</span></code>, sharks &amp; rays <code class="docutils literal notranslate"><span class="pre">0→4</span> <span class="pre">(+4)</span></code>, bats <code class="docutils literal notranslate"><span class="pre">0→4</span> <span class="pre">(+4)</span></code>, and cetaceans <code class="docutils literal notranslate"><span class="pre">0→2</span> <span class="pre">(+2)</span></code>.</p>
+<figure class="align-default" id="id1">
+<img alt="Taxonomic expansion of complete Class I grooves (+184 net new species across 14 vertebrate clades) paired with a heatmap of hitlist Class I validation datasets by species and experimental modality." src="_images/fig1_species_and_validation_landscape.svg" />
+<figcaption>
+<p><span class="caption-text">Left: distinct vertebrate species with complete Class I grooves in MHCflurry 2.3.0 versus MHCflurry 2.5.x + mhcseqs 2.12. Right: hitlist Class I validation data availability across 10 unseen vertebrate species, 2 unseen allele/mutant cohorts in trained species, and 2 trained MS reference controls.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<hr class="docutils" />
+<section id="zero-shot-presentation-real-proteome-flanks-vs-affinity-on-hitlist-ms-elutions">
+<h2>2. Zero-shot Presentation (+ real proteome flanks) vs Affinity on <code class="docutils literal notranslate"><span class="pre">hitlist</span></code> MS elutions<a class="headerlink" href="#zero-shot-presentation-real-proteome-flanks-vs-affinity-on-hitlist-ms-elutions" title="Link to this heading"></a></h2>
+<p>For cellular MS immunopeptidomics datasets with mapped host proteomes (<code class="docutils literal notranslate"><span class="pre">sarcophilus_harrisii.fasta</span></code>, <code class="docutils literal notranslate"><span class="pre">canis_lupus.fasta</span></code>, <code class="docutils literal notranslate"><span class="pre">macaca_mulatta.fasta</span></code>), we paired true eluted ligands against 10:1 length-matched decoys with real N- and C-terminal flanking sequences sampled from the same species proteome and scored frozen <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> weights with zero retraining:</p>
+<figure class="align-default" id="id2">
+<img alt="Presentation with and without real species proteome flanks versus Affinity and Processing alone on hitlist MS elutions for zero-shot Tasmanian devil and trained Dog and Rhesus reference alleles." src="_images/fig2_hitlist_presentation_vs_affinity.svg" />
+<figcaption>
+<p><span class="caption-text">Zero-shot Presentation (+ real species proteome flanks) versus Affinity on hitlist MS elutions (10:1 same-proteome length-matched decoys, 95% stratified bootstrap CI).</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head text-left"><p>Dataset (<code class="docutils literal notranslate"><span class="pre">hitlist</span></code> MS)</p></th>
+<th class="head text-left"><p>Status</p></th>
+<th class="head text-right"><p>Mapped Pos (Eval / Total)</p></th>
+<th class="head text-right"><p>Affinity AUROC</p></th>
+<th class="head text-right"><p>Processing (+F) AUROC</p></th>
+<th class="head text-right"><p>Pres (noF) AUROC</p></th>
+<th class="head text-right"><p><strong>Pres (+ real flanks)</strong></p></th>
+<th class="head text-right"><p>Δ (Pres+F − Aff)</p></th>
+<th class="head text-right"><p>PPV&#64;N (Aff → Pres+F)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td class="text-left"><p><strong>Tasmanian devil <code class="docutils literal notranslate"><span class="pre">Saha</span></code></strong> (11 grooves)</p></td>
+<td class="text-left"><p><strong>0-shot Marsupialia</strong></p></td>
+<td class="text-right"><p>2,500 / 15,301</p></td>
+<td class="text-right"><p>0.749</p></td>
+<td class="text-right"><p><strong>0.750</strong></p></td>
+<td class="text-right"><p>0.791</p></td>
+<td class="text-right"><p><strong>0.806</strong></p></td>
+<td class="text-right"><p><strong>+0.057</strong></p></td>
+<td class="text-right"><p><strong>0.273 → 0.356</strong> (+30%)</p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p>Dog <code class="docutils literal notranslate"><span class="pre">DLA-88*501:01</span></code></p></td>
+<td class="text-left"><p>Trained ref</p></td>
+<td class="text-right"><p>1,301 / 1,301</p></td>
+<td class="text-right"><p>0.933</p></td>
+<td class="text-right"><p>0.837</p></td>
+<td class="text-right"><p>0.942</p></td>
+<td class="text-right"><p><strong>0.947</strong></p></td>
+<td class="text-right"><p>+0.014</p></td>
+<td class="text-right"><p>0.711 → 0.746</p></td>
+</tr>
+<tr class="row-even"><td class="text-left"><p>Dog <code class="docutils literal notranslate"><span class="pre">DLA-88*034:01</span></code></p></td>
+<td class="text-left"><p>Trained ref</p></td>
+<td class="text-right"><p>355 / 355</p></td>
+<td class="text-right"><p>0.959</p></td>
+<td class="text-right"><p>0.875</p></td>
+<td class="text-right"><p>0.966</p></td>
+<td class="text-right"><p><strong>0.970</strong></p></td>
+<td class="text-right"><p>+0.011</p></td>
+<td class="text-right"><p>0.752 → 0.780</p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p>Rhesus <code class="docutils literal notranslate"><span class="pre">Mamu-B*008:01</span></code></p></td>
+<td class="text-left"><p>Trained ref</p></td>
+<td class="text-right"><p>874 / 874</p></td>
+<td class="text-right"><p>0.968</p></td>
+<td class="text-right"><p>0.866</p></td>
+<td class="text-right"><p>0.976</p></td>
+<td class="text-right"><p><strong>0.979</strong></p></td>
+<td class="text-right"><p>+0.011</p></td>
+<td class="text-right"><p>0.852 → 0.874</p></td>
+</tr>
+</tbody>
+</table>
+<p>Even across ~160 Myr of divergence to marsupials, MHCflurry’s human-trained processing model alone achieves <code class="docutils literal notranslate"><span class="pre">0.750</span></code> AUROC on Tasmanian devil peptides with real <em>S. harrisii</em> flanks and lifts combined Presentation by <code class="docutils literal notranslate"><span class="pre">+0.057</span></code> AUROC (<code class="docutils literal notranslate"><span class="pre">+30%</span></code> relative PPV&#64;N).</p>
+</section>
+<hr class="docutils" />
+<section id="experimental-binding-broad-zero-shot-ranking-across-16-unseen-species-mutant-sets">
+<h2>3. Experimental <code class="docutils literal notranslate"><span class="pre">+/-</span></code> binding &amp; broad zero-shot ranking across 16 unseen-species &amp; mutant sets<a class="headerlink" href="#experimental-binding-broad-zero-shot-ranking-across-16-unseen-species-mutant-sets" title="Link to this heading"></a></h2>
+<p>Non-MS datasets in <code class="docutils literal notranslate"><span class="pre">hitlist</span></code> (in-vitro refolding, purified-MHC fluorescence screens, and synthetic viral/mutant binding panels) have minimal host proteome coverage (<code class="docutils literal notranslate"><span class="pre">19</span> <span class="pre">/</span> <span class="pre">448</span> <span class="pre">=</span> <span class="pre">4.2%</span></code> mapped in <code class="docutils literal notranslate"><span class="pre">peptide_mappings.parquet</span></code>, and <code class="docutils literal notranslate"><span class="pre">0%</span></code> for the <code class="docutils literal notranslate"><span class="pre">5,607</span></code> synthetic random-library <code class="docutils literal notranslate"><span class="pre">Trvu-UB*01:01</span></code> peptides) and undergo no cellular proteasome/TAP processing, so <strong>Affinity</strong> is the primary metric (shown alongside no-flank Presentation and an <code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code> negative control on identical peptides):</p>
+<figure class="align-default" id="id3">
+<img alt="Experimental positive versus negative binding assay AUROC without synthetic decoys and zero-shot Affinity versus Presentation no-flank ligand ranking AUROC across unseen vertebrate species and pocket mutants." src="_images/fig3_hitlist_zeroshot_binding_and_ligands.svg" />
+<figcaption>
+<p><span class="caption-text">Left: experimental positive-versus-negative binding assays (no synthetic decoys) from hitlist/binding.parquet. Right: zero-shot Affinity (solid) and no-flank Presentation (hatched) ligand ranking against 10:1 length-matched background decoys.</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<figure class="align-default" id="id4">
+<img alt="Groove-specific zero-shot transfer compared to an HLA-A*02:01 negative control across all 16 unseen-species and mutant cohorts, paired with the controlled A/B pan-allele training parity comparison." src="_images/fig4_zeroshot_vs_control_and_parity.svg" />
+<figcaption>
+<p><span class="caption-text">Left: groove-specific zero-shot AUROC versus HLA-A*02:01 negative control across all 16 unseen-species and binding-pocket mutant datasets (sorted by Δ = Target − Control). Right: controlled A/B pan-allele training parity across all 307 trained 2.3.0 alleles.</span><a class="headerlink" href="#id4" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head text-left"><p>Unseen Species / Allele (Clade)</p></th>
+<th class="head text-left"><p>Validation Data Available</p></th>
+<th class="head text-right"><p>Ligand Ranking AUROC: Aff / Pres (noF)</p></th>
+<th class="head text-right"><p><code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code> Ctrl</p></th>
+<th class="head text-right"><p>Exp. <code class="docutils literal notranslate"><span class="pre">+/-</span></code> Binding AUROC <em>(no decoys)</em></p></th>
+<th class="head text-left"><p>Notes / Caveats</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td class="text-left"><p><strong>Cat <code class="docutils literal notranslate"><span class="pre">FLA-E*018:01</span></code></strong> (Carnivora)</p></td>
+<td class="text-left"><p>24 direct/bind + 16 <code class="docutils literal notranslate"><span class="pre">+/-</span></code> (<code class="docutils literal notranslate"><span class="pre">3+/13-</span></code>)</p></td>
+<td class="text-right"><p><strong>0.977</strong> / <strong>0.966</strong></p></td>
+<td class="text-right"><p>0.636</p></td>
+<td class="text-right"><p>0.308 <em>(3+/13-)</em></p></td>
+<td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">155</span> <span class="pre">vs</span> <span class="pre">16,992</span> <span class="pre">nM</span></code>; <code class="docutils literal notranslate"><span class="pre">2.5.0</span></code> full IEDB <code class="docutils literal notranslate"><span class="pre">24+/12-</span></code> gave <code class="docutils literal notranslate"><span class="pre">0.684</span></code></p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><strong>Cat <code class="docutils literal notranslate"><span class="pre">FLA-E*018:01</span> <span class="pre">W167S</span></code></strong> (Mutant)</p></td>
+<td class="text-left"><p>12 mutant ligands</p></td>
+<td class="text-right"><p><strong>0.976</strong> / <strong>0.981</strong></p></td>
+<td class="text-right"><p>0.642</p></td>
+<td class="text-right"><p>—</p></td>
+<td class="text-left"><p>Mutant groove beats WT (<code class="docutils literal notranslate"><span class="pre">Δ</span> <span class="pre">=</span> <span class="pre">+0.006</span></code>)</p></td>
+</tr>
+<tr class="row-even"><td class="text-left"><p><strong>Cat <code class="docutils literal notranslate"><span class="pre">FLA-E*003:01</span></code> &amp; <code class="docutils literal notranslate"><span class="pre">FLA-K*007:01</span></code></strong></p></td>
+<td class="text-left"><p>1,612 &amp; 491 MS ligands (<code class="docutils literal notranslate"><span class="pre">2.5.0</span></code> IEDB)</p></td>
+<td class="text-right"><p><strong>0.830</strong> &amp; <strong>0.880</strong></p></td>
+<td class="text-right"><p>0.562 / 0.659</p></td>
+<td class="text-right"><p>—</p></td>
+<td class="text-left"><p>Recovers P2-Pro &amp; P9-Arg/Lys motif zero-shot</p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><strong>Horse <code class="docutils literal notranslate"><span class="pre">Eqca-N*006:02</span></code></strong> (Unseen allele)</p></td>
+<td class="text-left"><p>6+ / 10− binding</p></td>
+<td class="text-right"><p><strong>0.967</strong> / <strong>0.956</strong></p></td>
+<td class="text-right"><p>0.611</p></td>
+<td class="text-right"><p>0.217 <em>(6+/10-)</em></p></td>
+<td class="text-left"><p>Single-mutant scan negatives (<code class="docutils literal notranslate"><span class="pre">n=16</span></code>)</p></td>
+</tr>
+<tr class="row-even"><td class="text-left"><p><strong>Pig <code class="docutils literal notranslate"><span class="pre">SLA-1*04:01</span> <span class="pre">R156A</span></code></strong> (Mutant)</p></td>
+<td class="text-left"><p>141 mutant ligands</p></td>
+<td class="text-right"><p><strong>0.951</strong> / <strong>0.946</strong></p></td>
+<td class="text-right"><p>0.706</p></td>
+<td class="text-right"><p>—</p></td>
+<td class="text-left"><p>Mutant groove beats WT (<code class="docutils literal notranslate"><span class="pre">Δ</span> <span class="pre">=</span> <span class="pre">+0.010</span></code>)</p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><strong>Mallard duck <code class="docutils literal notranslate"><span class="pre">Anpl-UAA*01</span></code></strong> (Aves)</p></td>
+<td class="text-left"><p>31 binding+</p></td>
+<td class="text-right"><p><strong>0.938</strong> / <strong>0.920</strong></p></td>
+<td class="text-right"><p>0.862</p></td>
+<td class="text-right"><p>—</p></td>
+<td class="text-left"><p>Indel-bearing avian groove; high ctrl baseline</p></td>
+</tr>
+<tr class="row-even"><td class="text-left"><p><strong>Pig <code class="docutils literal notranslate"><span class="pre">SLA-1*13:01</span> <span class="pre">F99Y</span></code></strong> (Mutant)</p></td>
+<td class="text-left"><p>60 mutant ligands</p></td>
+<td class="text-right"><p><strong>0.898</strong> / <strong>0.892</strong></p></td>
+<td class="text-right"><p>0.639</p></td>
+<td class="text-right"><p>—</p></td>
+<td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">227</span> <span class="pre">vs</span> <span class="pre">5,543</span> <span class="pre">nM</span></code></p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><strong>Mallard duck <code class="docutils literal notranslate"><span class="pre">Anpl-UAA*76</span></code></strong> (Aves)</p></td>
+<td class="text-left"><p>30 direct ligands</p></td>
+<td class="text-right"><p><strong>0.893</strong> / <strong>0.856</strong></p></td>
+<td class="text-right"><p>0.564</p></td>
+<td class="text-right"><p>—</p></td>
+<td class="text-left"><p>Strong <code class="docutils literal notranslate"><span class="pre">+0.329</span></code> lift over ctrl across ~310 Myr</p></td>
+</tr>
+<tr class="row-even"><td class="text-left"><p><strong>Giant panda <code class="docutils literal notranslate"><span class="pre">Aime-128</span></code></strong> (Carnivora)</p></td>
+<td class="text-left"><p>21 direct/bind (PDB <code class="docutils literal notranslate"><span class="pre">7DC6</span></code>)</p></td>
+<td class="text-right"><p><strong>0.883</strong> / <strong>0.906</strong></p></td>
+<td class="text-right"><p>0.718</p></td>
+<td class="text-right"><p>—</p></td>
+<td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">432</span> <span class="pre">vs</span> <span class="pre">15,828</span> <span class="pre">nM</span></code></p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><strong>Brushtail possum <code class="docutils literal notranslate"><span class="pre">Trvu-UB*01:01</span></code></strong> (Marsupial)</p></td>
+<td class="text-left"><p>5,607 direct/fluo + 31 <code class="docutils literal notranslate"><span class="pre">+/-</span></code> (<code class="docutils literal notranslate"><span class="pre">14+/17-</span></code>)</p></td>
+<td class="text-right"><p><strong>0.869</strong> / <strong>0.849</strong></p></td>
+<td class="text-right"><p>0.570</p></td>
+<td class="text-right"><p><strong>0.655</strong> <em>(14+/17-)</em></p></td>
+<td class="text-left"><p><code class="docutils literal notranslate"><span class="pre">+0.299</span></code> over ctrl (<code class="docutils literal notranslate"><span class="pre">1,182</span> <span class="pre">vs</span> <span class="pre">5,237</span> <span class="pre">nM</span></code> on <code class="docutils literal notranslate"><span class="pre">+/-</span></code>)</p></td>
+</tr>
+<tr class="row-even"><td class="text-left"><p><strong>Cynomolgus <code class="docutils literal notranslate"><span class="pre">Mafa-A1*063:01</span></code></strong> (NHP)</p></td>
+<td class="text-left"><p>56 <code class="docutils literal notranslate"><span class="pre">+/-</span></code> binding (<code class="docutils literal notranslate"><span class="pre">54+/2-</span></code>)</p></td>
+<td class="text-right"><p><strong>0.868</strong> / <strong>0.830</strong></p></td>
+<td class="text-right"><p>0.666</p></td>
+<td class="text-right"><p><strong>0.889</strong> <em>(54+/2-)</em></p></td>
+<td class="text-left"><p>Ctrl <code class="docutils literal notranslate"><span class="pre">0.157</span></code> on <code class="docutils literal notranslate"><span class="pre">+/-</span></code> (<code class="docutils literal notranslate"><span class="pre">1,325</span> <span class="pre">vs</span> <span class="pre">9,663</span> <span class="pre">nM</span></code>)</p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><strong>African clawed frog <code class="docutils literal notranslate"><span class="pre">Xela-UAAg</span></code></strong> (Amphibia)</p></td>
+<td class="text-left"><p>26 direct/bind + 19 <code class="docutils literal notranslate"><span class="pre">+/-</span></code> (<code class="docutils literal notranslate"><span class="pre">14+/5-</span></code>)</p></td>
+<td class="text-right"><p>0.826 / 0.828</p></td>
+<td class="text-right"><p>0.810</p></td>
+<td class="text-right"><p>0.357 <em>(14+/5-)</em></p></td>
+<td class="text-left"><p>Caveat: matches ctrl (composition bias + 2 pocket insertions)</p></td>
+</tr>
+<tr class="row-even"><td class="text-left"><p><strong>Rabbit <code class="docutils literal notranslate"><span class="pre">RLA-A*01</span></code></strong> (Lagomorpha)</p></td>
+<td class="text-left"><p>27 <code class="docutils literal notranslate"><span class="pre">+/-</span></code> binding (<code class="docutils literal notranslate"><span class="pre">11+/16-</span></code>)</p></td>
+<td class="text-right"><p>0.787 / 0.792</p></td>
+<td class="text-right"><p>0.969</p></td>
+<td class="text-right"><p>0.562 <em>(11+/16-)</em></p></td>
+<td class="text-left"><p>Shares P2/P9 hydrophobic motif with <code class="docutils literal notranslate"><span class="pre">HLA-A*02:01</span></code></p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><strong>Tasmanian devil <code class="docutils literal notranslate"><span class="pre">Saha</span></code></strong> (Marsupial)</p></td>
+<td class="text-left"><p>23,973 unique MS (<code class="docutils literal notranslate"><span class="pre">15,301</span></code> flanked)</p></td>
+<td class="text-right"><p><strong>0.772</strong> / <strong>0.803</strong> <em>(0.806 +F)</em></p></td>
+<td class="text-right"><p>0.666</p></td>
+<td class="text-right"><p>—</p></td>
+<td class="text-left"><p>Multi-allelic (11 UniProt grooves)</p></td>
+</tr>
+<tr class="row-even"><td class="text-left"><p><strong>Norway rat <code class="docutils literal notranslate"><span class="pre">RT1-A*a</span></code></strong> (Rodentia)</p></td>
+<td class="text-left"><p>5 binding+ (24 obs)</p></td>
+<td class="text-right"><p>0.720 / <strong>0.940</strong></p></td>
+<td class="text-right"><p>0.728</p></td>
+<td class="text-right"><p>—</p></td>
+<td class="text-left"><p>Tiny sample (<code class="docutils literal notranslate"><span class="pre">n=5</span></code>)</p></td>
+</tr>
+<tr class="row-odd"><td class="text-left"><p><strong>Black flying fox <code class="docutils literal notranslate"><span class="pre">Ptal-N*01:01</span></code></strong> (Bat)</p></td>
+<td class="text-left"><p>86 <code class="docutils literal notranslate"><span class="pre">+/-</span></code> binding (<code class="docutils literal notranslate"><span class="pre">37+/43-</span></code>)</p></td>
+<td class="text-right"><p>0.593 / 0.717</p></td>
+<td class="text-right"><p>0.520</p></td>
+<td class="text-right"><p><strong>0.606</strong> <em>(37+/43-)</em></p></td>
+<td class="text-left"><p>Mechanistic failure mode: <code class="docutils literal notranslate"><span class="pre">+3aa</span> <span class="pre">MDL</span></code> A-pocket insertion omitted by 39-aa pseudoseq (auto-warned by <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code>)</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<hr class="docutils" />
+<section id="controlled-a-b-pan-allele-training-parity-generate-sh-gate">
+<h2>4. Controlled A/B pan-allele training parity &amp; <code class="docutils literal notranslate"><span class="pre">GENERATE.sh</span></code> gate<a class="headerlink" href="#controlled-a-b-pan-allele-training-parity-generate-sh-gate" title="Link to this heading"></a></h2>
+<p>Auditing all <code class="docutils literal notranslate"><span class="pre">308</span></code> trained alleles in <code class="docutils literal notranslate"><span class="pre">curated_training_data.csv.bz2</span></code> against <code class="docutils literal notranslate"><span class="pre">mhcseqs</span> <span class="pre">2.12</span></code> showed <code class="docutils literal notranslate"><span class="pre">297</span> <span class="pre">/</span> <span class="pre">297</span></code> mammalian trained alleles match <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code>’s legacy <code class="docutils literal notranslate"><span class="pre">clustalo</span></code> pseudosequences 39-for-39, while <code class="docutils literal notranslate"><span class="pre">7</span></code> chicken <code class="docutils literal notranslate"><span class="pre">Gaga-BF1/BF2</span></code> alleles (<code class="docutils literal notranslate"><span class="pre">176</span></code> rows) differ at an indel alignment site and <code class="docutils literal notranslate"><span class="pre">4</span></code> alleles (<code class="docutils literal notranslate"><span class="pre">H2-D*q</span></code>, <code class="docutils literal notranslate"><span class="pre">H2-L*q</span></code>, <code class="docutils literal notranslate"><span class="pre">Gogo-B*01:01</span></code>, <code class="docutils literal notranslate"><span class="pre">HLA-A*30:14L</span></code>) were filed upstream as <code class="docutils literal notranslate"><span class="pre">pirl-unc/mhcseqs#141</span></code> (closed in <code class="docutils literal notranslate"><span class="pre">mhcseqs</span> <span class="pre">2.12.5</span></code>).</p>
+<p>In a controlled A/B pan-allele training run (<code class="docutils literal notranslate"><span class="pre">[1024,</span> <span class="pre">1024]</span></code> architecture, <code class="docutils literal notranslate"><span class="pre">30,760</span></code> train / <code class="docutils literal notranslate"><span class="pre">7,690</span></code> held-out test across all trained alleles, seed <code class="docutils literal notranslate"><span class="pre">42</span></code>):</p>
+<p>| Arm | Pseudosequence Table | Held-out AUROC (all) | Chicken <code class="docutils literal notranslate"><span class="pre">Gaga</span></code> AUROC | Max <code class="docutils literal notranslate"><span class="pre">|Δ|</span></code> vs Arm A | <code class="docutils literal notranslate"><span class="pre">log10</span> <span class="pre">r</span></code> vs Arm A |
+| :— | :— | —: | —: | —: | —: |
+| <strong>Arm A</strong> | Legacy <code class="docutils literal notranslate"><span class="pre">2.3.0</span></code> <code class="docutils literal notranslate"><span class="pre">clustalo</span></code> | <code class="docutils literal notranslate"><span class="pre">0.80169</span></code> | <code class="docutils literal notranslate"><span class="pre">0.57025</span></code> | <code class="docutils literal notranslate"><span class="pre">0.0</span></code> | <code class="docutils literal notranslate"><span class="pre">1.000000</span></code> |
+| <strong>Arm B</strong> | <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code> + <code class="docutils literal notranslate"><span class="pre">--lock-existing</span></code> | <strong><code class="docutils literal notranslate"><span class="pre">0.80169</span></code></strong> | <strong><code class="docutils literal notranslate"><span class="pre">0.57025</span></code></strong> | <strong><code class="docutils literal notranslate"><span class="pre">0.0</span></code></strong> | <strong><code class="docutils literal notranslate"><span class="pre">1.000000</span></code></strong> |
+| <strong>Arm C</strong> | <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code> (<code class="docutils literal notranslate"><span class="pre">prefer_existing=True</span></code>, unlocking 7 <code class="docutils literal notranslate"><span class="pre">Gaga-BF</span></code>) | <code class="docutils literal notranslate"><span class="pre">0.83151</span></code> | <code class="docutils literal notranslate"><span class="pre">0.52342</span></code> | non-zero | <code class="docutils literal notranslate"><span class="pre">0.920</span></code> |</p>
+<p>This directly validated migrating <code class="docutils literal notranslate"><span class="pre">downloads-generation/allele_sequences/GENERATE.sh</span></code> to <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">pseudosequences</span> <span class="pre">build</span> <span class="pre">--lock-existing</span></code> with <code class="docutils literal notranslate"><span class="pre">verify_trained_allele_parity.py</span></code> enforcing <code class="docutils literal notranslate"><span class="pre">308</span> <span class="pre">/</span> <span class="pre">308</span></code> bit-for-bit identical trained alleles.</p>
+</section>
+<section id="upstream-data-hygiene-nomenclature-unification-issues">
+<h2>Upstream data hygiene &amp; nomenclature unification issues<a class="headerlink" href="#upstream-data-hygiene-nomenclature-unification-issues" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference external" href="https://github.com/pirl-unc/mhcseqs/issues/141"><code class="docutils literal notranslate"><span class="pre">pirl-unc/mhcseqs#141</span></code></a> <em>(closed in <code class="docutils literal notranslate"><span class="pre">mhcseqs</span> <span class="pre">2.12.5</span></code>)</em> — canonical names for <code class="docutils literal notranslate"><span class="pre">H2-D*q</span></code> (<code class="docutils literal notranslate"><span class="pre">Q31145</span></code>), <code class="docutils literal notranslate"><span class="pre">H2-L*q</span></code> (<code class="docutils literal notranslate"><span class="pre">Q31151</span></code>), <code class="docutils literal notranslate"><span class="pre">Gogo-B*01:01</span></code>, <code class="docutils literal notranslate"><span class="pre">HLA-A*30:14L</span></code>.</p></li>
+<li><p><a class="reference external" href="https://github.com/pirl-unc/mhcgnomes/issues/306"><code class="docutils literal notranslate"><span class="pre">pirl-unc/mhcgnomes#306</span></code></a> <em>(closed in <code class="docutils literal notranslate"><span class="pre">mhcgnomes</span> <span class="pre">3.87.0</span></code>)</em> — bare UniProt accessions (<code class="docutils literal notranslate"><span class="pre">H2LR16..44</span></code> Japanese medaka fish → mouse <code class="docutils literal notranslate"><span class="pre">H2-L*r16..44</span></code>; <code class="docutils literal notranslate"><span class="pre">P01898..</span></code> → human pseudogene <code class="docutils literal notranslate"><span class="pre">HLA-P*</span></code>); fixed upstream in <code class="docutils literal notranslate"><span class="pre">mhcgnomes</span> <span class="pre">3.87.0</span></code> and also guarded defensively in <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">&gt;=</span> <span class="pre">2.5.8</span></code>.</p></li>
+<li><p><a class="reference external" href="https://github.com/pirl-unc/mhcgnomes/issues/311"><code class="docutils literal notranslate"><span class="pre">pirl-unc/mhcgnomes#311</span></code></a> &amp; <a class="reference external" href="https://github.com/pirl-unc/mhcseqs/issues/150"><code class="docutils literal notranslate"><span class="pre">pirl-unc/mhcseqs#150</span></code></a> / <a class="reference external" href="https://github.com/pirl-unc/mhcseqs/pull/152"><code class="docutils literal notranslate"><span class="pre">#152</span></code></a> <em>(shipped in <code class="docutils literal notranslate"><span class="pre">mhcgnomes</span> <span class="pre">3.84+</span></code> and <code class="docutils literal notranslate"><span class="pre">mhcseqs</span> <span class="pre">2.14.0</span></code>)</em> — unifies sequence-backed non-model vertebrate MHC identifiers (e.g. <code class="docutils literal notranslate"><span class="pre">TriakisScyllium-UAA*uniprot:O46817</span></code>, <code class="docutils literal notranslate"><span class="pre">Saha*uniprot:G3V1L5</span> <span class="pre">class</span> <span class="pre">I</span></code>) across <code class="docutils literal notranslate"><span class="pre">mhcgnomes</span></code>, <code class="docutils literal notranslate"><span class="pre">mhcseqs</span></code>, and <code class="docutils literal notranslate"><span class="pre">mhcflurry</span> <span class="pre">&gt;=</span> <span class="pre">2.5.9</span></code> under <code class="docutils literal notranslate"><span class="pre">normalize_alleles=True</span></code> (<code class="docutils literal notranslate"><span class="pre">26,156</span></code> alleles across <code class="docutils literal notranslate"><span class="pre">223</span></code> canonical / <code class="docutils literal notranslate"><span class="pre">233</span></code> raw species labels, including <code class="docutils literal notranslate"><span class="pre">2,884</span></code> <code class="docutils literal notranslate"><span class="pre">AccessionedAllele</span></code>s and <code class="docutils literal notranslate"><span class="pre">0</span></code> unparsed rows).</p></li>
+<li><p><a class="reference external" href="https://github.com/pirl-unc/hitlist/issues/977"><code class="docutils literal notranslate"><span class="pre">pirl-unc/hitlist#977</span></code></a> — 9 hardcoded UniProt proteome UPIDs in <code class="docutils literal notranslate"><span class="pre">hitlist/downloads.py</span></code> pointing to wrong organisms (e.g., <code class="docutils literal notranslate"><span class="pre">trichosurus_vulpecula.fasta</span></code> → sesame seed <code class="docutils literal notranslate"><span class="pre">Sesamum</span> <span class="pre">indicum</span></code>, <code class="docutils literal notranslate"><span class="pre">hpv16</span></code> → 45 MB poplar tree <code class="docutils literal notranslate"><span class="pre">Populus</span> <span class="pre">trichocarpa</span></code>).</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="experiment_25x_pan_class_ii.html" class="btn btn-neutral float-left" title="Experiment 2026-11-25: Speculative pan-class Class I → Class II transfer via mhcseqs IMGT alignments" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="training.html" class="btn btn-neutral float-right" title="Training models" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Nov 26, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

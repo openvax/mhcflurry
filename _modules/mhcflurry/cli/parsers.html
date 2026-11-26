@@ -1,0 +1,879 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mhcflurry.cli.parsers &mdash; MHCflurry 2.5.11 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=b06e8534"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            MHCflurry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro.html">Introduction and installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tutorial.html">Command-line tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../python_tutorial.html">Python library tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../docker.html">Running MHCflurry in Docker</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../model_downloads.html">Downloading and selecting model weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../release_model_evaluation.html">Evaluation of the 2.3.0 weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../dla_validation.html">DLA evidence and canine evaluation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../cross_species_validation.html">Cross-species alleles, pseudosequences, and zero-shot validation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../experiments.html">Experiment log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluating trained models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../commandline_tools.html">Command-line reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration and performance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Release notes and changelog</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced topics</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../shared_percent_rank_transforms.html">Percentile calibration for all predictors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training_provenance.html">Auditing training-sample overlap</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributors and maintainers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../maintainers.html">Maintainer workflows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../orchestrator.html">Orchestrator architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../auto_sizing_audit.html">Resource planning guarantees</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MHCflurry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">mhcflurry.cli.parsers</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for mhcflurry.cli.parsers</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="sd">"""Import-light argument parsers for training, selection, and calibration CLIs.</span>
+
+<span class="sd">Building these parsers here avoids importing torch, numpy, pandas, sklearn,</span>
+<span class="sd">scipy, mhcgnomes, tqdm, or yaml during shell tab completion. Each command</span>
+<span class="sd">module re-exports its parser as module-level ``parser`` so docs generation</span>
+<span class="sd">(sphinx-autoprogram) and existing callers remain unchanged.</span>
+<span class="sd">"""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">..cli_args</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">add_alleles_arg</span><span class="p">,</span>
+    <span class="n">add_cluster_parallelism_args</span><span class="p">,</span>
+    <span class="n">add_data_arg</span><span class="p">,</span>
+    <span class="n">add_debug_arg</span><span class="p">,</span>
+    <span class="n">add_hyperparameters_arg</span><span class="p">,</span>
+    <span class="n">add_max_epochs_arg</span><span class="p">,</span>
+    <span class="n">add_models_dir_arg</span><span class="p">,</span>
+    <span class="n">add_out_models_dir_arg</span><span class="p">,</span>
+    <span class="n">add_random_seed_arg</span><span class="p">,</span>
+    <span class="n">add_verbosity_arg</span><span class="p">,</span>
+    <span class="n">fraction_arg</span><span class="p">,</span>
+    <span class="n">positive_float_arg</span><span class="p">,</span>
+    <span class="n">positive_int_arg</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..parallelism.cli_args</span><span class="w"> </span><span class="kn">import</span> <span class="n">add_local_parallelism_args</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.help</span><span class="w"> </span><span class="kn">import</span> <span class="n">HelpArgumentParser</span>
+
+
+<div class="viewcode-block" id="held_out_fraction_reciprocal_arg">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.parsers.held_out_fraction_reciprocal_arg">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">held_out_fraction_reciprocal_arg</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">positive_int_arg</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">result</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentTypeError</span><span class="p">(</span>
+            <span class="s2">"held-out fraction reciprocal must be at least 2"</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="batch_size_arg">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.parsers.batch_size_arg">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">batch_size_arg</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Accept either an int or the literal string 'auto' for --prediction-batch-size.</span>
+
+<span class="sd">    ``auto`` (the default) delegates sizing to</span>
+<span class="sd">    ``mhcflurry.pytorch_sizing.compute_prediction_batch_size``,</span>
+<span class="sd">    which picks a per-GPU-memory batch, reserving the VRAM partition</span>
+<span class="sd">    across co-resident workers.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"auto"</span><span class="p">,</span> <span class="s2">""</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">"auto"</span>
+    <span class="k">return</span> <span class="n">positive_int_arg</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="make_train_allele_specific_models_parser">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.parsers.make_train_allele_specific_models_parser">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_train_allele_specific_models_parser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">HelpArgumentParser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="n">usage</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="n">description</span><span class="p">)</span>
+    <span class="n">add_data_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Training data CSV. Expected columns: "</span>
+            <span class="s2">"allele, peptide, measurement_value"</span><span class="p">))</span>
+    <span class="n">add_out_models_dir_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Directory to write models and manifest"</span><span class="p">)</span>
+    <span class="n">add_hyperparameters_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"JSON or YAML of hyperparameters"</span><span class="p">)</span>
+    <span class="n">add_alleles_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span>
+        <span class="n">dest</span><span class="o">=</span><span class="s2">"allele"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Alleles to train models for. If not specified, all alleles with "</span>
+        <span class="s2">"enough measurements will be used."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--min-measurements-per-allele"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Train models for alleles with &gt;=N measurements. Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--held-out-fraction-reciprocal"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">held_out_fraction_reciprocal_arg</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Hold out 1/N fraction of data (e.g. for subsequent model selection). "</span>
+        <span class="s2">"For example, specify 5 to hold out 20 percent of the data."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--held-out-fraction-seed"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Seed for randomizing which measurements are held out. Only matters "</span>
+        <span class="s2">"when --held-out-fraction-reciprocal is specified. When omitted, the "</span>
+        <span class="s2">"held-out split "</span>
+        <span class="s2">"is derived from --random-seed (so the whole run reproduces from one "</span>
+        <span class="s2">"value). Pass this explicitly to control the split directly — e.g. to "</span>
+        <span class="s2">"reproduce a pre-2.3.0 split — overriding --random-seed for the split."</span><span class="p">)</span>
+    <span class="n">add_random_seed_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--ignore-inequalities"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Do not use affinity value inequalities even when present in data"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--n-models"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Ensemble size, i.e. how many models to train for each architecture. "</span>
+        <span class="s2">"If specified here it overrides any 'n_models' specified in the "</span>
+        <span class="s2">"hyperparameters."</span><span class="p">)</span>
+    <span class="n">add_max_epochs_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--allele-sequences"</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"FILE.csv"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Allele sequences file. Used for computing allele similarity matrix."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--save-interval"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_float_arg</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Write models to disk every N seconds. Only affects parallel runs; "</span>
+        <span class="s2">"serial runs write each model to disk as it is trained."</span><span class="p">)</span>
+    <span class="n">add_verbosity_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">add_local_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+
+<div class="viewcode-block" id="make_train_pan_allele_models_parser">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.parsers.make_train_pan_allele_models_parser">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_train_pan_allele_models_parser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">HelpArgumentParser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="n">usage</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="n">description</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--reuse-folds"</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Use existing fold_0..N columns instead of generating new folds."</span><span class="p">)</span>
+    <span class="n">add_data_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Training data CSV (required unless --continue-incomplete). "</span>
+            <span class="s2">"Expected columns: allele, peptide, measurement_value"</span><span class="p">))</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--pretrain-data"</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"FILE.csv"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Pre-training data CSV. Expected columns: "</span>
+            <span class="s2">"allele, peptide, measurement_value"</span><span class="p">))</span>
+    <span class="n">add_out_models_dir_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Directory to write models and manifest"</span><span class="p">)</span>
+    <span class="n">add_hyperparameters_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"JSON or YAML of hyperparameters (required unless --continue-incomplete)"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--held-out-measurements-per-allele-fraction-and-max"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span>
+        <span class="n">nargs</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="p">[</span><span class="mf">0.25</span><span class="p">,</span> <span class="mi">100</span><span class="p">],</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Fraction of measurements per allele to hold out, and maximum number. "</span>
+        <span class="s2">"Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--ignore-inequalities"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Do not use affinity value inequalities even when present in data"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--num-folds"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Number of training folds. Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--num-replicates"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Number of replicates per (architecture, fold) pair to train. Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">)</span>
+    <span class="n">add_random_seed_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">add_max_epochs_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--allele-sequences"</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"FILE.csv"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Allele sequences file."</span><span class="p">)</span>
+    <span class="n">add_verbosity_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">add_debug_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--continue-incomplete"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Continue training models from an incomplete training run. If this is "</span>
+        <span class="s2">"specified then the only required argument is --out-models-dir"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--only-initialize"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Do not actually train models. The initialized run can be continued "</span>
+        <span class="s2">"later with --continue-incomplete."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--save-all-checkpoints"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Retain both terminal and minimum-validation weights for every fit. "</span>
+            <span class="s2">"The restore_best_weights hyperparameter still selects the primary "</span>
+            <span class="s2">"predictor weights."</span>
+        <span class="p">))</span>
+    <span class="n">add_local_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">add_cluster_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+
+<div class="viewcode-block" id="make_train_processing_models_parser">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.parsers.make_train_processing_models_parser">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_train_processing_models_parser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">HelpArgumentParser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="n">usage</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="n">description</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--processing-data-policy"</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="p">(</span><span class="s2">"matched"</span><span class="p">,</span> <span class="s2">"legacy"</span><span class="p">),</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"matched"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Require matched processing data; legacy is explicit historical replay only. "</span>
+        <span class="s2">"Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--reuse-folds"</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Use existing fold_0..N columns instead of generating new folds."</span><span class="p">)</span>
+    <span class="n">add_data_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Training data CSV (required unless --continue-incomplete). "</span>
+        <span class="s2">"Expected columns: peptide, n_flank, c_flank, hit"</span><span class="p">)</span>
+    <span class="n">add_out_models_dir_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Directory to write models and manifest"</span><span class="p">)</span>
+    <span class="n">add_hyperparameters_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"JSON or YAML of hyperparameters (required unless --continue-incomplete)"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--held-out-samples"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Number of experiments to hold out per fold. Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--num-folds"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Number of training folds. Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--num-replicates"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Number of replicates per (architecture, fold) pair to train. Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">)</span>
+    <span class="n">add_random_seed_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">add_max_epochs_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">add_verbosity_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">add_debug_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--continue-incomplete"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Continue training models from an incomplete training run. If this is "</span>
+        <span class="s2">"specified then the only required argument is --out-models-dir"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--only-initialize"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Do not actually train models. The initialized run can be continued "</span>
+        <span class="s2">"later with --continue-incomplete."</span><span class="p">)</span>
+    <span class="n">add_local_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">add_cluster_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+
+<div class="viewcode-block" id="make_train_presentation_models_parser">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.parsers.make_train_presentation_models_parser">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_train_presentation_models_parser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">HelpArgumentParser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="n">usage</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="n">description</span><span class="p">)</span>
+    <span class="n">add_data_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Training data CSV. Expected columns: peptide, n_flank, c_flank, hit"</span><span class="p">)</span>
+    <span class="n">add_out_models_dir_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Directory to write models and manifest"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--affinity-predictor"</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"DIR"</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Affinity predictor models dir"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--processing-predictor-with-flanks"</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"DIR"</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Processing predictor with flanks"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--processing-predictor-without-flanks"</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"DIR"</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Processing predictor without flanks"</span><span class="p">)</span>
+    <span class="n">add_verbosity_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">add_debug_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--hla-column"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"hla"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Column in data giving space-separated MHC I alleles"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--target-column"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"hit"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Column in data giving hit (1) vs decoy (0)"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--feature-chunk-size"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">250000</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Rows per parallel presentation feature-prediction task. Larger "</span>
+            <span class="s2">"chunks reduce scheduling overhead but increase worker memory. "</span>
+            <span class="s2">"Default: </span><span class="si">%(default)s</span><span class="s2">"</span><span class="p">))</span>
+    <span class="n">add_local_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">add_random_seed_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+
+<div class="viewcode-block" id="make_select_allele_specific_models_parser">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.parsers.make_select_allele_specific_models_parser">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_select_allele_specific_models_parser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">HelpArgumentParser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="n">usage</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="n">description</span><span class="p">)</span>
+    <span class="n">add_data_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Model selection data CSV. Expected columns: "</span>
+            <span class="s2">"allele, peptide, measurement_value"</span><span class="p">))</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--exclude-data"</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"FILE.csv"</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Data to EXCLUDE from model selection. Useful to specify the original "</span>
+            <span class="s2">"training data used"</span><span class="p">))</span>
+    <span class="n">add_models_dir_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Directory to read models"</span><span class="p">)</span>
+    <span class="n">add_out_models_dir_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Directory to write selected models"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--out-unselected-predictions"</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"FILE.csv"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Write predictions for validation data using unselected predictor to "</span>
+        <span class="s2">"FILE.csv"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--unselected-accuracy-scorer"</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"SCORER"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"combined:mass-spec,mse"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--unselected-accuracy-scorer-num-samples"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--unselected-accuracy-percentile-threshold"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">95</span><span class="p">)</span>
+    <span class="n">add_alleles_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span>
+        <span class="n">dest</span><span class="o">=</span><span class="s2">"allele"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Alleles to select models for. If not specified, all alleles with "</span>
+        <span class="s2">"enough measurements will be used."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--combined-min-models"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Min number of models to select per allele when using combined selector"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--combined-max-models"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Max number of models to select per allele when using combined selector"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--combined-min-contribution-percent"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Use only model selectors that can contribute at least X </span><span class="si">%%</span><span class="s2"> to the "</span>
+        <span class="s2">"total score. Default: </span><span class="si">%(default)s</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--mass-spec-min-measurements"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Min number of measurements required for an allele to use mass-spec model "</span>
+        <span class="s2">"selection"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--mass-spec-min-models"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Min number of models to select per allele when using mass-spec selector"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--mass-spec-max-models"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Max number of models to select per allele when using mass-spec selector"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--mse-min-measurements"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Min number of measurements required for an allele to use MSE model "</span>
+        <span class="s2">"selection"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--mse-min-models"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Min number of models to select per allele when using MSE selector"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--mse-max-models"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Max number of models to select per allele when using MSE selector"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--scoring"</span><span class="p">,</span>
+        <span class="n">nargs</span><span class="o">=</span><span class="s2">"+"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="p">[</span><span class="s2">"mse"</span><span class="p">,</span> <span class="s2">"consensus"</span><span class="p">],</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Scoring procedures to use in order"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--consensus-min-models"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Min number of models to select per allele when using consensus selector"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--consensus-max-models"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Max number of models to select per allele when using consensus selector"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--consensus-num-peptides-per-length"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Num peptides per length to use for consensus scoring"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--mass-spec-regex"</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"REGEX"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"mass[- ]spec"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Regular expression for mass-spec data. Runs on measurement_source col. "</span>
+        <span class="s2">"Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">)</span>
+    <span class="n">add_verbosity_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">add_local_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">add_random_seed_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+
+<div class="viewcode-block" id="make_select_pan_allele_models_parser">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.parsers.make_select_pan_allele_models_parser">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_select_pan_allele_models_parser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">HelpArgumentParser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="n">usage</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="n">description</span><span class="p">)</span>
+    <span class="n">add_data_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Model selection data CSV. Expected columns: "</span>
+            <span class="s2">"allele, peptide, measurement_value"</span><span class="p">))</span>
+    <span class="n">add_models_dir_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Directory to read models"</span><span class="p">)</span>
+    <span class="n">add_out_models_dir_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Directory to write selected models"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--min-models-per-fold"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Min number of models to select per fold. Default: 2, or the "</span>
+            <span class="s2">"requested maximum when it is smaller."</span><span class="p">))</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--max-models-per-fold"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Max number of models to select per fold. Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--mass-spec-regex"</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"REGEX"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"mass[- ]spec"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Regular expression for mass-spec data. Runs on measurement_source col. "</span>
+        <span class="s2">"Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">)</span>
+    <span class="n">add_verbosity_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--save-validation-predictions"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Save row-level out-of-fold predictions from the selected ensemble "</span>
+            <span class="s2">"as model_selection_predictions.csv.bz2."</span><span class="p">))</span>
+    <span class="n">add_local_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">add_cluster_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+
+<div class="viewcode-block" id="make_select_processing_models_parser">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.parsers.make_select_processing_models_parser">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_select_processing_models_parser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">HelpArgumentParser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="n">usage</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="n">description</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--processing-data-policy"</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="p">(</span><span class="s2">"matched"</span><span class="p">,</span> <span class="s2">"legacy"</span><span class="p">),</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"matched"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Require matched processing data; legacy is explicit historical replay only. "</span>
+        <span class="s2">"Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">)</span>
+    <span class="n">add_data_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Model selection data CSV. Expected columns: "</span>
+            <span class="s2">"peptide, hit, fold_0, ..., fold_N"</span><span class="p">))</span>
+    <span class="n">add_models_dir_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Directory to read models"</span><span class="p">)</span>
+    <span class="n">add_out_models_dir_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Directory to write selected models"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--min-models-per-fold"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Min number of models to select per fold. Default: 2, or the "</span>
+            <span class="s2">"requested maximum when it is smaller."</span><span class="p">))</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--max-models-per-fold"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Max number of models to select per fold. Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">)</span>
+    <span class="n">add_verbosity_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--save-validation-predictions"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Save row-level out-of-fold predictions from the selected ensemble "</span>
+            <span class="s2">"as model_selection_predictions.csv.bz2."</span><span class="p">))</span>
+    <span class="n">add_local_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">add_cluster_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+
+<div class="viewcode-block" id="make_calibrate_percentile_ranks_parser">
+<a class="viewcode-back" href="../../../mhcflurry.cli.html#mhcflurry.cli.parsers.make_calibrate_percentile_ranks_parser">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_calibrate_percentile_ranks_parser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">HelpArgumentParser</span><span class="p">(</span><span class="n">usage</span><span class="o">=</span><span class="n">usage</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="n">description</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--predictor-kind"</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="p">(</span><span class="s2">"class1_affinity"</span><span class="p">,</span> <span class="s2">"class1_processing"</span><span class="p">,</span> <span class="s2">"class1_presentation"</span><span class="p">),</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"class1_affinity"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Type of predictor to calibrate"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--percentile-method"</span><span class="p">,</span> <span class="n">choices</span><span class="o">=</span><span class="p">(</span><span class="s2">"compact"</span><span class="p">,</span> <span class="s2">"histogram"</span><span class="p">),</span> <span class="n">default</span><span class="o">=</span><span class="s2">"compact"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Method for new calibration (default: </span><span class="si">%(default)s</span><span class="s2">). Loading alone "</span>
+        <span class="s2">"never changes saved ranks. Histogram reproduction also requires the "</span>
+        <span class="s2">"original reference and bin policy."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--max-percentile-knots"</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">choices</span><span class="o">=</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">128</span><span class="p">),</span> <span class="n">default</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Compact starts at 64; allow 128 only when background validation "</span>
+        <span class="s2">"justifies it. This is a ceiling (default: </span><span class="si">%(default)s</span><span class="s2">), not a fixed size. "</span>
+        <span class="s2">"Ignored for histogram calibration."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--processing-reference-data"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Required for processing: independent background CSV with peptide and, "</span>
+        <span class="s2">"for a flanked model, n_flank and c_flank columns. No evaluation labels are used. "</span>
+        <span class="s2">"Scores and input sequences are saved in percent_rank_reference.npz. "</span>
+        <span class="s2">"Requires --num-jobs 0; reference-generation options do not apply."</span><span class="p">)</span>
+    <span class="n">add_models_dir_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span>
+        <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Directory to read and write models"</span><span class="p">)</span>
+    <span class="n">add_alleles_arg</span><span class="p">(</span>
+        <span class="n">parser</span><span class="p">,</span>
+        <span class="n">dest</span><span class="o">=</span><span class="s2">"allele"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Alleles to calibrate percentile ranks for. If not specified all "</span>
+        <span class="s2">"alleles are used"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--match-amino-acid-distribution-data"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Sample random peptides from the amino acid distribution of the "</span>
+        <span class="s2">"peptides listed in the supplied CSV file, which must have a 'peptide' "</span>
+        <span class="s2">"column. If not specified a uniform distribution is used."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--alleles-file"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Use alleles in supplied CSV file, which must have an 'allele' column."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--list-percent-rank-status"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"For class1 affinity predictors, print a CSV indicating which requested "</span>
+        <span class="s2">"alleles already have percentile-rank calibration and exit without "</span>
+        <span class="s2">"generating calibration peptides."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--only-missing"</span><span class="p">,</span>
+        <span class="n">dest</span><span class="o">=</span><span class="s2">"only_missing_percent_ranks"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"For class1 affinity predictors, calibrate only requested alleles that "</span>
+        <span class="s2">"do not already have direct or sequence-equivalent percentile-rank "</span>
+        <span class="s2">"calibration."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--num-peptides-per-length"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="mf">1e5</span><span class="p">),</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"For affinity/presentation, number of generated peptides per length "</span>
+        <span class="s2">"to use to calibrate percent ranks. Processing uses --processing-reference-data. "</span>
+        <span class="s2">"Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--num-genotypes"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Used when calibrating a presentation predictor. Number of MHC allele sets "</span>
+        <span class="s2">"to sample. Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--alleles-per-genotype"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Used when calibrating a presentation predictor. Number of alleles "</span>
+        <span class="s2">"per MHC allele set. Use 1 to calibrate for single alleles. Default: </span><span class="si">%(default)s</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--motif-summary"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Calculate motifs and length preferences for each allele"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--summary-top-peptide-fraction"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="p">[</span><span class="mf">0.0001</span><span class="p">,</span> <span class="mf">0.001</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">],</span>
+        <span class="n">nargs</span><span class="o">=</span><span class="s2">"+"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">fraction_arg</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"The top X fraction of predictions (i.e. tightest binders) to use to "</span>
+        <span class="s2">"generate motifs and length preferences. Default: </span><span class="si">%(default)s</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--length-range"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">15</span><span class="p">),</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">nargs</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Min and max peptide length to calibrate, inclusive. "</span>
+        <span class="s2">"Default: </span><span class="si">%(default)s</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--prediction-batch-size"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">batch_size_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"auto"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Batch size for predictions. Pass an int to pin, or 'auto' "</span>
+             <span class="s2">"(default) to size per GPU free memory / workers-per-GPU — see "</span>
+             <span class="s2">"mhcflurry.pytorch_sizing.compute_prediction_batch_size."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--alleles-per-work-chunk"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">positive_int_arg</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">"N"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Number of alleles per work chunk. Default: </span><span class="si">%(default)s</span><span class="s2">."</span><span class="p">)</span>
+    <span class="n">add_verbosity_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--gpu-batched"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"[class1 affinity predictors only] Use the GPU-hoisted "</span>
+             <span class="s2">"calibration fast path: precompute peptide-side activations "</span>
+             <span class="s2">"per network and batch "</span>
+             <span class="s2">"--gpu-allele-batch-size alleles into a single forward through "</span>
+             <span class="s2">"the merge + main dense path. Uses the same ensemble aggregation "</span>
+             <span class="s2">"and percentile method as the ordinary path; floating-point batching "</span>
+             <span class="s2">"can change predictions and selected knots slightly, so saved curves "</span>
+             <span class="s2">"are not guaranteed bit-identical. Applies to affinity in serial, "</span>
+             <span class="s2">"local-pool, and cluster modes; ignored for processing/presentation."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--gpu-allele-batch-size"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">batch_size_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"auto"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Alleles per GPU forward when --gpu-batched. Pass an int to "</span>
+             <span class="s2">"pin; 'auto' (default) partitions the VRAM budget with "</span>
+             <span class="s2">"--max-workers-per-gpu. Larger values trade off more VRAM for "</span>
+             <span class="s2">"fewer kernel launches."</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--gpu-peptide-batch-size"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">batch_size_arg</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"auto"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Peptide chunk size on device when --gpu-batched. Pass an int "</span>
+             <span class="s2">"to pin; 'auto' (default) picks the peptide axis of the "</span>
+             <span class="s2">"auto-sized budget. Reducing keeps peak VRAM down on smaller "</span>
+             <span class="s2">"GPUs but adds kernel-launch overhead."</span><span class="p">)</span>
+    <span class="c1"># Calibrate deliberately uses the broader training-flavored parallelism set</span>
+    <span class="c1"># (add_local_parallelism_args) rather than the prediction subset</span>
+    <span class="c1"># (add_prediction_parallelism_args used by predict / predict-scan): it needs</span>
+    <span class="c1"># the training-only knobs (e.g. --max-tasks-per-worker, --worker-log-dir,</span>
+    <span class="c1"># cluster parallelism). The shared flags (--num-jobs/--gpus/--max-workers-per-</span>
+    <span class="c1"># gpu) are identical across all three, so do not "simplify" this to the</span>
+    <span class="c1"># prediction helper.</span>
+    <span class="n">add_local_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">add_cluster_parallelism_args</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">add_random_seed_arg</span><span class="p">(</span><span class="n">parser</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span></div>
+
+
+
+<span class="n">SUBCOMMAND_PARSER_BUILDERS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"class1-train-allele-specific-models"</span><span class="p">:</span> <span class="n">make_train_allele_specific_models_parser</span><span class="p">,</span>
+    <span class="s2">"class1-train-pan-allele-models"</span><span class="p">:</span> <span class="n">make_train_pan_allele_models_parser</span><span class="p">,</span>
+    <span class="s2">"class1-train-processing-models"</span><span class="p">:</span> <span class="n">make_train_processing_models_parser</span><span class="p">,</span>
+    <span class="s2">"class1-train-presentation-models"</span><span class="p">:</span> <span class="n">make_train_presentation_models_parser</span><span class="p">,</span>
+    <span class="s2">"class1-select-allele-specific-models"</span><span class="p">:</span> <span class="n">make_select_allele_specific_models_parser</span><span class="p">,</span>
+    <span class="s2">"class1-select-pan-allele-models"</span><span class="p">:</span> <span class="n">make_select_pan_allele_models_parser</span><span class="p">,</span>
+    <span class="s2">"class1-select-processing-models"</span><span class="p">:</span> <span class="n">make_select_processing_models_parser</span><span class="p">,</span>
+    <span class="s2">"calibrate-percentile-ranks"</span><span class="p">:</span> <span class="n">make_calibrate_percentile_ranks_parser</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2017–2026, MHCflurry contributors.
+      <span class="lastupdated">Last updated on Nov 26, 2026.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
