@@ -80,7 +80,7 @@ _PROCESSING_WORKER_SAFETY_FACTOR = 1.3
 # When running in parallel, avoid using the neural network backend in the main
 # process. Model loading and inference should happen in worker processes.
 
-parser = make_train_processing_models_parser(usage=__doc__)
+parser = make_train_processing_models_parser(description=__doc__)
 
 
 def assign_folds(df, num_folds, held_out_samples, seed=None):
@@ -139,10 +139,9 @@ def assign_folds(df, num_folds, held_out_samples, seed=None):
 
 
 def run(argv=sys.argv[1:]):
-    install_sigusr1_stack_trace_handler()
-
     argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
+    install_sigusr1_stack_trace_handler()
 
     if args.debug:
         try:

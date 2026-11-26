@@ -137,7 +137,7 @@ def add_local_parallelism_args(parser):
         metavar="N",
         help="Number of local processes to parallelize training over. "
              "Pass 'auto' (default) to derive from "
-             "``--gpus * --max-workers-per-gpu`` once the latter is "
+             "'--gpus * --max-workers-per-gpu' once the latter is "
              "resolved (so workers never overflow to CPU silently). "
              "Pass 0 for serial run, or an int to pin.")
     group.add_argument(
@@ -166,8 +166,8 @@ def add_local_parallelism_args(parser):
         help="Maximum number of workers to assign to a GPU. Pass 'auto' "
              "(default) to pick a value based on detected free VRAM, the "
              "estimated per-worker working set, and a shared safety reserve "
-             "(see ``auto_max_workers_per_gpu``). Pass an integer to pin. "
-             "Workers beyond ``--gpus * --max-workers-per-gpu`` run on CPU.")
+             "(see auto_max_workers_per_gpu). Pass an integer to pin. "
+             "Workers beyond '--gpus * --max-workers-per-gpu' run on CPU.")
     group.add_argument(
         "--max-tasks-per-worker",
         type=_positive_int_arg,
@@ -186,11 +186,10 @@ def add_local_parallelism_args(parser):
         help="Per-fit-worker DataLoader child count for streaming "
              "pretraining. Pass "
              "'auto' (default) to derive from box vCPUs / RAM / "
-             "fit-worker plan via "
-             "``mhcflurry.parallelism.auto_dataloader_num_workers`` "
-             "(empirical throughput cap = 4). Pass an integer to pin (0 builds "
+             "fit-worker plan (empirical throughput cap = 4). "
+             "Pass an integer to pin (0 builds "
              "pretraining batches in-process). Overrides any "
-             "``dataloader_num_workers`` set in component-model "
+             "dataloader_num_workers set in component-model "
              "hyperparameters when applicable; non-affinity train commands "
              "accept the flag for uniformity but currently no-op.")
     group.add_argument(
@@ -200,12 +199,10 @@ def add_local_parallelism_args(parser):
         default="auto",
         help="Number of consecutive epochs that share a pre-encoded "
              "random-negative pool. Pass 'auto' (default) to size from "
-             "system RAM / fit-worker plan via "
-             "``mhcflurry.parallelism.auto_random_negative_pool_epochs`` "
-             "(empirical throughput cap = 10). Pass an integer to pin (1 means "
-             "fresh "
+             "system RAM / fit-worker plan (empirical throughput cap = 10). "
+             "Pass an integer to pin (1 means fresh "
              "random negatives every epoch). Overrides any "
-             "``random_negative_pool_epochs`` set in component-model "
+             "random_negative_pool_epochs set in component-model "
              "hyperparameters.")
     group.add_argument(
         "--torch-compile",

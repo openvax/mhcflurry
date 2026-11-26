@@ -61,8 +61,8 @@ def batch_size_arg(value):
     return positive_int_arg(value)
 
 
-def make_train_allele_specific_models_parser(usage=None):
-    parser = HelpArgumentParser(usage=usage)
+def make_train_allele_specific_models_parser(usage=None, description=None):
+    parser = HelpArgumentParser(usage=usage, description=description)
     add_data_arg(
         parser,
         required=True,
@@ -85,13 +85,13 @@ def make_train_allele_specific_models_parser(usage=None):
         type=positive_int_arg,
         metavar="N",
         default=50,
-        help="Train models for alleles with >=N measurements.")
+        help="Train models for alleles with >=N measurements. Default: %(default)s.")
     parser.add_argument(
         "--held-out-fraction-reciprocal",
         type=held_out_fraction_reciprocal_arg,
         metavar="N",
         default=None,
-        help="Hold out 1/N fraction of data (for e.g. subsequent model selection. "
+        help="Hold out 1/N fraction of data (e.g. for subsequent model selection). "
         "For example, specify 5 to hold out 20 percent of the data.")
     parser.add_argument(
         "--held-out-fraction-seed",
@@ -134,16 +134,16 @@ def make_train_allele_specific_models_parser(usage=None):
     return parser
 
 
-def make_train_pan_allele_models_parser(usage=None):
-    parser = HelpArgumentParser(usage=usage)
+def make_train_pan_allele_models_parser(usage=None, description=None):
+    parser = HelpArgumentParser(usage=usage, description=description)
     parser.add_argument(
         "--reuse-folds", action="store_true",
         help="Use existing fold_0..N columns instead of generating new folds.")
     add_data_arg(
         parser,
         help=(
-            "Training data CSV. Expected columns: "
-            "allele, peptide, measurement_value"))
+            "Training data CSV (required unless --continue-incomplete). "
+            "Expected columns: allele, peptide, measurement_value"))
     parser.add_argument(
         "--pretrain-data",
         metavar="FILE.csv",
@@ -154,14 +154,15 @@ def make_train_pan_allele_models_parser(usage=None):
         parser, help="Directory to write models and manifest")
     add_hyperparameters_arg(
         parser,
-        help="JSON or YAML of hyperparameters")
+        help="JSON or YAML of hyperparameters (required unless --continue-incomplete)")
     parser.add_argument(
         "--held-out-measurements-per-allele-fraction-and-max",
         type=float,
         metavar="X",
         nargs=2,
         default=[0.25, 100],
-        help="Fraction of measurements per allele to hold out, and maximum number")
+        help="Fraction of measurements per allele to hold out, and maximum number. "
+        "Default: %(default)s.")
     parser.add_argument(
         "--ignore-inequalities",
         action="store_true",
@@ -172,13 +173,13 @@ def make_train_pan_allele_models_parser(usage=None):
         type=positive_int_arg,
         default=4,
         metavar="N",
-        help="Number of training folds.")
+        help="Number of training folds. Default: %(default)s.")
     parser.add_argument(
         "--num-replicates",
         type=positive_int_arg,
         metavar="N",
         default=1,
-        help="Number of replicates per (architecture, fold) pair to train.")
+        help="Number of replicates per (architecture, fold) pair to train. Default: %(default)s.")
     add_random_seed_arg(parser)
     add_max_epochs_arg(parser)
     parser.add_argument(
@@ -213,42 +214,44 @@ def make_train_pan_allele_models_parser(usage=None):
     return parser
 
 
-def make_train_processing_models_parser(usage=None):
-    parser = HelpArgumentParser(usage=usage)
+def make_train_processing_models_parser(usage=None, description=None):
+    parser = HelpArgumentParser(usage=usage, description=description)
     parser.add_argument(
         "--processing-data-policy",
         choices=("matched", "legacy"),
         default="matched",
-        help="Require matched processing data; legacy is explicit historical replay only.")
+        help="Require matched processing data; legacy is explicit historical replay only. "
+        "Default: %(default)s.")
     parser.add_argument(
         "--reuse-folds", action="store_true",
         help="Use existing fold_0..N columns instead of generating new folds.")
     add_data_arg(
         parser,
-        help="Training data CSV. Expected columns: peptide, n_flank, c_flank, hit")
+        help="Training data CSV (required unless --continue-incomplete). "
+        "Expected columns: peptide, n_flank, c_flank, hit")
     add_out_models_dir_arg(
         parser, help="Directory to write models and manifest")
     add_hyperparameters_arg(
         parser,
-        help="JSON or YAML of hyperparameters")
+        help="JSON or YAML of hyperparameters (required unless --continue-incomplete)")
     parser.add_argument(
         "--held-out-samples",
         type=positive_int_arg,
         metavar="N",
         default=10,
-        help="Number of experiments to hold out per fold")
+        help="Number of experiments to hold out per fold. Default: %(default)s.")
     parser.add_argument(
         "--num-folds",
         type=positive_int_arg,
         default=4,
         metavar="N",
-        help="Number of training folds.")
+        help="Number of training folds. Default: %(default)s.")
     parser.add_argument(
         "--num-replicates",
         type=positive_int_arg,
         metavar="N",
         default=1,
-        help="Number of replicates per (architecture, fold) pair to train.")
+        help="Number of replicates per (architecture, fold) pair to train. Default: %(default)s.")
     add_random_seed_arg(parser)
     add_max_epochs_arg(parser)
     add_verbosity_arg(parser)
@@ -270,8 +273,8 @@ def make_train_processing_models_parser(usage=None):
     return parser
 
 
-def make_train_presentation_models_parser(usage=None):
-    parser = HelpArgumentParser(usage=usage)
+def make_train_presentation_models_parser(usage=None, description=None):
+    parser = HelpArgumentParser(usage=usage, description=description)
     add_data_arg(
         parser,
         help="Training data CSV. Expected columns: peptide, n_flank, c_flank, hit")
@@ -316,8 +319,8 @@ def make_train_presentation_models_parser(usage=None):
     return parser
 
 
-def make_select_allele_specific_models_parser(usage=None):
-    parser = HelpArgumentParser(usage=usage)
+def make_select_allele_specific_models_parser(usage=None, description=None):
+    parser = HelpArgumentParser(usage=usage, description=description)
     add_data_arg(
         parser,
         required=False,
@@ -443,7 +446,7 @@ def make_select_allele_specific_models_parser(usage=None):
         "--mass-spec-regex",
         metavar="REGEX",
         default="mass[- ]spec",
-        help="Regular expression for mass-spec data. Runs on measurement_source col."
+        help="Regular expression for mass-spec data. Runs on measurement_source col. "
         "Default: %(default)s.")
     add_verbosity_arg(parser)
     add_local_parallelism_args(parser)
@@ -451,8 +454,8 @@ def make_select_allele_specific_models_parser(usage=None):
     return parser
 
 
-def make_select_pan_allele_models_parser(usage=None):
-    parser = HelpArgumentParser(usage=usage)
+def make_select_pan_allele_models_parser(usage=None, description=None):
+    parser = HelpArgumentParser(usage=usage, description=description)
     add_data_arg(
         parser,
         required=False,
@@ -478,12 +481,12 @@ def make_select_pan_allele_models_parser(usage=None):
         type=positive_int_arg,
         default=1000,
         metavar="N",
-        help="Max number of models to select per fold")
+        help="Max number of models to select per fold. Default: %(default)s.")
     parser.add_argument(
         "--mass-spec-regex",
         metavar="REGEX",
         default="mass[- ]spec",
-        help="Regular expression for mass-spec data. Runs on measurement_source col."
+        help="Regular expression for mass-spec data. Runs on measurement_source col. "
         "Default: %(default)s.")
     add_verbosity_arg(parser)
     parser.add_argument(
@@ -498,12 +501,14 @@ def make_select_pan_allele_models_parser(usage=None):
     return parser
 
 
-def make_select_processing_models_parser(usage=None):
-    parser = HelpArgumentParser(usage=usage)
+def make_select_processing_models_parser(usage=None, description=None):
+    parser = HelpArgumentParser(usage=usage, description=description)
     parser.add_argument(
         "--processing-data-policy",
         choices=("matched", "legacy"),
-        default="matched")
+        default="matched",
+        help="Require matched processing data; legacy is explicit historical replay only. "
+        "Default: %(default)s.")
     add_data_arg(
         parser,
         required=False,
@@ -529,7 +534,7 @@ def make_select_processing_models_parser(usage=None):
         type=positive_int_arg,
         default=1000,
         metavar="N",
-        help="Max number of models to select per fold")
+        help="Max number of models to select per fold. Default: %(default)s.")
     add_verbosity_arg(parser)
     parser.add_argument(
         "--save-validation-predictions",
@@ -543,8 +548,8 @@ def make_select_processing_models_parser(usage=None):
     return parser
 
 
-def make_calibrate_percentile_ranks_parser(usage=None):
-    parser = HelpArgumentParser(usage=usage)
+def make_calibrate_percentile_ranks_parser(usage=None, description=None):
+    parser = HelpArgumentParser(usage=usage, description=description)
     parser.add_argument(
         "--predictor-kind",
         choices=("class1_affinity", "class1_processing", "class1_presentation"),
@@ -612,8 +617,8 @@ def make_calibrate_percentile_ranks_parser(usage=None):
         type=positive_int_arg,
         metavar="N",
         default=25,
-        help="Used when calibrating a presentation predictor. Number of MHC allele sets"
-        "to sample")
+        help="Used when calibrating a presentation predictor. Number of MHC allele sets "
+        "to sample. Default: %(default)s.")
     parser.add_argument(
         "--alleles-per-genotype",
         type=positive_int_arg,

@@ -8,6 +8,15 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.10](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.10.md)**:
+  CLI UX polish across prediction, downloads, training/selection/calibration,
+  and `pseudosequences` (`#424`–`#428`): adds `--float-format` and documents
+  units on `predict`/`predict-scan`, eliminates duplicated flank columns and
+  inconsistent processing-only scan columns, silences noisy default repr/plan/
+  unused-key logs, replaces routine user-error tracebacks with one-line CLI
+  errors, fixes train/select/calibrate `--help` usage synopses and stray
+  `SIGUSR1` banners, and fixes `downloads --verbose`/`--quiet` and subcommand
+  help. Existing `2.3.0` weights and predictions are unchanged.
 - **[2.5.9](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.9.md)**:
   Adds first-class `mhcgnomes.AccessionedAllele` support in
   `mhcflurry/common.py` so all `2,884` sequence-backed non-model vertebrate

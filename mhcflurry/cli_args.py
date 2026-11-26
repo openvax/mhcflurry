@@ -239,22 +239,23 @@ def add_cluster_parallelism_args(parser):
     group.add_argument(
         "--cluster-parallelism",
         default=False,
-        action="store_true")
+        action="store_true",
+        help="Run work items as separate cluster jobs instead of locally.")
     group.add_argument(
         "--cluster-submit-command",
         default="sh",
-        help="Default: %(default)s")
+        help="Command used to submit generated cluster job scripts. Default: %(default)s")
     group.add_argument(
         "--cluster-results-workdir",
         default="./cluster-workdir",
-        help="Default: %(default)s")
+        help="Working directory for cluster job scripts and outputs. Default: %(default)s")
     group.add_argument(
         "--additional-complete-file",
         default="STDERR",
         help="Additional file to monitor for job completion. Default: %(default)s")
     group.add_argument(
         "--cluster-script-prefix-path",
-        help="",
+        help="Optional shell script snippet prepended to each cluster job script.",
     )
     group.add_argument(
         "--cluster-max-retries",

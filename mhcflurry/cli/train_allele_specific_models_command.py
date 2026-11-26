@@ -75,7 +75,7 @@ def _alleles_with_minimum_measurements(allele_counts, minimum):
 # When running in parallel, avoid using the neural network backend in the main
 # process. Model loading and inference should happen in worker processes.
 
-parser = make_train_allele_specific_models_parser(usage=__doc__)
+parser = make_train_allele_specific_models_parser(description=__doc__)
 
 TRAIN_DATA_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
     subset="all",
@@ -84,10 +84,9 @@ TRAIN_DATA_HYPERPARAMETER_DEFAULTS = HyperparameterDefaults(
 
 
 def run(argv=sys.argv[1:]):
-    install_sigusr1_stack_trace_handler()
-
     argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
+    install_sigusr1_stack_trace_handler()
 
     args.out_models_dir = os.path.abspath(args.out_models_dir)
 

@@ -252,7 +252,7 @@ def test_existing_legacy_unreceipted_bundle_is_preserved(tmp_path, monkeypatch, 
     (legacy_target / "custom.txt").write_text("custom weights", encoding="utf-8")
 
     # Without --force, legacy directory is left completely untouched.
-    downloads_command.fetch_subcommand(args)
+    downloads_command.fetch_subcommand(Namespace(**{**vars(args), "quiet": False}))
     assert [p.name for p in legacy_target.iterdir()] == ["custom.txt"]
     assert (legacy_target / "custom.txt").read_text(encoding="utf-8") == "custom weights"
     assert Path(downloads.get_path("models", release="test")) == legacy_target
@@ -399,8 +399,14 @@ def test_fetch_requested_release_uses_its_own_status_and_destination(
     assert not (current_dir / "models/weights.txt").exists()
     assert downloads.get_release_downloads("older")["models"]["up_to_date"] is True
 
-    # Already-downloaded message goes to stderr, leaving stdout clean.
+    # --quiet suppresses the already-installed banner (#428); verbose/default
+    # writes it to stderr, leaving stdout clean.
     downloads_command.fetch_subcommand(args)
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
+
+    downloads_command.fetch_subcommand(Namespace(**{**vars(args), "quiet": False}))
     captured = capsys.readouterr()
     assert captured.out == ""
     assert str(installed) in captured.err

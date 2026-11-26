@@ -75,27 +75,29 @@ Download releases are catalogue versions, separate from the installed code.
 Browsing uses the catalogue shipped with this package; no network is required.
 """)
 
-parser.add_argument(
+verbosity_group = parser.add_mutually_exclusive_group()
+verbosity_group.add_argument(
     "--quiet",
     action="store_true",
     default=False,
-    help="Output less")
-
-parser.add_argument(
+    help="Output less (suppresses progress bars and status banners)")
+verbosity_group.add_argument(
     "--verbose",
     "-v",
     action="store_true",
     default=False,
-    help="Output more")
+    help="Output more (enables DEBUG logging and full path/override details)")
 
 subparsers = parser.add_subparsers(dest="subparser_name")
 
-parser_fetch = subparsers.add_parser('fetch')
+parser_fetch = subparsers.add_parser(
+    'fetch',
+    help='Download and install released models or supporting data')
 parser_fetch.add_argument(
     'download_name',
     metavar="DOWNLOAD",
     nargs="*",
-    help="Items to download")
+    help="Items to download (default: release default bundles)")
 parser_fetch.add_argument(
     "--keep",
     action="store_true",
@@ -127,8 +129,14 @@ parser_dirs = subparsers.add_parser(
 parser_dirs.add_argument(
     '--json', action='store_true', help='Print machine-readable JSON')
 
-parser_info = subparsers.add_parser('info')
-parser_info.add_argument('download_name', nargs='?', metavar='DOWNLOAD')
+parser_info = subparsers.add_parser(
+    'info',
+    help='Show download status, paths, and configuration (or details for one bundle)')
+parser_info.add_argument(
+    'download_name',
+    nargs='?',
+    metavar='DOWNLOAD',
+    help='Optional bundle name to inspect in detail')
 parser_info.add_argument('--json', action='store_true', help='Print machine-readable JSON')
 parser_info.add_argument(
     '--verify',
@@ -144,11 +152,15 @@ parser_releases = subparsers.add_parser('releases', help='List valid catalogue r
 parser_releases.add_argument('download_name', nargs='?', metavar='DOWNLOAD')
 parser_releases.add_argument('--json', action='store_true', help='Print machine-readable JSON')
 
-parser_path = subparsers.add_parser('path')
+parser_path = subparsers.add_parser(
+    'path',
+    help='Print the local path to an installed bundle (or the release root if omitted)')
 parser_path.add_argument(
     "download_name",
     nargs="?",
-    default='')
+    default='',
+    metavar='DOWNLOAD',
+    help='Bundle name (omit to print the active release downloads root directory)')
 parser_path.add_argument('--json', action='store_true', help='Print machine-readable JSON')
 
 parser_prune = subparsers.add_parser(
@@ -168,9 +180,13 @@ parser_prune.add_argument(
 parser_prune.add_argument(
     '--json', action='store_true', help='Print machine-readable JSON')
 
-parser_url = subparsers.add_parser('url')
+parser_url = subparsers.add_parser(
+    'url',
+    help='Print the archive download URL(s) for a bundle')
 parser_url.add_argument(
-    "download_name")
+    "download_name",
+    metavar="DOWNLOAD",
+    help="Bundle name whose archive URL(s) to print")
 
 for subparser in (parser_info, parser_list, parser_path, parser_url):
     subparser.add_argument('--release', metavar='RELEASE',
@@ -182,8 +198,13 @@ def run(argv=sys.argv[1:]):
 
     argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
-    logging.basicConfig(level=(logging.DEBUG if args.verbose else
-                               logging.WARNING if args.quiet else logging.INFO))
+    log_level = (
+        logging.DEBUG if args.verbose
+        else logging.WARNING if args.quiet
+        else logging.INFO
+    )
+    logging.basicConfig(level=log_level)
+    logging.getLogger().setLevel(log_level)
 
     command_functions = {
         "dirs": dirs_subcommand,
@@ -246,15 +267,10 @@ def fetch_subcommand(args):
             continue
         if info['downloaded'] and not force:
             if name in args.download_name:
-                print(
-                    (
-                        "*" * 40
-                        + "\nThe requested download '%s' is already installed at:\n\t%s\n"
-                        "To re-download or repair this data, re-run with --force.\n"
-                        + "*" * 40
-                    )
-                    % (name, quote(get_path(name, release=release))),
-                    file=sys.stderr,
+                qprint(
+                    "Download '%s' is already installed at %s "
+                    "(re-run with --force to re-download or repair)."
+                    % (name, quote(get_path(name, release=release)))
                 )
             continue
         items_to_fetch.append(name)

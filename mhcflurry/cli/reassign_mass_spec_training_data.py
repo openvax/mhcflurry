@@ -53,6 +53,23 @@ def make_parser(prog=None):
     return parser
 
 
+def _format_preview(df, max_rows=10):
+    """Format a compact explicit preview of the key training columns."""
+    preferred = [
+        "allele",
+        "peptide",
+        "measurement_kind",
+        "measurement_inequality",
+        "measurement_value",
+        "original_allele",
+    ]
+    cols = [c for c in preferred if c in df.columns] or list(df.columns[:6])
+    preview = df[cols].head(max_rows).to_string(index=False)
+    if len(df) > max_rows:
+        preview += "\n... (%d more row(s))" % (len(df) - max_rows)
+    return preview
+
+
 def reassign_mass_spec_training_data(
         data,
         ms_only=False,
@@ -73,7 +90,7 @@ def reassign_mass_spec_training_data(
         raise ValueError("sample_aliases requires exclude_source_samples_manifest")
     print("Read %d rows from %s" % (len(df), data), file=sys.stderr)
     if verbose:
-        print(df, file=sys.stderr)
+        print(_format_preview(df), file=sys.stderr)
 
     if drop_negative_ms:
         bad = df.loc[
@@ -102,7 +119,7 @@ def reassign_mass_spec_training_data(
                 indexer.sum(), set_measurement_value),
             file=sys.stderr)
         if verbose:
-            print(df.loc[indexer], file=sys.stderr)
+            print(_format_preview(df.loc[indexer]), file=sys.stderr)
 
     if out_csv:
         out_csv = os.path.abspath(out_csv)

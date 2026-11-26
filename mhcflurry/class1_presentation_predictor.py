@@ -919,10 +919,13 @@ class Class1PresentationPredictor(object):
 
             df["affinity_score"] = from_ic50(df.affinity)
         else:
-            # Processing prediction only.
+            # Processing prediction only. Keep ``peptide`` first so inserting
+            # ``n_flank`` / ``c_flank`` after ``df.columns[0]`` preserves the
+            # same ``peptide, n_flank, c_flank`` column order as the affinity
+            # path and ``predict_sequences_columns``.
             df = pandas.DataFrame({
-                "peptide_num": numpy.arange(len(peptides)),
                 "peptide": peptides,
+                "peptide_num": numpy.arange(len(peptides)),
             })
             df["sample_name"] = "sample1"
 

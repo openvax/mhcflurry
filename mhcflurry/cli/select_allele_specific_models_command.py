@@ -57,14 +57,13 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 WORKER_CONTEXT = {}
 
 
-parser = make_select_allele_specific_models_parser(usage=__doc__)
+parser = make_select_allele_specific_models_parser(description=__doc__)
 
 
 def run(argv=sys.argv[1:]):
-    install_sigusr1_stack_trace_handler()
-
     argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
+    install_sigusr1_stack_trace_handler()
     for prefix in ("combined", "mass_spec", "mse", "consensus"):
         minimum = getattr(args, "%s_min_models" % prefix)
         maximum = getattr(args, "%s_max_models" % prefix)
