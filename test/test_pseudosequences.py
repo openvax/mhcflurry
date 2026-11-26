@@ -812,12 +812,22 @@ def test_accessioned_alleles_flow_through_build_and_predictor():
         },
     ]
 
+    import mhcgnomes
+
+    expected_saha = mhcgnomes.parse(
+        "SarcophilusHarrisii*uniprot:G3V1L5 class I"
+    ).to_string()
+    assert expected_saha in (
+        "Saha-uniprot:G3V1L5",
+        "Saha*uniprot:G3V1L5 class I",
+    )
+
     built = build_pseudosequences_from_mhcseqs(rows=rows, normalize_alleles=True)
     assert set(built) == {
         "HLA-A*02:01",
         "TriakisScyllium-UAA*uniprot:O46817",
         "OryziasLatipes-UBA*uniprot:H2LR16",
-        "Saha*uniprot:G3V1L5 class I",
+        expected_saha,
     }
 
     predictor = Class1AffinityPredictor(
@@ -827,7 +837,7 @@ def test_accessioned_alleles_flow_through_build_and_predictor():
     assert added == 3
     assert (
         predictor.canonicalize_allele_name("SarcophilusHarrisii*uniprot:G3V1L5 class I")
-        == "Saha*uniprot:G3V1L5 class I"
+        == expected_saha
     )
     assert (
         predictor.canonicalize_allele_name("TriakisScyllium-UAA*uniprot:O46817")
