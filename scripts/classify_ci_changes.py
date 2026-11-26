@@ -168,8 +168,10 @@ def main(argv: list[str] | None = None) -> int:
         try:
             changed = git_changed_files(args.base_sha, args.head_sha or "HEAD")
         except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or "").strip()
+            detail = f"{exc}: {stderr}" if stderr else str(exc)
             print(
-                f"git diff failed ({exc}); failing safe to full ML matrix",
+                f"git diff failed ({detail}); failing safe to full ML matrix",
                 file=sys.stderr,
             )
             changed = []

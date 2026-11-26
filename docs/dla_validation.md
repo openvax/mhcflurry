@@ -215,3 +215,9 @@ measure of model accuracy. Tumor rows retain their unassigned mixture.
 | 163828A / BB7.6 | 755 | I 34.4%, L 27.5% | L 49.4%, V 17.1% |
 | Lily / H58A | 32 | I 53.1%, L 21.9% | V 40.6%, L 37.5% |
 | Bogey / BB7.6 | 2,573 | F 19.7%, L 15.2% | L 40.7%, V 15.7% |
+
+See also {doc}`experiment_25x_cattle_dog_hitlist` for a three-table `2.3.0`
+training-overlap audit of the refreshed `hitlist` Cattle (`BoLA-I`, PXD008151)
+and Dog (`DLA-88*501:01`/`508:01`) MS corpora, which independently confirms
+that both IEDB `DLA-88` MS cohorts are `100%` present in `2.3.0`'s bundled
+affinity training table.
