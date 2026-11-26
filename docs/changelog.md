@@ -8,6 +8,19 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.9](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.9.md)**:
+  Adds first-class `mhcgnomes.AccessionedAllele` support in
+  `mhcflurry/common.py` so all `2,884` sequence-backed non-model vertebrate
+  Class I alleles from `mhcseqs 2.14.0` (e.g.,
+  `TriakisScyllium-UAA*uniprot:O46817`, `Saha*uniprot:G3V1L5 class I`) flow
+  cleanly through `normalize_allele_name`,
+  `build_pseudosequences_from_mhcseqs(normalize_alleles=True)` (`26,156`
+  alleles across `223` canonical vertebrate species with `0` unparsed rows),
+  and `Class1AffinityPredictor`; publishes the speculative pan-class Class I →
+  Class II transfer experiment against `NetMHCIIpan-4.3` in
+  {doc}`experiment_25x_pan_class_ii` ({doc}`experiments`); and bumps
+  `mhcgnomes>=3.87.2` / optional `mhcseqs>=2.14.0`. Existing `2.3.0` weights
+  and predictions are unchanged.
 - **[2.5.8](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.8.md)**:
   Adds the published {doc}`experiments` log and full `2.5.x` cross-species
   `hitlist` + IEDB validation experiment report

@@ -25,6 +25,7 @@ import pandas
 from mhcgnomes import (
     parse,
     parse_gene_class,
+    AccessionedAllele,
     Allele,
     AlleleWithoutGene,
     Gene,
@@ -158,8 +159,8 @@ def normalize_allele_name(
     result = parse(
         raw_name,
         only_class1=True,
-        required_result_types=[Allele, AlleleWithoutGene, Gene],
-        preferred_result_types=[Allele],
+        required_result_types=[Allele, AlleleWithoutGene, AccessionedAllele, Gene],
+        preferred_result_types=[Allele, AccessionedAllele],
         use_allele_aliases=use_allele_aliases,
         infer_class2_pairing=False,
         collapse_singleton_haplotypes=True,
@@ -253,12 +254,17 @@ def normalize_sequence_resolved_allele_name(raw_name):
 
     HLA allele groups require at least two fields because a one-field group
     can contain multiple protein sequences. Other species require at least one
-    allele field. Serotypes, genes, class-II names, pseudogenes, and invalid
-    spellings fail through :func:`normalize_allele_name` with its specific
-    diagnostic.
+    allele field. Sequence-backed accessioned alleles
+    (:class:`mhcgnomes.AccessionedAllele`, e.g.
+    ``TriakisScyllium-UAA*uniprot:O46817`` or ``Saha*uniprot:G3V1L5 class I``)
+    uniquely identify a protein sequence and are accepted directly. Serotypes,
+    genes, class-II names, pseudogenes, and invalid spellings fail through
+    :func:`normalize_allele_name` with its specific diagnostic.
     """
     normalized = normalize_allele_name(raw_name)
     parsed = parse(normalized, only_class1=True, raise_on_error=False)
+    if isinstance(parsed, AccessionedAllele):
+        return normalized
     species = getattr(parsed, "species", None)
     required_fields = 2 if getattr(species, "mhc_prefix", None) == "HLA" else 1
     if (
@@ -303,8 +309,10 @@ def allele_locus_name(
     result = parse(
         str(raw_name),
         only_class1=True,
-        required_result_types=[Allele, AlleleWithoutGene, Gene, Serotype],
-        preferred_result_types=[Allele],
+        required_result_types=[
+            Allele, AlleleWithoutGene, AccessionedAllele, Gene, Serotype,
+        ],
+        preferred_result_types=[Allele, AccessionedAllele],
         use_allele_aliases=use_allele_aliases,
         infer_class2_pairing=False,
         collapse_singleton_haplotypes=True,

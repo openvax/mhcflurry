@@ -212,9 +212,13 @@ character diffs** on every trained allele in `curated_training_data.csv.bz2`.
 Pass `MHCFLURRY_ALLELE_SEQUENCES_BACKEND=legacy` to run the original
 `wget + clustalo + make_allele_sequences.py` workflow.
 
-For the full dated experiment write-up—including the 16-cohort groove-specificity
-synthesis figure, complete results table, and upstream data-hygiene audit—see
-{doc}`experiment_25x_cross_species_hitlist` in the {doc}`experiments` log.
+For the full dated experiment write-ups—including the 16-cohort
+groove-specificity synthesis figure, complete results tables, upstream
+nomenclature unification (`mhcgnomes.AccessionedAllele` across 230+ vertebrate
+species in `mhcflurry >= 2.5.9`), and our speculative zero-shot Class I →
+Class II pan-class experiment against `NetMHCIIpan-4.3`—see
+{doc}`experiment_25x_cross_species_hitlist` and
+{doc}`experiment_25x_pan_class_ii` in the {doc}`experiments` log.
 
 ## Reproducing the benchmark and figures
 

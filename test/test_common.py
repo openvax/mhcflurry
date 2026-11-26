@@ -203,6 +203,43 @@ def test_normalize_allele_name_scopes_inherited_pseudogene_status():
     assert normalize_allele_name("Poab-Ap*01:01") == "Poab-Ap*01:01"
 
 
+def test_normalize_allele_name_accepts_class1_accessioned_alleles():
+    # Sequence-backed AccessionedAllele identifiers (mhcgnomes >= 3.84 /
+    # mhcseqs >= 2.14) canonicalize cleanly for both gene-qualified and
+    # gene-less Class I alleles while rejecting Class II and forbidden genes.
+    assert (
+        normalize_allele_name("TriakisScyllium-UAA*uniprot:O46817")
+        == "TriakisScyllium-UAA*uniprot:O46817"
+    )
+    assert (
+        normalize_allele_name("OryziasLatipes-UBA*uniprot:H2LR16")
+        == "OryziasLatipes-UBA*uniprot:H2LR16"
+    )
+    assert (
+        normalize_allele_name("SarcophilusHarrisii*uniprot:G3V1L5 class I")
+        == "Saha*uniprot:G3V1L5 class I"
+    )
+    assert (
+        normalize_sequence_resolved_allele_name("TriakisScyllium-UAA*uniprot:O46817")
+        == "TriakisScyllium-UAA*uniprot:O46817"
+    )
+    assert (
+        normalize_sequence_resolved_allele_name("SarcophilusHarrisii*uniprot:G3V1L5 class I")
+        == "Saha*uniprot:G3V1L5 class I"
+    )
+    assert allele_locus_name("HLA-A*uniprot:P04439") == "HLA-A"
+    assert allele_locus_name("TriakisScyllium-UAA*uniprot:O46817") == "other"
+
+    with pytest.raises(ValueError, match="MHC class II allele"):
+        normalize_allele_name("HLA-DRA*uniprot:P01903")
+    with pytest.raises(ValueError, match="MHC class II allele"):
+        normalize_allele_name("Saha*uniprot:G3V1L5 class II")
+    with pytest.raises(ValueError, match="MIC-family"):
+        normalize_allele_name("HLA-MICA*uniprot:Q29983")
+    with pytest.raises(ValueError, match="HFE-family"):
+        normalize_allele_name("HLA-HFE*uniprot:Q30201")
+
+
 def test_numpy_json_encoder_handles_numpy2_scalars_and_arrays():
     import json
     import numpy as np
