@@ -8,6 +8,15 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.13](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.13.md)**:
+  Publishes {doc}`experiment_25x_cattle_dog_hitlist` in {doc}`experiments`
+  (cross-referenced from {doc}`dla_validation`): a three-table `2.3.0`
+  training-overlap audit and strictly peptide-disjoint evaluation of `21,332`
+  flanked Cattle `BoLA-I` MS ligands (PXD008151; `0.902–0.960` Presentation
+  `+F` AUROC with ultra-few-shot allele ablations on `4–12` training rows) plus
+  confirmation that IEDB `DLA-88*501:01`/`508:01` MS cohorts are `100%`
+  in-sample in `2.3.0` (`#490`). Existing `2.3.0` weights and predictions are
+  unchanged.
 - **[2.5.12](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.12.md)**:
   CI and GitHub Pages infrastructure modernization (`#471`, `#359`): adds
   fail-safe change classification (`scripts/classify_ci_changes.py`) in

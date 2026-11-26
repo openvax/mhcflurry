@@ -5,6 +5,14 @@ ablation experiments supporting MHCflurry releases.
 
 ## 2.5 series
 
+- {doc}`experiment_25x_cattle_dog_hitlist` *(2026-11-26)* — Audited Cattle
+  `BoLA-I` (PXD008151, `21,332` strictly peptide-disjoint flanked MS ligands)
+  and Dog `DLA-88` validation on the refreshed `hitlist` bundle: demonstrates
+  why auditing all three bundled `2.3.0` training tables is mandatory (catching
+  `100%` in-sample overlap on `hitlist` `DLA-88` and PMID 36423003 `BoLA-I`
+  cohorts), benchmarks `BoLA-I` Presentation (+ real `Bos taurus` flanks,
+  `0.902–0.960` AUROC), and ablates ultra-few-shot bovine alleles (`4–12`
+  training rows).
 - {doc}`experiment_25x_pan_class_ii` *(2026-11-25)* — Speculative zero-shot
   Class I → Class II transfer test: mapping Class II `DR`/`DQ`/`DP`
   heterodimers into MHCflurry's 39-aa groove representation via `mhcseqs`
@@ -37,6 +45,7 @@ sweeps, and historical public-data replays) live in the repository's
 :maxdepth: 1
 :hidden:
 
+experiment_25x_cattle_dog_hitlist
 experiment_25x_pan_class_ii
 experiment_25x_cross_species_hitlist
 ```
