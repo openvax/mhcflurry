@@ -7,23 +7,60 @@ on:
     branches: ["master", "release-2.3.0-final-weights"]
 
 jobs:
+  classify:
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.classify.outputs.mode }}
+      reason: ${{ steps.classify.outputs.reason }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}
+
+      - name: Classify changed files
+        id: classify
+        run: |
+          python3 scripts/classify_ci_changes.py \
+            --event-name "${{ github.event_name }}" \
+            --base-sha "${{ github.event.pull_request.base.sha }}" \
+            --head-sha "${{ github.event.pull_request.head.sha }}" \
+            --github-output "$GITHUB_OUTPUT" \
+            --summary-file "$GITHUB_STEP_SUMMARY"
+
   build:
+    needs: classify
     runs-on: ubuntu-latest
     env:
       # No MHCFLURRY_DOWNLOADS_CURRENT_RELEASE pin: CI tests the release that
       # mhcflurry/downloads.yml names as current-release, which is what users
       # get by default.
       MHCFLURRY_DATA_DIR: ${{ github.workspace }}/.mhcflurry-data
+      CI_MODE: ${{ needs.classify.outputs.mode }}
+      CI_REASON: ${{ needs.classify.outputs.reason }}
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
 
     steps:
+      - name: Record skipped ML matrix on secondary Python versions
+        if: needs.classify.outputs.mode == 'light' && matrix.python-version != '3.11'
+        run: |
+          echo "Skipping redundant ML matrix on Python ${{ matrix.python-version }} (mode=${CI_MODE}: ${CI_REASON})."
+          echo "Python 3.11 runs lint, packaging, CLI, and classifier checks; Documentation and Docker workflows run separately."
+          {
+            echo "### Python ${{ matrix.python-version }}: ML matrix skipped (\`mode=light\`)"
+            echo "- Reason: ${CI_REASON}"
+            echo "- Lint, packaging, CLI help, and classifier tests run on Python 3.11."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Checkout code
+        if: needs.classify.outputs.mode == 'full' || matrix.python-version == '3.11'
         uses: actions/checkout@v7
 
       - name: Set up Python ${{ matrix.python-version }}
+        if: needs.classify.outputs.mode == 'full' || matrix.python-version == '3.11'
         uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
@@ -34,11 +71,13 @@ jobs:
             pyproject.toml
 
       - name: Install system dependencies
+        if: needs.classify.outputs.mode == 'full'
         run: |
           sudo apt-get update
           sudo apt-get install -y pandoc
 
       - name: Lint shell scripts
+        if: needs.classify.outputs.mode == 'full' || matrix.python-version == '3.11'
         run: |
           # Catch syntax regressions in the training-pipeline shell
           # wrappers cheaply. ``bash -n`` parses without executing.
@@ -51,27 +90,47 @@ jobs:
           done
 
       - name: Install python dependencies
+        if: needs.classify.outputs.mode == 'full' || matrix.python-version == '3.11'
         run: |
           pip install --upgrade pip
           pip install pytest pytest-cov ruff==0.16.0
           pip install -r requirements.txt
-          pip install -r docs/requirements.txt
+          if [ "${CI_MODE}" = "full" ]; then
+              pip install -r docs/requirements.txt
+          fi
           pip install .
 
       - name: Lint Python
+        if: needs.classify.outputs.mode == 'full' || matrix.python-version == '3.11'
         run: ./lint.sh
+
+      - name: Run lightweight checks for docs/container-only PR
+        if: needs.classify.outputs.mode == 'light' && matrix.python-version == '3.11'
+        run: |
+          python -m pytest --tb=short \
+            test/test_packaging.py \
+            test/test_cli_help.py \
+            test/test_ci_change_classification.py
+          {
+            echo "### Python 3.11: Lightweight gate passed (\`mode=light\`)"
+            echo "- Reason: ${CI_REASON}"
+            echo "- Ran: shell syntax check, \`./lint.sh\`, \`test_packaging.py\`, \`test_cli_help.py\`, \`test_ci_change_classification.py\`."
+            echo "- Full ML model test suite skipped because no runtime/training/test/catalogue/dependency file changed."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # downloads.yml names the release and its archive URLs; this file names
       # the bundles fetched. Both are hashed into the key. There are no
       # restore-keys: fetch skips any bundle whose directory exists, so a
       # fallback cache could keep weights from another catalogue.
       - name: Cache MHCflurry downloads
+        if: needs.classify.outputs.mode == 'full'
         uses: actions/cache@v6
         with:
           path: .mhcflurry-data
           key: mhcflurry-data-${{ runner.os }}-${{ hashFiles('mhcflurry/downloads.yml', '.github/workflows/ci.yml') }}
 
       - name: Download data and models
+        if: needs.classify.outputs.mode == 'full'
         run: |
           mhcflurry-downloads fetch data_curated data_mass_spec_annotated models_class1 models_class1_presentation allele_sequences
           # Fixtures recorded from the 2020 public weights load catalogue
@@ -79,5 +138,6 @@ jobs:
           mhcflurry-downloads fetch --release 2.2.0 models_class1 models_class1_presentation
 
       - name: Test with pytest
+        if: needs.classify.outputs.mode == 'full'
         run: |
           python -m pytest --tb=long --cov=mhcflurry/ --cov-report=term-missing ./test

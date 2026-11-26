@@ -8,6 +8,16 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.12](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.12.md)**:
+  CI and GitHub Pages infrastructure modernization (`#471`, `#359`): adds
+  fail-safe change classification (`scripts/classify_ci_changes.py`) in
+  `.github/workflows/ci.yml` so docs/container-only PRs run lint, packaging,
+  and CLI checks in ~2 minutes instead of repeating the 4-Python ML matrix, and
+  migrates `.github/workflows/docs.yml` off legacy `gh-pages` branch publishing
+  to official GitHub Actions Pages (`configure-pages@v6`,
+  `upload-pages-artifact@v5`, `deploy-pages@v5`) while preserving
+  `previous-versions/` and eliminating Node 20 deprecation warnings. Existing
+  `2.3.0` weights and predictions are unchanged.
 - **[2.5.11](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.11.md)**:
   Codebase cleanup and modularization (`#506`, `#419`, partial `#513`): splits
   legacy Keras config/weight loading out of `class1_neural_network.py` into

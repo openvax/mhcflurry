@@ -9,7 +9,7 @@ on:
 
 concurrency:
   group: documentation-pages-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -71,7 +71,12 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout archived documentation
@@ -88,11 +93,18 @@ jobs:
           path: documentation-html
 
       - name: Preserve archived documentation
-        run: cp -R archived-docs/previous-versions documentation-html/
+        run: |
+          cp -R archived-docs/previous-versions documentation-html/
+          touch documentation-html/.nojekyll
 
-      - name: Publish GitHub Pages branch
-        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: documentation-html
-          force_orphan: true
+          path: documentation-html
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
