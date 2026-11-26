@@ -25,11 +25,18 @@ Examples:
 CSV columns: allele, peptide, n_flank and c_flank. Available N/C flanks are
 used by default; use --no-flanking to compare without sequence context. Flank
 columns may be omitted when context is unavailable, and a flank cell may be
-empty for a peptide at a protein terminus. Input columns
-are preserved in the output. Separate --alleles arguments are independent
-queries, each scored against every peptide. Delimit alleles within a CSV cell
-or quoted argument with commas, semicolons or spaces to score one MHC allele
-set; its row reports the strongest binding allele.
+empty for a peptide at a protein terminus. Input columns are preserved in the
+output. Separate --alleles arguments are independent queries, each scored
+against every peptide. Delimit alleles within a CSV cell or quoted argument
+with commas, semicolons or spaces to score one MHC allele set; its row reports
+the strongest binding allele.
+
+Output columns (prefixed by --prediction-column-prefix, default 'mhcflurry_'):
+  affinity                  Binding affinity (IC50 nM; lower is tighter)
+  affinity_percentile       Affinity percentile rank (0-100%; lower is tighter)
+  processing_score          Antigen processing score (0-1; higher is stronger)
+  presentation_score        Presentation score (0-1; higher is stronger)
+  presentation_percentile   Presentation percentile (0-100%; lower is tighter)
 """
 import sys
 import itertools
@@ -105,12 +112,18 @@ output_args.add_argument(
     "--prediction-column-prefix",
     metavar="NAME",
     default="mhcflurry_",
-    help="Prefix for output column names. Default: ``%(default)s``")
+    help="Prefix for output column names. Default: '%(default)s'")
 output_args.add_argument(
     "--output-delimiter",
     metavar="CHAR",
     default=",",
     help="Delimiter character for results. Default: '%(default)s'")
+output_args.add_argument(
+    "--float-format",
+    metavar="FMT",
+    default=None,
+    help="Optional printf-style float format for numeric CSV columns "
+    "(e.g. '%%.4f' or '%%.6g'). Default: full float precision.")
 output_args.add_argument(
     "--no-affinity-percentile",
     default=False,
@@ -314,18 +327,30 @@ def run(argv=sys.argv[1:]):
         # The reason we set the default here instead of in the argument parser
         # is that we want to test_exists at this point, so the user gets a
         # message instructing them to download the models if needed.
-        models_dir = get_default_class1_presentation_models_dir(test_exists=True)
+        try:
+            models_dir = get_default_class1_presentation_models_dir(test_exists=True)
+        except RuntimeError as error:
+            parser.error(str(error))
+    elif not os.path.isdir(models_dir):
+        parser.error("--models: no such directory: %s" % models_dir)
 
     if args.list_supported_alleles:
-        print("\n".join(_supported_alleles_for_command(models_dir)))
+        try:
+            print("\n".join(_supported_alleles_for_command(models_dir)))
+        except (FileNotFoundError, OSError, ValueError, RuntimeError) as error:
+            parser.error(str(error))
         return
 
     if args.list_supported_peptide_lengths:
-        min_len, max_len = _supported_peptide_lengths_for_command(models_dir)
+        try:
+            min_len, max_len = _supported_peptide_lengths_for_command(models_dir)
+        except (FileNotFoundError, OSError, ValueError, RuntimeError) as error:
+            parser.error(str(error))
         print("\n".join([str(length) for length in range(min_len, max_len + 1)]))
         return
 
     import pandas
+    from ..encodable_sequences import EncodingError
     from ..parallelism import (
         chunk_ranges_for_local_parallelism,
         num_workers_per_gpu_from_args,
@@ -342,6 +367,17 @@ def run(argv=sys.argv[1:]):
     # It's hard to pass a tab in a shell, so we correct a common error:
     if args.output_delimiter == "\\t":
         args.output_delimiter = "\t"
+    if len(args.output_delimiter) != 1:
+        parser.error(
+            "--output-delimiter must be a single character, got %r"
+            % (args.output_delimiter,)
+        )
+    if args.out:
+        out_dir = os.path.dirname(args.out)
+        if out_dir and not os.path.isdir(out_dir):
+            parser.error(
+                "--out: parent directory does not exist: %s" % out_dir
+            )
 
     # Detect models type by file presence so the parent stays torch-free
     # on paths that will fork workers. Workers pin to GPUs via
@@ -361,14 +397,17 @@ def run(argv=sys.argv[1:]):
                 "or --peptides")
         # Keep empty cells as "" rather than NaN: an empty flank means the
         # peptide is at a protein terminus, and "NA" is a valid residue string.
-        df = pandas.read_csv(args.input, keep_default_na=False)
+        try:
+            df = pandas.read_csv(args.input, keep_default_na=False)
+        except (FileNotFoundError, OSError, ValueError) as error:
+            parser.error(str(error))
         print(
             "Read input CSV with %d rows, columns are: %s" % (
                 len(df), ", ".join(df.columns)),
             file=sys.stderr)
         for col in [args.allele_column, args.peptide_column]:
             if col not in df.columns:
-                raise ValueError(
+                parser.error(
                     "No such column '%s' in CSV. Columns are: %s" % (
                         col, ", ".join(["'%s'" % c for c in df.columns])))
     else:
@@ -458,9 +497,12 @@ def run(argv=sys.argv[1:]):
         if worker_pool is None:
             # Serial path: no fork will happen, so loading the predictor
             # in this process is safe.
-            predictor, _ = _load_predictor_for_command(models_dir)
-            predictions = _predict_dataframe_chunk(
-                predictor, df, prediction_options)
+            try:
+                predictor, _ = _load_predictor_for_command(models_dir)
+                predictions = _predict_dataframe_chunk(
+                    predictor, df, prediction_options)
+            except (FileNotFoundError, OSError, ValueError, RuntimeError, EncodingError) as error:
+                parser.error(str(error))
         else:
             # Parallel path: do NOT load the predictor in this process.
             # Each worker loads it after CUDA_VISIBLE_DEVICES is set,
@@ -486,6 +528,8 @@ def run(argv=sys.argv[1:]):
                 worker_pool.close()
                 worker_pool.join()
                 worker_pool = None
+            except (FileNotFoundError, OSError, ValueError, RuntimeError, EncodingError) as error:
+                parser.error(str(error))
             finally:
                 # On failure mid-iteration, terminate() rather than
                 # close()/join() (which can hang on a wedged worker) and
@@ -508,12 +552,26 @@ def run(argv=sys.argv[1:]):
             if "best_allele" in predictions:
                 del predictions["best_allele"]
 
+    excluded_cols = {"allele", "peptide", "sample_name", "peptide_num"}
+    if use_flanking:
+        # Input CSV already carries the flank columns verbatim; do not
+        # duplicate them under the prediction prefix (#424).
+        excluded_cols.update(("n_flank", "c_flank"))
     for col in predictions.columns:
-        if col not in ("allele", "peptide", "sample_name", "peptide_num"):
+        if col not in excluded_cols:
             df[args.prediction_column_prefix + col] = predictions[col]
 
+    csv_kwargs = {
+        "index": False,
+        "sep": args.output_delimiter,
+    }
+    if args.float_format is not None:
+        csv_kwargs["float_format"] = args.float_format
     if args.out:
-        df.to_csv(args.out, index=False, sep=args.output_delimiter)
+        try:
+            df.to_csv(args.out, **csv_kwargs)
+        except OSError as error:
+            parser.error(str(error))
         print("Wrote: %s" % args.out, file=sys.stderr)
     else:
-        df.to_csv(sys.stdout, index=False, sep=args.output_delimiter)
+        df.to_csv(sys.stdout, **csv_kwargs)

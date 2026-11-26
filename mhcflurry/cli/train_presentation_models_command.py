@@ -60,13 +60,12 @@ WORKER_CONTEXT = {}
 _PRESENTATION_WORKER_RUNTIME_FLOOR_GB = 6.0
 _PRESENTATION_WORKER_SAFETY_FACTOR = 1.3
 
-parser = make_train_presentation_models_parser(usage=__doc__)
+parser = make_train_presentation_models_parser(description=__doc__)
 
 def run(argv=sys.argv[1:]):
-    install_sigusr1_stack_trace_handler()
-
     argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
+    install_sigusr1_stack_trace_handler()
 
     if args.debug:
         try:

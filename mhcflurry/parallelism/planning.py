@@ -911,8 +911,20 @@ def resolve_local_parallelism_args(
     for warning in list(plan.warnings) + preflight:
         print("Local parallelism:", warning, file=sys.stderr)
     from .torch_compile import hoist_torchinductor_compile_threads
+    from ..workload_planning import (
+        WORKLOAD_AFFINITY_INFERENCE,
+        WORKLOAD_PRESENTATION_INFERENCE,
+        WORKLOAD_PROCESSING_INFERENCE,
+    )
     hoist_torchinductor_compile_threads(args)
-    print("Local workload plan:", plan, file=sys.stderr)
+    if plan.workload_name in (
+        WORKLOAD_AFFINITY_INFERENCE,
+        WORKLOAD_PRESENTATION_INFERENCE,
+        WORKLOAD_PROCESSING_INFERENCE,
+    ):
+        logging.info("Local workload plan: %s", plan)
+    else:
+        print("Local workload plan:", plan, file=sys.stderr)
     args._local_parallelism_args_resolved = True
     return args
 

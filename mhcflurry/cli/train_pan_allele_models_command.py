@@ -134,7 +134,7 @@ def _log_process_telemetry(marker):
         f"rss_mb={rss_field} num_fds={fd_field}"
     )
 
-parser = make_train_pan_allele_models_parser(usage=__doc__)
+parser = make_train_pan_allele_models_parser(description=__doc__)
 
 
 def assign_folds(df, num_folds, held_out_fraction, held_out_max, seed=None):
@@ -386,10 +386,9 @@ def pretrain_network_input_iterator(
 
 
 def run(argv=sys.argv[1:]):
-    install_sigusr1_stack_trace_handler()
-
     argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
+    install_sigusr1_stack_trace_handler()
     held_out_fraction, held_out_max = (
         args.held_out_measurements_per_allele_fraction_and_max)
     if not numpy.isfinite(held_out_fraction) or not 0 <= held_out_fraction <= 1:

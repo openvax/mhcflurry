@@ -347,26 +347,46 @@ def make_parser(prog=None):
     """
     from .cli.help import HelpArgumentParser
 
-    parser = HelpArgumentParser(prog=prog, description=__doc__)
+    parser = HelpArgumentParser(
+        prog=prog,
+        description=(
+            "Inspect canonical Class I MHC pseudosequence filenames/paths "
+            "or extract/build 39-aa and 34-aa pseudosequences via mhcseqs."
+        ),
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     filename_parser = subparsers.add_parser(
         "filename",
         help="Print the canonical pseudosequence filename for a length.")
-    filename_parser.add_argument("--length", required=True, type=int)
+    filename_parser.add_argument(
+        "--length",
+        required=True,
+        type=int,
+        help="Pseudosequence length in amino acids (e.g. 39 or 34).")
     filename_parser.set_defaults(func=_run_filename)
 
     legacy_parser = subparsers.add_parser(
         "legacy",
         help="Print a legacy compatibility filename.")
-    legacy_parser.add_argument("name", choices=sorted(LEGACY_FILENAMES))
+    legacy_parser.add_argument(
+        "name",
+        choices=sorted(LEGACY_FILENAMES),
+        help="Legacy alias name to resolve.")
     legacy_parser.set_defaults(func=_run_legacy)
 
     path_parser = subparsers.add_parser(
         "path",
         help="Print the preferred pseudosequence path in a directory.")
-    path_parser.add_argument("--directory", required=True)
-    path_parser.add_argument("--length", required=True, type=int)
+    path_parser.add_argument(
+        "--directory",
+        required=True,
+        help="Directory containing pseudosequence CSV files.")
+    path_parser.add_argument(
+        "--length",
+        required=True,
+        type=int,
+        help="Pseudosequence length in amino acids (e.g. 39 or 34).")
     path_parser.add_argument(
         "--fallback-legacy",
         action="store_true",
@@ -474,7 +494,10 @@ def main(argv=None, prog=None):
     parser = make_parser(prog)
     argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
-    args.func(args)
+    try:
+        args.func(args)
+    except (ValueError, FileNotFoundError, OSError, ImportError) as error:
+        parser.error(str(error))
 
 
 if __name__ == "__main__":

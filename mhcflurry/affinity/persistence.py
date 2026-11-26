@@ -315,7 +315,7 @@ def _load_allele_sequences(models_dir, build_alias_map=True):
                 ", ".join(sorted(skipped_non_class1)[:10])
                 + (" ..." if len(skipped_non_class1) > 10 else ""))
         if skipped_unparseable:
-            logging.warning(
+            logging.debug(
                 "Skipped %d unparseable pseudosequence allele key(s) that "
                 "cannot be resolved by the predictor API: %s",
                 len(skipped_unparseable),

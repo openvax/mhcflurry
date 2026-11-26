@@ -27,8 +27,19 @@ Examples:
 CSV columns: sequence_id, sequence. Each --alleles argument is one sample;
 delimit alleles within a quoted argument with commas or semicolons to give
 a sample MHC allele set.
+
+Output columns:
+  sequence_name             Input sequence ID (CSV sequence_id or FASTA header)
+  pos                       Zero-based peptide start position in the sequence
+  peptide, n_flank, c_flank Peptide and optional flanking sequences
+  affinity                  Binding affinity (IC50 nM; lower is tighter)
+  affinity_percentile       Affinity percentile rank (0-100%; lower is tighter)
+  processing_score          Antigen processing score (0-1; higher is stronger)
+  presentation_score        Presentation score (0-1; higher is stronger)
+  presentation_percentile   Presentation percentile (0-100%; lower is tighter)
 """
 import collections
+import os
 import re
 import sys
 
@@ -131,6 +142,12 @@ output_args.add_argument(
     metavar="CHAR",
     default=",",
     help="Delimiter character for results. Default: '%(default)s'")
+output_args.add_argument(
+    "--float-format",
+    metavar="FMT",
+    default=None,
+    help="Optional printf-style float format for numeric CSV columns "
+    "(e.g. '%%.4f' or '%%.6g'). Default: full float precision.")
 output_args.add_argument(
     "--no-affinity-percentile",
     default=False,
@@ -262,7 +279,7 @@ def parse_peptide_lengths(value):
                     "Invalid peptide lengths: %r" % (value,)
                 )
     except ValueError:
-        raise ValueError("Couldn't parse peptide lengths: ", value)
+        raise ValueError("Couldn't parse peptide lengths: %r" % (value,)) from None
     return peptide_lengths
 
 
@@ -285,18 +302,30 @@ def run(argv=sys.argv[1:]):
         # The reason we set the default here instead of in the argument parser
         # is that we want to test_exists at this point, so the user gets a
         # message instructing them to download the models if needed.
-        models_dir = get_default_class1_presentation_models_dir(test_exists=True)
+        try:
+            models_dir = get_default_class1_presentation_models_dir(test_exists=True)
+        except RuntimeError as error:
+            parser.error(str(error))
+    elif not os.path.isdir(models_dir):
+        parser.error("--models: no such directory: %s" % models_dir)
 
     if args.list_supported_alleles:
-        print("\n".join(_supported_alleles_for_command(models_dir)))
+        try:
+            print("\n".join(_supported_alleles_for_command(models_dir)))
+        except (FileNotFoundError, OSError, ValueError, RuntimeError) as error:
+            parser.error(str(error))
         return
 
     if args.list_supported_peptide_lengths:
-        min_len, max_len = _supported_peptide_lengths_for_command(models_dir)
+        try:
+            min_len, max_len = _supported_peptide_lengths_for_command(models_dir)
+        except (FileNotFoundError, OSError, ValueError, RuntimeError) as error:
+            parser.error(str(error))
         print("\n".join([str(length) for length in range(min_len, max_len + 1)]))
         return
 
     import pandas
+    from ..encodable_sequences import EncodingError
     from ..parallelism import (
         chunk_ranges_for_local_parallelism,
         num_workers_per_gpu_from_args,
@@ -315,8 +344,22 @@ def run(argv=sys.argv[1:]):
     # It's hard to pass a tab in a shell, so we correct a common error:
     if args.output_delimiter == "\\t":
         args.output_delimiter = "\t"
+    if len(args.output_delimiter) != 1:
+        parser.error(
+            "--output-delimiter must be a single character, got %r"
+            % (args.output_delimiter,)
+        )
+    if args.out:
+        out_dir = os.path.dirname(args.out)
+        if out_dir and not os.path.isdir(out_dir):
+            parser.error(
+                "--out: parent directory does not exist: %s" % out_dir
+            )
 
-    peptide_lengths = parse_peptide_lengths(args.peptide_lengths)
+    try:
+        peptide_lengths = parse_peptide_lengths(args.peptide_lengths)
+    except ValueError as error:
+        parser.error(str(error))
 
     explicit_thresholds = {
         col
@@ -345,10 +388,9 @@ def run(argv=sys.argv[1:]):
             and args.alleles
             and not args.no_affinity_percentile):
         print(
-            "Filtering by affinity-percentile <= %s" % default_thresholds["affinity_percentile"],
-            file=sys.stderr)
-        print(
-            "to show all predictions, pass --results-all",
+            "Filtering by affinity-percentile <= %s "
+            "(pass --results-all to show all predictions)."
+            % default_thresholds["affinity_percentile"],
             file=sys.stderr)
         args.threshold_affinity_percentile = default_thresholds["affinity_percentile"]
 
@@ -380,26 +422,31 @@ def run(argv=sys.argv[1:]):
                 file=sys.stderr)
 
         if input_format == "csv":
-            df = pandas.read_csv(
-                args.input, keep_default_na=False, dtype=str)
+            try:
+                df = pandas.read_csv(
+                    args.input, keep_default_na=False, dtype=str)
+            except (FileNotFoundError, OSError, ValueError) as error:
+                parser.error(str(error))
             print(
                 "Read input CSV with %d rows, columns are: %s" % (
                     len(df), ", ".join(df.columns)),
                 file=sys.stderr)
             for col in [args.sequence_column,]:
                 if col not in df.columns:
-                    raise ValueError(
+                    parser.error(
                         "No such column '%s' in CSV. Columns are: %s" % (
                             col, ", ".join(["'%s'" % c for c in df.columns])))
 
         elif input_format == "fasta":
-            df = read_fasta_to_dataframe(args.input)
+            try:
+                df = read_fasta_to_dataframe(args.input)
+            except (FileNotFoundError, OSError, ValueError) as error:
+                parser.error(str(error))
             print(
-                "Read input fasta with %d sequences" % len(df),
+                "Read %d sequences from %s" % (len(df), args.input),
                 file=sys.stderr)
-            print(df, file=sys.stderr)
         else:
-            raise ValueError("Unsupported input format", input_format)
+            parser.error("Unsupported input format: %r" % (input_format,))
     else:
         if not args.sequences:
             parser.error(
@@ -473,17 +520,20 @@ def run(argv=sys.argv[1:]):
                 num_workers_per_gpu_from_args(args)
             )
         if worker_pool is None:
-            predictor = _load_predictor_for_command(models_dir)
-            result_df = predictor.predict_sequences(
-                sequences=sequences,
-                alleles=alleles,
-                result="all",
-                peptide_lengths=peptide_lengths,
-                use_flanks=not args.no_flanking,
-                include_affinity_percentile=not args.no_affinity_percentile,
-                throw=not args.no_throw,
-                affinity_model_kwargs=affinity_model_kwargs,
-                processing_batch_size="auto")
+            try:
+                predictor = _load_predictor_for_command(models_dir)
+                result_df = predictor.predict_sequences(
+                    sequences=sequences,
+                    alleles=alleles,
+                    result="all",
+                    peptide_lengths=peptide_lengths,
+                    use_flanks=not args.no_flanking,
+                    include_affinity_percentile=not args.no_affinity_percentile,
+                    throw=not args.no_throw,
+                    affinity_model_kwargs=affinity_model_kwargs,
+                    processing_batch_size="auto")
+            except (FileNotFoundError, OSError, ValueError, RuntimeError, EncodingError) as error:
+                parser.error(str(error))
         else:
             try:
                 # Build the work items inside the try so a failure here still
@@ -513,6 +563,8 @@ def run(argv=sys.argv[1:]):
                 worker_pool.close()
                 worker_pool.join()
                 worker_pool = None
+            except (FileNotFoundError, OSError, ValueError, RuntimeError, EncodingError) as error:
+                parser.error(str(error))
             finally:
                 # On failure mid-iteration, terminate() rather than
                 # close()/join() (which can hang on a wedged worker) and
@@ -536,6 +588,11 @@ def run(argv=sys.argv[1:]):
             comparison_quantity = chunks[0].comparison_quantity
             result_df = Class1PresentationPredictor.sort_predictions(
                 result_df, comparison_quantity).reset_index(drop=True)
+
+    # In processing-only mode (no --alleles), omit the synthetic sample_name
+    # placeholder ("sample1") since no sample was requested (#424).
+    if not alleles and "sample_name" in result_df.columns:
+        result_df = result_df.drop(columns=["sample_name"])
 
     # Apply thresholds, skipping ones whose column is missing (e.g.
     # processing-only run with no alleles, or --no-affinity-percentile
@@ -562,8 +619,17 @@ def run(argv=sys.argv[1:]):
             result_df = result_df.loc[result_df[col] <= thresh]
 
     # Write results
+    csv_kwargs = {
+        "index": False,
+        "sep": args.output_delimiter,
+    }
+    if args.float_format is not None:
+        csv_kwargs["float_format"] = args.float_format
     if args.out:
-        result_df.to_csv(args.out, index=False, sep=args.output_delimiter)
+        try:
+            result_df.to_csv(args.out, **csv_kwargs)
+        except OSError as error:
+            parser.error(str(error))
         print("Wrote: %s" % args.out, file=sys.stderr)
     else:
-        result_df.to_csv(sys.stdout, index=False, sep=args.output_delimiter)
+        result_df.to_csv(sys.stdout, **csv_kwargs)

@@ -66,7 +66,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 WORKER_CONTEXT = {}
 
 
-parser = make_select_pan_allele_models_parser(usage=__doc__)
+parser = make_select_pan_allele_models_parser(description=__doc__)
 
 
 def mse(
@@ -111,10 +111,9 @@ def mse(
 
 
 def run(argv=sys.argv[1:]):
-    install_sigusr1_stack_trace_handler()
-
     argcomplete.autocomplete(parser)
     args = parser.parse_args(argv)
+    install_sigusr1_stack_trace_handler()
     if args.min_models_per_fold is None:
         args.min_models_per_fold = min(2, args.max_models_per_fold)
     if args.min_models_per_fold > args.max_models_per_fold:

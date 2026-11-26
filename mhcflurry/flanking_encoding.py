@@ -274,8 +274,8 @@ class FlankingEncoding(object):
         ]
         if len(error_df) > 0:
             message = (
-                "Sequence '%s' (length %d) unsupported. There are %d "
-                "total peptides with this length." % (
+                "Sequence '%s' (length %d) unsupported. %d total "
+                "peptide(s) have unsupported lengths." % (
                     error_df.iloc[0].peptide,
                     len(error_df.iloc[0].peptide),
                     len(error_df)))

@@ -73,7 +73,7 @@ tqdm.monitor_interval = 0  # see https://github.com/tqdm/tqdm/issues/481
 # copy-on-write pages instead of receiving a pickled copy.
 WORKER_CONTEXT = {}
 
-parser = make_calibrate_percentile_ranks_parser(usage=__doc__)
+parser = make_calibrate_percentile_ranks_parser(description=__doc__)
 
 
 def run(argv=sys.argv[1:]):
