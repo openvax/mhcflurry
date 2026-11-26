@@ -31,7 +31,7 @@ against every peptide. Delimit alleles within a CSV cell or quoted argument
 with commas, semicolons or spaces to score one MHC allele set; its row reports
 the strongest binding allele.
 
-Output columns (prefixed by --prediction-column-prefix, default 'mhcflurry_'):
+Output columns (prefixed by --prediction-column-prefix):
   affinity                  Binding affinity (IC50 nM; lower is tighter)
   affinity_percentile       Affinity percentile rank (0-100%; lower is tighter)
   processing_score          Antigen processing score (0-1; higher is stronger)
@@ -112,7 +112,7 @@ output_args.add_argument(
     "--prediction-column-prefix",
     metavar="NAME",
     default="mhcflurry_",
-    help="Prefix for output column names. Default: '%(default)s'")
+    help="Prefix for output column names. Default: ``%(default)s``")
 output_args.add_argument(
     "--output-delimiter",
     metavar="CHAR",
