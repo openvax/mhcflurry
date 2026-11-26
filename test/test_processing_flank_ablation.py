@@ -6,7 +6,7 @@ import pytest
 
 
 def module():
-    path = Path(__file__).resolve().parents[1] / "scripts/training/processing_flank_ablation.py"
+    path = Path(__file__).resolve().parents[1] / "scripts/experiments/release_2_3_0/processing_flank_ablation.py"
     spec = importlib.util.spec_from_file_location("processing_flank_ablation", path)
     result = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(result)

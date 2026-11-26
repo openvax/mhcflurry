@@ -16,30 +16,25 @@ from mhcflurry.class1_neural_network import Class1NeuralNetworkModel
 
 
 REPO = Path(__file__).resolve().parents[1]
-RUNNER = REPO / "scripts" / "training" / "run_affinity_factorial.sh"
+EXPERIMENT_DIR = REPO / "scripts" / "experiments" / "release_2_3_0"
+RUNNER = EXPERIMENT_DIR / "run_affinity_factorial.sh"
 ARCHITECTURE_RUNNER = (
-    REPO
-    / "scripts"
-    / "training"
+    EXPERIMENT_DIR
     / "run_affinity_factorial_architecture_evaluation.sh"
 )
 PUBLIC_EVALUATOR = (
-    REPO
-    / "scripts"
-    / "training"
+    EXPERIMENT_DIR
     / "evaluate_affinity_factorial_public.sh"
 )
 PROCESSING_REGULARIZATION_RUNNER = (
-    REPO
-    / "scripts"
-    / "training"
+    EXPERIMENT_DIR
     / "run_processing_regularization_activation.sh"
 )
 
 
 def load_script(name):
-    """Load a training script as a module."""
-    path = REPO / "scripts" / "training" / (name + ".py")
+    """Load a release 2.3.0 experiment script as a module."""
+    path = EXPERIMENT_DIR / (name + ".py")
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

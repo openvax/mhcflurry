@@ -7,7 +7,9 @@ release. Current training and weight packaging are documented in
 [scripts/release/README.md](../scripts/release/README.md).
 
 Prediction users do not need these generators. Use `mhcflurry downloads fetch`
-to install published models and datasets.
+to install published models and datasets. Historical Mount Sinai LSF cluster
+submit headers (`cluster_submit_script_header.mssm_hpc*.lsf`, which probed
+legacy TensorFlow GPU availability) were removed in `2.5.14`.
 
 ## Class I Pseudosequence Files
 

@@ -1,43 +1,39 @@
 # Maintained scripts
 
-This directory contains reusable training, release, validation, and developer
-utilities. Transient experiments, incident-specific launchers, and smoke tests
-belong in the ignored `jobs/` directory or in the test suite.
+This directory separates reusable operational scripts from recorded experiment
+campaigns. Transient debugging and machine-specific launchers belong in the
+gitignored `jobs/` directory.
 
 ## Directory map
 
-- **`training/`** — production training stages, remote transport, sweeps, and
-  profiling. See [training/README.md](training/README.md).
-- **`release/`** — end-to-end release orchestration, provenance validation,
-  packaging, and deployment. See [release/README.md](release/README.md).
-- **`dev/`** — developer ergonomics that are not invoked by CI or releases.
-- **Top-level Python files** — focused validation tools for comparing a newly
-  trained predictor with a release or fixture.
+- **`training/`** — active release-training stages, remote transport, and
+  shared helpers (`gpu_telemetry.sh`, `set_cpu_threads.sh`). See
+  [training/README.md](training/README.md).
+- **`release/`** — end-to-end release orchestration
+  (`retrain_evaluate_deploy.sh`), provenance validation, packaging, and
+  deployment. See [release/README.md](release/README.md).
+- **`experiments/`** — self-contained reproducible scripts for completed
+  validation and ablation studies (`release_2_3_0/`, `release_2_5_0/`), each
+  tied to its published doc or note. See
+  [experiments/README.md](experiments/README.md).
+- **Top-level Python files** — focused CI and acceptance utilities:
+  - `classify_ci_changes.py` — `#471` fail-safe CI change classifier.
+  - `validate_against_public.py` — affinity and presentation rank correlation
+    against a public release on a peptide-by-allele grid.
+  - `validate_allele_sequences.py` — verifies shipped pseudosequences are
+    stable across model bundles.
+  - `validate_presentation_with_flanks.py` — fixed presentation regression set
+    with real flanks.
 
-The maintained public workflow for training, evaluation, plots, remote cleanup,
-and optional deployment is:
-
-```shell
-mhcflurry train pan-allele-release --help
-```
-
-## Validation tools
-
-- **`validate_against_public.py`** checks affinity and presentation rank
-  correlation against a public release on a peptide-by-allele grid.
-- **`validate_allele_sequences.py`** verifies that shipped pseudosequences are
-  stable across model bundles.
-- **`validate_presentation_with_flanks.py`** runs a small fixed presentation
-  regression set with real flanks.
-
-These are acceptance checks for model work. General behavior tests belong in
-`test/`.
+Packaged CLI workflows live under `mhcflurry train --help` and
+`mhcflurry eval --help`; full end-to-end release orchestration is driven by
+`scripts/release/retrain_evaluate_deploy.sh --help`.
 
 ## Where new work belongs
 
-- Use ignored `jobs/` for local launchers, interrupted experiments, and
-  machine-specific debugging.
-- Promote reusable operational tools from `jobs/` into `scripts/`.
-- Keep artifact generation reproducible through saved commands, configuration,
-  input/source hashes and seeds. Use the maintained `training/` and `release/`
-  workflows for current models; `downloads-generation/` retains historical recipes.
+- Promote reusable user/operator workflows into `mhcflurry/cli/` (`mhcflurry
+  train` / `mhcflurry eval`) rather than adding scattered top-level scripts.
+- Record completed reproducible studies under `scripts/experiments/<study>/` with
+  a clear link in `scripts/experiments/README.md` and `docs/experiments.md`.
+- Keep transient local debugging and interrupted runs in gitignored `jobs/`.
+- `downloads-generation/` retains historical dataset/bundle recipes only.

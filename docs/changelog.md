@@ -8,6 +8,13 @@ and on [GitHub Releases](https://github.com/openvax/mhcflurry/releases).
 
 ## 2.5 series (current)
 
+- **[2.5.14](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.14.md)**:
+  Repository hygiene and experiment-script organization: deletes 7 dead
+  unreferenced one-off campaign scripts and 8 legacy Mount Sinai LSF/TensorFlow
+  `.lsf` fossils from `downloads-generation/`, quarantines 15 reproducible
+  `2.3.0`/`2.5.0` experiment scripts into `scripts/experiments/` with an
+  indexed provenance `README.md`, and fixes stale CLI documentation in script
+  READMEs. Zero changes to runtime code, `2.3.0` weights, or predictions.
 - **[2.5.13](https://github.com/openvax/mhcflurry/blob/master/release-notes/2.5.13.md)**:
   Publishes {doc}`experiment_25x_cattle_dog_hitlist` in {doc}`experiments`
   (cross-referenced from {doc}`dla_validation`): a three-table `2.3.0`

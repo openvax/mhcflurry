@@ -98,12 +98,6 @@ rather than being fabricated; new predictions can first be added with
 `artifacts/summary.csv` is the stable optimizer × LSUV × minibatch table for
 factorial heatmaps. `data/training_history.csv` is the corresponding tidy
 model/fit/epoch table. Publication-style figures and correlation heatmaps can
-be regenerated with `mhcflurry eval paper-figures` when a run preserved its
-saved score tables.
-
-The cross-experiment release panels, including cleavage-boundary and cached
-presentation-factorial conclusions, are regenerated with:
-
-```bash
-mhcflurry eval release-experiment-figures --help
-```
+be regenerated with `mhcflurry eval paper-figures --help` when a run preserved
+its saved score tables. Recorded reproducible experiment scripts live under
+[`scripts/experiments/`](../scripts/experiments/README.md).

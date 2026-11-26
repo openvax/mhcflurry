@@ -223,10 +223,10 @@ Class II pan-class experiment against `NetMHCIIpan-4.3`—see
 ## Reproducing the benchmark and figures
 
 The complete evaluation and plotting pipeline lives in
-[`scripts/benchmark_cross_species_mhcseqs.py`](https://github.com/openvax/mhcflurry/blob/master/scripts/benchmark_cross_species_mhcseqs.py):
+[`scripts/experiments/release_2_5_0/benchmark_cross_species_mhcseqs.py`](https://github.com/openvax/mhcflurry/blob/master/scripts/experiments/release_2_5_0/benchmark_cross_species_mhcseqs.py):
 
 ```shell
-python scripts/benchmark_cross_species_mhcseqs.py --collect --plot --out-dir ./cross_species_250
+python scripts/experiments/release_2_5_0/benchmark_cross_species_mhcseqs.py --collect --plot --out-dir ./cross_species_250
 ```
 
 It uses frozen MHCflurry `2.3.0` weights (`models_class1_presentation`),

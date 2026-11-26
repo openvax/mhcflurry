@@ -168,7 +168,7 @@ TRAINING_PARALLELISM_ARGS=(
 )
 
 # shellcheck disable=SC1091
-source "$SCRIPT_DIR/gpu_telemetry.sh"
+source "$SCRIPT_DIR/../../training/gpu_telemetry.sh"
 GPU_TELEMETRY_PID=""
 trap stop_gpu_telemetry EXIT
 start_gpu_telemetry "$OUT/gpu_occupancy.csv"
