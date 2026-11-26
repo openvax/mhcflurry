@@ -163,8 +163,23 @@ def test_359_docs_workflow_uses_actions_pages_not_branch_push():
 
 def test_471_ci_workflow_has_classify_job_and_stable_matrix():
     workflow_path = REPO_ROOT / ".github" / "workflows" / "ci.yml"
-    parsed = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+    raw = workflow_path.read_text(encoding="utf-8")
+    # Guard against the GitHub Actions falsy-0 ternary footgun (`&& 0 ||`).
+    non_comment = "\n".join(
+        line for line in raw.splitlines() if not line.lstrip().startswith("#")
+    )
+    assert "&& 0 ||" not in non_comment
+
+    parsed = yaml.safe_load(raw)
     assert "classify" in parsed["jobs"]
+    classify_checkout = next(
+        step
+        for step in parsed["jobs"]["classify"]["steps"]
+        if str(step.get("uses", "")).startswith("actions/checkout@")
+    )
+    assert classify_checkout["with"]["fetch-depth"] == 0
+    assert classify_checkout["with"]["filter"] == "blob:none"
+
     build = parsed["jobs"]["build"]
     assert build["needs"] == "classify"
     assert build["strategy"]["matrix"]["python-version"] == [
